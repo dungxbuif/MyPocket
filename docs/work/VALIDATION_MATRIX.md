@@ -13,40 +13,67 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: TBD
+updated: 2026-08-24
 ---
 
 # Validation Matrix
 
 ## Field Ownership
 
-- Human owns proof overrides and acceptance sign-off.
-- AI recommends proof types, links evidence, and updates status from verification.
-
-This file maps accepted behavior and work items to proof.
-
-Policy lives in `docs/standards/VALIDATION.md`. This matrix is runtime project state and should change as work is planned, implemented, changed, or retired.
+- Human owns proof overrides and UAT acceptance sign-off.
+- AI recommends proof types, adds real evidence links, and updates status.
+- All rows are planned; no design or plan is treated as implementation proof.
 
 ## Status Values
 
 | Status | Meaning |
 | --- | --- |
-| planned | Accepted as intended behavior, not implemented |
-| in_progress | Actively being built or verified |
-| implemented | Implemented and evidence exists |
-| changed | Contract or expected proof changed after earlier implementation |
-| retired | No longer part of the accepted project contract |
+| planned | Accepted behavior, not implemented |
+| in_progress | Actively built or verified |
+| implemented | Implementation exists and every required proof has linked evidence |
+| changed | Contract or expected proof changed after implementation |
+| retired | No longer accepted |
 
 ## Matrix
 
 | Requirement | Phase | Ticket/Bug | Contract/Behavior | Unit | Integration | E2E | UAT | Platform/Manual | Docs Review | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| TBD | TBD | TBD | Add rows when requirements, tickets, or bugs are created | no | no | no | no | no | no | planned | none |
+| REQ-F-001 | PHASE-001 | TICKET-003 | Google OAuth, stateless cookie, and cross-user isolation | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-002 | PHASE-002 | TICKET-005/007 | Wallets, category hierarchy, activation, archive, and seeds | yes | yes | yes | yes | no | yes | planned | No execution evidence |
+| REQ-F-003 | PHASE-002 | TICKET-006 | Atomic income, expense, transfer, adjustment, edit, and search | yes | yes | yes | yes | no | yes | planned | No execution evidence |
+| REQ-F-004 | PHASE-003 | TICKET-008..010 | Offline mirror, outbox, sync, tombstones, and conflict review | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-005 | PHASE-004 | TICKET-011..014 | Budgets, events, recurring drafts, debts, and alerts | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-006 | PHASE-005 | TICKET-016/017 | Net worth and approved analytics formulas | yes | yes | yes | yes | no | yes | planned | No execution evidence |
+| REQ-F-007 | PHASE-006 | TICKET-018 | Text AI creates validated reviewable drafts | yes | yes | yes | yes | no | yes | planned | No execution evidence |
+| REQ-F-008 | PHASE-006 | TICKET-019 | Receipt camera uses S3 and external OCR to create a draft | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-009 | PHASE-006 | TICKET-020 | AI-chat image uses multimodal AI and shared drafts | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-010 | PHASE-006 | TICKET-021 | HMAC bank webhook rejects replay/duplicates and creates notice | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-011 | PHASE-006 | TICKET-018..021 | Generated inputs cannot affect accounting before confirmation | yes | yes | yes | yes | no | yes | planned | No execution evidence |
+| REQ-F-012 | PHASE-004 | TICKET-014 | Durable inbox and best-effort Web Push | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-013 | PHASE-007 | TICKET-023 | Manual user-scoped CSV/Sheets-compatible export | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-014 | PHASE-007 | TICKET-024 | Confirmed reset/delete removes exact database and S3 scope | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-015 | PHASE-007 | TICKET-022 | Append-only restricted audit viewer and 180-day default retention | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-016 | PHASE-005 | TICKET-015..017 | Installable Vietnamese/VND PWA navigation and workflows | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-017 | PHASE-008 | TICKET-026 | Deferred voice transcription reuses draft contract | yes | yes | yes | yes | yes | yes | planned | Deferred to M2 |
+| REQ-NF-001 | PHASE-001 | TICKET-003 | Backend ownership isolation on every user-owned operation | yes | yes | yes | not_required | no | yes | planned | No execution evidence |
+| REQ-NF-002 | PHASE-002/003/004 | TICKET-006/009/013 | Integer money, atomic writes, and idempotent retries | yes | yes | yes | not_required | no | yes | planned | No execution evidence |
+| REQ-NF-003 | PHASE-003 | TICKET-009/010 | No silent last-write-wins conflict handling | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-NF-004 | PHASE-001/006/007 | TICKET-003/018..022 | Secrets and sensitive provider data are redacted | yes | yes | yes | not_required | yes | yes | planned | No execution evidence |
+| REQ-NF-005 | PHASE-002/004/005 | TICKET-006/011/017 | VND integers and Ho Chi Minh reporting boundaries | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-NF-006 | PHASE-001/007 | TICKET-004/025 | Homelab health, migration, locks, backup, and restore | yes | yes | yes | not_required | yes | yes | planned | No execution evidence |
+| REQ-NF-007 | All phases | All tickets | Required proof and docs review gate implementation status | not_required | not_required | not_required | yes | yes | yes | planned | No execution evidence |
+| REQ-NF-008 | PHASE-001/003/006 | TICKET-001/009/018..021 | Stable safe error codes and correlation IDs | yes | yes | yes | not_required | yes | yes | planned | No execution evidence |
 
-## Rules
+## Evidence Rules
 
-- Add or update a row when a requirement, ticket, bug, public contract, or accepted behavior is created or changed.
-- Mark proof columns `yes`, `no`, or `not_required`.
-- Link evidence to `docs/templates/TEST_VERIFICATION.md`, ticket verification sections, UAT, docs review, release notes, or command output summaries.
-- Do not set `implemented` until required proof has evidence.
-- If a proof type is `not_required`, record the reason in the linked ticket, bug, or verification artifact.
+- Replace “No execution evidence” only with links to real test verification, UAT, platform proof, and docs review.
+- `not_required` must retain its reason in the owning ticket or verification artifact.
+- Security, deletion, synchronization, accounting, provider, and runtime rows cannot reduce proof without human approval.
+- A phase status cannot become `verified` until all its required rows are implemented with evidence.
+
+## Update Log
+
+| Date | Updated By | Change |
+| --- | --- | --- |
+| 2026-08-24 | AI | Migrated approved MyPocket requirements and planned proof into Harness. |
+

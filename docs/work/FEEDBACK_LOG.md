@@ -15,7 +15,7 @@ ai_fields:
 shared_fields:
   - feedback_items
   - status
-updated: TBD
+updated: 2026-08-24
 ---
 
 # Feedback Log (User Feedback Intake)
@@ -37,4 +37,5 @@ Feedback must be triaged here before it can be entered into the `BACKLOG.md`.
 
 | ID | Date | Raw Feedback | Source | Type (Bug/Feat/Enhance/Noise) | Status | Converted Artifact | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
-| FB-001 | TBD | TBD | TBD | TBD | raw | TBD | TBD |
+
+No raw user feedback has been logged. The initial product scope entered through the approved SRS and requirements workflow rather than feedback triage.

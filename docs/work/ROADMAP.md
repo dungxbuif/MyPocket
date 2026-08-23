@@ -12,27 +12,39 @@ ai_fields:
   - status_summaries
 shared_fields:
   - milestone_status
-updated: TBD
+updated: 2026-08-24
 ---
 
 # Roadmap
 
 ## Field Ownership
 
-- Human owns milestones, priority, and phase order.
-- AI maintains phase links and status summaries.
-
-Use this file to group work into milestones or major phases.
-
-## Roadmap Rules
-
-- A roadmap item becomes executable only after it has a phase file in `docs/work/phases/`.
-- Each phase should contain one or more tickets or bugs.
-- Completed phases should link to release notes or changelog entries when relevant.
+- Human approved the milestone scope and phase order during design review.
+- AI maintains phase links and evidence-backed status summaries.
 
 ## Milestones
 
 | Milestone | Goal | Status | Phase Files |
 | --- | --- | --- | --- |
-| M0 | Establish SDLC agent framework | active | TBD |
-| M1 | Phase 2: Develop Harness CLI (Hard Enforcement) | ready | [PHASE-2.md](phases/PHASE-2.md) |
+| M0 | Approve system design and migrate product planning into Harness | done | [SDD](../architecture/SDD.md), [requirements](../requirements/REQUIREMENTS.md), [traceability](TRACEABILITY.md), [docs review](DOCS-REVIEW-M0.md) |
+| M1 | Deliver the initial MyPocket release as seven deployable slices | planned | [PHASE-001](phases/PHASE-001-platform-identity.md), [PHASE-002](phases/PHASE-002-finance-core.md), [PHASE-003](phases/PHASE-003-offline-sync.md), [PHASE-004](phases/PHASE-004-planning-automation.md), [PHASE-005](phases/PHASE-005-analytics-dashboard.md), [PHASE-006](phases/PHASE-006-ai-receipt-bank-ingestion.md), [PHASE-007](phases/PHASE-007-audit-export-production.md) |
+| M2 | Add deferred voice transaction entry after v1 verification | deferred | [PHASE-008](phases/PHASE-008-deferred-voice.md) |
+
+## Approved Phase Order
+
+1. PHASE-001 Platform and Identity
+2. PHASE-002 Finance Core
+3. PHASE-003 Offline Synchronization
+4. PHASE-004 Planning and Automation
+5. PHASE-005 Analytics and Dashboard
+6. PHASE-006 AI, Receipt, and Bank Ingestion
+7. PHASE-007 Audit, Export, Account Lifecycle, and Production Operations
+8. PHASE-008 Deferred Voice Input
+
+## Milestone Gates
+
+- M0 closed on 2026-08-24 after Harness link, YAML, placeholder, whitespace, and docs-review validation passed.
+- M1 begins only after PHASE-001 ticket artifacts and implementation plan are reviewed.
+- Each M1 phase must be independently deployable and verified before the next dependent phase is promoted to `ready`.
+- M1 closes only after PHASE-001 through PHASE-007 meet completion rules and release proof.
+- M2 remains deferred until a human explicitly promotes it after M1.

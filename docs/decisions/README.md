@@ -29,3 +29,11 @@ Create an ADR when work changes:
 - Repository workflow or standards
 
 Start from `docs/templates/ADR.md`.
+
+## MyPocket Decisions
+
+- [ADR-001: React PWA and Go Modular Monolith](ADR-001-react-go-modular-monolith.md)
+- [ADR-002: Stateless Google OAuth Authentication](ADR-002-stateless-google-oauth.md)
+- [ADR-003: Offline Sync with Explicit Conflict Review](ADR-003-offline-sync-conflict-review.md)
+- [ADR-004: Review-First Shared Transaction Ingestion](ADR-004-review-first-ingestion.md)
+- [ADR-005: Restricted Append-Only Audit Log](ADR-005-restricted-audit-log.md)
