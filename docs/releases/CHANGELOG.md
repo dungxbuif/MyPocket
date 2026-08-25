@@ -17,6 +17,12 @@ shared_fields: [status]
 
 ## [Unreleased]
 
+### Added
+
+- Added Go API and worker runtime entrypoints with safe configuration validation, stable JSON error envelopes, correlation IDs, and health routes for PHASE-001.
+- Added a PostgreSQL migration runner with idempotent ordered migrations, checksum mismatch protection, and the PHASE-001 `users` schema without provider-token or server-session persistence.
+- Wired API and worker startup to verify required PostgreSQL availability from `DATABASE_URL`.
+
 ### Planning
 
 - Approved and recorded the MyPocket React PWA and Go modular-monolith system design.
@@ -24,5 +30,3 @@ shared_fields: [status]
 - Defined the seven-phase initial release and deferred voice-input phase.
 - Recorded full offline conflict review, review-first AI/OCR/webhook ingestion, Google OAuth without server sessions, and restricted 180-day-default audit logging.
 - Created PHASE-001 ticket artifacts, detail design, and executable implementation plan focused on the first deployable PWA/mobile shell, platform, identity, and offline app-shell cache slice.
-
-No product implementation or release artifact exists yet.

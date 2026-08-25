@@ -19,7 +19,7 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-08-25
+updated: 2026-08-26
 ---
 
 # Project Context
@@ -32,11 +32,11 @@ updated: 2026-08-25
 
 ## Current Status
 
-- Status: MyPocket system design and Harness migration verified; no product code exists yet.
+- Status: PHASE-001 execution is underway with the Go runtime/API foundation committed and PostgreSQL migration/readiness implementation in progress.
 - Active backlog: [BL-001](work/BACKLOG.md)
-- Current queue focus: execute PHASE-001 Task 1 from the approved implementation plan.
+- Current queue focus: continue PHASE-001 TICKET-002 with the S3-compatible object-store adapter, then proceed to Google OAuth/user isolation.
 - Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_progress`.
-- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md), and [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `ready`.
+- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `in_progress`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md) and [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `ready`.
 - Active bug: None.
 
 ## Current Focus
@@ -57,6 +57,12 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 - `docs/superpowers/plans/2026-08-25-phase-001-platform-identity.md`
 - `docs/superpowers/specs/2026-08-23-mypocket-system-design.md`
 - `docs/work/DOCS-REVIEW-M0.md`
+- `internal/platform/db/`
+- `migrations/0001_phase001_identity.sql`
+- `apps/api/main.go`
+- `apps/worker/main.go`
+- `docs/architecture/API.md`
+- `docs/architecture/ERD.md`
 
 ## Recent Decisions
 
@@ -78,10 +84,10 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 
 ## Next Steps
 
-1. Commit completed TICKET-001 Task 1 baseline.
-2. Continue PHASE-001 Task 2 test-first: PostgreSQL migration runner and user schema.
-3. During execution, record real verification evidence before updating validation rows from `planned`.
-4. After PHASE-001 verification/dehydration, promote PHASE-002 planning.
+1. Commit the TICKET-002 PostgreSQL migration/readiness slice.
+2. Continue TICKET-002 Task 3 test-first: S3-compatible object-store adapter and smoke operation.
+3. Complete PHASE-001 with Google OAuth/user isolation, dev operations, and the user-requested mobile-first PWA/offline shell.
+4. During execution, record real verification evidence before updating validation rows from `planned`.
 
 ## Open Questions
 

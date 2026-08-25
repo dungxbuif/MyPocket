@@ -4,8 +4,11 @@
 
 | Command | Purpose |
 | --- | --- |
-| TBD | TBD |
+| `npm run migrate:up` | Apply ordered PostgreSQL migrations from `migrations/` using `DATABASE_URL`. |
+| `npm run dev:api` | Start the Go HTTP API on `HTTP_ADDR` or `:8080`. |
+| `npm run dev:worker` | Start the Go worker and verify PostgreSQL connectivity. |
+| `npm run test:go` | Run the default Go test suite. |
 
 ## Local Workflow
 
-TBD
+Set `DATABASE_URL` before running migration, API, or worker commands. API and worker startup fail fast when PostgreSQL is unavailable.

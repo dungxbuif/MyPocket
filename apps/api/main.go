@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"log"
 	"net/http"
 
 	"mypocket/internal/platform/config"
+	"mypocket/internal/platform/db"
 	"mypocket/internal/platform/httpapi"
 )
 
@@ -14,7 +16,17 @@ func main() {
 		log.Fatalf("configuration error: %v", err)
 	}
 
-	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{})
+	conn, err := db.Open(context.Background(), cfg)
+	if err != nil {
+		log.Fatalf("database error: %v", err)
+	}
+	defer conn.Close()
+
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{
+		ReadyCheck: func() error {
+			return conn.PingContext(context.Background())
+		},
+	})
 	log.Printf("api listening on %s", cfg.HTTPAddr)
 	if err := http.ListenAndServe(cfg.HTTPAddr, handler); err != nil {
 		log.Fatalf("api stopped: %v", err)

@@ -85,10 +85,34 @@ updated: 2026-08-24
 - PostgreSQL integration tests start from an empty database and apply the full migration chain.
 - Production backup/restore proof is required before account-deletion and retention jobs are released.
 
+## Implemented Schema
+
+### `schema_migrations`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `version` | `text` | Primary key; migration filename |
+| `checksum` | `text` | SHA-256 checksum; mismatch fails startup/test migration |
+| `applied_at` | `timestamptz` | Defaults to `now()` |
+
+### `users`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key; defaults through `gen_random_uuid()` from `pgcrypto` |
+| `google_subject` | `text` | Required and unique |
+| `email` | `text` | Required |
+| `email_verified` | `boolean` | Required; defaults false |
+| `display_name` | `text` | Required; defaults empty string |
+| `avatar_url` | `text` | Required; defaults empty string |
+| `created_at` | `timestamptz` | Required; defaults to `now()` |
+| `updated_at` | `timestamptz` | Required; defaults to `now()` |
+
+The implemented identity schema intentionally has no `google_access_token`, `google_refresh_token`, or `session_id` columns.
+
 ## Linked Decisions
 
 - [ADR-001](../decisions/ADR-001-react-go-modular-monolith.md)
 - [ADR-003](../decisions/ADR-003-offline-sync-conflict-review.md)
 - [ADR-004](../decisions/ADR-004-review-first-ingestion.md)
 - [ADR-005](../decisions/ADR-005-restricted-audit-log.md)
-

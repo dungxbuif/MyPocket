@@ -4,6 +4,7 @@
   "scripts": {
     "dev:api": "go run ./apps/api",
     "dev:worker": "go run ./apps/worker",
+    "migrate:up": "go run ./apps/migrate",
     "test:go": "go test ./..."
   }
 }

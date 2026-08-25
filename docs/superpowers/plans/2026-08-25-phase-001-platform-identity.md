@@ -142,7 +142,7 @@ Expected: PASS.
 
 `apps/api/main.go` loads config, creates the router, and starts HTTP. `apps/worker/main.go` loads config and logs startup without running jobs yet.
 
-- [ ] **Step 10: Commit Task 1**
+- [x] **Step 10: Commit Task 1**
 
 ```bash
 rtk git add go.mod apps/api apps/worker internal/platform package.json
@@ -167,7 +167,7 @@ rtk git commit -m "feat: add runtime and API foundation"
 - Produces: `db.Migrate(ctx context.Context, conn *sql.DB, migrations fs.FS) error`
 - Produces: readiness dependency hook used by `httpapi.NewRouter`
 
-- [ ] **Step 1: Write migration tests**
+- [x] **Step 1: Write migration tests**
 
 ```go
 func TestMigrateCreatesUsersWithoutProviderTokens(t *testing.T) {
@@ -183,31 +183,31 @@ func TestMigrateCreatesUsersWithoutProviderTokens(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run migration tests to verify they fail**
+- [x] **Step 2: Run migration tests to verify they fail**
 
 Run: `rtk go test ./internal/platform/db`
 
 Expected: FAIL because migration code does not exist or test PostgreSQL is not configured. If PostgreSQL is missing, record the environment failure in TICKET-002 before continuing with local service setup in Task 6.
 
-- [ ] **Step 3: Implement migration SQL**
+- [x] **Step 3: Implement migration SQL**
 
 Create `schema_migrations` and `users` with UUID primary key, unique `google_subject`, verified email fields, display fields, and timestamps. Do not add session or provider-token columns.
 
-- [ ] **Step 4: Implement migration runner**
+- [x] **Step 4: Implement migration runner**
 
 Apply ordered `.sql` files once, store version/checksum, and fail on checksum mismatch.
 
-- [ ] **Step 5: Add readiness dependency**
+- [x] **Step 5: Add readiness dependency**
 
 Readiness returns OK only when database ping succeeds; liveness remains independent from database.
 
-- [ ] **Step 6: Run database and health tests**
+- [x] **Step 6: Run database and health tests**
 
 Run: `rtk go test ./internal/platform/db ./internal/platform/httpapi`
 
 Expected: PASS when local PostgreSQL test configuration is available.
 
-- [ ] **Step 7: Commit Task 2**
+- [x] **Step 7: Commit Task 2**
 
 ```bash
 rtk git add migrations internal/platform/db internal/platform/httpapi

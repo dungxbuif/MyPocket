@@ -80,6 +80,7 @@ MyPocket is a modular monolith deployed as three application processes: a static
 
 - Web assets are served over HTTPS and call the API on an approved origin.
 - API and worker connect to the homelab PostgreSQL instance using environment configuration.
+- API and worker startup currently requires a successful PostgreSQL ping through `DATABASE_URL`.
 - Receipt upload uses short-lived presigned URLs and private S3 objects.
 - Structured logs and API errors share a correlation ID.
 - API liveness does not depend on optional AI/OCR/Push providers; readiness reflects required database/config state.
@@ -106,4 +107,3 @@ MyPocket is a modular monolith deployed as three application processes: a static
 - [ADR-003](../decisions/ADR-003-offline-sync-conflict-review.md)
 - [ADR-004](../decisions/ADR-004-review-first-ingestion.md)
 - [ADR-005](../decisions/ADR-005-restricted-audit-log.md)
-

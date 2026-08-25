@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-002
-status: ready
+status: in_progress
 owner: human
 priority: urgent
 lane: high-risk
@@ -47,7 +47,7 @@ trace:
 ## Status
 
 - ID: TICKET-002
-- Status: ready
+- Status: in_progress
 - Type: feature
 - Priority: urgent
 - Phase: PHASE-001
@@ -81,8 +81,8 @@ AI fill:
 
 ## Acceptance Criteria
 
-- [ ] Given an empty PostgreSQL database, when migrations run, then PHASE-001 tables for users and platform metadata are created idempotently through documented commands.
-- [ ] Given API and worker processes start, when they open database connections, then readiness reflects required database availability.
+- [x] Given an empty PostgreSQL database, when migrations run, then PHASE-001 tables for users and platform metadata are created idempotently through documented commands.
+- [x] Given API and worker processes start, when they open database connections, then readiness reflects required database availability.
 - [ ] Given configured S3-compatible credentials, when the adapter performs a smoke operation, then object-store access is verified without exposing credentials in logs.
 - [ ] Given missing or invalid required runtime configuration, when API or worker starts, then startup fails with safe, actionable configuration errors.
 - [ ] UAT requirement is not_required because this ticket has no direct user-facing behavior.
@@ -119,9 +119,27 @@ AI fill:
 
 ## Verification Results
 
-- Command: not run
-- Result: not_started
-- Notes: Planning ticket only; execution is approval-gated.
+- Command: `rtk go test ./internal/platform/db`
+- Result: fail
+- Notes: RED check failed for expected missing package/implementation path after tests were added: `no non-test Go files`.
+- Command: `rtk go get github.com/jackc/pgx/v5/stdlib@v5.7.2`
+- Result: pass
+- Notes: Added PostgreSQL driver dependency required by the approved migration/runtime scope.
+- Command: `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55432/mypocket?sslmode=disable' go test ./internal/platform/db`
+- Result: pass
+- Notes: Migration integration tests passed against a disposable local PostgreSQL 16 container; verified idempotent application, checksum mismatch rejection, and `users` schema without provider-token/session columns.
+- Command: `rtk env 'DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55432/mypocket?sslmode=disable' go run ./apps/migrate`
+- Result: pass
+- Notes: Documented migration command printed `migrations applied` against the disposable local PostgreSQL 16 container.
+- Command: `rtk go test ./internal/platform/db ./internal/platform/httpapi`
+- Result: pass
+- Notes: 5 tests passed across database migration and API health packages.
+- Command: `rtk go test ./...`
+- Result: pass
+- Notes: 8 tests passed across 5 Go packages for the current backend/platform baseline.
+- Command: `rtk git diff --check`
+- Result: pass
+- Notes: No whitespace errors reported.
 
 ## Fix/Test Attempt Log
 
@@ -135,28 +153,28 @@ AI fill:
 - Required: no
 - Reason if not required: platform-only adapter and migration behavior is covered by integration and platform proof.
 - Expected behavior: not applicable
-- Verified behavior: not verified; no implementation exists.
+- Verified behavior: PostgreSQL migration and readiness behavior verified by automated integration/unit tests; S3 smoke behavior remains pending.
 - Sign-off: not required
 
 ## Docs Review
 
-- Requirements updated or not needed reason: not yet executed.
-- Architecture updated or not needed reason: not yet executed.
-- API updated or not needed reason: not yet executed.
-- ERD/data updated or not needed reason: not yet executed.
-- ADR created or not needed reason: not yet executed.
-- `docs/CONTEXT.md` updated: pending execution/dehydration.
+- Requirements updated or not needed reason: not needed; implementation follows existing PHASE-001/REQ-NF-006 platform scope.
+- Architecture updated or not needed reason: not needed; API/worker PostgreSQL startup follows the approved platform boundary.
+- API updated or not needed reason: updated to record concrete `/api/v1/health/live` and `/api/v1/health/ready` readiness behavior.
+- ERD/data updated or not needed reason: updated to record concrete PHASE-001 `users` and `schema_migrations` columns.
+- ADR created or not needed reason: not needed; follows ADR-001 and the approved detail design.
+- `docs/CONTEXT.md` updated: yes; next steps now point to S3 adapter slice.
 
 ## Completion Checklist
 
 - [ ] Implementation complete
-- [ ] Tests run and recorded
+- [x] Tests run and recorded
 - [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
-- [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
+- [x] Validation matrix updated or explicitly not affected
+- [x] UAT completed or explicitly not required
+- [x] Master docs reconciled
 - [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
-- [ ] Trace links updated
+- [x] ADR created or explicitly not needed
+- [x] `docs/CONTEXT.md` updated
+- [x] `docs/work/BACKLOG.md` updated
+- [x] Trace links updated

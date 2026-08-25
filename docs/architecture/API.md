@@ -45,7 +45,7 @@ updated: 2026-08-24
 | `POST /exports`, `GET /exports/{id}` | Job REST | User | planned | Manual snapshot export |
 | `POST /account/reset`, `DELETE /account` | Command | User | planned | Confirmed background deletion |
 | `GET /internal/audit-logs` | Query REST | Audit viewer | planned | Hidden read-only filtered audit access |
-| `GET /health/live`, `GET /health/ready` | Operations | None/internal | planned | No sensitive dependency details |
+| `GET /api/v1/health/live`, `GET /api/v1/health/ready` | Operations | None/internal | implemented | Liveness is process-only; readiness returns `503 INTERNAL_RETRYABLE` when the required database dependency is unavailable and never exposes sensitive dependency details |
 
 ## Errors
 
@@ -87,4 +87,3 @@ updated: 2026-08-24
 - [ADR-003](../decisions/ADR-003-offline-sync-conflict-review.md)
 - [ADR-004](../decisions/ADR-004-review-first-ingestion.md)
 - [ADR-005](../decisions/ADR-005-restricted-audit-log.md)
-
