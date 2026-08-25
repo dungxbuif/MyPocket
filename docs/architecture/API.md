@@ -28,7 +28,7 @@ updated: 2026-08-24
 
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
-| `GET /auth/google`, `GET /auth/google/callback`, `POST /auth/logout`, `GET /me` | OAuth/HTTP | Mixed | planned | Stateless signed cookie; no session API |
+| `GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`, `POST /api/v1/auth/logout`, `GET /api/v1/me` | OAuth/HTTP | Mixed | implemented | Fixture callback is available only when explicitly enabled; sets stateless signed `mypocket_auth` cookie and browser-readable `mypocket_csrf`; no session API |
 | `/wallets` | REST collection | User | planned | CRUD/archive and default-AI selection |
 | `/categories`, `/wallets/{id}/categories` | REST collection | User | planned | Two-level taxonomy and activation |
 | `/transactions` | REST collection | User | planned | Income, expense, transfer, adjustment, search |
@@ -70,6 +70,7 @@ updated: 2026-08-24
 - The application cookie is signed, `HttpOnly`, `Secure`, and `SameSite=Lax`.
 - No Google provider token is stored.
 - Cookie-authenticated mutations require the framework-selected CSRF token/header contract.
+- Cookie-authenticated mutations send `X-CSRF-Token`, matching the browser-readable `mypocket_csrf` cookie.
 - Audit queries additionally require verified email equality with `AUDIT_VIEWER_EMAIL`.
 - Webhooks authenticate through a per-source HMAC contract rather than the browser cookie.
 

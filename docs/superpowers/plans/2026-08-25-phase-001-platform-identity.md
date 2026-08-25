@@ -294,7 +294,7 @@ rtk git commit -m "feat: add object store adapter"
 - Produces: `identity.RequireCSRF(next http.Handler) http.Handler`
 - Produces: `identity.RequireOwner(ctx, userID, objectID string) error`
 
-- [ ] **Step 1: Write identity unit tests**
+- [x] **Step 1: Write identity unit tests**
 
 ```go
 func TestSignedCookieRoundTrip(t *testing.T) {
@@ -324,17 +324,17 @@ func TestCSRFMissingHeaderRejected(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run identity tests to verify they fail**
+- [x] **Step 2: Run identity tests to verify they fail**
 
 Run: `rtk go test ./internal/identity`
 
 Expected: FAIL because identity package does not exist.
 
-- [ ] **Step 3: Implement user model, repository, cookie signer, and CSRF guard**
+- [x] **Step 3: Implement user model, repository, cookie signer, and CSRF guard**
 
 Cookie claims include user ID, expiry, and issued-at. CSRF uses a signed token exposed through a non-HttpOnly CSRF cookie or equivalent double-submit contract and required header for mutations.
 
-- [ ] **Step 4: Write OAuth fixture and repository integration tests**
+- [x] **Step 4: Write OAuth fixture and repository integration tests**
 
 ```go
 func TestOAuthFixtureProvisionsUserWithoutProviderTokens(t *testing.T) {
@@ -352,21 +352,21 @@ func TestOAuthFixtureProvisionsUserWithoutProviderTokens(t *testing.T) {
 }
 ```
 
-- [ ] **Step 5: Implement auth routes**
+- [x] **Step 5: Implement auth routes**
 
 Add `GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`, `POST /api/v1/auth/logout`, and `GET /api/v1/me`. Fixture mode must be explicit through config and unavailable by accident in production mode.
 
-- [ ] **Step 6: Write ownership guard integration test**
+- [x] **Step 6: Write ownership guard integration test**
 
 Create two users and one user-owned harness object. Verify user B cannot access user A's object and receives a stable `FORBIDDEN` or scoped `NOT_FOUND` error.
 
-- [ ] **Step 7: Run identity and API tests**
+- [x] **Step 7: Run identity and API tests**
 
 Run: `rtk go test ./internal/identity ./internal/platform/httpapi`
 
 Expected: PASS.
 
-- [ ] **Step 8: Commit Task 4**
+- [x] **Step 8: Commit Task 4**
 
 ```bash
 rtk git add internal/identity internal/platform/httpapi

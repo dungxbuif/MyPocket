@@ -1,25 +1,37 @@
 package httpapi
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"strings"
 
+	"mypocket/internal/identity"
 	"mypocket/internal/platform/config"
 )
 
 type Dependencies struct {
-	ReadyCheck func() error
+	ReadyCheck         func() error
+	IdentityRepository IdentityRepository
 }
 
 func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/api/v1/auth/google", startGoogleAuth(cfg))
+	mux.HandleFunc("/api/v1/auth/google/callback", googleCallback(cfg, deps.IdentityRepository))
+	mux.Handle("/api/v1/auth/logout", requireCSRF(http.HandlerFunc(logout)))
+	mux.HandleFunc("/api/v1/me", currentUser(cfg, deps.IdentityRepository))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
 	mux.HandleFunc("/api/v1/health/ready", readyHealth(deps))
 
 	return correlationMiddleware(mux)
+}
+
+type IdentityRepository interface {
+	FindOrCreateGoogleUser(ctx context.Context, profile identity.GoogleProfile) (identity.User, error)
+	FindByID(ctx context.Context, id string) (identity.User, error)
 }
 
 func correlationMiddleware(next http.Handler) http.Handler {
@@ -33,7 +45,7 @@ func correlationMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func writeJSON(w http.ResponseWriter, status int, body Envelope) {
+func writeJSON(w http.ResponseWriter, status int, body any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(body)

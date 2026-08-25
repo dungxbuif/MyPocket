@@ -38,7 +38,7 @@ updated: 2026-08-24
 
 | Requirement | Phase | Ticket/Bug | Contract/Behavior | Unit | Integration | E2E | UAT | Platform/Manual | Docs Review | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| REQ-F-001 | PHASE-001 | TICKET-003 | Google OAuth, stateless cookie, and cross-user isolation | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-001 | PHASE-001 | TICKET-003 | Google OAuth, stateless cookie, and cross-user isolation | yes | yes | yes | yes | yes | yes | in_progress | Backend fixture callback, signed cookie, `/api/v1/me`, and repository provisioning evidence recorded; browser UAT pending |
 | REQ-F-002 | PHASE-002 | TICKET-005/007 | Wallets, category hierarchy, activation, archive, and seeds | yes | yes | yes | yes | no | yes | planned | No execution evidence |
 | REQ-F-003 | PHASE-002 | TICKET-006 | Atomic income, expense, transfer, adjustment, edit, and search | yes | yes | yes | yes | no | yes | planned | No execution evidence |
 | REQ-F-004 | PHASE-003 | TICKET-008..010 | Offline mirror, outbox, sync, tombstones, and conflict review | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
@@ -55,10 +55,10 @@ updated: 2026-08-24
 | REQ-F-015 | PHASE-007 | TICKET-022 | Append-only restricted audit viewer and 180-day default retention | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-F-016 | PHASE-005 | TICKET-015..017 | Installable Vietnamese/VND PWA navigation and workflows | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-F-017 | PHASE-008 | TICKET-026 | Deferred voice transcription reuses draft contract | yes | yes | yes | yes | yes | yes | planned | Deferred to M2 |
-| REQ-NF-001 | PHASE-001 | TICKET-003 | Backend ownership isolation on every user-owned operation | yes | yes | yes | not_required | no | yes | planned | No execution evidence |
+| REQ-NF-001 | PHASE-001 | TICKET-003 | Backend ownership isolation on every user-owned operation | yes | yes | yes | not_required | no | yes | in_progress | TICKET-003 ownership harness rejects cross-user object access; finance-domain ownership checks pending in later phases |
 | REQ-NF-002 | PHASE-002/003/004 | TICKET-006/009/013 | Integer money, atomic writes, and idempotent retries | yes | yes | yes | not_required | no | yes | planned | No execution evidence |
 | REQ-NF-003 | PHASE-003 | TICKET-009/010 | No silent last-write-wins conflict handling | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
-| REQ-NF-004 | PHASE-001/006/007 | TICKET-003/018..022 | Secrets and sensitive provider data are redacted | yes | yes | yes | not_required | yes | yes | planned | No execution evidence |
+| REQ-NF-004 | PHASE-001/006/007 | TICKET-003/018..022 | Secrets and sensitive provider data are redacted | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-002/TICKET-003 tests cover safe config/object-store/auth errors and no Google provider-token persistence; provider phases pending |
 | REQ-NF-005 | PHASE-002/004/005 | TICKET-006/011/017 | VND integers and Ho Chi Minh reporting boundaries | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-NF-006 | PHASE-001/007 | TICKET-002/004/025 | Homelab health, migration, locks, backup, and restore | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-002 PostgreSQL migration/readiness and S3-compatible smoke evidence recorded; compose, locks, backup, and restore still pending |
 | REQ-NF-007 | All phases | All tickets | Required proof and docs review gate implementation status | not_required | not_required | not_required | yes | yes | yes | planned | No execution evidence |

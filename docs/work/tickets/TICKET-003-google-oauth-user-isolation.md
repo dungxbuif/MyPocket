@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-003
-status: ready
+status: in_progress
 owner: human
 priority: urgent
 lane: high-risk
@@ -49,7 +49,7 @@ trace:
 ## Status
 
 - ID: TICKET-003
-- Status: ready
+- Status: in_progress
 - Type: feature
 - Priority: urgent
 - Phase: PHASE-001
@@ -83,11 +83,11 @@ AI fill:
 
 ## Acceptance Criteria
 
-- [ ] Given a valid Google callback fixture, when the callback is processed, then an application user is provisioned or found without persisting provider tokens.
-- [ ] Given a successful callback, when the response is returned, then it sets a signed `HttpOnly`, `Secure`, `SameSite=Lax` application cookie.
-- [ ] Given an authenticated request, when `GET /api/v1/me` is called, then the response returns the current application user without exposing provider tokens.
-- [ ] Given two authenticated users and a user-owned fixture object, when user B requests user A's object through the authorization harness, then the API returns `FORBIDDEN` or scoped `NOT_FOUND`.
-- [ ] Given a cookie-authenticated mutation, when the CSRF header/token is absent or invalid, then the API rejects it with a stable safe error code.
+- [x] Given a valid Google callback fixture, when the callback is processed, then an application user is provisioned or found without persisting provider tokens.
+- [x] Given a successful callback, when the response is returned, then it sets a signed `HttpOnly`, `Secure`, `SameSite=Lax` application cookie.
+- [x] Given an authenticated request, when `GET /api/v1/me` is called, then the response returns the current application user without exposing provider tokens.
+- [x] Given two authenticated users and a user-owned fixture object, when user B requests user A's object through the authorization harness, then the API returns `FORBIDDEN` or scoped `NOT_FOUND`.
+- [x] Given a cookie-authenticated mutation, when the CSRF header/token is absent or invalid, then the API rejects it with a stable safe error code.
 - [ ] UAT requirement is required for login, refresh persistence, logout, and forbidden state behavior.
 
 ## Small Task Exemption
@@ -122,9 +122,21 @@ AI fill:
 
 ## Verification Results
 
-- Command: not run
-- Result: not_started
-- Notes: Planning ticket only; execution is approval-gated.
+- Command: `rtk go test ./internal/identity`
+- Result: fail
+- Notes: RED check failed for expected missing identity implementation: `no non-test Go files`.
+- Command: `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55432/mypocket?sslmode=disable' go test ./internal/identity`
+- Result: pass
+- Notes: Signed cookie, tamper rejection, CSRF missing-header rejection, Google profile provisioning, no provider-token/session columns, and cross-user ownership rejection passed against PostgreSQL.
+- Command: `rtk go test ./internal/platform/httpapi`
+- Result: fail
+- Notes: RED check failed for expected missing auth route contracts and later for CSRF response without correlation ID.
+- Command: `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55432/mypocket?sslmode=disable' go test ./internal/identity ./internal/platform/httpapi`
+- Result: pass
+- Notes: Identity and auth route tests passed, including fixture callback cookie flags, `/api/v1/me`, logout CSRF envelope, and PostgreSQL-backed repository behavior.
+- Command: `rtk go test ./...`
+- Result: pass
+- Notes: 16 tests passed across 8 Go packages after backend identity implementation.
 
 ## Fix/Test Attempt Log
 
@@ -138,28 +150,28 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: login succeeds through fixture, session survives refresh, logout clears cookie, and forbidden states do not leak data.
-- Verified behavior: not verified; no implementation exists.
+- Verified behavior: backend fixture login, signed cookie, current-user endpoint, CSRF rejection, and ownership harness are verified by automated tests. Browser/PWA UAT remains pending until the web shell exists.
 - Sign-off: pending
 
 ## Docs Review
 
-- Requirements updated or not needed reason: not yet executed.
-- Architecture updated or not needed reason: not yet executed.
-- API updated or not needed reason: not yet executed.
-- ERD/data updated or not needed reason: not yet executed.
-- ADR created or not needed reason: not yet executed.
-- `docs/CONTEXT.md` updated: pending execution/dehydration.
+- Requirements updated or not needed reason: not needed; implementation follows REQ-F-001, REQ-NF-001, and REQ-NF-004.
+- Architecture updated or not needed reason: not needed; follows ADR-002 stateless cookie design.
+- API updated or not needed reason: updated with implemented auth routes and CSRF header contract.
+- ERD/data updated or not needed reason: not needed; users schema already reconciled in TICKET-002 and no provider-token/session columns were added.
+- ADR created or not needed reason: not needed; follows ADR-002.
+- `docs/CONTEXT.md` updated: pending after backend identity commit.
 
 ## Completion Checklist
 
 - [ ] Implementation complete
-- [ ] Tests run and recorded
-- [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
+- [x] Tests run and recorded
+- [x] Fix/test loop guard respected
+- [x] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
+- [x] Master docs reconciled
 - [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
+- [x] ADR created or explicitly not needed
 - [ ] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
-- [ ] Trace links updated
+- [x] `docs/work/BACKLOG.md` updated
+- [x] Trace links updated

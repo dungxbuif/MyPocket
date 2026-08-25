@@ -32,11 +32,11 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-001 execution is underway with the Go runtime/API foundation committed and PostgreSQL migration/readiness implementation in progress.
+- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, and backend identity implemented.
 - Active backlog: [BL-001](work/BACKLOG.md)
-- Current queue focus: execute PHASE-001 TICKET-003 Google OAuth/user isolation, then build the user-requested mobile-first PWA/offline shell.
+- Current queue focus: build the user-requested mobile-first PWA/offline shell with strict adherence to available design assets.
 - Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_progress`.
-- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `in_review`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md) and [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `ready`.
+- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `in_review`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md), status `in_progress`; [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `ready`.
 - Active bug: None.
 
 ## Current Focus
@@ -60,6 +60,8 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 - `internal/platform/db/`
 - `migrations/0001_phase001_identity.sql`
 - `internal/platform/objectstore/`
+- `internal/identity/`
+- `internal/platform/httpapi/auth.go`
 - `apps/api/main.go`
 - `apps/worker/main.go`
 - `docs/architecture/API.md`
@@ -85,9 +87,9 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 
 ## Next Steps
 
-1. Commit the TICKET-002 S3-compatible object-store adapter slice.
-2. Execute TICKET-003 test-first: Google OAuth fixture, signed stateless cookie, CSRF, and ownership guard.
-3. Complete PHASE-001 with dev operations and the user-requested mobile-first PWA/offline shell.
+1. Commit the TICKET-003 backend identity slice.
+2. Build the mobile-first PWA/offline shell from available design assets.
+3. Complete PHASE-001 with dev operations, platform smoke, browser UAT, and docs reconciliation.
 4. During execution, record real verification evidence before updating validation rows from `planned`.
 
 ## Open Questions

@@ -23,6 +23,7 @@ shared_fields: [status]
 - Added a PostgreSQL migration runner with idempotent ordered migrations, checksum mismatch protection, and the PHASE-001 `users` schema without provider-token or server-session persistence.
 - Wired API and worker startup to verify required PostgreSQL availability from `DATABASE_URL`.
 - Added an S3-compatible object-store adapter with safe smoke put/delete checks and complete S3 config validation.
+- Added backend identity primitives and auth routes for fixture Google login, stateless signed cookies, CSRF enforcement, current-user lookup, and cross-user ownership guard testing.
 
 ### Planning
 
