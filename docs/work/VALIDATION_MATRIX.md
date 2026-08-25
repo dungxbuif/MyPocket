@@ -53,7 +53,7 @@ updated: 2026-08-24
 | REQ-F-013 | PHASE-007 | TICKET-023 | Manual user-scoped CSV/Sheets-compatible export | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-F-014 | PHASE-007 | TICKET-024 | Confirmed reset/delete removes exact database and S3 scope | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-F-015 | PHASE-007 | TICKET-022 | Append-only restricted audit viewer and 180-day default retention | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
-| REQ-F-016 | PHASE-005 | TICKET-015..017 | Installable Vietnamese/VND PWA navigation and workflows | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
+| REQ-F-016 | PHASE-001/005 | TICKET-001/015..017 | Installable Vietnamese/VND PWA navigation and workflows | yes | yes | yes | yes | yes | yes | in_progress | TICKET-001 mobile shell tests, build, manifest/service worker, and screenshots recorded; finance workflows and offline E2E pending |
 | REQ-F-017 | PHASE-008 | TICKET-026 | Deferred voice transcription reuses draft contract | yes | yes | yes | yes | yes | yes | planned | Deferred to M2 |
 | REQ-NF-001 | PHASE-001 | TICKET-003 | Backend ownership isolation on every user-owned operation | yes | yes | yes | not_required | no | yes | in_progress | TICKET-003 ownership harness rejects cross-user object access; finance-domain ownership checks pending in later phases |
 | REQ-NF-002 | PHASE-002/003/004 | TICKET-006/009/013 | Integer money, atomic writes, and idempotent retries | yes | yes | yes | not_required | no | yes | planned | No execution evidence |
@@ -62,7 +62,7 @@ updated: 2026-08-24
 | REQ-NF-005 | PHASE-002/004/005 | TICKET-006/011/017 | VND integers and Ho Chi Minh reporting boundaries | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-NF-006 | PHASE-001/007 | TICKET-002/004/025 | Homelab health, migration, locks, backup, and restore | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-002 PostgreSQL migration/readiness and S3-compatible smoke evidence recorded; compose, locks, backup, and restore still pending |
 | REQ-NF-007 | All phases | All tickets | Required proof and docs review gate implementation status | not_required | not_required | not_required | yes | yes | yes | planned | No execution evidence |
-| REQ-NF-008 | PHASE-001/003/006 | TICKET-001/009/018..021 | Stable safe error codes and correlation IDs | yes | yes | yes | not_required | yes | yes | planned | No execution evidence |
+| REQ-NF-008 | PHASE-001/003/006 | TICKET-001/009/018..021 | Stable safe error codes and correlation IDs | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-001/TICKET-003 API tests cover stable error envelopes and correlation IDs for health/auth/CSRF paths; later API phases pending |
 
 ## Evidence Rules
 

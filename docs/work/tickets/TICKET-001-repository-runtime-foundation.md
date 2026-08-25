@@ -81,9 +81,9 @@ AI fill:
 
 ## Acceptance Criteria
 
-- [ ] Given a clean checkout, when dependencies are installed, then `apps/web`, `apps/api`, `apps/worker`, and shared Go packages have documented commands that run locally.
-- [ ] Given an API request, when the request is handled, then responses include stable JSON error envelopes and correlation IDs without stack traces or secrets.
-- [ ] Given the React shell loads on mobile width, when the app renders, then it shows an installable PWA shell with mobile-safe layout and no finance behavior.
+- [x] Given a clean checkout, when dependencies are installed, then `apps/web`, `apps/api`, `apps/worker`, and shared Go packages have documented commands that run locally.
+- [x] Given an API request, when the request is handled, then responses include stable JSON error envelopes and correlation IDs without stack traces or secrets.
+- [x] Given the React shell loads on mobile width, when the app renders, then it shows an installable PWA shell with mobile-safe layout and no finance behavior.
 - [ ] Given the browser is offline after the shell has loaded once, when the app is reopened, then the app shell loads from the service worker cache and shows an offline state.
 - [ ] UAT requirement is required for installability, mobile shell layout, and offline app-shell reload.
 
@@ -134,6 +134,30 @@ AI fill:
 - Command: `rtk go test ./...`
 - Result: pass
 - Notes: 7 tests passed across 4 Go packages for the Task 1 backend baseline.
+- Command: `rtk npm test --workspace apps/web -- --run`
+- Result: fail
+- Notes: RED check failed for expected missing `./App` import after shell tests were added.
+- Command: `rtk npm install`
+- Result: pass
+- Notes: Installed web workspace dependencies; npm reported 0 vulnerabilities.
+- Command: `rtk npm test --workspace apps/web -- --run`
+- Result: pass
+- Notes: 3 web tests passed for mobile navigation destinations, offline indicator, and quick-add sheet.
+- Command: `rtk npm run build --workspace apps/web`
+- Result: pass
+- Notes: Vite production build succeeded and emitted `index.html`, hashed CSS/JS, `manifest.webmanifest`, `pwa-icon.svg`, and `sw.js`.
+- Command: `rtk npx playwright screenshot --viewport-size=390,844 http://127.0.0.1:5173 /private/tmp/mypocket-mobile-3.png`
+- Result: pass
+- Notes: Mobile screenshot captured after visual fixes for balance and amount wrapping.
+- Command: `rtk npx playwright screenshot --viewport-size=1280,900 http://127.0.0.1:5173 /private/tmp/mypocket-desktop.png`
+- Result: pass
+- Notes: Desktop screenshot captured for centered shell verification.
+- Command: `rtk go test ./...`
+- Result: pass
+- Notes: 16 tests passed across 8 Go packages after PWA shell implementation.
+- Command: `rtk git diff --check`
+- Result: pass
+- Notes: No whitespace errors reported.
 
 ## Fix/Test Attempt Log
 
@@ -147,28 +171,28 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: app installs or qualifies as installable, renders mobile shell, and reopens while offline after first load.
-- Verified behavior: not verified; no implementation exists.
+- Verified behavior: automated tests and screenshots verify mobile shell layout, navigation, quick-add sheet, offline indicator, manifest, and service worker asset presence. Offline reload after first online load still requires Playwright E2E proof in Task 7.
 - Sign-off: pending
 
 ## Docs Review
 
-- Requirements updated or not needed reason: not yet executed.
-- Architecture updated or not needed reason: not yet executed.
-- API updated or not needed reason: not yet executed.
-- ERD/data updated or not needed reason: not yet executed.
-- ADR created or not needed reason: not yet executed.
-- `docs/CONTEXT.md` updated: pending execution/dehydration.
+- Requirements updated or not needed reason: not needed; implementation follows existing PHASE-001 and REQ-F-016/REQ-NF-008 scope.
+- Architecture updated or not needed reason: updated design contract in `design/DESIGN.md`; master architecture still matches approved React PWA boundary.
+- API updated or not needed reason: already reconciled for health/auth routes; PWA shell adds no new API endpoint.
+- ERD/data updated or not needed reason: not needed; PWA shell adds no data model.
+- ADR created or not needed reason: not needed; follows ADR-001.
+- `docs/CONTEXT.md` updated: pending after PWA shell commit.
 
 ## Completion Checklist
 
 - [ ] Implementation complete
-- [ ] Tests run and recorded
-- [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
+- [x] Tests run and recorded
+- [x] Fix/test loop guard respected
+- [x] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
+- [x] Master docs reconciled
 - [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
+- [x] ADR created or explicitly not needed
 - [ ] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
-- [ ] Trace links updated
+- [x] `docs/work/BACKLOG.md` updated
+- [x] Trace links updated

@@ -397,7 +397,7 @@ rtk git commit -m "feat: add Google OAuth identity"
 - Consumes: `GET /api/v1/me`, auth redirect routes, and logout route.
 - Produces: mobile shell route structure, auth state, offline status, service worker registration, cached app shell.
 
-- [ ] **Step 1: Write React shell tests**
+- [x] **Step 1: Write React shell tests**
 
 ```tsx
 it("renders mobile navigation destinations without finance data", async () => {
@@ -417,37 +417,37 @@ it("shows offline state when the browser is offline", () => {
 });
 ```
 
-- [ ] **Step 2: Run web tests to verify they fail**
+- [x] **Step 2: Run web tests to verify they fail**
 
 Run: `rtk npm test --workspace apps/web -- --run`
 
 Expected: FAIL because the web app does not exist yet.
 
-- [ ] **Step 3: Implement Vite React app**
+- [x] **Step 3: Implement Vite React app**
 
 Create a real app shell as the first screen. Use compact mobile-first layout, fixed bottom navigation on small screens, a wider sidebar/top layout on desktop, Vietnamese-facing copy where visible, VND-safe placeholder formatting, and no marketing page.
 
-- [ ] **Step 4: Implement API client and auth state**
+- [x] **Step 4: Implement API client and auth state**
 
 `apiClient` sends credentials, propagates `X-CSRF-Token` for mutations, and normalizes stable error codes. `auth.ts` loads `/api/v1/me`, exposes unauthenticated/authenticated/loading states, and supports logout.
 
-- [ ] **Step 5: Implement service worker**
+- [x] **Step 5: Implement service worker**
 
 Cache the app shell assets, `manifest.webmanifest`, and PWA icons. Do not cache authenticated API JSON as authoritative offline finance data in PHASE-001. Show offline state when network is unavailable.
 
-- [ ] **Step 6: Run web unit tests**
+- [x] **Step 6: Run web unit tests**
 
 Run: `rtk npm test --workspace apps/web -- --run`
 
 Expected: PASS.
 
-- [ ] **Step 7: Build the web app**
+- [x] **Step 7: Build the web app**
 
 Run: `rtk npm run build --workspace apps/web`
 
 Expected: PASS and generated assets include manifest and service worker.
 
-- [ ] **Step 8: Commit Task 5**
+- [x] **Step 8: Commit Task 5**
 
 ```bash
 rtk git add apps/web package.json

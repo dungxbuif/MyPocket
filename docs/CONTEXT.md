@@ -32,9 +32,9 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, and backend identity implemented.
+- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, and mobile-first PWA shell implemented.
 - Active backlog: [BL-001](work/BACKLOG.md)
-- Current queue focus: build the user-requested mobile-first PWA/offline shell with strict adherence to available design assets.
+- Current queue focus: execute local operations and browser E2E proof for PWA installability, offline reload, auth fixture, and platform smoke.
 - Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_progress`.
 - Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `in_review`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md), status `in_progress`; [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `ready`.
 - Active bug: None.
@@ -62,6 +62,8 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 - `internal/platform/objectstore/`
 - `internal/identity/`
 - `internal/platform/httpapi/auth.go`
+- `apps/web/`
+- `design/DESIGN.md`
 - `apps/api/main.go`
 - `apps/worker/main.go`
 - `docs/architecture/API.md`
@@ -87,9 +89,9 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 
 ## Next Steps
 
-1. Commit the TICKET-003 backend identity slice.
-2. Build the mobile-first PWA/offline shell from available design assets.
-3. Complete PHASE-001 with dev operations, platform smoke, browser UAT, and docs reconciliation.
+1. Commit the mobile-first PWA shell and component design contract.
+2. Execute TICKET-004 local operations and PHASE-001 platform smoke.
+3. Add browser E2E coverage for service worker offline reload, auth fixture persistence, logout, and forbidden state.
 4. During execution, record real verification evidence before updating validation rows from `planned`.
 
 ## Open Questions

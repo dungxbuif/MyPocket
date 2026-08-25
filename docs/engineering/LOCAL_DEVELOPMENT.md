@@ -6,7 +6,10 @@
 | --- | --- |
 | `npm run migrate:up` | Apply ordered PostgreSQL migrations from `migrations/` using `DATABASE_URL`. |
 | `npm run dev:api` | Start the Go HTTP API on `HTTP_ADDR` or `:8080`. |
+| `npm run dev:web` | Start the Vite React PWA shell. |
 | `npm run dev:worker` | Start the Go worker and verify PostgreSQL connectivity. |
+| `npm run build:web` | Build the production PWA shell assets. |
+| `npm run test:web` | Run the web shell test suite. |
 | `npm run test:go` | Run the default Go test suite. |
 
 ## Local Workflow
