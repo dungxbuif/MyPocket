@@ -1,0 +1,9 @@
+{
+  "name": "mypocket",
+  "private": true,
+  "scripts": {
+    "dev:api": "go run ./apps/api",
+    "dev:worker": "go run ./apps/worker",
+    "test:go": "go test ./..."
+  }
+}

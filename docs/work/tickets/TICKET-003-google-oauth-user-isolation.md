@@ -1,0 +1,165 @@
+---
+artifact_type: ticket
+id: TICKET-003
+status: ready
+owner: human
+priority: urgent
+lane: high-risk
+human_fields:
+  - title
+  - priority
+  - acceptance_criteria
+  - scope
+  - approval
+ai_fields:
+  - impacted_areas
+  - test_expectations
+  - verification_results
+  - docs_review
+  - context_updates
+shared_fields:
+  - status
+  - trace
+  - small_task_exemption
+trace:
+  backlog_item: BL-001
+  requirement:
+    - REQ-F-001
+    - REQ-NF-001
+    - REQ-NF-004
+  phase: PHASE-001
+  detail_design: ../phases/PHASE-001-detail-design.md
+  implementation_plan: ../../superpowers/plans/2026-08-25-phase-001-platform-identity.md
+  test_verification: not_created_phase_not_executed
+  validation_matrix: ../VALIDATION_MATRIX.md
+  docs_review: per-ticket_completion_checklist
+  adrs:
+    - ADR-002
+  release_notes: ../../releases/CHANGELOG.md
+---
+
+# Ticket: TICKET-003 Google OAuth and User Isolation
+
+## Field Ownership
+
+- Human fills intent, priority, acceptance criteria, scope, and approval.
+- AI fills impact analysis, test expectations, verification evidence, docs review, and context/backlog updates.
+- Shared fields include status, trace links, and small-task exemption.
+
+## Status
+
+- ID: TICKET-003
+- Status: ready
+- Type: feature
+- Priority: urgent
+- Phase: PHASE-001
+- Owner: human
+
+## Trace Links
+
+- Backlog item: [BL-001](../BACKLOG.md)
+- Requirement: [REQ-F-001](../../requirements/REQUIREMENTS.md), [REQ-NF-001](../../requirements/REQUIREMENTS.md), [REQ-NF-004](../../requirements/REQUIREMENTS.md)
+- Phase: [PHASE-001](../phases/PHASE-001-platform-identity.md)
+- Detail design: [PHASE-001-detail-design.md](../phases/PHASE-001-detail-design.md)
+- Implementation plan: [2026-08-25-phase-001-platform-identity.md](../../superpowers/plans/2026-08-25-phase-001-platform-identity.md)
+- Test verification: created during execution
+- Validation matrix: [VALIDATION_MATRIX.md](../VALIDATION_MATRIX.md)
+- Docs review: this ticket completion checklist
+- ADRs: [ADR-002](../../decisions/ADR-002-stateless-google-oauth.md)
+- Release notes: [CHANGELOG.md](../../releases/CHANGELOG.md)
+
+## Context
+
+Human fill:
+
+- User/business/system problem: Sensitive personal finance data requires authenticated user identities and hard ownership isolation before finance features exist.
+- Source prompt or requirement: REQ-F-001, REQ-NF-001, REQ-NF-004, ADR-002.
+- Out of scope: linked devices, database sessions, persisted Google tokens, non-Google identity providers, finance object authorization.
+
+AI fill:
+
+- Current repository context read: required hydration docs plus requirements, API, ERD, SDD, ADR-002.
+- Brownfield touched scope, if applicable: no existing implementation; expected touched scope is identity module, auth routes, cookie/CSRF helpers, current-user endpoint, and isolation test harness.
+
+## Acceptance Criteria
+
+- [ ] Given a valid Google callback fixture, when the callback is processed, then an application user is provisioned or found without persisting provider tokens.
+- [ ] Given a successful callback, when the response is returned, then it sets a signed `HttpOnly`, `Secure`, `SameSite=Lax` application cookie.
+- [ ] Given an authenticated request, when `GET /api/v1/me` is called, then the response returns the current application user without exposing provider tokens.
+- [ ] Given two authenticated users and a user-owned fixture object, when user B requests user A's object through the authorization harness, then the API returns `FORBIDDEN` or scoped `NOT_FOUND`.
+- [ ] Given a cookie-authenticated mutation, when the CSRF header/token is absent or invalid, then the API rejects it with a stable safe error code.
+- [ ] UAT requirement is required for login, refresh persistence, logout, and forbidden state behavior.
+
+## Small Task Exemption
+
+- Small task exemption: no
+- Reason: This ticket changes authentication, authorization, security, and public API behavior.
+- Impact checked: API=yes, DB=yes, Security=yes, Runtime=yes, Standards=no
+
+## Impacted Areas
+
+- Code: identity domain/application packages, auth HTTP routes, cookies, CSRF, user repository, current-user endpoint, frontend auth state.
+- Requirements docs: no change expected.
+- Architecture docs: no change expected if implementation follows ADR-002.
+- API docs: reconcile concrete request/response schemas and CSRF header name.
+- ERD/data docs: reconcile concrete `users` columns if needed.
+- Decisions: no new ADR expected unless execution diverges from stateless-cookie design.
+
+## Detail Design
+
+- Required: yes
+- Link: [PHASE-001-detail-design.md](../phases/PHASE-001-detail-design.md)
+- Approval: approved by user instruction "finish whole app" on 2026-08-25
+
+## Test Expectations
+
+- Unit: OAuth state/nonce validation, cookie signing/verification, CSRF helper behavior, redaction helpers.
+- Integration: callback fixture provisions user, no session/provider token persisted, cross-user harness denies access.
+- E2E: login callback fixture, authenticated shell, logout, forbidden state.
+- UAT: login, refresh persistence, logout, forbidden state.
+- Manual/platform: verify cookie flags in browser/devtools or Playwright context output.
+- Docs review: API/ERD/architecture reconciliation and ADR check.
+
+## Verification Results
+
+- Command: not run
+- Result: not_started
+- Notes: Planning ticket only; execution is approval-gated.
+
+## Fix/Test Attempt Log
+
+- Same-path failure attempts: 0 / 3
+- Total fix/test cycles: 0 / 5
+- Blocked by loop guard: no
+- Human/design input needed: none for approved PHASE-001 scope.
+
+## UAT
+
+- Required: yes
+- Reason if not required: not applicable
+- Expected behavior: login succeeds through fixture, session survives refresh, logout clears cookie, and forbidden states do not leak data.
+- Verified behavior: not verified; no implementation exists.
+- Sign-off: pending
+
+## Docs Review
+
+- Requirements updated or not needed reason: not yet executed.
+- Architecture updated or not needed reason: not yet executed.
+- API updated or not needed reason: not yet executed.
+- ERD/data updated or not needed reason: not yet executed.
+- ADR created or not needed reason: not yet executed.
+- `docs/CONTEXT.md` updated: pending execution/dehydration.
+
+## Completion Checklist
+
+- [ ] Implementation complete
+- [ ] Tests run and recorded
+- [ ] Fix/test loop guard respected
+- [ ] Validation matrix updated or explicitly not affected
+- [ ] UAT completed or explicitly not required
+- [ ] Master docs reconciled
+- [ ] Docs review completed
+- [ ] ADR created or explicitly not needed
+- [ ] `docs/CONTEXT.md` updated
+- [ ] `docs/work/BACKLOG.md` updated
+- [ ] Trace links updated

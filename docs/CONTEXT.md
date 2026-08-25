@@ -19,7 +19,7 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-08-24
+updated: 2026-08-25
 ---
 
 # Project Context
@@ -34,14 +34,14 @@ updated: 2026-08-24
 
 - Status: MyPocket system design and Harness migration verified; no product code exists yet.
 - Active backlog: [BL-001](work/BACKLOG.md)
-- Current queue focus: create ticket artifacts and a detailed executable plan for PHASE-001.
-- Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `draft`.
-- Active ticket: None; stable planned ticket IDs are TICKET-001 through TICKET-004.
+- Current queue focus: execute PHASE-001 Task 1 from the approved implementation plan.
+- Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_progress`.
+- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md), and [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `ready`.
 - Active bug: None.
 
 ## Current Focus
 
-Finish planning PHASE-001 as the first deployable slice of the approved React PWA, Go API/worker, PostgreSQL, S3-compatible, and Google OAuth architecture.
+Execute PHASE-001 as the first deployable slice of the approved React PWA, Go API/worker, PostgreSQL, S3-compatible, and Google OAuth architecture.
 
 ## Recently Touched Areas
 
@@ -49,6 +49,12 @@ Finish planning PHASE-001 as the first deployable slice of the approved React PW
 - `docs/architecture/`
 - `docs/decisions/`
 - `docs/work/`
+- `docs/work/tickets/TICKET-001-repository-runtime-foundation.md`
+- `docs/work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md`
+- `docs/work/tickets/TICKET-003-google-oauth-user-isolation.md`
+- `docs/work/tickets/TICKET-004-development-operations-verification-baseline.md`
+- `docs/work/phases/PHASE-001-detail-design.md`
+- `docs/superpowers/plans/2026-08-25-phase-001-platform-identity.md`
 - `docs/superpowers/specs/2026-08-23-mypocket-system-design.md`
 - `docs/work/DOCS-REVIEW-M0.md`
 
@@ -72,10 +78,10 @@ Finish planning PHASE-001 as the first deployable slice of the approved React PW
 
 ## Next Steps
 
-1. Create TICKET-001 through TICKET-004 for PHASE-001.
-2. Produce the Superpowers implementation plan linked to those Harness tickets.
-3. Review the plan and promote PHASE-001 from `draft` to `ready`.
-4. Execute only after ticket/detail-design approval and required gates pass.
+1. Commit completed TICKET-001 Task 1 baseline.
+2. Continue PHASE-001 Task 2 test-first: PostgreSQL migration runner and user schema.
+3. During execution, record real verification evidence before updating validation rows from `planned`.
+4. After PHASE-001 verification/dehydration, promote PHASE-002 planning.
 
 ## Open Questions
 
