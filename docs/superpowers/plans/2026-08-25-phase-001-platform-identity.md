@@ -229,7 +229,7 @@ rtk git commit -m "feat: add PostgreSQL migrations"
 - Produces: `objectstore.Store` with `PutSmokeObject(ctx context.Context) error` and `DeleteSmokeObject(ctx context.Context) error`
 - Consumes: S3 endpoint, bucket, access key, and secret from `config.Config`
 
-- [ ] **Step 1: Write config and adapter tests**
+- [x] **Step 1: Write config and adapter tests**
 
 ```go
 func TestS3ConfigRequiresBucketWhenEndpointConfigured(t *testing.T) {
@@ -243,27 +243,27 @@ func TestS3ConfigRequiresBucketWhenEndpointConfigured(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run tests to verify they fail**
+- [x] **Step 2: Run tests to verify they fail**
 
 Run: `rtk go test ./internal/platform/config ./internal/platform/objectstore`
 
 Expected: FAIL because object store package or config validation is incomplete.
 
-- [ ] **Step 3: Implement object store interface and S3 adapter**
+- [x] **Step 3: Implement object store interface and S3 adapter**
 
 Use the selected Go S3-compatible SDK. The adapter must never log access keys, secret keys, presigned URLs, or object payloads.
 
-- [ ] **Step 4: Add smoke test path**
+- [x] **Step 4: Add smoke test path**
 
 Add a test that runs only when local S3 environment variables are present. It should create and delete a small private smoke object.
 
-- [ ] **Step 5: Run adapter tests**
+- [x] **Step 5: Run adapter tests**
 
 Run: `rtk go test ./internal/platform/config ./internal/platform/objectstore`
 
 Expected: PASS, with smoke test skipped when S3 env is absent and passing when local S3 is available.
 
-- [ ] **Step 6: Commit Task 3**
+- [x] **Step 6: Commit Task 3**
 
 ```bash
 rtk git add internal/platform/config internal/platform/objectstore

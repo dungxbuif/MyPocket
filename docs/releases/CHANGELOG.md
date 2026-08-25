@@ -22,6 +22,7 @@ shared_fields: [status]
 - Added Go API and worker runtime entrypoints with safe configuration validation, stable JSON error envelopes, correlation IDs, and health routes for PHASE-001.
 - Added a PostgreSQL migration runner with idempotent ordered migrations, checksum mismatch protection, and the PHASE-001 `users` schema without provider-token or server-session persistence.
 - Wired API and worker startup to verify required PostgreSQL availability from `DATABASE_URL`.
+- Added an S3-compatible object-store adapter with safe smoke put/delete checks and complete S3 config validation.
 
 ### Planning
 

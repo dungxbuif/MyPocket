@@ -12,3 +12,5 @@
 ## Local Workflow
 
 Set `DATABASE_URL` before running migration, API, or worker commands. API and worker startup fail fast when PostgreSQL is unavailable.
+
+Set `MYPOCKET_TEST_S3_ENDPOINT`, `MYPOCKET_TEST_S3_BUCKET`, `MYPOCKET_TEST_S3_ACCESS_KEY`, and `MYPOCKET_TEST_S3_SECRET_KEY` to run the S3-compatible smoke test; otherwise that integration path is skipped by the default test suite.

@@ -58,8 +58,20 @@ func Load(env map[string]string) (Config, error) {
 	if len(cfg.CSRFSecret) < 32 {
 		return Config{}, fmt.Errorf("invalid config: CSRF_SECRET must be at least 32 bytes")
 	}
-	if cfg.S3Endpoint != "" && cfg.S3Bucket == "" {
-		return Config{}, fmt.Errorf("missing required config: S3_BUCKET")
+	if cfg.S3Endpoint != "" {
+		s3Missing := make([]string, 0, 3)
+		if cfg.S3Bucket == "" {
+			s3Missing = append(s3Missing, "S3_BUCKET")
+		}
+		if cfg.S3AccessKey == "" {
+			s3Missing = append(s3Missing, "S3_ACCESS_KEY")
+		}
+		if cfg.S3SecretKey == "" {
+			s3Missing = append(s3Missing, "S3_SECRET_KEY")
+		}
+		if len(s3Missing) > 0 {
+			return Config{}, fmt.Errorf("missing required config: %s", strings.Join(s3Missing, ", "))
+		}
 	}
 	if cfg.AppEnv == "production" && cfg.OAuthFixtureMode {
 		return Config{}, fmt.Errorf("invalid config: OAUTH_FIXTURE_MODE is not allowed in production")

@@ -60,7 +60,7 @@ updated: 2026-08-24
 | REQ-NF-003 | PHASE-003 | TICKET-009/010 | No silent last-write-wins conflict handling | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-NF-004 | PHASE-001/006/007 | TICKET-003/018..022 | Secrets and sensitive provider data are redacted | yes | yes | yes | not_required | yes | yes | planned | No execution evidence |
 | REQ-NF-005 | PHASE-002/004/005 | TICKET-006/011/017 | VND integers and Ho Chi Minh reporting boundaries | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
-| REQ-NF-006 | PHASE-001/007 | TICKET-002/004/025 | Homelab health, migration, locks, backup, and restore | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-002 PostgreSQL migration runner and health readiness evidence recorded; S3 smoke, compose, locks, backup, and restore still pending |
+| REQ-NF-006 | PHASE-001/007 | TICKET-002/004/025 | Homelab health, migration, locks, backup, and restore | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-002 PostgreSQL migration/readiness and S3-compatible smoke evidence recorded; compose, locks, backup, and restore still pending |
 | REQ-NF-007 | All phases | All tickets | Required proof and docs review gate implementation status | not_required | not_required | not_required | yes | yes | yes | planned | No execution evidence |
 | REQ-NF-008 | PHASE-001/003/006 | TICKET-001/009/018..021 | Stable safe error codes and correlation IDs | yes | yes | yes | not_required | yes | yes | planned | No execution evidence |
 

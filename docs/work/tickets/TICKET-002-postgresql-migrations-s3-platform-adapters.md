@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-002
-status: in_progress
+status: in_review
 owner: human
 priority: urgent
 lane: high-risk
@@ -47,7 +47,7 @@ trace:
 ## Status
 
 - ID: TICKET-002
-- Status: in_progress
+- Status: in_review
 - Type: feature
 - Priority: urgent
 - Phase: PHASE-001
@@ -83,9 +83,9 @@ AI fill:
 
 - [x] Given an empty PostgreSQL database, when migrations run, then PHASE-001 tables for users and platform metadata are created idempotently through documented commands.
 - [x] Given API and worker processes start, when they open database connections, then readiness reflects required database availability.
-- [ ] Given configured S3-compatible credentials, when the adapter performs a smoke operation, then object-store access is verified without exposing credentials in logs.
-- [ ] Given missing or invalid required runtime configuration, when API or worker starts, then startup fails with safe, actionable configuration errors.
-- [ ] UAT requirement is not_required because this ticket has no direct user-facing behavior.
+- [x] Given configured S3-compatible credentials, when the adapter performs a smoke operation, then object-store access is verified without exposing credentials in logs.
+- [x] Given missing or invalid required runtime configuration, when API or worker starts, then startup fails with safe, actionable configuration errors.
+- [x] UAT requirement is not_required because this ticket has no direct user-facing behavior.
 
 ## Small Task Exemption
 
@@ -140,6 +140,27 @@ AI fill:
 - Command: `rtk git diff --check`
 - Result: pass
 - Notes: No whitespace errors reported.
+- Command: `rtk go test ./internal/platform/config ./internal/platform/objectstore`
+- Result: fail
+- Notes: RED check failed for intended missing behavior: incomplete S3 config accepted and `internal/platform/objectstore` had no non-test Go files.
+- Command: `rtk go get github.com/aws/aws-sdk-go-v2/config@v1.29.7 github.com/aws/aws-sdk-go-v2/credentials@v1.17.60 github.com/aws/aws-sdk-go-v2/service/s3@v1.76.0`
+- Result: pass
+- Notes: Added AWS SDK v2 S3 client dependencies for the approved S3-compatible adapter.
+- Command: `rtk go test ./internal/platform/config ./internal/platform/objectstore`
+- Result: pass
+- Notes: 5 tests passed for config validation and objectstore default path; S3 lifecycle smoke skipped without env.
+- Command: `rtk docker run --rm -d --name mypocket-test-s3 -e SERVICES=s3 -e DEFAULT_REGION=us-east-1 -p 54566:4566 localstack/localstack:3.8.1`
+- Result: pass
+- Notes: Started cached LocalStack 3.8.1 container for S3-compatible smoke testing.
+- Command: `rtk curl -fsS http://127.0.0.1:54566/_localstack/health`
+- Result: pass
+- Notes: LocalStack reported S3 service `available`.
+- Command: `rtk env MYPOCKET_TEST_S3_ENDPOINT=http://127.0.0.1:54566 MYPOCKET_TEST_S3_BUCKET=mypocket-smoke MYPOCKET_TEST_S3_ACCESS_KEY=test MYPOCKET_TEST_S3_SECRET_KEY=test go test ./internal/platform/objectstore`
+- Result: pass
+- Notes: S3 smoke lifecycle test created the bucket, put the smoke object, and deleted it against LocalStack.
+- Command: `rtk go test ./...`
+- Result: pass
+- Notes: 10 tests passed across 7 Go packages after S3 adapter implementation.
 
 ## Fix/Test Attempt Log
 
@@ -153,27 +174,27 @@ AI fill:
 - Required: no
 - Reason if not required: platform-only adapter and migration behavior is covered by integration and platform proof.
 - Expected behavior: not applicable
-- Verified behavior: PostgreSQL migration and readiness behavior verified by automated integration/unit tests; S3 smoke behavior remains pending.
+- Verified behavior: PostgreSQL migration/readiness and S3-compatible smoke behavior verified by automated integration/unit tests.
 - Sign-off: not required
 
 ## Docs Review
 
 - Requirements updated or not needed reason: not needed; implementation follows existing PHASE-001/REQ-NF-006 platform scope.
-- Architecture updated or not needed reason: not needed; API/worker PostgreSQL startup follows the approved platform boundary.
+- Architecture updated or not needed reason: updated to record implemented PostgreSQL startup and S3-compatible adapter baseline.
 - API updated or not needed reason: updated to record concrete `/api/v1/health/live` and `/api/v1/health/ready` readiness behavior.
 - ERD/data updated or not needed reason: updated to record concrete PHASE-001 `users` and `schema_migrations` columns.
 - ADR created or not needed reason: not needed; follows ADR-001 and the approved detail design.
-- `docs/CONTEXT.md` updated: yes; next steps now point to S3 adapter slice.
+- `docs/CONTEXT.md` updated: yes; next steps now point to Google OAuth/user isolation.
 
 ## Completion Checklist
 
-- [ ] Implementation complete
+- [x] Implementation complete
 - [x] Tests run and recorded
-- [ ] Fix/test loop guard respected
+- [x] Fix/test loop guard respected
 - [x] Validation matrix updated or explicitly not affected
 - [x] UAT completed or explicitly not required
 - [x] Master docs reconciled
-- [ ] Docs review completed
+- [x] Docs review completed
 - [x] ADR created or explicitly not needed
 - [x] `docs/CONTEXT.md` updated
 - [x] `docs/work/BACKLOG.md` updated

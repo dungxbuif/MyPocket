@@ -25,6 +25,10 @@ Required backend environment variables:
 | `COOKIE_SECRET` | At least 32 bytes; signs application cookies. |
 | `CSRF_SECRET` | At least 32 bytes; protects cookie-authenticated mutations. |
 | `HTTP_ADDR` | Optional API bind address; defaults to `:8080`. |
+| `S3_ENDPOINT` | Optional S3-compatible endpoint; when set, bucket and credentials are required. |
+| `S3_BUCKET` | Private object bucket for receipts, exports, and smoke checks. |
+| `S3_ACCESS_KEY` | S3-compatible access key. |
+| `S3_SECRET_KEY` | S3-compatible secret key. |
 
 ## Verification
 

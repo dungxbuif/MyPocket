@@ -34,9 +34,9 @@ updated: 2026-08-26
 
 - Status: PHASE-001 execution is underway with the Go runtime/API foundation committed and PostgreSQL migration/readiness implementation in progress.
 - Active backlog: [BL-001](work/BACKLOG.md)
-- Current queue focus: continue PHASE-001 TICKET-002 with the S3-compatible object-store adapter, then proceed to Google OAuth/user isolation.
+- Current queue focus: execute PHASE-001 TICKET-003 Google OAuth/user isolation, then build the user-requested mobile-first PWA/offline shell.
 - Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_progress`.
-- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `in_progress`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md) and [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `ready`.
+- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `in_review`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md) and [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `ready`.
 - Active bug: None.
 
 ## Current Focus
@@ -59,6 +59,7 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 - `docs/work/DOCS-REVIEW-M0.md`
 - `internal/platform/db/`
 - `migrations/0001_phase001_identity.sql`
+- `internal/platform/objectstore/`
 - `apps/api/main.go`
 - `apps/worker/main.go`
 - `docs/architecture/API.md`
@@ -84,9 +85,9 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 
 ## Next Steps
 
-1. Commit the TICKET-002 PostgreSQL migration/readiness slice.
-2. Continue TICKET-002 Task 3 test-first: S3-compatible object-store adapter and smoke operation.
-3. Complete PHASE-001 with Google OAuth/user isolation, dev operations, and the user-requested mobile-first PWA/offline shell.
+1. Commit the TICKET-002 S3-compatible object-store adapter slice.
+2. Execute TICKET-003 test-first: Google OAuth fixture, signed stateless cookie, CSRF, and ownership guard.
+3. Complete PHASE-001 with dev operations and the user-requested mobile-first PWA/offline shell.
 4. During execution, record real verification evidence before updating validation rows from `planned`.
 
 ## Open Questions
