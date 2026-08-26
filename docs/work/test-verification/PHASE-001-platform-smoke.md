@@ -11,5 +11,6 @@ owner: shared
 - `npm run smoke:platform` — pass; API liveness/readiness returned correlation IDs and database `ok`; LocalStack reported S3 `available`.
 - `curl -fsS http://127.0.0.1:5173/` — pass; web shell served.
 - `docker compose config` — pass.
+- `npm run test:e2e` — pass; mobile shell exposed manifest metadata, registered the service worker, and reloaded offline.
 
 UAT is not required; this operational ticket is covered by platform evidence. Production secrets, TLS, backup/restore, and monitoring remain out of scope.

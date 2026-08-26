@@ -32,7 +32,7 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, and mobile-first PWA shell implemented.
+- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, mobile-first PWA shell, local Compose stack, and offline browser proof implemented.
 - Active backlog: [BL-001](work/BACKLOG.md)
 - Current queue focus: execute local operations and browser E2E proof for PWA installability, offline reload, auth fixture, and platform smoke.
 - Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_progress`.
@@ -94,8 +94,8 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 ## Next Steps
 
 1. Commit the mobile-first PWA shell and component design contract.
-2. Add browser E2E coverage for service worker offline reload, auth fixture persistence, logout, and forbidden state.
-3. During execution, record real verification evidence before updating validation rows from `planned`.
+2. Extend browser E2E coverage to auth fixture persistence, logout, and forbidden state.
+3. Begin PHASE-002 finance-core ticket decomposition after PHASE-001 review.
 
 ## Open Questions
 

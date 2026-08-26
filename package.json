@@ -11,6 +11,7 @@
     "build:web": "npm run build --workspace apps/web",
     "migrate:up": "go run ./apps/migrate",
     "test:web": "npm test --workspace apps/web -- --run",
+    "test:e2e": "npm run test:e2e --workspace apps/web",
     "test:go": "go test ./...",
     "smoke:platform": "bash scripts/smoke-platform.sh"
   }
