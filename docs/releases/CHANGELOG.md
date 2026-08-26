@@ -25,6 +25,7 @@ shared_fields: [status]
 - Added an S3-compatible object-store adapter with safe smoke put/delete checks and complete S3 config validation.
 - Added backend identity primitives and auth routes for fixture Google login, stateless signed cookies, CSRF enforcement, current-user lookup, and cross-user ownership guard testing.
 - Added the mobile-first React PWA shell, manifest, service worker app-shell cache, Vietnamese navigation, quick-add sheet, and component design contract based on provided screenshots.
+- Added a Docker Compose local stack for PostgreSQL, LocalStack S3, API, worker, migration, and nginx-served web, plus a repeatable platform smoke command.
 
 ### Planning
 

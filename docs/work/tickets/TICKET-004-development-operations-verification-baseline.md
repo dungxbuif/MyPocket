@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-004
-status: ready
+status: verified
 owner: human
 priority: urgent
 lane: high-risk
@@ -29,7 +29,7 @@ trace:
   phase: PHASE-001
   detail_design: ../phases/PHASE-001-detail-design.md
   implementation_plan: ../../superpowers/plans/2026-08-25-phase-001-platform-identity.md
-  test_verification: not_created_phase_not_executed
+  test_verification: ../test-verification/PHASE-001-platform-smoke.md
   validation_matrix: ../VALIDATION_MATRIX.md
   docs_review: per-ticket_completion_checklist
   adrs:
@@ -48,7 +48,7 @@ trace:
 ## Status
 
 - ID: TICKET-004
-- Status: ready
+- Status: verified
 - Type: feature
 - Priority: urgent
 - Phase: PHASE-001
@@ -120,9 +120,9 @@ AI fill:
 
 ## Verification Results
 
-- Command: not run
-- Result: not_started
-- Notes: Planning ticket only; execution is approval-gated.
+- Command: `docker compose up -d --build`; `npm run smoke:platform`; `docker compose config`
+- Result: pass
+- Notes: All local services started; health/readiness and S3 availability returned expected safe JSON.
 
 ## Fix/Test Attempt Log
 
@@ -150,14 +150,14 @@ AI fill:
 
 ## Completion Checklist
 
-- [ ] Implementation complete
-- [ ] Tests run and recorded
+- [x] Implementation complete
+- [x] Tests run and recorded
 - [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
-- [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
-- [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
+- [x] Validation matrix updated or explicitly not affected
+- [x] UAT completed or explicitly not required
+- [x] Master docs reconciled
+- [x] Docs review completed
+- [x] ADR created or explicitly not needed
+- [x] `docs/CONTEXT.md` updated
+- [x] `docs/work/BACKLOG.md` updated
 - [ ] Trace links updated
