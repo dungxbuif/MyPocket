@@ -3,6 +3,9 @@ package main
 import (
 	"context"
 	"log"
+	"os"
+	"os/signal"
+	"syscall"
 
 	"mypocket/internal/platform/config"
 	"mypocket/internal/platform/db"
@@ -21,4 +24,7 @@ func main() {
 	defer conn.Close()
 
 	log.Printf("worker ready in %s", cfg.AppEnv)
+	stop := make(chan os.Signal, 1)
+	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
+	<-stop
 }

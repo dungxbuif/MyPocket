@@ -7,7 +7,7 @@ owner: shared
 
 # PHASE-001 Platform Smoke
 
-- `docker compose up -d --build` — pass; PostgreSQL, LocalStack S3, migration, API, worker, and nginx web started.
+- `docker compose up -d --build` — pass; PostgreSQL, LocalStack S3, migration, API, worker, and nginx web started (worker remains running until SIGTERM).
 - `npm run smoke:platform` — pass; API liveness/readiness returned correlation IDs and database `ok`; LocalStack reported S3 `available`.
 - `curl -fsS http://127.0.0.1:5173/` — pass; web shell served.
 - `docker compose config` — pass.
