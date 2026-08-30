@@ -1,4 +1,5 @@
 import { apiFetch } from "./apiClient";
+import { queueTransaction } from "./outbox";
 
 export type WalletType = "cash" | "bank" | "credit" | "e_wallet" | "savings" | "debt";
 
@@ -65,6 +66,7 @@ export async function createTransaction(input: {
   occurred_at: string;
   note?: string;
 }) {
+  if (!navigator.onLine) return queueTransaction(input);
   const idempotencyKey = globalThis.crypto?.randomUUID?.() ?? `web-${Date.now()}`;
   const response = await apiFetch<{ transaction: Transaction }>("/api/v1/transactions", {
     method: "POST",

@@ -20,6 +20,7 @@ import { useOnlineStatus } from "./offline";
 import { apiBaseURL } from "./apiClient";
 import { loadCurrentUser, logout, type AuthState } from "./auth";
 import { createTransaction, loadCategories, loadTransactions, loadWallets, type CategorySummary, type Transaction, type WalletSummary } from "./finance";
+import { drainOutbox, readOutbox } from "./outbox";
 
 type Tab = "overview" | "transactions" | "budgets" | "account";
 
@@ -64,7 +65,8 @@ export function App() {
         if (!cancelled) {
           setWallets(nextWallets);
           setCategories(nextCategories);
-          setTransactions(nextTransactions);
+          const pending = readOutbox().map((item) => ({ id: item.id, ...item.input, amount_vnd: Number(item.input.amount_vnd), balance_after_vnd: 0, occurred_at: String(item.input.occurred_at), note: String(item.input.note ?? ""), with_person: "", event_ref: "", excluded_from_reports: false, version: 0 } as Transaction));
+          setTransactions([...pending, ...nextTransactions]);
         }
       })
       .catch(() => {
@@ -78,6 +80,11 @@ export function App() {
       cancelled = true;
     };
   }, [authState.status]);
+
+  useEffect(() => {
+    if (authState.status !== "authenticated" || !online || readOutbox().length === 0) return;
+    void drainOutbox(async (input) => { await createTransaction(input as Parameters<typeof createTransaction>[0]); });
+  }, [authState.status, online]);
 
   async function handleLogout() {
     await logout();

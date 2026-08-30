@@ -87,6 +87,7 @@ trace:
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Backend regression after transaction HTTP API implementation. |
 | `rtk npm test -- --run` (from `frontend/`) | pass | Mobile transaction list/search rendering and quick-add expense submission tests. |
 | `rtk npm run build` (from `frontend/`) | pass | Production frontend build after transaction UI integration. |
+| `rtk npm test -- --run` (from `frontend/`) | pass | Offline transaction outbox persistence and ordered drain tests. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./internal/finance -count=1` | pass | Receipt metadata validation, persistence, and user-scoped access tests. |
 | `rtk npm test -- --run src/app/App.test.tsx` | pass | RED first failed because wallet/category UI still used hardcoded data; GREEN passed after API-driven finance state was added. |
 | `rtk npm test -- --run` | pass | Full frontend component suite; 5 tests passed. |

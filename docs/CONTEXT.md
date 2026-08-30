@@ -32,7 +32,7 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, receipt metadata validation/persistence, backend wallet/category repository behavior, initial wallet/category API routes, API-driven mobile wallet/category display, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, and mobile transaction list/search/create UI are implemented with automated proof.
+- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, receipt metadata validation/persistence, backend wallet/category repository behavior, initial wallet/category API routes, API-driven mobile wallet/category display, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create UI, and a browser transaction outbox with reconnect drain are implemented with automated proof.
 - Active backlog: [BL-002](work/BACKLOG.md)
 - Current queue focus: execute PHASE-002 finance core; TICKET-005 wallet/category foundation is partially implemented and TICKET-006 transaction accounting has started.
 - Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `ready`.

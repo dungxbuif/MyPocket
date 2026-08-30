@@ -38,6 +38,7 @@ shared_fields: [status]
 - Added authenticated transaction HTTP routes for create, edit, archive, and filtered listing with CSRF and idempotency header support.
 - Added API-backed mobile transaction listing, search, and expense creation from the quick-add sheet.
 - Added user-scoped receipt metadata persistence with private object-key and SHA-256 validation.
+- Added an IndexedDB-compatible browser outbox layer (localStorage fallback) for optimistic offline transactions and ordered reconnect replay.
 
 ### Planning
 
