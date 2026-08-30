@@ -179,6 +179,7 @@ Seeded system keys include `expense_food`, `expense_shopping`, `expense_transpor
 | `receipt_object_id` | `uuid` | Optional private receipt metadata reference |
 | `amount_vnd` | `bigint` | Required positive VND integer |
 | `balance_after_vnd` | `bigint` | Snapshot for source wallet after posting |
+| `source_delta_vnd`, `destination_delta_vnd` | `bigint` | Persisted balance effects used to reverse edits and archives exactly |
 | `note`, `with_person`, `event_ref` | `text` | Optional search/display metadata; default empty |
 | `occurred_at` | `timestamptz` | Required transaction date/time |
 | `excluded_from_reports` | `boolean` | Report exclusion flag |

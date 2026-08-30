@@ -110,6 +110,8 @@ func TestPhase002FinanceTablesAndSeeds(t *testing.T) {
 		"destination_wallet_id",
 		"category_id",
 		"amount_vnd",
+		"source_delta_vnd",
+		"destination_delta_vnd",
 		"occurred_at",
 		"excluded_from_reports",
 		"archived_at",

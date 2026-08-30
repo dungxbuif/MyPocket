@@ -109,6 +109,31 @@ type CreateTransactionInput struct {
 	ExcludedFromReports bool
 }
 
+type UpdateTransactionInput struct {
+	Type                TransactionType
+	SourceWalletID      string
+	DestinationWalletID string
+	CategoryID          string
+	AmountVND           int64
+	TargetBalanceVND    *int64
+	OccurredAt          time.Time
+	Note                string
+	WithPerson          string
+	EventRef            string
+	ExcludedFromReports bool
+}
+
+type TransactionFilters struct {
+	WalletID             string
+	CategoryID           string
+	Type                 TransactionType
+	DateFrom             *time.Time
+	DateTo               *time.Time
+	Query                string
+	ExcludedFromReports  *bool
+	IncludeArchivedItems bool
+}
+
 type Transaction struct {
 	ID                  string          `json:"id"`
 	UserID              string          `json:"user_id"`
@@ -118,6 +143,8 @@ type Transaction struct {
 	CategoryID          string          `json:"category_id,omitempty"`
 	AmountVND           int64           `json:"amount_vnd"`
 	BalanceAfterVND     int64           `json:"balance_after_vnd"`
+	SourceDeltaVND      int64           `json:"source_delta_vnd"`
+	DestinationDeltaVND int64           `json:"destination_delta_vnd"`
 	OccurredAt          time.Time       `json:"occurred_at"`
 	Note                string          `json:"note"`
 	WithPerson          string          `json:"with_person"`

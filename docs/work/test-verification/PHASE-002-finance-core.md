@@ -78,6 +78,10 @@ trace:
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/finance -count=1` | pass | Unit-only finance regression after repository transaction create implementation. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1` | pass | Finance package regression with DB-backed transaction repository tests. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Backend regression after repository transaction create implementation. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -run 'TestRepositoryUpdatesTransaction\|TestRepositoryArchivesTransaction\|TestRepositoryListsTransactions' -count=1` | pass | RED first failed because edit/archive/search repository APIs were missing; GREEN passed after implementation. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/platform/db -run TestPhase002FinanceTablesAndSeeds -count=1` | pass | Migration proof after adding transaction delta columns. Parallel DB-backed commands briefly failed from shared schema-reset contention, then passed sequentially. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1` | pass | Finance package regression after edit/archive/search repository implementation. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Backend regression after edit/archive/search repository implementation. |
 | `rtk npm test -- --run src/app/App.test.tsx` | pass | RED first failed because wallet/category UI still used hardcoded data; GREEN passed after API-driven finance state was added. |
 | `rtk npm test -- --run` | pass | Full frontend component suite; 5 tests passed. |
 | `rtk npm run build` | pass | Production Vite build completed. |
@@ -94,19 +98,20 @@ trace:
 | 5 | Added frontend finance client and API-driven mobile wallet/category rendering after RED component tests showed hardcoded wallet/category data. | `rtk npm test -- --run`; `rtk npm run build`; `rtk npm run test:e2e` | pass | One assertion was adjusted after the UI correctly showed the same total in the header and wallet summary. |
 | 6 | Added TICKET-006 accounting effect tests and primitives for income, expense, transfer, and adjustment. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/finance -run 'TestApplyAccountingEffect' -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Initial RED compile failed because `TransactionType`, `AccountingInput`, and `ApplyAccountingEffect` did not exist. |
 | 7 | Added repository create transaction persistence with wallet locks, atomic balance/version updates, category activation checks, and idempotency replay storage. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -run 'TestRepository.*Transaction' -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Initial RED compile failed because `CreateTransaction` and `CreateTransactionInput` did not exist. |
+| 8 | Added transaction delta persistence plus repository edit reversal/reapply, archive reversal once, and filtered listing. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -run 'TestRepositoryUpdatesTransaction\|TestRepositoryArchivesTransaction\|TestRepositoryListsTransactions' -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Initial RED compile failed because edit/archive/search DTOs and repository methods did not exist. |
 
 Loop guard:
 
 - Same-path failure attempts: 1 / 3
-- Active work-item fix/test cycles: TICKET-006 is 2 / 5. Earlier TICKET-005 cycles are tracked in that ticket.
+- Active work-item fix/test cycles: TICKET-006 is 3 / 5. Earlier TICKET-005 cycles are tracked in that ticket.
 - Blocked: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
 ## Automated Tests
 
-- Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, TICKET-006 accounting effect tests, TICKET-006 repository create/idempotency tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
+- Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, TICKET-006 accounting effect tests, TICKET-006 repository create/idempotency/edit/archive/search tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
 - Failed: none remaining for migration, backend wallet/category domain, implemented wallet/category API route, and API-driven mobile display slices.
-- Skipped: remaining wallet/category mutation routes, transaction edit/archive/search repository workflows, transaction API/mobile workflows, and full wallet/category/transaction UAT pending later PHASE-002 work.
+- Skipped: remaining wallet/category mutation routes, transaction API/mobile workflows, and full wallet/category/transaction UAT pending later PHASE-002 work.
 
 ## Manual Checks
 
@@ -117,7 +122,7 @@ Loop guard:
 - Required: yes for wallet/category and transaction workflows; not required for receipt metadata foundation until PHASE-006.
 - Reason if not required: partial exception applies only to non-user-facing receipt metadata foundation.
 - Expected behavior: finance workflows use Vietnamese copy, exact VND integer formatting, user-owned data, and correct wallet balances.
-- Verified behavior: wallet/category API-driven display, backend accounting effects, and repository create transaction/idempotency behavior have automated proof; full edit/archive/search/API/mobile transaction workflows remain pending implementation.
+- Verified behavior: wallet/category API-driven display, backend accounting effects, repository create transaction/idempotency behavior, edit/archive reversal, and transaction search filters have automated proof; transaction API/mobile workflows remain pending implementation.
 - Sign-off: pending.
 
 ## Failures And Follow-Up
@@ -135,3 +140,4 @@ Loop guard:
 - Frontend wallet/category tests were written and observed failing on hardcoded display behavior, then passed after `frontend/src/app/finance.ts` and App state wiring were added.
 - TICKET-006 accounting tests were written and observed failing on missing finance accounting types/functions, then passed after `backend/internal/finance/transactions.go` and related types were added.
 - TICKET-006 repository tests were written and observed failing on missing `CreateTransaction` APIs, then passed after transaction persistence, wallet balance updates, category checks, and idempotency storage were added.
+- TICKET-006 edit/archive/search repository tests were written and observed failing on missing methods/types, then passed after persisted transaction deltas and repository methods were added.

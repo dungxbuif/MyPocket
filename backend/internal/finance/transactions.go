@@ -83,6 +83,30 @@ func validatePositiveAmount(amountVND int64) error {
 
 func ValidateCreateTransaction(input CreateTransactionInput) (CreateTransactionInput, error) {
 	input.IdempotencyKey = trimmed(input.IdempotencyKey)
+
+	if input.IdempotencyKey == "" {
+		return CreateTransactionInput{}, fmt.Errorf("%w: idempotency key is required", ErrValidation)
+	}
+	return validateTransactionFields(input)
+}
+
+func ValidateUpdateTransaction(input UpdateTransactionInput) (CreateTransactionInput, error) {
+	return validateTransactionFields(CreateTransactionInput{
+		Type:                input.Type,
+		SourceWalletID:      input.SourceWalletID,
+		DestinationWalletID: input.DestinationWalletID,
+		CategoryID:          input.CategoryID,
+		AmountVND:           input.AmountVND,
+		TargetBalanceVND:    input.TargetBalanceVND,
+		OccurredAt:          input.OccurredAt,
+		Note:                input.Note,
+		WithPerson:          input.WithPerson,
+		EventRef:            input.EventRef,
+		ExcludedFromReports: input.ExcludedFromReports,
+	})
+}
+
+func validateTransactionFields(input CreateTransactionInput) (CreateTransactionInput, error) {
 	input.SourceWalletID = trimmed(input.SourceWalletID)
 	input.DestinationWalletID = trimmed(input.DestinationWalletID)
 	input.CategoryID = trimmed(input.CategoryID)
@@ -90,9 +114,6 @@ func ValidateCreateTransaction(input CreateTransactionInput) (CreateTransactionI
 	input.WithPerson = trimmed(input.WithPerson)
 	input.EventRef = trimmed(input.EventRef)
 
-	if input.IdempotencyKey == "" {
-		return CreateTransactionInput{}, fmt.Errorf("%w: idempotency key is required", ErrValidation)
-	}
 	if input.OccurredAt.IsZero() {
 		return CreateTransactionInput{}, fmt.Errorf("%w: occurred_at is required", ErrValidation)
 	}

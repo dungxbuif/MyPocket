@@ -87,6 +87,8 @@ CREATE TABLE IF NOT EXISTS transactions (
     receipt_object_id uuid REFERENCES receipt_objects(id) ON DELETE SET NULL,
     amount_vnd bigint NOT NULL CHECK (amount_vnd > 0),
     balance_after_vnd bigint,
+    source_delta_vnd bigint NOT NULL DEFAULT 0,
+    destination_delta_vnd bigint NOT NULL DEFAULT 0,
     note text NOT NULL DEFAULT '',
     with_person text NOT NULL DEFAULT '',
     event_ref text NOT NULL DEFAULT '',

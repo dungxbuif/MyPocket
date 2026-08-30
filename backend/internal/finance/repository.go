@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -395,7 +396,7 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID string, input
 		}
 	}
 
-	transaction, err := insertTransaction(ctx, tx, userID, input, effect.SourceBalanceVND)
+	transaction, err := insertTransaction(ctx, tx, userID, input, effect)
 	if err != nil {
 		return Transaction{}, err
 	}
@@ -414,6 +415,164 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID string, input
 		return Transaction{}, fmt.Errorf("commit create transaction: %w", err)
 	}
 	return transaction, nil
+}
+
+func (r *Repository) UpdateTransaction(ctx context.Context, userID string, transactionID string, input UpdateTransactionInput) (Transaction, error) {
+	normalized, err := ValidateUpdateTransaction(input)
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Transaction{}, fmt.Errorf("begin update transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	current, err := loadActiveTransaction(ctx, tx, userID, transactionID)
+	if err != nil {
+		return Transaction{}, err
+	}
+	balances, err := lockWalletBalances(ctx, tx, userID, transactionWalletIDs(current, normalized))
+	if err != nil {
+		return Transaction{}, err
+	}
+	if err := requireTransactionCategory(ctx, tx, userID, normalized.SourceWalletID, normalized.CategoryID, normalized.Type); err != nil {
+		return Transaction{}, err
+	}
+
+	reverseTransactionEffect(balances, current)
+	effect, err := ApplyAccountingEffect(AccountingInput{
+		Type:                  normalized.Type,
+		AmountVND:             normalized.AmountVND,
+		SourceWalletID:        normalized.SourceWalletID,
+		DestinationWalletID:   normalized.DestinationWalletID,
+		SourceBalanceVND:      balances[normalized.SourceWalletID],
+		DestinationBalanceVND: balances[normalized.DestinationWalletID],
+		TargetBalanceVND:      normalized.TargetBalanceVND,
+	})
+	if err != nil {
+		return Transaction{}, err
+	}
+	balances[normalized.SourceWalletID] = effect.SourceBalanceVND
+	if normalized.Type == TransactionTransfer {
+		balances[normalized.DestinationWalletID] = effect.DestinationBalanceVND
+	}
+	if err := updateWalletBalances(ctx, tx, userID, balances); err != nil {
+		return Transaction{}, err
+	}
+
+	updated, err := updateTransactionRow(ctx, tx, userID, transactionID, normalized, effect)
+	if err != nil {
+		return Transaction{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Transaction{}, fmt.Errorf("commit update transaction: %w", err)
+	}
+	return updated, nil
+}
+
+func (r *Repository) ArchiveTransaction(ctx context.Context, userID string, transactionID string) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return fmt.Errorf("begin archive transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	current, err := loadActiveTransaction(ctx, tx, userID, transactionID)
+	if err != nil {
+		return err
+	}
+	balances, err := lockWalletBalances(ctx, tx, userID, transactionWalletIDs(current, CreateTransactionInput{}))
+	if err != nil {
+		return err
+	}
+	reverseTransactionEffect(balances, current)
+	if err := updateWalletBalances(ctx, tx, userID, balances); err != nil {
+		return err
+	}
+
+	result, err := tx.ExecContext(ctx, `
+		UPDATE transactions
+		SET archived_at = now(), updated_at = now(), version = version + 1
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+	`, transactionID, userID)
+	if err != nil {
+		return fmt.Errorf("archive transaction: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("archive transaction rows affected: %w", err)
+	}
+	if affected == 0 {
+		return ErrForbidden
+	}
+	if err := tx.Commit(); err != nil {
+		return fmt.Errorf("commit archive transaction: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) ListTransactions(ctx context.Context, userID string, filters TransactionFilters) ([]Transaction, error) {
+	walletID := trimmed(filters.WalletID)
+	categoryID := trimmed(filters.CategoryID)
+	txType := string(filters.Type)
+	query := "%" + trimmed(filters.Query) + "%"
+	if query == "%%" {
+		query = ""
+	}
+	var excluded any
+	if filters.ExcludedFromReports != nil {
+		excluded = *filters.ExcludedFromReports
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			id::text,
+			user_id::text,
+			type,
+			source_wallet_id::text,
+			coalesce(destination_wallet_id::text, ''),
+			coalesce(category_id::text, ''),
+			amount_vnd,
+			coalesce(balance_after_vnd, 0),
+			source_delta_vnd,
+			destination_delta_vnd,
+			occurred_at,
+			note,
+			with_person,
+			event_ref,
+			excluded_from_reports,
+			version
+		FROM transactions
+		WHERE user_id = $1
+			AND ($2 = '' OR source_wallet_id::text = $2 OR coalesce(destination_wallet_id::text, '') = $2)
+			AND ($3 = '' OR coalesce(category_id::text, '') = $3)
+			AND ($4 = '' OR type = $4)
+			AND ($5::timestamptz IS NULL OR occurred_at >= $5)
+			AND ($6::timestamptz IS NULL OR occurred_at <= $6)
+			AND ($7 = '' OR note ILIKE $7 OR with_person ILIKE $7 OR event_ref ILIKE $7)
+			AND ($8::boolean IS NULL OR excluded_from_reports = $8)
+			AND ($9 OR archived_at IS NULL)
+		ORDER BY occurred_at DESC, created_at DESC, id DESC
+	`, userID, walletID, categoryID, txType, filters.DateFrom, filters.DateTo, query, excluded, filters.IncludeArchivedItems)
+	if err != nil {
+		return nil, fmt.Errorf("list transactions: %w", err)
+	}
+	defer rows.Close()
+
+	var transactions []Transaction
+	for rows.Next() {
+		transaction, err := scanTransaction(rows)
+		if err != nil {
+			return nil, err
+		}
+		transactions = append(transactions, transaction)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("transaction rows: %w", err)
+	}
+	return transactions, nil
 }
 
 func loadIdempotentTransaction(ctx context.Context, tx *sql.Tx, userID string, key string, requestHash string) (Transaction, bool, error) {
@@ -441,6 +600,38 @@ func loadIdempotentTransaction(ctx context.Context, tx *sql.Tx, userID string, k
 	return transaction, true, nil
 }
 
+func loadActiveTransaction(ctx context.Context, tx *sql.Tx, userID string, transactionID string) (Transaction, error) {
+	transaction, err := queryTransaction(ctx, tx, `
+		SELECT
+			id::text,
+			user_id::text,
+			type,
+			source_wallet_id::text,
+			coalesce(destination_wallet_id::text, ''),
+			coalesce(category_id::text, ''),
+			amount_vnd,
+			coalesce(balance_after_vnd, 0),
+			source_delta_vnd,
+			destination_delta_vnd,
+			occurred_at,
+			note,
+			with_person,
+			event_ref,
+			excluded_from_reports,
+			version
+		FROM transactions
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+		FOR UPDATE
+	`, transactionID, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Transaction{}, ErrForbidden
+	}
+	if err != nil {
+		return Transaction{}, fmt.Errorf("load transaction: %w", err)
+	}
+	return transaction, nil
+}
+
 func lockWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletID string) (int64, error) {
 	var balanceVND int64
 	err := tx.QueryRowContext(ctx, `
@@ -456,6 +647,31 @@ func lockWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletID 
 		return 0, fmt.Errorf("lock wallet balance: %w", err)
 	}
 	return balanceVND, nil
+}
+
+func lockWalletBalances(ctx context.Context, tx *sql.Tx, userID string, walletIDs []string) (map[string]int64, error) {
+	unique := make(map[string]struct{}, len(walletIDs))
+	for _, walletID := range walletIDs {
+		walletID = trimmed(walletID)
+		if walletID != "" {
+			unique[walletID] = struct{}{}
+		}
+	}
+	ordered := make([]string, 0, len(unique))
+	for walletID := range unique {
+		ordered = append(ordered, walletID)
+	}
+	sort.Strings(ordered)
+
+	balances := make(map[string]int64, len(ordered))
+	for _, walletID := range ordered {
+		balance, err := lockWalletBalance(ctx, tx, userID, walletID)
+		if err != nil {
+			return nil, err
+		}
+		balances[walletID] = balance
+	}
+	return balances, nil
 }
 
 func requireTransactionCategory(ctx context.Context, tx *sql.Tx, userID string, walletID string, categoryID string, txType TransactionType) error {
@@ -526,9 +742,23 @@ func updateWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletI
 	return nil
 }
 
-func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input CreateTransactionInput, balanceAfterVND int64) (Transaction, error) {
+func updateWalletBalances(ctx context.Context, tx *sql.Tx, userID string, balances map[string]int64) error {
+	walletIDs := make([]string, 0, len(balances))
+	for walletID := range balances {
+		walletIDs = append(walletIDs, walletID)
+	}
+	sort.Strings(walletIDs)
+	for _, walletID := range walletIDs {
+		if err := updateWalletBalance(ctx, tx, userID, walletID, balances[walletID]); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input CreateTransactionInput, effect AccountingEffect) (Transaction, error) {
 	var transaction Transaction
-	err := tx.QueryRowContext(ctx, `
+	returning := `
 		INSERT INTO transactions (
 			user_id,
 			type,
@@ -537,13 +767,15 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 			category_id,
 			amount_vnd,
 			balance_after_vnd,
+			source_delta_vnd,
+			destination_delta_vnd,
 			note,
 			with_person,
 			event_ref,
 			occurred_at,
 			excluded_from_reports
 		)
-		VALUES ($1, $2, $3, NULLIF($4, '')::uuid, NULLIF($5, '')::uuid, $6, $7, $8, $9, $10, $11, $12)
+		VALUES ($1, $2, $3, NULLIF($4, '')::uuid, NULLIF($5, '')::uuid, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING
 			id::text,
 			user_id::text,
@@ -553,20 +785,25 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 			coalesce(category_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
+			source_delta_vnd,
+			destination_delta_vnd,
 			occurred_at,
 			note,
 			with_person,
 			event_ref,
 			excluded_from_reports,
 			version
-	`,
+	`
+	err := tx.QueryRowContext(ctx, returning,
 		userID,
 		string(input.Type),
 		input.SourceWalletID,
 		input.DestinationWalletID,
 		input.CategoryID,
 		input.AmountVND,
-		balanceAfterVND,
+		effect.SourceBalanceVND,
+		effect.SourceDeltaVND,
+		effect.DestinationDeltaVND,
 		input.Note,
 		input.WithPerson,
 		input.EventRef,
@@ -581,6 +818,8 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 		&transaction.CategoryID,
 		&transaction.AmountVND,
 		&transaction.BalanceAfterVND,
+		&transaction.SourceDeltaVND,
+		&transaction.DestinationDeltaVND,
 		&transaction.OccurredAt,
 		&transaction.Note,
 		&transaction.WithPerson,
@@ -592,6 +831,121 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 		return Transaction{}, fmt.Errorf("insert transaction: %w", err)
 	}
 	return transaction, nil
+}
+
+func updateTransactionRow(ctx context.Context, tx *sql.Tx, userID string, transactionID string, input CreateTransactionInput, effect AccountingEffect) (Transaction, error) {
+	transaction, err := queryTransaction(ctx, tx, `
+		UPDATE transactions
+		SET
+			type = $3,
+			source_wallet_id = $4,
+			destination_wallet_id = NULLIF($5, '')::uuid,
+			category_id = NULLIF($6, '')::uuid,
+			amount_vnd = $7,
+			balance_after_vnd = $8,
+			source_delta_vnd = $9,
+			destination_delta_vnd = $10,
+			note = $11,
+			with_person = $12,
+			event_ref = $13,
+			occurred_at = $14,
+			excluded_from_reports = $15,
+			updated_at = now(),
+			version = version + 1
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+		RETURNING
+			id::text,
+			user_id::text,
+			type,
+			source_wallet_id::text,
+			coalesce(destination_wallet_id::text, ''),
+			coalesce(category_id::text, ''),
+			amount_vnd,
+			coalesce(balance_after_vnd, 0),
+			source_delta_vnd,
+			destination_delta_vnd,
+			occurred_at,
+			note,
+			with_person,
+			event_ref,
+			excluded_from_reports,
+			version
+	`,
+		transactionID,
+		userID,
+		string(input.Type),
+		input.SourceWalletID,
+		input.DestinationWalletID,
+		input.CategoryID,
+		input.AmountVND,
+		effect.SourceBalanceVND,
+		effect.SourceDeltaVND,
+		effect.DestinationDeltaVND,
+		input.Note,
+		input.WithPerson,
+		input.EventRef,
+		input.OccurredAt,
+		input.ExcludedFromReports,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Transaction{}, ErrForbidden
+	}
+	if err != nil {
+		return Transaction{}, fmt.Errorf("update transaction row: %w", err)
+	}
+	return transaction, nil
+}
+
+type transactionScanner interface {
+	Scan(dest ...any) error
+}
+
+func queryTransaction(ctx context.Context, tx *sql.Tx, query string, args ...any) (Transaction, error) {
+	return scanTransaction(tx.QueryRowContext(ctx, query, args...))
+}
+
+func scanTransaction(scanner transactionScanner) (Transaction, error) {
+	var transaction Transaction
+	err := scanner.Scan(
+		&transaction.ID,
+		&transaction.UserID,
+		&transaction.Type,
+		&transaction.SourceWalletID,
+		&transaction.DestinationWalletID,
+		&transaction.CategoryID,
+		&transaction.AmountVND,
+		&transaction.BalanceAfterVND,
+		&transaction.SourceDeltaVND,
+		&transaction.DestinationDeltaVND,
+		&transaction.OccurredAt,
+		&transaction.Note,
+		&transaction.WithPerson,
+		&transaction.EventRef,
+		&transaction.ExcludedFromReports,
+		&transaction.Version,
+	)
+	if err != nil {
+		return Transaction{}, err
+	}
+	return transaction, nil
+}
+
+func transactionWalletIDs(current Transaction, next CreateTransactionInput) []string {
+	walletIDs := []string{current.SourceWalletID, current.DestinationWalletID}
+	if next.SourceWalletID != "" {
+		walletIDs = append(walletIDs, next.SourceWalletID)
+	}
+	if next.DestinationWalletID != "" {
+		walletIDs = append(walletIDs, next.DestinationWalletID)
+	}
+	return walletIDs
+}
+
+func reverseTransactionEffect(balances map[string]int64, transaction Transaction) {
+	balances[transaction.SourceWalletID] -= transaction.SourceDeltaVND
+	if transaction.DestinationWalletID != "" {
+		balances[transaction.DestinationWalletID] -= transaction.DestinationDeltaVND
+	}
 }
 
 func (r *Repository) getCategoryForUser(ctx context.Context, userID string, categoryID string) (Category, error) {

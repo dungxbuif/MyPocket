@@ -424,6 +424,156 @@ func TestRepositoryRejectsTransactionForAnotherUsersWallet(t *testing.T) {
 	assertWalletBalance(t, conn, wallet.ID, 0, 1)
 }
 
+func TestRepositoryUpdatesTransactionByReversingAndReapplyingEffect(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userID := createFinanceUser(t, conn, "tx-edit@example.com")
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	incomeCategoryID := findSystemCategory(t, conn, "income_salary")
+	expenseCategoryID := findSystemCategory(t, conn, "expense_food")
+	created, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
+		IdempotencyKey: "edit-base-1",
+		Type:           finance.TransactionIncome,
+		SourceWalletID: wallet.ID,
+		CategoryID:     incomeCategoryID,
+		AmountVND:      500_000,
+		OccurredAt:     fixedFinanceTime(),
+	})
+	if err != nil {
+		t.Fatalf("create transaction: %v", err)
+	}
+
+	updated, err := repo.UpdateTransaction(context.Background(), userID, created.ID, finance.UpdateTransactionInput{
+		Type:                finance.TransactionExpense,
+		SourceWalletID:      wallet.ID,
+		CategoryID:          expenseCategoryID,
+		AmountVND:           125_000,
+		OccurredAt:          fixedFinanceTime().Add(3 * time.Hour),
+		Note:                "Bữa tối",
+		ExcludedFromReports: true,
+	})
+	if err != nil {
+		t.Fatalf("update transaction: %v", err)
+	}
+
+	assertWalletBalance(t, conn, wallet.ID, -125_000, 3)
+	if updated.Type != finance.TransactionExpense || updated.AmountVND != 125_000 || updated.BalanceAfterVND != -125_000 || updated.Version != 2 {
+		t.Fatalf("updated transaction has wrong accounting state: %#v", updated)
+	}
+	if !updated.ExcludedFromReports || updated.Note != "Bữa tối" {
+		t.Fatalf("updated transaction metadata not persisted: %#v", updated)
+	}
+}
+
+func TestRepositoryArchivesTransactionByReversingEffectOnce(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userID := createFinanceUser(t, conn, "tx-archive@example.com")
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	categoryID := findSystemCategory(t, conn, "income_salary")
+	created, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
+		IdempotencyKey: "archive-base-1",
+		Type:           finance.TransactionIncome,
+		SourceWalletID: wallet.ID,
+		CategoryID:     categoryID,
+		AmountVND:      200_000,
+		OccurredAt:     fixedFinanceTime(),
+	})
+	if err != nil {
+		t.Fatalf("create transaction: %v", err)
+	}
+
+	if err := repo.ArchiveTransaction(context.Background(), userID, created.ID); err != nil {
+		t.Fatalf("archive transaction: %v", err)
+	}
+	assertWalletBalance(t, conn, wallet.ID, 0, 3)
+	if err := repo.ArchiveTransaction(context.Background(), userID, created.ID); !errors.Is(err, finance.ErrForbidden) {
+		t.Fatalf("expected second archive to be forbidden, got %v", err)
+	}
+	assertWalletBalance(t, conn, wallet.ID, 0, 3)
+}
+
+func TestRepositoryListsTransactionsWithFilters(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userA := createFinanceUser(t, conn, "tx-list-a@example.com")
+	userB := createFinanceUser(t, conn, "tx-list-b@example.com")
+	walletA := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletCash)
+	walletB := createFinanceWallet(t, repo, userA, "Ngân hàng", finance.WalletBank)
+	otherWallet := createFinanceWallet(t, repo, userB, "Other", finance.WalletCash)
+	incomeCategoryID := findSystemCategory(t, conn, "income_salary")
+	expenseCategoryID := findSystemCategory(t, conn, "expense_food")
+	base := fixedFinanceTime()
+
+	coffee, err := repo.CreateTransaction(context.Background(), userA, finance.CreateTransactionInput{
+		IdempotencyKey: "list-coffee",
+		Type:           finance.TransactionExpense,
+		SourceWalletID: walletA.ID,
+		CategoryID:     expenseCategoryID,
+		AmountVND:      45_000,
+		OccurredAt:     base.Add(time.Hour),
+		Note:           "Cafe sáng",
+	})
+	if err != nil {
+		t.Fatalf("create coffee: %v", err)
+	}
+	_, err = repo.CreateTransaction(context.Background(), userA, finance.CreateTransactionInput{
+		IdempotencyKey: "list-income",
+		Type:           finance.TransactionIncome,
+		SourceWalletID: walletB.ID,
+		CategoryID:     incomeCategoryID,
+		AmountVND:      1_000_000,
+		OccurredAt:     base.Add(2 * time.Hour),
+		Note:           "Lương",
+	})
+	if err != nil {
+		t.Fatalf("create income: %v", err)
+	}
+	excluded, err := repo.CreateTransaction(context.Background(), userA, finance.CreateTransactionInput{
+		IdempotencyKey:      "list-excluded",
+		Type:                finance.TransactionExpense,
+		SourceWalletID:      walletA.ID,
+		CategoryID:          expenseCategoryID,
+		AmountVND:           20_000,
+		OccurredAt:          base.Add(3 * time.Hour),
+		Note:                "Cafe excluded",
+		ExcludedFromReports: true,
+	})
+	if err != nil {
+		t.Fatalf("create excluded: %v", err)
+	}
+	_, err = repo.CreateTransaction(context.Background(), userB, finance.CreateTransactionInput{
+		IdempotencyKey: "list-other-user",
+		Type:           finance.TransactionIncome,
+		SourceWalletID: otherWallet.ID,
+		CategoryID:     incomeCategoryID,
+		AmountVND:      9_000_000,
+		OccurredAt:     base.Add(4 * time.Hour),
+		Note:           "Hidden",
+	})
+	if err != nil {
+		t.Fatalf("create other user transaction: %v", err)
+	}
+
+	excludedOnly := true
+	got, err := repo.ListTransactions(context.Background(), userA, finance.TransactionFilters{
+		WalletID:             walletA.ID,
+		CategoryID:           expenseCategoryID,
+		Type:                 finance.TransactionExpense,
+		DateFrom:             ptrTime(base),
+		DateTo:               ptrTime(base.Add(4 * time.Hour)),
+		Query:                "cafe",
+		ExcludedFromReports:  &excludedOnly,
+		IncludeArchivedItems: false,
+	})
+	if err != nil {
+		t.Fatalf("list transactions: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != excluded.ID {
+		t.Fatalf("expected only excluded cafe transaction, got %#v; coffee=%s", got, coffee.ID)
+	}
+}
+
 func migratedFinancePostgres(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -528,6 +678,10 @@ func assertWalletBalance(t *testing.T, conn *sql.DB, walletID string, wantBalanc
 }
 
 func ptrBool(value bool) *bool {
+	return &value
+}
+
+func ptrTime(value time.Time) *time.Time {
 	return &value
 }
 

@@ -160,7 +160,7 @@ All state-changing endpoints require `X-CSRF-Token`; retryable creates and edits
 - `wallets`: `id`, `user_id`, `name`, `type`, `balance_vnd`, `include_in_total`, `is_default_ai`, `archived_at`, `version`, credit metadata, timestamps.
 - `categories`: `id`, nullable `user_id`, nullable `parent_id`, `kind`, `name`, `system_key`, `is_system`, `archived_at`, timestamps.
 - `wallet_category_settings`: `wallet_id`, `category_id`, `is_active`, timestamps.
-- `transactions`: `id`, `user_id`, `type`, `source_wallet_id`, optional `destination_wallet_id`, optional `category_id`, `amount_vnd`, `occurred_at`, `note`, `with_person`, `event_id`, `receipt_object_id`, `excluded_from_reports`, `archived_at`, `version`, timestamps.
+- `transactions`: `id`, `user_id`, `type`, `source_wallet_id`, optional `destination_wallet_id`, optional `category_id`, `amount_vnd`, `balance_after_vnd`, `source_delta_vnd`, `destination_delta_vnd`, `occurred_at`, `note`, `with_person`, `event_id`, `receipt_object_id`, `excluded_from_reports`, `archived_at`, `version`, timestamps.
 - `finance_idempotency_keys`: `user_id`, `key`, `request_hash`, `response_json`, `created_at`.
 - `receipt_objects`: `id`, `user_id`, optional `transaction_id`, `object_key`, `content_type`, `size_bytes`, `checksum_sha256`, timestamps.
 

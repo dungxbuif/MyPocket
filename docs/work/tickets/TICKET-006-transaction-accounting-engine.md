@@ -131,11 +131,23 @@ AI fill:
 - Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
 - Result: pass
 - Notes: Backend regression passed after transaction repository changes.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -run 'TestRepositoryUpdatesTransaction|TestRepositoryArchivesTransaction|TestRepositoryListsTransactions' -count=1`
+- Result: pass
+- Notes: RED first failed because `UpdateTransaction`, `ArchiveTransaction`, `ListTransactions`, `UpdateTransactionInput`, and `TransactionFilters` were missing; GREEN passed after edit/archive/search repository implementation.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/platform/db -run TestPhase002FinanceTablesAndSeeds -count=1`
+- Result: pass
+- Notes: Migration test passed after adding transaction delta columns for exact reversal.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`
+- Result: pass
+- Notes: Full finance package regression passed after edit/archive/search implementation. A previous parallel DB-backed run failed due shared test schema resets, then passed when rerun sequentially.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
+- Result: pass
+- Notes: Backend regression passed after edit/archive/search implementation.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 2 / 5
+- Total fix/test cycles: 3 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -144,7 +156,7 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: transaction workflows update balances exactly and remain idempotent under retry.
-- Verified behavior: domain accounting effect validation and repository create flow now prove exact income, expense, transfer, and adjustment balance deltas, atomic wallet version/balance updates, category activation validation, duplicate idempotent replay, changed-request idempotency rejection, and user-owned wallet enforcement. Edit/archive, search, API, and mobile workflows remain pending.
+- Verified behavior: domain accounting effect validation and repository create/edit/archive/search flows now prove exact income, expense, transfer, and adjustment balance deltas, atomic wallet version/balance updates, category activation validation, duplicate idempotent replay, changed-request idempotency rejection, user-owned wallet enforcement, edit reversal/reapply, archive reversal once, and user-scoped filtered listing. Transaction API and mobile workflows remain pending.
 - Sign-off: pending.
 
 ## Docs Review
@@ -152,7 +164,7 @@ AI fill:
 - Requirements updated or not needed reason: not needed; accounting behavior follows accepted REQ-F-003/REQ-NF-002/REQ-NF-005 scope.
 - Architecture updated or not needed reason: not needed for this slice; repository behavior follows approved finance module boundary.
 - API updated or not needed reason: pending transaction API implementation.
-- ERD/data updated or not needed reason: existing PHASE-002 transaction and idempotency tables still match the repository create slice.
+- ERD/data updated or not needed reason: updated `docs/architecture/ERD.md` with persisted transaction delta columns needed for exact edit/archive reversal.
 - ADR created or not needed reason: not needed; no divergence from ADR-003 or approved PHASE-002 design.
 - `docs/CONTEXT.md` updated: yes.
 

@@ -262,9 +262,9 @@ Run: `rtk go test ./internal/finance -run TestAccountingEffects`
 
 Expected: FAIL because accounting functions are missing.
 
-- [ ] **Step 3: Implement accounting and transaction service**
+- [x] **Step 3: Implement accounting and transaction service**
 
-Accounting effects and create transaction persistence are implemented and verified. Edit/archive reversal and search remain pending.
+Accounting effects, create transaction persistence, edit/archive reversal, and repository search are implemented and verified. HTTP API and mobile transaction workflows remain pending in later tasks.
 
 Rules:
 - amount must be positive
@@ -274,9 +274,9 @@ Rules:
 - adjustment stores target balance as amount and computes delta internally
 - edit/archive reverses old effect before applying new state
 
-- [ ] **Step 4: Add integration tests**
+- [x] **Step 4: Add integration tests**
 
-Create transaction integration tests now cover income, expense, transfer, adjustment, duplicate idempotent replay, idempotency conflict rejection, inactive category rejection, cross-user wallet rejection, and wallet balance/version updates. Edit/archive reversal and search filters remain pending.
+Integration tests now cover income, expense, transfer, adjustment, duplicate idempotent replay, idempotency conflict rejection, inactive category rejection, cross-user wallet rejection, wallet balance/version updates, edit reversal/reapply, archive reversal once, and search filters.
 
 Cover:
 - create income/expense/transfer/adjustment updates balances in one DB transaction
@@ -285,7 +285,7 @@ Cover:
 - archive reverses effect once and sets `archived_at`
 - search filters remain user-scoped
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance`
 
