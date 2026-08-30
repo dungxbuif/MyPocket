@@ -37,6 +37,7 @@ shared_fields: [status]
 - Added repository transaction edit/archive reversal and user-scoped transaction search filters backed by persisted transaction deltas.
 - Added authenticated transaction HTTP routes for create, edit, archive, and filtered listing with CSRF and idempotency header support.
 - Added API-backed mobile transaction listing, search, and expense creation from the quick-add sheet.
+- Added user-scoped receipt metadata persistence with private object-key and SHA-256 validation.
 
 ### Planning
 

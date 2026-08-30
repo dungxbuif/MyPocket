@@ -153,6 +153,25 @@ type Transaction struct {
 	Version             int64           `json:"version"`
 }
 
+type ReceiptObject struct {
+	ID               string    `json:"id"`
+	UserID           string    `json:"user_id"`
+	ObjectKey        string    `json:"object_key"`
+	ContentType      string    `json:"content_type"`
+	SizeBytes        int64     `json:"size_bytes"`
+	ChecksumSHA256   string    `json:"checksum_sha256"`
+	OriginalFilename string    `json:"original_filename"`
+	CreatedAt        time.Time `json:"created_at"`
+}
+
+type CreateReceiptObjectInput struct {
+	ObjectKey        string
+	ContentType      string
+	SizeBytes        int64
+	ChecksumSHA256   string
+	OriginalFilename string
+}
+
 func trimmed(value string) string {
 	return strings.TrimSpace(value)
 }

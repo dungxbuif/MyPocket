@@ -19,6 +19,40 @@ func NewRepository(db *sql.DB) *Repository {
 	return &Repository{db: db}
 }
 
+func (r *Repository) CreateReceiptObject(ctx context.Context, userID string, input CreateReceiptObjectInput) (ReceiptObject, error) {
+	input, err := ValidateCreateReceiptObject(input)
+	if err != nil {
+		return ReceiptObject{}, err
+	}
+	var receipt ReceiptObject
+	err = r.db.QueryRowContext(ctx, `
+		INSERT INTO receipt_objects (user_id, object_key, content_type, size_bytes, checksum_sha256, original_filename)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING id::text, user_id::text, object_key, content_type, size_bytes, checksum_sha256, original_filename, created_at
+	`, userID, input.ObjectKey, input.ContentType, input.SizeBytes, input.ChecksumSHA256, input.OriginalFilename).Scan(
+		&receipt.ID, &receipt.UserID, &receipt.ObjectKey, &receipt.ContentType, &receipt.SizeBytes, &receipt.ChecksumSHA256, &receipt.OriginalFilename, &receipt.CreatedAt,
+	)
+	if err != nil {
+		return ReceiptObject{}, fmt.Errorf("create receipt object: %w", err)
+	}
+	return receipt, nil
+}
+
+func (r *Repository) GetReceiptObject(ctx context.Context, userID, receiptID string) (ReceiptObject, error) {
+	var receipt ReceiptObject
+	err := r.db.QueryRowContext(ctx, `
+		SELECT id::text, user_id::text, object_key, content_type, size_bytes, checksum_sha256, original_filename, created_at
+		FROM receipt_objects WHERE id = $1 AND user_id = $2
+	`, receiptID, userID).Scan(&receipt.ID, &receipt.UserID, &receipt.ObjectKey, &receipt.ContentType, &receipt.SizeBytes, &receipt.ChecksumSHA256, &receipt.OriginalFilename, &receipt.CreatedAt)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ReceiptObject{}, ErrForbidden
+	}
+	if err != nil {
+		return ReceiptObject{}, fmt.Errorf("get receipt object: %w", err)
+	}
+	return receipt, nil
+}
+
 func (r *Repository) CreateWallet(ctx context.Context, userID string, input CreateWalletInput) (Wallet, error) {
 	input, err := ValidateCreateWallet(input)
 	if err != nil {

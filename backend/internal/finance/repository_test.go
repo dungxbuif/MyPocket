@@ -46,6 +46,33 @@ func TestRepositoryListsOnlyUserWallets(t *testing.T) {
 	}
 }
 
+func TestRepositoryStoresUserScopedReceiptMetadata(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	owner := createFinanceUser(t, conn, "receipt-owner@example.com")
+	other := createFinanceUser(t, conn, "receipt-other@example.com")
+	receipt, err := repo.CreateReceiptObject(context.Background(), owner, finance.CreateReceiptObjectInput{ObjectKey: "users/owner/receipt.jpg", ContentType: "image/jpeg", SizeBytes: 1234, ChecksumSHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", OriginalFilename: "hoa-don.jpg"})
+	if err != nil {
+		t.Fatalf("create receipt: %v", err)
+	}
+	loaded, err := repo.GetReceiptObject(context.Background(), owner, receipt.ID)
+	if err != nil || loaded.ObjectKey != receipt.ObjectKey {
+		t.Fatalf("load receipt: %#v %v", loaded, err)
+	}
+	if _, err := repo.GetReceiptObject(context.Background(), other, receipt.ID); !errors.Is(err, finance.ErrForbidden) {
+		t.Fatalf("expected scoped receipt access denial, got %v", err)
+	}
+}
+
+func TestRepositoryRejectsInvalidReceiptMetadata(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	owner := createFinanceUser(t, conn, "receipt-invalid@example.com")
+	if _, err := repo.CreateReceiptObject(context.Background(), owner, finance.CreateReceiptObjectInput{ObjectKey: "x", ContentType: "image/jpeg", SizeBytes: 1, ChecksumSHA256: "bad"}); !errors.Is(err, finance.ErrValidation) {
+		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
 func TestRepositoryAllowsOneActiveDefaultAIWalletPerUser(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)

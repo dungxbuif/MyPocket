@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-007
-status: ready
+status: in_review
 owner: human
 priority: high
 lane: high-risk
@@ -43,7 +43,7 @@ trace:
 ## Status
 
 - ID: TICKET-007
-- Status: ready
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-002
@@ -102,9 +102,9 @@ AI fill:
 
 ## Verification Results
 
-- Command: not_run
-- Result: pending
-- Notes: Implementation has not started.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./internal/finance -count=1`
+- Result: pass
+- Notes: Receipt metadata validation, persistence, and user-scoped reads are covered by PostgreSQL-backed repository tests; seeded categories remain covered by the existing migration test.
 
 ## Fix/Test Attempt Log
 
@@ -118,7 +118,7 @@ AI fill:
 - Required: no
 - Reason if not required: seed and metadata foundation is not directly user-facing in this phase.
 - Expected behavior: not applicable.
-- Verified behavior: pending implementation.
+- Verified behavior: receipt object keys, content metadata, positive size, SHA-256 format, persistence, and cross-user access isolation are verified; metadata storage does not create accounting effects.
 - Sign-off: not required.
 
 ## Docs Review
@@ -132,14 +132,14 @@ AI fill:
 
 ## Completion Checklist
 
-- [ ] Implementation complete
-- [ ] Tests run and recorded
+- [x] Implementation complete
+- [x] Tests run and recorded
 - [ ] Fix/test loop guard respected
 - [ ] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
 - [ ] Master docs reconciled
 - [ ] Docs review completed
 - [ ] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
+- [x] `docs/CONTEXT.md` updated
+- [x] `docs/work/BACKLOG.md` updated
 - [ ] Trace links updated

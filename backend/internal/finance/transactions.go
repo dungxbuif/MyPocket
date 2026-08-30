@@ -7,6 +7,22 @@ import (
 	"fmt"
 )
 
+func ValidateCreateReceiptObject(input CreateReceiptObjectInput) (CreateReceiptObjectInput, error) {
+	input.ObjectKey = trimmed(input.ObjectKey)
+	input.ContentType = trimmed(input.ContentType)
+	input.ChecksumSHA256 = trimmed(input.ChecksumSHA256)
+	input.OriginalFilename = trimmed(input.OriginalFilename)
+	if input.ObjectKey == "" || input.ContentType == "" || input.SizeBytes <= 0 || len(input.ChecksumSHA256) != sha256.Size*2 {
+		return CreateReceiptObjectInput{}, ErrValidation
+	}
+	for _, char := range input.ChecksumSHA256 {
+		if !((char >= '0' && char <= '9') || (char >= 'a' && char <= 'f') || (char >= 'A' && char <= 'F')) {
+			return CreateReceiptObjectInput{}, ErrValidation
+		}
+	}
+	return input, nil
+}
+
 func ApplyAccountingEffect(input AccountingInput) (AccountingEffect, error) {
 	input.SourceWalletID = trimmed(input.SourceWalletID)
 	input.DestinationWalletID = trimmed(input.DestinationWalletID)

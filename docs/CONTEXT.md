@@ -32,7 +32,7 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, backend wallet/category repository behavior, initial wallet/category API routes, API-driven mobile wallet/category display, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, and mobile transaction list/search/create UI are implemented with automated proof.
+- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, receipt metadata validation/persistence, backend wallet/category repository behavior, initial wallet/category API routes, API-driven mobile wallet/category display, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, and mobile transaction list/search/create UI are implemented with automated proof.
 - Active backlog: [BL-002](work/BACKLOG.md)
 - Current queue focus: execute PHASE-002 finance core; TICKET-005 wallet/category foundation is partially implemented and TICKET-006 transaction accounting has started.
 - Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `ready`.
@@ -111,7 +111,7 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 
 ## Next Steps
 
-1. Add mobile transaction edit/archive controls against `/api/v1/transactions/{id}` and complete UAT.
+1. Add mobile transaction edit/archive controls against `/api/v1/transactions/{id}` and complete UAT (requires design review because TICKET-006 reached its loop guard).
 2. Complete remaining TICKET-005 wallet/category mutation API routes and mobile create/edit controls before PHASE-002 review.
 3. Run PHASE-002 frontend build/E2E proof and record UAT gaps.
 
