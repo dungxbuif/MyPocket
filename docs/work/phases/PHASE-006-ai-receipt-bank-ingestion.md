@@ -23,6 +23,7 @@ trace:
   backlog_items:
     - BL-006
   roadmap: ../ROADMAP.md
+  detail_design: PHASE-006-detail-design.md
   requirements:
     - REQ-F-007
     - REQ-F-008
@@ -58,6 +59,7 @@ trace:
 
 - Backlog: [BACKLOG.md](../BACKLOG.md)
 - Roadmap: [ROADMAP.md](../ROADMAP.md)
+- Detail design: [PHASE-006-detail-design.md](PHASE-006-detail-design.md) — approved 2026-08-30
 - Requirements: [REQUIREMENTS.md](../../requirements/REQUIREMENTS.md) — REQ-F-007, REQ-F-008, REQ-F-009, REQ-F-010, REQ-F-011, REQ-NF-004, REQ-NF-008
 - Test verification: created during execution
 - Validation matrix: [VALIDATION_MATRIX.md](../VALIDATION_MATRIX.md)
@@ -126,10 +128,10 @@ Deliver text AI, receipt OCR, AI-chat images, signed bank webhooks, and one safe
 - [x] Risks and dependencies are recorded
 - [x] Verification plan is defined
 - [x] Release/changelog need is linked
+- [x] Detail design is approved
 - [ ] Ticket artifacts and detailed implementation plan are created
 - [ ] Phase status is promoted to ready after plan review
 
 ## Completion Summary
 
 No implementation has started. Completion evidence will be recorded after the phase reaches execution.
-

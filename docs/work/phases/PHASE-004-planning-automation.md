@@ -23,6 +23,7 @@ trace:
   backlog_items:
     - BL-004
   roadmap: ../ROADMAP.md
+  detail_design: PHASE-004-detail-design.md
   requirements:
     - REQ-F-005
     - REQ-F-012
@@ -55,6 +56,7 @@ trace:
 
 - Backlog: [BACKLOG.md](../BACKLOG.md)
 - Roadmap: [ROADMAP.md](../ROADMAP.md)
+- Detail design: [PHASE-004-detail-design.md](PHASE-004-detail-design.md) — approved 2026-08-30
 - Requirements: [REQUIREMENTS.md](../../requirements/REQUIREMENTS.md) — REQ-F-005, REQ-F-012, REQ-NF-002, REQ-NF-005
 - Test verification: created during execution
 - Validation matrix: [VALIDATION_MATRIX.md](../VALIDATION_MATRIX.md)
@@ -122,10 +124,10 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 - [x] Risks and dependencies are recorded
 - [x] Verification plan is defined
 - [x] Release/changelog need is linked
+- [x] Detail design is approved
 - [ ] Ticket artifacts and detailed implementation plan are created
 - [ ] Phase status is promoted to ready after plan review
 
 ## Completion Summary
 
 No implementation has started. Completion evidence will be recorded after the phase reaches execution.
-

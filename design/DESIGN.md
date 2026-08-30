@@ -94,3 +94,52 @@ Tabs use icon over label. Active tab sits on a soft gray oval. The plus action o
 - Component/unit tests must assert the five destinations, quick add sheet, offline indicator, and auth state.
 - Browser verification must include mobile viewport screenshots and PWA manifest/service worker presence.
 - Text must not overflow pill buttons, cards, tabs, or the bottom navigation at mobile width.
+
+## PHASE-003 Offline Components
+
+- `SyncStatusPill`: compact synced/syncing/offline/conflict state near the top bar; never blocks cached reading.
+- `PendingMutationBadge`: appears on optimistic wallet, transaction, and planning rows until authoritative replay completes.
+- `ConflictInbox`: full-width list grouped by entity with local intent, server value, timestamp, and three commands: keep server, edit and retry, discard local.
+- `OfflineRecoverySheet`: explains quota, invalid cursor, or resync state with one primary recovery command and preserved-mutation count.
+- Cached screens show `Cập nhật lúc ...`; stale state must not reuse success-green as the only indicator.
+
+## PHASE-004 Planning Components
+
+- `BudgetSummary`: current-period amount, used/remaining values, 80%/100% threshold state, progress bar, and period selector.
+- `BudgetEditorSheet`: name, period, amount, category scope, alert toggles, version conflict state, save/archive commands.
+- `EventList` and `EventEditorSheet`: date range, optional location, grouped totals, and transaction association.
+- `ObligationCard`: borrowed/lent direction, counterparty, principal, repaid, remaining, due date, and repayment history.
+- `RecurringDraftCard`: schedule source, occurrence date, resolved wallet/category, editable proposal, confirm/reject actions.
+- `NotificationInbox`: unread filter, durable notice rows, read state, and push permission status without requiring push support.
+
+## PHASE-005 Dashboard And Report Components
+
+- `NetWorthHeader`: privacy toggle, included-wallet total, offline/stale label, and wallet selector.
+- `RecentTransactions`: real API data, pending-sync badges, empty/error states, and direct edit/archive entry.
+- `GlobalSearchSheet`: grouped transaction, wallet, category, event, and debt results with filters and bounded history.
+- `MetricSummary`: net income, income, expense, and comparison state; zero baselines display `Không thể so sánh`.
+- `CategoryDonut`, `DailyBars`, and `CumulativeTrend`: accessible chart plus adjacent numeric list; color is never the sole meaning.
+- Reports retain compact mobile controls and may use a two-column work surface on desktop without turning sections into floating cards.
+
+## PHASE-006 Ingestion And Draft Components
+
+- `AIComposer`: text entry, image attachment, send/cancel, provider progress, retryable error, and rate-limit state.
+- `ProposalCard`: source, type, amount, wallet/category resolution, editable fields, confidence note, validation issues, confirm/reject.
+- `ReceiptCaptureSheet`: camera/upload source, private upload progress, image preview, OCR status, replace/cancel commands.
+- `DraftReviewQueue`: groups pending AI, OCR, webhook, and recurring proposals while keeping each confirmation independent.
+- No generated result may use confirmed-success styling before the finance confirmation API succeeds.
+
+## PHASE-007 Account, Export, And Audit Components
+
+- `ExportSheet`: dataset/date selection, snapshot description, job progress, failure retry, and expiring download action.
+- `DestructiveActionSheet`: reset/delete scope preview, recent-auth state, typed confirmation, cancel, and job progress; destructive red is reserved for the final command.
+- `AuditViewer`: hidden read-only dense table with time, action, actor, target, correlation ID, filters, and redacted detail drawer.
+- `OperationsStatus`: production/admin documentation component only where appropriate; ordinary users do not see infrastructure health detail.
+
+## Cross-Phase Interaction Rules
+
+- All editors use a bottom sheet on mobile and a constrained dialog on desktop.
+- Mutation buttons expose saving, queued-offline, conflict, retry, success, and validation states without layout shift.
+- Archive is reversible where the domain supports it; account delete is explicitly irreversible after its documented recovery window.
+- Vietnamese text and VND formatting are authoritative UI defaults; raw integer amounts never appear to users.
+- Every list has loading, empty, error, offline-cache, and pagination/end states.

@@ -42,6 +42,7 @@ shared_fields: [status]
 
 ### Planning
 
+- Approved executable detail designs for PHASE-003 through PHASE-007 and extended the shared mobile component design contract through the full M1 release.
 - Approved and recorded the MyPocket React PWA and Go modular-monolith system design.
 - Migrated the source SRS into Harness requirements, user stories, architecture, API, ERD, integrations, SDD, ADRs, roadmap, eight phases, backlog, traceability, and validation planning.
 - Defined the seven-phase initial release and deferred voice-input phase.

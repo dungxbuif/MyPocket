@@ -19,7 +19,7 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-08-26
+updated: 2026-08-30
 ---
 
 # Project Context
@@ -102,6 +102,7 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - Keep receipt OCR and AI-chat images as distinct user flows.
 - Restrict a hidden audit page to `AUDIT_VIEWER_EMAIL`; default retention is 180 days.
 - Defer voice input until the seven initial release phases are verified.
+- User delegated remaining implementation decisions on 2026-08-30; PHASE-003 through PHASE-007 now have approved detail designs and component contracts.
 
 ## Queue Summary
 
@@ -114,6 +115,7 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 1. Add mobile transaction edit/archive controls against `/api/v1/transactions/{id}` and complete UAT (requires design review because TICKET-006 reached its loop guard).
 2. Complete remaining TICKET-005 wallet/category mutation API routes and mobile create/edit controls before PHASE-002 review.
 3. Run PHASE-002 frontend build/E2E proof and record UAT gaps.
+4. Generate bounded ticket artifacts and executable plans from the approved PHASE-003 through PHASE-007 designs as each dependency becomes ready.
 
 ## Open Questions
 
