@@ -41,6 +41,7 @@ shared_fields: [status]
 - Added an IndexedDB-compatible browser outbox layer (localStorage fallback) for optimistic offline transactions and ordered reconnect replay.
 - Added authenticated wallet/category mutation API routes for wallet edit/archive/default AI selection, category create/edit/archive, and per-wallet category activation.
 - Added mobile finance controls for wallet/category management plus income, expense, transfer, adjustment, report exclusion, and transaction edit/archive workflows.
+- Added live mobile Playwright coverage for fixture-login finance CRUD through the real API.
 
 ### Planning
 

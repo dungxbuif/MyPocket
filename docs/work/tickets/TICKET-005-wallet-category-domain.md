@@ -100,9 +100,9 @@ AI fill:
 
 ## Verification Results
 
-- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`; `rtk npm test -- --run`; `rtk npm run build`; `rtk npm run test:e2e`
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`; `rtk npm test -- --run`; `rtk npm run build`; `rtk npm run test:e2e -- finance-crud.spec.ts`; `rtk npm run test:e2e`
 - Result: pass
-- Notes: Unit, PostgreSQL integration, HTTP handler, frontend component, build, and mobile E2E smoke proof covers wallet validation, credit metadata validation, user-scoped wallet listing/create/update/archive behavior, one active default AI wallet, system/user category listing, user category create/update/archive, system category locks, wallet/category activation ownership/upsert, authenticated API scoping for wallet/category routes, API-driven wallet rendering, VND formatting, category display inside the add sheet, and mobile wallet/category manager API calls.
+- Notes: Unit, PostgreSQL integration, HTTP handler, frontend component, build, and mobile E2E proof covers wallet validation, credit metadata validation, user-scoped wallet listing/create/update/archive behavior, one active default AI wallet, system/user category listing, user category create/update/archive, system category locks, wallet/category activation ownership/upsert, authenticated API scoping for wallet/category routes, API-driven wallet rendering, VND formatting, category display inside the add sheet, mobile wallet/category manager API calls, and live browser wallet/category creation through the real API.
 
 ## Fix/Test Attempt Log
 
@@ -116,7 +116,7 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: wallet and category management match Vietnamese finance copy and VND formatting.
-- Verified behavior: mobile overview reads wallet totals from the finance API, add sheet shows loaded categories, and the manager sheet can call wallet/category create/edit/archive/default/activation APIs; full human UAT is pending.
+- Verified behavior: mobile overview reads wallet totals from the finance API, add sheet shows loaded categories, manager sheet can call wallet/category create/edit/archive/default/activation APIs, and live browser E2E creates wallet/category records through the real API; full human UAT is pending.
 - Sign-off: pending.
 
 ## Docs Review

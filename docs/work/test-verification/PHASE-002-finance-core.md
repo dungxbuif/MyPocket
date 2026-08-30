@@ -98,6 +98,8 @@ trace:
 | `rtk npm run build` (from `frontend/`) | pass | Production Vite build passed after mobile finance manager/editor controls. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Full backend regression passed after wallet/category mutation API implementation. |
 | `rtk npm run test:e2e` (from `frontend/`) | pass | Mobile Playwright smoke passed after finance workflow changes; 3 tests passed for service worker offline reload, fixture login persistence/logout, and forbidden auth state. |
+| `rtk npm run test:e2e -- finance-crud.spec.ts` (from `frontend/`) | pass | Dedicated mobile live finance CRUD spec passed for fixture login, wallet creation, category creation, income transaction creation, transaction edit, and transaction archive through the API. |
+| `rtk npm run test:e2e` (from `frontend/`) | pass | Full mobile Playwright suite passed with 4 tests, including service worker offline reload, auth, forbidden state, and finance CRUD. |
 
 ## Fix/Test Attempt Log
 
@@ -124,18 +126,18 @@ Loop guard:
 
 - Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, wallet/category mutation API tests, TICKET-006 accounting effect tests, TICKET-006 repository create/idempotency/edit/archive/search tests, TICKET-006 transaction HTTP route tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
 - Failed: none remaining for migration, backend wallet/category domain, implemented wallet/category API route, and API-driven mobile display slices.
-- Skipped: full wallet/category/transaction UAT remains pending; no dedicated Playwright scenario yet covers live finance CRUD beyond component-level API call proof.
+- Skipped: full wallet/category/transaction human UAT remains pending.
 
 ## Manual Checks
 
-- Mobile UI implementation now includes wallet/category manager controls and transaction add/edit/archive controls; full human UAT is still pending.
+- Mobile UI implementation now includes wallet/category manager controls and transaction add/edit/archive controls; live Playwright CRUD proof passes, and full human UAT is still pending.
 
 ## UAT
 
 - Required: yes for wallet/category and transaction workflows; not required for receipt metadata foundation until PHASE-006.
 - Reason if not required: partial exception applies only to non-user-facing receipt metadata foundation.
 - Expected behavior: finance workflows use Vietnamese copy, exact VND integer formatting, user-owned data, and correct wallet balances.
-- Verified behavior: wallet/category API-driven display and mutation routes, backend accounting effects, repository create transaction/idempotency behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create flows, type controls, report exclusion, and mobile edit/archive component flows have automated proof; full UAT remains pending.
+- Verified behavior: wallet/category API-driven display and mutation routes, backend accounting effects, repository create transaction/idempotency behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create flows, type controls, report exclusion, mobile edit/archive component flows, and live browser finance CRUD have automated proof; full UAT remains pending.
 - Sign-off: pending.
 
 ## Failures And Follow-Up
@@ -158,3 +160,4 @@ Loop guard:
 - TICKET-006 transaction HTTP tests were written and observed failing with 404s, then passed after route registration, handlers, filter parsing, and CORS idempotency header support were added.
 - Wallet/category mutation HTTP tests passed after route registration for item commands and category activation.
 - Frontend component tests passed after adding mobile wallet/category manager controls and transaction edit/archive controls.
+- Dedicated Playwright finance CRUD passed against the live fixture API after adding `frontend/e2e/finance-crud.spec.ts`.

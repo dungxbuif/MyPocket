@@ -167,6 +167,9 @@ AI fill:
 - Command: `rtk npm run test:e2e` (from `frontend/`)
 - Result: pass
 - Notes: Existing mobile PWA/auth/offline Playwright smoke passed after finance workflow changes.
+- Command: `rtk npm run test:e2e -- finance-crud.spec.ts`; `rtk npm run test:e2e` (from `frontend/`)
+- Result: pass
+- Notes: Dedicated live mobile finance CRUD proof covers income transaction create, edit, and archive through the real API; full Playwright suite passed with 4 tests.
 
 ## Fix/Test Attempt Log
 
@@ -180,7 +183,7 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: transaction workflows update balances exactly and remain idempotent under retry.
-- Verified behavior: domain accounting effect validation, repository create/edit/archive/search flows, transaction HTTP routes, and mobile transaction list/search/create/type/report-exclusion/edit/archive flows now have automated proof. Full UAT remains pending.
+- Verified behavior: domain accounting effect validation, repository create/edit/archive/search flows, transaction HTTP routes, mobile transaction list/search/create/type/report-exclusion/edit/archive flows, and live browser transaction create/edit/archive now have automated proof. Full UAT remains pending.
 - Sign-off: pending.
 
 ## Docs Review
