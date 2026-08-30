@@ -6,7 +6,7 @@ owner: shared
 human_fields: [approved_boundaries, architectural_constraints, tradeoff_approval]
 ai_fields: [overview, modules, diagrams, flows, dependencies, risks]
 shared_fields: [status, linked_decisions]
-updated: 2026-08-24
+updated: 2026-08-31
 ---
 
 # Architecture
@@ -65,7 +65,8 @@ MyPocket is a modular monolith deployed as three application processes: a static
 | export | Manual CSV/Sheets-compatible snapshots | `backend/internal/export/` | No spreadsheet import |
 | audit | Append-only audit writes and restricted queries | `backend/internal/audit/` | Viewer email is environment-configured |
 | platform | HTTP, config, database, object store, logging, jobs | `backend/internal/platform/` | Provider interfaces and adapters |
-| web features | User workflows and local state | `frontend/src/features/` | Feature boundaries mirror backend capabilities |
+| web app | Mobile PWA workflows and finance screens | `frontend/src/app/` | Online path uses the Go API; offline write acceptance depends on the offline adapter |
+| web offline | Browser mirror, local outbox, migration, and degraded storage handling | `frontend/src/offline/` | IndexedDB stores wallets, categories, transactions, outbox records, tombstones, conflicts, and sync meta |
 
 ## Data Flow
 

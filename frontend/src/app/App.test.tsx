@@ -2,7 +2,9 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { saveFinanceMirror } from "../offline/db";
 import { App } from "./App";
+import { readOutbox } from "./outbox";
 
 describe("App shell", () => {
   afterEach(() => {
@@ -90,6 +92,49 @@ describe("App shell", () => {
     expect(screen.getByText("-125.000 đ")).toBeInTheDocument();
     await userEvent.type(screen.getByLabelText("Tìm giao dịch"), "không tồn tại");
     expect(screen.getByText("Chưa có giao dịch")).toBeInTheDocument();
+  });
+
+  it("hydrates cached finance data and queues a transaction while offline", async () => {
+    mockNavigatorOnline(false);
+    await saveFinanceMirror({
+      wallets: [{ id: "wallet_cached", name: "Ví cached", type: "cash", balance_vnd: 880000, include_in_total: true, is_default_ai: true, version: 3 }],
+      categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống cached", is_system: false }],
+      transactions: [{ id: "tx_cached", type: "expense", source_wallet_id: "wallet_cached", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 868000, occurred_at: "2026-08-31T00:00:00Z", note: "Cached lunch", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }],
+    });
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByText("Ví cached")).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("Sổ giao dịch"));
+    expect(await screen.findByText("Cached lunch")).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+    await userEvent.type(await screen.findByLabelText("Số tiền"), "33000");
+    await userEvent.type(screen.getByLabelText("Ghi chú"), "Offline dinner");
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0]);
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Thêm Giao Dịch" })).not.toBeInTheDocument());
+    expect(await screen.findByText("1 chờ đồng bộ")).toBeInTheDocument();
+    expect((await readOutbox())[0].input.note).toBe("Offline dinner");
+    expect(fetchMock.mock.calls.map(([input]) => new URL(String(input), "http://localhost").pathname)).toEqual(["/api/v1/me"]);
+  });
+
+  it("blocks offline writes when IndexedDB is unavailable", async () => {
+    mockNavigatorOnline(false);
+    vi.stubGlobal("indexedDB", undefined);
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+    });
+
+    render(<App />);
+
+    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+
+    expect(await screen.findByText("Chỉ đọc offline")).toBeInTheDocument();
+    expect(screen.getByText("Offline storage chưa sẵn sàng. Mở mạng lại để lưu giao dịch.")).toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: "Lưu" })[0]).toBeDisabled();
   });
 
   it("creates an expense from the add sheet", async () => {

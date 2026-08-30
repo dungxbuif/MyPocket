@@ -1,7 +1,7 @@
 ---
 artifact_type: test_verification
 id: PHASE-003-offline-sync
-status: planned
+status: in_progress
 owner: shared
 human_fields:
   - uat_sign_off
@@ -41,7 +41,7 @@ trace:
 ## Status
 
 - ID: PHASE-003-offline-sync
-- Status: planned
+- Status: in_progress
 - Owner: shared
 
 ## Scope
@@ -72,28 +72,33 @@ trace:
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: This artifact is a planned verification target only. Replace this section with real proof during execution.
+| Command | Result | Coverage |
+| --- | --- | --- |
+| `rtk npm run build` from `frontend/` | Passed 2026-08-31 | Production PWA build after IndexedDB/offline UI changes. |
+| `rtk npm test -- --run` from `frontend/` | Passed 2026-08-31, 3 files / 19 tests | IndexedDB mirror, legacy localStorage migration/quarantine, durable sequence, transaction outbox drain, wallet/category mutation queueing, offline cached hydration, offline transaction create queueing, and degraded read-only UI. |
+| `rtk npm run test:e2e -- pwa-shell.spec.ts` from `frontend/` | Passed 2026-08-31 after local-network rerun | Mobile service-worker registration and app-shell reload while offline. |
+
+Notes: First `pwa-shell.spec.ts` attempt failed because the sandbox denied TCP to local PostgreSQL at `127.0.0.1:55433`; rerun with local network permission passed. Backend sync API/change feed, conflict inbox, and full offline replay E2E remain pending in TICKET-009/TICKET-010.
 
 ## Fix/Test Attempt Log
 
 | Attempt | Change Made | Command | Result | Failure Summary |
 | --- | --- | --- | --- | --- |
-| 0 | Planning only. | not run | pending | No implementation attempt yet. |
+| 1 | Added IndexedDB mirror/outbox and wired finance UI offline hydration/queue paths. | `rtk npm run build`; `rtk npm test -- --run` | failed then passed after fixes | Fixed async default parameter syntax, add-sheet async wallet initialization, and defensive manager callbacks. |
+| 2 | Tightened migration sequence/quarantine tests and added degraded-mode UI proof. | `rtk npm run build`; `rtk npm test -- --run`; `rtk npm run test:e2e -- pwa-shell.spec.ts` | passed | Initial E2E attempt was sandbox-blocked; rerun with local network access passed. |
 
 Loop guard:
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 0 / 5
+- Total fix/test cycles: 2 / 5
 - Blocked: no
 - Human/design input needed: none before starting approved PHASE-003 plan.
 
 ## Automated Tests
 
-- Passed: none yet.
+- Passed: `frontend/src/offline/db.test.ts`, `frontend/src/app/outbox.test.ts`, `frontend/src/app/App.test.tsx`, and `frontend/e2e/pwa-shell.spec.ts`.
 - Failed: none yet.
-- Skipped: all planned proof pending implementation.
+- Skipped: full offline sync API/change-feed tests, conflict inbox tests, and dedicated offline pending-mutation reload/reconnect E2E remain pending until TICKET-009/TICKET-010.
 
 ## Manual Checks
 
@@ -104,9 +109,9 @@ Loop guard:
 - Required: yes.
 - Reason if not required: not applicable.
 - Expected behavior: mobile PWA supports read/write offline, reconnect syncs each mutation once, and conflicts are reviewed explicitly.
-- Verified behavior: pending implementation.
+- Verified behavior: TICKET-008 partial frontend proof covers IndexedDB hydration, local outbox durability/order, legacy migration/quarantine, optimistic offline create for transactions, wallet/category queue primitives, degraded read-only UI, and PWA shell offline reload. Reconnect sync and conflict review are pending later tickets.
 - Sign-off: pending.
 
 ## Evidence Notes
 
-- PHASE-003 design is approved and tickets are ready, but no execution evidence exists yet.
+- TICKET-008 frontend IndexedDB/outbox implementation has automated evidence. PHASE-003 remains in progress because backend sync, conflict recovery, dedicated replay E2E, and UAT are not complete.

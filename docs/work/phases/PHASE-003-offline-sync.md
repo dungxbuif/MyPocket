@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-003
-status: ready
+status: in_progress
 owner: human
 priority: High
 human_fields:
@@ -45,11 +45,11 @@ trace:
 ## Status
 
 - ID: PHASE-003
-- Status: ready
+- Status: in_progress
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
-- Updated: 2026-08-30
+- Updated: 2026-08-31
 
 ## Trace Links
 
@@ -84,7 +84,7 @@ Deliver full offline read/write with deterministic reconciliation and user-revie
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-008 | Ticket | IndexedDB mirror and offline outbox | ready | [TICKET-008](../tickets/TICKET-008-indexeddb-mirror-outbox.md) |
+| TICKET-008 | Ticket | IndexedDB mirror and offline outbox | in_progress | [TICKET-008](../tickets/TICKET-008-indexeddb-mirror-outbox.md) |
 | TICKET-009 | Ticket | Idempotent sync API and change feed | ready | [TICKET-009](../tickets/TICKET-009-sync-api-change-feed.md) |
 | TICKET-010 | Ticket | Conflict inbox and recovery flows | ready | [TICKET-010](../tickets/TICKET-010-conflict-inbox-recovery.md) |
 
@@ -125,4 +125,4 @@ Deliver full offline read/write with deterministic reconciliation and user-revie
 
 ## Completion Summary
 
-No implementation has started. PHASE-003 is ready for execution from TICKET-008 through TICKET-010 using [2026-08-30-phase-003-offline-sync.md](../../superpowers/plans/2026-08-30-phase-003-offline-sync.md). Completion evidence will be recorded after implementation and tests.
+TICKET-008 implementation is in progress. The frontend now has an IndexedDB mirror/outbox with localStorage migration, wallet/category/transaction queue primitives, degraded read-only UI, and automated build/unit/PWA shell proof. TICKET-009 sync API/change feed, TICKET-010 conflicts, dedicated offline pending-reload E2E, and human UAT remain pending before PHASE-003 review.

@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-008
-status: ready
+status: in_progress
 owner: human
 priority: high
 lane: high-risk
@@ -41,7 +41,7 @@ trace:
 ## Status
 
 - ID: TICKET-008
-- Status: ready
+- Status: in_progress
 - Type: feature
 - Priority: high
 - Phase: PHASE-003
@@ -62,11 +62,11 @@ AI fill:
 
 ## Acceptance Criteria
 
-- [ ] Given an authenticated user has finance data, when the PWA hydrates, then wallets, categories, transactions, sync meta, conflicts, tombstones, and outbox records are loaded from IndexedDB before network refresh.
-- [ ] Given the browser is offline, when the user creates or edits supported finance data, then the UI updates optimistically and appends a durable ordered mutation with `mutation_id`, `device_id`, `sequence`, entity identity, operation, base version, and payload.
+- [x] Given an authenticated user has finance data, when the PWA hydrates, then wallets, categories, transactions, sync meta, conflicts, tombstones, and outbox records are loaded from IndexedDB before network refresh.
+- [x] Given the browser is offline, when the user creates or edits supported finance data, then the UI updates optimistically and appends a durable ordered mutation with `mutation_id`, `device_id`, `sequence`, entity identity, operation, base version, and payload.
 - [ ] Given the app reloads offline, when the user opens finance screens, then cached data and pending mutations remain visible without requiring the API.
-- [ ] Given legacy temporary localStorage outbox entries exist, when IndexedDB initializes, then valid entries migrate once and invalid entries are quarantined with a recovery note.
-- [ ] Given IndexedDB quota or open failure, when the app cannot persist writes safely, then it enters read-only degraded mode with a recovery action instead of accepting unsafe offline writes.
+- [x] Given legacy temporary localStorage outbox entries exist, when IndexedDB initializes, then valid entries migrate once and invalid entries are quarantined with a recovery note.
+- [x] Given IndexedDB quota or open failure, when the app cannot persist writes safely, then it enters read-only degraded mode with a recovery action instead of accepting unsafe offline writes.
 
 ## Small Task Exemption
 
@@ -100,14 +100,18 @@ AI fill:
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Ticket is ready for implementation; no execution evidence is claimed.
+- Command: `rtk npm run build` from `frontend/`
+- Result: passed 2026-08-31
+- Command: `rtk npm test -- --run` from `frontend/`
+- Result: passed 2026-08-31, 3 files / 19 tests.
+- Command: `rtk npm run test:e2e -- pwa-shell.spec.ts` from `frontend/`
+- Result: passed 2026-08-31 after rerun with local network access; initial sandboxed run was blocked from TCP `127.0.0.1:55433`.
+- Notes: IndexedDB mirror/outbox, localStorage migration/quarantine, durable sequence, offline transaction UI queueing, wallet/category queueing, degraded read-only UI, and PWA service-worker offline reload have automated proof. A dedicated offline reload-with-pending-mutations E2E/UAT remains pending before ticket review.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 0 / 5
+- Total fix/test cycles: 2 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none; design approval is recorded.
 
@@ -116,28 +120,28 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: mobile PWA finance screens stay usable offline and make pending write state obvious.
-- Verified behavior: pending implementation.
+- Verified behavior: cached finance data hydrates offline, offline transaction create queues durably and updates pending status, IndexedDB failure disables unsafe offline writes, and PWA shell reloads offline. Human mobile UAT and pending-mutation reload walkthrough remain pending.
 - Sign-off: pending.
 
 ## Docs Review
 
 - Requirements updated or not needed reason: no requirement change expected.
-- Architecture updated or not needed reason: pending implementation reconciliation.
+- Architecture updated or not needed reason: updated browser offline module boundary after implementation.
 - API updated or not needed reason: not affected by this frontend-local ticket.
-- ERD/data updated or not needed reason: pending browser storage reconciliation.
+- ERD/data updated or not needed reason: PostgreSQL ERD not affected; IndexedDB store shape remains documented in this ticket/design.
 - ADR created or not needed reason: not expected; follows approved PHASE-003 detail design.
-- `docs/CONTEXT.md` updated: yes, planning state recorded.
+- `docs/CONTEXT.md` updated: yes, implementation progress recorded.
 
 ## Completion Checklist
 
 - [ ] Implementation complete
-- [ ] Tests run and recorded
-- [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
+- [x] Tests run and recorded
+- [x] Fix/test loop guard respected
+- [x] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
-- [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
+- [x] Master docs reconciled
+- [x] Docs review completed
+- [x] ADR created or explicitly not needed
+- [x] `docs/CONTEXT.md` updated
+- [x] `docs/work/BACKLOG.md` updated
 - [x] Trace links updated
