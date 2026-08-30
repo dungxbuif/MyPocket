@@ -211,6 +211,20 @@ button {
   grid-template-columns: 52px 1fr auto;
 }
 
+.wallet-total-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 0 22px 16px;
+  color: #8e8e93;
+  font-weight: 800;
+}
+
+.wallet-total-row strong {
+  color: #29495a;
+  white-space: nowrap;
+}
+
 .wallet-row span,
 .category-dot {
   display: grid;

@@ -31,6 +31,7 @@ shared_fields: [status]
 - Added PHASE-002 PostgreSQL finance core schema for wallets, categories, wallet/category activation, transactions, idempotency keys, receipt metadata, and stable Vietnamese system category seeds.
 - Added backend wallet/category validation and repository behavior for user-scoped wallet CRUD, default AI wallet selection, system/user category rules, and wallet/category activation.
 - Added initial authenticated wallet/category API routes for listing and creating wallets plus listing categories.
+- Added API-driven mobile wallet/category display in the PWA overview and add-transaction sheet.
 
 ### Planning
 

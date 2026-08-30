@@ -100,14 +100,14 @@ AI fill:
 
 ## Verification Results
 
-- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`; `rtk npm test -- --run`; `rtk npm run build`; `rtk npm run test:e2e`
 - Result: pass
-- Notes: Unit, PostgreSQL integration, and HTTP handler proof covers wallet validation, credit metadata validation, user-scoped wallet listing/create/update/archive behavior, one active default AI wallet, system/user category listing, user category update/archive, system category locks, wallet/category activation ownership/upsert, and authenticated API scoping for implemented wallet/category routes.
+- Notes: Unit, PostgreSQL integration, HTTP handler, frontend component, build, and mobile E2E proof covers wallet validation, credit metadata validation, user-scoped wallet listing/create/update/archive behavior, one active default AI wallet, system/user category listing, user category update/archive, system category locks, wallet/category activation ownership/upsert, authenticated API scoping for implemented wallet/category routes, API-driven wallet rendering, VND formatting, and category display inside the add sheet.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 1 / 3
-- Total fix/test cycles: 4 / 5
+- Total fix/test cycles: 5 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -116,7 +116,7 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: wallet and category management match Vietnamese finance copy and VND formatting.
-- Verified behavior: pending mobile implementation; backend domain behavior and initial wallet/category API routes have automated proof.
+- Verified behavior: mobile overview reads wallet totals from the finance API and add sheet shows loaded categories; remaining wallet/category edit/create form UAT is pending.
 - Sign-off: pending.
 
 ## Docs Review
@@ -133,10 +133,10 @@ AI fill:
 - [ ] Implementation complete
 - [x] Tests run and recorded
 - [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
+- [x] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
 - [x] Master docs reconciled
-- [ ] Docs review completed
+- [x] Docs review completed
 - [x] ADR created or explicitly not needed
 - [x] `docs/CONTEXT.md` updated
 - [ ] `docs/work/BACKLOG.md` updated

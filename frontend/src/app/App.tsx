@@ -19,6 +19,7 @@ import {
 import { useOnlineStatus } from "./offline";
 import { apiBaseURL } from "./apiClient";
 import { loadCurrentUser, logout, type AuthState } from "./auth";
+import { loadCategories, loadWallets, type CategorySummary, type WalletSummary } from "./finance";
 
 type Tab = "overview" | "transactions" | "budgets" | "account";
 
@@ -34,6 +35,10 @@ export function App() {
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [sheetOpen, setSheetOpen] = useState(false);
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
+  const [wallets, setWallets] = useState<WalletSummary[] | null>(null);
+  const [categories, setCategories] = useState<CategorySummary[] | null>(null);
+  const headerWallets = wallets && wallets.length > 0 ? wallets : sampleWallets;
+  const totalBalance = totalIncludedVND(headerWallets);
 
   useEffect(() => {
     let cancelled = false;
@@ -44,6 +49,31 @@ export function App() {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (authState.status !== "authenticated") {
+      setWallets(null);
+      setCategories(null);
+      return;
+    }
+    let cancelled = false;
+    void Promise.all([loadWallets(), loadCategories()])
+      .then(([nextWallets, nextCategories]) => {
+        if (!cancelled) {
+          setWallets(nextWallets);
+          setCategories(nextCategories);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWallets([]);
+          setCategories([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [authState.status]);
 
   async function handleLogout() {
     await logout();
@@ -57,7 +87,7 @@ export function App() {
         <header className="home-header">
           <div>
             <div className="balance-line">
-              <strong>1.083.096 đ</strong>
+              <strong>{formatVND(totalBalance)}</strong>
               <button className="icon-button" aria-label="Ẩn số dư" type="button">
                 <Eye size={24} />
               </button>
@@ -78,7 +108,7 @@ export function App() {
 
         <AuthBanner authState={authState} />
         {authState.status === "forbidden" ? <ForbiddenState authState={authState} onLogout={handleLogout} /> : null}
-        {authState.status !== "forbidden" && activeTab === "overview" ? <Overview /> : null}
+        {authState.status !== "forbidden" && activeTab === "overview" ? <Overview wallets={wallets} /> : null}
         {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions /> : null}
         {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets /> : null}
         {authState.status !== "forbidden" && activeTab === "account" ? <Account authState={authState} onLogout={handleLogout} /> : null}
@@ -96,7 +126,7 @@ export function App() {
         ))}
       </nav>
 
-      {sheetOpen ? <AddTransactionSheet onClose={() => setSheetOpen(false)} /> : null}
+      {sheetOpen ? <AddTransactionSheet categories={categories ?? []} onClose={() => setSheetOpen(false)} /> : null}
     </div>
   );
 }
@@ -151,7 +181,10 @@ function TabButton({
   );
 }
 
-function Overview() {
+function Overview({ wallets }: { wallets: WalletSummary[] | null }) {
+  const visibleWallets = wallets && wallets.length > 0 ? wallets : sampleWallets;
+  const totalVND = totalIncludedVND(visibleWallets);
+
   return (
     <section className="content-stack">
       <section className="card wallet-card">
@@ -159,9 +192,10 @@ function Overview() {
           <h2>Ví của tôi</h2>
           <button type="button">Xem tất cả</button>
         </div>
-        <WalletRow icon="💳" name="Ví tín dụng" amount="-3.711.104 đ" />
-        <WalletRow icon="◆" name="Techcombank" amount="4.710.200 đ" />
-        <WalletRow icon="👛" name="Tiền Mặt" amount="84.000 đ" />
+        <div className="wallet-total-row"><span>Tổng hiển thị</span><strong>{formatVND(totalVND)}</strong></div>
+        {visibleWallets.map((wallet) => (
+          <WalletRow key={wallet.id} icon={walletIcon(wallet.type)} name={wallet.name} amount={formatVND(wallet.balance_vnd)} />
+        ))}
       </section>
 
       <SectionHeading title="Money Insider" action="↻" />
@@ -255,7 +289,8 @@ function Account({ authState, onLogout }: { authState: AuthState; onLogout: () =
   );
 }
 
-function AddTransactionSheet({ onClose }: { onClose: () => void }) {
+function AddTransactionSheet({ categories, onClose }: { categories: CategorySummary[]; onClose: () => void }) {
+  const firstExpenseCategory = categories.find((category) => category.kind === "expense");
   return (
     <div className="sheet-backdrop">
       <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label="Thêm Giao Dịch">
@@ -265,7 +300,7 @@ function AddTransactionSheet({ onClose }: { onClose: () => void }) {
           <span />
         </header>
         <div className="amount-row"><span>VND</span><strong>0</strong></div>
-        <SheetRow icon={<span className="dot-icon" />} label="Chọn nhóm" muted />
+        <SheetRow icon={<span className="dot-icon" />} label={firstExpenseCategory?.name ?? "Chọn nhóm"} muted={!firstExpenseCategory} />
         <SheetRow icon={<List />} label="Ghi chú" />
         <SheetRow icon={<CalendarDays />} label="Chủ Nhật, 23/08/2026" green />
         <div className="sheet-group">
@@ -302,6 +337,38 @@ function SheetRow({ icon, label, muted = false, green = false }: { icon: ReactNo
 
 function SectionHeading({ title, action }: { title: string; action: string }) {
   return <div className="section-heading"><h2>{title}</h2><button type="button">{action}</button></div>;
+}
+
+const sampleWallets: WalletSummary[] = [
+  { id: "sample-credit", name: "Ví tín dụng", type: "credit", balance_vnd: -3711104, include_in_total: true, is_default_ai: false, version: 1 },
+  { id: "sample-bank", name: "Techcombank", type: "bank", balance_vnd: 4710200, include_in_total: true, is_default_ai: false, version: 1 },
+  { id: "sample-cash", name: "Tiền Mặt", type: "cash", balance_vnd: 84000, include_in_total: true, is_default_ai: true, version: 1 },
+];
+
+function formatVND(amount: number) {
+  return `${new Intl.NumberFormat("vi-VN").format(amount)} đ`;
+}
+
+function totalIncludedVND(wallets: WalletSummary[]) {
+  return wallets.filter((wallet) => wallet.include_in_total).reduce((total, wallet) => total + wallet.balance_vnd, 0);
+}
+
+function walletIcon(type: WalletSummary["type"]) {
+  switch (type) {
+    case "credit":
+      return "💳";
+    case "bank":
+      return "◆";
+    case "e_wallet":
+      return "◎";
+    case "savings":
+      return "◇";
+    case "debt":
+      return "!";
+    case "cash":
+    default:
+      return "₫";
+  }
 }
 
 export default App;

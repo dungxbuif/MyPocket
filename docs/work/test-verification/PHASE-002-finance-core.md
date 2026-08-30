@@ -69,8 +69,10 @@ trace:
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1` | pass | Wallet/category unit and PostgreSQL integration proof for TICKET-005 backend domain/repository behavior. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -run 'TestWalletsAPI|TestCreateWallet|TestCategoriesAPI' -count=1` | pass | HTTP handler proof for wallet/category auth requirement, authenticated user scoping, CSRF requirement, create wallet request mapping, and category listing. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Backend regression after finance repository; API, worker, finance, identity, config, db, httpapi, objectstore packages passed. `-p 1` avoids package-level races because integration helpers reset the same local test schema. |
-| `rtk npm test -- --run` | pending | Frontend component proof. |
-| `rtk npm run test:e2e` | pending | Mobile browser finance workflow proof. |
+| `rtk npm test -- --run src/app/App.test.tsx` | pass | RED first failed because wallet/category UI still used hardcoded data; GREEN passed after API-driven finance state was added. |
+| `rtk npm test -- --run` | pass | Full frontend component suite; 5 tests passed. |
+| `rtk npm run build` | pass | Production Vite build completed. |
+| `rtk npm run test:e2e` | pass | Existing mobile PWA/auth/offline browser smoke passed after finance UI changes; 3 tests passed. |
 
 ## Fix/Test Attempt Log
 
@@ -80,19 +82,20 @@ trace:
 | 2 | Added finance validation and repository methods after RED tests exposed missing package/methods; adjusted `UpdateCategoryInput` to match the test-facing API. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1` | pass | Initial finance GREEN compile failed because `UpdateCategoryInput.Name` was a pointer while tests and plan used a string field. |
 | 3 | Reran backend regression sequentially after package-parallel integration tests raced on shared schema reset. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Plain package-parallel `go test ./...` can reset the shared local test schema while another package is using it. |
 | 4 | Added finance HTTP dependency, wallet/category handlers, and API runtime wiring after RED tests exposed missing finance dependency/route support. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -run 'TestWalletsAPI|TestCreateWallet|TestCategoriesAPI' -count=1`; backend regression command above | pass | No remaining HTTP handler failure for implemented wallet/category routes. |
+| 5 | Added frontend finance client and API-driven mobile wallet/category rendering after RED component tests showed hardcoded wallet/category data. | `rtk npm test -- --run`; `rtk npm run build`; `rtk npm run test:e2e` | pass | One assertion was adjusted after the UI correctly showed the same total in the header and wallet summary. |
 
 Loop guard:
 
 - Same-path failure attempts: 1 / 3
-- Total fix/test cycles: 4 / 5
+- Total fix/test cycles: 5 / 5
 - Blocked: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
 ## Automated Tests
 
-- Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, and full backend regression.
-- Failed: none remaining for migration, backend wallet/category domain, and implemented wallet/category API route slices.
-- Skipped: remaining wallet/category API mutation routes, frontend, and E2E checks pending later PHASE-002 tasks.
+- Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
+- Failed: none remaining for migration, backend wallet/category domain, implemented wallet/category API route, and API-driven mobile display slices.
+- Skipped: remaining wallet/category mutation routes and full wallet/category UAT pending later TICKET-005 work.
 
 ## Manual Checks
 
@@ -118,3 +121,4 @@ Loop guard:
 - After adding migration `0002_phase002_finance_core.sql` and fixing the category unique index, `internal/platform/db` tests passed against the local Compose PostgreSQL test URL.
 - Wallet/category repository tests were written and observed failing on missing methods before repository code existed, then passed against local Compose PostgreSQL after implementation.
 - Wallet/category HTTP tests were written and observed failing on missing dependency support before route code existed, then passed after handlers and runtime wiring were added.
+- Frontend wallet/category tests were written and observed failing on hardcoded display behavior, then passed after `frontend/src/app/finance.ts` and App state wiring were added.
