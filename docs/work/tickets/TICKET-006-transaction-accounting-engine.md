@@ -143,11 +143,20 @@ AI fill:
 - Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
 - Result: pass
 - Notes: Backend regression passed after edit/archive/search implementation.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -run 'TestTransactionsAPI|TestCreateTransaction|TestUpdateTransaction|TestArchiveTransaction' -count=1`
+- Result: pass
+- Notes: RED first failed with 404s because `/api/v1/transactions` routes were missing; GREEN passed after collection and item transaction handlers were added.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -count=1`
+- Result: pass
+- Notes: HTTP package regression passed after transaction routes and `Idempotency-Key` CORS proof.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
+- Result: pass
+- Notes: Backend regression passed after transaction HTTP API implementation.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 3 / 5
+- Total fix/test cycles: 4 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -156,14 +165,14 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: transaction workflows update balances exactly and remain idempotent under retry.
-- Verified behavior: domain accounting effect validation and repository create/edit/archive/search flows now prove exact income, expense, transfer, and adjustment balance deltas, atomic wallet version/balance updates, category activation validation, duplicate idempotent replay, changed-request idempotency rejection, user-owned wallet enforcement, edit reversal/reapply, archive reversal once, and user-scoped filtered listing. Transaction API and mobile workflows remain pending.
+- Verified behavior: domain accounting effect validation, repository create/edit/archive/search flows, and transaction HTTP routes now prove exact income, expense, transfer, and adjustment balance deltas, atomic wallet version/balance updates, category activation validation, duplicate idempotent replay, changed-request idempotency rejection, user-owned wallet enforcement, edit reversal/reapply, archive reversal once, user-scoped filtered listing, CSRF-protected create/edit/archive, authenticated list, idempotency header mapping, and transaction API JSON envelopes. Mobile workflows and UAT remain pending.
 - Sign-off: pending.
 
 ## Docs Review
 
 - Requirements updated or not needed reason: not needed; accounting behavior follows accepted REQ-F-003/REQ-NF-002/REQ-NF-005 scope.
 - Architecture updated or not needed reason: not needed for this slice; repository behavior follows approved finance module boundary.
-- API updated or not needed reason: pending transaction API implementation.
+- API updated or not needed reason: updated `docs/architecture/API.md` with implemented transaction endpoints, filters, body shapes, CSRF, idempotency, and archive semantics.
 - ERD/data updated or not needed reason: updated `docs/architecture/ERD.md` with persisted transaction delta columns needed for exact edit/archive reversal.
 - ADR created or not needed reason: not needed; no divergence from ADR-003 or approved PHASE-002 design.
 - `docs/CONTEXT.md` updated: yes.

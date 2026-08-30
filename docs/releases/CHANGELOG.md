@@ -35,6 +35,7 @@ shared_fields: [status]
 - Added backend transaction accounting effect validation for income, expense, transfer, and balance adjustment balance deltas.
 - Added repository create-transaction behavior with atomic wallet balance updates, version increments, category activation validation, and idempotent replay storage.
 - Added repository transaction edit/archive reversal and user-scoped transaction search filters backed by persisted transaction deltas.
+- Added authenticated transaction HTTP routes for create, edit, archive, and filtered listing with CSRF and idempotency header support.
 
 ### Planning
 

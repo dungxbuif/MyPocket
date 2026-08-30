@@ -315,7 +315,7 @@ rtk git commit -m "feat: add transaction accounting engine"
 - Consumes `finance.Service`.
 - Produces `/api/v1/wallets`, `/api/v1/categories`, `/api/v1/wallets/{wallet_id}/categories/{category_id}`, and `/api/v1/transactions`.
 
-- [ ] **Step 1: Write failing route tests**
+- [x] **Step 1: Write failing route tests**
 
 Add tests:
 - unauthenticated `GET /api/v1/wallets` returns `AUTH_REQUIRED`
@@ -323,13 +323,13 @@ Add tests:
 - authenticated create wallet returns stable JSON with wallet ID and balance
 - duplicate transaction idempotency key returns same JSON and no duplicate balance effect
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `rtk go test ./internal/platform/httpapi -run 'TestFinance'`
 
 Expected: FAIL because finance routes are missing.
 
-- [ ] **Step 3: Implement handlers**
+- [x] **Step 3: Implement handlers**
 
 Handlers parse JSON, call finance service, map finance errors to:
 - `VALIDATION_FAILED`
@@ -339,11 +339,11 @@ Handlers parse JSON, call finance service, map finance errors to:
 - `IDEMPOTENT_REPLAY`
 - `INTERNAL_RETRYABLE`
 
-- [ ] **Step 4: Wire API main**
+- [x] **Step 4: Wire API main**
 
 Instantiate `finance.NewService(finance.NewRepository(conn))` and add it to `httpapi.Dependencies`.
 
-- [ ] **Step 5: Run backend tests**
+- [x] **Step 5: Run backend tests**
 
 Run: `rtk go test ./...`
 

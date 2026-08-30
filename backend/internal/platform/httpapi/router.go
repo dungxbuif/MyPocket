@@ -27,6 +27,8 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/me", currentUser(cfg, deps.IdentityRepository))
 	mux.HandleFunc("/api/v1/wallets", wallets(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/categories", categories(cfg, deps.FinanceRepository))
+	mux.HandleFunc("/api/v1/transactions", transactions(cfg, deps.FinanceRepository))
+	mux.HandleFunc("/api/v1/transactions/", transactionByID(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
 	mux.HandleFunc("/api/v1/health/ready", readyHealth(deps))
 
@@ -41,8 +43,8 @@ func corsMiddleware(cfg config.Config, next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Add("Vary", "Origin")
 			if r.Method == http.MethodOptions {
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Correlation-ID")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Correlation-ID, Idempotency-Key")
 				w.WriteHeader(http.StatusNoContent)
 				return
 			}
@@ -60,6 +62,10 @@ type FinanceRepository interface {
 	ListWallets(ctx context.Context, userID string) ([]finance.Wallet, error)
 	CreateWallet(ctx context.Context, userID string, input finance.CreateWalletInput) (finance.Wallet, error)
 	ListCategories(ctx context.Context, userID string) ([]finance.Category, error)
+	ListTransactions(ctx context.Context, userID string, filters finance.TransactionFilters) ([]finance.Transaction, error)
+	CreateTransaction(ctx context.Context, userID string, input finance.CreateTransactionInput) (finance.Transaction, error)
+	UpdateTransaction(ctx context.Context, userID string, transactionID string, input finance.UpdateTransactionInput) (finance.Transaction, error)
+	ArchiveTransaction(ctx context.Context, userID string, transactionID string) error
 }
 
 func correlationMiddleware(next http.Handler) http.Handler {

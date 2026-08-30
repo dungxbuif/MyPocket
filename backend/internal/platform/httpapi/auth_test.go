@@ -85,7 +85,7 @@ func TestCORSAllowsPublicWebOriginCredentials(t *testing.T) {
 	req := httptest.NewRequest(http.MethodOptions, "/api/v1/auth/logout", nil)
 	req.Header.Set("Origin", "http://localhost:5173")
 	req.Header.Set("Access-Control-Request-Method", "POST")
-	req.Header.Set("Access-Control-Request-Headers", "X-CSRF-Token")
+	req.Header.Set("Access-Control-Request-Headers", "X-CSRF-Token, Idempotency-Key")
 	res := httptest.NewRecorder()
 
 	handler.ServeHTTP(res, req)
@@ -101,6 +101,9 @@ func TestCORSAllowsPublicWebOriginCredentials(t *testing.T) {
 	}
 	if got := res.Header().Get("Vary"); !strings.Contains(got, "Origin") {
 		t.Fatalf("expected Origin vary header, got %q", got)
+	}
+	if got := res.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(got, "Idempotency-Key") {
+		t.Fatalf("expected idempotency header to be allowed, got %q", got)
 	}
 }
 

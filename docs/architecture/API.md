@@ -32,7 +32,7 @@ updated: 2026-08-24
 | `GET /wallets`, `POST /wallets` | REST collection | User | implemented | Lists and creates authenticated-user wallets; creation requires CSRF; `user_id` is always derived from the signed cookie |
 | `GET /categories` | REST collection | User | implemented | Lists system and authenticated-user categories; `system_key` is returned for locked system rows |
 | `PATCH /wallets/{id}`, `POST /wallets/{id}/archive`, `POST /wallets/{id}/default-ai`, `PATCH /categories/{id}`, `POST /categories/{id}/archive`, `/wallets/{id}/categories` | REST/command | User | planned | Backend repository behavior exists for TICKET-005; HTTP routes remain pending with the mobile UI pass |
-| `/transactions` | REST collection | User | planned | Income, expense, transfer, adjustment, search |
+| `GET /transactions`, `POST /transactions`, `PATCH /transactions/{id}`, `POST /transactions/{id}/archive` | REST/command | User | implemented | Income, expense, transfer, adjustment, edit/archive reversal, search filters, and idempotent creates |
 | `/receipts/uploads`, `/receipts/{id}` | REST/object | User | planned | Presigned upload and private metadata |
 | `POST /sync/mutations`, `GET /sync/changes` | Sync | User | planned | Idempotent batches, cursors, versions, tombstones |
 | `/sync/conflicts` | REST collection | User | planned | Read and resolve explicit conflicts |
@@ -128,6 +128,88 @@ Response:
   "correlation_id": "req_..."
 }
 ```
+
+## Transaction Schemas
+
+### `GET /api/v1/transactions`
+
+Query filters:
+
+- `wallet_id`
+- `category_id`
+- `type`: `income`, `expense`, `transfer`, or `adjustment`
+- `date_from`, `date_to`: RFC3339 timestamps
+- `q`: searches note, with-person, and event reference
+- `excluded_from_reports`: boolean
+- `include_archived`: boolean
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "transactions": [
+    {
+      "id": "uuid",
+      "type": "expense",
+      "source_wallet_id": "uuid",
+      "category_id": "uuid",
+      "amount_vnd": 45000,
+      "balance_after_vnd": 955000,
+      "occurred_at": "2026-08-30T10:00:00Z",
+      "note": "Cafe",
+      "with_person": "",
+      "event_ref": "",
+      "excluded_from_reports": false,
+      "version": 1
+    }
+  ],
+  "correlation_id": "req_..."
+}
+```
+
+### `POST /api/v1/transactions`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+- `Idempotency-Key`: required for retry-safe create.
+
+Request:
+
+```json
+{
+  "type": "income",
+  "source_wallet_id": "uuid",
+  "destination_wallet_id": "",
+  "category_id": "uuid",
+  "amount_vnd": 500000,
+  "target_balance_vnd": null,
+  "occurred_at": "2026-08-30T10:00:00Z",
+  "note": "Lương",
+  "with_person": "",
+  "event_ref": "",
+  "excluded_from_reports": false
+}
+```
+
+Response status: `201 Created`.
+
+### `PATCH /api/v1/transactions/{id}`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request uses the same body shape as `POST /api/v1/transactions`; the backend reverses the old stored deltas and reapplies the new effect in one database transaction.
+
+### `POST /api/v1/transactions/{id}/archive`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Response status: `200 OK`; the backend reverses the stored balance effect exactly once.
 
 ## Authentication And CSRF
 
