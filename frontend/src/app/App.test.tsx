@@ -121,6 +121,37 @@ describe("App shell", () => {
     expect(fetchMock.mock.calls.map(([input]) => new URL(String(input), "http://localhost").pathname)).toEqual(["/api/v1/me"]);
   });
 
+  it("reloads offline with cached auth, cached finance data, and pending mutation visibility", async () => {
+    const onlineFetch = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví reload", type: "cash", balance_vnd: 990000, include_in_total: true, is_default_ai: true, version: 5 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn reload", is_system: false }] },
+      "/api/v1/transactions": { transactions: [{ id: "tx_reload", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 11000, balance_after_vnd: 979000, occurred_at: "2026-08-31T00:00:00Z", note: "Online cached", with_person: "", event_ref: "", excluded_from_reports: false, version: 1 }] },
+    });
+    const firstRender = render(<App />);
+    expect(await screen.findByText("Ví reload")).toBeInTheDocument();
+    expect(onlineFetch).toHaveBeenCalled();
+    firstRender.unmount();
+
+    mockNavigatorOnline(false);
+    const offlineFetch = vi.fn(async () => { throw new TypeError("offline"); });
+    vi.stubGlobal("fetch", offlineFetch);
+    render(<App />);
+
+    expect(await screen.findByText("Ví reload")).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("Sổ giao dịch"));
+    expect(await screen.findByText("Online cached")).toBeInTheDocument();
+    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+    await userEvent.type(await screen.findByLabelText("Số tiền"), "44000");
+    await userEvent.type(screen.getByLabelText("Ghi chú"), "Reload pending");
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0]);
+
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Thêm Giao Dịch" })).not.toBeInTheDocument());
+    expect(await screen.findByText("1 chờ đồng bộ")).toBeInTheDocument();
+    expect(await screen.findByText("Reload pending")).toBeInTheDocument();
+    expect(offlineFetch).toHaveBeenCalledTimes(1);
+  });
+
   it("blocks offline writes when IndexedDB is unavailable", async () => {
     mockNavigatorOnline(false);
     vi.stubGlobal("indexedDB", undefined);

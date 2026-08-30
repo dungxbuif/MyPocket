@@ -42,7 +42,7 @@ shared_fields: [status]
 - Added authenticated wallet/category mutation API routes for wallet edit/archive/default AI selection, category create/edit/archive, and per-wallet category activation.
 - Added mobile finance controls for wallet/category management plus income, expense, transfer, adjustment, report exclusion, and transaction edit/archive workflows.
 - Added live mobile Playwright coverage for fixture-login finance CRUD through the real API.
-- Added the PHASE-003 frontend IndexedDB mirror/outbox foundation with legacy localStorage migration/quarantine, wallet/category/transaction offline mutation queueing, cached offline hydration, degraded read-only UI, and mobile PWA offline reload proof.
+- Added the PHASE-003 frontend IndexedDB mirror/outbox foundation with legacy localStorage migration/quarantine, wallet/category/transaction offline mutation queueing, cached-auth offline reload, cached finance hydration, degraded read-only UI, and mobile PWA offline reload proof.
 
 ### Planning
 

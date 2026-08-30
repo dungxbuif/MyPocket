@@ -32,11 +32,11 @@ updated: 2026-08-31
 
 ## Current Status
 
-- Status: PHASE-002 finance core is in review after automated implementation proof. PHASE-003 offline synchronization is now in progress: TICKET-008 has frontend IndexedDB mirror/outbox implementation proof for cached hydration, wallet/category/transaction queue primitives, localStorage migration/quarantine, durable sequence, degraded read-only UI, and mobile PWA shell offline reload.
+- Status: PHASE-002 finance core is in review after automated implementation proof. PHASE-003 offline synchronization is now in progress: TICKET-008 is in review with frontend IndexedDB mirror/outbox implementation proof for cached hydration, cached-auth offline reload, wallet/category/transaction queue primitives, localStorage migration/quarantine, durable sequence, degraded read-only UI, and mobile PWA shell offline reload.
 - Active backlog: [BL-003](work/BACKLOG.md)
-- Current queue focus: finish TICKET-008 pending-reload proof, then implement TICKET-009 sync API/change feed.
+- Current queue focus: implement TICKET-009 sync API/change feed.
 - Active phase: [PHASE-003 Offline Synchronization](work/phases/PHASE-003-offline-sync.md), status `in_progress`.
-- Active ticket: [TICKET-008](work/tickets/TICKET-008-indexeddb-mirror-outbox.md), status `in_progress`.
+- Active ticket: [TICKET-009](work/tickets/TICKET-009-sync-api-change-feed.md), status `ready`.
 - Active bug: None.
 
 ## Current Focus
@@ -137,17 +137,18 @@ Execute PHASE-003 offline synchronization after PHASE-002 finance core reached r
 - User delegated remaining implementation decisions on 2026-08-30; PHASE-003 through PHASE-007 now have approved detail designs and component contracts.
 - PHASE-003 through PHASE-007 now also have ready ticket artifacts, planned verification targets, and executable implementation plans; no implementation evidence is claimed for those phases yet.
 - TICKET-008 uses `frontend/src/offline/` as the IndexedDB boundary for wallets, categories, transactions, outbox mutations, tombstones, conflicts, and sync meta; `frontend/src/app/outbox.ts` remains a compatibility wrapper for the previous localStorage-first transaction outbox.
+- Offline reload for authenticated cached data now uses the last successful `/api/v1/me` envelope only when `navigator.onLine` is false; logout clears both this cached user and IndexedDB offline stores.
 
 ## Queue Summary
 
 - BL-001 through BL-007 comprise the initial release in dependency order.
 - BL-008 is deferred voice input.
-- PHASE-001 and PHASE-002 have automated implementation proof pending human review. PHASE-003 is in progress with TICKET-008 frontend offline proof; PHASE-004 through PHASE-007 remain planned and ready after PHASE-003.
+- PHASE-001 and PHASE-002 have automated implementation proof pending human review. PHASE-003 is in progress with TICKET-008 in review; PHASE-004 through PHASE-007 remain planned and ready after PHASE-003.
 
 ## Next Steps
 
-1. Finish TICKET-008 pending-mutation offline reload proof and decide whether to add a dedicated Playwright offline-create spec before review.
-2. Execute TICKET-009 sync API/change-feed backend after the browser mirror and mutation envelope are stable.
+1. Execute TICKET-009 sync API/change-feed backend now that the browser mirror and mutation envelope are stable.
+2. Execute TICKET-010 conflict inbox/recovery, then run PHASE-003 replay/conflict E2E and UAT.
 3. Execute TICKET-010 conflict inbox/recovery, then run PHASE-003 E2E/UAT and reconcile docs.
 4. Review PHASE-002 with the user/UAT criteria and mark verified if accepted.
 

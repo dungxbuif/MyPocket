@@ -80,6 +80,7 @@ MyPocket is a modular monolith deployed as three application processes: a static
 ## Runtime Flow
 
 - Web assets are served over HTTPS and call the API on an approved origin.
+- The browser caches the last successful current-user envelope only to keep authenticated IndexedDB data visible when `navigator.onLine` is false; logout clears the cached user and local offline stores.
 - API and worker connect to the homelab PostgreSQL instance using environment configuration.
 - API and worker startup currently requires a successful PostgreSQL ping through `DATABASE_URL`.
 - Receipt upload uses short-lived presigned URLs and private S3 objects; the platform layer now includes an S3-compatible smoke adapter for endpoint/bucket access verification.

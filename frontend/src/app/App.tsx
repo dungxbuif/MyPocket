@@ -111,7 +111,7 @@ export function App() {
   }, [authState.status, online]);
 
   async function handleLogout() {
-    await logout();
+    await logout().catch(() => undefined);
     await clearOfflineStore().catch(() => undefined);
     setAuthState({ status: "unauthenticated" });
     setWallets(null);

@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-008
-status: in_progress
+status: in_review
 owner: human
 priority: high
 lane: high-risk
@@ -41,7 +41,7 @@ trace:
 ## Status
 
 - ID: TICKET-008
-- Status: in_progress
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-003
@@ -64,7 +64,7 @@ AI fill:
 
 - [x] Given an authenticated user has finance data, when the PWA hydrates, then wallets, categories, transactions, sync meta, conflicts, tombstones, and outbox records are loaded from IndexedDB before network refresh.
 - [x] Given the browser is offline, when the user creates or edits supported finance data, then the UI updates optimistically and appends a durable ordered mutation with `mutation_id`, `device_id`, `sequence`, entity identity, operation, base version, and payload.
-- [ ] Given the app reloads offline, when the user opens finance screens, then cached data and pending mutations remain visible without requiring the API.
+- [x] Given the app reloads offline, when the user opens finance screens, then cached data and pending mutations remain visible without requiring the API.
 - [x] Given legacy temporary localStorage outbox entries exist, when IndexedDB initializes, then valid entries migrate once and invalid entries are quarantined with a recovery note.
 - [x] Given IndexedDB quota or open failure, when the app cannot persist writes safely, then it enters read-only degraded mode with a recovery action instead of accepting unsafe offline writes.
 
@@ -103,10 +103,10 @@ AI fill:
 - Command: `rtk npm run build` from `frontend/`
 - Result: passed 2026-08-31
 - Command: `rtk npm test -- --run` from `frontend/`
-- Result: passed 2026-08-31, 3 files / 19 tests.
+- Result: passed 2026-08-31, 3 files / 20 tests.
 - Command: `rtk npm run test:e2e -- pwa-shell.spec.ts` from `frontend/`
 - Result: passed 2026-08-31 after rerun with local network access; initial sandboxed run was blocked from TCP `127.0.0.1:55433`.
-- Notes: IndexedDB mirror/outbox, localStorage migration/quarantine, durable sequence, offline transaction UI queueing, wallet/category queueing, degraded read-only UI, and PWA service-worker offline reload have automated proof. A dedicated offline reload-with-pending-mutations E2E/UAT remains pending before ticket review.
+- Notes: IndexedDB mirror/outbox, localStorage migration/quarantine, durable sequence, offline transaction UI queueing, wallet/category queueing, cached-auth offline reload with pending mutation visibility, degraded read-only UI, and PWA service-worker offline reload have automated proof. Human mobile UAT remains pending before `verified`.
 
 ## Fix/Test Attempt Log
 
@@ -120,7 +120,7 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: mobile PWA finance screens stay usable offline and make pending write state obvious.
-- Verified behavior: cached finance data hydrates offline, offline transaction create queues durably and updates pending status, IndexedDB failure disables unsafe offline writes, and PWA shell reloads offline. Human mobile UAT and pending-mutation reload walkthrough remain pending.
+- Verified behavior: cached finance data hydrates offline, offline transaction create queues durably and updates pending status, pending mutations remain visible after offline reload through cached auth, IndexedDB failure disables unsafe offline writes, and PWA shell reloads offline. Human mobile UAT remains pending.
 - Sign-off: pending.
 
 ## Docs Review
@@ -134,7 +134,7 @@ AI fill:
 
 ## Completion Checklist
 
-- [ ] Implementation complete
+- [x] Implementation complete
 - [x] Tests run and recorded
 - [x] Fix/test loop guard respected
 - [x] Validation matrix updated or explicitly not affected
