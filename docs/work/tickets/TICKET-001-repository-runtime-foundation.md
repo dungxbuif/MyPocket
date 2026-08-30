@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-001
-status: in_progress
+status: verified
 owner: human
 priority: urgent
 lane: high-risk
@@ -28,7 +28,7 @@ trace:
   phase: PHASE-001
   detail_design: ../phases/PHASE-001-detail-design.md
   implementation_plan: ../../superpowers/plans/2026-08-25-phase-001-platform-identity.md
-  test_verification: not_created_phase_not_executed
+  test_verification: ../test-verification/PHASE-001-platform-smoke.md
   validation_matrix: ../VALIDATION_MATRIX.md
   docs_review: per-ticket_completion_checklist
   adrs:
@@ -47,7 +47,7 @@ trace:
 ## Status
 
 - ID: TICKET-001
-- Status: in_progress
+- Status: verified
 - Type: feature
 - Priority: urgent
 - Phase: PHASE-001
@@ -183,8 +183,8 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: app installs or qualifies as installable, renders mobile shell, and reopens while offline after first load.
-- Verified behavior: automated tests and screenshots verify mobile shell layout, navigation, quick-add sheet, offline indicator, manifest, and service worker asset presence. Offline reload after first online load still requires Playwright E2E proof in Task 7.
-- Sign-off: pending
+- Verified behavior: automated tests and screenshots verify mobile shell layout, navigation, quick-add sheet, offline indicator, manifest, service worker asset presence, and offline reload after first online load.
+- Sign-off: automated UAT evidence recorded; human review pending.
 
 ## Docs Review
 
@@ -193,18 +193,18 @@ AI fill:
 - API updated or not needed reason: already reconciled for health/auth routes; PWA shell adds no new API endpoint.
 - ERD/data updated or not needed reason: not needed; PWA shell adds no data model.
 - ADR created or not needed reason: not needed; follows ADR-001.
-- `docs/CONTEXT.md` updated: pending after PWA shell commit.
+- `docs/CONTEXT.md` updated: yes; next steps now point to PHASE-001 reconciliation and PHASE-002.
 
 ## Completion Checklist
 
-- [ ] Implementation complete
+- [x] Implementation complete
 - [x] Tests run and recorded
 - [x] Fix/test loop guard respected
 - [x] Validation matrix updated or explicitly not affected
-- [ ] UAT completed or explicitly not required
+- [x] UAT completed or explicitly not required
 - [x] Master docs reconciled
-- [ ] Docs review completed
+- [x] Docs review completed
 - [x] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
+- [x] `docs/CONTEXT.md` updated
 - [x] `docs/work/BACKLOG.md` updated
 - [x] Trace links updated

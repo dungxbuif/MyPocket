@@ -32,11 +32,11 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, mobile-first PWA shell, local Compose stack, offline browser proof, and backend/frontend folder split implemented.
+- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, mobile-first PWA shell, local Compose stack, offline/auth browser proof, Compose web API proxy, and backend/frontend folder split implemented.
 - Active backlog: [BL-001](work/BACKLOG.md)
-- Current queue focus: execute local operations and browser E2E proof for PWA installability, offline reload, auth fixture, and platform smoke.
-- Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_progress`.
-- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `in_progress`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `in_review`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md), status `in_progress`; [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `verified`.
+- Current queue focus: reconcile PHASE-001 status and prepare PHASE-002 finance-core ticket decomposition.
+- Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_review`.
+- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `verified`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `verified`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md), status `verified`; [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `verified`.
 - Active bug: None.
 
 ## Current Focus
@@ -62,10 +62,13 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 - `backend/internal/platform/objectstore/`
 - `backend/internal/identity/`
 - `backend/internal/platform/httpapi/auth.go`
+- `backend/internal/platform/httpapi/router.go`
 - `frontend/`
 - `compose.yaml`
 - `backend/Dockerfile`
 - `frontend/Dockerfile`
+- `frontend/nginx.conf`
+- `frontend/e2e/auth-shell.spec.ts`
 - `scripts/smoke-platform.sh`
 - `design/DESIGN.md`
 - `backend/cmd/api/main.go`
@@ -93,9 +96,9 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 
 ## Next Steps
 
-1. Commit the verified backend/frontend folder split.
-2. Extend browser E2E coverage to auth fixture persistence, logout, and forbidden state.
-3. Begin PHASE-002 finance-core ticket decomposition after PHASE-001 review.
+1. Commit PHASE-001 browser auth E2E and web API proxy proof.
+2. Begin PHASE-002 finance-core ticket decomposition.
+3. Implement finance core schema, API, and mobile UI slices.
 
 ## Open Questions
 

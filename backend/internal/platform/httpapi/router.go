@@ -26,7 +26,25 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
 	mux.HandleFunc("/api/v1/health/ready", readyHealth(deps))
 
-	return correlationMiddleware(mux)
+	return corsMiddleware(cfg, correlationMiddleware(mux))
+}
+
+func corsMiddleware(cfg config.Config, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := strings.TrimSpace(r.Header.Get("Origin"))
+		if origin != "" && origin == strings.TrimRight(cfg.PublicWebURL, "/") {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Add("Vary", "Origin")
+			if r.Method == http.MethodOptions {
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Correlation-ID")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 type IdentityRepository interface {

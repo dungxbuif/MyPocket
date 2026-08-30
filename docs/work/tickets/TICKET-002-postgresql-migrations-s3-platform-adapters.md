@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-002
-status: in_review
+status: verified
 owner: human
 priority: urgent
 lane: high-risk
@@ -28,7 +28,7 @@ trace:
   phase: PHASE-001
   detail_design: ../phases/PHASE-001-detail-design.md
   implementation_plan: ../../superpowers/plans/2026-08-25-phase-001-platform-identity.md
-  test_verification: not_created_phase_not_executed
+  test_verification: ../test-verification/PHASE-001-platform-smoke.md
   validation_matrix: ../VALIDATION_MATRIX.md
   docs_review: per-ticket_completion_checklist
   adrs:
@@ -47,7 +47,7 @@ trace:
 ## Status
 
 - ID: TICKET-002
-- Status: in_review
+- Status: verified
 - Type: feature
 - Priority: urgent
 - Phase: PHASE-001
@@ -161,6 +161,9 @@ AI fill:
 - Command: `rtk go test ./...`
 - Result: pass
 - Notes: 10 tests passed across 7 Go packages after S3 adapter implementation.
+- Command: `rtk go test ./...` from `backend/`
+- Result: pass
+- Notes: 17 tests passed across 8 Go packages after backend/frontend split and auth browser proof updates.
 
 ## Fix/Test Attempt Log
 

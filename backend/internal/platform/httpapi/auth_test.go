@@ -80,6 +80,30 @@ func TestLogoutRequiresCSRF(t *testing.T) {
 	}
 }
 
+func TestCORSAllowsPublicWebOriginCredentials(t *testing.T) {
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: &authRepoStub{}})
+	req := httptest.NewRequest(http.MethodOptions, "/api/v1/auth/logout", nil)
+	req.Header.Set("Origin", "http://localhost:5173")
+	req.Header.Set("Access-Control-Request-Method", "POST")
+	req.Header.Set("Access-Control-Request-Headers", "X-CSRF-Token")
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusNoContent {
+		t.Fatalf("expected 204 preflight, got %d: %s", res.Code, res.Body.String())
+	}
+	if got := res.Header().Get("Access-Control-Allow-Origin"); got != "http://localhost:5173" {
+		t.Fatalf("wrong allow origin: %q", got)
+	}
+	if got := res.Header().Get("Access-Control-Allow-Credentials"); got != "true" {
+		t.Fatalf("wrong allow credentials: %q", got)
+	}
+	if got := res.Header().Get("Vary"); !strings.Contains(got, "Origin") {
+		t.Fatalf("expected Origin vary header, got %q", got)
+	}
+}
+
 type authRepoStub struct {
 	user    identity.User
 	profile identity.GoogleProfile

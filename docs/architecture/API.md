@@ -71,6 +71,7 @@ updated: 2026-08-24
 - No Google provider token is stored.
 - Cookie-authenticated mutations require the framework-selected CSRF token/header contract.
 - Cookie-authenticated mutations send `X-CSRF-Token`, matching the browser-readable `mypocket_csrf` cookie.
+- Local and preview browser calls may use credentialed CORS only from the configured `PUBLIC_WEB_URL`; Compose serves same-origin `/api/` through the web nginx proxy.
 - Audit queries additionally require verified email equality with `AUDIT_VIEWER_EMAIL`.
 - Webhooks authenticate through a per-source HMAC contract rather than the browser cookie.
 

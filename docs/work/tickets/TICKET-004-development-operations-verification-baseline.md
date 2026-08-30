@@ -128,7 +128,7 @@ AI fill:
 - Notes: Compose validates and rebuilds after moving backend and frontend to separate build contexts.
 - Command: `rtk bash scripts/smoke-platform.sh`
 - Result: pass
-- Notes: Health smoke passed after the folder split; API liveness/readiness and LocalStack S3 remained reachable.
+- Notes: Health smoke passed after the folder split; API liveness/readiness, web-origin `/api` proxy health, and LocalStack S3 remained reachable.
 
 ## Fix/Test Attempt Log
 

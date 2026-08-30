@@ -19,4 +19,6 @@ Source code is split into `backend/` for the Go module and `frontend/` for the R
 
 Set `DATABASE_URL` before running migration, API, or worker commands. API and worker startup fail fast when PostgreSQL is unavailable.
 
+The Compose web service serves the PWA at `http://127.0.0.1:5173` and proxies same-origin `/api/` requests to the API container, so fixture login can run from the browser without a separate frontend API base URL.
+
 Set `MYPOCKET_TEST_S3_ENDPOINT`, `MYPOCKET_TEST_S3_BUCKET`, `MYPOCKET_TEST_S3_ACCESS_KEY`, and `MYPOCKET_TEST_S3_SECRET_KEY` to run the S3-compatible smoke test; otherwise that integration path is skipped by the default test suite.

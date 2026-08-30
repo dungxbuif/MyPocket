@@ -24,7 +24,7 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     if (token) headers.set("X-CSRF-Token", token);
   }
 
-  const response = await fetch(path, {
+  const response = await fetch(`${apiBaseURL()}${path}`, {
     ...options,
     headers,
     credentials: "include",
@@ -34,6 +34,10 @@ export async function apiFetch<T>(path: string, options: RequestInit = {}): Prom
     throw new APIClientError(body.error?.code ?? "INTERNAL_FAILURE", body.error?.message ?? "Request failed", body.correlation_id);
   }
   return body as T;
+}
+
+export function apiBaseURL() {
+  return import.meta.env.VITE_API_BASE_URL ?? "";
 }
 
 function readCookie(name: string) {

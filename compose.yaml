@@ -33,7 +33,7 @@ services:
     entrypoint: ["/app/migrate"]
     environment:
       DATABASE_URL: postgres://mypocket:mypocket@postgres:5432/mypocket?sslmode=disable
-      PUBLIC_WEB_URL: http://web:80
+      PUBLIC_WEB_URL: http://127.0.0.1:5173
       COOKIE_SECRET: change-this-development-cookie-secret-32-bytes
       CSRF_SECRET: change-this-development-csrf-secret-32-bytes
     depends_on:
@@ -47,7 +47,7 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgres://mypocket:mypocket@postgres:5432/mypocket?sslmode=disable
-      PUBLIC_WEB_URL: http://web:80
+      PUBLIC_WEB_URL: http://127.0.0.1:5173
       COOKIE_SECRET: change-this-development-cookie-secret-32-bytes
       CSRF_SECRET: change-this-development-csrf-secret-32-bytes
       HTTP_ADDR: :8080
@@ -72,7 +72,7 @@ services:
     environment:
       APP_ENV: development
       DATABASE_URL: postgres://mypocket:mypocket@postgres:5432/mypocket?sslmode=disable
-      PUBLIC_WEB_URL: http://web:80
+      PUBLIC_WEB_URL: http://127.0.0.1:5173
       COOKIE_SECRET: change-this-development-cookie-secret-32-bytes
       CSRF_SECRET: change-this-development-csrf-secret-32-bytes
     depends_on:

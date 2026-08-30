@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-003
-status: in_progress
+status: verified
 owner: human
 priority: urgent
 lane: high-risk
@@ -30,7 +30,7 @@ trace:
   phase: PHASE-001
   detail_design: ../phases/PHASE-001-detail-design.md
   implementation_plan: ../../superpowers/plans/2026-08-25-phase-001-platform-identity.md
-  test_verification: not_created_phase_not_executed
+  test_verification: ../test-verification/PHASE-001-platform-smoke.md
   validation_matrix: ../VALIDATION_MATRIX.md
   docs_review: per-ticket_completion_checklist
   adrs:
@@ -49,7 +49,7 @@ trace:
 ## Status
 
 - ID: TICKET-003
-- Status: in_progress
+- Status: verified
 - Type: feature
 - Priority: urgent
 - Phase: PHASE-001
@@ -137,6 +137,9 @@ AI fill:
 - Command: `rtk go test ./...`
 - Result: pass
 - Notes: 16 tests passed across 8 Go packages after backend identity implementation.
+- Command: `rtk npm run test:e2e` from `frontend/`
+- Result: pass
+- Notes: Browser E2E verifies fixture Google login, authenticated email display, session persistence after reload, CSRF-backed logout, return to login state, and a safe forbidden state with correlation ID.
 
 ## Fix/Test Attempt Log
 
@@ -150,8 +153,8 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: login succeeds through fixture, session survives refresh, logout clears cookie, and forbidden states do not leak data.
-- Verified behavior: backend fixture login, signed cookie, current-user endpoint, CSRF rejection, and ownership harness are verified by automated tests. Browser/PWA UAT remains pending until the web shell exists.
-- Sign-off: pending
+- Verified behavior: backend fixture login, signed cookie, current-user endpoint, CSRF rejection, ownership harness, browser fixture login, refresh persistence, logout, and forbidden state are verified by automated tests.
+- Sign-off: automated UAT evidence recorded; human review pending.
 
 ## Docs Review
 
@@ -160,18 +163,18 @@ AI fill:
 - API updated or not needed reason: updated with implemented auth routes and CSRF header contract.
 - ERD/data updated or not needed reason: not needed; users schema already reconciled in TICKET-002 and no provider-token/session columns were added.
 - ADR created or not needed reason: not needed; follows ADR-002.
-- `docs/CONTEXT.md` updated: pending after backend identity commit.
+- `docs/CONTEXT.md` updated: pending after auth browser E2E commit.
 
 ## Completion Checklist
 
-- [ ] Implementation complete
+- [x] Implementation complete
 - [x] Tests run and recorded
 - [x] Fix/test loop guard respected
 - [x] Validation matrix updated or explicitly not affected
-- [ ] UAT completed or explicitly not required
+- [x] UAT completed or explicitly not required
 - [x] Master docs reconciled
-- [ ] Docs review completed
+- [x] Docs review completed
 - [x] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
+- [x] `docs/CONTEXT.md` updated
 - [x] `docs/work/BACKLOG.md` updated
 - [x] Trace links updated

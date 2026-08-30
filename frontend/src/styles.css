@@ -120,6 +120,52 @@ button {
   gap: 28px;
 }
 
+.auth-panel {
+  margin: -10px 0 24px;
+  border-radius: 24px;
+  background: #ffffff;
+  padding: 14px;
+}
+
+.auth-panel p {
+  margin: 0;
+  color: #8e8e93;
+  font-weight: 700;
+  text-align: center;
+}
+
+.compact-auth {
+  padding: 12px 16px;
+}
+
+.compact-auth p {
+  color: #29495a;
+  overflow-wrap: anywhere;
+}
+
+.login-button {
+  font-size: 20px;
+}
+
+.auth-state-card {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  text-align: center;
+}
+
+.auth-state-card h1 {
+  margin: 0;
+  font-size: 26px;
+}
+
+.auth-state-card p,
+.auth-state-card small {
+  margin: 0;
+  color: #8e8e93;
+  overflow-wrap: anywhere;
+}
+
 .card {
   border-radius: 26px;
   background: #ffffff;

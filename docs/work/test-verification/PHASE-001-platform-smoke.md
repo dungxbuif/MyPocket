@@ -18,6 +18,7 @@ owner: shared
 - `rtk npm run test:e2e` from `frontend/` — pass after the folder split; offline reload still works.
 - `rtk docker compose config` — pass after backend and frontend build contexts were split.
 - `rtk docker compose up -d --build` — pass after rebuilding images from `backend/` and `frontend/`.
-- `rtk bash scripts/smoke-platform.sh` — pass after the split; API readiness and LocalStack S3 health remain reachable.
+- `rtk bash scripts/smoke-platform.sh` — pass after the split; API readiness, web-origin `/api` proxy health, and LocalStack S3 health remain reachable.
+- `rtk npm run test:e2e` from `frontend/` — pass with 3 mobile browser tests covering service worker offline reload, fixture login persistence/logout, and forbidden auth state.
 
 UAT is not required; this operational ticket is covered by platform evidence. Production secrets, TLS, backup/restore, and monitoring remain out of scope.

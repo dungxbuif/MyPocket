@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import {
   Bell,
   BriefcaseBusiness,
@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 
 import { useOnlineStatus } from "./offline";
+import { apiBaseURL } from "./apiClient";
+import { loadCurrentUser, logout, type AuthState } from "./auth";
 
 type Tab = "overview" | "transactions" | "budgets" | "account";
 
@@ -31,6 +33,23 @@ export function App() {
   const online = useOnlineStatus();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadCurrentUser().then((nextAuthState) => {
+      if (!cancelled) setAuthState(nextAuthState);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function handleLogout() {
+    await logout();
+    setAuthState({ status: "unauthenticated" });
+    setActiveTab("overview");
+  }
 
   return (
     <div className="app-shell">
@@ -57,10 +76,12 @@ export function App() {
           </div>
         </header>
 
-        {activeTab === "overview" ? <Overview /> : null}
-        {activeTab === "transactions" ? <Transactions /> : null}
-        {activeTab === "budgets" ? <Budgets /> : null}
-        {activeTab === "account" ? <Account /> : null}
+        <AuthBanner authState={authState} />
+        {authState.status === "forbidden" ? <ForbiddenState authState={authState} onLogout={handleLogout} /> : null}
+        {authState.status !== "forbidden" && activeTab === "overview" ? <Overview /> : null}
+        {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions /> : null}
+        {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets /> : null}
+        {authState.status !== "forbidden" && activeTab === "account" ? <Account authState={authState} onLogout={handleLogout} /> : null}
       </main>
 
       <nav className="bottom-nav" aria-label="Điều hướng chính">
@@ -77,6 +98,38 @@ export function App() {
 
       {sheetOpen ? <AddTransactionSheet onClose={() => setSheetOpen(false)} /> : null}
     </div>
+  );
+}
+
+function AuthBanner({ authState }: { authState: AuthState }) {
+  if (authState.status === "loading") {
+    return <section className="auth-panel"><p>Đang kiểm tra phiên đăng nhập...</p></section>;
+  }
+  if (authState.status === "unauthenticated") {
+    return (
+      <section className="auth-panel">
+        <button className="primary-cta login-button" type="button" onClick={() => { window.location.href = `${apiBaseURL()}/api/v1/auth/google`; }}>
+          Đăng nhập bằng Google
+        </button>
+      </section>
+    );
+  }
+  if (authState.status === "authenticated") {
+    return <section className="auth-panel compact-auth"><p>{authState.user.email}</p></section>;
+  }
+  return null;
+}
+
+function ForbiddenState({ authState, onLogout }: { authState: Extract<AuthState, { status: "forbidden" }>; onLogout: () => void }) {
+  return (
+    <section className="content-stack">
+      <section className="card auth-state-card">
+        <h1>Không có quyền truy cập</h1>
+        <p>Phiên hiện tại không thể mở dữ liệu này.</p>
+        {authState.correlationID ? <small>{authState.correlationID}</small> : null}
+        <button className="wide-pill destructive" type="button" onClick={onLogout}>Đăng xuất</button>
+      </section>
+    </section>
   );
 }
 
@@ -177,7 +230,10 @@ function Budgets() {
   );
 }
 
-function Account() {
+function Account({ authState, onLogout }: { authState: AuthState; onLogout: () => void }) {
+  const email = authState.status === "authenticated" ? authState.user.email : "Chưa đăng nhập";
+  const displayName = authState.status === "authenticated" ? authState.user.display_name || authState.user.email : "Tài khoản MyPocket";
+
   return (
     <section className="content-stack">
       <div className="sub-header">
@@ -186,15 +242,15 @@ function Account() {
       <section className="card profile-card">
         <div className="avatar">D</div>
         <div className="ribbon">TÀI KHOẢN PREMIUM</div>
-        <h2>dungbui.dungbui.00</h2>
-        <p>dungbui.dungbui.00@gmail.com</p>
+        <h2>{displayName}</h2>
+        <p>{email}</p>
         <strong className="google-mark">G</strong>
       </section>
       <button className="wide-pill" type="button">Thay đổi mật khẩu</button>
       <section className="card list-card">
         <TransactionRow title="iPhone" subtitle="Thiết bị này" amount="" positive />
       </section>
-      <button className="wide-pill destructive" type="button">Đăng xuất</button>
+      <button className="wide-pill destructive" type="button" onClick={onLogout}>Đăng xuất</button>
     </section>
   );
 }
