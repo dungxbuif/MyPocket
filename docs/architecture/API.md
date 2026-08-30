@@ -29,9 +29,9 @@ updated: 2026-08-24
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`, `POST /api/v1/auth/logout`, `GET /api/v1/me` | OAuth/HTTP | Mixed | implemented | Fixture callback is available only when explicitly enabled; sets stateless signed `mypocket_auth` cookie and browser-readable `mypocket_csrf`; no session API |
-| `GET /wallets`, `POST /wallets` | REST collection | User | implemented | Lists and creates authenticated-user wallets; creation requires CSRF; `user_id` is always derived from the signed cookie |
+| `GET /wallets`, `POST /wallets`, `PATCH /wallets/{id}`, `POST /wallets/{id}/archive`, `POST /wallets/{id}/default-ai` | REST/command | User | implemented | Lists, creates, edits, archives, and selects the default AI wallet for the authenticated user; mutations require CSRF; `user_id` is always derived from the signed cookie |
 | `GET /categories` | REST collection | User | implemented | Lists system and authenticated-user categories; `system_key` is returned for locked system rows |
-| `PATCH /wallets/{id}`, `POST /wallets/{id}/archive`, `POST /wallets/{id}/default-ai`, `PATCH /categories/{id}`, `POST /categories/{id}/archive`, `/wallets/{id}/categories` | REST/command | User | planned | Backend repository behavior exists for TICKET-005; HTTP routes remain pending with the mobile UI pass |
+| `POST /categories`, `PATCH /categories/{id}`, `POST /categories/{id}/archive`, `PUT /wallets/{wallet_id}/categories/{category_id}` | REST/command | User | implemented | Creates user categories, edits/archives user-owned categories, rejects system category mutation, and toggles category activation for a user-owned wallet |
 | `GET /transactions`, `POST /transactions`, `PATCH /transactions/{id}`, `POST /transactions/{id}/archive` | REST/command | User | implemented | Income, expense, transfer, adjustment, edit/archive reversal, search filters, and idempotent creates |
 | `/receipts/uploads`, `/receipts/{id}` | REST/object | User | planned | Presigned upload and private metadata |
 | `POST /sync/mutations`, `GET /sync/changes` | Sync | User | planned | Idempotent batches, cursors, versions, tombstones |
@@ -109,6 +109,39 @@ Request:
 
 Response status: `201 Created`.
 
+### `PATCH /api/v1/wallets/{id}`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request:
+
+```json
+{
+  "name": "Ví chính",
+  "include_in_total": true
+}
+```
+
+Response status: `200 OK`; body uses the single-wallet envelope from create.
+
+### `POST /api/v1/wallets/{id}/archive`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Response status: `200 OK`; archived wallets are removed from ordinary list results and cannot remain the default AI wallet.
+
+### `POST /api/v1/wallets/{id}/default-ai`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Response status: `200 OK`; the backend clears any previous active default AI wallet for the authenticated user.
+
 ### `GET /api/v1/categories`
 
 Response:
@@ -128,6 +161,63 @@ Response:
   "correlation_id": "req_..."
 }
 ```
+
+### `POST /api/v1/categories`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request:
+
+```json
+{
+  "kind": "expense",
+  "name": "Cafe"
+}
+```
+
+Response status: `201 Created`; body contains `{ "category": { ... } }`.
+
+### `PATCH /api/v1/categories/{id}`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request:
+
+```json
+{
+  "name": "Cafe"
+}
+```
+
+Response status: `200 OK`; system categories return `VALIDATION_FAILED`.
+
+### `POST /api/v1/categories/{id}/archive`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Response status: `200 OK`; system categories return `VALIDATION_FAILED`.
+
+### `PUT /api/v1/wallets/{wallet_id}/categories/{category_id}`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request:
+
+```json
+{
+  "active": false
+}
+```
+
+Response status: `200 OK`; activation is scoped to the authenticated user's wallet and the visible system/user category.
 
 ## Transaction Schemas
 

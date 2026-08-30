@@ -123,23 +123,23 @@ AI fill:
 
 ## Docs Review
 
-- Requirements updated or not needed reason: pending execution.
-- Architecture updated or not needed reason: pending execution.
-- API updated or not needed reason: pending execution.
-- ERD/data updated or not needed reason: pending execution.
-- ADR created or not needed reason: pending execution.
-- `docs/CONTEXT.md` updated: pending execution.
+- Requirements updated or not needed reason: not needed; REQ-F-002/REQ-F-011 scope is unchanged and PHASE-006 still owns user-facing receipt/OCR flows.
+- Architecture updated or not needed reason: not needed; receipt metadata remains inside the approved finance repository boundary and no provider/OCR flow is introduced in PHASE-002.
+- API updated or not needed reason: not needed; receipt upload/extract endpoints remain planned for PHASE-006 and no PHASE-002 receipt API is exposed.
+- ERD/data updated or not needed reason: ERD already records implemented `receipt_objects` metadata columns and ownership scope.
+- ADR created or not needed reason: not needed; implementation follows ADR-004 review-first ingestion and does not confirm accounting effects.
+- `docs/CONTEXT.md` updated: yes.
 
 ## Completion Checklist
 
 - [x] Implementation complete
 - [x] Tests run and recorded
-- [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
-- [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
-- [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
+- [x] Fix/test loop guard respected
+- [x] Validation matrix updated or explicitly not affected
+- [x] UAT completed or explicitly not required
+- [x] Master docs reconciled
+- [x] Docs review completed
+- [x] ADR created or explicitly not needed
 - [x] `docs/CONTEXT.md` updated
 - [x] `docs/work/BACKLOG.md` updated
-- [ ] Trace links updated
+- [x] Trace links updated

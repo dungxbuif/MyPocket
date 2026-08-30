@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-006
-status: in_progress
+status: in_review
 owner: human
 priority: high
 lane: high-risk
@@ -44,7 +44,7 @@ trace:
 ## Status
 
 - ID: TICKET-006
-- Status: in_progress
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-002
@@ -65,11 +65,11 @@ AI fill:
 
 ## Acceptance Criteria
 
-- [ ] Given an authenticated user and active wallet/category, when an income or expense is created, then the transaction amount is a positive VND integer and the source wallet balance changes atomically with an incremented version.
-- [ ] Given two user-owned wallets, when a transfer is created, then source and destination wallet effects commit atomically, cannot use the same wallet twice, and retrying the same idempotency key cannot duplicate effects.
-- [ ] Given a balance adjustment, when it is created, then the wallet balance becomes the target amount through an auditable adjustment transaction.
-- [ ] Given an existing transaction, when it is edited or archived, then wallet balances are reversed and reapplied exactly once inside one database transaction.
-- [ ] Given search filters, when transactions are listed, then results are user-scoped and support wallet, category, type, date range, query text, and report-excluded filters.
+- [x] Given an authenticated user and active wallet/category, when an income or expense is created, then the transaction amount is a positive VND integer and the source wallet balance changes atomically with an incremented version.
+- [x] Given two user-owned wallets, when a transfer is created, then source and destination wallet effects commit atomically, cannot use the same wallet twice, and retrying the same idempotency key cannot duplicate effects.
+- [x] Given a balance adjustment, when it is created, then the wallet balance becomes the target amount through an auditable adjustment transaction.
+- [x] Given an existing transaction, when it is edited or archived, then wallet balances are reversed and reapplied exactly once inside one database transaction.
+- [x] Given search filters, when transactions are listed, then results are user-scoped and support wallet, category, type, date range, query text, and report-excluded filters.
 - [ ] UAT requirement is required for add/edit/search, transfer, adjustment, report exclusion, and VND integer formatting.
 
 ## Small Task Exemption
@@ -158,11 +158,20 @@ AI fill:
 - Command: `rtk npm run build` (from `frontend/`)
 - Result: pass
 - Notes: Production frontend build passed after finance UI integration.
+- Command: `rtk npm test -- --run` (from `frontend/`)
+- Result: pass
+- Notes: Frontend component suite now covers mobile transaction type controls, report exclusion, edit submission, and archive submission in addition to list/search/create.
+- Command: `rtk npm run build` (from `frontend/`)
+- Result: pass
+- Notes: Production frontend build passed after mobile transaction editor changes.
+- Command: `rtk npm run test:e2e` (from `frontend/`)
+- Result: pass
+- Notes: Existing mobile PWA/auth/offline Playwright smoke passed after finance workflow changes.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 5 / 5
+- Total fix/test cycles: 5 / 5 before user delegated implementation/design decisions on 2026-08-30; latest mobile workflow pass had no repeated failing path.
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -171,7 +180,7 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: transaction workflows update balances exactly and remain idempotent under retry.
-- Verified behavior: domain accounting effect validation, repository create/edit/archive/search flows, transaction HTTP routes, and mobile transaction list/search/create flows now have automated proof. Mobile edit/archive controls and full UAT remain pending.
+- Verified behavior: domain accounting effect validation, repository create/edit/archive/search flows, transaction HTTP routes, and mobile transaction list/search/create/type/report-exclusion/edit/archive flows now have automated proof. Full UAT remains pending.
 - Sign-off: pending.
 
 ## Docs Review
@@ -185,14 +194,14 @@ AI fill:
 
 ## Completion Checklist
 
-- [ ] Implementation complete
-- [ ] Tests run and recorded
-- [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
+- [x] Implementation complete
+- [x] Tests run and recorded
+- [x] Fix/test loop guard respected
+- [x] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
-- [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
-- [ ] Trace links updated
+- [x] Master docs reconciled
+- [x] Docs review completed
+- [x] ADR created or explicitly not needed
+- [x] `docs/CONTEXT.md` updated
+- [x] `docs/work/BACKLOG.md` updated
+- [x] Trace links updated

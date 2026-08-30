@@ -26,7 +26,9 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.Handle("/api/v1/auth/logout", requireCSRF(http.HandlerFunc(logout)))
 	mux.HandleFunc("/api/v1/me", currentUser(cfg, deps.IdentityRepository))
 	mux.HandleFunc("/api/v1/wallets", wallets(cfg, deps.FinanceRepository))
+	mux.HandleFunc("/api/v1/wallets/", walletByID(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/categories", categories(cfg, deps.FinanceRepository))
+	mux.HandleFunc("/api/v1/categories/", categoryByID(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/transactions", transactions(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/transactions/", transactionByID(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
@@ -43,7 +45,7 @@ func corsMiddleware(cfg config.Config, next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Add("Vary", "Origin")
 			if r.Method == http.MethodOptions {
-				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PATCH, PUT, OPTIONS")
 				w.Header().Set("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, X-Correlation-ID, Idempotency-Key")
 				w.WriteHeader(http.StatusNoContent)
 				return
@@ -61,7 +63,14 @@ type IdentityRepository interface {
 type FinanceRepository interface {
 	ListWallets(ctx context.Context, userID string) ([]finance.Wallet, error)
 	CreateWallet(ctx context.Context, userID string, input finance.CreateWalletInput) (finance.Wallet, error)
+	UpdateWallet(ctx context.Context, userID string, walletID string, input finance.UpdateWalletInput) (finance.Wallet, error)
+	ArchiveWallet(ctx context.Context, userID string, walletID string) error
+	SetDefaultAIWallet(ctx context.Context, userID string, walletID string) error
 	ListCategories(ctx context.Context, userID string) ([]finance.Category, error)
+	CreateCategory(ctx context.Context, userID string, input finance.CreateCategoryInput) (finance.Category, error)
+	UpdateCategory(ctx context.Context, userID string, categoryID string, input finance.UpdateCategoryInput) (finance.Category, error)
+	ArchiveCategory(ctx context.Context, userID string, categoryID string) error
+	SetWalletCategoryActive(ctx context.Context, userID string, walletID string, categoryID string, active bool) error
 	ListTransactions(ctx context.Context, userID string, filters finance.TransactionFilters) ([]finance.Transaction, error)
 	CreateTransaction(ctx context.Context, userID string, input finance.CreateTransactionInput) (finance.Transaction, error)
 	UpdateTransaction(ctx context.Context, userID string, transactionID string, input finance.UpdateTransactionInput) (finance.Transaction, error)

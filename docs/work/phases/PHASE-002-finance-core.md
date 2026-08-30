@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-002
-status: ready
+status: in_progress
 owner: human
 priority: High
 human_fields:
@@ -47,7 +47,7 @@ trace:
 ## Status
 
 - ID: PHASE-002
-- Status: ready
+- Status: in_progress
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
@@ -86,9 +86,9 @@ Deliver correct wallet accounting, category management, transaction workflows, a
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-005 | Ticket | Wallet and category domain | ready | [TICKET-005](../tickets/TICKET-005-wallet-category-domain.md) |
-| TICKET-006 | Ticket | Transaction accounting and transfer engine | in_progress | [TICKET-006](../tickets/TICKET-006-transaction-accounting-engine.md) |
-| TICKET-007 | Ticket | Vietnamese seed data and receipt metadata | ready | [TICKET-007](../tickets/TICKET-007-vietnamese-seeds-receipt-metadata.md) |
+| TICKET-005 | Ticket | Wallet and category domain | in_review | [TICKET-005](../tickets/TICKET-005-wallet-category-domain.md) |
+| TICKET-006 | Ticket | Transaction accounting and transfer engine | in_review | [TICKET-006](../tickets/TICKET-006-transaction-accounting-engine.md) |
+| TICKET-007 | Ticket | Vietnamese seed data and receipt metadata | in_review | [TICKET-007](../tickets/TICKET-007-vietnamese-seeds-receipt-metadata.md) |
 
 ## Dependencies
 
@@ -126,4 +126,4 @@ Deliver correct wallet accounting, category management, transaction workflows, a
 
 ## Completion Summary
 
-Ticket artifacts, detail design, and implementation plan are created. Implementation evidence will be recorded after execution starts.
+Wallet/category APIs, transaction APIs, receipt metadata foundation, and mobile finance component workflows have automated proof. Full finance UAT and dedicated live finance browser CRUD coverage remain before PHASE-002 can be verified.

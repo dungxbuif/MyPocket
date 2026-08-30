@@ -105,6 +105,9 @@ func TestCORSAllowsPublicWebOriginCredentials(t *testing.T) {
 	if got := res.Header().Get("Access-Control-Allow-Headers"); !strings.Contains(got, "Idempotency-Key") {
 		t.Fatalf("expected idempotency header to be allowed, got %q", got)
 	}
+	if got := res.Header().Get("Access-Control-Allow-Methods"); !strings.Contains(got, "PUT") {
+		t.Fatalf("expected PUT to be allowed for wallet/category activation, got %q", got)
+	}
 }
 
 type authRepoStub struct {

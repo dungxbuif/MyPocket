@@ -100,6 +100,63 @@ func TestCreateWalletUsesAuthenticatedUser(t *testing.T) {
 	}
 }
 
+func TestUpdateWalletUsesAuthenticatedUser(t *testing.T) {
+	includeInTotal := false
+	repo := &financeRepoStub{
+		updatedWallet: finance.Wallet{ID: "wallet-2", UserID: "user_123", Name: "Ngân hàng phụ", Type: finance.WalletBank, IncludeInTotal: includeInTotal, Version: 2},
+	}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		FinanceRepository:  repo,
+	})
+	req := authenticatedRequest(t, http.MethodPatch, "/api/v1/wallets/wallet-2", `{"name":"Ngân hàng phụ","include_in_total":false}`)
+	addCSRF(req)
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if repo.updateWalletUserID != "user_123" || repo.updateWalletID != "wallet-2" {
+		t.Fatalf("wallet update not scoped: user=%q id=%q", repo.updateWalletUserID, repo.updateWalletID)
+	}
+	if repo.updateWalletInput.Name != "Ngân hàng phụ" || repo.updateWalletInput.IncludeInTotal == nil || *repo.updateWalletInput.IncludeInTotal {
+		t.Fatalf("unexpected wallet update input: %#v", repo.updateWalletInput)
+	}
+}
+
+func TestWalletCommandsUseAuthenticatedUser(t *testing.T) {
+	repo := &financeRepoStub{}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		FinanceRepository:  repo,
+	})
+
+	archiveReq := authenticatedRequest(t, http.MethodPost, "/api/v1/wallets/wallet-2/archive", "")
+	addCSRF(archiveReq)
+	archiveRes := httptest.NewRecorder()
+	handler.ServeHTTP(archiveRes, archiveReq)
+	if archiveRes.Code != http.StatusOK {
+		t.Fatalf("expected archive 200, got %d: %s", archiveRes.Code, archiveRes.Body.String())
+	}
+
+	defaultReq := authenticatedRequest(t, http.MethodPost, "/api/v1/wallets/wallet-2/default-ai", "")
+	addCSRF(defaultReq)
+	defaultRes := httptest.NewRecorder()
+	handler.ServeHTTP(defaultRes, defaultReq)
+	if defaultRes.Code != http.StatusOK {
+		t.Fatalf("expected default 200, got %d: %s", defaultRes.Code, defaultRes.Body.String())
+	}
+
+	if repo.archiveWalletUserID != "user_123" || repo.archiveWalletID != "wallet-2" {
+		t.Fatalf("wallet archive not scoped: user=%q id=%q", repo.archiveWalletUserID, repo.archiveWalletID)
+	}
+	if repo.defaultWalletUserID != "user_123" || repo.defaultWalletID != "wallet-2" {
+		t.Fatalf("wallet default not scoped: user=%q id=%q", repo.defaultWalletUserID, repo.defaultWalletID)
+	}
+}
+
 func TestCategoriesAPIListsSystemAndOwnedCategories(t *testing.T) {
 	repo := &financeRepoStub{
 		categories: []finance.Category{{ID: "cat-1", Name: "Ăn uống", Kind: finance.CategoryExpense, SystemKey: "expense_food", IsSystem: true}},
@@ -125,6 +182,84 @@ func TestCategoriesAPIListsSystemAndOwnedCategories(t *testing.T) {
 	}
 	if !strings.Contains(res.Body.String(), `"system_key":"expense_food"`) {
 		t.Fatalf("unexpected categories response: %s", res.Body.String())
+	}
+}
+
+func TestCreateCategoryUsesAuthenticatedUser(t *testing.T) {
+	repo := &financeRepoStub{
+		createdCategory: finance.Category{ID: "cat-custom", UserID: "user_123", Kind: finance.CategoryExpense, Name: "Cafe", IsSystem: false},
+	}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		FinanceRepository:  repo,
+	})
+	req := authenticatedRequest(t, http.MethodPost, "/api/v1/categories", `{"kind":"expense","name":"Cafe"}`)
+	addCSRF(req)
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", res.Code, res.Body.String())
+	}
+	if repo.createCategoryUserID != "user_123" {
+		t.Fatalf("expected create category scoped to auth user, got %q", repo.createCategoryUserID)
+	}
+	if repo.createCategoryInput.Kind != finance.CategoryExpense || repo.createCategoryInput.Name != "Cafe" {
+		t.Fatalf("unexpected category input: %#v", repo.createCategoryInput)
+	}
+}
+
+func TestCategoryCommandsUseAuthenticatedUser(t *testing.T) {
+	repo := &financeRepoStub{
+		updatedCategory: finance.Category{ID: "cat-custom", UserID: "user_123", Kind: finance.CategoryExpense, Name: "Cafe mới"},
+	}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		FinanceRepository:  repo,
+	})
+
+	updateReq := authenticatedRequest(t, http.MethodPatch, "/api/v1/categories/cat-custom", `{"name":"Cafe mới"}`)
+	addCSRF(updateReq)
+	updateRes := httptest.NewRecorder()
+	handler.ServeHTTP(updateRes, updateReq)
+	if updateRes.Code != http.StatusOK {
+		t.Fatalf("expected category update 200, got %d: %s", updateRes.Code, updateRes.Body.String())
+	}
+
+	archiveReq := authenticatedRequest(t, http.MethodPost, "/api/v1/categories/cat-custom/archive", "")
+	addCSRF(archiveReq)
+	archiveRes := httptest.NewRecorder()
+	handler.ServeHTTP(archiveRes, archiveReq)
+	if archiveRes.Code != http.StatusOK {
+		t.Fatalf("expected category archive 200, got %d: %s", archiveRes.Code, archiveRes.Body.String())
+	}
+
+	if repo.updateCategoryUserID != "user_123" || repo.updateCategoryID != "cat-custom" || repo.updateCategoryInput.Name != "Cafe mới" {
+		t.Fatalf("category update not scoped: user=%q id=%q input=%#v", repo.updateCategoryUserID, repo.updateCategoryID, repo.updateCategoryInput)
+	}
+	if repo.archiveCategoryUserID != "user_123" || repo.archiveCategoryID != "cat-custom" {
+		t.Fatalf("category archive not scoped: user=%q id=%q", repo.archiveCategoryUserID, repo.archiveCategoryID)
+	}
+}
+
+func TestWalletCategoryActivationUsesAuthenticatedUser(t *testing.T) {
+	repo := &financeRepoStub{}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		FinanceRepository:  repo,
+	})
+	req := authenticatedRequest(t, http.MethodPut, "/api/v1/wallets/wallet-2/categories/cat-food", `{"active":false}`)
+	addCSRF(req)
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", res.Code, res.Body.String())
+	}
+	if repo.walletCategoryUserID != "user_123" || repo.walletCategoryWalletID != "wallet-2" || repo.walletCategoryCategoryID != "cat-food" || repo.walletCategoryActive {
+		t.Fatalf("wallet category activation not scoped: user=%q wallet=%q category=%q active=%t", repo.walletCategoryUserID, repo.walletCategoryWalletID, repo.walletCategoryCategoryID, repo.walletCategoryActive)
 	}
 }
 
@@ -315,12 +450,33 @@ type financeRepoStub struct {
 	categories               []finance.Category
 	transactions             []finance.Transaction
 	createdWallet            finance.Wallet
+	updatedWallet            finance.Wallet
 	createdTransaction       finance.Transaction
+	createdCategory          finance.Category
+	updatedCategory          finance.Category
 	updatedTransaction       finance.Transaction
 	listWalletsUserID        string
 	createWalletUserID       string
 	createWalletInput        finance.CreateWalletInput
+	updateWalletUserID       string
+	updateWalletID           string
+	updateWalletInput        finance.UpdateWalletInput
+	archiveWalletUserID      string
+	archiveWalletID          string
+	defaultWalletUserID      string
+	defaultWalletID          string
 	listCategoriesUserID     string
+	createCategoryUserID     string
+	createCategoryInput      finance.CreateCategoryInput
+	updateCategoryUserID     string
+	updateCategoryID         string
+	updateCategoryInput      finance.UpdateCategoryInput
+	archiveCategoryUserID    string
+	archiveCategoryID        string
+	walletCategoryUserID     string
+	walletCategoryWalletID   string
+	walletCategoryCategoryID string
+	walletCategoryActive     bool
 	listTransactionsUserID   string
 	listTransactionFilters   finance.TransactionFilters
 	createTransactionUserID  string
@@ -343,9 +499,55 @@ func (r *financeRepoStub) CreateWallet(_ context.Context, userID string, input f
 	return r.createdWallet, nil
 }
 
+func (r *financeRepoStub) UpdateWallet(_ context.Context, userID string, walletID string, input finance.UpdateWalletInput) (finance.Wallet, error) {
+	r.updateWalletUserID = userID
+	r.updateWalletID = walletID
+	r.updateWalletInput = input
+	return r.updatedWallet, nil
+}
+
+func (r *financeRepoStub) ArchiveWallet(_ context.Context, userID string, walletID string) error {
+	r.archiveWalletUserID = userID
+	r.archiveWalletID = walletID
+	return nil
+}
+
+func (r *financeRepoStub) SetDefaultAIWallet(_ context.Context, userID string, walletID string) error {
+	r.defaultWalletUserID = userID
+	r.defaultWalletID = walletID
+	return nil
+}
+
 func (r *financeRepoStub) ListCategories(_ context.Context, userID string) ([]finance.Category, error) {
 	r.listCategoriesUserID = userID
 	return r.categories, nil
+}
+
+func (r *financeRepoStub) CreateCategory(_ context.Context, userID string, input finance.CreateCategoryInput) (finance.Category, error) {
+	r.createCategoryUserID = userID
+	r.createCategoryInput = input
+	return r.createdCategory, nil
+}
+
+func (r *financeRepoStub) UpdateCategory(_ context.Context, userID string, categoryID string, input finance.UpdateCategoryInput) (finance.Category, error) {
+	r.updateCategoryUserID = userID
+	r.updateCategoryID = categoryID
+	r.updateCategoryInput = input
+	return r.updatedCategory, nil
+}
+
+func (r *financeRepoStub) ArchiveCategory(_ context.Context, userID string, categoryID string) error {
+	r.archiveCategoryUserID = userID
+	r.archiveCategoryID = categoryID
+	return nil
+}
+
+func (r *financeRepoStub) SetWalletCategoryActive(_ context.Context, userID string, walletID string, categoryID string, active bool) error {
+	r.walletCategoryUserID = userID
+	r.walletCategoryWalletID = walletID
+	r.walletCategoryCategoryID = categoryID
+	r.walletCategoryActive = active
+	return nil
 }
 
 func (r *financeRepoStub) ListTransactions(_ context.Context, userID string, filters finance.TransactionFilters) ([]finance.Transaction, error) {

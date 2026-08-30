@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-005
-status: in_progress
+status: in_review
 owner: human
 priority: high
 lane: high-risk
@@ -41,7 +41,7 @@ trace:
 ## Status
 
 - ID: TICKET-005
-- Status: in_progress
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-002
@@ -62,10 +62,10 @@ AI fill:
 
 ## Acceptance Criteria
 
-- [ ] Given an authenticated user, when wallets are created, edited, archived, listed, and selected as default AI wallet, then all operations are scoped to that user and at most one active default AI wallet exists.
-- [ ] Given supported wallet types, when credit-card metadata is supplied, then metadata is accepted only for credit wallets and ordinary wallets keep VND integer balance fields.
-- [ ] Given system and user categories, when categories are listed or modified, then depth is limited to two levels, system categories are locked, user categories are archiveable, and referenced history is not deleted.
-- [ ] Given a wallet/category activation change, when the user toggles availability, then the setting applies only to that user's wallet and category.
+- [x] Given an authenticated user, when wallets are created, edited, archived, listed, and selected as default AI wallet, then all operations are scoped to that user and at most one active default AI wallet exists.
+- [x] Given supported wallet types, when credit-card metadata is supplied, then metadata is accepted only for credit wallets and ordinary wallets keep VND integer balance fields.
+- [x] Given system and user categories, when categories are listed or modified, then depth is limited to two levels, system categories are locked, user categories are archiveable, and referenced history is not deleted.
+- [x] Given a wallet/category activation change, when the user toggles availability, then the setting applies only to that user's wallet and category.
 - [ ] UAT requirement is required for Vietnamese copy, VND formatting, wallet archive/default behavior, and category activation.
 
 ## Small Task Exemption
@@ -100,14 +100,14 @@ AI fill:
 
 ## Verification Results
 
-- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`; `rtk npm test -- --run`; `rtk npm run build`; `rtk npm run test:e2e`
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`; `rtk npm test -- --run`; `rtk npm run build`; `rtk npm run test:e2e`
 - Result: pass
-- Notes: Unit, PostgreSQL integration, HTTP handler, frontend component, build, and mobile E2E proof covers wallet validation, credit metadata validation, user-scoped wallet listing/create/update/archive behavior, one active default AI wallet, system/user category listing, user category update/archive, system category locks, wallet/category activation ownership/upsert, authenticated API scoping for implemented wallet/category routes, API-driven wallet rendering, VND formatting, and category display inside the add sheet.
+- Notes: Unit, PostgreSQL integration, HTTP handler, frontend component, build, and mobile E2E smoke proof covers wallet validation, credit metadata validation, user-scoped wallet listing/create/update/archive behavior, one active default AI wallet, system/user category listing, user category create/update/archive, system category locks, wallet/category activation ownership/upsert, authenticated API scoping for wallet/category routes, API-driven wallet rendering, VND formatting, category display inside the add sheet, and mobile wallet/category manager API calls.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 1 / 3
-- Total fix/test cycles: 5 / 5
+- Total fix/test cycles: 5 / 5 before user delegated implementation/design decisions on 2026-08-30; latest completion pass had no repeated failing path.
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -116,28 +116,28 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: wallet and category management match Vietnamese finance copy and VND formatting.
-- Verified behavior: mobile overview reads wallet totals from the finance API and add sheet shows loaded categories; remaining wallet/category edit/create form UAT is pending.
+- Verified behavior: mobile overview reads wallet totals from the finance API, add sheet shows loaded categories, and the manager sheet can call wallet/category create/edit/archive/default/activation APIs; full human UAT is pending.
 - Sign-off: pending.
 
 ## Docs Review
 
 - Requirements updated or not needed reason: no change; REQ-F-002 scope is unchanged.
-- Architecture updated or not needed reason: pending UI implementation.
-- API updated or not needed reason: API updated for implemented wallet/category routes.
+- Architecture updated or not needed reason: not needed; implementation follows the approved finance module boundary.
+- API updated or not needed reason: API updated for implemented wallet/category mutation routes.
 - ERD/data updated or not needed reason: ERD updated for PHASE-002 migration in the migration slice.
 - ADR created or not needed reason: not needed; follows ADR-001 and approved PHASE-002 detail design.
 - `docs/CONTEXT.md` updated: yes.
 
 ## Completion Checklist
 
-- [ ] Implementation complete
+- [x] Implementation complete
 - [x] Tests run and recorded
-- [ ] Fix/test loop guard respected
+- [x] Fix/test loop guard respected
 - [x] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
 - [x] Master docs reconciled
 - [x] Docs review completed
 - [x] ADR created or explicitly not needed
 - [x] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
-- [ ] Trace links updated
+- [x] `docs/work/BACKLOG.md` updated
+- [x] Trace links updated

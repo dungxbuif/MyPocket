@@ -19,7 +19,28 @@ import {
 import { useOnlineStatus } from "./offline";
 import { apiBaseURL } from "./apiClient";
 import { loadCurrentUser, logout, type AuthState } from "./auth";
-import { createTransaction, loadCategories, loadTransactions, loadWallets, type CategorySummary, type Transaction, type WalletSummary } from "./finance";
+import {
+  archiveCategory,
+  archiveTransaction,
+  archiveWallet,
+  createCategory,
+  createTransaction,
+  createWallet,
+  loadCategories,
+  loadTransactions,
+  loadWallets,
+  setDefaultAIWallet,
+  setWalletCategoryActive,
+  updateCategory,
+  updateTransaction,
+  updateWallet,
+  type CategorySummary,
+  type Transaction,
+  type TransactionInput,
+  type TransactionType,
+  type WalletSummary,
+  type WalletType,
+} from "./finance";
 import { drainOutbox, readOutbox } from "./outbox";
 
 type Tab = "overview" | "transactions" | "budgets" | "account";
@@ -35,6 +56,8 @@ export function App() {
   const online = useOnlineStatus();
   const [activeTab, setActiveTab] = useState<Tab>("overview");
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [walletSheetOpen, setWalletSheetOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
   const [wallets, setWallets] = useState<WalletSummary[] | null>(null);
   const [categories, setCategories] = useState<CategorySummary[] | null>(null);
@@ -60,15 +83,7 @@ export function App() {
       return;
     }
     let cancelled = false;
-    void Promise.all([loadWallets(), loadCategories(), loadTransactions()])
-      .then(([nextWallets, nextCategories, nextTransactions]) => {
-        if (!cancelled) {
-          setWallets(nextWallets);
-          setCategories(nextCategories);
-          const pending = readOutbox().map((item) => ({ id: item.id, ...item.input, amount_vnd: Number(item.input.amount_vnd), balance_after_vnd: 0, occurred_at: String(item.input.occurred_at), note: String(item.input.note ?? ""), with_person: "", event_ref: "", excluded_from_reports: false, version: 0 } as Transaction));
-          setTransactions([...pending, ...nextTransactions]);
-        }
-      })
+    void refreshFinanceData()
       .catch(() => {
         if (!cancelled) {
           setWallets([]);
@@ -90,6 +105,19 @@ export function App() {
     await logout();
     setAuthState({ status: "unauthenticated" });
     setActiveTab("overview");
+  }
+
+  async function refreshFinanceData() {
+    const [nextWallets, nextCategories, nextTransactions] = await Promise.all([loadWallets(), loadCategories(), loadTransactions()]);
+    setWallets(nextWallets);
+    setCategories(nextCategories);
+    const pending = readOutbox().map((item) => ({ id: item.id, ...item.input, amount_vnd: Number(item.input.amount_vnd), balance_after_vnd: 0, occurred_at: String(item.input.occurred_at), note: String(item.input.note ?? ""), with_person: "", event_ref: "", excluded_from_reports: Boolean(item.input.excluded_from_reports), version: 0 } as Transaction));
+    setTransactions([...pending, ...nextTransactions]);
+  }
+
+  function upsertTransaction(transaction: Transaction) {
+    setTransactions((current) => [transaction, ...(current ?? []).filter((item) => item.id !== transaction.id)]);
+    void refreshFinanceData().catch(() => undefined);
   }
 
   return (
@@ -119,8 +147,8 @@ export function App() {
 
         <AuthBanner authState={authState} />
         {authState.status === "forbidden" ? <ForbiddenState authState={authState} onLogout={handleLogout} /> : null}
-        {authState.status !== "forbidden" && activeTab === "overview" ? <Overview wallets={wallets} /> : null}
-        {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions transactions={transactions ?? []} /> : null}
+        {authState.status !== "forbidden" && activeTab === "overview" ? <Overview wallets={wallets} onManageWallets={() => setWalletSheetOpen(true)} /> : null}
+        {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions transactions={transactions ?? []} onEdit={setEditingTransaction} /> : null}
         {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets /> : null}
         {authState.status !== "forbidden" && activeTab === "account" ? <Account authState={authState} onLogout={handleLogout} /> : null}
       </main>
@@ -137,7 +165,9 @@ export function App() {
         ))}
       </nav>
 
-      {sheetOpen ? <AddTransactionSheet categories={categories ?? []} wallets={wallets ?? []} onCreated={(transaction) => setTransactions((current) => [transaction, ...(current ?? [])])} onClose={() => setSheetOpen(false)} /> : null}
+      {sheetOpen ? <AddTransactionSheet categories={categories ?? []} wallets={wallets ?? []} onCreated={upsertTransaction} onClose={() => setSheetOpen(false)} /> : null}
+      {walletSheetOpen ? <WalletManagerSheet categories={categories ?? []} wallets={wallets ?? []} onChanged={() => void refreshFinanceData()} onClose={() => setWalletSheetOpen(false)} /> : null}
+      {editingTransaction ? <EditTransactionSheet categories={categories ?? []} wallets={wallets ?? []} transaction={editingTransaction} onChanged={upsertTransaction} onArchived={() => { setTransactions((current) => (current ?? []).filter((item) => item.id !== editingTransaction.id)); setEditingTransaction(null); void refreshFinanceData().catch(() => undefined); }} onClose={() => setEditingTransaction(null)} /> : null}
     </div>
   );
 }
@@ -192,7 +222,7 @@ function TabButton({
   );
 }
 
-function Overview({ wallets }: { wallets: WalletSummary[] | null }) {
+function Overview({ wallets, onManageWallets }: { wallets: WalletSummary[] | null; onManageWallets: () => void }) {
   const visibleWallets = wallets && wallets.length > 0 ? wallets : sampleWallets;
   const totalVND = totalIncludedVND(visibleWallets);
 
@@ -201,7 +231,7 @@ function Overview({ wallets }: { wallets: WalletSummary[] | null }) {
       <section className="card wallet-card">
         <div className="section-title">
           <h2>Ví của tôi</h2>
-          <button type="button">Xem tất cả</button>
+          <button type="button" onClick={onManageWallets}>Xem tất cả</button>
         </div>
         <div className="wallet-total-row"><span>Tổng hiển thị</span><strong>{formatVND(totalVND)}</strong></div>
         {visibleWallets.map((wallet) => (
@@ -241,7 +271,7 @@ function Overview({ wallets }: { wallets: WalletSummary[] | null }) {
   );
 }
 
-function Transactions({ transactions }: { transactions: Transaction[] }) {
+function Transactions({ transactions, onEdit }: { transactions: Transaction[]; onEdit: (transaction: Transaction) => void }) {
   const [query, setQuery] = useState("");
   const visible = transactions.filter((transaction) => `${transaction.note} ${transaction.type}`.toLowerCase().includes(query.toLowerCase()));
   return (
@@ -252,7 +282,7 @@ function Transactions({ transactions }: { transactions: Transaction[] }) {
       </div>
       <section className="card list-card">
         <label className="transaction-search"><Search size={18} /><input aria-label="Tìm giao dịch" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm giao dịch" /></label>
-        {visible.length === 0 ? <p className="empty-state">Chưa có giao dịch</p> : visible.map((transaction) => <TransactionRow key={transaction.id} title={transaction.note || transaction.type} subtitle={new Date(transaction.occurred_at).toLocaleDateString("vi-VN")} amount={`${transaction.type === "income" ? "+" : "-"}${formatVND(transaction.amount_vnd)}`} positive={transaction.type === "income"} />)}
+        {visible.length === 0 ? <p className="empty-state">Chưa có giao dịch</p> : visible.map((transaction) => <TransactionRow key={transaction.id} title={transaction.note || transaction.type} subtitle={new Date(transaction.occurred_at).toLocaleDateString("vi-VN")} amount={signedAmount(transaction)} positive={transaction.type === "income"} onClick={() => onEdit(transaction)} />)}
       </section>
     </section>
   );
@@ -303,16 +333,23 @@ function Account({ authState, onLogout }: { authState: AuthState; onLogout: () =
 }
 
 function AddTransactionSheet({ categories, wallets, onCreated, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; onCreated: (transaction: Transaction) => void; onClose: () => void }) {
-  const firstExpenseCategory = categories.find((category) => category.kind === "expense");
+  const [type, setType] = useState<TransactionType>("expense");
   const [amount, setAmount] = useState("");
+  const [targetBalance, setTargetBalance] = useState("");
   const [note, setNote] = useState("");
+  const [sourceWalletID, setSourceWalletID] = useState(wallets[0]?.id ?? "");
+  const [destinationWalletID, setDestinationWalletID] = useState(wallets.find((wallet) => wallet.id !== (wallets[0]?.id ?? ""))?.id ?? "");
+  const [categoryID, setCategoryID] = useState("");
+  const [excludedFromReports, setExcludedFromReports] = useState(false);
   const [saving, setSaving] = useState(false);
-  const canSave = Number(amount) > 0 && Boolean(wallets[0]);
+  const filteredCategories = categories.filter((category) => category.kind === (type === "income" ? "income" : "expense"));
+  const chosenCategoryID = type === "income" || type === "expense" ? categoryID || filteredCategories[0]?.id : "";
+  const canSave = Number(amount) > 0 && Boolean(sourceWalletID) && (type !== "transfer" || Boolean(destinationWalletID && destinationWalletID !== sourceWalletID));
   async function save() {
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      const transaction = await createTransaction({ type: "expense", source_wallet_id: wallets[0].id, category_id: firstExpenseCategory?.id, amount_vnd: Number(amount), occurred_at: new Date().toISOString(), note });
+      const transaction = await createTransaction(buildTransactionInput({ type, amount, targetBalance, sourceWalletID, destinationWalletID, categoryID: chosenCategoryID, note, excludedFromReports }));
       onCreated(transaction);
       onClose();
     } finally {
@@ -327,8 +364,16 @@ function AddTransactionSheet({ categories, wallets, onCreated, onClose }: { cate
           <h2>Thêm Giao Dịch</h2>
           <span />
         </header>
+        <div className="segmented sheet-segmented">
+          {(["expense", "income", "transfer", "adjustment"] as TransactionType[]).map((option) => (
+            <button className={type === option ? "active" : ""} type="button" key={option} onClick={() => setType(option)}>{transactionTypeLabel(option)}</button>
+          ))}
+        </div>
         <label className="amount-row"><span>VND</span><input aria-label="Số tiền" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
-        <SheetRow icon={<span className="dot-icon" />} label={firstExpenseCategory?.name ?? "Chọn nhóm"} muted={!firstExpenseCategory} />
+        {type === "adjustment" ? <label className="sheet-row"><Wallet /><input aria-label="Số dư mục tiêu" inputMode="numeric" value={targetBalance} onChange={(event) => setTargetBalance(event.target.value.replace(/\D/g, ""))} placeholder="Số dư sau điều chỉnh" /></label> : null}
+        <label className="sheet-row"><Wallet /><select aria-label="Ví nguồn" value={sourceWalletID} onChange={(event) => setSourceWalletID(event.target.value)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</select></label>
+        {type === "transfer" ? <label className="sheet-row"><Wallet /><select aria-label="Ví nhận" value={destinationWalletID} onChange={(event) => setDestinationWalletID(event.target.value)}>{wallets.filter((wallet) => wallet.id !== sourceWalletID).map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</select></label> : null}
+        {type === "income" || type === "expense" ? <label className="sheet-row"><span className="dot-icon" /><select aria-label="Nhóm" value={chosenCategoryID} onChange={(event) => setCategoryID(event.target.value)}><option value="">Chọn nhóm</option>{filteredCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label> : null}
         <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label>
         <SheetRow icon={<CalendarDays />} label="Chủ Nhật, 23/08/2026" green />
         <div className="sheet-group">
@@ -340,9 +385,143 @@ function AddTransactionSheet({ categories, wallets, onCreated, onClose }: { cate
           <SheetRow icon={<Bell />} label="Đặt nhắc nhở" muted />
         </div>
         <button className="image-row" type="button"><ImagePlus size={28} />Thêm Hình Ảnh</button>
-        <label className="toggle-row">Không tính vào báo cáo<span /></label>
+        <button className={excludedFromReports ? "toggle-row active" : "toggle-row"} type="button" onClick={() => setExcludedFromReports((current) => !current)}>Không tính vào báo cáo<span /></button>
         <div className="save-bar"><button type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button><button type="button" className="receipt"><ImagePlus size={24} /></button></div>
       </section>
+    </div>
+  );
+}
+
+function EditTransactionSheet({ categories, wallets, transaction, onChanged, onArchived, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; transaction: Transaction; onChanged: (transaction: Transaction) => void; onArchived: () => void; onClose: () => void }) {
+  const [amount, setAmount] = useState(String(transaction.amount_vnd));
+  const [note, setNote] = useState(transaction.note);
+  const [excludedFromReports, setExcludedFromReports] = useState(transaction.excluded_from_reports);
+  const [saving, setSaving] = useState(false);
+  const category = categories.find((item) => item.id === transaction.category_id);
+  const sourceWallet = wallets.find((item) => item.id === transaction.source_wallet_id);
+  async function save() {
+    if (Number(amount) <= 0 || saving) return;
+    setSaving(true);
+    try {
+      const next = await updateTransaction(transaction.id, {
+        type: transaction.type,
+        source_wallet_id: transaction.source_wallet_id,
+        destination_wallet_id: transaction.destination_wallet_id,
+        category_id: transaction.category_id,
+        amount_vnd: Number(amount),
+        occurred_at: transaction.occurred_at,
+        note,
+        with_person: transaction.with_person,
+        event_ref: transaction.event_ref,
+        excluded_from_reports: excludedFromReports,
+      });
+      onChanged(next);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function archive() {
+    if (saving) return;
+    setSaving(true);
+    try {
+      await archiveTransaction(transaction.id);
+      onArchived();
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div className="sheet-backdrop">
+      <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label="Sửa Giao Dịch">
+        <header>
+          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <h2>Sửa Giao Dịch</h2>
+          <span />
+        </header>
+        <p className="sheet-meta">{transactionTypeLabel(transaction.type)} · {sourceWallet?.name ?? "Ví"} · {category?.name ?? "Không nhóm"}</p>
+        <label className="amount-row"><span>VND</span><input aria-label="Số tiền" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
+        <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label>
+        <button className={excludedFromReports ? "toggle-row active" : "toggle-row"} type="button" onClick={() => setExcludedFromReports((current) => !current)}>Không tính vào báo cáo<span /></button>
+        <div className="sheet-actions">
+          <button className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</button>
+          <button className="primary-cta" type="button" disabled={saving || Number(amount) <= 0} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu thay đổi"}</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function WalletManagerSheet({ categories, wallets, onChanged, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; onChanged: () => void; onClose: () => void }) {
+  const [walletName, setWalletName] = useState("");
+  const [walletType, setWalletType] = useState<WalletType>("cash");
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryKind, setCategoryKind] = useState<CategorySummary["kind"]>("expense");
+  const [busy, setBusy] = useState(false);
+  async function run(action: () => Promise<unknown>) {
+    if (busy) return;
+    setBusy(true);
+    try {
+      await action();
+      onChanged();
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <div className="sheet-backdrop">
+      <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label="Quản lý ví và nhóm">
+        <header>
+          <button className="pill-button" type="button" onClick={onClose}>Đóng</button>
+          <h2>Ví và nhóm</h2>
+          <span />
+        </header>
+        <section className="manager-section">
+          <h3>Ví</h3>
+          <div className="manager-form">
+            <input aria-label="Tên ví mới" value={walletName} onChange={(event) => setWalletName(event.target.value)} placeholder="Tên ví mới" />
+            <select aria-label="Loại ví" value={walletType} onChange={(event) => setWalletType(event.target.value as WalletType)}>{walletTypes.map((type) => <option key={type} value={type}>{walletTypeLabel(type)}</option>)}</select>
+            <button type="button" disabled={!walletName.trim() || busy} onClick={() => void run(async () => { await createWallet({ name: walletName, type: walletType }); setWalletName(""); })}>Tạo ví</button>
+          </div>
+          {wallets.map((wallet) => <WalletManageRow key={wallet.id} wallet={wallet} busy={busy} onChanged={run} />)}
+        </section>
+        <section className="manager-section">
+          <h3>Nhóm</h3>
+          <div className="manager-form">
+            <input aria-label="Tên nhóm mới" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} placeholder="Tên nhóm mới" />
+            <select aria-label="Loại nhóm" value={categoryKind} onChange={(event) => setCategoryKind(event.target.value as CategorySummary["kind"])}><option value="expense">Chi</option><option value="income">Thu</option><option value="debt">Nợ</option></select>
+            <button type="button" disabled={!categoryName.trim() || busy} onClick={() => void run(async () => { await createCategory({ name: categoryName, kind: categoryKind }); setCategoryName(""); })}>Tạo nhóm</button>
+          </div>
+          {categories.map((category) => <CategoryManageRow key={category.id} category={category} walletID={wallets[0]?.id ?? ""} busy={busy} onChanged={run} />)}
+        </section>
+      </section>
+    </div>
+  );
+}
+
+function WalletManageRow({ wallet, busy, onChanged }: { wallet: WalletSummary; busy: boolean; onChanged: (action: () => Promise<unknown>) => Promise<void> }) {
+  const [name, setName] = useState(wallet.name);
+  const [include, setInclude] = useState(wallet.include_in_total);
+  return (
+    <div className="manager-row">
+      <input aria-label={`Tên ví ${wallet.name}`} value={name} onChange={(event) => setName(event.target.value)} />
+      <button type="button" className={include ? "mini-toggle active" : "mini-toggle"} onClick={() => setInclude((current) => !current)}>{include ? "Tổng" : "Ẩn"}</button>
+      <button type="button" disabled={busy || !name.trim()} onClick={() => void onChanged(() => updateWallet(wallet.id, { name, include_in_total: include }))}>Lưu</button>
+      <button type="button" disabled={busy} onClick={() => void onChanged(() => setDefaultAIWallet(wallet.id))}>{wallet.is_default_ai ? "AI" : "Đặt AI"}</button>
+      <button type="button" className="danger-text" disabled={busy} onClick={() => void onChanged(() => archiveWallet(wallet.id))}>Ẩn</button>
+    </div>
+  );
+}
+
+function CategoryManageRow({ category, walletID, busy, onChanged }: { category: CategorySummary; walletID: string; busy: boolean; onChanged: (action: () => Promise<unknown>) => Promise<void> }) {
+  const [name, setName] = useState(category.name);
+  const [active, setActive] = useState(true);
+  return (
+    <div className="manager-row">
+      <input aria-label={`Tên nhóm ${category.name}`} value={name} onChange={(event) => setName(event.target.value)} disabled={category.is_system} />
+      <button type="button" disabled={!walletID || busy} className={active ? "mini-toggle active" : "mini-toggle"} onClick={() => { const next = !active; setActive(next); void onChanged(() => setWalletCategoryActive(walletID, category.id, next)); }}>{active ? "Bật" : "Tắt"}</button>
+      <button type="button" disabled={busy || category.is_system || !name.trim()} onClick={() => void onChanged(() => updateCategory(category.id, { name }))}>Lưu</button>
+      <button type="button" className="danger-text" disabled={busy || category.is_system} onClick={() => void onChanged(() => archiveCategory(category.id))}>Ẩn</button>
     </div>
   );
 }
@@ -351,8 +530,8 @@ function WalletRow({ icon, name, amount }: { icon: string; name: string; amount:
   return <div className="wallet-row"><span>{icon}</span><strong>{name}</strong><b>{amount}</b></div>;
 }
 
-function TransactionRow({ title, subtitle, amount, positive = false }: { title: string; subtitle: string; amount: string; positive?: boolean }) {
-  return <div className="transaction-row"><span className="category-dot" /><div><strong>{title}</strong><p>{subtitle}</p></div><b className={positive ? "income" : "expense"}>{amount}</b><ChevronRight size={22} /></div>;
+function TransactionRow({ title, subtitle, amount, positive = false, onClick }: { title: string; subtitle: string; amount: string; positive?: boolean; onClick?: () => void }) {
+  return <button className="transaction-row" type="button" onClick={onClick}><span className="category-dot" /><div><strong>{title}</strong><p>{subtitle}</p></div><b className={positive ? "income" : "expense"}>{amount}</b><ChevronRight size={22} /></button>;
 }
 
 function BudgetRow({ name, amount, remaining, progress }: { name: string; amount: string; remaining: string; progress: number }) {
@@ -396,6 +575,78 @@ function walletIcon(type: WalletSummary["type"]) {
     case "cash":
     default:
       return "₫";
+  }
+}
+
+const walletTypes: WalletType[] = ["cash", "bank", "credit", "e_wallet", "savings", "debt"];
+
+function buildTransactionInput({
+  type,
+  amount,
+  targetBalance,
+  sourceWalletID,
+  destinationWalletID,
+  categoryID,
+  note,
+  excludedFromReports,
+}: {
+  type: TransactionType;
+  amount: string;
+  targetBalance: string;
+  sourceWalletID: string;
+  destinationWalletID: string;
+  categoryID: string;
+  note: string;
+  excludedFromReports: boolean;
+}): TransactionInput {
+  return {
+    type,
+    source_wallet_id: sourceWalletID,
+    destination_wallet_id: type === "transfer" ? destinationWalletID : undefined,
+    category_id: type === "income" || type === "expense" ? categoryID : undefined,
+    amount_vnd: Number(amount),
+    target_balance_vnd: type === "adjustment" && targetBalance ? Number(targetBalance) : null,
+    occurred_at: new Date().toISOString(),
+    note,
+    excluded_from_reports: excludedFromReports,
+  };
+}
+
+function signedAmount(transaction: Transaction) {
+  if (transaction.type === "income") return `+${formatVND(transaction.amount_vnd)}`;
+  if (transaction.type === "adjustment") return formatVND(transaction.amount_vnd);
+  return `-${formatVND(transaction.amount_vnd)}`;
+}
+
+function transactionTypeLabel(type: TransactionType) {
+  switch (type) {
+    case "income":
+      return "Thu";
+    case "transfer":
+      return "Chuyển";
+    case "adjustment":
+      return "Điều chỉnh";
+    case "expense":
+    default:
+      return "Chi";
+  }
+}
+
+function walletTypeLabel(type: WalletType) {
+  switch (type) {
+    case "bank":
+      return "Ngân hàng";
+    case "credit":
+      return "Tín dụng";
+    case "e_wallet":
+      return "Ví điện tử";
+    case "savings":
+      return "Tiết kiệm";
+    case "debt":
+      return "Nợ";
+    case "cash":
+    default:
+      return "Tiền mặt";
   }
 }
 

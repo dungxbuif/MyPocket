@@ -112,9 +112,59 @@ describe("App shell", () => {
     await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
     await userEvent.type(await screen.findByLabelText("Số tiền"), "50000");
     await userEvent.type(screen.getByLabelText("Ghi chú"), "Ăn sáng");
-    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0]);
     await waitFor(() => expect(screen.queryByRole("dialog", { name: "Thêm Giao Dịch" })).not.toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalled();
+  });
+
+  it("updates wallet/category settings from the manager sheet", async () => {
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_custom", kind: "expense", name: "Cafe", is_system: false }] },
+      "/api/v1/transactions": { transactions: [] },
+    });
+
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Xem tất cả" }));
+    await userEvent.clear(await screen.findByLabelText("Tên ví Ví API"));
+    await userEvent.type(screen.getByLabelText("Tên ví Ví API"), "Ví chính");
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0]);
+
+    await waitFor(() => {
+      const updateCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/wallets/wallet_live" && options?.method === "PATCH");
+      expect(updateCall).toBeTruthy();
+    });
+  });
+
+  it("edits and archives a transaction from the transaction list", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const path = new URL(url, "http://localhost").pathname;
+      if (path === "/api/v1/me") return jsonResponse({ user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } });
+      if (path === "/api/v1/wallets") return jsonResponse({ wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] });
+      if (path === "/api/v1/categories") return jsonResponse({ categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true }] });
+      if (path === "/api/v1/transactions/tx_1" && options?.method === "PATCH") {
+        const body = JSON.parse(String(options.body));
+        expect(body.note).toBe("Cà phê chiều");
+        return jsonResponse({ transaction: { id: "tx_1", ...body, balance_after_vnd: 850000, version: 2 } });
+      }
+      if (path === "/api/v1/transactions/tx_1/archive" && options?.method === "POST") return jsonResponse({});
+      return jsonResponse({ transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 125000, balance_after_vnd: 875000, occurred_at: "2026-08-30T00:00:00Z", note: "Cà phê sáng", with_person: "", event_ref: "", excluded_from_reports: false, version: 1 }] });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    render(<App />);
+    await userEvent.click(await screen.findByLabelText("Sổ giao dịch"));
+    await userEvent.click(await screen.findByText("Cà phê sáng"));
+    await userEvent.clear(screen.getByLabelText("Ghi chú"));
+    await userEvent.type(screen.getByLabelText("Ghi chú"), "Cà phê chiều");
+    await userEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Sửa Giao Dịch" })).not.toBeInTheDocument());
+
+    await userEvent.click(await screen.findByText("Cà phê sáng"));
+    await userEvent.click(screen.getByRole("button", { name: "Lưu trữ" }));
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/transactions/tx_1/archive" && options?.method === "POST")).toBe(true));
   });
 });
 
@@ -126,22 +176,27 @@ function mockNavigatorOnline(value: boolean) {
 }
 
 function mockFetchRoutes(routes: Record<string, unknown>) {
-  vi.stubGlobal(
-    "fetch",
-    vi.fn(async (input: RequestInfo | URL) => {
-      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
-      const path = new URL(url, "http://localhost").pathname;
-      const body = routes[path];
-      if (!body) {
-        return new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "Not found" }, correlation_id: "req_test" }), {
-          status: 404,
-          headers: { "Content-Type": "application/json" },
-        });
-      }
-      return new Response(JSON.stringify({ status: "ok", correlation_id: "req_test", ...body }), {
-        status: 200,
-        headers: { "Content-Type": "application/json" },
-      });
-    }),
-  );
+  const fetchMock = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+    const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+    const path = new URL(url, "http://localhost").pathname;
+    if (routes[path]) {
+      return jsonResponse(routes[path]);
+    }
+    if (options?.method && options.method !== "GET") {
+      return jsonResponse({});
+    }
+    return new Response(JSON.stringify({ error: { code: "NOT_FOUND", message: "Not found" }, correlation_id: "req_test" }), {
+      status: 404,
+      headers: { "Content-Type": "application/json" },
+    });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify({ status: "ok", correlation_id: "req_test", ...(body as Record<string, unknown>) }), {
+    status,
+    headers: { "Content-Type": "application/json" },
+  });
 }

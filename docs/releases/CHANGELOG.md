@@ -39,6 +39,8 @@ shared_fields: [status]
 - Added API-backed mobile transaction listing, search, and expense creation from the quick-add sheet.
 - Added user-scoped receipt metadata persistence with private object-key and SHA-256 validation.
 - Added an IndexedDB-compatible browser outbox layer (localStorage fallback) for optimistic offline transactions and ordered reconnect replay.
+- Added authenticated wallet/category mutation API routes for wallet edit/archive/default AI selection, category create/edit/archive, and per-wallet category activation.
+- Added mobile finance controls for wallet/category management plus income, expense, transfer, adjustment, report exclusion, and transaction edit/archive workflows.
 
 ### Planning
 

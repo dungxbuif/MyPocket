@@ -336,6 +336,25 @@ button {
   padding: 12px;
 }
 
+.sheet-segmented {
+  grid-template-columns: repeat(4, 1fr);
+  margin-bottom: 12px;
+}
+
+.sheet-segmented button {
+  min-height: 46px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #8e8e93;
+  font-weight: 800;
+}
+
+.sheet-segmented button.active {
+  background: #ffffff;
+  color: #111111;
+}
+
 .chart {
   position: relative;
   height: 230px;
@@ -382,6 +401,12 @@ button {
 
 .transaction-row {
   grid-template-columns: 48px 1fr auto 22px;
+  width: 100%;
+  border-left: 0;
+  border-right: 0;
+  border-bottom: 0;
+  background: #ffffff;
+  text-align: left;
 }
 
 .transaction-search {
@@ -397,6 +422,10 @@ button {
 
 .transaction-search input,
 .sheet-row input,
+.sheet-row select,
+.manager-form input,
+.manager-form select,
+.manager-row input,
 .amount-row input {
   width: 100%;
   min-width: 0;
@@ -405,6 +434,11 @@ button {
   background: transparent;
   color: inherit;
   font: inherit;
+}
+
+.sheet-row select,
+.manager-form select {
+  appearance: none;
 }
 
 .empty-state {
@@ -681,6 +715,80 @@ button {
   height: 42px;
   border-radius: 999px;
   background: #c7c7cc;
+}
+
+.toggle-row.active span {
+  background: #2dbd4f;
+}
+
+.sheet-meta {
+  margin: 0 0 12px;
+  color: #8e8e93;
+  font-weight: 800;
+  text-align: center;
+}
+
+.sheet-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.manager-section {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.manager-section h3 {
+  margin: 0;
+  font-size: 22px;
+}
+
+.manager-form,
+.manager-row {
+  display: grid;
+  gap: 10px;
+  border-radius: 18px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.manager-form {
+  grid-template-columns: 1fr 132px;
+}
+
+.manager-form input {
+  grid-column: 1 / -1;
+}
+
+.manager-form button,
+.manager-row button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: #e8f7ed;
+  color: #2dbd4f;
+  font-weight: 800;
+}
+
+.manager-row {
+  grid-template-columns: 1fr 70px 64px 78px 54px;
+  align-items: center;
+}
+
+.mini-toggle {
+  background: #eeeeef !important;
+  color: #8e8e93 !important;
+}
+
+.mini-toggle.active {
+  background: #e8f7ed !important;
+  color: #2dbd4f !important;
+}
+
+.danger-text {
+  color: #ff1717 !important;
 }
 
 .save-bar {

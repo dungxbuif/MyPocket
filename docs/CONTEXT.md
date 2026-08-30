@@ -32,11 +32,11 @@ updated: 2026-08-30
 
 ## Current Status
 
-- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, receipt metadata validation/persistence, backend wallet/category repository behavior, initial wallet/category API routes, API-driven mobile wallet/category display, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create UI, and a browser transaction outbox with reconnect drain are implemented with automated proof.
+- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, receipt metadata validation/persistence, backend wallet/category repository behavior, wallet/category mutation API routes, API-driven mobile wallet/category management, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create/type/edit/archive UI, and a browser transaction outbox with reconnect drain are implemented with automated proof.
 - Active backlog: [BL-002](work/BACKLOG.md)
-- Current queue focus: execute PHASE-002 finance core; TICKET-005 wallet/category foundation is partially implemented and TICKET-006 transaction accounting has started.
-- Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `ready`.
-- Active ticket: [TICKET-006](work/tickets/TICKET-006-transaction-accounting-engine.md), status `in_progress`.
+- Current queue focus: execute PHASE-002 finance core; TICKET-005 and TICKET-006 are in review with UAT/live finance CRUD browser proof still pending.
+- Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `in_progress`.
+- Active ticket: [TICKET-006](work/tickets/TICKET-006-transaction-accounting-engine.md), status `in_review`.
 - Active bug: None.
 
 ## Current Focus
@@ -112,9 +112,9 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 
 ## Next Steps
 
-1. Add mobile transaction edit/archive controls against `/api/v1/transactions/{id}` and complete UAT (requires design review because TICKET-006 reached its loop guard).
-2. Complete remaining TICKET-005 wallet/category mutation API routes and mobile create/edit controls before PHASE-002 review.
-3. Run PHASE-002 frontend build/E2E proof and record UAT gaps.
+1. Add dedicated Playwright live finance CRUD coverage for wallet/category manager and transaction create/edit/archive flows.
+2. Complete PHASE-002 UAT notes and move the phase to review if browser proof passes.
+3. Reconcile any remaining TICKET-007 docs-review checklist gaps.
 4. Generate bounded ticket artifacts and executable plans from the approved PHASE-003 through PHASE-007 designs as each dependency becomes ready.
 
 ## Open Questions

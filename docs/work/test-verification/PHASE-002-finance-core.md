@@ -93,6 +93,11 @@ trace:
 | `rtk npm test -- --run` | pass | Full frontend component suite; 5 tests passed. |
 | `rtk npm run build` | pass | Production Vite build completed. |
 | `rtk npm run test:e2e` | pass | Existing mobile PWA/auth/offline browser smoke passed after finance UI changes; 3 tests passed. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -count=1` | pass | HTTP package regression passed after adding wallet/category mutation routes for update/archive/default AI selection, category create/update/archive, and per-wallet category activation. |
+| `rtk npm test -- --run` (from `frontend/`) | pass | Full frontend component suite; 11 tests passed, including wallet/category manager mutation calls and transaction edit/archive workflow proof. |
+| `rtk npm run build` (from `frontend/`) | pass | Production Vite build passed after mobile finance manager/editor controls. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Full backend regression passed after wallet/category mutation API implementation. |
+| `rtk npm run test:e2e` (from `frontend/`) | pass | Mobile Playwright smoke passed after finance workflow changes; 3 tests passed for service worker offline reload, fixture login persistence/logout, and forbidden auth state. |
 
 ## Fix/Test Attempt Log
 
@@ -111,26 +116,26 @@ trace:
 Loop guard:
 
 - Same-path failure attempts: 1 / 3
-- Active work-item fix/test cycles: TICKET-006 is 5 / 5. Earlier TICKET-005 cycles are tracked in that ticket; further TICKET-006 changes require human/design review.
+- Active work-item fix/test cycles: user delegated implementation/design decisions on 2026-08-30, allowing the bounded wallet/category and transaction UI completion pass after earlier loop-guard pressure. Future repeated failures still require the standard loop guard.
 - Blocked: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
 ## Automated Tests
 
-- Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, TICKET-006 accounting effect tests, TICKET-006 repository create/idempotency/edit/archive/search tests, TICKET-006 transaction HTTP route tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
+- Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, wallet/category mutation API tests, TICKET-006 accounting effect tests, TICKET-006 repository create/idempotency/edit/archive/search tests, TICKET-006 transaction HTTP route tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
 - Failed: none remaining for migration, backend wallet/category domain, implemented wallet/category API route, and API-driven mobile display slices.
-- Skipped: remaining wallet/category mutation routes, transaction edit/archive mobile controls, and full wallet/category/transaction UAT pending later PHASE-002 work.
+- Skipped: full wallet/category/transaction UAT remains pending; no dedicated Playwright scenario yet covers live finance CRUD beyond component-level API call proof.
 
 ## Manual Checks
 
-- Pending mobile UI implementation.
+- Mobile UI implementation now includes wallet/category manager controls and transaction add/edit/archive controls; full human UAT is still pending.
 
 ## UAT
 
 - Required: yes for wallet/category and transaction workflows; not required for receipt metadata foundation until PHASE-006.
 - Reason if not required: partial exception applies only to non-user-facing receipt metadata foundation.
 - Expected behavior: finance workflows use Vietnamese copy, exact VND integer formatting, user-owned data, and correct wallet balances.
-- Verified behavior: wallet/category API-driven display, backend accounting effects, repository create transaction/idempotency behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, and mobile transaction list/search/create flows have automated proof; mobile edit/archive and UAT remain pending.
+- Verified behavior: wallet/category API-driven display and mutation routes, backend accounting effects, repository create transaction/idempotency behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create flows, type controls, report exclusion, and mobile edit/archive component flows have automated proof; full UAT remains pending.
 - Sign-off: pending.
 
 ## Failures And Follow-Up
@@ -138,6 +143,7 @@ Loop guard:
 - Migration GREEN attempt 1 exposed a partial-index conflict-target issue; fixed in the migration before committing.
 - Finance validation GREEN attempt 1 exposed a test-facing type mismatch; fixed before repository implementation continued.
 - Package-parallel backend regression with a shared DB URL exposed test harness schema-reset contention; rerun with `-p 1` passed.
+- Running backend regression and Playwright E2E concurrently can collide on the shared local PostgreSQL migration/schema path; sequential Playwright rerun passed.
 
 ## Evidence Notes
 
@@ -150,3 +156,5 @@ Loop guard:
 - TICKET-006 repository tests were written and observed failing on missing `CreateTransaction` APIs, then passed after transaction persistence, wallet balance updates, category checks, and idempotency storage were added.
 - TICKET-006 edit/archive/search repository tests were written and observed failing on missing methods/types, then passed after persisted transaction deltas and repository methods were added.
 - TICKET-006 transaction HTTP tests were written and observed failing with 404s, then passed after route registration, handlers, filter parsing, and CORS idempotency header support were added.
+- Wallet/category mutation HTTP tests passed after route registration for item commands and category activation.
+- Frontend component tests passed after adding mobile wallet/category manager controls and transaction edit/archive controls.
