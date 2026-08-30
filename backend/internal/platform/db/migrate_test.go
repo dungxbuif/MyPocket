@@ -71,6 +71,65 @@ func TestMigrateCreatesUsersWithoutProviderTokens(t *testing.T) {
 	}
 }
 
+func TestPhase002FinanceTablesAndSeeds(t *testing.T) {
+	ctx := context.Background()
+	conn := openTestPostgres(t)
+	resetSchema(t, conn)
+
+	migrations := os.DirFS(filepath.Join("..", "..", "..", "migrations"))
+	if err := db.Migrate(ctx, conn, migrations); err != nil {
+		t.Fatalf("migrate: %v", err)
+	}
+
+	assertTableColumns(t, conn, "wallets", []string{
+		"id",
+		"user_id",
+		"name",
+		"type",
+		"balance_vnd",
+		"include_in_total",
+		"is_default_ai",
+		"archived_at",
+		"version",
+	})
+	assertTableColumns(t, conn, "categories", []string{
+		"id",
+		"user_id",
+		"parent_id",
+		"kind",
+		"name",
+		"system_key",
+		"is_system",
+		"archived_at",
+	})
+	assertTableColumns(t, conn, "transactions", []string{
+		"id",
+		"user_id",
+		"type",
+		"source_wallet_id",
+		"destination_wallet_id",
+		"category_id",
+		"amount_vnd",
+		"occurred_at",
+		"excluded_from_reports",
+		"archived_at",
+		"version",
+	})
+
+	var count int
+	err := conn.QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM categories
+		WHERE is_system AND system_key IN ('expense_food', 'income_salary', 'debt_loan')
+	`).Scan(&count)
+	if err != nil {
+		t.Fatalf("count required system categories: %v", err)
+	}
+	if count != 3 {
+		t.Fatalf("expected required Vietnamese system categories, got %d", count)
+	}
+}
+
 func openTestPostgres(t *testing.T) *sql.DB {
 	t.Helper()
 
@@ -123,6 +182,17 @@ func loadColumns(t *testing.T, conn *sql.DB, table string) map[string]bool {
 		t.Fatalf("columns rows: %v", err)
 	}
 	return columns
+}
+
+func assertTableColumns(t *testing.T, conn *sql.DB, table string, required []string) {
+	t.Helper()
+
+	columns := loadColumns(t, conn, table)
+	for _, name := range required {
+		if !columns[name] {
+			t.Fatalf("%s table missing %s column: %#v", table, name, columns)
+		}
+	}
 }
 
 func TestMigrationsDirectoryContainsOnlySQLFiles(t *testing.T) {

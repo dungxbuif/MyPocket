@@ -63,9 +63,10 @@ trace:
 
 | Command | Result | Notes |
 | --- | --- | --- |
-| `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/platform/db -run TestPhase002FinanceTablesAndSeeds` | pending | RED/GREEN migration proof for PHASE-002 schema and seeds. |
+| `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/platform/db -run TestPhase002FinanceTablesAndSeeds -count=1` | pass | RED first failed because `wallets` did not exist; GREEN passed after adding `0002_phase002_finance_core.sql`. |
+| `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/platform/db -count=1` | pass | Full migration package regression after PHASE-002 migration. |
 | `rtk go test ./internal/finance` | pending | Wallet/category and accounting domain proof. |
-| `rtk go test ./...` | pending | Backend regression proof. |
+| `rtk go test ./...` | pass | Backend regression after PHASE-002 migration; 17 passed in 8 packages. |
 | `rtk npm test -- --run` | pending | Frontend component proof. |
 | `rtk npm run test:e2e` | pending | Mobile browser finance workflow proof. |
 
@@ -73,20 +74,20 @@ trace:
 
 | Attempt | Change Made | Command | Result | Failure Summary |
 | --- | --- | --- | --- | --- |
-| 0 | None yet | not_run | pending | Implementation has not started. |
+| 1 | Added PHASE-002 migration, then changed `categories_system_key_unique` from partial to full unique index so `ON CONFLICT (system_key)` is valid. | `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/platform/db -run TestPhase002FinanceTablesAndSeeds -count=1` | pass | Initial GREEN attempt failed with SQLSTATE 42P10 because PostgreSQL cannot use a partial unique index for that conflict target. |
 
 Loop guard:
 
-- Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 0 / 5
+- Same-path failure attempts: 1 / 3
+- Total fix/test cycles: 1 / 5
 - Blocked: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
 ## Automated Tests
 
-- Passed: pending
-- Failed: pending
-- Skipped: pending
+- Passed: PHASE-002 migration/schema/seed test and full `internal/platform/db` package.
+- Failed: none remaining for the migration slice.
+- Skipped: finance domain, API, frontend, and E2E checks pending later PHASE-002 tasks.
 
 ## Manual Checks
 
@@ -102,8 +103,9 @@ Loop guard:
 
 ## Failures And Follow-Up
 
-- None recorded yet.
+- Migration GREEN attempt 1 exposed a partial-index conflict-target issue; fixed in the migration before committing.
 
 ## Evidence Notes
 
-- This artifact is initialized before PHASE-002 execution so tests and UAT evidence have a stable destination.
+- PHASE-002 migration test was written and observed failing before production migration code existed: `wallets table missing id column: map[string]bool{}`.
+- After adding migration `0002_phase002_finance_core.sql` and fixing the category unique index, `internal/platform/db` tests passed against the local Compose PostgreSQL test URL.

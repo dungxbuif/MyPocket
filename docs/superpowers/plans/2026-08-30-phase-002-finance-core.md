@@ -35,7 +35,7 @@
 - Produces tables: `wallets`, `categories`, `wallet_category_settings`, `transactions`, `finance_idempotency_keys`, `receipt_objects`.
 - Produces stable system category keys consumed by Task 2 and frontend fixtures.
 
-- [ ] **Step 1: Write the failing migration tests**
+- [x] **Step 1: Write the failing migration tests**
 
 Add tests in `backend/internal/platform/db/migrate_test.go`:
 
@@ -59,13 +59,13 @@ func TestPhase002FinanceTablesAndSeeds(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run test to verify it fails**
+- [x] **Step 2: Run test to verify it fails**
 
 Run: `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/platform/db -run TestPhase002FinanceTablesAndSeeds`
 
 Expected: FAIL because PHASE-002 tables do not exist.
 
-- [ ] **Step 3: Add migration**
+- [x] **Step 3: Add migration**
 
 Create `0002_phase002_finance_core.sql` with:
 
@@ -92,7 +92,7 @@ CREATE UNIQUE INDEX wallets_one_default_ai_per_user ON wallets(user_id) WHERE is
 
 Include equivalent DDL for categories, wallet category settings, transactions, idempotency keys, and receipt objects per the detail design.
 
-- [ ] **Step 4: Seed Vietnamese system categories**
+- [x] **Step 4: Seed Vietnamese system categories**
 
 Insert stable `system_key` rows including:
 
@@ -108,7 +108,7 @@ VALUES
 ON CONFLICT (system_key) DO UPDATE SET name = EXCLUDED.name;
 ```
 
-- [ ] **Step 5: Run migration tests**
+- [x] **Step 5: Run migration tests**
 
 Run: `rtk env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/platform/db`
 

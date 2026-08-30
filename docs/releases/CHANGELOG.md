@@ -28,6 +28,7 @@ shared_fields: [status]
 - Added a Docker Compose local stack for PostgreSQL, LocalStack S3, API, worker, migration, and nginx-served web, plus a repeatable platform smoke command.
 - Split source code into `backend/` for the Go API/worker/migrations and `frontend/` for the React PWA, with npm package metadata owned by `frontend/`.
 - Added browser auth proof for fixture Google login persistence, CSRF-backed logout, forbidden state rendering, credentialed CORS, and Compose web `/api` proxying.
+- Added PHASE-002 PostgreSQL finance core schema for wallets, categories, wallet/category activation, transactions, idempotency keys, receipt metadata, and stable Vietnamese system category seeds.
 
 ### Planning
 

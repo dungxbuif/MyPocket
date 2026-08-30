@@ -110,6 +110,93 @@ updated: 2026-08-24
 
 The implemented identity schema intentionally has no `google_access_token`, `google_refresh_token`, or `session_id` columns.
 
+### `wallets`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key; defaults through `gen_random_uuid()` |
+| `user_id` | `uuid` | Required owner; references `users(id)` |
+| `name` | `text` | Required non-empty wallet name |
+| `type` | `text` | `cash`, `bank`, `credit`, `e_wallet`, `savings`, or `debt` |
+| `balance_vnd` | `bigint` | Required integer VND balance; defaults `0` |
+| `include_in_total` | `boolean` | Controls total balance inclusion |
+| `is_default_ai` | `boolean` | Partial unique index allows one active default AI wallet per user |
+| `credit_limit_vnd`, `statement_day`, `payment_due_day` | nullable numeric fields | Allowed only for `credit` wallets |
+| `archived_at` | `timestamptz` | Archive marker |
+| `version` | `bigint` | Optimistic version seed; starts at `1` |
+| `created_at`, `updated_at` | `timestamptz` | Audit timestamps |
+
+### `categories`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key; system seed rows use stable UUIDs |
+| `user_id` | `uuid` | Nullable owner; `NULL` only for system categories |
+| `parent_id` | `uuid` | Optional parent category; references `categories(id)` |
+| `kind` | `text` | `expense`, `income`, or `debt` |
+| `name` | `text` | Required non-empty Vietnamese/user label |
+| `system_key` | `text` | Unique stable key for system rows; user rows keep `NULL` |
+| `is_system` | `boolean` | Locks seeded category ownership and key semantics |
+| `archived_at` | `timestamptz` | User category archive marker |
+| `version` | `bigint` | Optimistic version seed; starts at `1` |
+| `created_at`, `updated_at` | `timestamptz` | Audit timestamps |
+
+Seeded system keys include `expense_food`, `expense_shopping`, `expense_transport`, `income_salary`, `income_bonus`, and `debt_loan`.
+
+### `wallet_category_settings`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `wallet_id` | `uuid` | References `wallets(id)`; part of composite primary key |
+| `category_id` | `uuid` | References `categories(id)`; part of composite primary key |
+| `user_id` | `uuid` | Required owner scope |
+| `active` | `boolean` | Wallet/category availability flag |
+| `created_at`, `updated_at` | `timestamptz` | Audit timestamps |
+
+### `receipt_objects`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key |
+| `user_id` | `uuid` | Required owner scope |
+| `object_key` | `text` | Private S3-compatible object key; unique per user |
+| `content_type` | `text` | Required MIME type |
+| `size_bytes` | `bigint` | Required positive object size |
+| `checksum_sha256` | `text` | Required 64-character SHA-256 checksum |
+| `original_filename` | `text` | Optional display filename; defaults empty |
+| `created_at` | `timestamptz` | Creation timestamp |
+
+### `transactions`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key |
+| `user_id` | `uuid` | Required owner scope |
+| `type` | `text` | `income`, `expense`, `transfer`, or `adjustment` |
+| `source_wallet_id` | `uuid` | Required source wallet |
+| `destination_wallet_id` | `uuid` | Required only for transfer; must differ from source |
+| `category_id` | `uuid` | Optional category reference |
+| `receipt_object_id` | `uuid` | Optional private receipt metadata reference |
+| `amount_vnd` | `bigint` | Required positive VND integer |
+| `balance_after_vnd` | `bigint` | Snapshot for source wallet after posting |
+| `note`, `with_person`, `event_ref` | `text` | Optional search/display metadata; default empty |
+| `occurred_at` | `timestamptz` | Required transaction date/time |
+| `excluded_from_reports` | `boolean` | Report exclusion flag |
+| `archived_at` | `timestamptz` | Archive marker |
+| `version` | `bigint` | Optimistic version seed; starts at `1` |
+| `created_at`, `updated_at` | `timestamptz` | Audit timestamps |
+
+### `finance_idempotency_keys`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `user_id` | `uuid` | Required owner; part of primary key |
+| `key` | `text` | Idempotency key; part of primary key |
+| `request_hash` | `text` | Request identity hash |
+| `response_status` | `integer` | Stored HTTP-equivalent response status |
+| `response_json` | `jsonb` | Stored replay response |
+| `created_at` | `timestamptz` | Creation timestamp |
+
 ## Linked Decisions
 
 - [ADR-001](../decisions/ADR-001-react-go-modular-monolith.md)

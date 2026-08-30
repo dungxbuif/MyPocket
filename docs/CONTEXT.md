@@ -65,6 +65,8 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - `docs/work/DOCS-REVIEW-M0.md`
 - `backend/internal/platform/db/`
 - `backend/migrations/0001_phase001_identity.sql`
+- `backend/migrations/0002_phase002_finance_core.sql`
+- `docs/work/test-verification/PHASE-002-finance-core.md`
 - `backend/internal/platform/objectstore/`
 - `backend/internal/identity/`
 - `backend/internal/platform/httpapi/auth.go`
