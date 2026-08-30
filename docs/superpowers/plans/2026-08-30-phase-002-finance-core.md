@@ -139,7 +139,7 @@ rtk git commit -m "feat: add finance core migrations"
 - Produces `finance.Service` with `ListWallets`, `CreateWallet`, `UpdateWallet`, `ListCategories`, `CreateCategory`, `UpdateCategory`, `SetWalletCategoryActive`.
 - Consumes authenticated user IDs from HTTP handlers in Task 4.
 
-- [ ] **Step 1: Write failing unit tests**
+- [x] **Step 1: Write failing unit tests**
 
 Test wallet validation:
 
@@ -165,13 +165,13 @@ func TestSystemCategoryCannotBeRenamed(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `rtk go test ./internal/finance`
 
 Expected: FAIL because `backend/internal/finance` does not exist.
 
-- [ ] **Step 3: Implement validation and repository methods**
+- [x] **Step 3: Implement validation and repository methods**
 
 Create focused types and methods:
 
@@ -189,7 +189,7 @@ func ValidateCreateWallet(input CreateWalletInput) (CreateWalletInput, error)
 func ValidateCategoryUpdate(category Category, input UpdateCategoryInput) error
 ```
 
-- [ ] **Step 4: Add PostgreSQL integration tests**
+- [x] **Step 4: Add PostgreSQL integration tests**
 
 Cover:
 - user A cannot list/update user B wallet
@@ -197,7 +197,7 @@ Cover:
 - category depth above two is rejected
 - wallet/category activation is unique per wallet/category
 
-- [ ] **Step 5: Run tests**
+- [x] **Step 5: Run tests**
 
 Run: `rtk go test ./internal/finance`
 

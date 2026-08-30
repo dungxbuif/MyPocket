@@ -36,7 +36,7 @@ updated: 2026-08-26
 - Active backlog: [BL-001](work/BACKLOG.md)
 - Current queue focus: execute PHASE-002 finance core, starting with TICKET-005 wallet/category domain.
 - Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `ready`.
-- Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `verified`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `verified`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md), status `verified`; [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `verified`.
+- Active ticket: [TICKET-005](work/tickets/TICKET-005-wallet-category-domain.md), status `in_progress`.
 - Active bug: None.
 
 ## Current Focus
@@ -66,6 +66,7 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - `backend/internal/platform/db/`
 - `backend/migrations/0001_phase001_identity.sql`
 - `backend/migrations/0002_phase002_finance_core.sql`
+- `backend/internal/finance/`
 - `docs/work/test-verification/PHASE-002-finance-core.md`
 - `backend/internal/platform/objectstore/`
 - `backend/internal/identity/`
@@ -105,8 +106,8 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 ## Next Steps
 
 1. Commit PHASE-002 finance-core ticket/design/plan artifacts.
-2. Execute TICKET-005 wallet/category domain with migration and TDD.
-3. Continue TICKET-006 transaction accounting engine after wallet/category foundation.
+2. Expose TICKET-005 wallet/category HTTP API routes with authenticated user scoping and CSRF on mutations.
+3. Build mobile wallet/category UI flows against the finance API before moving to TICKET-006 transaction accounting.
 
 ## Open Questions
 

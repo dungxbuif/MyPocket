@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-005
-status: ready
+status: in_progress
 owner: human
 priority: high
 lane: high-risk
@@ -41,7 +41,7 @@ trace:
 ## Status
 
 - ID: TICKET-005
-- Status: ready
+- Status: in_progress
 - Type: feature
 - Priority: high
 - Phase: PHASE-002
@@ -100,14 +100,14 @@ AI fill:
 
 ## Verification Results
 
-- Command: not_run
-- Result: pending
-- Notes: Implementation has not started.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
+- Result: pass
+- Notes: Unit and PostgreSQL integration proof covers wallet validation, credit metadata validation, user-scoped wallet listing, update/archive behavior, one active default AI wallet, system/user category listing, user category update/archive, system category locks, and wallet/category activation ownership/upsert.
 
 ## Fix/Test Attempt Log
 
-- Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 0 / 5
+- Same-path failure attempts: 1 / 3
+- Total fix/test cycles: 3 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -116,28 +116,28 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: wallet and category management match Vietnamese finance copy and VND formatting.
-- Verified behavior: pending implementation.
+- Verified behavior: pending mobile/API implementation; backend domain behavior has automated proof.
 - Sign-off: pending.
 
 ## Docs Review
 
-- Requirements updated or not needed reason: pending execution.
-- Architecture updated or not needed reason: pending execution.
-- API updated or not needed reason: pending execution.
-- ERD/data updated or not needed reason: pending execution.
-- ADR created or not needed reason: pending execution.
-- `docs/CONTEXT.md` updated: pending execution.
+- Requirements updated or not needed reason: no change; REQ-F-002 scope is unchanged.
+- Architecture updated or not needed reason: pending API/UI implementation.
+- API updated or not needed reason: pending HTTP route implementation.
+- ERD/data updated or not needed reason: ERD updated for PHASE-002 migration in the migration slice.
+- ADR created or not needed reason: not needed; follows ADR-001 and approved PHASE-002 detail design.
+- `docs/CONTEXT.md` updated: yes.
 
 ## Completion Checklist
 
 - [ ] Implementation complete
-- [ ] Tests run and recorded
+- [x] Tests run and recorded
 - [ ] Fix/test loop guard respected
 - [ ] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
 - [ ] Master docs reconciled
 - [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
+- [x] ADR created or explicitly not needed
 - [ ] `docs/CONTEXT.md` updated
 - [ ] `docs/work/BACKLOG.md` updated
 - [ ] Trace links updated
