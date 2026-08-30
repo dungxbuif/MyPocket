@@ -1,0 +1,147 @@
+---
+artifact_type: ticket
+id: TICKET-006
+status: ready
+owner: human
+priority: high
+lane: high-risk
+human_fields:
+  - title
+  - priority
+  - acceptance_criteria
+  - scope
+  - approval
+ai_fields:
+  - impacted_areas
+  - test_expectations
+  - verification_results
+  - docs_review
+  - context_updates
+shared_fields:
+  - status
+  - trace
+  - small_task_exemption
+trace:
+  backlog_item: BL-002
+  requirement:
+    - REQ-F-003
+    - REQ-NF-002
+    - REQ-NF-005
+  phase: PHASE-002
+  detail_design: ../phases/PHASE-002-detail-design.md
+  implementation_plan: ../../superpowers/plans/2026-08-30-phase-002-finance-core.md
+  test_verification: ../test-verification/PHASE-002-finance-core.md
+  validation_matrix: ../VALIDATION_MATRIX.md
+  docs_review: per-ticket_completion_checklist
+  adrs:
+    - ADR-001
+    - ADR-003
+  release_notes: ../../releases/CHANGELOG.md
+---
+
+# Ticket: TICKET-006 Transaction Accounting Engine
+
+## Status
+
+- ID: TICKET-006
+- Status: ready
+- Type: feature
+- Priority: high
+- Phase: PHASE-002
+- Owner: human
+
+## Context
+
+Human fill:
+
+- User/business/system problem: Users need reliable income, expense, transfer, adjustment, edit, archive, and search flows with balances that stay correct under retry.
+- Source prompt or requirement: REQ-F-003, REQ-NF-002, REQ-NF-005, and PHASE-002.
+- Out of scope: offline change feed, analytics aggregates, AI/OCR draft generation, recurring schedules.
+
+AI fill:
+
+- Current repository context read: PHASE-002, requirements, ERD, API, ADR-001, ADR-003, and existing identity/platform code.
+- Brownfield touched scope, if applicable: new finance transaction service, migration tables, HTTP handlers, and mobile add/search flows.
+
+## Acceptance Criteria
+
+- [ ] Given an authenticated user and active wallet/category, when an income or expense is created, then the transaction amount is a positive VND integer and the source wallet balance changes atomically with an incremented version.
+- [ ] Given two user-owned wallets, when a transfer is created, then source and destination wallet effects commit atomically, cannot use the same wallet twice, and retrying the same idempotency key cannot duplicate effects.
+- [ ] Given a balance adjustment, when it is created, then the wallet balance becomes the target amount through an auditable adjustment transaction.
+- [ ] Given an existing transaction, when it is edited or archived, then wallet balances are reversed and reapplied exactly once inside one database transaction.
+- [ ] Given search filters, when transactions are listed, then results are user-scoped and support wallet, category, type, date range, query text, and report-excluded filters.
+- [ ] UAT requirement is required for add/edit/search, transfer, adjustment, report exclusion, and VND integer formatting.
+
+## Small Task Exemption
+
+- Small task exemption: no
+- Reason: This ticket implements the core accounting engine and public finance API.
+- Impact checked: API=yes, DB=yes, Security=yes, Runtime=no, Standards=no
+
+## Impacted Areas
+
+- Code: finance domain/application code, migrations, HTTP routes, frontend add/search screens.
+- Requirements docs: no change expected.
+- Architecture docs: reconcile implemented accounting boundary.
+- API docs: add concrete transaction contracts and idempotency behavior.
+- ERD/data docs: add implemented transaction/idempotency tables.
+- Decisions: no new ADR expected unless idempotency or balance strategy diverges from ADR-003.
+
+## Detail Design
+
+- Required: yes
+- Link: [PHASE-002-detail-design.md](../phases/PHASE-002-detail-design.md)
+- Approval: approved by user instruction to complete the app; design remains available for human review.
+
+## Test Expectations
+
+- Unit: table-driven accounting effects for income, expense, transfer, adjustment, edit, and archive.
+- Integration: transaction atomicity, idempotency ledger, ownership isolation, search filters, version increments.
+- E2E: add income/expense/transfer/adjustment, edit/archive, and search flows.
+- UAT: required; automated browser proof plus human review.
+- Manual/platform: not required beyond existing Compose.
+- Docs review: API, ERD, validation matrix, context, backlog, changelog.
+
+## Verification Results
+
+- Command: not_run
+- Result: pending
+- Notes: Implementation has not started.
+
+## Fix/Test Attempt Log
+
+- Same-path failure attempts: 0 / 3
+- Total fix/test cycles: 0 / 5
+- Blocked by loop guard: no
+- Human/design input needed: none before starting approved PHASE-002 plan.
+
+## UAT
+
+- Required: yes
+- Reason if not required: not applicable
+- Expected behavior: transaction workflows update balances exactly and remain idempotent under retry.
+- Verified behavior: pending implementation.
+- Sign-off: pending.
+
+## Docs Review
+
+- Requirements updated or not needed reason: pending execution.
+- Architecture updated or not needed reason: pending execution.
+- API updated or not needed reason: pending execution.
+- ERD/data updated or not needed reason: pending execution.
+- ADR created or not needed reason: pending execution.
+- `docs/CONTEXT.md` updated: pending execution.
+
+## Completion Checklist
+
+- [ ] Implementation complete
+- [ ] Tests run and recorded
+- [ ] Fix/test loop guard respected
+- [ ] Validation matrix updated or explicitly not affected
+- [ ] UAT completed or explicitly not required
+- [ ] Master docs reconciled
+- [ ] Docs review completed
+- [ ] ADR created or explicitly not needed
+- [ ] `docs/CONTEXT.md` updated
+- [ ] `docs/work/BACKLOG.md` updated
+- [ ] Trace links updated

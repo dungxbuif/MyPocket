@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-002
-status: draft
+status: ready
 owner: human
 priority: High
 human_fields:
@@ -34,7 +34,9 @@ trace:
     - TICKET-006
     - TICKET-007
   bugs: []
-  test_verification: not_created_phase_not_executed
+  detail_design: PHASE-002-detail-design.md
+  implementation_plan: ../../superpowers/plans/2026-08-30-phase-002-finance-core.md
+  test_verification: ../test-verification/PHASE-002-finance-core.md
   validation_matrix: ../VALIDATION_MATRIX.md
   adrs: []
   release_notes: ../../releases/CHANGELOG.md
@@ -45,7 +47,7 @@ trace:
 ## Status
 
 - ID: PHASE-002
-- Status: draft
+- Status: ready
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
@@ -56,7 +58,9 @@ trace:
 - Backlog: [BACKLOG.md](../BACKLOG.md)
 - Roadmap: [ROADMAP.md](../ROADMAP.md)
 - Requirements: [REQUIREMENTS.md](../../requirements/REQUIREMENTS.md) — REQ-F-002, REQ-F-003, REQ-F-011, REQ-NF-002, REQ-NF-005
-- Test verification: created during execution
+- Detail design: [PHASE-002-detail-design.md](PHASE-002-detail-design.md)
+- Implementation plan: [2026-08-30-phase-002-finance-core.md](../../superpowers/plans/2026-08-30-phase-002-finance-core.md)
+- Test verification: [PHASE-002-finance-core.md](../test-verification/PHASE-002-finance-core.md)
 - Validation matrix: [VALIDATION_MATRIX.md](../VALIDATION_MATRIX.md)
 - ADRs: [decisions](../../decisions/README.md)
 - Release notes: [CHANGELOG.md](../../releases/CHANGELOG.md)
@@ -82,9 +86,9 @@ Deliver correct wallet accounting, category management, transaction workflows, a
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-005 | Ticket | Wallet and category domain | planned | Created during implementation planning |
-| TICKET-006 | Ticket | Transaction accounting and transfer engine | planned | Created during implementation planning |
-| TICKET-007 | Ticket | Vietnamese seed data and receipt metadata | planned | Created during implementation planning |
+| TICKET-005 | Ticket | Wallet and category domain | ready | [TICKET-005](../tickets/TICKET-005-wallet-category-domain.md) |
+| TICKET-006 | Ticket | Transaction accounting and transfer engine | ready | [TICKET-006](../tickets/TICKET-006-transaction-accounting-engine.md) |
+| TICKET-007 | Ticket | Vietnamese seed data and receipt metadata | ready | [TICKET-007](../tickets/TICKET-007-vietnamese-seeds-receipt-metadata.md) |
 
 ## Dependencies
 
@@ -117,10 +121,9 @@ Deliver correct wallet accounting, category management, transaction workflows, a
 - [x] Risks and dependencies are recorded
 - [x] Verification plan is defined
 - [x] Release/changelog need is linked
-- [ ] Ticket artifacts and detailed implementation plan are created
-- [ ] Phase status is promoted to ready after plan review
+- [x] Ticket artifacts and detailed implementation plan are created
+- [x] Phase status is promoted to ready after plan review
 
 ## Completion Summary
 
-No implementation has started. Completion evidence will be recorded after the phase reaches execution.
-
+Ticket artifacts, detail design, and implementation plan are created. Implementation evidence will be recorded after execution starts.

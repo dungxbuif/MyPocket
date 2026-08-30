@@ -34,14 +34,14 @@ updated: 2026-08-26
 
 - Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, mobile-first PWA shell, local Compose stack, offline/auth browser proof, Compose web API proxy, and backend/frontend folder split implemented.
 - Active backlog: [BL-001](work/BACKLOG.md)
-- Current queue focus: reconcile PHASE-001 status and prepare PHASE-002 finance-core ticket decomposition.
-- Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_review`.
+- Current queue focus: execute PHASE-002 finance core, starting with TICKET-005 wallet/category domain.
+- Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `ready`.
 - Active ticket: [TICKET-001](work/tickets/TICKET-001-repository-runtime-foundation.md), status `verified`; [TICKET-002](work/tickets/TICKET-002-postgresql-migrations-s3-platform-adapters.md), status `verified`; [TICKET-003](work/tickets/TICKET-003-google-oauth-user-isolation.md), status `verified`; [TICKET-004](work/tickets/TICKET-004-development-operations-verification-baseline.md), status `verified`.
 - Active bug: None.
 
 ## Current Focus
 
-Execute PHASE-001 as the first deployable slice of the approved React PWA, Go API/worker, PostgreSQL, S3-compatible, and Google OAuth architecture.
+Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, PWA shell, and local stack proof reached review.
 
 ## Recently Touched Areas
 
@@ -54,6 +54,12 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 - `docs/work/tickets/TICKET-003-google-oauth-user-isolation.md`
 - `docs/work/tickets/TICKET-004-development-operations-verification-baseline.md`
 - `docs/work/phases/PHASE-001-detail-design.md`
+- `docs/work/phases/PHASE-002-finance-core.md`
+- `docs/work/phases/PHASE-002-detail-design.md`
+- `docs/work/tickets/TICKET-005-wallet-category-domain.md`
+- `docs/work/tickets/TICKET-006-transaction-accounting-engine.md`
+- `docs/work/tickets/TICKET-007-vietnamese-seeds-receipt-metadata.md`
+- `docs/superpowers/plans/2026-08-30-phase-002-finance-core.md`
 - `docs/superpowers/plans/2026-08-25-phase-001-platform-identity.md`
 - `docs/superpowers/specs/2026-08-23-mypocket-system-design.md`
 - `docs/work/DOCS-REVIEW-M0.md`
@@ -96,9 +102,9 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 
 ## Next Steps
 
-1. Commit PHASE-001 browser auth E2E and web API proxy proof.
-2. Begin PHASE-002 finance-core ticket decomposition.
-3. Implement finance core schema, API, and mobile UI slices.
+1. Commit PHASE-002 finance-core ticket/design/plan artifacts.
+2. Execute TICKET-005 wallet/category domain with migration and TDD.
+3. Continue TICKET-006 transaction accounting engine after wallet/category foundation.
 
 ## Open Questions
 
