@@ -33,6 +33,7 @@ shared_fields: [status]
 - Added initial authenticated wallet/category API routes for listing and creating wallets plus listing categories.
 - Added API-driven mobile wallet/category display in the PWA overview and add-transaction sheet.
 - Added backend transaction accounting effect validation for income, expense, transfer, and balance adjustment balance deltas.
+- Added repository create-transaction behavior with atomic wallet balance updates, version increments, category activation validation, and idempotent replay storage.
 
 ### Planning
 

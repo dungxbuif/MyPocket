@@ -3,6 +3,7 @@ package finance
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -328,6 +329,269 @@ func (r *Repository) SetWalletCategoryActive(ctx context.Context, userID string,
 		return fmt.Errorf("set wallet category active: %w", err)
 	}
 	return nil
+}
+
+func (r *Repository) CreateTransaction(ctx context.Context, userID string, input CreateTransactionInput) (Transaction, error) {
+	input, err := ValidateCreateTransaction(input)
+	if err != nil {
+		return Transaction{}, err
+	}
+	requestHash, err := transactionRequestHash(input)
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Transaction{}, fmt.Errorf("begin create transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	replayed, ok, err := loadIdempotentTransaction(ctx, tx, userID, input.IdempotencyKey, requestHash)
+	if err != nil {
+		return Transaction{}, err
+	}
+	if ok {
+		if err := tx.Commit(); err != nil {
+			return Transaction{}, fmt.Errorf("commit idempotent transaction replay: %w", err)
+		}
+		return replayed, nil
+	}
+
+	sourceBalance, err := lockWalletBalance(ctx, tx, userID, input.SourceWalletID)
+	if err != nil {
+		return Transaction{}, err
+	}
+	destinationBalance := int64(0)
+	if input.Type == TransactionTransfer {
+		destinationBalance, err = lockWalletBalance(ctx, tx, userID, input.DestinationWalletID)
+		if err != nil {
+			return Transaction{}, err
+		}
+	}
+	if err := requireTransactionCategory(ctx, tx, userID, input.SourceWalletID, input.CategoryID, input.Type); err != nil {
+		return Transaction{}, err
+	}
+
+	effect, err := ApplyAccountingEffect(AccountingInput{
+		Type:                  input.Type,
+		AmountVND:             input.AmountVND,
+		SourceWalletID:        input.SourceWalletID,
+		DestinationWalletID:   input.DestinationWalletID,
+		SourceBalanceVND:      sourceBalance,
+		DestinationBalanceVND: destinationBalance,
+		TargetBalanceVND:      input.TargetBalanceVND,
+	})
+	if err != nil {
+		return Transaction{}, err
+	}
+
+	if err := updateWalletBalance(ctx, tx, userID, input.SourceWalletID, effect.SourceBalanceVND); err != nil {
+		return Transaction{}, err
+	}
+	if input.Type == TransactionTransfer {
+		if err := updateWalletBalance(ctx, tx, userID, input.DestinationWalletID, effect.DestinationBalanceVND); err != nil {
+			return Transaction{}, err
+		}
+	}
+
+	transaction, err := insertTransaction(ctx, tx, userID, input, effect.SourceBalanceVND)
+	if err != nil {
+		return Transaction{}, err
+	}
+	responseJSON, err := json.Marshal(transaction)
+	if err != nil {
+		return Transaction{}, fmt.Errorf("marshal transaction replay response: %w", err)
+	}
+	if _, err := tx.ExecContext(ctx, `
+		INSERT INTO finance_idempotency_keys (user_id, key, request_hash, response_status, response_json)
+		VALUES ($1, $2, $3, 201, $4)
+	`, userID, input.IdempotencyKey, requestHash, responseJSON); err != nil {
+		return Transaction{}, fmt.Errorf("store transaction idempotency: %w", err)
+	}
+
+	if err := tx.Commit(); err != nil {
+		return Transaction{}, fmt.Errorf("commit create transaction: %w", err)
+	}
+	return transaction, nil
+}
+
+func loadIdempotentTransaction(ctx context.Context, tx *sql.Tx, userID string, key string, requestHash string) (Transaction, bool, error) {
+	var storedHash string
+	var responseJSON []byte
+	err := tx.QueryRowContext(ctx, `
+		SELECT request_hash, response_json
+		FROM finance_idempotency_keys
+		WHERE user_id = $1 AND key = $2
+		FOR UPDATE
+	`, userID, key).Scan(&storedHash, &responseJSON)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Transaction{}, false, nil
+	}
+	if err != nil {
+		return Transaction{}, false, fmt.Errorf("load transaction idempotency: %w", err)
+	}
+	if storedHash != requestHash {
+		return Transaction{}, false, fmt.Errorf("%w: idempotency key reused with different request", ErrValidation)
+	}
+	var transaction Transaction
+	if err := json.Unmarshal(responseJSON, &transaction); err != nil {
+		return Transaction{}, false, fmt.Errorf("decode transaction idempotency response: %w", err)
+	}
+	return transaction, true, nil
+}
+
+func lockWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletID string) (int64, error) {
+	var balanceVND int64
+	err := tx.QueryRowContext(ctx, `
+		SELECT balance_vnd
+		FROM wallets
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+		FOR UPDATE
+	`, walletID, userID).Scan(&balanceVND)
+	if errors.Is(err, sql.ErrNoRows) {
+		return 0, ErrForbidden
+	}
+	if err != nil {
+		return 0, fmt.Errorf("lock wallet balance: %w", err)
+	}
+	return balanceVND, nil
+}
+
+func requireTransactionCategory(ctx context.Context, tx *sql.Tx, userID string, walletID string, categoryID string, txType TransactionType) error {
+	if txType == TransactionTransfer || txType == TransactionAdjustment {
+		return nil
+	}
+
+	var kind CategoryKind
+	err := tx.QueryRowContext(ctx, `
+		SELECT kind
+		FROM categories
+		WHERE id = $1
+			AND archived_at IS NULL
+			AND (is_system OR user_id = $2)
+	`, categoryID, userID).Scan(&kind)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrForbidden
+	}
+	if err != nil {
+		return fmt.Errorf("load transaction category: %w", err)
+	}
+
+	if txType == TransactionIncome && kind != CategoryIncome {
+		return fmt.Errorf("%w: income requires income category", ErrValidation)
+	}
+	if txType == TransactionExpense && kind != CategoryExpense {
+		return fmt.Errorf("%w: expense requires expense category", ErrValidation)
+	}
+
+	return requireWalletCategoryActive(ctx, tx, userID, walletID, categoryID)
+}
+
+func requireWalletCategoryActive(ctx context.Context, tx *sql.Tx, userID string, walletID string, categoryID string) error {
+	var active bool
+	err := tx.QueryRowContext(ctx, `
+		SELECT active
+		FROM wallet_category_settings
+		WHERE wallet_id = $1 AND category_id = $2 AND user_id = $3
+	`, walletID, categoryID, userID).Scan(&active)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("load wallet category setting: %w", err)
+	}
+	if !active {
+		return fmt.Errorf("%w: category is inactive for wallet", ErrValidation)
+	}
+	return nil
+}
+
+func updateWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletID string, balanceVND int64) error {
+	result, err := tx.ExecContext(ctx, `
+		UPDATE wallets
+		SET balance_vnd = $3, version = version + 1, updated_at = now()
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+	`, walletID, userID, balanceVND)
+	if err != nil {
+		return fmt.Errorf("update wallet balance: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("update wallet balance rows affected: %w", err)
+	}
+	if affected == 0 {
+		return ErrForbidden
+	}
+	return nil
+}
+
+func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input CreateTransactionInput, balanceAfterVND int64) (Transaction, error) {
+	var transaction Transaction
+	err := tx.QueryRowContext(ctx, `
+		INSERT INTO transactions (
+			user_id,
+			type,
+			source_wallet_id,
+			destination_wallet_id,
+			category_id,
+			amount_vnd,
+			balance_after_vnd,
+			note,
+			with_person,
+			event_ref,
+			occurred_at,
+			excluded_from_reports
+		)
+		VALUES ($1, $2, $3, NULLIF($4, '')::uuid, NULLIF($5, '')::uuid, $6, $7, $8, $9, $10, $11, $12)
+		RETURNING
+			id::text,
+			user_id::text,
+			type,
+			source_wallet_id::text,
+			coalesce(destination_wallet_id::text, ''),
+			coalesce(category_id::text, ''),
+			amount_vnd,
+			coalesce(balance_after_vnd, 0),
+			occurred_at,
+			note,
+			with_person,
+			event_ref,
+			excluded_from_reports,
+			version
+	`,
+		userID,
+		string(input.Type),
+		input.SourceWalletID,
+		input.DestinationWalletID,
+		input.CategoryID,
+		input.AmountVND,
+		balanceAfterVND,
+		input.Note,
+		input.WithPerson,
+		input.EventRef,
+		input.OccurredAt,
+		input.ExcludedFromReports,
+	).Scan(
+		&transaction.ID,
+		&transaction.UserID,
+		&transaction.Type,
+		&transaction.SourceWalletID,
+		&transaction.DestinationWalletID,
+		&transaction.CategoryID,
+		&transaction.AmountVND,
+		&transaction.BalanceAfterVND,
+		&transaction.OccurredAt,
+		&transaction.Note,
+		&transaction.WithPerson,
+		&transaction.EventRef,
+		&transaction.ExcludedFromReports,
+		&transaction.Version,
+	)
+	if err != nil {
+		return Transaction{}, fmt.Errorf("insert transaction: %w", err)
+	}
+	return transaction, nil
 }
 
 func (r *Repository) getCategoryForUser(ctx context.Context, userID string, categoryID string) (Category, error) {

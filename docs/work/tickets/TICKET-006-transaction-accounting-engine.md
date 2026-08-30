@@ -116,11 +116,26 @@ AI fill:
 - Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
 - Result: pass
 - Notes: Backend regression passed across api, migrate, worker, finance, identity, config, db, httpapi, and objectstore packages.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -run 'TestRepositoryCreates.*Transaction|TestRepositoryReplaysDuplicateTransactionIdempotencyKey|TestRepositoryRejectsTransactionForAnotherUsersWallet' -count=1`
+- Result: pass
+- Notes: RED first failed because `CreateTransaction` and `CreateTransactionInput` were missing; GREEN passed after repository create transaction persistence.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -run 'TestRepository.*Transaction' -count=1`
+- Result: pass
+- Notes: Repository transaction suite covers income, expense, transfer, adjustment, atomic wallet version/balance updates, duplicate idempotent replay, changed-request idempotency rejection, inactive category rejection, and cross-user wallet rejection.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/finance -count=1`
+- Result: pass
+- Notes: Unit-only finance package regression passed after transaction repository changes.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`
+- Result: pass
+- Notes: Full finance package regression passed with DB-backed transaction repository tests.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
+- Result: pass
+- Notes: Backend regression passed after transaction repository changes.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 1 / 5
+- Total fix/test cycles: 2 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -129,15 +144,15 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: transaction workflows update balances exactly and remain idempotent under retry.
-- Verified behavior: domain accounting effect validation now proves exact income, expense, transfer, and adjustment balance deltas; repository idempotency, edit/archive, search, API, and mobile workflows remain pending.
+- Verified behavior: domain accounting effect validation and repository create flow now prove exact income, expense, transfer, and adjustment balance deltas, atomic wallet version/balance updates, category activation validation, duplicate idempotent replay, changed-request idempotency rejection, and user-owned wallet enforcement. Edit/archive, search, API, and mobile workflows remain pending.
 - Sign-off: pending.
 
 ## Docs Review
 
 - Requirements updated or not needed reason: not needed; accounting behavior follows accepted REQ-F-003/REQ-NF-002/REQ-NF-005 scope.
-- Architecture updated or not needed reason: pending repository/API implementation.
+- Architecture updated or not needed reason: not needed for this slice; repository behavior follows approved finance module boundary.
 - API updated or not needed reason: pending transaction API implementation.
-- ERD/data updated or not needed reason: existing PHASE-002 transaction tables still match the accounting-effect slice.
+- ERD/data updated or not needed reason: existing PHASE-002 transaction and idempotency tables still match the repository create slice.
 - ADR created or not needed reason: not needed; no divergence from ADR-003 or approved PHASE-002 design.
 - `docs/CONTEXT.md` updated: yes.
 

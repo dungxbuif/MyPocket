@@ -1,6 +1,9 @@
 package finance
 
-import "strings"
+import (
+	"strings"
+	"time"
+)
 
 type WalletType string
 
@@ -89,6 +92,38 @@ type AccountingEffect struct {
 	DestinationBalanceVND int64
 	SourceDeltaVND        int64
 	DestinationDeltaVND   int64
+}
+
+type CreateTransactionInput struct {
+	IdempotencyKey      string
+	Type                TransactionType
+	SourceWalletID      string
+	DestinationWalletID string
+	CategoryID          string
+	AmountVND           int64
+	TargetBalanceVND    *int64
+	OccurredAt          time.Time
+	Note                string
+	WithPerson          string
+	EventRef            string
+	ExcludedFromReports bool
+}
+
+type Transaction struct {
+	ID                  string          `json:"id"`
+	UserID              string          `json:"user_id"`
+	Type                TransactionType `json:"type"`
+	SourceWalletID      string          `json:"source_wallet_id"`
+	DestinationWalletID string          `json:"destination_wallet_id,omitempty"`
+	CategoryID          string          `json:"category_id,omitempty"`
+	AmountVND           int64           `json:"amount_vnd"`
+	BalanceAfterVND     int64           `json:"balance_after_vnd"`
+	OccurredAt          time.Time       `json:"occurred_at"`
+	Note                string          `json:"note"`
+	WithPerson          string          `json:"with_person"`
+	EventRef            string          `json:"event_ref"`
+	ExcludedFromReports bool            `json:"excluded_from_reports"`
+	Version             int64           `json:"version"`
 }
 
 func trimmed(value string) string {

@@ -1,6 +1,11 @@
 package finance
 
-import "fmt"
+import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
+	"fmt"
+)
 
 func ApplyAccountingEffect(input AccountingInput) (AccountingEffect, error) {
 	input.SourceWalletID = trimmed(input.SourceWalletID)
@@ -74,4 +79,108 @@ func validatePositiveAmount(amountVND int64) error {
 		return fmt.Errorf("%w: amount must be a positive VND integer", ErrValidation)
 	}
 	return nil
+}
+
+func ValidateCreateTransaction(input CreateTransactionInput) (CreateTransactionInput, error) {
+	input.IdempotencyKey = trimmed(input.IdempotencyKey)
+	input.SourceWalletID = trimmed(input.SourceWalletID)
+	input.DestinationWalletID = trimmed(input.DestinationWalletID)
+	input.CategoryID = trimmed(input.CategoryID)
+	input.Note = trimmed(input.Note)
+	input.WithPerson = trimmed(input.WithPerson)
+	input.EventRef = trimmed(input.EventRef)
+
+	if input.IdempotencyKey == "" {
+		return CreateTransactionInput{}, fmt.Errorf("%w: idempotency key is required", ErrValidation)
+	}
+	if input.OccurredAt.IsZero() {
+		return CreateTransactionInput{}, fmt.Errorf("%w: occurred_at is required", ErrValidation)
+	}
+
+	switch input.Type {
+	case TransactionIncome:
+		if input.CategoryID == "" {
+			return CreateTransactionInput{}, fmt.Errorf("%w: income category is required", ErrValidation)
+		}
+		if input.TargetBalanceVND != nil {
+			return CreateTransactionInput{}, fmt.Errorf("%w: income cannot target balance", ErrValidation)
+		}
+	case TransactionExpense:
+		if input.CategoryID == "" {
+			return CreateTransactionInput{}, fmt.Errorf("%w: expense category is required", ErrValidation)
+		}
+		if input.TargetBalanceVND != nil {
+			return CreateTransactionInput{}, fmt.Errorf("%w: expense cannot target balance", ErrValidation)
+		}
+	case TransactionTransfer:
+		if input.CategoryID != "" {
+			return CreateTransactionInput{}, fmt.Errorf("%w: transfer cannot have category", ErrValidation)
+		}
+		if input.TargetBalanceVND != nil {
+			return CreateTransactionInput{}, fmt.Errorf("%w: transfer cannot target balance", ErrValidation)
+		}
+	case TransactionAdjustment:
+		if input.CategoryID != "" {
+			return CreateTransactionInput{}, fmt.Errorf("%w: adjustment cannot have category", ErrValidation)
+		}
+		if input.TargetBalanceVND == nil {
+			return CreateTransactionInput{}, fmt.Errorf("%w: adjustment target balance is required", ErrValidation)
+		}
+		if *input.TargetBalanceVND <= 0 {
+			return CreateTransactionInput{}, fmt.Errorf("%w: adjustment target balance must be positive", ErrValidation)
+		}
+		input.AmountVND = *input.TargetBalanceVND
+	default:
+		return CreateTransactionInput{}, fmt.Errorf("%w: unsupported transaction type", ErrValidation)
+	}
+
+	if input.Type != TransactionAdjustment {
+		if err := validatePositiveAmount(input.AmountVND); err != nil {
+			return CreateTransactionInput{}, err
+		}
+	}
+	if _, err := ApplyAccountingEffect(AccountingInput{
+		Type:                input.Type,
+		AmountVND:           input.AmountVND,
+		SourceWalletID:      input.SourceWalletID,
+		DestinationWalletID: input.DestinationWalletID,
+		TargetBalanceVND:    input.TargetBalanceVND,
+	}); err != nil {
+		return CreateTransactionInput{}, err
+	}
+	return input, nil
+}
+
+func transactionRequestHash(input CreateTransactionInput) (string, error) {
+	payload := struct {
+		Type                TransactionType `json:"type"`
+		SourceWalletID      string          `json:"source_wallet_id"`
+		DestinationWalletID string          `json:"destination_wallet_id"`
+		CategoryID          string          `json:"category_id"`
+		AmountVND           int64           `json:"amount_vnd"`
+		TargetBalanceVND    *int64          `json:"target_balance_vnd"`
+		OccurredAt          string          `json:"occurred_at"`
+		Note                string          `json:"note"`
+		WithPerson          string          `json:"with_person"`
+		EventRef            string          `json:"event_ref"`
+		ExcludedFromReports bool            `json:"excluded_from_reports"`
+	}{
+		Type:                input.Type,
+		SourceWalletID:      input.SourceWalletID,
+		DestinationWalletID: input.DestinationWalletID,
+		CategoryID:          input.CategoryID,
+		AmountVND:           input.AmountVND,
+		TargetBalanceVND:    input.TargetBalanceVND,
+		OccurredAt:          input.OccurredAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00"),
+		Note:                input.Note,
+		WithPerson:          input.WithPerson,
+		EventRef:            input.EventRef,
+		ExcludedFromReports: input.ExcludedFromReports,
+	}
+	encoded, err := json.Marshal(payload)
+	if err != nil {
+		return "", fmt.Errorf("hash transaction request: %w", err)
+	}
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:]), nil
 }

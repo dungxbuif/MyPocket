@@ -264,7 +264,7 @@ Expected: FAIL because accounting functions are missing.
 
 - [ ] **Step 3: Implement accounting and transaction service**
 
-Accounting effects are implemented and verified. Repository transaction service, edit/archive reversal, and idempotency storage remain pending.
+Accounting effects and create transaction persistence are implemented and verified. Edit/archive reversal and search remain pending.
 
 Rules:
 - amount must be positive
@@ -275,6 +275,8 @@ Rules:
 - edit/archive reverses old effect before applying new state
 
 - [ ] **Step 4: Add integration tests**
+
+Create transaction integration tests now cover income, expense, transfer, adjustment, duplicate idempotent replay, idempotency conflict rejection, inactive category rejection, cross-user wallet rejection, and wallet balance/version updates. Edit/archive reversal and search filters remain pending.
 
 Cover:
 - create income/expense/transfer/adjustment updates balances in one DB transaction
