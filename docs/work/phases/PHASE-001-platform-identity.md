@@ -72,7 +72,7 @@ Deliver a deployable React PWA, Go API, Go worker, PostgreSQL and S3 foundation 
 
 ## Scope
 
-- Repository and build foundation for `apps/web`, `apps/api`, `apps/worker`, shared Go packages, migrations, and deployment files.
+- Repository and build foundation for `frontend`, `backend/cmd/api`, `backend/cmd/worker`, shared Go packages, migrations, and deployment files.
 - React PWA shell, API client baseline, Go HTTP/config/logging baseline, PostgreSQL migration runner, and S3 adapter.
 - Google OAuth callback, user provisioning, signed stateless cookie, CSRF protection, current-user endpoint, and ownership test harness.
 - Docker Compose development topology, liveness/readiness endpoints, structured correlation IDs, and CI-quality commands.

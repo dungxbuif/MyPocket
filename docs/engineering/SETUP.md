@@ -3,15 +3,23 @@
 ## Prerequisites
 
 - Go 1.23 or newer.
-- Node.js/npm for repository scripts.
+- Node.js/npm for frontend scripts.
 - PostgreSQL for local database-backed development.
 
 ## Installation
 
-Run Go module setup from the repository root:
+Run Go module setup from `backend/`:
 
 ```bash
+cd backend
 go mod download
+```
+
+Run frontend dependency setup from `frontend/`:
+
+```bash
+cd frontend
+npm install
 ```
 
 ## Configuration
@@ -35,11 +43,20 @@ Required backend environment variables:
 Apply migrations:
 
 ```bash
-npm run migrate:up
+cd backend
+go run ./cmd/migrate
 ```
 
 Run backend tests:
 
 ```bash
-npm run test:go
+cd backend
+go test ./...
+```
+
+Run frontend tests:
+
+```bash
+cd frontend
+npm test -- --run
 ```

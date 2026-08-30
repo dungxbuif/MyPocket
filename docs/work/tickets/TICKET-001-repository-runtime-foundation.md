@@ -81,7 +81,7 @@ AI fill:
 
 ## Acceptance Criteria
 
-- [x] Given a clean checkout, when dependencies are installed, then `apps/web`, `apps/api`, `apps/worker`, and shared Go packages have documented commands that run locally.
+- [x] Given a clean checkout, when dependencies are installed, then `frontend`, `backend/cmd/api`, `backend/cmd/worker`, and shared Go packages have documented commands that run locally.
 - [x] Given an API request, when the request is handled, then responses include stable JSON error envelopes and correlation IDs without stack traces or secrets.
 - [x] Given the React shell loads on mobile width, when the app renders, then it shows an installable PWA shell with mobile-safe layout and no finance behavior.
 - [ ] Given the browser is offline after the shell has loaded once, when the app is reopened, then the app shell loads from the service worker cache and shows an offline state.
@@ -95,7 +95,7 @@ AI fill:
 
 ## Impacted Areas
 
-- Code: create `apps/web`, `apps/api`, `apps/worker`, `internal/platform`, repository config, package manifests.
+- Code: create `frontend`, `backend/cmd/api`, `backend/cmd/worker`, `backend/internal/platform`, repository config, package manifests.
 - Requirements docs: no change expected unless scope changes.
 - Architecture docs: no change expected if implementation follows approved SDD.
 - API docs: may need endpoint schema details for health/error envelopes.
@@ -134,18 +134,30 @@ AI fill:
 - Command: `rtk go test ./...`
 - Result: pass
 - Notes: 7 tests passed across 4 Go packages for the Task 1 backend baseline.
-- Command: `rtk npm test --workspace apps/web -- --run`
+- Command: `rtk npm test -- --run` from `frontend/`
 - Result: fail
 - Notes: RED check failed for expected missing `./App` import after shell tests were added.
 - Command: `rtk npm install`
 - Result: pass
 - Notes: Installed web workspace dependencies; npm reported 0 vulnerabilities.
-- Command: `rtk npm test --workspace apps/web -- --run`
+- Command: `rtk npm test -- --run` from `frontend/`
 - Result: pass
 - Notes: 3 web tests passed for mobile navigation destinations, offline indicator, and quick-add sheet.
-- Command: `rtk npm run build --workspace apps/web`
+- Command: `rtk npm run build` from `frontend/`
 - Result: pass
 - Notes: Vite production build succeeded and emitted `index.html`, hashed CSS/JS, `manifest.webmanifest`, `pwa-icon.svg`, and `sw.js`.
+- Command: `rtk go test ./...` from `backend/`
+- Result: pass
+- Notes: Backend tests passed after moving Go module, commands, shared packages, and migrations under `backend/`.
+- Command: `rtk npm test -- --run` from `frontend/`
+- Result: pass
+- Notes: Frontend component tests passed after moving npm package ownership to `frontend/`.
+- Command: `rtk npm run build` from `frontend/`
+- Result: pass
+- Notes: Frontend production build passed after removing the root npm workspace wrapper.
+- Command: `rtk npm run test:e2e` from `frontend/`
+- Result: pass
+- Notes: Mobile PWA service worker registration and offline reload passed after the folder split.
 - Command: `rtk npx playwright screenshot --viewport-size=390,844 http://127.0.0.1:5173 /private/tmp/mypocket-mobile-3.png`
 - Result: pass
 - Notes: Mobile screenshot captured after visual fixes for balance and amount wrapping.

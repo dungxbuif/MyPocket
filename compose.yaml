@@ -28,8 +28,8 @@ services:
 
   migrate:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ./backend
+      dockerfile: Dockerfile
     entrypoint: ["/app/migrate"]
     environment:
       DATABASE_URL: postgres://mypocket:mypocket@postgres:5432/mypocket?sslmode=disable
@@ -42,8 +42,8 @@ services:
 
   api:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ./backend
+      dockerfile: Dockerfile
     environment:
       APP_ENV: development
       DATABASE_URL: postgres://mypocket:mypocket@postgres:5432/mypocket?sslmode=disable
@@ -66,8 +66,8 @@ services:
 
   worker:
     build:
-      context: .
-      dockerfile: Dockerfile.api
+      context: ./backend
+      dockerfile: Dockerfile
     entrypoint: ["/app/worker"]
     environment:
       APP_ENV: development
@@ -81,8 +81,8 @@ services:
 
   web:
     build:
-      context: .
-      dockerfile: apps/web/Dockerfile
+      context: ./frontend
+      dockerfile: Dockerfile
     ports:
       - "5173:80"
     depends_on:

@@ -55,17 +55,17 @@ MyPocket is a modular monolith deployed as three application processes: a static
 
 | Module | Responsibility | Key Files | Notes |
 | --- | --- | --- | --- |
-| identity | Google callback, user provisioning, signed cookie, current-user context | `internal/identity/` | No session table or Google token persistence |
-| finance | Wallets, categories, transactions, transfers, adjustments, attachments | `internal/finance/` | Authoritative accounting boundary |
-| sync | Idempotency, versions, cursors, tombstones, conflicts | `internal/sync/` | Calls finance/planning application services |
-| planning | Budgets, events, recurring schedules, debts/loans | `internal/planning/` | Recurring occurrences produce drafts |
-| analytics | Net worth and report aggregations | `internal/analytics/` | Reads confirmed reportable transactions |
-| ingestion | Drafts, AI chat, OCR, multimodal images, bank webhooks | `internal/ingestion/` | Shared `TransactionDraft` contract |
-| notification | In-app inbox and Web Push | `internal/notification/` | Inbox remains authoritative when push fails |
-| export | Manual CSV/Sheets-compatible snapshots | `internal/export/` | No spreadsheet import |
-| audit | Append-only audit writes and restricted queries | `internal/audit/` | Viewer email is environment-configured |
-| platform | HTTP, config, database, object store, logging, jobs | `internal/platform/` | Provider interfaces and adapters |
-| web features | User workflows and local state | `apps/web/src/features/` | Feature boundaries mirror backend capabilities |
+| identity | Google callback, user provisioning, signed cookie, current-user context | `backend/internal/identity/` | No session table or Google token persistence |
+| finance | Wallets, categories, transactions, transfers, adjustments, attachments | `backend/internal/finance/` | Authoritative accounting boundary |
+| sync | Idempotency, versions, cursors, tombstones, conflicts | `backend/internal/sync/` | Calls finance/planning application services |
+| planning | Budgets, events, recurring schedules, debts/loans | `backend/internal/planning/` | Recurring occurrences produce drafts |
+| analytics | Net worth and report aggregations | `backend/internal/analytics/` | Reads confirmed reportable transactions |
+| ingestion | Drafts, AI chat, OCR, multimodal images, bank webhooks | `backend/internal/ingestion/` | Shared `TransactionDraft` contract |
+| notification | In-app inbox and Web Push | `backend/internal/notification/` | Inbox remains authoritative when push fails |
+| export | Manual CSV/Sheets-compatible snapshots | `backend/internal/export/` | No spreadsheet import |
+| audit | Append-only audit writes and restricted queries | `backend/internal/audit/` | Viewer email is environment-configured |
+| platform | HTTP, config, database, object store, logging, jobs | `backend/internal/platform/` | Provider interfaces and adapters |
+| web features | User workflows and local state | `frontend/src/features/` | Feature boundaries mirror backend capabilities |
 
 ## Data Flow
 

@@ -1,4 +1,4 @@
 /references
 node_modules/
-apps/web/dist/
-apps/web/test-results/
+frontend/dist/
+frontend/test-results/

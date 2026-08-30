@@ -32,7 +32,7 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, mobile-first PWA shell, local Compose stack, and offline browser proof implemented.
+- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, mobile-first PWA shell, local Compose stack, offline browser proof, and backend/frontend folder split implemented.
 - Active backlog: [BL-001](work/BACKLOG.md)
 - Current queue focus: execute local operations and browser E2E proof for PWA installability, offline reload, auth fixture, and platform smoke.
 - Active phase: [PHASE-001 Platform and Identity](work/phases/PHASE-001-platform-identity.md), status `in_progress`.
@@ -57,19 +57,19 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 - `docs/superpowers/plans/2026-08-25-phase-001-platform-identity.md`
 - `docs/superpowers/specs/2026-08-23-mypocket-system-design.md`
 - `docs/work/DOCS-REVIEW-M0.md`
-- `internal/platform/db/`
-- `migrations/0001_phase001_identity.sql`
-- `internal/platform/objectstore/`
-- `internal/identity/`
-- `internal/platform/httpapi/auth.go`
-- `apps/web/`
+- `backend/internal/platform/db/`
+- `backend/migrations/0001_phase001_identity.sql`
+- `backend/internal/platform/objectstore/`
+- `backend/internal/identity/`
+- `backend/internal/platform/httpapi/auth.go`
+- `frontend/`
 - `compose.yaml`
-- `Dockerfile.api`
-- `apps/web/Dockerfile`
+- `backend/Dockerfile`
+- `frontend/Dockerfile`
 - `scripts/smoke-platform.sh`
 - `design/DESIGN.md`
-- `apps/api/main.go`
-- `apps/worker/main.go`
+- `backend/cmd/api/main.go`
+- `backend/cmd/worker/main.go`
 - `docs/architecture/API.md`
 - `docs/architecture/ERD.md`
 
@@ -93,7 +93,7 @@ Execute PHASE-001 as the first deployable slice of the approved React PWA, Go AP
 
 ## Next Steps
 
-1. Commit the mobile-first PWA shell and component design contract.
+1. Commit the verified backend/frontend folder split.
 2. Extend browser E2E coverage to auth fixture persistence, logout, and forbidden state.
 3. Begin PHASE-002 finance-core ticket decomposition after PHASE-001 review.
 

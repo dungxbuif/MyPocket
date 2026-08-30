@@ -120,9 +120,15 @@ AI fill:
 
 ## Verification Results
 
-- Command: `docker compose up -d --build`; `npm run smoke:platform`; `docker compose config`
+- Command: `docker compose up -d --build`; `bash scripts/smoke-platform.sh`; `docker compose config`
 - Result: pass
 - Notes: All local services started; health/readiness and S3 availability returned expected safe JSON.
+- Command: `rtk docker compose config`; `rtk docker compose up -d --build`
+- Result: pass
+- Notes: Compose validates and rebuilds after moving backend and frontend to separate build contexts.
+- Command: `rtk bash scripts/smoke-platform.sh`
+- Result: pass
+- Notes: Health smoke passed after the folder split; API liveness/readiness and LocalStack S3 remained reachable.
 
 ## Fix/Test Attempt Log
 
@@ -136,7 +142,7 @@ AI fill:
 - Required: no
 - Reason if not required: command/platform evidence is the required proof for runtime behavior.
 - Expected behavior: not applicable
-- Verified behavior: not verified; no implementation exists.
+- Verified behavior: local Compose startup, rebuild, health/readiness, and S3 smoke are verified by command evidence.
 - Sign-off: not required
 
 ## Docs Review

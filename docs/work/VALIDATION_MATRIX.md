@@ -53,14 +53,14 @@ updated: 2026-08-24
 | REQ-F-013 | PHASE-007 | TICKET-023 | Manual user-scoped CSV/Sheets-compatible export | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-F-014 | PHASE-007 | TICKET-024 | Confirmed reset/delete removes exact database and S3 scope | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-F-015 | PHASE-007 | TICKET-022 | Append-only restricted audit viewer and 180-day default retention | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
-| REQ-F-016 | PHASE-001/005 | TICKET-001/015..017 | Installable Vietnamese/VND PWA navigation and workflows | yes | yes | yes | yes | yes | yes | in_progress | Mobile shell tests, build, manifest/service worker, screenshots, and Playwright offline reload pass; finance workflows remain pending |
+| REQ-F-016 | PHASE-001/005 | TICKET-001/015..017 | Installable Vietnamese/VND PWA navigation and workflows | yes | yes | yes | yes | yes | yes | in_progress | Mobile shell tests, build, manifest/service worker, screenshots, and Playwright offline reload pass from `frontend/`; finance workflows remain pending |
 | REQ-F-017 | PHASE-008 | TICKET-026 | Deferred voice transcription reuses draft contract | yes | yes | yes | yes | yes | yes | planned | Deferred to M2 |
 | REQ-NF-001 | PHASE-001 | TICKET-003 | Backend ownership isolation on every user-owned operation | yes | yes | yes | not_required | no | yes | in_progress | TICKET-003 ownership harness rejects cross-user object access; finance-domain ownership checks pending in later phases |
 | REQ-NF-002 | PHASE-002/003/004 | TICKET-006/009/013 | Integer money, atomic writes, and idempotent retries | yes | yes | yes | not_required | no | yes | planned | No execution evidence |
 | REQ-NF-003 | PHASE-003 | TICKET-009/010 | No silent last-write-wins conflict handling | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-NF-004 | PHASE-001/006/007 | TICKET-003/018..022 | Secrets and sensitive provider data are redacted | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-002/TICKET-003 tests cover safe config/object-store/auth errors and no Google provider-token persistence; provider phases pending |
 | REQ-NF-005 | PHASE-002/004/005 | TICKET-006/011/017 | VND integers and Ho Chi Minh reporting boundaries | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
-| REQ-NF-006 | PHASE-001/007 | TICKET-002/004/025 | Homelab health, migration, locks, backup, and restore | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-004 compose startup and health/S3 smoke passed; locks, backup, and restore remain pending |
+| REQ-NF-006 | PHASE-001/007 | TICKET-002/004/025 | Homelab health, migration, locks, backup, and restore | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-004 compose startup and health/S3 smoke passed after splitting backend/frontend build contexts; locks, backup, and restore remain pending |
 | REQ-NF-007 | All phases | All tickets | Required proof and docs review gate implementation status | not_required | not_required | not_required | yes | yes | yes | planned | No execution evidence |
 | REQ-NF-008 | PHASE-001/003/006 | TICKET-001/009/018..021 | Stable safe error codes and correlation IDs | yes | yes | yes | not_required | yes | yes | in_progress | TICKET-001/TICKET-003 API tests cover stable error envelopes and correlation IDs for health/auth/CSRF paths; later API phases pending |
 
@@ -76,3 +76,4 @@ updated: 2026-08-24
 | Date | Updated By | Change |
 | --- | --- | --- |
 | 2026-08-24 | AI | Migrated approved MyPocket requirements and planned proof into Harness. |
+| 2026-08-30 | AI | Recorded backend/frontend folder split verification for frontend PWA build/E2E and local Compose smoke. |

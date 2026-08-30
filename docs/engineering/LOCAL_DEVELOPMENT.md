@@ -4,15 +4,18 @@
 
 | Command | Purpose |
 | --- | --- |
-| `npm run migrate:up` | Apply ordered PostgreSQL migrations from `migrations/` using `DATABASE_URL`. |
-| `npm run dev:api` | Start the Go HTTP API on `HTTP_ADDR` or `:8080`. |
-| `npm run dev:web` | Start the Vite React PWA shell. |
-| `npm run dev:worker` | Start the Go worker and verify PostgreSQL connectivity. |
-| `npm run build:web` | Build the production PWA shell assets. |
-| `npm run test:web` | Run the web shell test suite. |
-| `npm run test:go` | Run the default Go test suite. |
+| `cd backend && go run ./cmd/migrate` | Apply ordered PostgreSQL migrations from `backend/migrations/` using `DATABASE_URL`. |
+| `cd backend && go run ./cmd/api` | Start the Go HTTP API on `HTTP_ADDR` or `:8080`. |
+| `cd backend && go run ./cmd/worker` | Start the Go worker and verify PostgreSQL connectivity. |
+| `cd frontend && npm run dev` | Start the Vite React PWA shell. |
+| `cd frontend && npm run build` | Build the production PWA shell assets. |
+| `cd frontend && npm test -- --run` | Run the web shell test suite. |
+| `cd backend && go test ./...` | Run the default Go test suite. |
+| `bash scripts/smoke-platform.sh` | Probe the local Compose API and S3-compatible health endpoints. |
 
 ## Local Workflow
+
+Source code is split into `backend/` for the Go module and `frontend/` for the React PWA. npm package metadata lives in `frontend/`; Go module metadata lives in `backend/`.
 
 Set `DATABASE_URL` before running migration, API, or worker commands. API and worker startup fail fast when PostgreSQL is unavailable.
 

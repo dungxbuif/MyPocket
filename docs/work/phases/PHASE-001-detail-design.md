@@ -115,7 +115,7 @@ trace:
 
 ### Brownfield Scope
 
-- Touched modules/files: no product code exists yet; execution will create `apps/web`, `apps/api`, `apps/worker`, shared Go packages, migrations, platform config, compose/dev docs, and verification artifacts.
+- Touched modules/files: execution created the split `frontend/` PWA, `backend/cmd/api`, `backend/cmd/worker`, shared backend packages, migrations, platform config, compose/dev docs, and verification artifacts.
 - Direct dependencies inspected: planning docs, templates, requirements, architecture masters, and accepted ADRs.
 - Contracts affected: `/api/v1` baseline, auth routes, `GET /api/v1/me`, `POST /api/v1/auth/logout`, `GET /api/v1/health/live`, `GET /api/v1/health/ready`, error envelopes, cookie, CSRF header, migration contract, S3 adapter contract.
 - Known unknowns: production URLs, Google OAuth credentials, S3 credentials, and final homelab connection strings remain deployment inputs. Tests must use fixtures or local services instead of requiring production secrets.
@@ -146,7 +146,7 @@ trace:
 
 ```text
 -----------------------------+       /api/v1 JSON       +-----------------------------+
-| apps/web React PWA         | -----------------------> | apps/api Go HTTP           |
+| frontend React PWA         | -----------------------> | backend/cmd/api Go HTTP    |
 | - mobile shell/nav         | <----------------------- | - auth middleware          |
 | - service worker cache     |    signed cookie + CSRF  | - errors/correlation IDs   |
 | - auth state + offline UI  |                          | - health/readiness         |
@@ -163,22 +163,22 @@ trace:
                                                      +----------------------+----------------+
                                                                             |
                                                                             v
-                                                            apps/worker Go runtime
+                                                            backend/cmd/worker runtime
 ```
 
 ### Component Responsibilities
 
 | Component | Role |
 | --- | --- |
-| `apps/web` | React TypeScript PWA shell, mobile layout, route fallback, auth state, offline status, service worker registration, API client baseline |
-| `apps/api` | Go HTTP entrypoint, routes, middleware, config, health, auth endpoints, current-user endpoint |
-| `apps/worker` | Go worker entrypoint that validates config, connects to platform dependencies, and exposes/logs a runnable baseline |
-| `internal/platform/config` | Environment loading and safe validation errors |
-| `internal/platform/http` | Router, JSON errors, correlation IDs, request logging, CSRF middleware |
-| `internal/platform/db` | PostgreSQL connection and migration runner |
-| `internal/platform/objectstore` | S3-compatible adapter and smoke operation |
-| `internal/identity` | Google callback fixture/provider boundary, user provisioning, signed cookie claims, CSRF token handling, ownership context |
-| `migrations` | Ordered immutable SQL migrations for PHASE-001 identity/platform tables |
+| `frontend` | React TypeScript PWA shell, mobile layout, route fallback, auth state, offline status, service worker registration, API client baseline |
+| `backend/cmd/api` | Go HTTP entrypoint, routes, middleware, config, health, auth endpoints, current-user endpoint |
+| `backend/cmd/worker` | Go worker entrypoint that validates config, connects to platform dependencies, and exposes/logs a runnable baseline |
+| `backend/internal/platform/config` | Environment loading and safe validation errors |
+| `backend/internal/platform/httpapi` | Router, JSON errors, correlation IDs, request logging, CSRF middleware |
+| `backend/internal/platform/db` | PostgreSQL connection and migration runner |
+| `backend/internal/platform/objectstore` | S3-compatible adapter and smoke operation |
+| `backend/internal/identity` | Google callback fixture/provider boundary, user provisioning, signed cookie claims, CSRF token handling, ownership context |
+| `backend/migrations` | Ordered immutable SQL migrations for PHASE-001 identity/platform tables |
 | `deployments` or `compose.yaml` | Local PostgreSQL, S3-compatible service, API, worker, and web topology |
 
 ---
