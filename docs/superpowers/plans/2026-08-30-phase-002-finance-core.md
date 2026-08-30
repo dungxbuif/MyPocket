@@ -226,7 +226,7 @@ rtk git commit -m "feat: add wallet and category domain"
 - Produces `CreateTransaction`, `UpdateTransaction`, `ArchiveTransaction`, and `ListTransactions`.
 - Produces idempotency response storage consumed by HTTP handlers.
 
-- [ ] **Step 1: Write failing accounting effect tests**
+- [x] **Step 1: Write failing accounting effect tests**
 
 Add table-driven tests:
 
@@ -256,13 +256,15 @@ func TestAccountingEffects(t *testing.T) {
 }
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `rtk go test ./internal/finance -run TestAccountingEffects`
 
 Expected: FAIL because accounting functions are missing.
 
 - [ ] **Step 3: Implement accounting and transaction service**
+
+Accounting effects are implemented and verified. Repository transaction service, edit/archive reversal, and idempotency storage remain pending.
 
 Rules:
 - amount must be positive

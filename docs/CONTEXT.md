@@ -32,11 +32,11 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, backend wallet/category repository behavior, initial wallet/category API routes, and API-driven mobile wallet/category display are implemented with automated proof.
+- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, backend wallet/category repository behavior, initial wallet/category API routes, API-driven mobile wallet/category display, and transaction accounting effect validation are implemented with automated proof.
 - Active backlog: [BL-002](work/BACKLOG.md)
-- Current queue focus: execute PHASE-002 finance core, starting with TICKET-005 wallet/category domain.
+- Current queue focus: execute PHASE-002 finance core; TICKET-005 wallet/category foundation is partially implemented and TICKET-006 transaction accounting has started.
 - Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `ready`.
-- Active ticket: [TICKET-005](work/tickets/TICKET-005-wallet-category-domain.md), status `in_progress`.
+- Active ticket: [TICKET-006](work/tickets/TICKET-006-transaction-accounting-engine.md), status `in_progress`.
 - Active bug: None.
 
 ## Current Focus
@@ -111,9 +111,9 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 
 ## Next Steps
 
-1. Complete remaining TICKET-005 wallet/category mutation API routes and mobile create/edit controls.
-2. Finish TICKET-005 UAT notes or record the exact residual review gap.
-3. Start TICKET-006 transaction accounting after TICKET-005 review gate clears.
+1. Continue TICKET-006 by adding repository-level create transaction behavior with atomic wallet balance updates and idempotency proof.
+2. Complete remaining TICKET-005 wallet/category mutation API routes and mobile create/edit controls before PHASE-002 review.
+3. Finish PHASE-002 transaction API/mobile flows and UAT notes.
 
 ## Open Questions
 

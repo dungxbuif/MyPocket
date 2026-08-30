@@ -32,6 +32,7 @@ shared_fields: [status]
 - Added backend wallet/category validation and repository behavior for user-scoped wallet CRUD, default AI wallet selection, system/user category rules, and wallet/category activation.
 - Added initial authenticated wallet/category API routes for listing and creating wallets plus listing categories.
 - Added API-driven mobile wallet/category display in the PWA overview and add-transaction sheet.
+- Added backend transaction accounting effect validation for income, expense, transfer, and balance adjustment balance deltas.
 
 ### Planning
 

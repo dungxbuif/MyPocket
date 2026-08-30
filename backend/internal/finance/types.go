@@ -65,6 +65,32 @@ type UpdateCategoryInput struct {
 	Name string
 }
 
+type TransactionType string
+
+const (
+	TransactionIncome     TransactionType = "income"
+	TransactionExpense    TransactionType = "expense"
+	TransactionTransfer   TransactionType = "transfer"
+	TransactionAdjustment TransactionType = "adjustment"
+)
+
+type AccountingInput struct {
+	Type                  TransactionType
+	AmountVND             int64
+	SourceWalletID        string
+	DestinationWalletID   string
+	SourceBalanceVND      int64
+	DestinationBalanceVND int64
+	TargetBalanceVND      *int64
+}
+
+type AccountingEffect struct {
+	SourceBalanceVND      int64
+	DestinationBalanceVND int64
+	SourceDeltaVND        int64
+	DestinationDeltaVND   int64
+}
+
 func trimmed(value string) string {
 	return strings.TrimSpace(value)
 }

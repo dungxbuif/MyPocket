@@ -87,7 +87,7 @@ Deliver correct wallet accounting, category management, transaction workflows, a
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
 | TICKET-005 | Ticket | Wallet and category domain | ready | [TICKET-005](../tickets/TICKET-005-wallet-category-domain.md) |
-| TICKET-006 | Ticket | Transaction accounting and transfer engine | ready | [TICKET-006](../tickets/TICKET-006-transaction-accounting-engine.md) |
+| TICKET-006 | Ticket | Transaction accounting and transfer engine | in_progress | [TICKET-006](../tickets/TICKET-006-transaction-accounting-engine.md) |
 | TICKET-007 | Ticket | Vietnamese seed data and receipt metadata | ready | [TICKET-007](../tickets/TICKET-007-vietnamese-seeds-receipt-metadata.md) |
 
 ## Dependencies

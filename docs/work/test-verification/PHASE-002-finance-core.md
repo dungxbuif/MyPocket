@@ -69,6 +69,10 @@ trace:
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1` | pass | Wallet/category unit and PostgreSQL integration proof for TICKET-005 backend domain/repository behavior. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -run 'TestWalletsAPI|TestCreateWallet|TestCategoriesAPI' -count=1` | pass | HTTP handler proof for wallet/category auth requirement, authenticated user scoping, CSRF requirement, create wallet request mapping, and category listing. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Backend regression after finance repository; API, worker, finance, identity, config, db, httpapi, objectstore packages passed. `-p 1` avoids package-level races because integration helpers reset the same local test schema. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/finance -run 'TestApplyAccountingEffect' -count=1` | pass | RED first failed because accounting types/functions were missing; GREEN passed after adding income, expense, transfer, adjustment effect validation. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/finance -count=1` | pass | Unit-only finance regression after TICKET-006 accounting primitives. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1` | pass | Finance package regression with DB-backed repository tests after accounting primitives. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Backend regression after TICKET-006 accounting primitives. |
 | `rtk npm test -- --run src/app/App.test.tsx` | pass | RED first failed because wallet/category UI still used hardcoded data; GREEN passed after API-driven finance state was added. |
 | `rtk npm test -- --run` | pass | Full frontend component suite; 5 tests passed. |
 | `rtk npm run build` | pass | Production Vite build completed. |
@@ -83,19 +87,20 @@ trace:
 | 3 | Reran backend regression sequentially after package-parallel integration tests raced on shared schema reset. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Plain package-parallel `go test ./...` can reset the shared local test schema while another package is using it. |
 | 4 | Added finance HTTP dependency, wallet/category handlers, and API runtime wiring after RED tests exposed missing finance dependency/route support. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -run 'TestWalletsAPI|TestCreateWallet|TestCategoriesAPI' -count=1`; backend regression command above | pass | No remaining HTTP handler failure for implemented wallet/category routes. |
 | 5 | Added frontend finance client and API-driven mobile wallet/category rendering after RED component tests showed hardcoded wallet/category data. | `rtk npm test -- --run`; `rtk npm run build`; `rtk npm run test:e2e` | pass | One assertion was adjusted after the UI correctly showed the same total in the header and wallet summary. |
+| 6 | Added TICKET-006 accounting effect tests and primitives for income, expense, transfer, and adjustment. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/finance -run 'TestApplyAccountingEffect' -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Initial RED compile failed because `TransactionType`, `AccountingInput`, and `ApplyAccountingEffect` did not exist. |
 
 Loop guard:
 
 - Same-path failure attempts: 1 / 3
-- Total fix/test cycles: 5 / 5
+- Active work-item fix/test cycles: TICKET-006 is 1 / 5. Earlier TICKET-005 cycles are tracked in that ticket.
 - Blocked: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
 ## Automated Tests
 
-- Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
+- Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, TICKET-006 accounting effect tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
 - Failed: none remaining for migration, backend wallet/category domain, implemented wallet/category API route, and API-driven mobile display slices.
-- Skipped: remaining wallet/category mutation routes and full wallet/category UAT pending later TICKET-005 work.
+- Skipped: remaining wallet/category mutation routes, transaction repository/API/mobile workflows, idempotency integration proof, and full wallet/category/transaction UAT pending later PHASE-002 work.
 
 ## Manual Checks
 
@@ -106,7 +111,7 @@ Loop guard:
 - Required: yes for wallet/category and transaction workflows; not required for receipt metadata foundation until PHASE-006.
 - Reason if not required: partial exception applies only to non-user-facing receipt metadata foundation.
 - Expected behavior: finance workflows use Vietnamese copy, exact VND integer formatting, user-owned data, and correct wallet balances.
-- Verified behavior: pending implementation.
+- Verified behavior: wallet/category API-driven display and backend accounting effects have automated proof; full transaction workflows remain pending implementation.
 - Sign-off: pending.
 
 ## Failures And Follow-Up
@@ -122,3 +127,4 @@ Loop guard:
 - Wallet/category repository tests were written and observed failing on missing methods before repository code existed, then passed against local Compose PostgreSQL after implementation.
 - Wallet/category HTTP tests were written and observed failing on missing dependency support before route code existed, then passed after handlers and runtime wiring were added.
 - Frontend wallet/category tests were written and observed failing on hardcoded display behavior, then passed after `frontend/src/app/finance.ts` and App state wiring were added.
+- TICKET-006 accounting tests were written and observed failing on missing finance accounting types/functions, then passed after `backend/internal/finance/transactions.go` and related types were added.

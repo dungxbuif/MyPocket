@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-006
-status: ready
+status: in_progress
 owner: human
 priority: high
 lane: high-risk
@@ -44,7 +44,7 @@ trace:
 ## Status
 
 - ID: TICKET-006
-- Status: ready
+- Status: in_progress
 - Type: feature
 - Priority: high
 - Phase: PHASE-002
@@ -104,14 +104,23 @@ AI fill:
 
 ## Verification Results
 
-- Command: not_run
-- Result: pending
-- Notes: Implementation has not started.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/finance -run 'TestApplyAccountingEffect' -count=1`
+- Result: pass
+- Notes: RED first failed because accounting types and `ApplyAccountingEffect` were missing; GREEN passed after adding transaction type constants, accounting input/effect structs, and income/expense/transfer/adjustment balance effect validation.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/finance -count=1`
+- Result: pass
+- Notes: Unit-only finance package regression passed after accounting primitives.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`
+- Result: pass
+- Notes: Finance package regression passed with DB-backed wallet/category repository tests included.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
+- Result: pass
+- Notes: Backend regression passed across api, migrate, worker, finance, identity, config, db, httpapi, and objectstore packages.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 0 / 5
+- Total fix/test cycles: 1 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -120,17 +129,17 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: transaction workflows update balances exactly and remain idempotent under retry.
-- Verified behavior: pending implementation.
+- Verified behavior: domain accounting effect validation now proves exact income, expense, transfer, and adjustment balance deltas; repository idempotency, edit/archive, search, API, and mobile workflows remain pending.
 - Sign-off: pending.
 
 ## Docs Review
 
-- Requirements updated or not needed reason: pending execution.
-- Architecture updated or not needed reason: pending execution.
-- API updated or not needed reason: pending execution.
-- ERD/data updated or not needed reason: pending execution.
-- ADR created or not needed reason: pending execution.
-- `docs/CONTEXT.md` updated: pending execution.
+- Requirements updated or not needed reason: not needed; accounting behavior follows accepted REQ-F-003/REQ-NF-002/REQ-NF-005 scope.
+- Architecture updated or not needed reason: pending repository/API implementation.
+- API updated or not needed reason: pending transaction API implementation.
+- ERD/data updated or not needed reason: existing PHASE-002 transaction tables still match the accounting-effect slice.
+- ADR created or not needed reason: not needed; no divergence from ADR-003 or approved PHASE-002 design.
+- `docs/CONTEXT.md` updated: yes.
 
 ## Completion Checklist
 
