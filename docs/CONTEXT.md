@@ -32,8 +32,8 @@ updated: 2026-08-26
 
 ## Current Status
 
-- Status: PHASE-001 execution is underway with Go runtime/API foundation, PostgreSQL migrations, S3 adapter, backend identity, mobile-first PWA shell, local Compose stack, offline/auth browser proof, Compose web API proxy, and backend/frontend folder split implemented.
-- Active backlog: [BL-001](work/BACKLOG.md)
+- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, backend wallet/category repository behavior, initial wallet/category API routes, and API-driven mobile wallet/category display are implemented with automated proof.
+- Active backlog: [BL-002](work/BACKLOG.md)
 - Current queue focus: execute PHASE-002 finance core, starting with TICKET-005 wallet/category domain.
 - Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `ready`.
 - Active ticket: [TICKET-005](work/tickets/TICKET-005-wallet-category-domain.md), status `in_progress`.
@@ -111,9 +111,9 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 
 ## Next Steps
 
-1. Commit PHASE-002 finance-core ticket/design/plan artifacts.
-2. Complete remaining TICKET-005 wallet/category mutation API routes and mobile create/edit controls.
-3. Finish TICKET-005 UAT notes before moving to TICKET-006 transaction accounting.
+1. Complete remaining TICKET-005 wallet/category mutation API routes and mobile create/edit controls.
+2. Finish TICKET-005 UAT notes or record the exact residual review gap.
+3. Start TICKET-006 transaction accounting after TICKET-005 review gate clears.
 
 ## Open Questions
 
