@@ -32,10 +32,10 @@ updated: 2026-08-30
 
 ## Current Status
 
-- Status: PHASE-002 finance-core execution is underway after PHASE-001 reached review. Finance schema, Vietnamese seed categories, receipt metadata validation/persistence, backend wallet/category repository behavior, wallet/category mutation API routes, API-driven mobile wallet/category management, live mobile finance CRUD E2E, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create/type/edit/archive UI, and a browser transaction outbox with reconnect drain are implemented with automated proof.
+- Status: PHASE-002 finance core is in review after automated implementation proof. Finance schema, Vietnamese seed categories, receipt metadata validation/persistence, backend wallet/category repository behavior, wallet/category mutation API routes, API-driven mobile wallet/category management, live mobile finance CRUD E2E, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create/type/edit/archive UI, and a browser transaction outbox with reconnect drain are implemented with automated proof.
 - Active backlog: [BL-002](work/BACKLOG.md)
-- Current queue focus: execute PHASE-002 finance core; TICKET-005 and TICKET-006 are in review with UAT/live finance CRUD browser proof still pending.
-- Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `in_progress`.
+- Current queue focus: PHASE-002 human/UAT review while preparing PHASE-003 offline synchronization tickets and execution plan.
+- Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `in_review`.
 - Active ticket: [TICKET-006](work/tickets/TICKET-006-transaction-accounting-engine.md), status `in_review`.
 - Active bug: None.
 
@@ -112,8 +112,9 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 
 ## Next Steps
 
-1. Complete PHASE-002 UAT notes and move the phase to review if acceptance is satisfied.
-2. Generate bounded ticket artifacts and executable plans from the approved PHASE-003 through PHASE-007 designs as each dependency becomes ready.
+1. Review PHASE-002 with the user/UAT criteria and mark verified if accepted.
+2. Generate PHASE-003 TICKET-008..010 artifacts and executable plan from the approved offline sync design.
+3. Replace the temporary localStorage-first outbox with the approved IndexedDB-primary offline store during PHASE-003.
 
 ## Open Questions
 

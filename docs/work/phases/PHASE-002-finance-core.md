@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-002
-status: in_progress
+status: in_review
 owner: human
 priority: High
 human_fields:
@@ -47,7 +47,7 @@ trace:
 ## Status
 
 - ID: PHASE-002
-- Status: in_progress
+- Status: in_review
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
@@ -126,4 +126,4 @@ Deliver correct wallet accounting, category management, transaction workflows, a
 
 ## Completion Summary
 
-Wallet/category APIs, transaction APIs, receipt metadata foundation, and mobile finance component workflows have automated proof. Full finance UAT and dedicated live finance browser CRUD coverage remain before PHASE-002 can be verified.
+Wallet/category APIs, transaction APIs, receipt metadata foundation, mobile finance component workflows, and live mobile finance CRUD have automated proof. PHASE-002 is ready for review; full human UAT/sign-off remains before it can be verified or done.
