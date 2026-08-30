@@ -50,6 +50,7 @@ describe("App shell", () => {
         ],
       },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true }] },
+      "/api/v1/transactions": { transactions: [] },
     });
 
     render(<App />);
@@ -66,6 +67,7 @@ describe("App shell", () => {
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
       "/api/v1/wallets": { wallets: [] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true }] },
+      "/api/v1/transactions": { transactions: [] },
     });
 
     render(<App />);
@@ -73,6 +75,46 @@ describe("App shell", () => {
     await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
 
     expect(screen.getByText("Ăn uống API")).toBeInTheDocument();
+  });
+
+  it("renders API transactions and can search them", async () => {
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [] },
+      "/api/v1/transactions": { transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_live", amount_vnd: 125000, balance_after_vnd: 875000, occurred_at: "2026-08-30T00:00:00Z", note: "Cà phê sáng", with_person: "", event_ref: "", excluded_from_reports: false, version: 1 }] },
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByLabelText("Sổ giao dịch"));
+    expect(await screen.findByText("Cà phê sáng")).toBeInTheDocument();
+    expect(screen.getByText("-125.000 đ")).toBeInTheDocument();
+    await userEvent.type(screen.getByLabelText("Tìm giao dịch"), "không tồn tại");
+    expect(screen.getByText("Chưa có giao dịch")).toBeInTheDocument();
+  });
+
+  it("creates an expense from the add sheet", async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
+      const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
+      const path = new URL(url, "http://localhost").pathname;
+      if (path === "/api/v1/me") return new Response(JSON.stringify({ user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } }), { status: 200 });
+      if (path === "/api/v1/wallets") return new Response(JSON.stringify({ wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] }), { status: 200 });
+      if (path === "/api/v1/categories") return new Response(JSON.stringify({ categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true }] }), { status: 200 });
+      if (path === "/api/v1/transactions" && options?.method === "POST") {
+        expect(new Headers(options.headers).get("Idempotency-Key")).toBeTruthy();
+        const body = JSON.parse(String(options.body));
+        expect(body.amount_vnd).toBe(50000);
+        return new Response(JSON.stringify({ transaction: { id: "tx_new", ...body, balance_after_vnd: 950000, version: 1 } }), { status: 201 });
+      }
+      return new Response(JSON.stringify({ transactions: [] }), { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    render(<App />);
+    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+    await userEvent.type(await screen.findByLabelText("Số tiền"), "50000");
+    await userEvent.type(screen.getByLabelText("Ghi chú"), "Ăn sáng");
+    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Thêm Giao Dịch" })).not.toBeInTheDocument());
+    expect(fetchMock).toHaveBeenCalled();
   });
 });
 

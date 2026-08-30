@@ -203,7 +203,7 @@ Run: `rtk go test ./internal/finance`
 
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 Run:
 
@@ -374,7 +374,7 @@ rtk git commit -m "feat: expose finance API"
 - Consumes finance API from Task 4.
 - Produces mobile workflows matching `design/DESIGN.md`.
 
-- [ ] **Step 1: Write failing frontend tests**
+- [x] **Step 1: Write failing frontend tests**
 
 Add Vitest checks:
 - wallet totals render from API fixture data
@@ -382,13 +382,13 @@ Add Vitest checks:
 - quick add submits expense payload with VND integer amount
 - transaction search filters rendered list
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `rtk npm test -- --run`
 
 Expected: FAIL because finance client/UI does not exist.
 
-- [ ] **Step 3: Implement finance client and UI**
+- [x] **Step 3: Implement finance client and UI**
 
 Create typed calls:
 
@@ -409,7 +409,7 @@ Wire screens:
 
 Test fixture login, create wallet/category if needed, add expense, verify wallet balance changes, search transaction, edit/archive transaction.
 
-- [ ] **Step 5: Run frontend verification**
+- [x] **Step 5: Run frontend verification**
 
 Run:
 

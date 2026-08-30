@@ -152,11 +152,17 @@ AI fill:
 - Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
 - Result: pass
 - Notes: Backend regression passed after transaction HTTP API implementation.
+- Command: `rtk npm test -- --run` (from `frontend/)`
+- Result: pass
+- Notes: Mobile transaction list/search rendering and quick-add expense submission are covered by Vitest.
+- Command: `rtk npm run build` (from `frontend/`)
+- Result: pass
+- Notes: Production frontend build passed after finance UI integration.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 4 / 5
+- Total fix/test cycles: 5 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -165,7 +171,7 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: transaction workflows update balances exactly and remain idempotent under retry.
-- Verified behavior: domain accounting effect validation, repository create/edit/archive/search flows, and transaction HTTP routes now prove exact income, expense, transfer, and adjustment balance deltas, atomic wallet version/balance updates, category activation validation, duplicate idempotent replay, changed-request idempotency rejection, user-owned wallet enforcement, edit reversal/reapply, archive reversal once, user-scoped filtered listing, CSRF-protected create/edit/archive, authenticated list, idempotency header mapping, and transaction API JSON envelopes. Mobile workflows and UAT remain pending.
+- Verified behavior: domain accounting effect validation, repository create/edit/archive/search flows, transaction HTTP routes, and mobile transaction list/search/create flows now have automated proof. Mobile edit/archive controls and full UAT remain pending.
 - Sign-off: pending.
 
 ## Docs Review

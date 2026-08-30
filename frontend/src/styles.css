@@ -384,6 +384,35 @@ button {
   grid-template-columns: 48px 1fr auto 22px;
 }
 
+.transaction-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 14px 18px 0;
+  padding: 10px 14px;
+  border-radius: 14px;
+  background: #f2f3f8;
+  color: #8e8e93;
+}
+
+.transaction-search input,
+.sheet-row input,
+.amount-row input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+.empty-state {
+  margin: 26px 22px;
+  color: #8e8e93;
+  text-align: center;
+}
+
 .budget-hero {
   text-align: center;
 }
@@ -599,6 +628,11 @@ button {
 
 .amount-row strong {
   font-size: 56px;
+}
+
+.amount-row input {
+  font-size: 56px;
+  font-weight: 800;
 }
 
 .sheet-row {

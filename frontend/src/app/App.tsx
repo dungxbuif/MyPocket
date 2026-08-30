@@ -19,7 +19,7 @@ import {
 import { useOnlineStatus } from "./offline";
 import { apiBaseURL } from "./apiClient";
 import { loadCurrentUser, logout, type AuthState } from "./auth";
-import { loadCategories, loadWallets, type CategorySummary, type WalletSummary } from "./finance";
+import { createTransaction, loadCategories, loadTransactions, loadWallets, type CategorySummary, type Transaction, type WalletSummary } from "./finance";
 
 type Tab = "overview" | "transactions" | "budgets" | "account";
 
@@ -37,6 +37,7 @@ export function App() {
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
   const [wallets, setWallets] = useState<WalletSummary[] | null>(null);
   const [categories, setCategories] = useState<CategorySummary[] | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[] | null>(null);
   const headerWallets = wallets && wallets.length > 0 ? wallets : sampleWallets;
   const totalBalance = totalIncludedVND(headerWallets);
 
@@ -54,20 +55,23 @@ export function App() {
     if (authState.status !== "authenticated") {
       setWallets(null);
       setCategories(null);
+      setTransactions(null);
       return;
     }
     let cancelled = false;
-    void Promise.all([loadWallets(), loadCategories()])
-      .then(([nextWallets, nextCategories]) => {
+    void Promise.all([loadWallets(), loadCategories(), loadTransactions()])
+      .then(([nextWallets, nextCategories, nextTransactions]) => {
         if (!cancelled) {
           setWallets(nextWallets);
           setCategories(nextCategories);
+          setTransactions(nextTransactions);
         }
       })
       .catch(() => {
         if (!cancelled) {
           setWallets([]);
           setCategories([]);
+          setTransactions([]);
         }
       });
     return () => {
@@ -109,7 +113,7 @@ export function App() {
         <AuthBanner authState={authState} />
         {authState.status === "forbidden" ? <ForbiddenState authState={authState} onLogout={handleLogout} /> : null}
         {authState.status !== "forbidden" && activeTab === "overview" ? <Overview wallets={wallets} /> : null}
-        {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions /> : null}
+        {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions transactions={transactions ?? []} /> : null}
         {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets /> : null}
         {authState.status !== "forbidden" && activeTab === "account" ? <Account authState={authState} onLogout={handleLogout} /> : null}
       </main>
@@ -126,7 +130,7 @@ export function App() {
         ))}
       </nav>
 
-      {sheetOpen ? <AddTransactionSheet categories={categories ?? []} onClose={() => setSheetOpen(false)} /> : null}
+      {sheetOpen ? <AddTransactionSheet categories={categories ?? []} wallets={wallets ?? []} onCreated={(transaction) => setTransactions((current) => [transaction, ...(current ?? [])])} onClose={() => setSheetOpen(false)} /> : null}
     </div>
   );
 }
@@ -230,7 +234,9 @@ function Overview({ wallets }: { wallets: WalletSummary[] | null }) {
   );
 }
 
-function Transactions() {
+function Transactions({ transactions }: { transactions: Transaction[] }) {
+  const [query, setQuery] = useState("");
+  const visible = transactions.filter((transaction) => `${transaction.note} ${transaction.type}`.toLowerCase().includes(query.toLowerCase()));
   return (
     <section className="content-stack">
       <div className="sub-header">
@@ -238,8 +244,8 @@ function Transactions() {
         <button className="pill-button" type="button">Tháng 08/2026</button>
       </div>
       <section className="card list-card">
-        <TransactionRow title="Ăn uống" subtitle="Techcombank" amount="-250.000 đ" />
-        <TransactionRow title="Tiền mặt" subtitle="Điều chỉnh số dư" amount="+84.000 đ" positive />
+        <label className="transaction-search"><Search size={18} /><input aria-label="Tìm giao dịch" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm giao dịch" /></label>
+        {visible.length === 0 ? <p className="empty-state">Chưa có giao dịch</p> : visible.map((transaction) => <TransactionRow key={transaction.id} title={transaction.note || transaction.type} subtitle={new Date(transaction.occurred_at).toLocaleDateString("vi-VN")} amount={`${transaction.type === "income" ? "+" : "-"}${formatVND(transaction.amount_vnd)}`} positive={transaction.type === "income"} />)}
       </section>
     </section>
   );
@@ -289,8 +295,23 @@ function Account({ authState, onLogout }: { authState: AuthState; onLogout: () =
   );
 }
 
-function AddTransactionSheet({ categories, onClose }: { categories: CategorySummary[]; onClose: () => void }) {
+function AddTransactionSheet({ categories, wallets, onCreated, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; onCreated: (transaction: Transaction) => void; onClose: () => void }) {
   const firstExpenseCategory = categories.find((category) => category.kind === "expense");
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [saving, setSaving] = useState(false);
+  const canSave = Number(amount) > 0 && Boolean(wallets[0]);
+  async function save() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      const transaction = await createTransaction({ type: "expense", source_wallet_id: wallets[0].id, category_id: firstExpenseCategory?.id, amount_vnd: Number(amount), occurred_at: new Date().toISOString(), note });
+      onCreated(transaction);
+      onClose();
+    } finally {
+      setSaving(false);
+    }
+  }
   return (
     <div className="sheet-backdrop">
       <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label="Thêm Giao Dịch">
@@ -299,9 +320,9 @@ function AddTransactionSheet({ categories, onClose }: { categories: CategorySumm
           <h2>Thêm Giao Dịch</h2>
           <span />
         </header>
-        <div className="amount-row"><span>VND</span><strong>0</strong></div>
+        <label className="amount-row"><span>VND</span><input aria-label="Số tiền" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
         <SheetRow icon={<span className="dot-icon" />} label={firstExpenseCategory?.name ?? "Chọn nhóm"} muted={!firstExpenseCategory} />
-        <SheetRow icon={<List />} label="Ghi chú" />
+        <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label>
         <SheetRow icon={<CalendarDays />} label="Chủ Nhật, 23/08/2026" green />
         <div className="sheet-group">
           <SheetRow icon={<Users />} label="Với" muted />
@@ -313,7 +334,7 @@ function AddTransactionSheet({ categories, onClose }: { categories: CategorySumm
         </div>
         <button className="image-row" type="button"><ImagePlus size={28} />Thêm Hình Ảnh</button>
         <label className="toggle-row">Không tính vào báo cáo<span /></label>
-        <div className="save-bar"><button type="button" disabled>Lưu</button><button type="button" className="receipt"><ImagePlus size={24} /></button></div>
+        <div className="save-bar"><button type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button><button type="button" className="receipt"><ImagePlus size={24} /></button></div>
       </section>
     </div>
   );

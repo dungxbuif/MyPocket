@@ -85,6 +85,8 @@ trace:
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -run 'TestTransactionsAPI\|TestCreateTransaction\|TestUpdateTransaction\|TestArchiveTransaction' -count=1` | pass | RED first returned 404 for transaction routes; GREEN passed after handlers were added. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./internal/platform/httpapi -count=1` | pass | HTTP package regression after transaction API and `Idempotency-Key` CORS proof. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | pass | Backend regression after transaction HTTP API implementation. |
+| `rtk npm test -- --run` (from `frontend/`) | pass | Mobile transaction list/search rendering and quick-add expense submission tests. |
+| `rtk npm run build` (from `frontend/`) | pass | Production frontend build after transaction UI integration. |
 | `rtk npm test -- --run src/app/App.test.tsx` | pass | RED first failed because wallet/category UI still used hardcoded data; GREEN passed after API-driven finance state was added. |
 | `rtk npm test -- --run` | pass | Full frontend component suite; 5 tests passed. |
 | `rtk npm run build` | pass | Production Vite build completed. |
@@ -107,7 +109,7 @@ trace:
 Loop guard:
 
 - Same-path failure attempts: 1 / 3
-- Active work-item fix/test cycles: TICKET-006 is 4 / 5. Earlier TICKET-005 cycles are tracked in that ticket.
+- Active work-item fix/test cycles: TICKET-006 is 5 / 5. Earlier TICKET-005 cycles are tracked in that ticket; further TICKET-006 changes require human/design review.
 - Blocked: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -115,7 +117,7 @@ Loop guard:
 
 - Passed: PHASE-002 migration/schema/seed test, full `internal/platform/db` package, wallet/category finance package tests, wallet/category HTTP handler tests, TICKET-006 accounting effect tests, TICKET-006 repository create/idempotency/edit/archive/search tests, TICKET-006 transaction HTTP route tests, full backend regression, frontend component tests, frontend build, and mobile PWA/auth/offline E2E smoke.
 - Failed: none remaining for migration, backend wallet/category domain, implemented wallet/category API route, and API-driven mobile display slices.
-- Skipped: remaining wallet/category mutation routes, transaction mobile workflows, and full wallet/category/transaction UAT pending later PHASE-002 work.
+- Skipped: remaining wallet/category mutation routes, transaction edit/archive mobile controls, and full wallet/category/transaction UAT pending later PHASE-002 work.
 
 ## Manual Checks
 
@@ -126,7 +128,7 @@ Loop guard:
 - Required: yes for wallet/category and transaction workflows; not required for receipt metadata foundation until PHASE-006.
 - Reason if not required: partial exception applies only to non-user-facing receipt metadata foundation.
 - Expected behavior: finance workflows use Vietnamese copy, exact VND integer formatting, user-owned data, and correct wallet balances.
-- Verified behavior: wallet/category API-driven display, backend accounting effects, repository create transaction/idempotency behavior, edit/archive reversal, transaction search filters, and transaction HTTP routes have automated proof; transaction mobile workflows remain pending implementation.
+- Verified behavior: wallet/category API-driven display, backend accounting effects, repository create transaction/idempotency behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, and mobile transaction list/search/create flows have automated proof; mobile edit/archive and UAT remain pending.
 - Sign-off: pending.
 
 ## Failures And Follow-Up
