@@ -102,12 +102,12 @@ AI fill:
 
 - Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/finance -count=1`; `rtk env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`
 - Result: pass
-- Notes: Unit and PostgreSQL integration proof covers wallet validation, credit metadata validation, user-scoped wallet listing, update/archive behavior, one active default AI wallet, system/user category listing, user category update/archive, system category locks, and wallet/category activation ownership/upsert.
+- Notes: Unit, PostgreSQL integration, and HTTP handler proof covers wallet validation, credit metadata validation, user-scoped wallet listing/create/update/archive behavior, one active default AI wallet, system/user category listing, user category update/archive, system category locks, wallet/category activation ownership/upsert, and authenticated API scoping for implemented wallet/category routes.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 1 / 3
-- Total fix/test cycles: 3 / 5
+- Total fix/test cycles: 4 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none before starting approved PHASE-002 plan.
 
@@ -116,14 +116,14 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: wallet and category management match Vietnamese finance copy and VND formatting.
-- Verified behavior: pending mobile/API implementation; backend domain behavior has automated proof.
+- Verified behavior: pending mobile implementation; backend domain behavior and initial wallet/category API routes have automated proof.
 - Sign-off: pending.
 
 ## Docs Review
 
 - Requirements updated or not needed reason: no change; REQ-F-002 scope is unchanged.
-- Architecture updated or not needed reason: pending API/UI implementation.
-- API updated or not needed reason: pending HTTP route implementation.
+- Architecture updated or not needed reason: pending UI implementation.
+- API updated or not needed reason: API updated for implemented wallet/category routes.
 - ERD/data updated or not needed reason: ERD updated for PHASE-002 migration in the migration slice.
 - ADR created or not needed reason: not needed; follows ADR-001 and approved PHASE-002 detail design.
 - `docs/CONTEXT.md` updated: yes.
@@ -135,9 +135,9 @@ AI fill:
 - [ ] Fix/test loop guard respected
 - [ ] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
+- [x] Master docs reconciled
 - [ ] Docs review completed
 - [x] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
+- [x] `docs/CONTEXT.md` updated
 - [ ] `docs/work/BACKLOG.md` updated
 - [ ] Trace links updated

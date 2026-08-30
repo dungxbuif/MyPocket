@@ -39,7 +39,7 @@ updated: 2026-08-24
 | Requirement | Phase | Ticket/Bug | Contract/Behavior | Unit | Integration | E2E | UAT | Platform/Manual | Docs Review | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | REQ-F-001 | PHASE-001 | TICKET-003 | Google OAuth, stateless cookie, and cross-user isolation | yes | yes | yes | yes | yes | yes | implemented | Backend fixture callback, signed cookie, `/api/v1/me`, repository provisioning, browser fixture login, refresh persistence, logout, and forbidden state evidence recorded |
-| REQ-F-002 | PHASE-002 | TICKET-005/007 | Wallets, category hierarchy, activation, archive, and seeds | yes | yes | yes | yes | no | yes | in_progress | PHASE-002 migration/schema/seed and backend wallet/category repository proof recorded in [PHASE-002 finance verification](test-verification/PHASE-002-finance-core.md); wallet/category HTTP API, mobile UI, and UAT remain pending |
+| REQ-F-002 | PHASE-002 | TICKET-005/007 | Wallets, category hierarchy, activation, archive, and seeds | yes | yes | yes | yes | no | yes | in_progress | PHASE-002 migration/schema/seed, backend wallet/category repository, and initial wallet/category HTTP route proof recorded in [PHASE-002 finance verification](test-verification/PHASE-002-finance-core.md); remaining mutation routes, mobile UI, and UAT remain pending |
 | REQ-F-003 | PHASE-002 | TICKET-006 | Atomic income, expense, transfer, adjustment, edit, and search | yes | yes | yes | yes | no | yes | planned | No execution evidence |
 | REQ-F-004 | PHASE-003 | TICKET-008..010 | Offline mirror, outbox, sync, tombstones, and conflict review | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
 | REQ-F-005 | PHASE-004 | TICKET-011..014 | Budgets, events, recurring drafts, debts, and alerts | yes | yes | yes | yes | yes | yes | planned | No execution evidence |
@@ -80,3 +80,4 @@ updated: 2026-08-24
 | 2026-08-30 | AI | Recorded PHASE-001 browser auth E2E coverage for fixture login persistence, logout, and forbidden state. |
 | 2026-08-30 | AI | Recorded PHASE-002 finance migration/schema/seed RED/GREEN proof and backend regression evidence. |
 | 2026-08-30 | AI | Recorded TICKET-005 backend wallet/category validation and repository proof. |
+| 2026-08-30 | AI | Recorded TICKET-005 initial wallet/category HTTP route proof and API contract reconciliation. |

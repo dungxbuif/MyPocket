@@ -29,8 +29,9 @@ updated: 2026-08-24
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`, `POST /api/v1/auth/logout`, `GET /api/v1/me` | OAuth/HTTP | Mixed | implemented | Fixture callback is available only when explicitly enabled; sets stateless signed `mypocket_auth` cookie and browser-readable `mypocket_csrf`; no session API |
-| `/wallets` | REST collection | User | planned | CRUD/archive and default-AI selection |
-| `/categories`, `/wallets/{id}/categories` | REST collection | User | planned | Two-level taxonomy and activation |
+| `GET /wallets`, `POST /wallets` | REST collection | User | implemented | Lists and creates authenticated-user wallets; creation requires CSRF; `user_id` is always derived from the signed cookie |
+| `GET /categories` | REST collection | User | implemented | Lists system and authenticated-user categories; `system_key` is returned for locked system rows |
+| `PATCH /wallets/{id}`, `POST /wallets/{id}/archive`, `POST /wallets/{id}/default-ai`, `PATCH /categories/{id}`, `POST /categories/{id}/archive`, `/wallets/{id}/categories` | REST/command | User | planned | Backend repository behavior exists for TICKET-005; HTTP routes remain pending with the mobile UI pass |
 | `/transactions` | REST collection | User | planned | Income, expense, transfer, adjustment, search |
 | `/receipts/uploads`, `/receipts/{id}` | REST/object | User | planned | Presigned upload and private metadata |
 | `POST /sync/mutations`, `GET /sync/changes` | Sync | User | planned | Idempotent batches, cursors, versions, tombstones |
@@ -63,6 +64,70 @@ updated: 2026-08-24
 | `RATE_LIMITED` | Caller exceeded a bounded operation limit | Retry after returned interval |
 | `INTERNAL_RETRYABLE` | Safe transient internal failure | Retry with the same idempotency key |
 | `INTERNAL_FAILURE` | Unclassified failure | Show correlation ID; do not expose internals |
+
+## Wallet And Category Schemas
+
+### `GET /api/v1/wallets`
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "wallets": [
+    {
+      "id": "uuid",
+      "name": "Tiền mặt",
+      "type": "cash",
+      "balance_vnd": 120000,
+      "include_in_total": true,
+      "is_default_ai": false,
+      "version": 1
+    }
+  ],
+  "correlation_id": "req_..."
+}
+```
+
+### `POST /api/v1/wallets`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request:
+
+```json
+{
+  "name": "Ngân hàng",
+  "type": "bank",
+  "credit_limit_vnd": null,
+  "statement_day": null,
+  "payment_due_day": null
+}
+```
+
+Response status: `201 Created`.
+
+### `GET /api/v1/categories`
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "categories": [
+    {
+      "id": "uuid",
+      "kind": "expense",
+      "name": "Ăn uống",
+      "system_key": "expense_food",
+      "is_system": true
+    }
+  ],
+  "correlation_id": "req_..."
+}
+```
 
 ## Authentication And CSRF
 

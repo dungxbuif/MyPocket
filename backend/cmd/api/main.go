@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"mypocket/internal/finance"
 	"mypocket/internal/identity"
 	"mypocket/internal/platform/config"
 	"mypocket/internal/platform/db"
@@ -25,6 +26,7 @@ func main() {
 
 	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{
 		IdentityRepository: identity.NewRepository(conn),
+		FinanceRepository:  finance.NewRepository(conn),
 		ReadyCheck: func() error {
 			return conn.PingContext(context.Background())
 		},

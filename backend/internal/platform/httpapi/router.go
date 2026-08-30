@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"strings"
 
+	"mypocket/internal/finance"
 	"mypocket/internal/identity"
 	"mypocket/internal/platform/config"
 )
@@ -15,6 +16,7 @@ import (
 type Dependencies struct {
 	ReadyCheck         func() error
 	IdentityRepository IdentityRepository
+	FinanceRepository  FinanceRepository
 }
 
 func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
@@ -23,6 +25,8 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/auth/google/callback", googleCallback(cfg, deps.IdentityRepository))
 	mux.Handle("/api/v1/auth/logout", requireCSRF(http.HandlerFunc(logout)))
 	mux.HandleFunc("/api/v1/me", currentUser(cfg, deps.IdentityRepository))
+	mux.HandleFunc("/api/v1/wallets", wallets(cfg, deps.FinanceRepository))
+	mux.HandleFunc("/api/v1/categories", categories(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
 	mux.HandleFunc("/api/v1/health/ready", readyHealth(deps))
 
@@ -50,6 +54,12 @@ func corsMiddleware(cfg config.Config, next http.Handler) http.Handler {
 type IdentityRepository interface {
 	FindOrCreateGoogleUser(ctx context.Context, profile identity.GoogleProfile) (identity.User, error)
 	FindByID(ctx context.Context, id string) (identity.User, error)
+}
+
+type FinanceRepository interface {
+	ListWallets(ctx context.Context, userID string) ([]finance.Wallet, error)
+	CreateWallet(ctx context.Context, userID string, input finance.CreateWalletInput) (finance.Wallet, error)
+	ListCategories(ctx context.Context, userID string) ([]finance.Category, error)
 }
 
 func correlationMiddleware(next http.Handler) http.Handler {

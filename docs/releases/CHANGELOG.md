@@ -30,6 +30,7 @@ shared_fields: [status]
 - Added browser auth proof for fixture Google login persistence, CSRF-backed logout, forbidden state rendering, credentialed CORS, and Compose web `/api` proxying.
 - Added PHASE-002 PostgreSQL finance core schema for wallets, categories, wallet/category activation, transactions, idempotency keys, receipt metadata, and stable Vietnamese system category seeds.
 - Added backend wallet/category validation and repository behavior for user-scoped wallet CRUD, default AI wallet selection, system/user category rules, and wallet/category activation.
+- Added initial authenticated wallet/category API routes for listing and creating wallets plus listing categories.
 
 ### Planning
 

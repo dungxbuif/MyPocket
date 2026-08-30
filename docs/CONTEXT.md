@@ -67,6 +67,8 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - `backend/migrations/0001_phase001_identity.sql`
 - `backend/migrations/0002_phase002_finance_core.sql`
 - `backend/internal/finance/`
+- `backend/internal/platform/httpapi/finance.go`
+- `backend/internal/platform/httpapi/finance_test.go`
 - `docs/work/test-verification/PHASE-002-finance-core.md`
 - `backend/internal/platform/objectstore/`
 - `backend/internal/identity/`
@@ -106,8 +108,8 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 ## Next Steps
 
 1. Commit PHASE-002 finance-core ticket/design/plan artifacts.
-2. Expose TICKET-005 wallet/category HTTP API routes with authenticated user scoping and CSRF on mutations.
-3. Build mobile wallet/category UI flows against the finance API before moving to TICKET-006 transaction accounting.
+2. Complete remaining TICKET-005 wallet/category mutation API routes or build the mobile wallet/category UI against the implemented list/create routes.
+3. Finish TICKET-005 browser/E2E proof and UAT notes before moving to TICKET-006 transaction accounting.
 
 ## Open Questions
 
