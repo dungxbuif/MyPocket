@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-007
-status: draft
+status: ready
 owner: human
 priority: High
 human_fields:
@@ -37,7 +37,7 @@ trace:
     - TICKET-024
     - TICKET-025
   bugs: []
-  test_verification: not_created_phase_not_executed
+  test_verification: ../test-verification/PHASE-007-audit-export-production.md
   validation_matrix: ../VALIDATION_MATRIX.md
   adrs: []
   release_notes: ../../releases/CHANGELOG.md
@@ -48,11 +48,11 @@ trace:
 ## Status
 
 - ID: PHASE-007
-- Status: draft
+- Status: ready
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
-- Updated: 2026-08-24
+- Updated: 2026-08-30
 
 ## Trace Links
 
@@ -60,7 +60,7 @@ trace:
 - Roadmap: [ROADMAP.md](../ROADMAP.md)
 - Detail design: [PHASE-007-detail-design.md](PHASE-007-detail-design.md) — approved 2026-08-30
 - Requirements: [REQUIREMENTS.md](../../requirements/REQUIREMENTS.md) — REQ-F-013, REQ-F-014, REQ-F-015, REQ-NF-004, REQ-NF-006, REQ-NF-007
-- Test verification: created during execution
+- Test verification: [PHASE-007-audit-export-production.md](../test-verification/PHASE-007-audit-export-production.md) — planned proof target
 - Validation matrix: [VALIDATION_MATRIX.md](../VALIDATION_MATRIX.md)
 - ADRs: [decisions](../../decisions/README.md)
 - Release notes: [CHANGELOG.md](../../releases/CHANGELOG.md)
@@ -88,10 +88,10 @@ Deliver restricted audit debugging, manual exports, safe account lifecycle, and 
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-022 | Ticket | Append-only audit pipeline and hidden viewer | planned | Created during implementation planning |
-| TICKET-023 | Ticket | Manual export jobs | planned | Created during implementation planning |
-| TICKET-024 | Ticket | Account reset and deletion | planned | Created during implementation planning |
-| TICKET-025 | Ticket | Homelab production hardening and release proof | planned | Created during implementation planning |
+| TICKET-022 | Ticket | Append-only audit pipeline and hidden viewer | ready | [TICKET-022](../tickets/TICKET-022-audit-pipeline-hidden-viewer.md) |
+| TICKET-023 | Ticket | Manual export jobs | ready | [TICKET-023](../tickets/TICKET-023-manual-export-jobs.md) |
+| TICKET-024 | Ticket | Account reset and deletion | ready | [TICKET-024](../tickets/TICKET-024-account-reset-deletion.md) |
+| TICKET-025 | Ticket | Homelab production hardening and release proof | ready | [TICKET-025](../tickets/TICKET-025-homelab-production-release-proof.md) |
 
 ## Dependencies
 
@@ -129,9 +129,9 @@ Deliver restricted audit debugging, manual exports, safe account lifecycle, and 
 - [x] Verification plan is defined
 - [x] Release/changelog need is linked
 - [x] Detail design is approved
-- [ ] Ticket artifacts and detailed implementation plan are created
-- [ ] Phase status is promoted to ready after plan review
+- [x] Ticket artifacts and detailed implementation plan are created
+- [x] Phase status is promoted to ready after plan review
 
 ## Completion Summary
 
-No implementation has started. Completion evidence will be recorded after the phase reaches execution.
+No implementation has started. PHASE-007 is ready for execution after dependencies and production env inputs using [2026-08-30-phase-007-production.md](../../superpowers/plans/2026-08-30-phase-007-production.md).

@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-006
-status: draft
+status: ready
 owner: human
 priority: High
 human_fields:
@@ -38,7 +38,7 @@ trace:
     - TICKET-020
     - TICKET-021
   bugs: []
-  test_verification: not_created_phase_not_executed
+  test_verification: ../test-verification/PHASE-006-ai-receipt-bank-ingestion.md
   validation_matrix: ../VALIDATION_MATRIX.md
   adrs: []
   release_notes: ../../releases/CHANGELOG.md
@@ -49,11 +49,11 @@ trace:
 ## Status
 
 - ID: PHASE-006
-- Status: draft
+- Status: ready
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
-- Updated: 2026-08-24
+- Updated: 2026-08-30
 
 ## Trace Links
 
@@ -61,7 +61,7 @@ trace:
 - Roadmap: [ROADMAP.md](../ROADMAP.md)
 - Detail design: [PHASE-006-detail-design.md](PHASE-006-detail-design.md) — approved 2026-08-30
 - Requirements: [REQUIREMENTS.md](../../requirements/REQUIREMENTS.md) — REQ-F-007, REQ-F-008, REQ-F-009, REQ-F-010, REQ-F-011, REQ-NF-004, REQ-NF-008
-- Test verification: created during execution
+- Test verification: [PHASE-006-ai-receipt-bank-ingestion.md](../test-verification/PHASE-006-ai-receipt-bank-ingestion.md) — planned proof target
 - Validation matrix: [VALIDATION_MATRIX.md](../VALIDATION_MATRIX.md)
 - ADRs: [decisions](../../decisions/README.md)
 - Release notes: [CHANGELOG.md](../../releases/CHANGELOG.md)
@@ -89,10 +89,10 @@ Deliver text AI, receipt OCR, AI-chat images, signed bank webhooks, and one safe
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-018 | Ticket | Shared drafts and text AI chat | planned | Created during implementation planning |
-| TICKET-019 | Ticket | Receipt capture and OCR adapter | planned | Created during implementation planning |
-| TICKET-020 | Ticket | Multimodal image chat | planned | Created during implementation planning |
-| TICKET-021 | Ticket | Signed bank-notification webhook | planned | Created during implementation planning |
+| TICKET-018 | Ticket | Shared drafts and text AI chat | ready | [TICKET-018](../tickets/TICKET-018-shared-drafts-text-ai-chat.md) |
+| TICKET-019 | Ticket | Receipt capture and OCR adapter | ready | [TICKET-019](../tickets/TICKET-019-receipt-capture-ocr-adapter.md) |
+| TICKET-020 | Ticket | Multimodal image chat | ready | [TICKET-020](../tickets/TICKET-020-multimodal-image-chat.md) |
+| TICKET-021 | Ticket | Signed bank-notification webhook | ready | [TICKET-021](../tickets/TICKET-021-signed-bank-webhook.md) |
 
 ## Dependencies
 
@@ -129,9 +129,9 @@ Deliver text AI, receipt OCR, AI-chat images, signed bank webhooks, and one safe
 - [x] Verification plan is defined
 - [x] Release/changelog need is linked
 - [x] Detail design is approved
-- [ ] Ticket artifacts and detailed implementation plan are created
-- [ ] Phase status is promoted to ready after plan review
+- [x] Ticket artifacts and detailed implementation plan are created
+- [x] Phase status is promoted to ready after plan review
 
 ## Completion Summary
 
-No implementation has started. Completion evidence will be recorded after the phase reaches execution.
+No implementation has started. PHASE-006 is ready for execution after dependencies and provider env inputs using [2026-08-30-phase-006-ingestion.md](../../superpowers/plans/2026-08-30-phase-006-ingestion.md).

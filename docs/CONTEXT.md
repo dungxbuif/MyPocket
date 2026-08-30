@@ -62,8 +62,27 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - `docs/work/tickets/TICKET-008-indexeddb-mirror-outbox.md`
 - `docs/work/tickets/TICKET-009-sync-api-change-feed.md`
 - `docs/work/tickets/TICKET-010-conflict-inbox-recovery.md`
+- `docs/work/tickets/TICKET-011-budgets-threshold-alerts.md`
+- `docs/work/tickets/TICKET-012-events-debts-repayments.md`
+- `docs/work/tickets/TICKET-013-recurring-schedules-worker.md`
+- `docs/work/tickets/TICKET-014-inbox-web-push.md`
+- `docs/work/tickets/TICKET-015-pwa-navigation-search-wallet-views.md`
+- `docs/work/tickets/TICKET-016-overview-net-worth-dashboard.md`
+- `docs/work/tickets/TICKET-017-analytics-reports-cumulative-trends.md`
+- `docs/work/tickets/TICKET-018-shared-drafts-text-ai-chat.md`
+- `docs/work/tickets/TICKET-019-receipt-capture-ocr-adapter.md`
+- `docs/work/tickets/TICKET-020-multimodal-image-chat.md`
+- `docs/work/tickets/TICKET-021-signed-bank-webhook.md`
+- `docs/work/tickets/TICKET-022-audit-pipeline-hidden-viewer.md`
+- `docs/work/tickets/TICKET-023-manual-export-jobs.md`
+- `docs/work/tickets/TICKET-024-account-reset-deletion.md`
+- `docs/work/tickets/TICKET-025-homelab-production-release-proof.md`
 - `docs/superpowers/plans/2026-08-30-phase-002-finance-core.md`
 - `docs/superpowers/plans/2026-08-30-phase-003-offline-sync.md`
+- `docs/superpowers/plans/2026-08-30-phase-004-planning-automation.md`
+- `docs/superpowers/plans/2026-08-30-phase-005-analytics-dashboard.md`
+- `docs/superpowers/plans/2026-08-30-phase-006-ingestion.md`
+- `docs/superpowers/plans/2026-08-30-phase-007-production.md`
 - `docs/superpowers/plans/2026-08-25-phase-001-platform-identity.md`
 - `docs/superpowers/specs/2026-08-23-mypocket-system-design.md`
 - `docs/work/DOCS-REVIEW-M0.md`
@@ -79,6 +98,10 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - `frontend/src/styles.css`
 - `docs/work/test-verification/PHASE-002-finance-core.md`
 - `docs/work/test-verification/PHASE-003-offline-sync.md`
+- `docs/work/test-verification/PHASE-004-planning-automation.md`
+- `docs/work/test-verification/PHASE-005-analytics-dashboard.md`
+- `docs/work/test-verification/PHASE-006-ai-receipt-bank-ingestion.md`
+- `docs/work/test-verification/PHASE-007-audit-export-production.md`
 - `backend/internal/platform/objectstore/`
 - `backend/internal/identity/`
 - `backend/internal/platform/httpapi/auth.go`
@@ -108,12 +131,13 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - Restrict a hidden audit page to `AUDIT_VIEWER_EMAIL`; default retention is 180 days.
 - Defer voice input until the seven initial release phases are verified.
 - User delegated remaining implementation decisions on 2026-08-30; PHASE-003 through PHASE-007 now have approved detail designs and component contracts.
+- PHASE-003 through PHASE-007 now also have ready ticket artifacts, planned verification targets, and executable implementation plans; no implementation evidence is claimed for those phases yet.
 
 ## Queue Summary
 
 - BL-001 through BL-007 comprise the initial release in dependency order.
 - BL-008 is deferred voice input.
-- All product requirements are accepted but remain unimplemented with planned proof only.
+- PHASE-001 and PHASE-002 have automated implementation proof pending human review; PHASE-003 through PHASE-007 are planned and ready for ordered execution.
 
 ## Next Steps
 

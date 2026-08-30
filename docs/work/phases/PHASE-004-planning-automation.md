@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-004
-status: draft
+status: ready
 owner: human
 priority: High
 human_fields:
@@ -35,7 +35,7 @@ trace:
     - TICKET-013
     - TICKET-014
   bugs: []
-  test_verification: not_created_phase_not_executed
+  test_verification: ../test-verification/PHASE-004-planning-automation.md
   validation_matrix: ../VALIDATION_MATRIX.md
   adrs: []
   release_notes: ../../releases/CHANGELOG.md
@@ -46,11 +46,11 @@ trace:
 ## Status
 
 - ID: PHASE-004
-- Status: draft
+- Status: ready
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
-- Updated: 2026-08-24
+- Updated: 2026-08-30
 
 ## Trace Links
 
@@ -58,7 +58,7 @@ trace:
 - Roadmap: [ROADMAP.md](../ROADMAP.md)
 - Detail design: [PHASE-004-detail-design.md](PHASE-004-detail-design.md) — approved 2026-08-30
 - Requirements: [REQUIREMENTS.md](../../requirements/REQUIREMENTS.md) — REQ-F-005, REQ-F-012, REQ-NF-002, REQ-NF-005
-- Test verification: created during execution
+- Test verification: [PHASE-004-planning-automation.md](../test-verification/PHASE-004-planning-automation.md) — planned proof target
 - Validation matrix: [VALIDATION_MATRIX.md](../VALIDATION_MATRIX.md)
 - ADRs: [decisions](../../decisions/README.md)
 - Release notes: [CHANGELOG.md](../../releases/CHANGELOG.md)
@@ -86,10 +86,10 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-011 | Ticket | Budgets and threshold alerts | planned | Created during implementation planning |
-| TICKET-012 | Ticket | Events, debts, and repayments | planned | Created during implementation planning |
-| TICKET-013 | Ticket | Recurring schedules and worker occurrences | planned | Created during implementation planning |
-| TICKET-014 | Ticket | In-app inbox and Web Push | planned | Created during implementation planning |
+| TICKET-011 | Ticket | Budgets and threshold alerts | ready | [TICKET-011](../tickets/TICKET-011-budgets-threshold-alerts.md) |
+| TICKET-012 | Ticket | Events, debts, and repayments | ready | [TICKET-012](../tickets/TICKET-012-events-debts-repayments.md) |
+| TICKET-013 | Ticket | Recurring schedules and worker occurrences | ready | [TICKET-013](../tickets/TICKET-013-recurring-schedules-worker.md) |
+| TICKET-014 | Ticket | In-app inbox and Web Push | ready | [TICKET-014](../tickets/TICKET-014-inbox-web-push.md) |
 
 ## Dependencies
 
@@ -125,9 +125,9 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 - [x] Verification plan is defined
 - [x] Release/changelog need is linked
 - [x] Detail design is approved
-- [ ] Ticket artifacts and detailed implementation plan are created
-- [ ] Phase status is promoted to ready after plan review
+- [x] Ticket artifacts and detailed implementation plan are created
+- [x] Phase status is promoted to ready after plan review
 
 ## Completion Summary
 
-No implementation has started. Completion evidence will be recorded after the phase reaches execution.
+No implementation has started. PHASE-004 is ready for execution after dependencies using [2026-08-30-phase-004-planning-automation.md](../../superpowers/plans/2026-08-30-phase-004-planning-automation.md).

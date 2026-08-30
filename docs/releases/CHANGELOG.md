@@ -53,3 +53,4 @@ shared_fields: [status]
 - Created PHASE-001 ticket artifacts, detail design, and executable implementation plan focused on the first deployable PWA/mobile shell, platform, identity, and offline app-shell cache slice.
 - Created PHASE-002 finance-core tickets, detail design, and executable implementation plan for wallet/category, transaction accounting, and Vietnamese seed/receipt metadata slices.
 - Created PHASE-003 offline synchronization tickets, verification target, and executable implementation plan for IndexedDB mirror/outbox, idempotent sync APIs, change feed, conflict inbox, and full resync.
+- Created PHASE-004 through PHASE-007 ticket artifacts, verification targets, and executable implementation plans for planning automation, analytics/dashboard, AI/OCR/webhook ingestion, audit/export/account lifecycle, and production release proof.
