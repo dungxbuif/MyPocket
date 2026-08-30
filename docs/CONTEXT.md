@@ -33,10 +33,10 @@ updated: 2026-08-30
 ## Current Status
 
 - Status: PHASE-002 finance core is in review after automated implementation proof. Finance schema, Vietnamese seed categories, receipt metadata validation/persistence, backend wallet/category repository behavior, wallet/category mutation API routes, API-driven mobile wallet/category management, live mobile finance CRUD E2E, transaction accounting effect validation, repository create-transaction atomic/idempotent behavior, edit/archive reversal, transaction search filters, transaction HTTP routes, mobile transaction list/search/create/type/edit/archive UI, and a browser transaction outbox with reconnect drain are implemented with automated proof.
-- Active backlog: [BL-002](work/BACKLOG.md)
-- Current queue focus: PHASE-002 human/UAT review while preparing PHASE-003 offline synchronization tickets and execution plan.
-- Active phase: [PHASE-002 Finance Core](work/phases/PHASE-002-finance-core.md), status `in_review`.
-- Active ticket: [TICKET-006](work/tickets/TICKET-006-transaction-accounting-engine.md), status `in_review`.
+- Active backlog: [BL-003](work/BACKLOG.md)
+- Current queue focus: PHASE-002 human/UAT review remains pending while PHASE-003 offline synchronization is ready for execution.
+- Active phase: [PHASE-003 Offline Synchronization](work/phases/PHASE-003-offline-sync.md), status `ready`.
+- Active ticket: [TICKET-008](work/tickets/TICKET-008-indexeddb-mirror-outbox.md), status `ready`.
 - Active bug: None.
 
 ## Current Focus
@@ -59,7 +59,11 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - `docs/work/tickets/TICKET-005-wallet-category-domain.md`
 - `docs/work/tickets/TICKET-006-transaction-accounting-engine.md`
 - `docs/work/tickets/TICKET-007-vietnamese-seeds-receipt-metadata.md`
+- `docs/work/tickets/TICKET-008-indexeddb-mirror-outbox.md`
+- `docs/work/tickets/TICKET-009-sync-api-change-feed.md`
+- `docs/work/tickets/TICKET-010-conflict-inbox-recovery.md`
 - `docs/superpowers/plans/2026-08-30-phase-002-finance-core.md`
+- `docs/superpowers/plans/2026-08-30-phase-003-offline-sync.md`
 - `docs/superpowers/plans/2026-08-25-phase-001-platform-identity.md`
 - `docs/superpowers/specs/2026-08-23-mypocket-system-design.md`
 - `docs/work/DOCS-REVIEW-M0.md`
@@ -74,6 +78,7 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 - `frontend/src/app/App.test.tsx`
 - `frontend/src/styles.css`
 - `docs/work/test-verification/PHASE-002-finance-core.md`
+- `docs/work/test-verification/PHASE-003-offline-sync.md`
 - `backend/internal/platform/objectstore/`
 - `backend/internal/identity/`
 - `backend/internal/platform/httpapi/auth.go`
@@ -112,9 +117,10 @@ Execute PHASE-002 as the finance core slice after PHASE-001 platform, identity, 
 
 ## Next Steps
 
-1. Review PHASE-002 with the user/UAT criteria and mark verified if accepted.
-2. Generate PHASE-003 TICKET-008..010 artifacts and executable plan from the approved offline sync design.
-3. Replace the temporary localStorage-first outbox with the approved IndexedDB-primary offline store during PHASE-003.
+1. Execute TICKET-008 to replace the temporary localStorage-first outbox with the approved IndexedDB-primary offline store.
+2. Execute TICKET-009 sync API/change-feed backend after the browser mirror and mutation envelope are stable.
+3. Execute TICKET-010 conflict inbox/recovery, then run PHASE-003 E2E/UAT and reconcile docs.
+4. Review PHASE-002 with the user/UAT criteria and mark verified if accepted.
 
 ## Open Questions
 
