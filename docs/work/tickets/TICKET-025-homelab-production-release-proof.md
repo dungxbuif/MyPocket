@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-025
-status: ready
+status: deferred
 owner: human
 priority: high
 lane: high-risk
@@ -20,7 +20,7 @@ trace:
 
 ## Status
 
-- Status: ready
+- Status: deferred
 - Type: feature
 - Priority: high
 - Phase: PHASE-007
@@ -53,4 +53,4 @@ The release needs production-like configuration validation, migration/health pro
 
 - Command: not run yet
 - Result: pending
-- Notes: Ready for implementation; no execution evidence claimed.
+- Notes: Deferred to M2/post-M1 by human scope decision on 2026-08-31; no execution evidence claimed.

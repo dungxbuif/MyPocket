@@ -12,7 +12,7 @@ ai_fields:
   - status_summaries
 shared_fields:
   - milestone_status
-updated: 2026-08-24
+updated: 2026-08-31
 ---
 
 # Roadmap
@@ -27,8 +27,9 @@ updated: 2026-08-24
 | Milestone | Goal | Status | Phase Files |
 | --- | --- | --- | --- |
 | M0 | Approve system design and migrate product planning into Harness | done | [SDD](../architecture/SDD.md), [requirements](../requirements/REQUIREMENTS.md), [traceability](TRACEABILITY.md), [docs review](DOCS-REVIEW-M0.md) |
-| M1 | Deliver the initial MyPocket release as seven deployable slices | planned | [PHASE-001](phases/PHASE-001-platform-identity.md), [PHASE-002](phases/PHASE-002-finance-core.md), [PHASE-003](phases/PHASE-003-offline-sync.md), [PHASE-004](phases/PHASE-004-planning-automation.md), [PHASE-005](phases/PHASE-005-analytics-dashboard.md), [PHASE-006](phases/PHASE-006-ai-receipt-bank-ingestion.md), [PHASE-007](phases/PHASE-007-audit-export-production.md) |
-| M2 | Add deferred voice transaction entry after v1 verification | deferred | [PHASE-008](phases/PHASE-008-deferred-voice.md) |
+| M1 | Deliver the current MyPocket release through TICKET-017 | planned | [PHASE-001](phases/PHASE-001-platform-identity.md), [PHASE-002](phases/PHASE-002-finance-core.md), [PHASE-003](phases/PHASE-003-offline-sync.md), [PHASE-004](phases/PHASE-004-planning-automation.md), [PHASE-005](phases/PHASE-005-analytics-dashboard.md) |
+| M2 | Deliver post-M1 ingestion, audit, export, account lifecycle, and production-hardening work | deferred | [PHASE-006](phases/PHASE-006-ai-receipt-bank-ingestion.md), [PHASE-007](phases/PHASE-007-audit-export-production.md) |
+| M3 | Add deferred voice transaction entry after post-M1 draft infrastructure is verified | deferred | [PHASE-008](phases/PHASE-008-deferred-voice.md) |
 
 ## Approved Phase Order
 
@@ -37,14 +38,15 @@ updated: 2026-08-24
 3. PHASE-003 Offline Synchronization
 4. PHASE-004 Planning and Automation
 5. PHASE-005 Analytics and Dashboard
-6. PHASE-006 AI, Receipt, and Bank Ingestion
-7. PHASE-007 Audit, Export, Account Lifecycle, and Production Operations
-8. PHASE-008 Deferred Voice Input
+6. PHASE-006 AI, Receipt, and Bank Ingestion (deferred to M2)
+7. PHASE-007 Audit, Export, Account Lifecycle, and Production Operations (deferred to M2)
+8. PHASE-008 Deferred Voice Input (deferred to M3)
 
 ## Milestone Gates
 
 - M0 closed on 2026-08-24 after Harness link, YAML, placeholder, whitespace, and docs-review validation passed.
 - M1 begins only after PHASE-001 ticket artifacts and implementation plan are reviewed.
 - Each M1 phase must be independently deployable and verified before the next dependent phase is promoted to `ready`.
-- M1 closes only after PHASE-001 through PHASE-007 meet completion rules and release proof.
-- M2 remains deferred until a human explicitly promotes it after M1.
+- M1 closes after PHASE-001 through PHASE-005 meet completion rules, including TICKET-017.
+- M2 remains deferred until a human explicitly promotes TICKET-018 onward after M1.
+- M3 remains deferred until M2 draft infrastructure is verified and a human explicitly promotes voice work.

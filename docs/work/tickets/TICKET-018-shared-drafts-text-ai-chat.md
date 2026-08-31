@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-018
-status: ready
+status: deferred
 owner: human
 priority: high
 lane: high-risk
@@ -21,7 +21,7 @@ trace:
 
 ## Status
 
-- Status: ready
+- Status: deferred
 - Type: feature
 - Priority: high
 - Phase: PHASE-006
@@ -54,4 +54,4 @@ Text AI can propose transactions, but all proposals must remain editable drafts 
 
 - Command: not run yet
 - Result: pending
-- Notes: Ready for implementation; no execution evidence claimed.
+- Notes: Deferred to M2/post-M1 by human scope decision on 2026-08-31; no execution evidence claimed.

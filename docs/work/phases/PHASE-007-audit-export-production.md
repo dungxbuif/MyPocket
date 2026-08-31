@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-007
-status: ready
+status: deferred
 owner: human
 priority: High
 human_fields:
@@ -48,11 +48,11 @@ trace:
 ## Status
 
 - ID: PHASE-007
-- Status: ready
+- Status: deferred
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
-- Updated: 2026-08-30
+- Updated: 2026-08-31
 
 ## Trace Links
 
@@ -88,10 +88,10 @@ Deliver restricted audit debugging, manual exports, safe account lifecycle, and 
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-022 | Ticket | Append-only audit pipeline and hidden viewer | ready | [TICKET-022](../tickets/TICKET-022-audit-pipeline-hidden-viewer.md) |
-| TICKET-023 | Ticket | Manual export jobs | ready | [TICKET-023](../tickets/TICKET-023-manual-export-jobs.md) |
-| TICKET-024 | Ticket | Account reset and deletion | ready | [TICKET-024](../tickets/TICKET-024-account-reset-deletion.md) |
-| TICKET-025 | Ticket | Homelab production hardening and release proof | ready | [TICKET-025](../tickets/TICKET-025-homelab-production-release-proof.md) |
+| TICKET-022 | Ticket | Append-only audit pipeline and hidden viewer | deferred | [TICKET-022](../tickets/TICKET-022-audit-pipeline-hidden-viewer.md) |
+| TICKET-023 | Ticket | Manual export jobs | deferred | [TICKET-023](../tickets/TICKET-023-manual-export-jobs.md) |
+| TICKET-024 | Ticket | Account reset and deletion | deferred | [TICKET-024](../tickets/TICKET-024-account-reset-deletion.md) |
+| TICKET-025 | Ticket | Homelab production hardening and release proof | deferred | [TICKET-025](../tickets/TICKET-025-homelab-production-release-proof.md) |
 
 ## Dependencies
 
@@ -134,4 +134,4 @@ Deliver restricted audit debugging, manual exports, safe account lifecycle, and 
 
 ## Completion Summary
 
-No implementation has started. PHASE-007 is ready for execution after dependencies and production env inputs using [2026-08-30-phase-007-production.md](../../superpowers/plans/2026-08-30-phase-007-production.md).
+No implementation has started. PHASE-007 has ready design and ticket artifacts, but execution is deferred by human scope decision on 2026-08-31. PHASE-007 and TICKET-022 through TICKET-025 are excluded from the current M1 release and should be promoted again for M2/post-M1 execution.

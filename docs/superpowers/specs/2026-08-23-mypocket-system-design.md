@@ -329,9 +329,9 @@ The full SRS is implemented through linked plans rather than one oversized execu
 3. **Offline Sync:** IndexedDB mirror, outbox, idempotent mutation API, change cursor, versions, tombstones, and conflict review.
 4. **Planning and Automation:** budgets, alerts, events, recurring drafts, debt/loan tracking, in-app notifications, and Web Push.
 5. **Analytics and Dashboard:** navigation, dashboard, wallet selector, reports, comparisons, and trends.
-6. **AI, Receipt, and Bank Ingestion:** text chat, shared drafts, receipt OCR, AI-chat images, signed webhook intake, and provider adapters.
-7. **Audit, Export, Account Lifecycle, and Production Operations:** hidden audit page, retention, manual export, reset/delete, backups, health checks, and release proof.
-8. **Deferred Voice Input:** audio capture, OpenAI-compatible transcription, and transcript-to-draft behavior after the initial release.
+6. **AI, Receipt, and Bank Ingestion:** text chat, shared drafts, receipt OCR, AI-chat images, signed webhook intake, and provider adapters. Deferred to M2 by the 2026-08-31 release-scope decision.
+7. **Audit, Export, Account Lifecycle, and Production Operations:** hidden audit page, retention, manual export, reset/delete, backups, health checks, and release proof. Deferred to M2 by the 2026-08-31 release-scope decision.
+8. **Deferred Voice Input:** audio capture, OpenAI-compatible transcription, and transcript-to-draft behavior after post-M1 draft infrastructure.
 
 Each phase must remain deployable and testable. Later phases consume public application interfaces from earlier phases rather than bypassing their domain rules.
 

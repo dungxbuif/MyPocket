@@ -46,10 +46,10 @@ shared_fields: [status]
 
 ### Planning
 
-- Approved executable detail designs for PHASE-003 through PHASE-007 and extended the shared mobile component design contract through the full M1 release.
+- Approved executable detail designs for PHASE-003 through PHASE-007 and extended the shared mobile component design contract through the originally planned release scope.
 - Approved and recorded the MyPocket React PWA and Go modular-monolith system design.
 - Migrated the source SRS into Harness requirements, user stories, architecture, API, ERD, integrations, SDD, ADRs, roadmap, eight phases, backlog, traceability, and validation planning.
-- Defined the seven-phase initial release and deferred voice-input phase.
+- Redefined the current M1 release to stop after TICKET-017; TICKET-018 through TICKET-025 are deferred to M2/post-M1 work, and voice input moves after that.
 - Recorded full offline conflict review, review-first AI/OCR/webhook ingestion, Google OAuth without server sessions, and restricted 180-day-default audit logging.
 - Created PHASE-001 ticket artifacts, detail design, and executable implementation plan focused on the first deployable PWA/mobile shell, platform, identity, and offline app-shell cache slice.
 - Created PHASE-002 finance-core tickets, detail design, and executable implementation plan for wallet/category, transaction accounting, and Vietnamese seed/receipt metadata slices.

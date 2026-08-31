@@ -39,6 +39,6 @@ Start from `docs/templates/PHASE.md`.
 3. [PHASE-003 Offline Synchronization](PHASE-003-offline-sync.md)
 4. [PHASE-004 Planning and Automation](PHASE-004-planning-automation.md)
 5. [PHASE-005 Analytics and Dashboard](PHASE-005-analytics-dashboard.md)
-6. [PHASE-006 AI, Receipt, and Bank Ingestion](PHASE-006-ai-receipt-bank-ingestion.md)
-7. [PHASE-007 Audit, Export, Account Lifecycle, and Production Operations](PHASE-007-audit-export-production.md)
-8. [PHASE-008 Deferred Voice Input](PHASE-008-deferred-voice.md)
+6. [PHASE-006 AI, Receipt, and Bank Ingestion](PHASE-006-ai-receipt-bank-ingestion.md) - deferred to M2
+7. [PHASE-007 Audit, Export, Account Lifecycle, and Production Operations](PHASE-007-audit-export-production.md) - deferred to M2
+8. [PHASE-008 Deferred Voice Input](PHASE-008-deferred-voice.md) - deferred to M3

@@ -32,7 +32,7 @@ updated: 2026-08-31
 
 ## Current Status
 
-- Status: PHASE-002 finance core is in review after automated implementation proof. PHASE-003 offline synchronization is now in progress: TICKET-008 is in review with frontend IndexedDB mirror/outbox implementation proof for cached hydration, cached-auth offline reload, wallet/category/transaction queue primitives, localStorage migration/quarantine, durable sequence, degraded read-only UI, and mobile PWA shell offline reload.
+- Status: PHASE-002 finance core is in review after automated implementation proof. PHASE-003 offline synchronization is now in progress: TICKET-008 is in review with frontend IndexedDB mirror/outbox implementation proof for cached hydration, cached-auth offline reload, wallet/category/transaction queue primitives, localStorage migration/quarantine, durable sequence, degraded read-only UI, and mobile PWA shell offline reload. Human scope decision on 2026-08-31 caps the current M1 release at TICKET-017; TICKET-018 through TICKET-025 move to M2/post-M1 work.
 - Active backlog: [BL-003](work/BACKLOG.md)
 - Current queue focus: implement TICKET-009 sync API/change feed.
 - Active phase: [PHASE-003 Offline Synchronization](work/phases/PHASE-003-offline-sync.md), status `in_progress`.
@@ -133,24 +133,26 @@ Execute PHASE-003 offline synchronization after PHASE-002 finance core reached r
 - Use optimistic versions and explicit conflict review for full offline read/write.
 - Keep receipt OCR and AI-chat images as distinct user flows.
 - Restrict a hidden audit page to `AUDIT_VIEWER_EMAIL`; default retention is 180 days.
-- Defer voice input until the seven initial release phases are verified.
+- Defer TICKET-018 through TICKET-025 to M2/post-M1 work; the current M1 release stops after TICKET-017.
+- Defer voice input until post-M1 draft infrastructure is verified.
 - User delegated remaining implementation decisions on 2026-08-30; PHASE-003 through PHASE-007 now have approved detail designs and component contracts.
-- PHASE-003 through PHASE-007 now also have ready ticket artifacts, planned verification targets, and executable implementation plans; no implementation evidence is claimed for those phases yet.
+- PHASE-003 through PHASE-005 remain in the current release queue; PHASE-006 and PHASE-007 keep their ready design artifacts but are deferred to M2.
 - TICKET-008 uses `frontend/src/offline/` as the IndexedDB boundary for wallets, categories, transactions, outbox mutations, tombstones, conflicts, and sync meta; `frontend/src/app/outbox.ts` remains a compatibility wrapper for the previous localStorage-first transaction outbox.
 - Offline reload for authenticated cached data now uses the last successful `/api/v1/me` envelope only when `navigator.onLine` is false; logout clears both this cached user and IndexedDB offline stores.
 
 ## Queue Summary
 
-- BL-001 through BL-007 comprise the initial release in dependency order.
+- BL-001 through BL-005 comprise the current M1 release in dependency order.
 - BL-008 is deferred voice input.
-- PHASE-001 and PHASE-002 have automated implementation proof pending human review. PHASE-003 is in progress with TICKET-008 in review; PHASE-004 through PHASE-007 remain planned and ready after PHASE-003.
+- BL-006 and BL-007 are deferred to M2 after TICKET-017; BL-008 is deferred after M2.
+- PHASE-001 and PHASE-002 have automated implementation proof pending human review. PHASE-003 is in progress with TICKET-008 in review; PHASE-004 and PHASE-005 remain planned and ready after PHASE-003.
 
 ## Next Steps
 
 1. Execute TICKET-009 sync API/change-feed backend now that the browser mirror and mutation envelope are stable.
 2. Execute TICKET-010 conflict inbox/recovery, then run PHASE-003 replay/conflict E2E and UAT.
-3. Execute TICKET-010 conflict inbox/recovery, then run PHASE-003 E2E/UAT and reconcile docs.
-4. Review PHASE-002 with the user/UAT criteria and mark verified if accepted.
+3. Execute PHASE-004 TICKET-011 through TICKET-014, then PHASE-005 TICKET-015 through TICKET-017 for the current M1 release.
+4. Keep TICKET-018 through TICKET-025 out of M1 until the user promotes M2.
 
 ## Open Questions
 

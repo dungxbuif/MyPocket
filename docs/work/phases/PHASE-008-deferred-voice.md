@@ -46,7 +46,7 @@ trace:
 - Owner: human
 - Priority: Low
 - Created: 2026-08-24
-- Updated: 2026-08-24
+- Updated: 2026-08-31
 
 ## Trace Links
 
@@ -71,7 +71,7 @@ Add recorded voice transaction entry through OpenAI-compatible transcription wit
 
 ## Out Of Scope
 
-- Initial release scope.
+- Current M1 and M2 release scope.
 - Real-time voice assistant or continuous listening.
 - Automatic transaction confirmation.
 
@@ -84,7 +84,7 @@ Add recorded voice transaction entry through OpenAI-compatible transcription wit
 ## Dependencies
 
 - PHASE-006 shared AI conversation and draft pipeline.
-- Explicit product decision to start deferred voice work after PHASE-001 through PHASE-007 are verified.
+- Explicit product decision to start deferred voice work after M2/post-M1 draft infrastructure is verified.
 
 ## Risks
 
@@ -117,4 +117,3 @@ Add recorded voice transaction entry through OpenAI-compatible transcription wit
 ## Completion Summary
 
 No implementation has started. Completion evidence will be recorded after the phase reaches execution.
-

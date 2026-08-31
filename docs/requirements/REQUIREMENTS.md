@@ -36,7 +36,7 @@ updated: 2026-08-24
 | REQ-F-014 | Let users reset or delete their account through confirmed, audited background operations that include owned S3 objects. | High | [SPEC](SPEC.md) | accepted |
 | REQ-F-015 | Record append-only state-changing and security audit events, retain them for a configurable default of 180 days, and expose a hidden read-only page only to `AUDIT_VIEWER_EMAIL`. | High | [Design](../superpowers/specs/2026-08-23-mypocket-system-design.md) | accepted |
 | REQ-F-016 | Provide an installable five-destination PWA with quick add, transaction search, wallet views, Vietnamese copy, VND formatting, and a balance-privacy toggle. | High | [SRS](../../SRS.md) | accepted |
-| REQ-F-017 | Add voice capture and OpenAI-compatible transcription only after the initial seven phases are delivered and verified. | Low | [SPEC](SPEC.md) | deferred |
+| REQ-F-017 | Add voice capture and OpenAI-compatible transcription only after post-M1 draft infrastructure is delivered and verified. | Low | [SPEC](SPEC.md) | deferred |
 
 ## Non-Functional Requirements
 
