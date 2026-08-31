@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-011
-status: ready
+status: in_review
 owner: human
 priority: high
 lane: high-risk
@@ -20,7 +20,7 @@ trace:
 
 ## Status
 
-- Status: ready
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-004
@@ -31,11 +31,11 @@ Users need budget periods and threshold notices that match confirmed spending in
 
 ## Acceptance Criteria
 
-- [ ] Budget CRUD supports weekly, monthly, quarterly, yearly, and custom periods.
-- [ ] Budget scopes can cover all expense categories or selected categories owned/available to the user.
-- [ ] Progress uses confirmed non-archived expenses and excludes transfers, adjustments, and report-excluded transactions.
-- [ ] 80% and 100% notices are deduplicated by budget, threshold, and period.
-- [ ] Mobile budget screens show progress, period status, empty/error/offline states, and create/edit/archive flows.
+- [x] Budget CRUD supports weekly, monthly, quarterly, yearly, and custom periods.
+- [x] Budget scopes can cover all expense categories or selected categories owned/available to the user.
+- [x] Progress uses confirmed non-archived expenses and excludes transfers, adjustments, and report-excluded transactions.
+- [x] 80% and 100% notices are deduplicated by budget, threshold, and period.
+- [x] Mobile budget screens show progress, period status, empty/error/offline states, and create/edit/archive flows.
 
 ## Small Task Exemption
 
@@ -51,6 +51,14 @@ Users need budget periods and threshold notices that match confirmed spending in
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Ready for implementation; no execution evidence claimed.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/planning ./internal/platform/httpapi -count=1` from `backend/`
+- Result: passed 2026-08-31
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` from `backend/`
+- Result: passed 2026-08-31
+- Command: `rtk npm test -- --run` from `frontend/`
+- Result: passed 2026-08-31, 4 files / 29 tests
+- Command: `rtk npm run build` from `frontend/`
+- Result: passed 2026-08-31
+- Command: `rtk npm run test:e2e -- planning-automation.spec.ts` from `frontend/`
+- Result: passed 2026-08-31, 1 mobile test
+- Notes: Budget CRUD, category scope validation, Ho Chi Minh period boundaries, progress formula exclusions, 80/100 threshold dedupe, and mobile budget create/edit/archive are implemented and covered by automated proof. UAT remains pending.

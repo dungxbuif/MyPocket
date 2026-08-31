@@ -32,11 +32,11 @@ updated: 2026-08-31
 
 ## Current Status
 
-- Status: PHASE-002 finance core is in review after automated implementation proof. PHASE-003 offline synchronization is in review: TICKET-008, TICKET-009, and TICKET-010 have automated proof. TICKET-008 covers frontend IndexedDB mirror/outbox, cached hydration, cached-auth offline reload, wallet/category/transaction queue primitives, localStorage migration/quarantine, durable sequence, degraded read-only UI, and mobile PWA shell offline reload. TICKET-009 covers backend sync migration/API, idempotent replay, user-scoped change feed, authoritative resync, stale-version conflict responses, frontend sync API drain, and mobile reconnect-once E2E. TICKET-010 covers conflict persistence, non-blocking mobile inbox, keep-server/discard-local/edit-and-retry actions, full resync preservation, and mobile conflict E2E. Human scope decision on 2026-08-31 caps the current M1 release at TICKET-017; TICKET-018 through TICKET-025 move to M2/post-M1 work.
+- Status: PHASE-002 finance core and PHASE-003 offline synchronization are in review after automated implementation proof. PHASE-004 planning and automation is in progress: TICKET-011 budgets and threshold alerts are in review with planning migration, authenticated budget API, Ho Chi Minh period progress, selected/all-category scopes, 80%/100% alert dedupe, frontend unit proof, and mobile budget CRUD E2E. Human scope decision on 2026-08-31 caps the current M1 release at TICKET-017; TICKET-018 through TICKET-025 move to M2/post-M1 work.
 - Active backlog: [BL-004](work/BACKLOG.md)
-- Current queue focus: implement TICKET-011 budgets and threshold alerts.
-- Active phase: [PHASE-004 Planning and Automation](work/phases/PHASE-004-planning-automation.md), status `ready`.
-- Active ticket: [TICKET-011](work/tickets/TICKET-011-budgets-threshold-alerts.md), status `ready`.
+- Current queue focus: implement TICKET-012 events, debts, and repayments.
+- Active phase: [PHASE-004 Planning and Automation](work/phases/PHASE-004-planning-automation.md), status `in_progress`.
+- Active ticket: [TICKET-012](work/tickets/TICKET-012-events-debts-repayments.md), status `ready`.
 - Active bug: None.
 
 ## Current Focus
@@ -129,6 +129,11 @@ Execute PHASE-004 planning and automation after PHASE-003 reached review.
 - `frontend/src/offline/syncApi.ts`
 - `frontend/src/offline/conflicts.ts`
 - `frontend/src/offline/conflicts.test.ts`
+- `backend/internal/planning/`
+- `backend/internal/platform/httpapi/planning.go`
+- `backend/migrations/0004_phase004_planning_budgets.sql`
+- `frontend/src/app/planning.ts`
+- `frontend/e2e/planning-automation.spec.ts`
 
 ## Recent Decisions
 
@@ -148,17 +153,18 @@ Execute PHASE-004 planning and automation after PHASE-003 reached review.
 - Offline reload for authenticated cached data now uses the last successful `/api/v1/me` envelope only when `navigator.onLine` is false; logout clears both this cached user and IndexedDB offline stores.
 - TICKET-009 preserves client UUIDs for offline-created wallets, categories, and transactions so optimistic IndexedDB rows reconcile to the same authoritative IDs after reconnect.
 - TICKET-010 keeps conflict review local to the PWA for M1: conflict responses are persisted in IndexedDB, the failed mutation remains recoverable until the user chooses an action, keep-server/discard-local remove the pending local intent, edit-and-retry queues a replacement mutation against the authoritative server version, and full resync refreshes the finance mirror without clearing recoverable outbox items.
+- TICKET-011 implements budgets as online-authenticated planning records; web/PWA can view progress, but create/edit/archive requires online API access. Threshold notices are deduped in `budget_alerts` by `(budget_id, threshold, period_start)`.
 
 ## Queue Summary
 
 - BL-001 through BL-005 comprise the current M1 release in dependency order.
 - BL-008 is deferred voice input.
 - BL-006 and BL-007 are deferred to M2 after TICKET-017; BL-008 is deferred after M2.
-- PHASE-001, PHASE-002, and PHASE-003 have automated implementation proof pending human review. PHASE-004 is now the active M1 implementation phase; PHASE-005 remains planned and ready after PHASE-004.
+- PHASE-001, PHASE-002, and PHASE-003 have automated implementation proof pending human review. PHASE-004 is in progress with TICKET-011 in review; PHASE-005 remains planned and ready after PHASE-004.
 
 ## Next Steps
 
-1. Execute PHASE-004 TICKET-011 through TICKET-014, starting with TICKET-011 budgets and threshold alerts.
+1. Execute PHASE-004 TICKET-012 events, debts, and repayments.
 2. Execute PHASE-005 TICKET-015 through TICKET-017 for the current M1 release.
 3. Review PHASE-002 and PHASE-003 with the user/UAT criteria and mark verified if accepted.
 4. Keep TICKET-018 through TICKET-025 out of M1 until the user promotes M2.

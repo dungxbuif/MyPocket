@@ -7,9 +7,11 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"time"
 
 	"mypocket/internal/finance"
 	"mypocket/internal/identity"
+	"mypocket/internal/planning"
 	"mypocket/internal/platform/config"
 	mysync "mypocket/internal/sync"
 )
@@ -18,6 +20,7 @@ type Dependencies struct {
 	ReadyCheck         func() error
 	IdentityRepository IdentityRepository
 	FinanceRepository  FinanceRepository
+	PlanningRepository PlanningRepository
 	SyncService        SyncService
 }
 
@@ -33,6 +36,8 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/categories/", categoryByID(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/transactions", transactions(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/transactions/", transactionByID(cfg, deps.FinanceRepository))
+	mux.HandleFunc("/api/v1/budgets", budgets(cfg, deps.PlanningRepository))
+	mux.HandleFunc("/api/v1/budgets/", budgetByID(cfg, deps.PlanningRepository))
 	mux.HandleFunc("/api/v1/sync/mutations", syncMutations(cfg, deps.SyncService))
 	mux.HandleFunc("/api/v1/sync/changes", syncChanges(cfg, deps.SyncService))
 	mux.HandleFunc("/api/v1/sync/resync", syncResync(cfg, deps.SyncService))
@@ -86,6 +91,13 @@ type SyncService interface {
 	ApplyMutations(ctx context.Context, userID string, mutations []mysync.Mutation) ([]mysync.MutationResult, error)
 	Changes(ctx context.Context, userID string, after int64, limit int) (mysync.ChangesResult, error)
 	Resync(ctx context.Context, userID string) (mysync.Snapshot, error)
+}
+
+type PlanningRepository interface {
+	ListBudgetProgress(ctx context.Context, userID string, now time.Time) ([]planning.BudgetProgress, error)
+	CreateBudget(ctx context.Context, userID string, input planning.CreateBudgetInput) (planning.Budget, error)
+	UpdateBudget(ctx context.Context, userID string, budgetID string, input planning.UpdateBudgetInput) (planning.Budget, error)
+	ArchiveBudget(ctx context.Context, userID string, budgetID string) error
 }
 
 func correlationMiddleware(next http.Handler) http.Handler {

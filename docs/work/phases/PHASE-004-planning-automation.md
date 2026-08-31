@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-004
-status: ready
+status: in_progress
 owner: human
 priority: High
 human_fields:
@@ -46,7 +46,7 @@ trace:
 ## Status
 
 - ID: PHASE-004
-- Status: ready
+- Status: in_progress
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
@@ -86,7 +86,7 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-011 | Ticket | Budgets and threshold alerts | ready | [TICKET-011](../tickets/TICKET-011-budgets-threshold-alerts.md) |
+| TICKET-011 | Ticket | Budgets and threshold alerts | in_review | [TICKET-011](../tickets/TICKET-011-budgets-threshold-alerts.md) |
 | TICKET-012 | Ticket | Events, debts, and repayments | ready | [TICKET-012](../tickets/TICKET-012-events-debts-repayments.md) |
 | TICKET-013 | Ticket | Recurring schedules and worker occurrences | ready | [TICKET-013](../tickets/TICKET-013-recurring-schedules-worker.md) |
 | TICKET-014 | Ticket | In-app inbox and Web Push | ready | [TICKET-014](../tickets/TICKET-014-inbox-web-push.md) |
@@ -130,4 +130,4 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 
 ## Completion Summary
 
-No implementation has started. PHASE-004 is ready for execution after dependencies using [2026-08-30-phase-004-planning-automation.md](../../superpowers/plans/2026-08-30-phase-004-planning-automation.md).
+TICKET-011 budgets and threshold alerts are in review with automated backend, frontend, and mobile E2E proof. Remaining PHASE-004 work is TICKET-012 events/debts/repayments, TICKET-013 recurring schedules/worker occurrences, and TICKET-014 in-app inbox/Web Push.

@@ -36,7 +36,8 @@ updated: 2026-08-31
 | `/receipts/uploads`, `/receipts/{id}` | REST/object | User | planned | Presigned upload and private metadata |
 | `POST /sync/mutations`, `GET /sync/changes`, `POST /sync/resync` | Sync | User | implemented | Idempotent batches, per-user cursors, versions, tombstones, and authoritative resync snapshots |
 | `/sync/conflicts` | REST collection | User | planned | Optional server-backed conflict collection; current PHASE-003 conflict review is persisted client-side from sync mutation results |
-| `/budgets`, `/events`, `/recurring-schedules`, `/debts` | REST collection | User | planned | Planning and automation |
+| `GET /budgets`, `POST /budgets`, `PATCH /budgets/{id}`, `POST /budgets/{id}/archive` | REST/command | User | implemented | Budget CRUD, selected/all expense category scopes, Ho Chi Minh period progress, and 80%/100% alert dedupe |
+| `/events`, `/recurring-schedules`, `/debts` | REST collection | User | planned | Remaining planning and automation |
 | `/analytics/*` | Query REST | User | planned | Dashboard, categories, periods, trends |
 | `/ai/conversations`, `/ai/conversations/{id}/messages` | REST collection | User | planned | Text and multimodal chat |
 | `POST /receipts/{id}/extract` | Command | User | planned | External OCR path from add transaction |
@@ -292,6 +293,55 @@ Headers:
 - `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
 
 Response status: `200 OK`; body contains `snapshot.wallets`, `snapshot.categories`, `snapshot.transactions`, and `snapshot.next_cursor` from authoritative PostgreSQL state.
+
+### `GET /api/v1/budgets`
+
+Returns authenticated-user active budgets with current period progress computed in `Asia/Ho_Chi_Minh`.
+
+```json
+{
+  "status": "ok",
+  "budgets": [
+    {
+      "budget": {
+        "id": "uuid",
+        "name": "Ăn uống",
+        "period_type": "monthly",
+        "amount_vnd": 500000,
+        "category_ids": ["uuid"],
+        "all_categories": false,
+        "version": 1
+      },
+      "period_start": "2026-08-01",
+      "period_end": "2026-08-31",
+      "spent_vnd": 410000,
+      "remaining_vnd": 90000,
+      "percent": 82,
+      "alert_80": true,
+      "alert_100": false
+    }
+  ],
+  "correlation_id": "req_..."
+}
+```
+
+### `POST /api/v1/budgets`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request fields: `name`, `period_type` (`weekly`, `monthly`, `quarterly`, `yearly`, or `custom`), `amount_vnd`, optional `category_ids`, and `custom_start`/`custom_end` as `YYYY-MM-DD` for custom periods. Empty `category_ids` means all expense categories.
+
+Response status: `201 Created`.
+
+### `PATCH /api/v1/budgets/{id}`
+
+Same JSON shape as create. Mutations are scoped to the authenticated owner and return `403 FORBIDDEN` for another user's budget or category scope.
+
+### `POST /api/v1/budgets/{id}/archive`
+
+Archives the budget for the authenticated owner. Archived budgets are hidden from `GET /api/v1/budgets`.
 
 ## Transaction Schemas
 

@@ -49,6 +49,15 @@ import {
   type WalletSummary,
   type WalletType,
 } from "./finance";
+import {
+  archiveBudget,
+  createBudget,
+  loadBudgets,
+  updateBudget,
+  type BudgetInput,
+  type BudgetPeriodType,
+  type BudgetProgress,
+} from "./planning";
 import { drainOutbox, readOutbox } from "./outbox";
 import type { OfflineConflict } from "../offline/types";
 
@@ -71,6 +80,9 @@ export function App() {
   const [wallets, setWallets] = useState<WalletSummary[] | null>(null);
   const [categories, setCategories] = useState<CategorySummary[] | null>(null);
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
+  const [budgets, setBudgets] = useState<BudgetProgress[] | null>(null);
+  const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
+  const [editingBudget, setEditingBudget] = useState<BudgetProgress | null>(null);
   const [offlineStatus, setOfflineStatus] = useState<{ mode: "ready" | "degraded"; pending: number; reason?: string }>({ mode: "ready", pending: 0 });
   const [conflicts, setConflicts] = useState<OfflineConflict[]>([]);
   const offlineReadOnly = !online && offlineStatus.mode === "degraded";
@@ -92,6 +104,7 @@ export function App() {
       setWallets(null);
       setCategories(null);
       setTransactions(null);
+      setBudgets(null);
       setConflicts([]);
       return;
     }
@@ -128,15 +141,17 @@ export function App() {
     setWallets(null);
     setCategories(null);
     setTransactions(null);
+    setBudgets(null);
     setConflicts([]);
     setOfflineStatus({ mode: "ready", pending: 0 });
     setActiveTab("overview");
   }
 
   async function refreshFinanceData() {
-    const [nextWallets, nextCategories, nextTransactions] = await Promise.all([loadWallets(), loadCategories(), loadTransactions()]);
+    const [nextWallets, nextCategories, nextTransactions, nextBudgets] = await Promise.all([loadWallets(), loadCategories(), loadTransactions(), loadBudgets()]);
     setWallets(nextWallets);
     setCategories(nextCategories);
+    setBudgets(nextBudgets);
     await saveFinanceMirror({ wallets: nextWallets, categories: nextCategories, transactions: nextTransactions });
     const queued = await readOutbox();
     setOfflineStatus((current) => ({ ...current, pending: queued.length }));
@@ -218,7 +233,7 @@ export function App() {
         {authState.status === "forbidden" ? <ForbiddenState authState={authState} onLogout={handleLogout} /> : null}
         {authState.status !== "forbidden" && activeTab === "overview" ? <Overview wallets={wallets} onManageWallets={() => setWalletSheetOpen(true)} /> : null}
         {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions transactions={transactions ?? []} onEdit={setEditingTransaction} /> : null}
-        {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets /> : null}
+        {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets budgets={budgets} categories={categories ?? []} online={online} onCreate={() => setBudgetSheetOpen(true)} onEdit={setEditingBudget} /> : null}
         {authState.status !== "forbidden" && activeTab === "account" ? <Account authState={authState} onLogout={handleLogout} /> : null}
       </main>
 
@@ -237,6 +252,8 @@ export function App() {
       {sheetOpen ? <AddTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} onCreated={upsertTransaction} onClose={() => setSheetOpen(false)} /> : null}
       {walletSheetOpen ? <WalletManagerSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} onWalletChanged={(wallet) => setWallets((current) => [wallet, ...(current ?? []).filter((item) => item.id !== wallet.id)])} onWalletArchived={(walletID) => setWallets((current) => (current ?? []).filter((item) => item.id !== walletID))} onCategoryChanged={(category) => setCategories((current) => [category, ...(current ?? []).filter((item) => item.id !== category.id)])} onCategoryArchived={(categoryID) => setCategories((current) => (current ?? []).filter((item) => item.id !== categoryID))} onChanged={() => void reconcileAfterLocalChange().catch(() => undefined)} onClose={() => setWalletSheetOpen(false)} /> : null}
       {editingTransaction ? <EditTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} transaction={editingTransaction} onChanged={upsertTransaction} onArchived={() => { setTransactions((current) => (current ?? []).filter((item) => item.id !== editingTransaction.id)); setEditingTransaction(null); void reconcileAfterLocalChange().catch(() => undefined); }} onClose={() => setEditingTransaction(null)} /> : null}
+      {budgetSheetOpen ? <BudgetSheet categories={categories ?? []} onSaved={() => { setBudgetSheetOpen(false); void refreshFinanceData(); }} onClose={() => setBudgetSheetOpen(false)} /> : null}
+      {editingBudget ? <BudgetSheet budget={editingBudget} categories={categories ?? []} onSaved={() => { setEditingBudget(null); void refreshFinanceData(); }} onArchived={() => { setEditingBudget(null); void refreshFinanceData(); }} onClose={() => setEditingBudget(null)} /> : null}
     </div>
   );
 }
@@ -400,22 +417,106 @@ function Transactions({ transactions, onEdit }: { transactions: Transaction[]; o
   );
 }
 
-function Budgets() {
+function Budgets({ budgets, categories, online, onCreate, onEdit }: { budgets: BudgetProgress[] | null; categories: CategorySummary[]; online: boolean; onCreate: () => void; onEdit: (budget: BudgetProgress) => void }) {
+  const rows = budgets ?? [];
+  const totalBudget = rows.reduce((total, item) => total + item.budget.amount_vnd, 0);
+  const totalSpent = rows.reduce((total, item) => total + item.spent_vnd, 0);
+  const daysLeft = rows[0] ? Math.max(0, Math.ceil((new Date(rows[0].period_end).getTime() - Date.now()) / 86400000)) : 0;
   return (
     <section className="content-stack">
       <div className="sub-header">
-        <h1>Ngân sách Đang áp dụng</h1>
-        <button className="pill-button" type="button">🌐</button>
+        <h1>Ngân sách</h1>
+        <button className="pill-button" type="button" disabled={!online} onClick={onCreate}>Tạo</button>
       </div>
       <section className="card budget-hero">
-        <p>Tháng này</p>
-        <strong>45.075.000 đ</strong>
-        <div className="budget-stats"><span>65 M đ<br />Tổng ngân sách</span><span>19,92 M đ<br />Tổng đã chi</span><span>12 ngày<br />Đến cuối tháng</span></div>
-        <button className="primary-cta compact" type="button">Tạo Ngân sách</button>
+        <p>{rows[0] ? `${formatDate(rows[0].period_start)} - ${formatDate(rows[0].period_end)}` : "Kỳ hiện tại"}</p>
+        <strong>{formatVND(totalBudget)}</strong>
+        <div className="budget-stats"><span>{formatVND(totalBudget)}<br />Tổng ngân sách</span><span>{formatVND(totalSpent)}<br />Tổng đã chi</span><span>{daysLeft} ngày<br />Còn lại</span></div>
+        <button className="primary-cta compact" type="button" disabled={!online} onClick={onCreate}>Tạo Ngân sách</button>
       </section>
-      <BudgetRow name="Mua sắm" amount="8.000.000 đ" remaining="Còn lại 5.810.000 đ" progress={28} />
-      <BudgetRow name="Ăn uống" amount="5.000.000 đ" remaining="Còn lại 2.005.000 đ" progress={62} />
+      {!online ? <p className="offline-warning">Cần online để tạo hoặc sửa ngân sách. Dữ liệu đã tải vẫn có thể xem.</p> : null}
+      {rows.length === 0 ? <section className="card list-card"><p className="empty-state">Chưa có ngân sách</p></section> : rows.map((budget) => (
+        <BudgetRow key={budget.budget.id} item={budget} categories={categories} disabled={!online} onEdit={() => onEdit(budget)} />
+      ))}
     </section>
+  );
+}
+
+function BudgetSheet({ budget, categories, onSaved, onArchived, onClose }: { budget?: BudgetProgress; categories: CategorySummary[]; onSaved: () => void; onArchived?: () => void; onClose: () => void }) {
+  const editing = budget?.budget;
+  const [name, setName] = useState(editing?.name ?? "");
+  const [amount, setAmount] = useState(String(editing?.amount_vnd ?? ""));
+  const [periodType, setPeriodType] = useState<BudgetPeriodType>(editing?.period_type ?? "monthly");
+  const [allCategories, setAllCategories] = useState(editing?.all_categories ?? true);
+  const [categoryIDs, setCategoryIDs] = useState<string[]>(editing?.category_ids ?? []);
+  const [customStart, setCustomStart] = useState(editing?.custom_start ?? "");
+  const [customEnd, setCustomEnd] = useState(editing?.custom_end ?? "");
+  const [saving, setSaving] = useState(false);
+  const expenseCategories = categories.filter((category) => category.kind === "expense");
+  const canSave = name.trim() !== "" && Number(amount) > 0 && (periodType !== "custom" || Boolean(customStart && customEnd));
+  function toggleCategory(categoryID: string) {
+    setCategoryIDs((current) => current.includes(categoryID) ? current.filter((item) => item !== categoryID) : [...current, categoryID]);
+  }
+  function input(): BudgetInput {
+    return {
+      name,
+      period_type: periodType,
+      amount_vnd: Number(amount),
+      category_ids: allCategories ? [] : categoryIDs,
+      custom_start: periodType === "custom" ? customStart : undefined,
+      custom_end: periodType === "custom" ? customEnd : undefined,
+    };
+  }
+  async function save() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      if (editing) await updateBudget(editing.id, input());
+      else await createBudget(input());
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function archive() {
+    if (!editing || saving) return;
+    setSaving(true);
+    try {
+      await archiveBudget(editing.id);
+      onArchived?.();
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div className="sheet-backdrop">
+      <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label={editing ? "Sửa Ngân Sách" : "Tạo Ngân Sách"}>
+        <header>
+          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <h2>{editing ? "Sửa Ngân Sách" : "Tạo Ngân Sách"}</h2>
+          <span />
+        </header>
+        <label className="sheet-row"><List /><input aria-label="Tên ngân sách" value={name} onChange={(event) => setName(event.target.value)} placeholder="Tên ngân sách" /></label>
+        <label className="amount-row"><span>VND</span><input aria-label="Số tiền ngân sách" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
+        <label className="sheet-row"><CalendarDays /><select aria-label="Kỳ ngân sách" value={periodType} onChange={(event) => setPeriodType(event.target.value as BudgetPeriodType)}>{budgetPeriods.map((period) => <option key={period} value={period}>{budgetPeriodLabel(period)}</option>)}</select></label>
+        {periodType === "custom" ? (
+          <div className="manager-form two">
+            <input aria-label="Ngày bắt đầu" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} />
+            <input aria-label="Ngày kết thúc" type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} />
+          </div>
+        ) : null}
+        <button className={allCategories ? "toggle-row active" : "toggle-row"} type="button" onClick={() => setAllCategories((current) => !current)}>Tất cả nhóm chi<span /></button>
+        {!allCategories ? (
+          <div className="category-picker">
+            {expenseCategories.map((category) => <button className={categoryIDs.includes(category.id) ? "mini-toggle active" : "mini-toggle"} type="button" key={category.id} onClick={() => toggleCategory(category.id)}>{category.name}</button>)}
+          </div>
+        ) : null}
+        <div className="sheet-actions">
+          {editing ? <button className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</button> : null}
+          <button className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -710,8 +811,19 @@ function TransactionRow({ title, subtitle, amount, positive = false, onClick }: 
   return <button className="transaction-row" type="button" onClick={onClick}><span className="category-dot" /><div><strong>{title}</strong><p>{subtitle}</p></div><b className={positive ? "income" : "expense"}>{amount}</b><ChevronRight size={22} /></button>;
 }
 
-function BudgetRow({ name, amount, remaining, progress }: { name: string; amount: string; remaining: string; progress: number }) {
-  return <section className="card budget-row"><div><span className="category-dot" /><strong>{name}</strong></div><b>{amount}</b><p>{remaining}</p><span className="progress"><i style={{ width: `${progress}%` }} /></span></section>;
+function BudgetRow({ item, categories, disabled, onEdit }: { item: BudgetProgress; categories: CategorySummary[]; disabled: boolean; onEdit: () => void }) {
+  const categoryNames = item.budget.all_categories ? "Tất cả nhóm chi" : (item.budget.category_ids ?? []).map((id) => categories.find((category) => category.id === id)?.name ?? "Nhóm").join(", ");
+  const progress = Math.min(100, item.percent);
+  return (
+    <button className="card budget-row" type="button" disabled={disabled} onClick={onEdit}>
+      <div><span className="category-dot" /><strong>{item.budget.name}</strong></div>
+      <b>{formatVND(item.budget.amount_vnd)}</b>
+      <p>{categoryNames}</p>
+      <p>Đã chi {formatVND(item.spent_vnd)} · Còn {formatVND(item.remaining_vnd)}</p>
+      <span className="progress"><i style={{ width: `${progress}%` }} /></span>
+      {item.alert_100 ? <small className="budget-alert">Đã vượt 100%</small> : item.alert_80 ? <small className="budget-alert">Đã chạm 80%</small> : null}
+    </button>
+  );
 }
 
 function SheetRow({ icon, label, muted = false, green = false }: { icon: ReactNode; label: string; muted?: boolean; green?: boolean }) {
@@ -730,6 +842,10 @@ const sampleWallets: WalletSummary[] = [
 
 function formatVND(amount: number) {
   return `${new Intl.NumberFormat("vi-VN").format(amount)} đ`;
+}
+
+function formatDate(value: string) {
+  return new Date(`${value}T00:00:00+07:00`).toLocaleDateString("vi-VN");
 }
 
 function totalIncludedVND(wallets: WalletSummary[]) {
@@ -755,6 +871,22 @@ function walletIcon(type: WalletSummary["type"]) {
 }
 
 const walletTypes: WalletType[] = ["cash", "bank", "credit", "e_wallet", "savings", "debt"];
+const budgetPeriods: BudgetPeriodType[] = ["weekly", "monthly", "quarterly", "yearly", "custom"];
+
+function budgetPeriodLabel(period: BudgetPeriodType) {
+  switch (period) {
+    case "weekly":
+      return "Hàng tuần";
+    case "monthly":
+      return "Hàng tháng";
+    case "quarterly":
+      return "Hàng quý";
+    case "yearly":
+      return "Hàng năm";
+    case "custom":
+      return "Tùy chọn";
+  }
+}
 
 function buildTransactionInput({
   type,

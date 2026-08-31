@@ -65,7 +65,7 @@ describe("App shell", () => {
   });
 
   it("shows loaded categories in the add transaction sheet", async () => {
-    mockFetchRoutes({
+    const fetchMock = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
       "/api/v1/wallets": { wallets: [] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true, version: 1 }] },
@@ -74,6 +74,7 @@ describe("App shell", () => {
 
     render(<App />);
     await waitFor(() => expect(screen.queryByText("Đang kiểm tra phiên đăng nhập...")).not.toBeInTheDocument());
+    await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => new URL(String(input), "http://localhost").pathname === "/api/v1/categories")).toBe(true));
     await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
 
     expect(screen.getByText("Ăn uống API")).toBeInTheDocument();
@@ -277,6 +278,41 @@ describe("App shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Giữ server" }));
     await waitFor(() => expect(screen.queryByLabelText("Xung đột đồng bộ")).not.toBeInTheDocument());
   });
+
+  it("shows budget progress and creates a monthly budget", async () => {
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [] },
+      "/api/v1/budgets": {
+        budgets: [{
+          budget: { id: "budget_1", name: "Ăn uống", period_type: "monthly", amount_vnd: 500000, category_ids: ["cat_food"], all_categories: false, version: 1 },
+          period_start: "2026-08-01",
+          period_end: "2026-08-31",
+          spent_vnd: 410000,
+          remaining_vnd: 90000,
+          percent: 82,
+          alert_80: true,
+          alert_100: false,
+        }],
+      },
+    });
+
+    render(<App />);
+    await userEvent.click(await screen.findByLabelText("Ngân sách"));
+    expect((await screen.findAllByText("Ăn uống")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Đã chạm 80%")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Tạo", exact: true }));
+    await userEvent.type(await screen.findByLabelText("Tên ngân sách"), "Mua sắm");
+    await userEvent.type(screen.getByLabelText("Số tiền ngân sách"), "1200000");
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu" }).at(-1)!);
+
+    await waitFor(() => {
+      const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/budgets" && options?.method === "POST");
+      expect(createCall).toBeTruthy();
+    });
+  });
 });
 
 function mockNavigatorOnline(value: boolean) {
@@ -292,6 +328,9 @@ function mockFetchRoutes(routes: Record<string, unknown>) {
     const path = new URL(url, "http://localhost").pathname;
     if (routes[path]) {
       return jsonResponse(routes[path]);
+    }
+    if (path === "/api/v1/budgets") {
+      return jsonResponse({ budgets: [] });
     }
     if (options?.method && options.method !== "GET") {
       return jsonResponse({});

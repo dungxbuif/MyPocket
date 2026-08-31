@@ -45,6 +45,7 @@ shared_fields: [status]
 - Added the PHASE-003 frontend IndexedDB mirror/outbox foundation with legacy localStorage migration/quarantine, wallet/category/transaction offline mutation queueing, cached-auth offline reload, cached finance hydration, degraded read-only UI, and mobile PWA offline reload proof.
 - Added PHASE-003 sync API/change-feed support with PostgreSQL sync cursors/changes/mutation ledger, idempotent mutation replay, stale-version conflict responses, authoritative resync snapshots, frontend sync outbox drain, and mobile reconnect replay proof.
 - Added PHASE-003 conflict inbox and recovery support with IndexedDB conflict persistence, non-blocking mobile review UI, keep-server, discard-local, edit-and-retry, full resync preservation, and targeted mobile E2E proof.
+- Added PHASE-004 budget and threshold support with planning tables, authenticated budget API routes, Ho Chi Minh period progress, selected/all-category scopes, 80%/100% alert dedupe, and mobile create/edit/archive proof.
 
 ### Planning
 

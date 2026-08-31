@@ -564,7 +564,11 @@ button {
 
 .budget-row {
   position: relative;
+  display: block;
+  width: 100%;
+  border: 0;
   padding: 24px;
+  text-align: left;
 }
 
 .budget-row > div {
@@ -574,10 +578,16 @@ button {
 }
 
 .budget-row > b {
-  position: absolute;
-  top: 24px;
-  right: 24px;
+  display: block;
+  margin-top: 12px;
   font-size: 24px;
+}
+
+.budget-alert {
+  display: inline-block;
+  margin-top: 12px;
+  color: #ff8800;
+  font-weight: 900;
 }
 
 .progress {
@@ -850,8 +860,35 @@ button {
   grid-template-columns: 1fr 132px;
 }
 
+.manager-form.two {
+  grid-template-columns: 1fr 1fr;
+  margin: 12px 0;
+}
+
 .manager-form input {
   grid-column: 1 / -1;
+}
+
+.manager-form.two input {
+  grid-column: auto;
+}
+
+.category-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border-radius: 18px;
+  background: #ffffff;
+}
+
+.category-picker .mini-toggle {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  padding: 0 16px;
+  font-weight: 800;
 }
 
 .manager-form button,

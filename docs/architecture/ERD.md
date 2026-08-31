@@ -28,7 +28,9 @@ updated: 2026-08-31
 | `transactions` | Confirmed accounting event | User | Positive integer amount; type determines balance effect |
 | `transaction_drafts` | Reviewable proposal from manual automation/provider flow | User | Source and confirmation link; no accounting effect |
 | `receipt_objects` | Private object metadata | User | S3 key, checksum, size, content type |
-| `budgets` | Period category/all-category limits | User | 80%/100% threshold state |
+| `budgets` | Period category/all-category limits | User | Weekly/monthly/quarterly/yearly/custom periods; versioned/archiveable |
+| `budget_categories` | Selected expense category scope for a budget | User | Composite budget/category uniqueness |
+| `budget_alerts` | Durable 80%/100% budget threshold event | User | Unique budget/threshold/period dedupe |
 | `events` | Trip or event grouping | User | Optional transaction relationship |
 | `recurring_schedules` | Template and next occurrence | User | Worker emits deterministic drafts |
 | `debts` | Borrowed/lent obligation | User | Related repayment transactions |

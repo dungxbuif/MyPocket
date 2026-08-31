@@ -1,7 +1,7 @@
 ---
 artifact_type: test_verification
 id: PHASE-004-planning-automation
-status: planned
+status: in_progress
 owner: shared
 trace:
   backlog_item: BL-004
@@ -17,7 +17,7 @@ trace:
 
 ## Status
 
-- Status: planned
+- Status: in_progress
 - Owner: shared
 
 ## Planned Commands
@@ -32,6 +32,12 @@ trace:
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Planned proof only; no implementation evidence.
+| Command | Result | Coverage |
+| --- | --- | --- |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/planning ./internal/platform/httpapi -count=1` from `backend/` | Passed 2026-08-31 | Budget period windows, category ownership, progress formula exclusions, threshold dedupe, and authenticated budget API route scoping. |
+| `rtk npm test -- --run` from `frontend/` | Passed 2026-08-31, 4 files / 29 tests | Mobile budget progress rendering and budget create form behavior plus existing app/offline regressions. |
+| `rtk npm run build` from `frontend/` | Passed 2026-08-31 | Production PWA build with live budget client and screen. |
+| `rtk npm run test:e2e -- planning-automation.spec.ts` from `frontend/` | Passed 2026-08-31, 1 mobile test | Live API budget create/edit/archive, selected category scope, and 80% threshold display. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` from `backend/` | Passed 2026-08-31 | Full backend regression after TICKET-011 migration, planning package, API route, and dependency wiring. |
+
+Notes: TICKET-011 has automated proof and is in review. PHASE-004 remains in progress because TICKET-012 through TICKET-014 are not implemented yet.
