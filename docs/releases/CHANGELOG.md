@@ -47,13 +47,25 @@ shared_fields: [status]
 - Added PHASE-003 conflict inbox and recovery support with IndexedDB conflict persistence, non-blocking mobile review UI, keep-server, discard-local, edit-and-retry, full resync preservation, and targeted mobile E2E proof.
 - Added PHASE-004 budget and threshold support with planning tables, authenticated budget API routes, Ho Chi Minh period progress, selected/all-category scopes, 80%/100% alert dedupe, and mobile create/edit/archive proof.
 - Added PHASE-004 event and debt planning with event/obligation tables, authenticated API routes, event transaction links, repayment links with overpayment protection, mobile Vietnamese planning screens, and live mobile E2E proof.
+- Added PHASE-004 recurring schedules with deterministic occurrence keys, transaction draft generation, worker lease processing, authenticated schedule/draft APIs, mobile schedule setup, and pending draft review rows.
+- Added TICKET-027 Wave 1 backend portfolio schema and domain repository for user-owned asset positions, ordered buy/sell trades, append-only manual/provider price history, moving-average cost, realized/unrealized P&L, archive retention, and wallet-accounting isolation.
+- Added login email allowlisting through `ALLOWED_LOGIN_EMAILS`, plus asset portfolio REST routes, dashboard investment/combined net-worth fields, Account-tab asset UI, IndexedDB asset cache/outbox, sync replay for asset mutations, and a static-price provider worker path for automatic valuation UAT.
+- Added TICKET-028 production-hardening foundations: structured API/worker logging, safe panic recovery, PostgreSQL audit events, hidden audit event API, audit retention worker, Account-tab user-managed API keys for AI agents/third-party callers, Redis-backed auth cache with DB fallback and revoke invalidation, and production config validation for audit/API-key/cache secrets.
+- Extended TICKET-028 with whitelist-only audit access checking and Account audit-log UI, user-scoped receipt uploads/downloads via S3-compatible presigned URLs, transaction receipt attachment, and IndexedDB offline receipt retry. OCR remains deferred.
 
 ### Planning
 
+- Approved TICKET-027 immediately after TICKET-017 with hybrid automatic/manual pricing, moving-average buy/sell accounting, separate wallet/investment/combined totals, offline manual mutations, an accepted wallet/portfolio boundary ADR, executable plan, and verification target; implementation is now in review pending human UAT.
 - Approved executable detail designs for PHASE-003 through PHASE-007 and extended the shared mobile component design contract through the originally planned release scope.
 - Approved and recorded the MyPocket React PWA and Go modular-monolith system design.
 - Migrated the source SRS into Harness requirements, user stories, architecture, API, ERD, integrations, SDD, ADRs, roadmap, eight phases, backlog, traceability, and validation planning.
 - Redefined the current M1 release to stop after TICKET-017; TICKET-018 through TICKET-025 are deferred to M2/post-M1 work, and voice input moves after that.
+- Added durable notification inbox/Web Push subscription lifecycle, search and wallet detail APIs, authoritative dashboard totals, and normalized analytics reports through TICKET-017.
+- Replaced the hardcoded Money Insider Home card and subscription CTAs with an authenticated report for the most frequent expense category, real spending, elapsed-day average, prior-month comparison, privacy masking, empty state, and refresh action.
+- Refined the mobile wallet experience with a compact Money Lover-style wallet sheet, create-wallet entry flow, main-page wallet-only card, liquid-glass navigation/sheets, and transparent scrollbars.
+- Added Tailwind CSS v4 through the Vite plugin and introduced reusable frontend base primitives for cards, pills, icon buttons, sheets, section titles, and class composition.
+- Fixed blank-page runtime crashes from extension-scheme cache requests and malformed authenticated-user payloads.
+- Added configurable Google OAuth authorization-code exchange with state-cookie validation and Google userinfo provisioning; fixture mode remains available for local tests.
 - Recorded full offline conflict review, review-first AI/OCR/webhook ingestion, Google OAuth without server sessions, and restricted 180-day-default audit logging.
 - Created PHASE-001 ticket artifacts, detail design, and executable implementation plan focused on the first deployable PWA/mobile shell, platform, identity, and offline app-shell cache slice.
 - Created PHASE-002 finance-core tickets, detail design, and executable implementation plan for wallet/category, transaction accounting, and Vietnamese seed/receipt metadata slices.

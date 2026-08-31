@@ -13,10 +13,11 @@ describe("App shell", () => {
     vi.restoreAllMocks();
   });
 
-  it("renders mobile navigation destinations without finance data", () => {
+  it("renders mobile navigation destinations without finance data", async () => {
+    mockFetchRoutes({ "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } } });
     render(<App />);
 
-    expect(screen.getByRole("navigation")).toBeInTheDocument();
+    expect(await screen.findByRole("navigation")).toBeInTheDocument();
     expect(screen.getByLabelText("Tổng quan")).toBeInTheDocument();
     expect(screen.getByLabelText("Sổ giao dịch")).toBeInTheDocument();
     expect(screen.getByLabelText("Thêm giao dịch")).toBeInTheDocument();
@@ -24,22 +25,47 @@ describe("App shell", () => {
     expect(screen.getByLabelText("Tài khoản")).toBeInTheDocument();
   });
 
-  it("shows offline state when the browser is offline", () => {
+  it("shows offline state when the browser is offline", async () => {
     mockNavigatorOnline(false);
+    localStorage.setItem("mypocket.current-user.v1", JSON.stringify({ id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" }));
 
     render(<App />);
 
-    expect(screen.getByText("Offline")).toBeInTheDocument();
+    expect(await screen.findByText("Offline")).toBeInTheDocument();
   });
 
   it("opens the transaction add sheet from the raised add action", async () => {
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [] },
+    });
     render(<App />);
 
-    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+    expect(await screen.findByText("Ví API")).toBeInTheDocument();
+    await userEvent.click(await screen.findByLabelText("Thêm giao dịch"));
 
     expect(screen.getByRole("dialog", { name: "Thêm Giao Dịch" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Khoản chi" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Khoản thu" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Vay/nợ" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Chuyển" })).not.toBeInTheDocument();
     expect(screen.getByText("Chọn nhóm")).toBeInTheDocument();
     expect(screen.getByText("Thêm Hình Ảnh")).toBeInTheDocument();
+  });
+
+  it("blocks quick add until at least one wallet exists", async () => {
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [] },
+      "/api/v1/categories": { categories: [] },
+      "/api/v1/transactions": { transactions: [] },
+    });
+    render(<App />);
+
+    expect(await screen.findByLabelText("Thêm giao dịch")).toBeDisabled();
+    expect(screen.queryByRole("dialog", { name: "Thêm Giao Dịch" })).not.toBeInTheDocument();
   });
 
   it("renders authenticated wallet data from the finance API", async () => {
@@ -59,7 +85,9 @@ describe("App shell", () => {
 
     expect(await screen.findByText("Ví API")).toBeInTheDocument();
     expect(screen.getByText("Tiết kiệm API")).toBeInTheDocument();
-    expect(screen.getAllByText("1.234.567 đ")).toHaveLength(2);
+    expect(screen.getAllByText("1.234.567 đ")).toHaveLength(1);
+    expect(screen.queryByText("Tổng hiển thị")).not.toBeInTheDocument();
+    expect(screen.queryByText("Thu nhập ròng")).not.toBeInTheDocument();
     expect(screen.getByText("1.000.000 đ")).toBeInTheDocument();
     expect(screen.queryByText("Techcombank")).not.toBeInTheDocument();
   });
@@ -67,7 +95,7 @@ describe("App shell", () => {
   it("shows loaded categories in the add transaction sheet", async () => {
     const fetchMock = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
@@ -75,7 +103,8 @@ describe("App shell", () => {
     render(<App />);
     await waitFor(() => expect(screen.queryByText("Đang kiểm tra phiên đăng nhập...")).not.toBeInTheDocument());
     await waitFor(() => expect(fetchMock.mock.calls.some(([input]) => new URL(String(input), "http://localhost").pathname === "/api/v1/categories")).toBe(true));
-    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+    expect(await screen.findByText("Ví API")).toBeInTheDocument();
+    await userEvent.click(await screen.findByLabelText("Thêm giao dịch"));
 
     expect(screen.getByText("Ăn uống API")).toBeInTheDocument();
   });
@@ -111,7 +140,7 @@ describe("App shell", () => {
     expect(await screen.findByText("Ví cached")).toBeInTheDocument();
     await userEvent.click(screen.getByLabelText("Sổ giao dịch"));
     expect(await screen.findByText("Cached lunch")).toBeInTheDocument();
-    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+    await userEvent.click(await screen.findByLabelText("Thêm giao dịch"));
     await userEvent.type(await screen.findByLabelText("Số tiền"), "33000");
     await userEvent.type(screen.getByLabelText("Ghi chú"), "Offline dinner");
     await userEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0]);
@@ -142,7 +171,7 @@ describe("App shell", () => {
     expect(await screen.findByText("Ví reload")).toBeInTheDocument();
     await userEvent.click(screen.getByLabelText("Sổ giao dịch"));
     expect(await screen.findByText("Online cached")).toBeInTheDocument();
-    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+    await userEvent.click(await screen.findByLabelText("Thêm giao dịch"));
     await userEvent.type(await screen.findByLabelText("Số tiền"), "44000");
     await userEvent.type(screen.getByLabelText("Ghi chú"), "Reload pending");
     await userEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0]);
@@ -162,11 +191,8 @@ describe("App shell", () => {
 
     render(<App />);
 
-    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
-
     expect(await screen.findByText("Chỉ đọc offline")).toBeInTheDocument();
-    expect(screen.getByText("Offline storage chưa sẵn sàng. Mở mạng lại để lưu giao dịch.")).toBeInTheDocument();
-    expect(screen.getAllByRole("button", { name: "Lưu" })[0]).toBeDisabled();
+    expect(screen.getByLabelText("Thêm giao dịch")).toBeDisabled();
   });
 
   it("creates an expense from the add sheet", async () => {
@@ -186,7 +212,7 @@ describe("App shell", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
-    await userEvent.click(screen.getByLabelText("Thêm giao dịch"));
+    await userEvent.click(await screen.findByLabelText("Thêm giao dịch"));
     await userEvent.type(await screen.findByLabelText("Số tiền"), "50000");
     await userEvent.type(screen.getByLabelText("Ghi chú"), "Ăn sáng");
     await userEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0]);
@@ -204,6 +230,7 @@ describe("App shell", () => {
 
     render(<App />);
     await userEvent.click(await screen.findByRole("button", { name: "Xem tất cả" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Sửa" }));
     await userEvent.clear(await screen.findByLabelText("Tên ví Ví API"));
     await userEvent.type(screen.getByLabelText("Tên ví Ví API"), "Ví chính");
     await userEvent.click(screen.getAllByRole("button", { name: "Lưu" })[0]);
@@ -299,6 +326,8 @@ describe("App shell", () => {
       },
       "/api/v1/events": { events: [] },
       "/api/v1/obligations": { obligations: [] },
+      "/api/v1/recurring-schedules": { schedules: [] },
+      "/api/v1/transaction-drafts": { drafts: [] },
     });
 
     render(<App />);
@@ -325,6 +354,8 @@ describe("App shell", () => {
       "/api/v1/budgets": { budgets: [] },
       "/api/v1/events": { events: [{ id: "event_1", name: "Đà Lạt", starts_on: "2026-08-31", ends_on: "2026-09-02", note: "Trip", total_vnd: 125000, transaction_count: 1, version: 1 }] },
       "/api/v1/obligations": { obligations: [{ id: "debt_1", direction: "borrowed", principal_vnd: 1000000, counterparty: "Anh Minh", due_on: "2026-09-30", note: "Vay sửa nhà", repaid_vnd: 600000, remaining_vnd: 400000, version: 1 }] },
+      "/api/v1/recurring-schedules": { schedules: [{ id: "schedule_1", name: "Tiền nhà", frequency: "monthly", timezone: "Asia/Ho_Chi_Minh", starts_at: "2026-08-01T02:00:00Z", next_occurs_at: "2026-09-01T02:00:00Z", type: "expense", source_wallet_id: "wallet_1", category_id: "cat_food", amount_vnd: 3500000, note: "Thuê nhà", version: 1 }] },
+      "/api/v1/transaction-drafts": { drafts: [{ id: "draft_1", schedule_id: "schedule_1", occurrence_key: "recurring:schedule_1:2026-08-01T02:00:00Z", type: "expense", source_wallet_id: "wallet_1", category_id: "cat_food", amount_vnd: 3500000, occurred_at: "2026-08-01T02:00:00Z", note: "Thuê nhà", status: "pending", version: 1 }] },
     });
 
     render(<App />);
@@ -333,6 +364,8 @@ describe("App shell", () => {
     expect(screen.getByText("Đã dùng 125.000 đ · 1 giao dịch")).toBeInTheDocument();
     expect(screen.getByText("Anh Minh")).toBeInTheDocument();
     expect(screen.getByText("Còn 400.000 đ")).toBeInTheDocument();
+    expect(screen.getByText("Tiền nhà")).toBeInTheDocument();
+    expect(screen.getByText("3.500.000 đ · Chờ duyệt")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Tạo sự kiện" }));
     await userEvent.type(await screen.findByLabelText("Tên sự kiện"), "Du lịch Huế");
     await userEvent.click(screen.getAllByRole("button", { name: "Lưu", exact: true }).at(-1)!);
@@ -341,6 +374,51 @@ describe("App shell", () => {
       const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/events" && options?.method === "POST");
       expect(createCall).toBeTruthy();
     });
+  });
+
+  it("creates a recurring schedule from the planning tab", async () => {
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_1", name: "Ví chính", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [] },
+      "/api/v1/budgets": { budgets: [] },
+      "/api/v1/events": { events: [] },
+      "/api/v1/obligations": { obligations: [] },
+      "/api/v1/recurring-schedules": { schedules: [] },
+      "/api/v1/transaction-drafts": { drafts: [] },
+    });
+
+    render(<App />);
+    await userEvent.click(await screen.findByLabelText("Ngân sách"));
+    await userEvent.click(screen.getByRole("button", { name: "Tạo lịch" }));
+    await userEvent.type(await screen.findByLabelText("Tên lịch lặp"), "Tiền nhà");
+    await userEvent.type(screen.getByLabelText("Số tiền lịch lặp"), "3500000");
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu", exact: true }).at(-1)!);
+
+    await waitFor(() => {
+      const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/recurring-schedules" && options?.method === "POST");
+      expect(createCall).toBeTruthy();
+    });
+  });
+
+  it("shows docs link in the Account tab", async () => {
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [] },
+      "/api/v1/categories": { categories: [] },
+      "/api/v1/transactions": { transactions: [] },
+      "/api/v1/assets": { assets: [] },
+      "/api/v1/portfolio/summary": { summary: { investment_market_value_vnd: 0, missing_price_count: 0, position_count: 0 } },
+      "/api/v1/api-keys": { keys: [] },
+    });
+    render(<App />);
+    await userEvent.click(await screen.findByLabelText("Tài khoản"));
+    expect(screen.getByText("Tài liệu")).toBeInTheDocument();
+    expect(screen.getByText("Sơ đồ CSDL và tài liệu API")).toBeInTheDocument();
+    const link = screen.getByRole("link", { name: /tài liệu/i });
+    expect(link).toHaveAttribute("href", "/docs/");
+    expect(link).toHaveAttribute("target", "_blank");
   });
 });
 
@@ -366,6 +444,12 @@ function mockFetchRoutes(routes: Record<string, unknown>) {
     }
     if (path === "/api/v1/obligations") {
       return jsonResponse({ obligations: [] });
+    }
+    if (path === "/api/v1/recurring-schedules") {
+      return jsonResponse({ schedules: [] });
+    }
+    if (path === "/api/v1/transaction-drafts") {
+      return jsonResponse({ drafts: [] });
     }
     if (options?.method && options.method !== "GET") {
       return jsonResponse({});

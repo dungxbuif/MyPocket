@@ -5,12 +5,19 @@ import (
 	"log"
 	"net/http"
 
+	"mypocket/internal/analytics"
+	"mypocket/internal/audit"
 	"mypocket/internal/finance"
 	"mypocket/internal/identity"
+	"mypocket/internal/notification"
 	"mypocket/internal/planning"
+	"mypocket/internal/platform/authcache"
 	"mypocket/internal/platform/config"
 	"mypocket/internal/platform/db"
 	"mypocket/internal/platform/httpapi"
+	"mypocket/internal/platform/logging"
+	"mypocket/internal/platform/objectstore"
+	"mypocket/internal/portfolio"
 	mysync "mypocket/internal/sync"
 )
 
@@ -19,6 +26,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("configuration error: %v", err)
 	}
+	logging.Configure(cfg)
 
 	conn, err := db.Open(context.Background(), cfg)
 	if err != nil {
@@ -27,11 +35,39 @@ func main() {
 	defer conn.Close()
 
 	financeRepo := finance.NewRepository(conn)
+	portfolioRepo := portfolio.NewRepository(conn)
+	auditRepo := audit.NewRepository(conn)
+	identityRepo := identity.NewRepository(conn)
+	cache, err := authcache.NewRedis(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("auth cache configuration error: %v", err)
+	}
+	if cache != nil {
+		defer cache.Close()
+	}
+	var objectStore httpapi.ObjectStore
+	if cfg.S3Endpoint != "" {
+		store, storeErr := objectstore.NewS3(cfg)
+		if storeErr != nil {
+			log.Fatalf("object store configuration error: %v", storeErr)
+		}
+		objectStore = store
+	}
+	syncService := mysync.NewService(mysync.NewRepository(conn), financeRepo, portfolioRepo)
+	syncService.SetAuditSink(auditRepo)
 	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{
-		IdentityRepository: identity.NewRepository(conn),
-		FinanceRepository:  financeRepo,
-		PlanningRepository: planning.NewRepository(conn),
-		SyncService:        mysync.NewService(mysync.NewRepository(conn), financeRepo),
+		AuditRepository:        auditRepo,
+		AuthCache:              cache,
+		IdentityRepository:     identityRepo,
+		APIKeyRepository:       identityRepo,
+		FinanceRepository:      financeRepo,
+		ReceiptRepository:      financeRepo,
+		ObjectStore:            objectStore,
+		PlanningRepository:     planning.NewRepository(conn),
+		NotificationRepository: notification.NewRepository(conn),
+		AnalyticsRepository:    analytics.NewRepository(conn),
+		PortfolioRepository:    portfolioRepo,
+		SyncService:            syncService,
 		ReadyCheck: func() error {
 			return conn.PingContext(context.Background())
 		},

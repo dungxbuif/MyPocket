@@ -6,6 +6,7 @@ import (
 	"os"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
@@ -38,6 +39,21 @@ func TestS3SmokeErrorsDoNotExposeCredentials(t *testing.T) {
 	}
 }
 
+func TestS3PresignedURLsUseConfiguredEndpoint(t *testing.T) {
+	store, err := objectstore.NewS3(config.Config{S3Endpoint: "https://storage.example.test", S3Bucket: "my-pocket", S3AccessKey: "access", S3SecretKey: "secret"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	putURL, err := store.PresignPut(context.Background(), "users/u/receipt.jpg", "image/jpeg", 15*time.Minute)
+	if err != nil || !strings.HasPrefix(putURL, "https://storage.example.test/") {
+		t.Fatalf("unexpected presigned put URL: %q (%v)", putURL, err)
+	}
+	getURL, err := store.PresignGet(context.Background(), "users/u/receipt.jpg", 10*time.Minute)
+	if err != nil || !strings.HasPrefix(getURL, "https://storage.example.test/") {
+		t.Fatalf("unexpected presigned get URL: %q (%v)", getURL, err)
+	}
+}
+
 func TestS3SmokeObjectLifecycle(t *testing.T) {
 	cfg := loadSmokeConfig(t)
 	ensureSmokeBucket(t, cfg)
@@ -56,6 +72,9 @@ func TestS3SmokeObjectLifecycle(t *testing.T) {
 
 func ensureSmokeBucket(t *testing.T, cfg config.Config) {
 	t.Helper()
+	if os.Getenv("MYPOCKET_TEST_S3_SKIP_BUCKET_CREATE") == "true" {
+		return
+	}
 
 	awsConfig, err := awscfg.LoadDefaultConfig(context.Background(),
 		awscfg.WithRegion("us-east-1"),

@@ -106,6 +106,7 @@ type CreateTransactionInput struct {
 	SourceWalletID      string
 	DestinationWalletID string
 	CategoryID          string
+	ReceiptObjectID     string
 	AmountVND           int64
 	TargetBalanceVND    *int64
 	OccurredAt          time.Time
@@ -120,6 +121,7 @@ type UpdateTransactionInput struct {
 	SourceWalletID      string
 	DestinationWalletID string
 	CategoryID          string
+	ReceiptObjectID     string
 	AmountVND           int64
 	TargetBalanceVND    *int64
 	OccurredAt          time.Time
@@ -147,6 +149,7 @@ type Transaction struct {
 	SourceWalletID      string          `json:"source_wallet_id"`
 	DestinationWalletID string          `json:"destination_wallet_id,omitempty"`
 	CategoryID          string          `json:"category_id,omitempty"`
+	ReceiptObjectID     string          `json:"receipt_object_id,omitempty"`
 	AmountVND           int64           `json:"amount_vnd"`
 	BalanceAfterVND     int64           `json:"balance_after_vnd"`
 	SourceDeltaVND      int64           `json:"source_delta_vnd"`

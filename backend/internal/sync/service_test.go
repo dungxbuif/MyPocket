@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"mypocket/internal/finance"
+	"mypocket/internal/portfolio"
 	mysync "mypocket/internal/sync"
 )
 
@@ -74,6 +75,48 @@ func TestServiceReturnsConflictForStaleBaseVersion(t *testing.T) {
 	}
 }
 
+func TestServiceAppliesAssetMutations(t *testing.T) {
+	store := newStoreStub()
+	portfolioRepo := &portfolioStub{
+		created: portfolio.Position{ID: fixedAssetID, UserID: fixedUserID, Type: portfolio.AssetGold, Name: "SJC", Unit: "tael", PricingMode: portfolio.PricingManual, IncludeInNetWorth: true, Version: 1},
+		priced:  portfolio.Position{ID: fixedAssetID, UserID: fixedUserID, Type: portfolio.AssetGold, Name: "SJC", Unit: "tael", PricingMode: portfolio.PricingManual, IncludeInNetWorth: true, Version: 2},
+	}
+	service := mysync.NewService(store, &financeStub{}, portfolioRepo)
+
+	createResult, err := service.ApplyMutations(context.Background(), fixedUserID, []mysync.Mutation{{
+		MutationID:  "mut_asset_create",
+		DeviceID:    "device_1",
+		Sequence:    1,
+		EntityType:  mysync.EntityAsset,
+		EntityID:    fixedAssetID,
+		Operation:   mysync.OperationCreate,
+		BaseVersion: 0,
+		Payload:     rawJSON(`{"type":"gold","name":"SJC","unit":"tael","pricing_mode":"manual","include_in_net_worth":true}`),
+	}})
+	if err != nil {
+		t.Fatalf("apply asset create: %v", err)
+	}
+	priceResult, err := service.ApplyMutations(context.Background(), fixedUserID, []mysync.Mutation{{
+		MutationID:  "mut_asset_price",
+		DeviceID:    "device_1",
+		Sequence:    2,
+		EntityType:  mysync.EntityAsset,
+		EntityID:    fixedAssetID,
+		Operation:   mysync.OperationAddPrice,
+		BaseVersion: 1,
+		Payload:     rawJSON(`{"unit_price_vnd":75000000,"priced_at":"2026-08-31T00:00:00Z","source":"manual","base_version":1}`),
+	}})
+	if err != nil {
+		t.Fatalf("apply asset price: %v", err)
+	}
+	if createResult[0].State != mysync.ResultApplied || priceResult[0].State != mysync.ResultApplied {
+		t.Fatalf("unexpected asset sync states: create=%s price=%s", createResult[0].State, priceResult[0].State)
+	}
+	if portfolioRepo.createCalls != 1 || portfolioRepo.priceCalls != 1 {
+		t.Fatalf("asset calls create=%d price=%d", portfolioRepo.createCalls, portfolioRepo.priceCalls)
+	}
+}
+
 func TestServiceValidatesOrderedBatch(t *testing.T) {
 	service := mysync.NewService(newStoreStub(), &financeStub{})
 	_, err := service.ApplyMutations(context.Background(), fixedUserID, []mysync.Mutation{
@@ -91,6 +134,7 @@ const (
 	fixedWalletID      = "00000000-0000-4000-8000-000000000101"
 	fixedCategoryID    = "00000000-0000-4000-8000-000000000201"
 	fixedTransactionID = "00000000-0000-4000-8000-000000000301"
+	fixedAssetID       = "00000000-0000-4000-8000-000000000401"
 )
 
 type storeStub struct {
@@ -178,6 +222,39 @@ func (f *financeStub) UpdateTransaction(context.Context, string, string, finance
 	return finance.Transaction{ID: fixedTransactionID, Version: 2}, nil
 }
 func (f *financeStub) ArchiveTransaction(context.Context, string, string) error { return nil }
+
+type portfolioStub struct {
+	createCalls int
+	priceCalls  int
+	created     portfolio.Position
+	priced      portfolio.Position
+}
+
+func (p *portfolioStub) ListPositions(context.Context, string, bool) ([]portfolio.Position, error) {
+	return []portfolio.Position{p.created}, nil
+}
+func (p *portfolioStub) CreatePosition(_ context.Context, _ string, input portfolio.CreatePositionInput) (portfolio.Position, error) {
+	p.createCalls++
+	p.created.ID = input.ID
+	return p.created, nil
+}
+func (p *portfolioStub) GetPosition(context.Context, string, string) (portfolio.Position, error) {
+	return p.created, nil
+}
+func (p *portfolioStub) ArchivePosition(context.Context, string, string, int64) error { return nil }
+func (p *portfolioStub) AddTrade(context.Context, string, string, portfolio.AddTradeInput) (portfolio.Position, error) {
+	return p.priced, nil
+}
+func (p *portfolioStub) UpdateTrade(context.Context, string, string, string, portfolio.UpdateTradeInput) (portfolio.Position, error) {
+	return p.priced, nil
+}
+func (p *portfolioStub) ArchiveTrade(context.Context, string, string, string, int64) (portfolio.Position, error) {
+	return p.priced, nil
+}
+func (p *portfolioStub) AddPrice(context.Context, string, string, portfolio.AddPriceInput) (portfolio.Position, error) {
+	p.priceCalls++
+	return p.priced, nil
+}
 
 func transactionCreateMutation(mutationID string, sequence int64, amount int64) mysync.Mutation {
 	return mysync.Mutation{

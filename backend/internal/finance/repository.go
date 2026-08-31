@@ -401,6 +401,11 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID string, input
 		}
 		return replayed, nil
 	}
+	if input.ReceiptObjectID != "" {
+		if err := requireReceiptOwnership(ctx, tx, userID, input.ReceiptObjectID); err != nil {
+			return Transaction{}, err
+		}
+	}
 
 	sourceBalance, err := lockWalletBalance(ctx, tx, userID, input.SourceWalletID)
 	if err != nil {
@@ -482,6 +487,11 @@ func (r *Repository) UpdateTransaction(ctx context.Context, userID string, trans
 	}
 	if err := requireTransactionCategory(ctx, tx, userID, normalized.SourceWalletID, normalized.CategoryID, normalized.Type); err != nil {
 		return Transaction{}, err
+	}
+	if normalized.ReceiptObjectID != "" {
+		if err := requireReceiptOwnership(ctx, tx, userID, normalized.ReceiptObjectID); err != nil {
+			return Transaction{}, err
+		}
 	}
 
 	reverseTransactionEffect(balances, current)
@@ -577,6 +587,7 @@ func (r *Repository) ListTransactions(ctx context.Context, userID string, filter
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
 			source_delta_vnd,
@@ -652,6 +663,7 @@ func loadActiveTransaction(ctx context.Context, tx *sql.Tx, userID string, trans
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
 			source_delta_vnd,
@@ -807,8 +819,9 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 			user_id,
 			type,
 			source_wallet_id,
-			destination_wallet_id,
-			category_id,
+			 destination_wallet_id,
+			 category_id,
+			receipt_object_id,
 			amount_vnd,
 			balance_after_vnd,
 			source_delta_vnd,
@@ -819,7 +832,7 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 			occurred_at,
 			excluded_from_reports
 		)
-		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, $3, $4, NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, $3, $4, NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, NULLIF($7, '')::uuid, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 		RETURNING
 			id::text,
 			user_id::text,
@@ -827,6 +840,7 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
 			source_delta_vnd,
@@ -845,6 +859,7 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 		input.SourceWalletID,
 		input.DestinationWalletID,
 		input.CategoryID,
+		input.ReceiptObjectID,
 		input.AmountVND,
 		effect.SourceBalanceVND,
 		effect.SourceDeltaVND,
@@ -861,6 +876,7 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 		&transaction.SourceWalletID,
 		&transaction.DestinationWalletID,
 		&transaction.CategoryID,
+		&transaction.ReceiptObjectID,
 		&transaction.AmountVND,
 		&transaction.BalanceAfterVND,
 		&transaction.SourceDeltaVND,
@@ -886,15 +902,16 @@ func updateTransactionRow(ctx context.Context, tx *sql.Tx, userID string, transa
 			source_wallet_id = $4,
 			destination_wallet_id = NULLIF($5, '')::uuid,
 			category_id = NULLIF($6, '')::uuid,
-			amount_vnd = $7,
-			balance_after_vnd = $8,
-			source_delta_vnd = $9,
-			destination_delta_vnd = $10,
-			note = $11,
-			with_person = $12,
-			event_ref = $13,
-			occurred_at = $14,
-			excluded_from_reports = $15,
+			receipt_object_id = NULLIF($7, '')::uuid,
+			amount_vnd = $8,
+			balance_after_vnd = $9,
+			source_delta_vnd = $10,
+			destination_delta_vnd = $11,
+			note = $12,
+			with_person = $13,
+			event_ref = $14,
+			occurred_at = $15,
+			excluded_from_reports = $16,
 			updated_at = now(),
 			version = version + 1
 		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
@@ -905,6 +922,7 @@ func updateTransactionRow(ctx context.Context, tx *sql.Tx, userID string, transa
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
 			source_delta_vnd,
@@ -922,6 +940,7 @@ func updateTransactionRow(ctx context.Context, tx *sql.Tx, userID string, transa
 		input.SourceWalletID,
 		input.DestinationWalletID,
 		input.CategoryID,
+		input.ReceiptObjectID,
 		input.AmountVND,
 		effect.SourceBalanceVND,
 		effect.SourceDeltaVND,
@@ -958,6 +977,7 @@ func scanTransaction(scanner transactionScanner) (Transaction, error) {
 		&transaction.SourceWalletID,
 		&transaction.DestinationWalletID,
 		&transaction.CategoryID,
+		&transaction.ReceiptObjectID,
 		&transaction.AmountVND,
 		&transaction.BalanceAfterVND,
 		&transaction.SourceDeltaVND,
@@ -973,6 +993,17 @@ func scanTransaction(scanner transactionScanner) (Transaction, error) {
 		return Transaction{}, err
 	}
 	return transaction, nil
+}
+
+func requireReceiptOwnership(ctx context.Context, tx *sql.Tx, userID, receiptID string) error {
+	var exists bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM receipt_objects WHERE id = $1 AND user_id = $2)`, receiptID, userID).Scan(&exists); err != nil {
+		return fmt.Errorf("check receipt ownership: %w", err)
+	}
+	if !exists {
+		return ErrForbidden
+	}
+	return nil
 }
 
 func transactionWalletIDs(current Transaction, next CreateTransactionInput) []string {

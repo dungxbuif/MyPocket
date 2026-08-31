@@ -29,26 +29,28 @@ updated: 2026-08-31
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`, `POST /api/v1/auth/logout`, `GET /api/v1/me` | OAuth/HTTP | Mixed | implemented | Fixture callback is available only when explicitly enabled; sets stateless signed `mypocket_auth` cookie and browser-readable `mypocket_csrf`; no session API |
+| `GET /api/v1/api-keys`, `POST /api/v1/api-keys`, `POST /api/v1/api-keys/{id}/revoke` | REST/command | User | implemented | Browser-authenticated users can create/list/revoke API keys from the Account tab or API for third-party systems and AI agents; plaintext `mpk_...` key is returned only once on create; key management requires browser cookie + CSRF |
 | `GET /wallets`, `POST /wallets`, `PATCH /wallets/{id}`, `POST /wallets/{id}/archive`, `POST /wallets/{id}/default-ai` | REST/command | User | implemented | Lists, creates, edits, archives, and selects the default AI wallet for the authenticated user; mutations require CSRF; `user_id` is always derived from the signed cookie |
 | `GET /categories` | REST collection | User | implemented | Lists system and authenticated-user categories; `system_key` is returned for locked system rows |
 | `POST /categories`, `PATCH /categories/{id}`, `POST /categories/{id}/archive`, `PUT /wallets/{wallet_id}/categories/{category_id}` | REST/command | User | implemented | Creates user categories, edits/archives user-owned categories, rejects system category mutation, and toggles category activation for a user-owned wallet |
 | `GET /transactions`, `POST /transactions`, `PATCH /transactions/{id}`, `POST /transactions/{id}/archive` | REST/command | User | implemented | Income, expense, transfer, adjustment, edit/archive reversal, search filters, and idempotent creates |
-| `/receipts/uploads`, `/receipts/{id}` | REST/object | User | planned | Presigned upload and private metadata |
+| `POST /api/v1/receipts/uploads`, `GET /api/v1/receipts/{id}` | REST/object | User | implemented | Validates image metadata (JPEG/PNG/WebP, max 15 MiB), creates user-scoped receipt metadata, returns a 15-minute private S3 presigned upload URL, and returns a 10-minute download URL |
 | `POST /sync/mutations`, `GET /sync/changes`, `POST /sync/resync` | Sync | User | implemented | Idempotent batches, per-user cursors, versions, tombstones, and authoritative resync snapshots |
 | `/sync/conflicts` | REST collection | User | planned | Optional server-backed conflict collection; current PHASE-003 conflict review is persisted client-side from sync mutation results |
 | `GET /budgets`, `POST /budgets`, `PATCH /budgets/{id}`, `POST /budgets/{id}/archive` | REST/command | User | implemented | Budget CRUD, selected/all expense category scopes, Ho Chi Minh period progress, and 80%/100% alert dedupe |
 | `GET /events`, `POST /events`, `PATCH /events/{id}`, `POST /events/{id}/archive`, `POST /events/{id}/transactions/{transaction_id}` | REST/command | User | implemented | Event CRUD and links to owned confirmed transactions; totals preserve report exclusion |
 | `GET /obligations`, `POST /obligations`, `PATCH /obligations/{id}`, `POST /obligations/{id}/archive`, `POST /obligations/{id}/repayments/{transaction_id}` | REST/command | User | implemented | Borrow/lend obligation CRUD and repayment links with overpayment protection |
-| `/recurring-schedules` | REST collection | User | planned | Remaining planning automation |
-| `/analytics/*` | Query REST | User | planned | Dashboard, categories, periods, trends |
+| `GET /recurring-schedules`, `POST /recurring-schedules`, `POST /recurring-schedules/{id}/archive` | REST/command | User | implemented | Recurring schedule setup for deterministic draft generation |
+| `GET /dashboard`, `GET /reports/{cash-flow,categories,daily,comparison,cumulative,insider}`, `GET /search` | Query REST | User | implemented | Authenticated server aggregates, normalized Ho Chi Minh date filters, bounded grouped search, generated metadata and data version; Insider Home summary selects the most frequent expense category and compares daily averages |
+| `GET /assets`, `POST /assets`, `GET /assets/{id}`, `POST /assets/{id}/archive`, `POST /assets/{id}/trades`, `PATCH /assets/{id}/trades/{trade_id}`, `POST /assets/{id}/trades/{trade_id}/archive`, `POST /assets/{id}/prices`, `GET /portfolio/summary` | REST/command | User | implemented | User-owned market-valued assets, moving-average buy/sell trades, append-only manual/provider VND price snapshots, archive retention, optimistic versions, and separate investment totals |
 | `/ai/conversations`, `/ai/conversations/{id}/messages` | REST collection | User | planned | Text and multimodal chat |
 | `POST /receipts/{id}/extract` | Command | User | planned | External OCR path from add transaction |
-| `/transaction-drafts`, `POST /transaction-drafts/{id}/confirm` | REST/command | User | planned | Shared review and idempotent confirmation |
+| `GET /transaction-drafts`, `POST /transaction-drafts/{id}/confirm` | REST/command | User | partial | Draft listing implemented; confirmation remains planned |
 | `POST /webhooks/bank/{source_id}` | Webhook | HMAC | planned | Timestamp, nonce, signature, deduplication |
-| `/notifications`, `/push-subscriptions` | REST collection | User | planned | Inbox and Web Push |
+| `GET /notifications`, `PATCH /notifications/{id}/read`, `POST /push-subscriptions`, `DELETE /push-subscriptions/{id}` | REST collection | User | implemented | Cursor-bounded inbox, ownership checks, private subscription keys, best-effort worker delivery |
 | `POST /exports`, `GET /exports/{id}` | Job REST | User | planned | Manual snapshot export |
 | `POST /account/reset`, `DELETE /account` | Command | User | planned | Confirmed background deletion |
-| `GET /internal/audit-logs` | Query REST | Audit viewer | planned | Hidden read-only filtered audit access |
+| `GET /api/v1/audit/access`, `GET /api/v1/audit/events` | Query REST | Audit viewer | implemented | Access check and read-only filtered audit access; both require signed-cookie auth and exact verified `AUDIT_VIEWER_EMAIL`; the Account UI only renders the log panel after the access check succeeds |
 | `GET /api/v1/health/live`, `GET /api/v1/health/ready` | Operations | None/internal | implemented | Liveness is process-only; readiness returns `503 INTERNAL_RETRYABLE` when the required database dependency is unavailable and never exposes sensitive dependency details |
 
 ## Errors
@@ -60,6 +62,7 @@ updated: 2026-08-31
 | `VALIDATION_FAILED` | Stable field-level domain validation failed | Display correctable fields |
 | `NOT_FOUND` | Object absent within authenticated scope | Display missing/removed state |
 | `VERSION_CONFLICT` | `base_version` is stale | Store conflict and request user resolution |
+| `ASSET_OVERSELL` | Asset sell quantity exceeds current position quantity | Ask the user to reduce quantity or add/correct buy history |
 | `IDEMPOTENT_REPLAY` | Mutation was already applied | Reconcile returned authoritative result |
 | `PROVIDER_UNAVAILABLE` | AI/OCR/Push provider failed transiently | Keep draft/input retryable |
 | `UPLOAD_REJECTED` | File failed size/type/checksum/decode rules | Ask for a valid image |
@@ -144,6 +147,118 @@ Headers:
 - `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
 
 Response status: `200 OK`; the backend clears any previous active default AI wallet for the authenticated user.
+
+## Asset Portfolio Schemas
+
+### `GET /api/v1/assets`
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "assets": [
+    {
+      "id": "uuid",
+      "type": "gold",
+      "symbol": "SJC",
+      "exchange": "",
+      "name": "SJC 9999",
+      "unit": "tael",
+      "reporting_currency": "VND",
+      "pricing_mode": "manual",
+      "include_in_net_worth": true,
+      "version": 3,
+      "summary": {
+        "quantity": "2.5",
+        "cost_basis_vnd": 180000000,
+        "realized_pnl_vnd": 0,
+        "current_unit_price_vnd": 75000000,
+        "market_value_vnd": 187500000,
+        "unrealized_pnl_vnd": 7500000,
+        "unrealized_pnl_percent": "4.1667",
+        "unrealized_not_comparable": false,
+        "valuation_status": "current"
+      }
+    }
+  ],
+  "correlation_id": "req_..."
+}
+```
+
+### `POST /api/v1/assets`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request:
+
+```json
+{
+  "type": "stock",
+  "symbol": "FPT",
+  "exchange": "HOSE",
+  "name": "FPT",
+  "unit": "share",
+  "pricing_mode": "automatic",
+  "provider_key": "static",
+  "provider_symbol": "FPT",
+  "include_in_net_worth": true
+}
+```
+
+Response status: `201 Created`; body contains `{ "asset": { ... } }`.
+
+### `POST /api/v1/assets/{id}/trades`
+
+Request:
+
+```json
+{
+  "side": "buy",
+  "quantity": "10",
+  "unit_price_vnd": 120000,
+  "fee_vnd": 15000,
+  "occurred_at": "2026-08-31T10:00:00Z",
+  "note": "",
+  "base_version": 1
+}
+```
+
+Response status: `201 Created`; body contains the recalculated asset. `sell` rejects overselling with `ASSET_OVERSELL`.
+
+### `POST /api/v1/assets/{id}/prices`
+
+Request:
+
+```json
+{
+  "unit_price_vnd": 75000000,
+  "priced_at": "2026-08-31T10:00:00Z",
+  "source": "manual",
+  "base_version": 2
+}
+```
+
+Response status: `201 Created`; price history is append-only and latest `priced_at` wins valuation.
+
+### `GET /api/v1/portfolio/summary`
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "summary": {
+    "investment_market_value_vnd": 187500000,
+    "missing_price_count": 0,
+    "included_position_count": 1,
+    "position_count": 1
+  },
+  "correlation_id": "req_..."
+}
+```
 
 ### `GET /api/v1/categories`
 
@@ -393,6 +508,26 @@ Archives the obligation for the authenticated owner. Archived obligations are hi
 
 Links an owned confirmed transaction as a repayment. The command returns `400 VALIDATION_FAILED` when the linked repayment total would exceed the obligation principal.
 
+### `GET /api/v1/recurring-schedules`
+
+Returns authenticated-user active recurring schedules with normalized `frequency`, `timezone`, `starts_at`, `next_occurs_at`, wallet/category references, integer `amount_vnd`, and draft payload fields.
+
+### `POST /api/v1/recurring-schedules`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request fields: `name`, `frequency` (`daily`, `weekly`, or `monthly`), `timezone`, `starts_at` as RFC3339, `type`, `source_wallet_id`, optional `destination_wallet_id`, optional `category_id`, `amount_vnd`, and optional `note`. Response status: `201 Created`.
+
+### `POST /api/v1/recurring-schedules/{id}/archive`
+
+Archives the recurring schedule for the authenticated owner. Existing generated drafts remain visible for review.
+
+### `GET /api/v1/transaction-drafts`
+
+Returns authenticated-user transaction drafts generated by recurring schedules. Drafts are reviewable records and do not modify wallet balances until an explicit confirmation API is added.
+
 ## Transaction Schemas
 
 ### `GET /api/v1/transactions`
@@ -483,6 +618,9 @@ Response status: `200 OK`; the backend reverses the stored balance effect exactl
 - Cookie-authenticated mutations require the framework-selected CSRF token/header contract.
 - Cookie-authenticated mutations send `X-CSRF-Token`, matching the browser-readable `mypocket_csrf` cookie.
 - Local and preview browser calls may use credentialed CORS only from the configured `PUBLIC_WEB_URL`; Compose serves same-origin `/api/` through the web nginx proxy.
+- Third-party callers can authenticate with `Authorization: Bearer mpk_...`; API key requests resolve to the owning user and do not require browser CSRF for business API mutations.
+- API key management endpoints still require browser cookie + CSRF; API keys cannot create or revoke other API keys.
+- API key hashes are stored in PostgreSQL and cached through Redis by the same HMAC hash so revoke can invalidate the cached key immediately. Redis is an acceleration/cache layer; PostgreSQL remains authoritative.
 - Audit queries additionally require verified email equality with `AUDIT_VIEWER_EMAIL`.
 - Webhooks authenticate through a per-source HMAC contract rather than the browser cookie.
 

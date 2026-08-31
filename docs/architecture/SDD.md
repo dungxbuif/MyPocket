@@ -37,6 +37,7 @@ The user approved the architecture, scope decomposition, security rules, two dis
 - Multi-user isolation enforced in every Go query and command.
 - Review-first shared transaction drafts for AI text, receipt OCR, AI-chat images, bank webhooks, and recurring occurrences.
 - Full offline read/write with idempotent mutations, per-record versions, per-user change cursors, tombstones, and explicit user-reviewed conflicts.
+- Market-valued asset positions are separate from wallet accounting and track quantity, moving-average cost basis, manual/provider price history, and realized/unrealized P&L.
 - Hidden append-only audit page authorized by exact verified email equality with `AUDIT_VIEWER_EMAIL`; retention defaults to 180 days.
 
 ## Design Invariants
@@ -59,6 +60,7 @@ The user approved the architecture, scope decomposition, security rules, two dis
 | PHASE-003 | Full offline client mirror, outbox, incremental synchronization, tombstones, and conflict resolution |
 | PHASE-004 | Budgets, events, recurring drafts, debts/loans, inbox, and Web Push |
 | PHASE-005 | PWA navigation, dashboard, search, wallet views, analytics, comparison, and cumulative trend |
+| PHASE-005 extension | User-owned asset portfolio valuation with offline manual mutations, provider-refresh boundary, and separate investment/combined net-worth totals |
 | PHASE-006 | AI text, receipt OCR, AI-chat images, bank webhook, and shared draft confirmation |
 | PHASE-007 | Hidden audit viewer, retention, exports, account lifecycle, backup/restore, and production release proof |
 | PHASE-008 | Deferred voice transcription feeding the established draft contract |

@@ -106,6 +106,7 @@ type transactionBody struct {
 	SourceWalletID      string                  `json:"source_wallet_id"`
 	DestinationWalletID string                  `json:"destination_wallet_id,omitempty"`
 	CategoryID          string                  `json:"category_id,omitempty"`
+	ReceiptObjectID     string                  `json:"receipt_object_id,omitempty"`
 	AmountVND           int64                   `json:"amount_vnd"`
 	BalanceAfterVND     int64                   `json:"balance_after_vnd"`
 	OccurredAt          time.Time               `json:"occurred_at"`
@@ -121,6 +122,7 @@ type transactionRequest struct {
 	SourceWalletID      string                  `json:"source_wallet_id"`
 	DestinationWalletID string                  `json:"destination_wallet_id"`
 	CategoryID          string                  `json:"category_id"`
+	ReceiptObjectID     string                  `json:"receipt_object_id"`
 	AmountVND           int64                   `json:"amount_vnd"`
 	TargetBalanceVND    *int64                  `json:"target_balance_vnd"`
 	OccurredAt          time.Time               `json:"occurred_at"`
@@ -184,6 +186,8 @@ func walletByID(cfg config.Config, repo FinanceRepository) http.HandlerFunc {
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				setDefaultAIWallet(w, r, repo, userID, walletID)
 			})).ServeHTTP(w, r)
+		case r.Method == http.MethodGet && action == "detail":
+			walletDetail(w, r, repo, userID, walletID)
 		case r.Method == http.MethodPut && action == "category":
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				setWalletCategoryActive(w, r, repo, userID, walletID, categoryID)
@@ -210,6 +214,33 @@ func listWallets(w http.ResponseWriter, r *http.Request, repo FinanceRepository,
 		CorrelationID: correlationID(r.Context()),
 	})
 }
+
+func walletDetail(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID, walletID string) {
+	wallets, err := repo.ListWallets(r.Context(), userID)
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Wallet unavailable", correlationID(r.Context())))
+		return
+	}
+	var wallet *finance.Wallet
+	for i := range wallets {
+		if wallets[i].ID == walletID {
+			wallet = &wallets[i]
+			break
+		}
+	}
+	if wallet == nil {
+		writeJSON(w, http.StatusNotFound, ErrorEnvelope("NOT_FOUND", "Wallet not found", correlationID(r.Context())))
+		return
+	}
+	transactions, err := repo.ListTransactions(r.Context(), userID, finance.TransactionFilters{WalletID: walletID})
+	if err != nil {
+		writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Wallet transactions unavailable", correlationID(r.Context())))
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"status": "ok", "wallet": toWalletBody(*wallet), "transactions": transactions, "generated_at": time.Now().UTC(), "stale": !isOnlineRequest(r), "correlation_id": correlationID(r.Context())})
+}
+
+func isOnlineRequest(r *http.Request) bool { return r.Header.Get("X-Offline") == "" }
 
 func createWallet(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID string) {
 	var req createWalletRequest
@@ -509,6 +540,7 @@ func createTransaction(w http.ResponseWriter, r *http.Request, repo FinanceRepos
 		SourceWalletID:      req.SourceWalletID,
 		DestinationWalletID: req.DestinationWalletID,
 		CategoryID:          req.CategoryID,
+		ReceiptObjectID:     req.ReceiptObjectID,
 		AmountVND:           req.AmountVND,
 		TargetBalanceVND:    req.TargetBalanceVND,
 		OccurredAt:          req.OccurredAt,
@@ -538,6 +570,7 @@ func updateTransaction(w http.ResponseWriter, r *http.Request, repo FinanceRepos
 		SourceWalletID:      req.SourceWalletID,
 		DestinationWalletID: req.DestinationWalletID,
 		CategoryID:          req.CategoryID,
+		ReceiptObjectID:     req.ReceiptObjectID,
 		AmountVND:           req.AmountVND,
 		TargetBalanceVND:    req.TargetBalanceVND,
 		OccurredAt:          req.OccurredAt,
@@ -569,6 +602,9 @@ func archiveTransaction(w http.ResponseWriter, r *http.Request, repo FinanceRepo
 }
 
 func authenticatedUserID(w http.ResponseWriter, r *http.Request, cfg config.Config) (string, bool) {
+	if userID := authenticatedUserIDFromContext(r.Context()); userID != "" {
+		return userID, true
+	}
 	cookie, err := r.Cookie(identity.AuthCookieName)
 	if err != nil {
 		writeJSON(w, http.StatusUnauthorized, ErrorEnvelope("AUTH_REQUIRED", "Authentication required", correlationID(r.Context())))
@@ -672,7 +708,7 @@ func parseWalletPath(path string) (string, string, string, bool) {
 	if len(parts) == 1 && parts[0] != "" {
 		return parts[0], "", "", true
 	}
-	if len(parts) == 2 && parts[0] != "" && (parts[1] == "archive" || parts[1] == "default-ai") {
+	if len(parts) == 2 && parts[0] != "" && (parts[1] == "archive" || parts[1] == "default-ai" || parts[1] == "detail") {
 		return parts[0], "", parts[1], true
 	}
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "categories" && parts[2] != "" {
@@ -700,6 +736,7 @@ func toTransactionBody(transaction finance.Transaction) transactionBody {
 		SourceWalletID:      transaction.SourceWalletID,
 		DestinationWalletID: transaction.DestinationWalletID,
 		CategoryID:          transaction.CategoryID,
+		ReceiptObjectID:     transaction.ReceiptObjectID,
 		AmountVND:           transaction.AmountVND,
 		BalanceAfterVND:     transaction.BalanceAfterVND,
 		OccurredAt:          transaction.OccurredAt,

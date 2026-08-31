@@ -1,5 +1,7 @@
 import type { CategorySummary, Transaction, TransactionInput, WalletSummary } from "../app/finance";
+import type { AssetPosition } from "../app/portfolio";
 import {
+  archiveOfflineAsset,
   archiveOfflineCategory,
   archiveOfflineTransaction,
   archiveOfflineWallet,
@@ -8,6 +10,7 @@ import {
   readPendingMutations,
   saveOfflineConflict,
   upsertOfflineCategory,
+  upsertOfflineAsset,
   upsertOfflineTransaction,
   upsertOfflineWallet,
 } from "./db";
@@ -241,12 +244,14 @@ async function applyServerResult(result: SyncMutationResult) {
     if (result.entity_type === "wallet") await archiveOfflineWallet(result.entity_id, result.version ?? 0);
     if (result.entity_type === "category") await archiveOfflineCategory(result.entity_id, result.version ?? 0);
     if (result.entity_type === "transaction") await archiveOfflineTransaction(result.entity_id, result.version ?? 0);
+    if (result.entity_type === "asset") await archiveOfflineAsset(result.entity_id, result.version ?? 0);
     return;
   }
   if (!result.payload) return;
   if (result.entity_type === "wallet") await upsertOfflineWallet(result.payload as unknown as WalletSummary);
   if (result.entity_type === "category") await upsertOfflineCategory(result.payload as unknown as CategorySummary);
   if (result.entity_type === "transaction") await upsertOfflineTransaction(result.payload as unknown as Transaction);
+  if (result.entity_type === "asset") await upsertOfflineAsset(result.payload as unknown as AssetPosition);
 }
 
 async function saveConflictResult(result: SyncMutationResult) {

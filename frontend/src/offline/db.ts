@@ -1,9 +1,10 @@
 import type { CategorySummary, Transaction, WalletSummary } from "../app/finance";
+import type { AssetPosition } from "../app/portfolio";
 import { migrateLegacyLocalStorageOutbox } from "./migrations";
-import { stores, type OfflineConflict, type OfflineMeta, type OfflineMutation, type OfflineSnapshot, type OfflineTombstone } from "./types";
+import { stores, type OfflineConflict, type OfflineMeta, type OfflineMutation, type OfflineReceiptUpload, type OfflineSnapshot, type OfflineTombstone } from "./types";
 
 const DB_NAME = "mypocket.offline.v1";
-const DB_VERSION = 1;
+const DB_VERSION = 3;
 const META_CURSOR = "sync_cursor";
 const META_DEVICE_ID = "device_id";
 const META_SEQUENCE = "mutation_sequence";
@@ -21,16 +22,43 @@ export async function openOfflineDatabase(factory?: IDBFactory): Promise<Offline
       ensureStore(db, stores.wallets, "id", tx);
       ensureStore(db, stores.categories, "id", tx);
       ensureStore(db, stores.transactions, "id", tx);
+      ensureStore(db, stores.assets, "id", tx);
       const outbox = ensureStore(db, stores.outbox, "mutation_id", request.transaction);
       if (!outbox.indexNames.contains("by_state_sequence")) outbox.createIndex("by_state_sequence", ["state", "sequence"]);
       ensureStore(db, stores.conflicts, "conflict_id", tx);
       ensureStore(db, stores.tombstones, "id", tx);
       ensureStore(db, stores.meta, "key", tx);
+      ensureStore(db, stores.receipts, "id", tx);
     };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () => reject(request.error ?? new Error("Cannot open offline database"));
     request.onblocked = () => reject(new Error("Offline database upgrade is blocked"));
   });
+}
+
+export async function queueReceiptUpload(input: Omit<OfflineReceiptUpload, "id" | "created_at">, db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const record: OfflineReceiptUpload = { ...input, id: randomID("receipt"), created_at: new Date().toISOString() };
+  const tx = database.transaction(stores.receipts, "readwrite");
+  tx.objectStore(stores.receipts).put(record);
+  await transactionDone(tx);
+  if (!db) database.close();
+  return record;
+}
+
+export async function readPendingReceiptUploads(db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const records = await readAll<OfflineReceiptUpload>(database, stores.receipts);
+  if (!db) database.close();
+  return records.sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+export async function removeReceiptUpload(id: string, db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const tx = database.transaction(stores.receipts, "readwrite");
+  tx.objectStore(stores.receipts).delete(id);
+  await transactionDone(tx);
+  if (!db) database.close();
 }
 
 export async function initializeOfflineStore(factory?: IDBFactory): Promise<OfflineSnapshot> {
@@ -49,10 +77,11 @@ export async function initializeOfflineStore(factory?: IDBFactory): Promise<Offl
 
 export async function readOfflineSnapshot(db?: IDBDatabase): Promise<OfflineSnapshot> {
   const database = db ?? await openOfflineDatabase();
-  const [wallets, categories, transactions, outbox, conflicts, tombstones, cursor] = await Promise.all([
+  const [wallets, categories, transactions, assets, outbox, conflicts, tombstones, cursor] = await Promise.all([
     readAll<WalletSummary>(database, stores.wallets),
     readAll<CategorySummary>(database, stores.categories),
     readAll<Transaction>(database, stores.transactions),
+    readAll<AssetPosition>(database, stores.assets),
     readAll<OfflineMutation>(database, stores.outbox),
     readAll<OfflineConflict>(database, stores.conflicts),
     readAll<OfflineTombstone>(database, stores.tombstones),
@@ -61,7 +90,8 @@ export async function readOfflineSnapshot(db?: IDBDatabase): Promise<OfflineSnap
   const snapshot = {
     wallets,
     categories,
-    transactions: applyPendingArchives(transactions, tombstones),
+    transactions: applyPendingArchives(transactions, tombstones, "transaction"),
+    assets: applyPendingArchives(assets, tombstones, "asset"),
     outbox: outbox.filter((item) => item.state !== "synced").sort((a, b) => a.sequence - b.sequence),
     conflicts,
     tombstones,
@@ -76,6 +106,7 @@ export async function saveFinanceMirror(input: {
   wallets?: WalletSummary[];
   categories?: CategorySummary[];
   transactions?: Transaction[];
+  assets?: AssetPosition[];
   cursor?: number;
 }, db?: IDBDatabase) {
   const database = db ?? await openOfflineDatabase();
@@ -83,6 +114,7 @@ export async function saveFinanceMirror(input: {
   if (input.wallets) names.push(stores.wallets);
   if (input.categories) names.push(stores.categories);
   if (input.transactions) names.push(stores.transactions);
+  if (input.assets) names.push(stores.assets);
   if (typeof input.cursor === "number") names.push(stores.meta);
   if (names.length === 0) {
     if (!db) database.close();
@@ -92,6 +124,7 @@ export async function saveFinanceMirror(input: {
   if (input.wallets) replaceStore(tx.objectStore(stores.wallets), input.wallets);
   if (input.categories) replaceStore(tx.objectStore(stores.categories), input.categories);
   if (input.transactions) replaceStore(tx.objectStore(stores.transactions), input.transactions);
+  if (input.assets) replaceStore(tx.objectStore(stores.assets), input.assets);
   if (typeof input.cursor === "number") tx.objectStore(stores.meta).put({ key: META_CURSOR, value: input.cursor } satisfies OfflineMeta);
   await transactionDone(tx);
   if (!db) database.close();
@@ -142,6 +175,14 @@ export async function upsertOfflineCategory(category: CategorySummary, db?: IDBD
   if (!db) database.close();
 }
 
+export async function upsertOfflineAsset(asset: AssetPosition, db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const tx = database.transaction(stores.assets, "readwrite");
+  tx.objectStore(stores.assets).put(asset);
+  await transactionDone(tx);
+  if (!db) database.close();
+}
+
 export async function archiveOfflineTransaction(id: string, baseVersion = 0, db?: IDBDatabase) {
   await archiveEntity("transaction", id, baseVersion, stores.transactions, db);
 }
@@ -152,6 +193,10 @@ export async function archiveOfflineWallet(id: string, baseVersion = 0, db?: IDB
 
 export async function archiveOfflineCategory(id: string, baseVersion = 0, db?: IDBDatabase) {
   await archiveEntity("category", id, baseVersion, stores.categories, db);
+}
+
+export async function archiveOfflineAsset(id: string, baseVersion = 0, db?: IDBDatabase) {
+  await archiveEntity("asset", id, baseVersion, stores.assets, db);
 }
 
 async function archiveEntity(entityType: OfflineTombstone["entity_type"], id: string, baseVersion: number, storeName: string, db?: IDBDatabase) {
@@ -295,13 +340,13 @@ function transactionDone(tx: IDBTransaction): Promise<void> {
   });
 }
 
-function applyPendingArchives(transactions: Transaction[], tombstones: OfflineTombstone[]) {
-  const archived = new Set(tombstones.filter((item) => item.entity_type === "transaction").map((item) => item.entity_id));
-  return transactions.filter((transaction) => !archived.has(transaction.id));
+function applyPendingArchives<T extends { id: string }>(records: T[], tombstones: OfflineTombstone[], entityType: OfflineTombstone["entity_type"]) {
+  const archived = new Set(tombstones.filter((item) => item.entity_type === entityType).map((item) => item.entity_id));
+  return records.filter((record) => !archived.has(record.id));
 }
 
 function emptyDegradedSnapshot(reason: string): OfflineSnapshot {
-  return { wallets: [], categories: [], transactions: [], outbox: [], conflicts: [], tombstones: [], cursor: 0, mode: "degraded", reason };
+  return { wallets: [], categories: [], transactions: [], assets: [], outbox: [], conflicts: [], tombstones: [], cursor: 0, mode: "degraded", reason };
 }
 
 function randomID(prefix: string) {

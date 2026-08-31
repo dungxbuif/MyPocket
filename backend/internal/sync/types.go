@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"mypocket/internal/finance"
+	"mypocket/internal/portfolio"
 )
 
 type EntityType string
@@ -15,12 +16,17 @@ const (
 	EntityWallet      EntityType = "wallet"
 	EntityCategory    EntityType = "category"
 	EntityTransaction EntityType = "transaction"
+	EntityAsset       EntityType = "asset"
 
 	OperationCreate            Operation = "create"
 	OperationUpdate            Operation = "update"
 	OperationArchive           Operation = "archive"
 	OperationSetDefaultAI      Operation = "set_default_ai"
 	OperationSetCategoryActive Operation = "set_category_active"
+	OperationAddTrade          Operation = "add_trade"
+	OperationUpdateTrade       Operation = "update_trade"
+	OperationArchiveTrade      Operation = "archive_trade"
+	OperationAddPrice          Operation = "add_price"
 
 	ResultApplied  ResultState = "applied"
 	ResultReplayed ResultState = "replayed"
@@ -80,5 +86,6 @@ type Snapshot struct {
 	Wallets      []finance.Wallet      `json:"wallets"`
 	Categories   []finance.Category    `json:"categories"`
 	Transactions []finance.Transaction `json:"transactions"`
+	Assets       []portfolio.Position  `json:"assets"`
 	NextCursor   int64                 `json:"next_cursor"`
 }

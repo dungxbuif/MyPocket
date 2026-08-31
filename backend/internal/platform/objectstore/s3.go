@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awscfg "github.com/aws/aws-sdk-go-v2/config"
@@ -17,8 +18,9 @@ import (
 const smokeObjectKey = "platform/smoke.txt"
 
 type S3Store struct {
-	client *s3.Client
-	bucket string
+	client  *s3.Client
+	presign *s3.PresignClient
+	bucket  string
 }
 
 func NewS3(cfg config.Config) (*S3Store, error) {
@@ -47,7 +49,37 @@ func NewS3(cfg config.Config) (*S3Store, error) {
 		options.BaseEndpoint = aws.String(cfg.S3Endpoint)
 		options.UsePathStyle = true
 	})
-	return &S3Store{client: client, bucket: cfg.S3Bucket}, nil
+	return &S3Store{client: client, presign: s3.NewPresignClient(client), bucket: cfg.S3Bucket}, nil
+}
+
+func (s *S3Store) PresignPut(ctx context.Context, key string, contentType string, expires time.Duration) (string, error) {
+	if expires <= 0 {
+		expires = 10 * time.Minute
+	}
+	result, err := s.presign.PresignPutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key), ContentType: aws.String(contentType)}, s3.WithPresignExpires(expires))
+	if err != nil {
+		return "", fmt.Errorf("presign upload: %w", err)
+	}
+	return result.URL, nil
+}
+
+func (s *S3Store) PresignGet(ctx context.Context, key string, expires time.Duration) (string, error) {
+	if expires <= 0 {
+		expires = 10 * time.Minute
+	}
+	result, err := s.presign.PresignGetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)}, s3.WithPresignExpires(expires))
+	if err != nil {
+		return "", fmt.Errorf("presign download: %w", err)
+	}
+	return result.URL, nil
+}
+
+func (s *S3Store) DeleteObject(ctx context.Context, key string) error {
+	_, err := s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	if err != nil {
+		return fmt.Errorf("delete object: %w", err)
+	}
+	return nil
 }
 
 func (s *S3Store) PutSmokeObject(ctx context.Context) error {

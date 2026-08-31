@@ -36,6 +36,7 @@ export async function fetchAuthoritativeSnapshot() {
       wallets: unknown[];
       categories: unknown[];
       transactions: unknown[];
+      assets: unknown[];
       next_cursor: number;
     };
   }>("/api/v1/sync/resync", { method: "POST" });

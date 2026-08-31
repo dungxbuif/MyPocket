@@ -1,4 +1,4 @@
-const CACHE_NAME = "mypocket-shell-v1";
+const CACHE_NAME = "mypocket-shell-v3";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -17,6 +17,9 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
+  if (url.protocol !== "http:" && url.protocol !== "https:") {
+    return;
+  }
   if (url.pathname.startsWith("/api/") || event.request.method !== "GET") {
     return;
   }
@@ -31,4 +34,23 @@ self.addEventListener("fetch", (event) => {
       })
       .catch(() => caches.match(event.request).then((cached) => cached || caches.match("/"))),
   );
+});
+
+self.addEventListener("push", (event) => {
+  const data = event.data ? event.data.json() : {};
+  event.waitUntil(self.registration.showNotification(data.title || "MyPocket", {
+    body: data.body || "Có thông báo mới",
+    tag: data.id || "mypocket-notice",
+    data: { url: data.url || "/" },
+  }));
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target = event.notification.data && event.notification.data.url ? event.notification.data.url : "/";
+  event.waitUntil(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+    const client = clients.find((item) => "focus" in item);
+    if (client) return client.focus();
+    return self.clients.openWindow(target);
+  }));
 });

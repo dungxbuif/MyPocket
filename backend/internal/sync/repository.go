@@ -185,6 +185,8 @@ func (r *Repository) EntityVersionAndPayload(ctx context.Context, userID string,
 		return r.categoryVersionAndPayload(ctx, userID, entityID)
 	case EntityTransaction:
 		return r.transactionVersionAndPayload(ctx, userID, entityID)
+	case EntityAsset:
+		return r.assetVersionAndPayload(ctx, userID, entityID)
 	default:
 		return 0, nil, false, fmt.Errorf("%w: unsupported entity_type", ErrValidation)
 	}
@@ -229,6 +231,22 @@ func (r *Repository) transactionVersionAndPayload(ctx context.Context, userID st
 			WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
 		) row
 	`, transactionID, userID).Scan(&version, &payload)
+	return versionPayloadResult(err, payload)
+}
+
+func (r *Repository) assetVersionAndPayload(ctx context.Context, userID string, assetID string) (int64, json.RawMessage, bool, error) {
+	var version int64
+	var payload []byte
+	err := r.db.QueryRowContext(ctx, `
+		SELECT version, to_jsonb(row) - 'user_id'
+		FROM (
+			SELECT id::text, user_id::text, type, symbol, exchange, name, unit,
+				reporting_currency, pricing_mode, coalesce(provider_key, '') AS provider_key,
+				coalesce(provider_symbol, '') AS provider_symbol, include_in_net_worth, version
+			FROM asset_positions
+			WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+		) row
+	`, assetID, userID).Scan(&version, &payload)
 	return versionPayloadResult(err, payload)
 }
 

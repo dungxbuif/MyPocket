@@ -114,6 +114,49 @@ func TestRequireOwnerRejectsOtherUsersObject(t *testing.T) {
 	}
 }
 
+func TestAPIKeyLifecycleStoresHashOnlyAndAuthenticatesUser(t *testing.T) {
+	conn := migratedTestPostgres(t)
+	repo := identity.NewRepository(conn)
+	user, err := repo.FindOrCreateGoogleUser(context.Background(), identity.GoogleProfile{
+		Subject:       "google-sub-api-key",
+		Email:         "agent-owner@example.com",
+		EmailVerified: true,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	secret := "01234567890123456789012345678901"
+
+	created, err := repo.CreateAPIKey(context.Background(), user.ID, "Agent", secret)
+	if err != nil {
+		t.Fatalf("create api key: %v", err)
+	}
+	if !strings.HasPrefix(created.Plaintext, identity.APIKeyPrefix) {
+		t.Fatalf("unexpected plaintext prefix: %q", created.Plaintext)
+	}
+	var storedHash string
+	if err := conn.QueryRowContext(context.Background(), `SELECT key_hash FROM api_keys WHERE id = $1`, created.ID).Scan(&storedHash); err != nil {
+		t.Fatalf("load stored hash: %v", err)
+	}
+	if storedHash == "" || strings.Contains(storedHash, created.Plaintext) {
+		t.Fatalf("api key secret was not stored safely: %q", storedHash)
+	}
+
+	authUser, authKey, err := repo.AuthenticateAPIKey(context.Background(), created.Plaintext, secret)
+	if err != nil {
+		t.Fatalf("authenticate api key: %v", err)
+	}
+	if authUser.ID != user.ID || authKey.ID != created.ID || authKey.LastUsedAt == nil {
+		t.Fatalf("wrong api key auth result user=%#v key=%#v", authUser, authKey)
+	}
+	if _, err := repo.RevokeAPIKey(context.Background(), user.ID, created.ID); err != nil {
+		t.Fatalf("revoke api key: %v", err)
+	}
+	if _, _, err := repo.AuthenticateAPIKey(context.Background(), created.Plaintext, secret); !errors.Is(err, identity.ErrUserNotFound) {
+		t.Fatalf("expected revoked key to stop authenticating, got %v", err)
+	}
+}
+
 func migratedTestPostgres(t *testing.T) *sql.DB {
 	t.Helper()
 

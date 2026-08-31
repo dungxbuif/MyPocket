@@ -1,4 +1,7 @@
 /references
+.env
 node_modules/
 frontend/dist/
 frontend/test-results/
+frontend/docs/build/
+frontend/docs/.docusaurus/

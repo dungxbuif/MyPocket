@@ -43,6 +43,7 @@ export type Transaction = {
   source_wallet_id: string;
   destination_wallet_id?: string;
   category_id?: string;
+  receipt_object_id?: string;
   amount_vnd: number;
   balance_after_vnd: number;
   occurred_at: string;
@@ -60,6 +61,7 @@ export type TransactionInput = {
   source_wallet_id: string;
   destination_wallet_id?: string;
   category_id?: string;
+  receipt_object_id?: string;
   amount_vnd: number;
   target_balance_vnd?: number | null;
   occurred_at: string;

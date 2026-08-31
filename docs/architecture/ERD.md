@@ -33,11 +33,15 @@ updated: 2026-08-31
 | `budget_alerts` | Durable 80%/100% budget threshold event | User | Unique budget/threshold/period dedupe |
 | `events` | Trip or event grouping | User | Versioned/archiveable date range |
 | `event_transactions` | Event-to-transaction link | User | Composite event/transaction uniqueness |
-| `recurring_schedules` | Template and next occurrence | User | Worker emits deterministic drafts |
+| `recurring_schedules` | Template and next occurrence | User | Worker emits deterministic drafts; versioned/archiveable |
+| `recurring_occurrences` | Processed schedule occurrence ledger | User | Unique schedule/occurrence key |
 | `obligations` | Borrowed/lent obligation | User | Principal, counterparty, due date; versioned/archiveable |
 | `obligation_repayments` | Obligation-to-transaction repayment link | User | Composite obligation/transaction uniqueness |
 | `notifications` | Durable in-app notice | User | Read state and related entity |
-| `push_subscriptions` | Browser Web Push subscription | User | Encrypted keys and endpoint |
+| `push_subscriptions` | Browser Web Push subscription | User | Private endpoint/keys, capped failure retry, expiry cleanup |
+| `asset_positions` | Market-valued asset identity and pricing mode | User | Separate from wallets; versioned/archiveable; VND reporting only |
+| `asset_trades` | Ordered buy/sell asset ledger | User/asset | Decimal quantity, integer VND price/fee, persisted replay results |
+| `asset_price_history` | Append-only current/historical asset prices | User/asset | Manual or provider source; latest observation drives valuation |
 | `sync_mutations` | Idempotency ledger | User | Unique client mutation ID |
 | `sync_changes` | Incremental authoritative change feed | User | Monotonic per-user cursor |
 | `sync_conflicts` | Rejected client mutation and server snapshot | User | Explicit resolution lifecycle |
@@ -45,7 +49,8 @@ updated: 2026-08-31
 | `webhook_events` | Replay/deduplication ledger | User/source | Unique source event and payload digest |
 | `ai_conversations` | AI chat container | User | Provider-independent metadata |
 | `ai_messages` | Text/image-reference message | User/conversation | Links structured draft results |
-| `audit_logs` | Append-only state/security event | System | Redacted; restricted read; retention-managed |
+| `api_keys` | Third-party/API-agent credentials | User | Stores HMAC hash and display prefix only; revocable; Redis-cached lookup |
+| `audit_events` | Append-only state/security event | System | Redacted; restricted read; retention-managed |
 | `job_leases` | Worker ownership/idempotency state | System | Bounded leases and occurrence keys |
 | `exports` | Manual export job and object result | User | Expiring snapshot metadata |
 
@@ -63,6 +68,8 @@ updated: 2026-08-31
 | `event_transactions` | `transactions` | many-to-one | Report-excluded transactions are linkable but excluded from event totals |
 | `transactions` | `receipt_objects` | optional many-to-one | Private attachment |
 | `transaction_drafts` | `transactions` | optional one-to-one confirmation | Idempotent confirmation |
+| `recurring_schedules` | `recurring_occurrences` | one-to-many | Worker locks due schedules and advances next occurrence |
+| `recurring_occurrences` | `transaction_drafts` | one-to-one by occurrence key | Deterministic draft generation without wallet accounting |
 | `ai_conversations` | `ai_messages` | one-to-many | Ordered messages |
 | `ai_messages` | `transaction_drafts` | one-to-many | Multi-transaction result |
 | `obligations` | `obligation_repayments` | one-to-many | Repayment links cannot exceed principal |
@@ -70,6 +77,9 @@ updated: 2026-08-31
 | `webhook_sources` | `webhook_events` | one-to-many | Replay and deduplication scope |
 | `webhook_events` | `transaction_drafts` | optional one-to-one | Accepted event result |
 | `users` | `sync_changes` | one-to-many ordered cursor | Pull scope is per user |
+| `users` | `asset_positions` | one-to-many | Portfolio ownership is separate from wallet accounting |
+| `asset_positions` | `asset_trades` | one-to-many | Composite `(asset_id, user_id)` FK enforces same-user ownership |
+| `asset_positions` | `asset_price_history` | one-to-many | Composite `(asset_id, user_id)` FK enforces same-user ownership |
 
 ## Constraints
 
@@ -79,10 +89,15 @@ updated: 2026-08-31
 - At most one active default AI wallet exists per user.
 - Category depth is at most two; system categories cannot be renamed or deleted.
 - Mutation IDs, confirmation commands, recurring occurrences, and source webhook event IDs are unique in their intended scope.
+- API keys store only HMAC hashes plus a short display prefix; plaintext key material is returned only once at creation.
 - Version increments occur only with accepted authoritative mutations.
 - Audit rows have no application update/delete endpoint; retention deletion is worker-only.
 - Rows referenced by financial history are archived or tombstoned rather than cascade-deleted.
 - Account deletion is an explicit background lifecycle, not ordinary cascading API behavior.
+- Portfolio asset quantities are `numeric(30,12)`; API-facing quantities are decimal strings, not binary floats.
+- Portfolio VND price, fee, cost basis, market value, and P&L fields are integer VND.
+- Portfolio commands must not mutate `wallets` or confirmed `transactions`; analytics may only read portfolio values for separate combined net-worth display.
+- Asset prices are append-only. Provider quote IDs are unique when present, and duplicate provider quotes replay the existing valuation instead of adding a second row.
 
 ## Migrations
 
@@ -204,6 +219,64 @@ Seeded system keys include `expense_food`, `expense_shopping`, `expense_transpor
 | `response_status` | `integer` | Stored HTTP-equivalent response status |
 | `response_json` | `jsonb` | Stored replay response |
 | `created_at` | `timestamptz` | Creation timestamp |
+
+### `asset_positions`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key; client UUID can be accepted by API/offline flow |
+| `user_id` | `uuid` | Required owner; references `users(id)` |
+| `type` | `text` | `gold`, `stock`, `crypto`, `foreign_currency`, or `other` |
+| `symbol` | `text` | Optional normalized symbol; defaults empty |
+| `exchange` | `text` | Optional normalized exchange; defaults empty |
+| `name` | `text` | Required non-empty display name |
+| `unit` | `text` | Required unit compatible with type |
+| `reporting_currency` | `text` | Fixed to `VND` for TICKET-027 |
+| `pricing_mode` | `text` | `manual` or `automatic`; automatic requires provider mapping |
+| `provider_key`, `provider_symbol` | nullable `text` | Server-side adapter mapping; credentials are never client-visible |
+| `include_in_net_worth` | `boolean` | Controls combined net-worth inclusion |
+| `archived_at` | `timestamptz` | Hides position from active totals without deleting history |
+| `version` | `bigint` | Optimistic version seed; starts at `1` |
+| `created_at`, `updated_at` | `timestamptz` | Audit timestamps |
+
+Implemented indexes and constraints include owner lookup, automatic-refresh lookup, same-user composite uniqueness `(id, user_id)`, and active symbol uniqueness per user/type/exchange/unit when a symbol exists.
+
+### `asset_trades`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key; client UUID can be accepted by API/offline flow |
+| `user_id` | `uuid` | Required owner; references `users(id)` |
+| `asset_id` | `uuid` | Required asset; composite FK with `user_id` references `asset_positions(id, user_id)` |
+| `side` | `text` | `buy` or `sell` |
+| `quantity` | `numeric(30,12)` | Required positive decimal quantity |
+| `unit_price_vnd` | `bigint` | Required non-negative integer VND unit price |
+| `fee_vnd` | `bigint` | Required non-negative integer VND fee; defaults `0` |
+| `occurred_at` | `timestamptz` | User-supplied trade timestamp; participates in replay order |
+| `quantity_after` | `numeric(30,12)` | Persisted replay result after this trade |
+| `cost_basis_after_vnd` | `bigint` | Persisted moving-average cost basis after this trade |
+| `realized_pnl_vnd` | `bigint` | Persisted realized P&L for this trade |
+| `note` | `text` | Optional note; defaults empty |
+| `archived_at` | `timestamptz` | Excludes erroneous trade from active replay without deleting it |
+| `version` | `bigint` | Optimistic version seed; starts at `1` |
+| `created_at`, `updated_at` | `timestamptz` | Audit timestamps |
+
+Active trades replay by `(occurred_at, created_at, id)`. Historical correction/archive recomputes all later derived fields deterministically.
+
+### `asset_price_history`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `id` | `uuid` | Primary key; client UUID can be accepted for manual snapshots |
+| `user_id` | `uuid` | Required owner; references `users(id)` |
+| `asset_id` | `uuid` | Required asset; composite FK with `user_id` references `asset_positions(id, user_id)` |
+| `unit_price_vnd` | `bigint` | Required positive integer VND unit price |
+| `priced_at` | `timestamptz` | Observation timestamp |
+| `source` | `text` | `manual` or provider key |
+| `provider_quote_id` | nullable `text` | Provider idempotency key; globally unique with `source` when present |
+| `created_at` | `timestamptz` | Insertion timestamp |
+
+Latest price is selected by `(priced_at DESC, created_at DESC, id DESC)`. Manual corrections append a newer snapshot instead of updating or deleting an older row.
 
 ### `sync_cursors`
 

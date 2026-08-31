@@ -8,7 +8,9 @@ import (
 	"strings"
 	"time"
 
+	"mypocket/internal/audit"
 	"mypocket/internal/finance"
+	"mypocket/internal/portfolio"
 )
 
 type FinanceCommands interface {
@@ -28,6 +30,21 @@ type FinanceCommands interface {
 	ArchiveTransaction(ctx context.Context, userID string, transactionID string) error
 }
 
+type PortfolioCommands interface {
+	ListPositions(ctx context.Context, userID string, includeArchived bool) ([]portfolio.Position, error)
+	CreatePosition(ctx context.Context, userID string, input portfolio.CreatePositionInput) (portfolio.Position, error)
+	GetPosition(ctx context.Context, userID, assetID string) (portfolio.Position, error)
+	ArchivePosition(ctx context.Context, userID, assetID string, baseVersion int64) error
+	AddTrade(ctx context.Context, userID, assetID string, input portfolio.AddTradeInput) (portfolio.Position, error)
+	UpdateTrade(ctx context.Context, userID, assetID, tradeID string, input portfolio.UpdateTradeInput) (portfolio.Position, error)
+	ArchiveTrade(ctx context.Context, userID, assetID, tradeID string, baseVersion int64) (portfolio.Position, error)
+	AddPrice(ctx context.Context, userID, assetID string, input portfolio.AddPriceInput) (portfolio.Position, error)
+}
+
+type AuditSink interface {
+	Append(ctx context.Context, event audit.Event) error
+}
+
 type Store interface {
 	LoadMutationResult(ctx context.Context, userID string, mutationID string) (requestHash string, result MutationResult, found bool, err error)
 	StoreMutationResult(ctx context.Context, userID string, mutationID string, requestHash string, result MutationResult) error
@@ -38,12 +55,22 @@ type Store interface {
 }
 
 type Service struct {
-	store   Store
-	finance FinanceCommands
+	store     Store
+	finance   FinanceCommands
+	portfolio PortfolioCommands
+	audit     AuditSink
 }
 
-func NewService(store Store, financeCommands FinanceCommands) *Service {
-	return &Service{store: store, finance: financeCommands}
+func NewService(store Store, financeCommands FinanceCommands, portfolioCommands ...PortfolioCommands) *Service {
+	var portfolioCommand PortfolioCommands
+	if len(portfolioCommands) > 0 {
+		portfolioCommand = portfolioCommands[0]
+	}
+	return &Service{store: store, finance: financeCommands, portfolio: portfolioCommand}
+}
+
+func (s *Service) SetAuditSink(sink AuditSink) {
+	s.audit = sink
 }
 
 func (s *Service) ApplyMutations(ctx context.Context, userID string, mutations []Mutation) ([]MutationResult, error) {
@@ -87,11 +114,18 @@ func (s *Service) Resync(ctx context.Context, userID string) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("list resync transactions: %w", err)
 	}
+	var assets []portfolio.Position
+	if s.portfolio != nil {
+		assets, err = s.portfolio.ListPositions(ctx, userID, false)
+		if err != nil {
+			return Snapshot{}, fmt.Errorf("list resync assets: %w", err)
+		}
+	}
 	cursor, err := s.store.CurrentCursor(ctx, userID)
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{Wallets: wallets, Categories: categories, Transactions: transactions, NextCursor: cursor}, nil
+	return Snapshot{Wallets: wallets, Categories: categories, Transactions: transactions, Assets: assets, NextCursor: cursor}, nil
 }
 
 func (s *Service) applyOne(ctx context.Context, userID string, mutation Mutation) (MutationResult, error) {
@@ -110,12 +144,13 @@ func (s *Service) applyOne(ctx context.Context, userID string, mutation Mutation
 		if stored.State == ResultApplied {
 			stored.State = ResultReplayed
 		}
+		s.appendMutationAudit(ctx, userID, stored)
 		return stored, nil
 	}
 
 	result, err := s.executeMutation(ctx, userID, mutation)
 	if err != nil {
-		if errors.Is(err, finance.ErrValidation) || errors.Is(err, finance.ErrForbidden) || errors.Is(err, ErrValidation) {
+		if errors.Is(err, finance.ErrValidation) || errors.Is(err, finance.ErrForbidden) || errors.Is(err, portfolio.ErrValidation) || errors.Is(err, portfolio.ErrForbidden) || errors.Is(err, portfolio.ErrOversell) || errors.Is(err, portfolio.ErrConflict) || errors.Is(err, ErrValidation) {
 			result = rejectedResult(mutation, safeReason(err))
 		} else {
 			return MutationResult{}, err
@@ -124,7 +159,38 @@ func (s *Service) applyOne(ctx context.Context, userID string, mutation Mutation
 	if err := s.store.StoreMutationResult(ctx, userID, mutation.MutationID, hash, result); err != nil {
 		return MutationResult{}, err
 	}
+	s.appendMutationAudit(ctx, userID, result)
 	return result, nil
+}
+
+func (s *Service) appendMutationAudit(ctx context.Context, userID string, result MutationResult) {
+	if s.audit == nil {
+		return
+	}
+	outcome := audit.OutcomeSuccess
+	severity := audit.SeverityInfo
+	if result.State == ResultRejected {
+		outcome = audit.OutcomeDenied
+		severity = audit.SeverityWarn
+	}
+	if result.State == ResultConflict {
+		outcome = audit.OutcomeConflict
+		severity = audit.SeverityWarn
+	}
+	if result.State == ResultReplayed {
+		outcome = audit.OutcomeReplayed
+	}
+	_ = s.audit.Append(ctx, audit.Event{
+		CorrelationID: "sync:" + result.MutationID,
+		ActorUserID:   userID,
+		Action:        "sync." + string(result.Operation),
+		EntityType:    string(result.EntityType),
+		EntityID:      result.EntityID,
+		Outcome:       outcome,
+		Severity:      severity,
+		Source:        audit.SourceSync,
+		Metadata:      audit.SafeMetadata(map[string]any{"mutation_id": result.MutationID, "entity_type": result.EntityType, "operation": result.Operation, "version": result.Version, "reason": result.Reason}),
+	})
 }
 
 func (s *Service) executeMutation(ctx context.Context, userID string, mutation Mutation) (MutationResult, error) {
@@ -152,6 +218,8 @@ func (s *Service) executeMutation(ctx context.Context, userID string, mutation M
 		return s.executeCategoryMutation(ctx, userID, mutation)
 	case EntityTransaction:
 		return s.executeTransactionMutation(ctx, userID, mutation)
+	case EntityAsset:
+		return s.executeAssetMutation(ctx, userID, mutation)
 	default:
 		return MutationResult{}, fmt.Errorf("%w: unsupported entity_type", ErrValidation)
 	}
@@ -281,6 +349,7 @@ func (s *Service) executeTransactionMutation(ctx context.Context, userID string,
 			SourceWalletID:      input.SourceWalletID,
 			DestinationWalletID: input.DestinationWalletID,
 			CategoryID:          input.CategoryID,
+			ReceiptObjectID:     input.ReceiptObjectID,
 			AmountVND:           input.AmountVND,
 			TargetBalanceVND:    input.TargetBalanceVND,
 			OccurredAt:          input.OccurredAt,
@@ -300,6 +369,106 @@ func (s *Service) executeTransactionMutation(ctx context.Context, userID string,
 		return s.appliedWithChange(ctx, userID, mutation, mutation.BaseVersion+1, json.RawMessage(`{}`))
 	default:
 		return MutationResult{}, fmt.Errorf("%w: unsupported transaction operation", ErrValidation)
+	}
+}
+
+func (s *Service) executeAssetMutation(ctx context.Context, userID string, mutation Mutation) (MutationResult, error) {
+	if s.portfolio == nil {
+		return MutationResult{}, fmt.Errorf("%w: portfolio sync unavailable", ErrValidation)
+	}
+	switch mutation.Operation {
+	case OperationCreate:
+		var input struct {
+			Type              portfolio.AssetType   `json:"type"`
+			Symbol            string                `json:"symbol"`
+			Exchange          string                `json:"exchange"`
+			Name              string                `json:"name"`
+			Unit              string                `json:"unit"`
+			PricingMode       portfolio.PricingMode `json:"pricing_mode"`
+			ProviderKey       string                `json:"provider_key"`
+			ProviderSymbol    string                `json:"provider_symbol"`
+			IncludeInNetWorth *bool                 `json:"include_in_net_worth"`
+		}
+		if err := decodePayload(mutation.Payload, &input); err != nil {
+			return MutationResult{}, err
+		}
+		asset, err := s.portfolio.CreatePosition(ctx, userID, portfolio.CreatePositionInput{
+			ID:                mutation.EntityID,
+			Type:              input.Type,
+			Symbol:            input.Symbol,
+			Exchange:          input.Exchange,
+			Name:              input.Name,
+			Unit:              input.Unit,
+			PricingMode:       input.PricingMode,
+			ProviderKey:       input.ProviderKey,
+			ProviderSymbol:    input.ProviderSymbol,
+			IncludeInNetWorth: input.IncludeInNetWorth,
+		})
+		if err != nil {
+			return MutationResult{}, err
+		}
+		return s.appliedWithChange(ctx, userID, mutation, asset.Version, mustJSON(asset))
+	case OperationArchive:
+		if err := s.portfolio.ArchivePosition(ctx, userID, mutation.EntityID, mutation.BaseVersion); err != nil {
+			return MutationResult{}, err
+		}
+		return s.appliedWithChange(ctx, userID, mutation, mutation.BaseVersion+1, json.RawMessage(`{}`))
+	case OperationAddTrade:
+		input, err := assetTradeInputFromPayload(mutation.Payload)
+		if err != nil {
+			return MutationResult{}, err
+		}
+		asset, err := s.portfolio.AddTrade(ctx, userID, mutation.EntityID, input)
+		if err != nil {
+			return MutationResult{}, err
+		}
+		return s.appliedWithChange(ctx, userID, mutation, asset.Version, mustJSON(asset))
+	case OperationUpdateTrade:
+		input, err := assetUpdateTradeInputFromPayload(mutation.Payload)
+		if err != nil {
+			return MutationResult{}, err
+		}
+		tradeID := payloadString(mutation.Payload, "trade_id")
+		if tradeID == "" {
+			return MutationResult{}, fmt.Errorf("%w: asset trade_id is required", ErrValidation)
+		}
+		asset, err := s.portfolio.UpdateTrade(ctx, userID, mutation.EntityID, tradeID, input)
+		if err != nil {
+			return MutationResult{}, err
+		}
+		return s.appliedWithChange(ctx, userID, mutation, asset.Version, mustJSON(asset))
+	case OperationArchiveTrade:
+		tradeID := payloadString(mutation.Payload, "trade_id")
+		if tradeID == "" {
+			return MutationResult{}, fmt.Errorf("%w: asset trade_id is required", ErrValidation)
+		}
+		asset, err := s.portfolio.ArchiveTrade(ctx, userID, mutation.EntityID, tradeID, mutation.BaseVersion)
+		if err != nil {
+			return MutationResult{}, err
+		}
+		return s.appliedWithChange(ctx, userID, mutation, asset.Version, mustJSON(asset))
+	case OperationAddPrice:
+		var input struct {
+			ID              string    `json:"id"`
+			UnitPriceVND    int64     `json:"unit_price_vnd"`
+			PricedAt        time.Time `json:"priced_at"`
+			Source          string    `json:"source"`
+			ProviderQuoteID string    `json:"provider_quote_id"`
+			BaseVersion     int64     `json:"base_version"`
+		}
+		if err := decodePayload(mutation.Payload, &input); err != nil {
+			return MutationResult{}, err
+		}
+		if input.Source == "" {
+			input.Source = "manual"
+		}
+		asset, err := s.portfolio.AddPrice(ctx, userID, mutation.EntityID, portfolio.AddPriceInput(input))
+		if err != nil {
+			return MutationResult{}, err
+		}
+		return s.appliedWithChange(ctx, userID, mutation, asset.Version, mustJSON(asset))
+	default:
+		return MutationResult{}, fmt.Errorf("%w: unsupported asset operation", ErrValidation)
 	}
 }
 
@@ -380,6 +549,7 @@ func transactionInputFromPayload(payload json.RawMessage) (finance.CreateTransac
 		SourceWalletID      string                  `json:"source_wallet_id"`
 		DestinationWalletID string                  `json:"destination_wallet_id"`
 		CategoryID          string                  `json:"category_id"`
+		ReceiptObjectID     string                  `json:"receipt_object_id"`
 		AmountVND           int64                   `json:"amount_vnd"`
 		TargetBalanceVND    *int64                  `json:"target_balance_vnd"`
 		OccurredAt          time.Time               `json:"occurred_at"`
@@ -396,6 +566,7 @@ func transactionInputFromPayload(payload json.RawMessage) (finance.CreateTransac
 		SourceWalletID:      input.SourceWalletID,
 		DestinationWalletID: input.DestinationWalletID,
 		CategoryID:          input.CategoryID,
+		ReceiptObjectID:     input.ReceiptObjectID,
 		AmountVND:           input.AmountVND,
 		TargetBalanceVND:    input.TargetBalanceVND,
 		OccurredAt:          input.OccurredAt,
@@ -404,6 +575,48 @@ func transactionInputFromPayload(payload json.RawMessage) (finance.CreateTransac
 		EventRef:            input.EventRef,
 		ExcludedFromReports: input.ExcludedFromReports,
 	}, nil
+}
+
+func assetTradeInputFromPayload(payload json.RawMessage) (portfolio.AddTradeInput, error) {
+	var input struct {
+		ID           string              `json:"id"`
+		Side         portfolio.TradeSide `json:"side"`
+		Quantity     string              `json:"quantity"`
+		UnitPriceVND int64               `json:"unit_price_vnd"`
+		FeeVND       int64               `json:"fee_vnd"`
+		OccurredAt   time.Time           `json:"occurred_at"`
+		Note         string              `json:"note"`
+		BaseVersion  int64               `json:"base_version"`
+	}
+	if err := decodePayload(payload, &input); err != nil {
+		return portfolio.AddTradeInput{}, err
+	}
+	return portfolio.AddTradeInput(input), nil
+}
+
+func assetUpdateTradeInputFromPayload(payload json.RawMessage) (portfolio.UpdateTradeInput, error) {
+	input, err := assetTradeInputFromPayload(payload)
+	if err != nil {
+		return portfolio.UpdateTradeInput{}, err
+	}
+	return portfolio.UpdateTradeInput{
+		Side:         input.Side,
+		Quantity:     input.Quantity,
+		UnitPriceVND: input.UnitPriceVND,
+		FeeVND:       input.FeeVND,
+		OccurredAt:   input.OccurredAt,
+		Note:         input.Note,
+		BaseVersion:  input.BaseVersion,
+	}, nil
+}
+
+func payloadString(payload json.RawMessage, key string) string {
+	var values map[string]any
+	if err := json.Unmarshal(normalizedPayload(payload), &values); err != nil {
+		return ""
+	}
+	value, _ := values[key].(string)
+	return strings.TrimSpace(value)
 }
 
 func rejectedResult(mutation Mutation, reason string) MutationResult {

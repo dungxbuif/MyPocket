@@ -1,17 +1,20 @@
 import type { CategorySummary, Transaction, TransactionInput, WalletSummary } from "../app/finance";
+import type { AssetPosition } from "../app/portfolio";
 
 export const stores = {
   wallets: "wallets",
   categories: "categories",
   transactions: "transactions",
+  assets: "assets",
   outbox: "outbox",
   conflicts: "conflicts",
   tombstones: "tombstones",
   meta: "meta",
+  receipts: "receipts",
 } as const;
 
-export type OfflineEntityType = "wallet" | "category" | "transaction";
-export type OfflineOperation = "create" | "update" | "archive" | "set_default_ai" | "set_category_active";
+export type OfflineEntityType = "wallet" | "category" | "transaction" | "asset";
+export type OfflineOperation = "create" | "update" | "archive" | "set_default_ai" | "set_category_active" | "add_trade" | "update_trade" | "archive_trade" | "add_price";
 export type OfflineMutationState = "pending" | "sending" | "retryable" | "conflict" | "synced" | "quarantined";
 export type OfflineStoreMode = "ready" | "degraded";
 
@@ -59,10 +62,20 @@ export type OfflineMeta = {
   value: string | number | boolean;
 };
 
+export type OfflineReceiptUpload = {
+  id: string;
+  transaction_id: string;
+  file: Blob;
+  filename: string;
+  content_type: string;
+  created_at: string;
+};
+
 export type OfflineSnapshot = {
   wallets: WalletSummary[];
   categories: CategorySummary[];
   transactions: Transaction[];
+  assets: AssetPosition[];
   outbox: OfflineMutation[];
   conflicts: OfflineConflict[];
   tombstones: OfflineTombstone[];

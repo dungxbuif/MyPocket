@@ -20,6 +20,7 @@ const OFFLINE_USER_KEY = "mypocket.current-user.v1";
 export async function loadCurrentUser(): Promise<AuthState> {
   try {
     const response = await apiFetch<{ user: CurrentUser }>("/api/v1/me");
+    if (!isCurrentUser(response.user)) return { status: "unauthenticated" };
     cacheCurrentUser(response.user);
     return { status: "authenticated", user: response.user };
   } catch (error) {
@@ -33,6 +34,12 @@ export async function loadCurrentUser(): Promise<AuthState> {
     }
     return { status: "unauthenticated" };
   }
+}
+
+function isCurrentUser(user: unknown): user is CurrentUser {
+  if (!user || typeof user !== "object") return false;
+  const candidate = user as Partial<CurrentUser>;
+  return typeof candidate.id === "string" && typeof candidate.email === "string";
 }
 
 export async function logout() {
