@@ -1395,6 +1395,95 @@
   margin-top: 24px;
 }
 
+/* Compact transaction editor: one card, inset dividers, native mobile date/number controls. */
+.transaction-form-card {
+  overflow: hidden;
+  border: 1px solid #e8e8eb;
+  border-radius: 18px;
+  background: #fff;
+}
+.transaction-form-card .sheet-segmented {
+  margin: 10px;
+  min-height: 42px;
+  border-radius: 999px;
+}
+.transaction-form-card .sheet-segmented button {
+  min-height: 40px;
+  padding: 0 10px;
+  font-size: 15px;
+}
+.transaction-form-card .amount-row,
+.transaction-form-card .sheet-row,
+.transaction-form-card .date-row {
+  min-height: 58px;
+  margin: 0 16px;
+  width: calc(100% - 32px);
+  border-bottom: 1px solid #ededf0;
+}
+.transaction-form-card .amount-row {
+  grid-template-columns: 58px 1fr;
+  padding: 8px 0;
+  border-radius: 0;
+}
+.transaction-form-card .amount-row span {
+  width: 50px;
+  padding: 7px 0;
+  font-size: 12px;
+}
+.transaction-form-card .amount-row input {
+  min-width: 0;
+  font-size: 32px;
+  font-weight: 700;
+}
+.transaction-form-card .sheet-row {
+  grid-template-columns: 28px 1fr;
+  gap: 12px;
+  padding: 0;
+  font-size: 16px;
+}
+.transaction-form-card .sheet-row svg { width: 20px; height: 20px; }
+.transaction-form-card .sheet-row select,
+.transaction-form-card .sheet-row input,
+.transaction-form-card .date-row input {
+  min-width: 0;
+  font-size: 16px;
+}
+.transaction-form-card .date-row {
+  display: grid;
+  grid-template-columns: 28px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 0;
+  color: #2dbd4f;
+}
+.transaction-form-card .date-row svg { width: 20px; height: 20px; }
+.exclude-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  margin: 0 16px;
+  color: #66666d;
+  font-size: 14px;
+}
+.exclude-row input { width: 18px; height: 18px; accent-color: #2dbd4f; }
+.details-trigger {
+  display: block;
+  width: 100%;
+  padding: 13px 16px;
+  border: 0;
+  border-top: 1px solid #ededf0;
+  background: transparent;
+  color: #2dbd4f;
+  font-size: 15px;
+  text-align: left;
+}
+.details-panel { border-top: 1px solid #ededf0; }
+.details-panel .sheet-row,
+.details-panel .image-row { margin-left: 16px; margin-right: 16px; width: calc(100% - 32px); }
+.debt-segmented { margin: 8px 16px; }
+.debt-segmented button { font-size: 14px; }
+
 .manager-section {
   display: grid;
   gap: 12px;

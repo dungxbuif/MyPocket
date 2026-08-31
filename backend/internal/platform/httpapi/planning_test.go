@@ -171,6 +171,41 @@ func TestObligationsAPIUsesAuthenticatedUser(t *testing.T) {
 	}
 }
 
+func TestRecurringSchedulesAPIUsesAuthenticatedUser(t *testing.T) {
+	now := time.Date(2026, 8, 31, 2, 0, 0, 0, time.UTC)
+	repo := &planningRepoStub{
+		schedules:       []planning.RecurringSchedule{{ID: "schedule-1", UserID: "user_123", Name: "Tiền nhà", Frequency: planning.RecurrenceMonthly, Timezone: "Asia/Ho_Chi_Minh", StartsAt: now, NextOccursAt: now, Version: 1}},
+		createdSchedule: planning.RecurringSchedule{ID: "schedule-2", UserID: "user_123", Name: "Internet", Frequency: planning.RecurrenceMonthly, Timezone: "Asia/Ho_Chi_Minh", StartsAt: now, NextOccursAt: now, Version: 1},
+		drafts:          []planning.TransactionDraft{{ID: "draft-1", UserID: "user_123", ScheduleID: "schedule-1", OccurrenceKey: "recurring:schedule-1:2026-08-31T02:00:00Z", AmountVND: 250000, OccurredAt: now, Status: "pending", Version: 1}},
+	}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		PlanningRepository: repo,
+	})
+
+	listReq := authenticatedRequest(t, http.MethodGet, "/api/v1/recurring-schedules", "")
+	listRes := httptest.NewRecorder()
+	handler.ServeHTTP(listRes, listReq)
+	if listRes.Code != http.StatusOK || repo.scheduleListUserID != "user_123" || !strings.Contains(listRes.Body.String(), "Tiền nhà") {
+		t.Fatalf("schedule list failed/scoped wrong: code=%d user=%q body=%s", listRes.Code, repo.scheduleListUserID, listRes.Body.String())
+	}
+
+	createReq := authenticatedRequest(t, http.MethodPost, "/api/v1/recurring-schedules", `{"name":"Internet","frequency":"monthly","timezone":"Asia/Ho_Chi_Minh","starts_at":"2026-08-31T09:00:00+07:00","type":"expense","source_wallet_id":"wallet-1","category_id":"cat-1","amount_vnd":250000,"note":"Wifi"}`)
+	addCSRF(createReq)
+	createRes := httptest.NewRecorder()
+	handler.ServeHTTP(createRes, createReq)
+	if createRes.Code != http.StatusCreated || repo.scheduleCreateUserID != "user_123" || repo.scheduleCreateInput.AmountVND != 250000 {
+		t.Fatalf("schedule create failed/scoped wrong: code=%d user=%q input=%#v body=%s", createRes.Code, repo.scheduleCreateUserID, repo.scheduleCreateInput, createRes.Body.String())
+	}
+
+	draftReq := authenticatedRequest(t, http.MethodGet, "/api/v1/transaction-drafts", "")
+	draftRes := httptest.NewRecorder()
+	handler.ServeHTTP(draftRes, draftReq)
+	if draftRes.Code != http.StatusOK || repo.draftListUserID != "user_123" || !strings.Contains(draftRes.Body.String(), `"status":"pending"`) {
+		t.Fatalf("draft list failed/scoped wrong: code=%d user=%q body=%s", draftRes.Code, repo.draftListUserID, draftRes.Body.String())
+	}
+}
+
 type planningRepoStub struct {
 	progress                []planning.BudgetProgress
 	created                 planning.Budget
@@ -211,6 +246,15 @@ type planningRepoStub struct {
 	obligationLinkUserID    string
 	obligationLinkID        string
 	obligationLinkTxID      string
+	schedules               []planning.RecurringSchedule
+	createdSchedule         planning.RecurringSchedule
+	scheduleListUserID      string
+	scheduleCreateUserID    string
+	scheduleCreateInput     planning.CreateRecurringScheduleInput
+	scheduleArchiveUserID   string
+	scheduleArchiveID       string
+	drafts                  []planning.TransactionDraft
+	draftListUserID         string
 }
 
 func (s *planningRepoStub) ListBudgetProgress(_ context.Context, userID string, _ time.Time) ([]planning.BudgetProgress, error) {
@@ -297,4 +341,26 @@ func (s *planningRepoStub) LinkObligationRepayment(_ context.Context, userID str
 	s.obligationLinkID = obligationID
 	s.obligationLinkTxID = transactionID
 	return nil
+}
+
+func (s *planningRepoStub) ListRecurringSchedules(_ context.Context, userID string) ([]planning.RecurringSchedule, error) {
+	s.scheduleListUserID = userID
+	return s.schedules, nil
+}
+
+func (s *planningRepoStub) CreateRecurringSchedule(_ context.Context, userID string, input planning.CreateRecurringScheduleInput) (planning.RecurringSchedule, error) {
+	s.scheduleCreateUserID = userID
+	s.scheduleCreateInput = input
+	return s.createdSchedule, nil
+}
+
+func (s *planningRepoStub) ArchiveRecurringSchedule(_ context.Context, userID string, scheduleID string) error {
+	s.scheduleArchiveUserID = userID
+	s.scheduleArchiveID = scheduleID
+	return nil
+}
+
+func (s *planningRepoStub) ListTransactionDrafts(_ context.Context, userID string) ([]planning.TransactionDraft, error) {
+	s.draftListUserID = userID
+	return s.drafts, nil
 }

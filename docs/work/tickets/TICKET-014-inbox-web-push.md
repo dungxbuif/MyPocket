@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-014
-status: ready
+status: in_review
 owner: human
 priority: high
 lane: high-risk
@@ -20,7 +20,7 @@ trace:
 
 ## Status
 
-- Status: ready
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-004
@@ -31,11 +31,17 @@ In-app notifications are authoritative. Web Push is a best-effort delivery chann
 
 ## Acceptance Criteria
 
-- [ ] Notifications persist in a user-scoped inbox with read/unread state and bounded pagination.
-- [ ] Budget thresholds, due obligations, and recurring drafts can create durable notices.
-- [ ] Push subscriptions are created/deleted with private endpoint/key handling and redacted logs.
-- [ ] Worker delivery retries are capped and expired endpoints are cleaned up.
-- [ ] Mobile inbox handles permission denied, unsupported, offline, and delivery-failed states.
+- [x] Notifications persist in a user-scoped inbox with read/unread state and bounded pagination.
+- [x] Budget thresholds, due obligations, and recurring drafts can create durable notices.
+- [x] Push subscriptions are created/deleted with private endpoint/key handling and redacted logs.
+- [x] Worker delivery retries are capped and expired endpoints are cleaned up.
+- [x] Mobile inbox handles permission denied, unsupported, offline, and delivery-failed states.
+
+## Implementation Decision
+
+- Use a dedicated `notification` package backed by PostgreSQL. Notification creation is idempotent on `(user_id, dedupe_key)` and list pagination is cursor-based with a server-side maximum of 50 rows.
+- Store push endpoint and encryption keys only in the server database; API responses expose subscription metadata but never return keys. Delivery is injected behind a small interface so the worker can classify success, expired endpoints, and retryable failures without coupling domain code to a provider.
+- Push is best effort: durable inbox insertion succeeds independently, retries stop after five attempts, and expired/invalid subscriptions are deleted.
 
 ## Small Task Exemption
 
@@ -51,6 +57,6 @@ In-app notifications are authoritative. Web Push is a best-effort delivery chann
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Ready for implementation; no execution evidence claimed.
+- Command: `GOCACHE=/private/tmp/mypocket-go-cache go test ./...` (backend), `npm test -- --run`, `npm run build` (frontend)
+- Result: pass for package/component/build proof; PostgreSQL integration requires local test database
+- Notes: Notification API ownership/read tests and retry/redaction unit tests pass; mobile UI exposes denied, unsupported, offline, and failed states.

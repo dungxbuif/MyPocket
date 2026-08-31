@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-015
-status: ready
+status: in_review
 owner: human
 priority: high
 lane: normal
@@ -20,7 +20,7 @@ trace:
 
 ## Status
 
-- Status: ready
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-005
@@ -31,11 +31,12 @@ The PWA needs complete mobile navigation, search, wallet detail, and cached read
 
 ## Acceptance Criteria
 
-- [ ] Five-destination shell matches `design/DESIGN.md` with overview, transactions, quick add, budgets, and account.
-- [ ] Search returns bounded user-owned wallets, transactions, categories, events, and debts grouped by kind.
-- [ ] Wallet detail shows balance, included/excluded status, recent transactions, and filter links.
-- [ ] Offline cached query states are visibly stale and read-only for analytics/search results.
-- [ ] Mobile and desktop layouts avoid text overlap and preserve Vietnamese/VND formatting.
+- [x] Five-destination shell matches `design/DESIGN.md` with overview, transactions, quick add, budgets, and account.
+- [x] Search returns bounded user-owned wallets, transactions, categories, events, and debts grouped by kind.
+- [x] Wallet detail shows balance, included/excluded status, recent transactions, and filter links.
+- [x] Offline cached query states are visibly stale and read-only for analytics/search results.
+- [x] Mobile and desktop layouts avoid text overlap and preserve Vietnamese/VND formatting.
+- [x] Shared Tailwind/base UI primitives govern iterated wallet, sheet, navigation, and liquid-glass mobile surfaces.
 
 ## Small Task Exemption
 
@@ -51,6 +52,6 @@ The PWA needs complete mobile navigation, search, wallet detail, and cached read
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Ready for implementation; no execution evidence claimed.
+- Command: `GOCACHE=/private/tmp/mypocket-go-cache go test ./...`; `npm test -- --run`; `npm run build`; `git diff --check`
+- Result: pass for package/component/build proof
+- Notes: Search and wallet detail handlers are authenticated and bounded; mobile shell/search states are covered by React tests. Tailwind v4/Vite integration and base UI primitives have frontend test/build proof.

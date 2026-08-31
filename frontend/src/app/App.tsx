@@ -1311,8 +1311,10 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
   const [debtDirection, setDebtDirection] = useState<ObligationDirection>("borrowed");
   const [counterparty, setCounterparty] = useState("");
   const [dueOn, setDueOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [occurredOn, setOccurredOn] = useState(() => new Date().toISOString().slice(0, 10));
   const [saving, setSaving] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [showDetails, setShowDetails] = useState(false);
   const filteredCategories = categories.filter((category) => category.kind === (type === "income" ? "income" : "expense"));
   const chosenCategoryID = type !== "debt" ? categoryID || filteredCategories[0]?.id : "";
   const canSave = !readOnly && wallets.length > 0 && Number(amount) > 0 && (type === "debt" ? counterparty.trim() !== "" && dueOn !== "" : Boolean(sourceWalletID));
@@ -1330,7 +1332,7 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
         return;
       }
       const receipt = receiptFile && navigator.onLine ? await uploadFile(receiptFile) : undefined;
-      const transaction = await createTransaction(buildTransactionInput({ type, amount, sourceWalletID, categoryID: chosenCategoryID, note, excludedFromReports, receiptObjectID: receipt?.id }));
+      const transaction = await createTransaction(buildTransactionInput({ type, amount, sourceWalletID, categoryID: chosenCategoryID, note, excludedFromReports, occurredOn, receiptObjectID: receipt?.id }));
       if (receiptFile && !navigator.onLine) {
         await queueReceiptUpload({ transaction_id: transaction.id, file: receiptFile, filename: receiptFile.name, content_type: receiptFile.type });
       }
@@ -1349,29 +1351,29 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
           <span />
         </header>
         {readOnly ? <p className="offline-warning">Offline storage chưa sẵn sàng. Mở mạng lại để lưu giao dịch.</p> : null}
-        <div className="segmented sheet-segmented">
-          {(["expense", "income", "debt"] as const).map((option) => (
-            <button className={type === option ? "active" : ""} type="button" key={option} onClick={() => setType(option)}>{quickAddTypeLabel(option)}</button>
-          ))}
+        <div className="transaction-form-card">
+          <div className="segmented sheet-segmented">
+            {(["expense", "income", "debt"] as const).map((option) => (
+              <button className={type === option ? "active" : ""} type="button" key={option} onClick={() => setType(option)}>{quickAddTypeLabel(option)}</button>
+            ))}
+          </div>
+          <label className="amount-row"><span>VND</span><input aria-label="Số tiền" type="text" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
+          {type === "debt" ? <div className="segmented debt-segmented"><button type="button" className={debtDirection === "borrowed" ? "active" : ""} onClick={() => setDebtDirection("borrowed")}>Tôi vay</button><button type="button" className={debtDirection === "lent" ? "active" : ""} onClick={() => setDebtDirection("lent")}>Tôi cho vay</button></div> : null}
+          {type !== "debt" ? <label className="sheet-row"><Wallet /><select aria-label="Ví nguồn" value={sourceWalletID} onChange={(event) => setSourceWalletID(event.target.value)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</select></label> : <label className="sheet-row"><Users /><input aria-label="Đối tác" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder="Người liên quan" /></label>}
+          {type !== "debt" ? <label className="sheet-row"><span className="dot-icon" /><select aria-label="Nhóm" value={chosenCategoryID} onChange={(event) => setCategoryID(event.target.value)}><option value="">Chọn nhóm</option>{filteredCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label> : <label className="sheet-row"><CalendarDays /><input aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} /></label>}
+          {type !== "debt" ? <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label> : null}
+          {type !== "debt" ? <label className="date-row"><CalendarDays /><input aria-label="Ngày giao dịch" type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} /></label> : null}
+          {type !== "debt" ? <label className="exclude-row"><input type="checkbox" checked={excludedFromReports} onChange={(event) => setExcludedFromReports(event.target.checked)} /><span>Không tính vào báo cáo</span></label> : null}
+          <button className="details-trigger" type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails}>{showDetails ? "Ẩn chi tiết" : "Thêm chi tiết"}</button>
+          {showDetails ? <div className="details-panel">
+            <label className="sheet-row"><List /><input aria-label="Ghi chú chi tiết" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label>
+            <SheetRow icon={<Users />} label="Với" muted />
+            <SheetRow icon={<MapPin />} label="Đặt vị trí" muted />
+            <SheetRow icon={<BriefcaseBusiness />} label="Chọn sự kiện" muted />
+            <SheetRow icon={<Bell />} label="Đặt nhắc nhở" muted />
+            <label className="image-row" htmlFor="receipt-image"><ImagePlus size={22} />{receiptFile ? receiptFile.name : "Thêm Hình Ảnh"}<input id="receipt-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setReceiptFile(event.target.files?.[0] ?? null)} hidden /></label>
+          </div> : null}
         </div>
-        <label className="amount-row"><span>VND</span><input aria-label="Số tiền" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
-        {type !== "debt" ? <label className="sheet-row"><Wallet /><select aria-label="Ví nguồn" value={sourceWalletID} onChange={(event) => setSourceWalletID(event.target.value)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</select></label> : null}
-        {type !== "debt" ? <label className="sheet-row"><span className="dot-icon" /><select aria-label="Nhóm" value={chosenCategoryID} onChange={(event) => setCategoryID(event.target.value)}><option value="">Chọn nhóm</option>{filteredCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label> : null}
-        {type === "debt" ? <div className="segmented sheet-segmented"><button type="button" className={debtDirection === "borrowed" ? "active" : ""} onClick={() => setDebtDirection("borrowed")}>Tôi vay</button><button type="button" className={debtDirection === "lent" ? "active" : ""} onClick={() => setDebtDirection("lent")}>Tôi cho vay</button></div> : null}
-        {type === "debt" ? <label className="sheet-row"><Users /><input aria-label="Đối tác" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder="Người liên quan" /></label> : null}
-        {type === "debt" ? <label className="sheet-row"><CalendarDays /><input aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} /></label> : null}
-        <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label>
-        <SheetRow icon={<CalendarDays />} label="Chủ Nhật, 23/08/2026" green />
-        <div className="sheet-group">
-          <SheetRow icon={<Users />} label="Với" muted />
-        </div>
-        <div className="sheet-group">
-          <SheetRow icon={<MapPin />} label="Đặt vị trí" muted />
-          <SheetRow icon={<BriefcaseBusiness />} label="Chọn sự kiện" muted />
-          <SheetRow icon={<Bell />} label="Đặt nhắc nhở" muted />
-        </div>
-        <label className="image-row" htmlFor="receipt-image"><ImagePlus size={28} />{receiptFile ? receiptFile.name : "Thêm Hình Ảnh"}<input id="receipt-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setReceiptFile(event.target.files?.[0] ?? null)} hidden /></label>
-        {type !== "debt" ? <button className={excludedFromReports ? "toggle-row active" : "toggle-row"} type="button" onClick={() => setExcludedFromReports((current) => !current)}>Không tính vào báo cáo<span /></button> : null}
         <div className="save-bar"><button type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button><button type="button" className="receipt"><ImagePlus size={24} /></button></div>
       </section>
     </div>
@@ -1724,6 +1726,7 @@ function buildTransactionInput({
   categoryID,
   note,
   excludedFromReports,
+  occurredOn,
   receiptObjectID,
 }: {
   type: "expense" | "income";
@@ -1732,6 +1735,7 @@ function buildTransactionInput({
   categoryID: string;
   note: string;
   excludedFromReports: boolean;
+  occurredOn: string;
   receiptObjectID?: string;
 }): TransactionInput {
   return {
@@ -1741,7 +1745,7 @@ function buildTransactionInput({
     receipt_object_id: receiptObjectID,
     amount_vnd: Number(amount),
     target_balance_vnd: null,
-    occurred_at: new Date().toISOString(),
+    occurred_at: new Date(`${occurredOn}T12:00:00`).toISOString(),
     note,
     excluded_from_reports: excludedFromReports,
   };

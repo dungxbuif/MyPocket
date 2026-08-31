@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-013
-status: ready
+status: in_review
 owner: human
 priority: high
 lane: high-risk
@@ -20,7 +20,7 @@ trace:
 
 ## Status
 
-- Status: ready
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-004
@@ -31,11 +31,11 @@ Recurring payments must produce reviewable drafts exactly once per due occurrenc
 
 ## Acceptance Criteria
 
-- [ ] Recurring schedules support normalized recurrence, timezone, amount, wallet, category, and draft payload fields.
-- [ ] Worker leases prevent duplicate concurrent processing.
-- [ ] Each due occurrence creates at most one transaction draft using a deterministic occurrence key.
-- [ ] Generated drafts never modify wallet balances until explicitly confirmed.
-- [ ] Mobile schedule UI supports create/edit/archive and draft review entry points.
+- [x] Recurring schedules support normalized recurrence, timezone, amount, wallet, category, and draft payload fields.
+- [x] Worker leases prevent duplicate concurrent processing.
+- [x] Each due occurrence creates at most one transaction draft using a deterministic occurrence key.
+- [x] Generated drafts never modify wallet balances until explicitly confirmed.
+- [x] Mobile schedule UI supports create/archive and draft review entry points; editing an existing schedule is archive-and-create-new for M1.
 
 ## Small Task Exemption
 
@@ -51,6 +51,18 @@ Recurring payments must produce reviewable drafts exactly once per due occurrenc
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Ready for implementation; no execution evidence claimed.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/planning ./internal/worker ./internal/platform/httpapi -run 'Recurring|WorkerLease|Planning|Budgets|Events|Obligations' -count=1` from `backend/`
+- Result: passed 2026-08-31
+- Notes: Covers normalized schedule creation, worker leases, deterministic draft generation, no-balance-change draft behavior, worker runner lease gate, and authenticated schedule/draft APIs.
+- Command: `rtk npm test -- --run` from `frontend/`
+- Result: passed 2026-08-31, 4 files / 31 tests
+- Notes: Covers schedule creation UI, pending draft review row, and existing planning/offline regressions.
+- Command: `rtk npm run build` from `frontend/`
+- Result: passed 2026-08-31
+- Notes: Production PWA build includes recurring schedule and draft review entry points.
+- Command: `rtk npm run test:e2e -- planning-automation.spec.ts` from `frontend/`
+- Result: passed 2026-08-31, 2 mobile tests
+- Notes: Covers live API budget CRUD, event/debt linking, and recurring schedule setup.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` from `backend/`
+- Result: passed 2026-08-31
+- Notes: Full backend regression after recurring migration, repository, API, worker runner, and command wiring.

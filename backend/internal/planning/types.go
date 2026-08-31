@@ -3,6 +3,8 @@ package planning
 import (
 	"strings"
 	"time"
+
+	"mypocket/internal/finance"
 )
 
 type BudgetPeriodType string
@@ -117,6 +119,62 @@ type ObligationSummary struct {
 	RepaidVND    int64               `json:"repaid_vnd"`
 	RemainingVND int64               `json:"remaining_vnd"`
 	Version      int64               `json:"version"`
+}
+
+type RecurrenceFrequency string
+
+const (
+	RecurrenceDaily   RecurrenceFrequency = "daily"
+	RecurrenceWeekly  RecurrenceFrequency = "weekly"
+	RecurrenceMonthly RecurrenceFrequency = "monthly"
+)
+
+type CreateRecurringScheduleInput struct {
+	Name                string
+	Frequency           RecurrenceFrequency
+	Timezone            string
+	StartsAt            string
+	Type                finance.TransactionType
+	SourceWalletID      string
+	DestinationWalletID string
+	CategoryID          string
+	AmountVND           int64
+	Note                string
+}
+
+type UpdateRecurringScheduleInput = CreateRecurringScheduleInput
+
+type RecurringSchedule struct {
+	ID                  string                  `json:"id"`
+	UserID              string                  `json:"user_id"`
+	Name                string                  `json:"name"`
+	Frequency           RecurrenceFrequency     `json:"frequency"`
+	Timezone            string                  `json:"timezone"`
+	StartsAt            time.Time               `json:"starts_at"`
+	NextOccursAt        time.Time               `json:"next_occurs_at"`
+	Type                finance.TransactionType `json:"type"`
+	SourceWalletID      string                  `json:"source_wallet_id"`
+	DestinationWalletID string                  `json:"destination_wallet_id,omitempty"`
+	CategoryID          string                  `json:"category_id,omitempty"`
+	AmountVND           int64                   `json:"amount_vnd"`
+	Note                string                  `json:"note"`
+	Version             int64                   `json:"version"`
+}
+
+type TransactionDraft struct {
+	ID                  string                  `json:"id"`
+	UserID              string                  `json:"user_id"`
+	ScheduleID          string                  `json:"schedule_id,omitempty"`
+	OccurrenceKey       string                  `json:"occurrence_key"`
+	Type                finance.TransactionType `json:"type"`
+	SourceWalletID      string                  `json:"source_wallet_id"`
+	DestinationWalletID string                  `json:"destination_wallet_id,omitempty"`
+	CategoryID          string                  `json:"category_id,omitempty"`
+	AmountVND           int64                   `json:"amount_vnd"`
+	OccurredAt          time.Time               `json:"occurred_at"`
+	Note                string                  `json:"note"`
+	Status              string                  `json:"status"`
+	Version             int64                   `json:"version"`
 }
 
 func trimmed(value string) string {

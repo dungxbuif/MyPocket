@@ -1,5 +1,7 @@
 import type { CategorySummary, Transaction, TransactionInput, WalletSummary } from "../app/finance";
+import type { AssetPosition } from "../app/portfolio";
 import {
+  archiveOfflineAsset,
   archiveOfflineCategory,
   archiveOfflineTransaction,
   archiveOfflineWallet,
@@ -7,6 +9,7 @@ import {
   removeOfflineMutation,
   resolveOfflineConflict,
   saveFinanceMirror,
+  upsertOfflineAsset,
   upsertOfflineCategory,
   upsertOfflineTransaction,
   upsertOfflineWallet,
@@ -58,6 +61,7 @@ export async function fullResync() {
     wallets: snapshot.wallets as WalletSummary[],
     categories: snapshot.categories as CategorySummary[],
     transactions: snapshot.transactions as Transaction[],
+    assets: snapshot.assets as AssetPosition[],
     cursor: snapshot.next_cursor,
   });
 }
@@ -67,9 +71,11 @@ async function mirrorConflictServerPayload(conflict: OfflineConflict) {
     if (conflict.entity_type === "wallet") await archiveOfflineWallet(conflict.entity_id, conflict.server_version);
     if (conflict.entity_type === "category") await archiveOfflineCategory(conflict.entity_id, conflict.server_version);
     if (conflict.entity_type === "transaction") await archiveOfflineTransaction(conflict.entity_id, conflict.server_version);
+    if (conflict.entity_type === "asset") await archiveOfflineAsset(conflict.entity_id, conflict.server_version);
     return;
   }
   if (conflict.entity_type === "wallet") await upsertOfflineWallet(conflict.server_payload as WalletSummary);
   if (conflict.entity_type === "category") await upsertOfflineCategory(conflict.server_payload as CategorySummary);
   if (conflict.entity_type === "transaction") await upsertOfflineTransaction(conflict.server_payload as Transaction);
+  if (conflict.entity_type === "asset") await upsertOfflineAsset(conflict.server_payload as AssetPosition);
 }

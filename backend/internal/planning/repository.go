@@ -426,6 +426,189 @@ func (r *Repository) ListObligations(ctx context.Context, userID string) ([]Obli
 	return obligations, nil
 }
 
+func (r *Repository) CreateRecurringSchedule(ctx context.Context, userID string, input CreateRecurringScheduleInput) (RecurringSchedule, error) {
+	input, startsAt, err := ValidateCreateRecurringSchedule(input)
+	if err != nil {
+		return RecurringSchedule{}, err
+	}
+	if err := r.validateRecurringFinanceRefs(ctx, userID, input); err != nil {
+		return RecurringSchedule{}, err
+	}
+	var schedule RecurringSchedule
+	err = r.db.QueryRowContext(ctx, `
+		INSERT INTO recurring_schedules (user_id, name, frequency, timezone, starts_at, next_occurs_at, transaction_type, source_wallet_id, destination_wallet_id, category_id, amount_vnd, note)
+		VALUES ($1, $2, $3, $4, $5, $5, $6, $7, $8, $9, $10, $11)
+		RETURNING id::text, user_id::text, name, frequency, timezone, starts_at, next_occurs_at, transaction_type, source_wallet_id::text, coalesce(destination_wallet_id::text, ''), coalesce(category_id::text, ''), amount_vnd, note, version
+	`, userID, input.Name, string(input.Frequency), input.Timezone, startsAt.UTC(), string(input.Type), input.SourceWalletID, nullString(input.DestinationWalletID), nullString(input.CategoryID), input.AmountVND, input.Note).Scan(
+		&schedule.ID, &schedule.UserID, &schedule.Name, &schedule.Frequency, &schedule.Timezone, &schedule.StartsAt, &schedule.NextOccursAt, &schedule.Type, &schedule.SourceWalletID, &schedule.DestinationWalletID, &schedule.CategoryID, &schedule.AmountVND, &schedule.Note, &schedule.Version,
+	)
+	if err != nil {
+		return RecurringSchedule{}, fmt.Errorf("create recurring schedule: %w", err)
+	}
+	return schedule, nil
+}
+
+func (r *Repository) ListRecurringSchedules(ctx context.Context, userID string) ([]RecurringSchedule, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id::text, user_id::text, name, frequency, timezone, starts_at, next_occurs_at, transaction_type, source_wallet_id::text, coalesce(destination_wallet_id::text, ''), coalesce(category_id::text, ''), amount_vnd, note, version
+		FROM recurring_schedules
+		WHERE user_id = $1 AND archived_at IS NULL
+		ORDER BY next_occurs_at, created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list recurring schedules: %w", err)
+	}
+	defer rows.Close()
+	var schedules []RecurringSchedule
+	for rows.Next() {
+		var schedule RecurringSchedule
+		if err := rows.Scan(&schedule.ID, &schedule.UserID, &schedule.Name, &schedule.Frequency, &schedule.Timezone, &schedule.StartsAt, &schedule.NextOccursAt, &schedule.Type, &schedule.SourceWalletID, &schedule.DestinationWalletID, &schedule.CategoryID, &schedule.AmountVND, &schedule.Note, &schedule.Version); err != nil {
+			return nil, fmt.Errorf("scan recurring schedule: %w", err)
+		}
+		schedules = append(schedules, schedule)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("recurring schedule rows: %w", err)
+	}
+	return schedules, nil
+}
+
+func (r *Repository) ArchiveRecurringSchedule(ctx context.Context, userID string, scheduleID string) error {
+	result, err := r.db.ExecContext(ctx, `
+		UPDATE recurring_schedules
+		SET archived_at = now(), updated_at = now(), version = version + 1
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+	`, scheduleID, userID)
+	if err != nil {
+		return fmt.Errorf("archive recurring schedule: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("archive recurring schedule rows affected: %w", err)
+	}
+	if affected == 0 {
+		return ErrForbidden
+	}
+	return nil
+}
+
+func (r *Repository) ListTransactionDrafts(ctx context.Context, userID string) ([]TransactionDraft, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id::text, user_id::text, coalesce(schedule_id::text, ''), occurrence_key, transaction_type, source_wallet_id::text, coalesce(destination_wallet_id::text, ''), coalesce(category_id::text, ''), amount_vnd, occurred_at, note, status, version
+		FROM transaction_drafts
+		WHERE user_id = $1
+		ORDER BY occurred_at DESC, created_at DESC
+	`, userID)
+	if err != nil {
+		return nil, fmt.Errorf("list transaction drafts: %w", err)
+	}
+	defer rows.Close()
+	var drafts []TransactionDraft
+	for rows.Next() {
+		var draft TransactionDraft
+		if err := rows.Scan(&draft.ID, &draft.UserID, &draft.ScheduleID, &draft.OccurrenceKey, &draft.Type, &draft.SourceWalletID, &draft.DestinationWalletID, &draft.CategoryID, &draft.AmountVND, &draft.OccurredAt, &draft.Note, &draft.Status, &draft.Version); err != nil {
+			return nil, fmt.Errorf("scan transaction draft: %w", err)
+		}
+		drafts = append(drafts, draft)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("transaction draft rows: %w", err)
+	}
+	return drafts, nil
+}
+
+func (r *Repository) AcquireWorkerLease(ctx context.Context, leaseKey string, owner string, ttl time.Duration, now time.Time) (bool, error) {
+	leaseKey = trimmed(leaseKey)
+	owner = trimmed(owner)
+	if leaseKey == "" || owner == "" || ttl <= 0 {
+		return false, fmt.Errorf("%w: invalid worker lease", ErrValidation)
+	}
+	var acquired bool
+	err := r.db.QueryRowContext(ctx, `
+		INSERT INTO worker_leases (lease_key, owner, expires_at)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (lease_key) DO UPDATE
+		SET owner = EXCLUDED.owner,
+		    expires_at = EXCLUDED.expires_at,
+		    updated_at = now()
+		WHERE worker_leases.expires_at <= $4 OR worker_leases.owner = $2
+		RETURNING true
+	`, leaseKey, owner, now.Add(ttl), now).Scan(&acquired)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("acquire worker lease: %w", err)
+	}
+	return acquired, nil
+}
+
+func (r *Repository) ProcessDueRecurringSchedules(ctx context.Context, workerID string, now time.Time, limit int) (int, error) {
+	if limit <= 0 {
+		limit = 25
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("begin recurring processing: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	rows, err := tx.QueryContext(ctx, `
+		SELECT id::text, user_id::text, name, frequency, timezone, starts_at, next_occurs_at, transaction_type, source_wallet_id::text, coalesce(destination_wallet_id::text, ''), coalesce(category_id::text, ''), amount_vnd, note, version
+		FROM recurring_schedules
+		WHERE archived_at IS NULL AND next_occurs_at <= $1
+		ORDER BY next_occurs_at
+		LIMIT $2
+		FOR UPDATE SKIP LOCKED
+	`, now.UTC(), limit)
+	if err != nil {
+		return 0, fmt.Errorf("query due recurring schedules: %w", err)
+	}
+	var schedules []RecurringSchedule
+	for rows.Next() {
+		var schedule RecurringSchedule
+		if err := rows.Scan(&schedule.ID, &schedule.UserID, &schedule.Name, &schedule.Frequency, &schedule.Timezone, &schedule.StartsAt, &schedule.NextOccursAt, &schedule.Type, &schedule.SourceWalletID, &schedule.DestinationWalletID, &schedule.CategoryID, &schedule.AmountVND, &schedule.Note, &schedule.Version); err != nil {
+			_ = rows.Close()
+			return 0, fmt.Errorf("scan due recurring schedule: %w", err)
+		}
+		schedules = append(schedules, schedule)
+	}
+	if err := rows.Close(); err != nil {
+		return 0, fmt.Errorf("close due recurring schedules: %w", err)
+	}
+	if err := rows.Err(); err != nil {
+		return 0, fmt.Errorf("due recurring rows: %w", err)
+	}
+
+	processed := 0
+	for _, schedule := range schedules {
+		next := schedule.NextOccursAt
+		for !next.After(now.UTC()) {
+			key := fmt.Sprintf("recurring:%s:%s", schedule.ID, next.UTC().Format(time.RFC3339))
+			inserted, err := insertRecurringDraft(ctx, tx, schedule, key, next.UTC())
+			if err != nil {
+				return 0, err
+			}
+			if inserted {
+				processed++
+			}
+			next = NextOccurrence(next, schedule.Frequency, schedule.Timezone)
+		}
+		if _, err := tx.ExecContext(ctx, `
+			UPDATE recurring_schedules
+			SET next_occurs_at = $1, updated_at = now(), version = version + 1
+			WHERE id = $2
+		`, next.UTC(), schedule.ID); err != nil {
+			return 0, fmt.Errorf("advance recurring schedule: %w", err)
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit recurring processing: %w", err)
+	}
+	_ = workerID
+	return processed, nil
+}
+
 func (r *Repository) listBudgets(ctx context.Context, userID string) ([]Budget, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT b.id::text, b.user_id::text, b.name, b.period_type, b.amount_vnd, b.all_categories, b.custom_start, b.custom_end, b.version,
@@ -544,9 +727,40 @@ func (r *Repository) validateExpenseCategories(ctx context.Context, userID strin
 	return nil
 }
 
+func (r *Repository) validateRecurringFinanceRefs(ctx context.Context, userID string, input CreateRecurringScheduleInput) error {
+	if err := r.ensureActiveOwnerRow(ctx, "wallets", userID, input.SourceWalletID); err != nil {
+		return err
+	}
+	if input.DestinationWalletID != "" {
+		if err := r.ensureActiveOwnerRow(ctx, "wallets", userID, input.DestinationWalletID); err != nil {
+			return err
+		}
+	}
+	if input.CategoryID != "" {
+		var exists bool
+		if err := r.db.QueryRowContext(ctx, `
+			SELECT EXISTS (
+				SELECT 1
+				FROM categories
+				WHERE id = $1
+				  AND archived_at IS NULL
+				  AND (is_system OR user_id = $2)
+			)
+		`, input.CategoryID, userID).Scan(&exists); err != nil {
+			return fmt.Errorf("check schedule category: %w", err)
+		}
+		if !exists {
+			return ErrForbidden
+		}
+	}
+	return nil
+}
+
 func (r *Repository) ensureActiveOwnerRow(ctx context.Context, table string, userID string, id string) error {
 	query := ""
 	switch table {
+	case "wallets":
+		query = `SELECT EXISTS (SELECT 1 FROM wallets WHERE id = $1 AND user_id = $2 AND archived_at IS NULL)`
 	case "events":
 		query = `SELECT EXISTS (SELECT 1 FROM events WHERE id = $1 AND user_id = $2 AND archived_at IS NULL)`
 	case "obligations":
@@ -564,6 +778,36 @@ func (r *Repository) ensureActiveOwnerRow(ctx context.Context, table string, use
 		return ErrForbidden
 	}
 	return nil
+}
+
+func insertRecurringDraft(ctx context.Context, tx *sql.Tx, schedule RecurringSchedule, occurrenceKey string, occursAt time.Time) (bool, error) {
+	result, err := tx.ExecContext(ctx, `
+		WITH occurrence AS (
+			INSERT INTO recurring_occurrences (user_id, schedule_id, occurrence_key, occurs_at)
+			VALUES ($1, $2, $3, $4)
+			ON CONFLICT (schedule_id, occurrence_key) DO NOTHING
+			RETURNING occurrence_key
+		)
+		INSERT INTO transaction_drafts (user_id, schedule_id, occurrence_key, transaction_type, source_wallet_id, destination_wallet_id, category_id, amount_vnd, occurred_at, note)
+		SELECT $1, $2, $3, $5, $6, $7, $8, $9, $4, $10
+		FROM occurrence
+		ON CONFLICT (user_id, occurrence_key) DO NOTHING
+	`, schedule.UserID, schedule.ID, occurrenceKey, occursAt, string(schedule.Type), schedule.SourceWalletID, nullString(schedule.DestinationWalletID), nullString(schedule.CategoryID), schedule.AmountVND, schedule.Note)
+	if err != nil {
+		return false, fmt.Errorf("insert recurring draft: %w", err)
+	}
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return false, fmt.Errorf("recurring draft rows affected: %w", err)
+	}
+	return affected > 0, nil
+}
+
+func nullString(value string) any {
+	if trimmed(value) == "" {
+		return nil
+	}
+	return value
 }
 
 func (r *Repository) transactionAmount(ctx context.Context, userID string, transactionID string) (int64, error) {

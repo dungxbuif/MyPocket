@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-004
-status: in_progress
+status: in_review
 owner: human
 priority: High
 human_fields:
@@ -46,7 +46,7 @@ trace:
 ## Status
 
 - ID: PHASE-004
-- Status: in_progress
+- Status: in_review
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
@@ -88,8 +88,8 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 | --- | --- | --- | --- | --- |
 | TICKET-011 | Ticket | Budgets and threshold alerts | in_review | [TICKET-011](../tickets/TICKET-011-budgets-threshold-alerts.md) |
 | TICKET-012 | Ticket | Events, debts, and repayments | in_review | [TICKET-012](../tickets/TICKET-012-events-debts-repayments.md) |
-| TICKET-013 | Ticket | Recurring schedules and worker occurrences | ready | [TICKET-013](../tickets/TICKET-013-recurring-schedules-worker.md) |
-| TICKET-014 | Ticket | In-app inbox and Web Push | ready | [TICKET-014](../tickets/TICKET-014-inbox-web-push.md) |
+| TICKET-013 | Ticket | Recurring schedules and worker occurrences | in_review | [TICKET-013](../tickets/TICKET-013-recurring-schedules-worker.md) |
+| TICKET-014 | Ticket | In-app inbox and Web Push | in_review | [TICKET-014](../tickets/TICKET-014-inbox-web-push.md) |
 
 ## Dependencies
 
@@ -130,4 +130,4 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 
 ## Completion Summary
 
-TICKET-011 budgets/threshold alerts and TICKET-012 events/debts/repayments are in review with automated backend, frontend, build, and mobile E2E proof. Remaining PHASE-004 work is TICKET-013 recurring schedules/worker occurrences and TICKET-014 in-app inbox/Web Push.
+TICKET-011 through TICKET-014 are in review with automated backend, frontend, build, and mobile E2E proof. PHASE-004 implementation scope is complete; human UAT remains.

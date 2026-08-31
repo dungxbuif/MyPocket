@@ -45,5 +45,10 @@ trace:
 | `rtk npm run build` from `frontend/` | Passed 2026-08-31 | Production PWA build after event/debt planning UI and client changes. |
 | `rtk npm run test:e2e -- planning-automation.spec.ts` from `frontend/` | Passed 2026-08-31, 2 mobile tests | Live API budget CRUD plus event creation and debt creation linked to existing transactions. |
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` from `backend/` | Passed 2026-08-31 | Full backend regression after TICKET-012 migration, planning repository, API, and dependency wiring. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test ./internal/planning ./internal/worker ./internal/platform/httpapi -run 'Recurring|WorkerLease|Planning|Budgets|Events|Obligations' -count=1` from `backend/` | Passed 2026-08-31 | Recurring schedules, worker leases, deterministic draft generation, no-balance-change drafts, worker runner lease gate, and authenticated schedule/draft APIs. |
+| `rtk npm test -- --run` from `frontend/` | Passed 2026-08-31, 4 files / 31 tests | Mobile schedule creation UI, pending draft review row, and existing planning/offline regressions. |
+| `rtk npm run build` from `frontend/` | Passed 2026-08-31 | Production PWA build after recurring schedule and draft UI changes. |
+| `rtk npm run test:e2e -- planning-automation.spec.ts` from `frontend/` | Passed 2026-08-31, 2 mobile tests | Live API budget CRUD, event/debt transaction linking, and recurring schedule setup. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` from `backend/` | Passed 2026-08-31 | Full backend regression after TICKET-013 migration, planning repository, API, worker package, and worker command wiring. |
 
-Notes: TICKET-011 and TICKET-012 have automated proof and are in review. PHASE-004 remains in progress because TICKET-013 and TICKET-014 are not implemented yet.
+Notes: TICKET-011 through TICKET-013 have automated proof and are in review. PHASE-004 remains in progress because TICKET-014 is not implemented yet.

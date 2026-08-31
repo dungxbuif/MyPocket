@@ -178,8 +178,8 @@ func issueAuthRedirect(w http.ResponseWriter, r *http.Request, cfg config.Config
 		writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Authentication unavailable", correlationID(r.Context())))
 		return err
 	}
-	http.SetCookie(w, authCookie(authValue, time.Now().Add(30*24*time.Hour)))
-	http.SetCookie(w, csrfCookie(csrfValue, time.Now().Add(30*24*time.Hour)))
+	http.SetCookie(w, authCookie(authValue, time.Now().Add(30*24*time.Hour), r))
+	http.SetCookie(w, csrfCookie(csrfValue, time.Now().Add(30*24*time.Hour), r))
 	http.Redirect(w, r, cfg.PublicWebURL, http.StatusFound)
 	return nil
 }
@@ -290,8 +290,8 @@ func logout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	expired := time.Unix(0, 0)
-	http.SetCookie(w, authCookie("", expired))
-	http.SetCookie(w, csrfCookie("", expired))
+	http.SetCookie(w, authCookie("", expired, r))
+	http.SetCookie(w, csrfCookie("", expired, r))
 	writeJSON(w, http.StatusOK, Envelope{
 		Status:        "ok",
 		CorrelationID: correlationID(r.Context()),
@@ -308,26 +308,28 @@ func requireCSRF(next http.Handler) http.Handler {
 	})
 }
 
-func authCookie(value string, expires time.Time) *http.Cookie {
+func authCookie(value string, expires time.Time, req *http.Request) *http.Cookie {
+	secure := req != nil && req.TLS != nil
 	return &http.Cookie{
 		Name:     identity.AuthCookieName,
 		Value:    value,
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: true,
-		Secure:   true,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	}
 }
 
-func csrfCookie(value string, expires time.Time) *http.Cookie {
+func csrfCookie(value string, expires time.Time, req *http.Request) *http.Cookie {
+	secure := req != nil && req.TLS != nil
 	return &http.Cookie{
 		Name:     identity.CSRFCookieName,
 		Value:    value,
 		Path:     "/",
 		Expires:  expires,
 		HttpOnly: false,
-		Secure:   true,
+		Secure:   secure,
 		SameSite: http.SameSiteLaxMode,
 	}
 }

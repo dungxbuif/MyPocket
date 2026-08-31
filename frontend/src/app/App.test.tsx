@@ -52,6 +52,7 @@ describe("App shell", () => {
     expect(screen.getByRole("button", { name: "Vay/nợ" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Chuyển" })).not.toBeInTheDocument();
     expect(screen.getByText("Chọn nhóm")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Thêm chi tiết" }));
     expect(screen.getByText("Thêm Hình Ảnh")).toBeInTheDocument();
   });
 

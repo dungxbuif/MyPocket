@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-005
-status: ready
+status: in_review
 owner: human
 priority: High
 human_fields:
@@ -29,10 +29,12 @@ trace:
     - REQ-F-016
     - REQ-NF-005
     - REQ-NF-007
+    - REQ-F-018
   tickets:
     - TICKET-015
     - TICKET-016
     - TICKET-017
+    - TICKET-027
   bugs: []
   test_verification: ../test-verification/PHASE-005-analytics-dashboard.md
   validation_matrix: ../VALIDATION_MATRIX.md
@@ -45,7 +47,7 @@ trace:
 ## Status
 
 - ID: PHASE-005
-- Status: ready
+- Status: in_review
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
@@ -55,8 +57,8 @@ trace:
 
 - Backlog: [BACKLOG.md](../BACKLOG.md)
 - Roadmap: [ROADMAP.md](../ROADMAP.md)
-- Detail design: [PHASE-005-detail-design.md](PHASE-005-detail-design.md) — approved 2026-08-30
-- Requirements: [REQUIREMENTS.md](../../requirements/REQUIREMENTS.md) — REQ-F-006, REQ-F-016, REQ-NF-005, REQ-NF-007
+- Detail design: [PHASE-005-detail-design.md](PHASE-005-detail-design.md) — approved 2026-08-30; [asset portfolio extension](PHASE-005-asset-portfolio-detail-design.md) — approved 2026-08-31
+- Requirements: [REQUIREMENTS.md](../../requirements/REQUIREMENTS.md) — REQ-F-006, REQ-F-016, REQ-F-018, REQ-NF-005, REQ-NF-007
 - Test verification: [PHASE-005-analytics-dashboard.md](../test-verification/PHASE-005-analytics-dashboard.md) — planned proof target
 - Validation matrix: [VALIDATION_MATRIX.md](../VALIDATION_MATRIX.md)
 - ADRs: [decisions](../../decisions/README.md)
@@ -72,6 +74,7 @@ Deliver the installable MoneyLover-inspired PWA navigation, dashboard, search, w
 - Net worth, included wallets, recent transactions, balance privacy, search, and wallet selector.
 - Net income, category/subcategory donut, daily bars and average, period comparison, and three-month cumulative baseline.
 - Responsive installed-PWA behavior, Vietnamese copy, VND formatting, loading/empty/error/offline states.
+- Draft extension after TICKET-017: separate asset portfolio valuation for gold, stocks, crypto, foreign currency, and other assets under TICKET-027.
 
 ## Out Of Scope
 
@@ -83,9 +86,10 @@ Deliver the installable MoneyLover-inspired PWA navigation, dashboard, search, w
 
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
-| TICKET-015 | Ticket | PWA navigation, search, and wallet views | ready | [TICKET-015](../tickets/TICKET-015-pwa-navigation-search-wallet-views.md) |
-| TICKET-016 | Ticket | Overview and net-worth dashboard | ready | [TICKET-016](../tickets/TICKET-016-overview-net-worth-dashboard.md) |
-| TICKET-017 | Ticket | Analytics reports and cumulative trends | ready | [TICKET-017](../tickets/TICKET-017-analytics-reports-cumulative-trends.md) |
+| TICKET-015 | Ticket | PWA navigation, search, and wallet views | in_review | [TICKET-015](../tickets/TICKET-015-pwa-navigation-search-wallet-views.md) |
+| TICKET-016 | Ticket | Overview and net-worth dashboard | in_review | [TICKET-016](../tickets/TICKET-016-overview-net-worth-dashboard.md) |
+| TICKET-017 | Ticket | Analytics reports and cumulative trends | in_review | [TICKET-017](../tickets/TICKET-017-analytics-reports-cumulative-trends.md) |
+| TICKET-027 | Ticket | Asset portfolio and market valuation | in_progress | [TICKET-027](../tickets/TICKET-027-asset-portfolio-valuation.md) |
 
 ## Dependencies
 
@@ -126,4 +130,4 @@ Deliver the installable MoneyLover-inspired PWA navigation, dashboard, search, w
 
 ## Completion Summary
 
-No implementation has started. PHASE-005 is ready for execution after dependencies using [2026-08-30-phase-005-analytics-dashboard.md](../../superpowers/plans/2026-08-30-phase-005-analytics-dashboard.md).
+TICKET-015 through TICKET-017 are in review. Search, wallet detail, dashboard aggregates, normalized reports, category roll-up, daily/cumulative series, comparison baseline handling, privacy masking, and mobile UI have automated package/component/build proof. TICKET-027 is in progress as the extension sequenced immediately after TICKET-017; Wave 1 backend schema/domain/repository proof passed, while API, sync/offline, provider worker, UI/dashboard, E2E, and UAT remain pending. PostgreSQL integration and desktop UAT remain for the earlier implemented scope.

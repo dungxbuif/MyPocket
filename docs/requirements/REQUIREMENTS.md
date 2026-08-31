@@ -6,7 +6,7 @@ owner: shared
 human_fields: [priority, acceptance, requirement_source]
 ai_fields: [requirement_rows, status_updates, trace_links]
 shared_fields: [functional_requirements, non_functional_requirements]
-updated: 2026-08-24
+updated: 2026-08-31
 ---
 
 # Requirements
@@ -37,6 +37,7 @@ updated: 2026-08-24
 | REQ-F-015 | Record append-only state-changing and security audit events, retain them for a configurable default of 180 days, and expose a hidden read-only page only to `AUDIT_VIEWER_EMAIL`. | High | [Design](../superpowers/specs/2026-08-23-mypocket-system-design.md) | accepted |
 | REQ-F-016 | Provide an installable five-destination PWA with quick add, transaction search, wallet views, Vietnamese copy, VND formatting, and a balance-privacy toggle. | High | [SRS](../../SRS.md) | accepted |
 | REQ-F-017 | Add voice capture and OpenAI-compatible transcription only after post-M1 draft infrastructure is delivered and verified. | Low | [SPEC](SPEC.md) | deferred |
+| REQ-F-018 | Track user-owned gold, stock, crypto, foreign-currency, and other asset positions with offline buy/sell history, moving-average cost, hybrid automatic/manual VND price history, current market value, and realized/unrealized profit/loss without mutating wallet accounting. | High | [TICKET-027 design](../work/phases/PHASE-005-asset-portfolio-detail-design.md) | accepted |
 
 ## Non-Functional Requirements
 

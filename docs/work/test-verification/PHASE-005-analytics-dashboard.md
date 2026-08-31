@@ -1,7 +1,7 @@
 ---
 artifact_type: test_verification
 id: PHASE-005-analytics-dashboard
-status: planned
+status: in_review
 owner: shared
 trace:
   backlog_item: BL-005
@@ -17,7 +17,7 @@ trace:
 
 ## Status
 
-- Status: planned
+- Status: in_review
 - Owner: shared
 
 ## Planned Commands
@@ -29,9 +29,10 @@ trace:
 | `rtk npm test -- --run` | Dashboard/search/report component and accessibility tests. |
 | `rtk npm run build` | Production PWA build. |
 | `rtk npm run test:e2e -- analytics-dashboard.spec.ts` | Seeded dashboard/report totals on mobile and desktop. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache go test ./...`; `rtk npm test -- --run`; `rtk npm run build` | Pass 2026-08-31 after replacing hardcoded Money Insider Home metrics with authenticated category-frequency, elapsed-day average, and prior-period comparison. |
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Planned proof only; no implementation evidence.
+- Command: `GOCACHE=/private/tmp/mypocket-go-cache go test ./...` (backend), `npm test -- --run`, `npm run build` (frontend)
+- Result: pass for package/component/build proof; PostgreSQL integration and E2E need local services
+- Notes: Analytics package, authenticated search/dashboard/report handlers, privacy masking, and report preview UI are implemented through TICKET-017.

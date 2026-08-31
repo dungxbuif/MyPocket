@@ -74,6 +74,52 @@ export type ObligationInput = {
   note?: string;
 };
 
+export type RecurrenceFrequency = "daily" | "weekly" | "monthly";
+
+export type RecurringSchedule = {
+  id: string;
+  name: string;
+  frequency: RecurrenceFrequency;
+  timezone: string;
+  starts_at: string;
+  next_occurs_at: string;
+  type: "income" | "expense" | "transfer";
+  source_wallet_id: string;
+  destination_wallet_id?: string;
+  category_id?: string;
+  amount_vnd: number;
+  note: string;
+  version: number;
+};
+
+export type RecurringScheduleInput = {
+  name: string;
+  frequency: RecurrenceFrequency;
+  timezone: string;
+  starts_at: string;
+  type: "income" | "expense" | "transfer";
+  source_wallet_id: string;
+  destination_wallet_id?: string;
+  category_id?: string;
+  amount_vnd: number;
+  note?: string;
+};
+
+export type TransactionDraft = {
+  id: string;
+  schedule_id?: string;
+  occurrence_key: string;
+  type: "income" | "expense" | "transfer";
+  source_wallet_id: string;
+  destination_wallet_id?: string;
+  category_id?: string;
+  amount_vnd: number;
+  occurred_at: string;
+  note: string;
+  status: string;
+  version: number;
+};
+
 export async function loadBudgets() {
   const response = await apiFetch<{ budgets: BudgetProgress[] }>("/api/v1/budgets");
   return response.budgets;
@@ -161,4 +207,27 @@ export async function archiveObligation(id: string) {
 
 export async function linkObligationRepayment(obligationID: string, transactionID: string) {
   await apiFetch(`/api/v1/obligations/${encodeURIComponent(obligationID)}/repayments/${encodeURIComponent(transactionID)}`, { method: "POST" });
+}
+
+export async function loadRecurringSchedules() {
+  const response = await apiFetch<{ schedules: RecurringSchedule[] }>("/api/v1/recurring-schedules");
+  return response.schedules;
+}
+
+export async function createRecurringSchedule(input: RecurringScheduleInput) {
+  const response = await apiFetch<{ schedule: RecurringSchedule }>("/api/v1/recurring-schedules", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  return response.schedule;
+}
+
+export async function archiveRecurringSchedule(id: string) {
+  await apiFetch(`/api/v1/recurring-schedules/${encodeURIComponent(id)}/archive`, { method: "POST" });
+}
+
+export async function loadTransactionDrafts() {
+  const response = await apiFetch<{ drafts: TransactionDraft[] }>("/api/v1/transaction-drafts");
+  return response.drafts;
 }

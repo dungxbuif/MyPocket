@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-016
-status: ready
+status: in_review
 owner: human
 priority: high
 lane: normal
@@ -20,7 +20,7 @@ trace:
 
 ## Status
 
-- Status: ready
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-005
@@ -31,11 +31,11 @@ Dashboard totals must come from authoritative server aggregates, not frontend re
 
 ## Acceptance Criteria
 
-- [ ] Net worth sums active included wallets and preserves signed credit/debt balances.
-- [ ] Overview shows wallet summaries, recent transactions, planning summary, stale state, and privacy masking.
-- [ ] Privacy toggle masks DOM-visible balance text and persists per device.
-- [ ] Dashboard API responses include generated timestamp, normalized date range, timezone, and data version.
-- [ ] Totals match seeded transaction/wallet fixtures in automated proof.
+- [x] Net worth sums active included wallets and preserves signed credit/debt balances.
+- [x] Overview shows wallet summaries, recent transactions, planning summary, stale state, and privacy masking.
+- [x] Privacy toggle masks DOM-visible balance text and persists per device.
+- [x] Dashboard API responses include generated timestamp, normalized date range, timezone, and data version.
+- [x] Totals match seeded transaction/wallet fixtures in automated proof.
 
 ## Small Task Exemption
 
@@ -51,6 +51,6 @@ Dashboard totals must come from authoritative server aggregates, not frontend re
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Ready for implementation; no execution evidence claimed.
+- Command: `GOCACHE=/private/tmp/mypocket-go-cache go test ./...`; `npm test -- --run`; `npm run build`
+- Result: pass for package/component/build proof
+- Notes: Dashboard aggregate is server-side and privacy masking is device-persistent; PostgreSQL fixture comparison remains environment-gated.

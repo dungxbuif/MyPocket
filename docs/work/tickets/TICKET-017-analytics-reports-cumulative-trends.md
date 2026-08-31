@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-017
-status: ready
+status: in_review
 owner: human
 priority: high
 lane: normal
@@ -9,7 +9,7 @@ trace:
   backlog_item: BL-005
   requirement: [REQ-F-006, REQ-NF-005, REQ-NF-007]
   phase: PHASE-005
-  detail_design: ../phases/PHASE-005-detail-design.md
+  detail_design: [../phases/PHASE-005-detail-design.md, ../phases/PHASE-005-money-insider-detail-design.md]
   implementation_plan: ../../superpowers/plans/2026-08-30-phase-005-analytics-dashboard.md
   test_verification: ../test-verification/PHASE-005-analytics-dashboard.md
   validation_matrix: ../VALIDATION_MATRIX.md
@@ -20,7 +20,7 @@ trace:
 
 ## Status
 
-- Status: ready
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-005
@@ -31,11 +31,13 @@ Reports must use exact server formulas for income, expenses, category shares, da
 
 ## Acceptance Criteria
 
-- [ ] Cash-flow, category, daily, comparison, and cumulative report APIs share one normalized filter contract.
-- [ ] Reports exclude archived, transfer, adjustment, and report-excluded transactions exactly as designed.
-- [ ] Category reports roll leaf categories to parents and expose uncategorized explicitly.
-- [ ] Zero prior baseline returns `not_comparable`, never infinity or misleading percentages.
-- [ ] Charts expose accessible labels and adjacent numeric summaries; color is not the only signal.
+- [x] Cash-flow, category, daily, comparison, and cumulative report APIs share one normalized filter contract.
+- [x] Reports exclude archived, transfer, adjustment, and report-excluded transactions exactly as designed.
+- [x] Category reports roll leaf categories to parents and expose uncategorized explicitly.
+- [x] Zero prior baseline returns `not_comparable`, never infinity or misleading percentages.
+- [x] Charts expose accessible labels and adjacent numeric summaries; color is not the only signal.
+- [x] Money Insider Home uses authenticated aggregates for the most frequent expense category, elapsed-day average, and prior-month comparison; no sample finance values or subscription CTAs remain.
+- [ ] Money Insider detail view exposes six periods, wallet/category filters, projection, applicable budget, and top expenses.
 
 ## Small Task Exemption
 
@@ -51,6 +53,6 @@ Reports must use exact server formulas for income, expenses, category shares, da
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Ready for implementation; no execution evidence claimed.
+- Command: `GOCACHE=/private/tmp/mypocket-go-cache go test ./...`; `npm test -- --run`; `npm run build`
+- Result: pass for package/component/build proof
+- Notes: Server formulas normalize Ho Chi Minh date ranges, zero-fill daily series, roll parent categories, and mark zero comparison baselines; PostgreSQL integration remains environment-gated.

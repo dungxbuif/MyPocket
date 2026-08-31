@@ -1,0 +1,82 @@
+package planning
+
+import (
+	"fmt"
+	"time"
+
+	"mypocket/internal/finance"
+)
+
+func ValidateCreateRecurringSchedule(input CreateRecurringScheduleInput) (CreateRecurringScheduleInput, time.Time, error) {
+	input.Name = trimmed(input.Name)
+	input.Timezone = trimmed(input.Timezone)
+	input.Note = trimmed(input.Note)
+	if input.Name == "" {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: schedule name is required", ErrValidation)
+	}
+	if !validRecurrenceFrequency(input.Frequency) {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: recurrence frequency is invalid", ErrValidation)
+	}
+	if input.Timezone == "" {
+		input.Timezone = "Asia/Ho_Chi_Minh"
+	}
+	if _, err := time.LoadLocation(input.Timezone); err != nil {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: recurrence timezone is invalid", ErrValidation)
+	}
+	startsAt, err := time.Parse(time.RFC3339, trimmed(input.StartsAt))
+	if err != nil {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: schedule start is invalid", ErrValidation)
+	}
+	if !validRecurringTransactionType(input.Type) {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: schedule transaction type is invalid", ErrValidation)
+	}
+	if trimmed(input.SourceWalletID) == "" {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: source wallet is required", ErrValidation)
+	}
+	if input.Type == finance.TransactionTransfer && trimmed(input.DestinationWalletID) == "" {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: destination wallet is required", ErrValidation)
+	}
+	if input.Type != finance.TransactionTransfer && trimmed(input.CategoryID) == "" {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: category is required", ErrValidation)
+	}
+	if input.AmountVND <= 0 {
+		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: schedule amount must be positive", ErrValidation)
+	}
+	return input, startsAt, nil
+}
+
+func validRecurrenceFrequency(value RecurrenceFrequency) bool {
+	switch value {
+	case RecurrenceDaily, RecurrenceWeekly, RecurrenceMonthly:
+		return true
+	default:
+		return false
+	}
+}
+
+func validRecurringTransactionType(value finance.TransactionType) bool {
+	switch value {
+	case finance.TransactionIncome, finance.TransactionExpense, finance.TransactionTransfer:
+		return true
+	default:
+		return false
+	}
+}
+
+func NextOccurrence(previous time.Time, frequency RecurrenceFrequency, timezone string) time.Time {
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		loc = mustHoChiMinh()
+	}
+	local := previous.In(loc)
+	switch frequency {
+	case RecurrenceDaily:
+		return local.AddDate(0, 0, 1).UTC()
+	case RecurrenceWeekly:
+		return local.AddDate(0, 0, 7).UTC()
+	case RecurrenceMonthly:
+		return local.AddDate(0, 1, 0).UTC()
+	default:
+		return local.UTC()
+	}
+}

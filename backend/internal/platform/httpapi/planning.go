@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"mypocket/internal/finance"
 	"mypocket/internal/planning"
 	"mypocket/internal/platform/config"
 )
@@ -69,6 +70,37 @@ type obligationRequest struct {
 	Counterparty string                       `json:"counterparty"`
 	DueOn        string                       `json:"due_on"`
 	Note         string                       `json:"note"`
+}
+
+type recurringSchedulesResponse struct {
+	Status        string                       `json:"status"`
+	Schedules     []planning.RecurringSchedule `json:"schedules"`
+	CorrelationID string                       `json:"correlation_id"`
+}
+
+type recurringScheduleResponse struct {
+	Status        string                     `json:"status"`
+	Schedule      planning.RecurringSchedule `json:"schedule"`
+	CorrelationID string                     `json:"correlation_id"`
+}
+
+type recurringScheduleRequest struct {
+	Name                string                       `json:"name"`
+	Frequency           planning.RecurrenceFrequency `json:"frequency"`
+	Timezone            string                       `json:"timezone"`
+	StartsAt            string                       `json:"starts_at"`
+	Type                finance.TransactionType      `json:"type"`
+	SourceWalletID      string                       `json:"source_wallet_id"`
+	DestinationWalletID string                       `json:"destination_wallet_id"`
+	CategoryID          string                       `json:"category_id"`
+	AmountVND           int64                        `json:"amount_vnd"`
+	Note                string                       `json:"note"`
+}
+
+type transactionDraftsResponse struct {
+	Status        string                      `json:"status"`
+	Drafts        []planning.TransactionDraft `json:"drafts"`
+	CorrelationID string                      `json:"correlation_id"`
 }
 
 func budgets(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
@@ -301,6 +333,95 @@ func obligationByID(cfg config.Config, repo PlanningRepository) http.HandlerFunc
 	}
 }
 
+func recurringSchedules(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUserID(w, r, cfg)
+		if !ok {
+			return
+		}
+		if repo == nil {
+			writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Planning repository unavailable", correlationID(r.Context())))
+			return
+		}
+		switch r.Method {
+		case http.MethodGet:
+			schedules, err := repo.ListRecurringSchedules(r.Context(), userID)
+			if err != nil {
+				writePlanningError(w, r, err, "Recurring schedules unavailable")
+				return
+			}
+			writeJSON(w, http.StatusOK, recurringSchedulesResponse{Status: "ok", Schedules: schedules, CorrelationID: correlationID(r.Context())})
+		case http.MethodPost:
+			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				input, ok := decodeRecurringScheduleRequest(w, r)
+				if !ok {
+					return
+				}
+				schedule, err := repo.CreateRecurringSchedule(r.Context(), userID, input)
+				if err != nil {
+					writePlanningError(w, r, err, "Recurring schedule unavailable")
+					return
+				}
+				writeJSON(w, http.StatusCreated, recurringScheduleResponse{Status: "ok", Schedule: schedule, CorrelationID: correlationID(r.Context())})
+			})).ServeHTTP(w, r)
+		default:
+			writeJSON(w, http.StatusMethodNotAllowed, ErrorEnvelope("VALIDATION_FAILED", "Method not allowed", correlationID(r.Context())))
+		}
+	}
+}
+
+func recurringScheduleByID(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUserID(w, r, cfg)
+		if !ok {
+			return
+		}
+		if repo == nil {
+			writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Planning repository unavailable", correlationID(r.Context())))
+			return
+		}
+		scheduleID, action, valid := parseBudgetPathWithPrefix(r.URL.Path, "/api/v1/recurring-schedules/")
+		if !valid {
+			writeJSON(w, http.StatusNotFound, ErrorEnvelope("NOT_FOUND", "Recurring schedule not found", correlationID(r.Context())))
+			return
+		}
+		if r.Method == http.MethodPost && action == "archive" {
+			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if err := repo.ArchiveRecurringSchedule(r.Context(), userID, scheduleID); err != nil {
+					writePlanningError(w, r, err, "Recurring schedule unavailable")
+					return
+				}
+				writeJSON(w, http.StatusOK, commandResponse{Status: "ok", CorrelationID: correlationID(r.Context())})
+			})).ServeHTTP(w, r)
+			return
+		}
+		writeJSON(w, http.StatusMethodNotAllowed, ErrorEnvelope("VALIDATION_FAILED", "Method not allowed", correlationID(r.Context())))
+	}
+}
+
+func transactionDrafts(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUserID(w, r, cfg)
+		if !ok {
+			return
+		}
+		if repo == nil {
+			writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Planning repository unavailable", correlationID(r.Context())))
+			return
+		}
+		if r.Method != http.MethodGet {
+			writeJSON(w, http.StatusMethodNotAllowed, ErrorEnvelope("VALIDATION_FAILED", "Method not allowed", correlationID(r.Context())))
+			return
+		}
+		drafts, err := repo.ListTransactionDrafts(r.Context(), userID)
+		if err != nil {
+			writePlanningError(w, r, err, "Drafts unavailable")
+			return
+		}
+		writeJSON(w, http.StatusOK, transactionDraftsResponse{Status: "ok", Drafts: drafts, CorrelationID: correlationID(r.Context())})
+	}
+}
+
 func listBudgets(w http.ResponseWriter, r *http.Request, repo PlanningRepository, userID string) {
 	progress, err := repo.ListBudgetProgress(r.Context(), userID, time.Now())
 	if err != nil {
@@ -386,6 +507,26 @@ func decodeObligationRequest(w http.ResponseWriter, r *http.Request) (planning.C
 	return planning.CreateObligationInput{Direction: req.Direction, PrincipalVND: req.PrincipalVND, Counterparty: req.Counterparty, DueOn: req.DueOn, Note: req.Note}, true
 }
 
+func decodeRecurringScheduleRequest(w http.ResponseWriter, r *http.Request) (planning.CreateRecurringScheduleInput, bool) {
+	var req recurringScheduleRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
+		return planning.CreateRecurringScheduleInput{}, false
+	}
+	return planning.CreateRecurringScheduleInput{
+		Name:                req.Name,
+		Frequency:           req.Frequency,
+		Timezone:            req.Timezone,
+		StartsAt:            req.StartsAt,
+		Type:                req.Type,
+		SourceWalletID:      req.SourceWalletID,
+		DestinationWalletID: req.DestinationWalletID,
+		CategoryID:          req.CategoryID,
+		AmountVND:           req.AmountVND,
+		Note:                req.Note,
+	}, true
+}
+
 func parseOptionalDate(w http.ResponseWriter, r *http.Request, value string) (*time.Time, bool) {
 	value = strings.TrimSpace(value)
 	if value == "" {
@@ -418,7 +559,11 @@ func parseLinkedPath(path string, prefix string, linkedAction string) (resourceI
 }
 
 func parseBudgetPath(path string) (budgetID string, action string, valid bool) {
-	rest := strings.TrimPrefix(path, "/api/v1/budgets/")
+	return parseBudgetPathWithPrefix(path, "/api/v1/budgets/")
+}
+
+func parseBudgetPathWithPrefix(path string, prefix string) (budgetID string, action string, valid bool) {
+	rest := strings.TrimPrefix(path, prefix)
 	parts := strings.Split(strings.Trim(rest, "/"), "/")
 	if len(parts) == 0 || parts[0] == "" {
 		return "", "", false

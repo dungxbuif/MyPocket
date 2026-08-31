@@ -55,6 +55,7 @@ test("mobile event and debt planning links existing transactions", async ({ page
   const note = `Khoản plan ${suffix}`;
   const eventName = `Sự kiện ${suffix}`;
   const counterparty = `Bạn ${suffix}`;
+  const scheduleName = `Lịch ${suffix}`;
 
   await page.goto("/");
   await page.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
@@ -90,4 +91,12 @@ test("mobile event and debt planning links existing transactions", async ({ page
   await page.getByLabel("Giao dịch trả nợ").selectOption({ label: `${note} · 200.000 đ` });
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByRole("button", { name: new RegExp(`${counterparty}[\\s\\S]*300\\.000`) })).toBeVisible();
+
+  await page.getByRole("button", { name: "Tạo lịch" }).click();
+  await page.getByLabel("Tên lịch lặp").fill(scheduleName);
+  await page.getByLabel("Số tiền lịch lặp").fill("99000");
+  await page.getByLabel("Ví lịch lặp").selectOption({ label: walletName });
+  await page.getByLabel("Nhóm lịch lặp").selectOption({ label: categoryName });
+  await page.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page.getByRole("button", { name: new RegExp(`${scheduleName}[\\s\\S]*99\\.000`) })).toBeVisible();
 });
