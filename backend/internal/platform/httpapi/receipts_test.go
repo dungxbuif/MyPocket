@@ -20,7 +20,7 @@ func TestReceiptUploadAndDownloadAreUserScoped(t *testing.T) {
 	identityRepo := &authRepoStub{user: identity.User{ID: "user_123", Email: "owner@example.com", EmailVerified: true}}
 	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: identityRepo, ReceiptRepository: repo, ObjectStore: store})
 
-	req := httptest.NewRequest(http.MethodPost, "/api/v1/receipts/uploads", strings.NewReader(`{"filename":"bill.jpg","content_type":"image/jpeg","size_bytes":123,"checksum_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}`))
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/files/presign", strings.NewReader(`{"filename":"bill.jpg","content_type":"image/jpeg","size_bytes":123,"checksum_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}`))
 	addAuthCookie(t, req, cfg.CookieSecret, "user_123")
 	addCSRF(req)
 	res := httptest.NewRecorder()
@@ -29,7 +29,7 @@ func TestReceiptUploadAndDownloadAreUserScoped(t *testing.T) {
 		t.Fatalf("unexpected receipt upload: %d %s", res.Code, res.Body.String())
 	}
 
-	req = httptest.NewRequest(http.MethodGet, "/api/v1/receipts/receipt_1", nil)
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/files/receipt_1/download", nil)
 	addAuthCookie(t, req, cfg.CookieSecret, "user_123")
 	res = httptest.NewRecorder()
 	handler.ServeHTTP(res, req)

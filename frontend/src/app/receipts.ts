@@ -9,20 +9,20 @@ export type ReceiptObject = {
   created_at: string;
 };
 
-export async function uploadReceipt(file: File): Promise<ReceiptObject> {
+export async function uploadFile(file: File): Promise<ReceiptObject> {
   const checksum = await sha256Hex(file);
-  const prepared = await apiFetch<{ receipt: ReceiptObject; upload_url: string }>("/api/v1/receipts/uploads", {
+  const prepared = await apiFetch<{ file: ReceiptObject; upload_url: string }>("/api/v1/files/presign", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ filename: file.name, content_type: file.type, size_bytes: file.size, checksum_sha256: checksum }),
   });
   const response = await fetch(prepared.upload_url, { method: "PUT", headers: { "Content-Type": file.type }, body: file });
   if (!response.ok) throw new Error("receipt upload failed");
-  return prepared.receipt;
+  return prepared.file;
 }
 
 export async function getReceiptURL(id: string) {
-  const response = await apiFetch<{ download_url: string }>(`/api/v1/receipts/${encodeURIComponent(id)}`);
+  const response = await apiFetch<{ download_url: string }>(`/api/v1/files/${encodeURIComponent(id)}/download`);
   return response.download_url;
 }
 

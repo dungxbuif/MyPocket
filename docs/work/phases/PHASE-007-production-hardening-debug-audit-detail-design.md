@@ -46,7 +46,7 @@ UAT/prod bugs need a reliable path from a user-visible `correlation_id` to API l
 - Backend: new `backend/internal/audit`, migration `0009`, API key migration `0010`, HTTP middleware/router/auth/sync instrumentation, worker instrumentation, Redis auth cache, config validation.
 - Frontend: Account tab contains a viewer-only log panel. It first calls the backend access-check API; no audit controls or event data render for unauthorized users.
 - Runtime: `.env.example`, Compose env, production docs.
-- Media: private S3-compatible presigned receipt upload/download with user-scoped metadata and IndexedDB retry queue for offline-selected receipts.
+- Media: generic private S3-compatible presigned file upload/download. The upload contract is `/api/v1/files/presign`; receipt metadata is one current consumer and remains user-scoped internally. IndexedDB retries the presigned file upload offline.
 - Master docs: API, ERD, architecture, validation matrix, changelog, context.
 
 ## Proposed Approach

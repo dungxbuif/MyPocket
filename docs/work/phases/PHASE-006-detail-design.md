@@ -48,7 +48,7 @@ Providers receive the minimum required data. HTTP clients use strict timeouts, r
 ## 4. API and Workflow
 
 - `POST /api/v1/ai/chat` and `/ai/images` create one or more drafts from user input.
-- `POST /api/v1/receipts/uploads` returns a short-lived presigned upload; `POST /receipts/{id}/extract` starts OCR and creates draft results.
+- `POST /api/v1/files/presign` returns a short-lived presigned upload for any supported file; receipt OCR/extraction is a later consumer of the returned file ID.
 - `POST /api/v1/webhooks/banks/{source}` authenticates by HMAC without user cookies and maps the configured source to one user.
 - `GET/PATCH /api/v1/drafts`, `POST /drafts/{id}/confirm`, and `/reject` provide the shared review surface.
 - Provider work longer than the request budget runs as a worker job with status polling and notification completion.
@@ -76,4 +76,3 @@ Providers receive the minimum required data. HTTP clients use strict timeouts, r
 - Integration: user isolation, draft idempotency, confirmation exactly once, webhook dedupe, and audit evidence.
 - E2E/UAT: text single/multi/transfer, receipt OCR, image chat, webhook review, edit/reject/confirm, and every provider failure state.
 - Reconcile API, ERD, integrations, architecture, validation matrix, security notes, context, backlog, and changelog.
-

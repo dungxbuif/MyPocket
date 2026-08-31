@@ -91,7 +91,7 @@ import { loadDashboard, loadInsider, loadReport, loadWalletDetail, searchRecords
 import { addAssetPrice, addAssetTrade, archiveAsset, createAsset, loadAssets, loadPortfolioSummary, type AssetPosition, type AssetType, type PortfolioSummary, type TradeSide } from "./portfolio";
 import { createAPIKey, loadAPIKeys, revokeAPIKey, type APIKeySummary, type CreatedAPIKey } from "./apiKeys";
 import { checkAuditAccess, loadAuditEvents, type AuditEvent } from "./audit";
-import { uploadReceipt } from "./receipts";
+import { uploadFile } from "./receipts";
 import type { OfflineConflict } from "../offline/types";
 
 type Tab = "overview" | "transactions" | "budgets" | "account";
@@ -222,7 +222,7 @@ export function App() {
     for (const record of records) {
       const current = currentTransactions.find((item) => item.id === record.transaction_id);
       if (!current) continue;
-      const receipt = await uploadReceipt(new File([record.file], record.filename, { type: record.content_type }));
+      const receipt = await uploadFile(new File([record.file], record.filename, { type: record.content_type }));
       await updateTransaction(current.id, {
         type: current.type,
         source_wallet_id: current.source_wallet_id,
@@ -1329,7 +1329,7 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
         onClose();
         return;
       }
-      const receipt = receiptFile && navigator.onLine ? await uploadReceipt(receiptFile) : undefined;
+      const receipt = receiptFile && navigator.onLine ? await uploadFile(receiptFile) : undefined;
       const transaction = await createTransaction(buildTransactionInput({ type, amount, sourceWalletID, categoryID: chosenCategoryID, note, excludedFromReports, receiptObjectID: receipt?.id }));
       if (receiptFile && !navigator.onLine) {
         await queueReceiptUpload({ transaction_id: transaction.id, file: receiptFile, filename: receiptFile.name, content_type: receiptFile.type });

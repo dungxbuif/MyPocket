@@ -16,30 +16,30 @@ import (
 
 const maxReceiptBytes int64 = 15 * 1024 * 1024
 
-type receiptUploadRequest struct {
+type filePresignRequest struct {
 	Filename    string `json:"filename"`
 	ContentType string `json:"content_type"`
 	SizeBytes   int64  `json:"size_bytes"`
 	ChecksumSHA string `json:"checksum_sha256"`
 }
 
-type receiptUploadResponse struct {
+type filePresignResponse struct {
 	Status        string                `json:"status"`
-	Receipt       finance.ReceiptObject `json:"receipt"`
+	File          finance.ReceiptObject `json:"file"`
 	UploadURL     string                `json:"upload_url"`
 	ExpiresInSecs int                   `json:"expires_in_seconds"`
 	CorrelationID string                `json:"correlation_id"`
 }
 
-type receiptDownloadResponse struct {
+type fileDownloadResponse struct {
 	Status        string                `json:"status"`
-	Receipt       finance.ReceiptObject `json:"receipt"`
+	File          finance.ReceiptObject `json:"file"`
 	DownloadURL   string                `json:"download_url"`
 	ExpiresInSecs int                   `json:"expires_in_seconds"`
 	CorrelationID string                `json:"correlation_id"`
 }
 
-func receiptUpload(cfg config.Config, repo ReceiptRepository, store ObjectStore) http.HandlerFunc {
+func filePresign(cfg config.Config, repo ReceiptRepository, store ObjectStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUserID(w, r, cfg)
 		if !ok {
@@ -54,7 +54,7 @@ func receiptUpload(cfg config.Config, repo ReceiptRepository, store ObjectStore)
 			return
 		}
 		requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			var input receiptUploadRequest
+			var input filePresignRequest
 			if err := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32*1024)).Decode(&input); err != nil {
 				writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
 				return
@@ -80,12 +80,12 @@ func receiptUpload(cfg config.Config, repo ReceiptRepository, store ObjectStore)
 				writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Receipt storage unavailable", correlationID(r.Context())))
 				return
 			}
-			writeJSON(w, http.StatusCreated, receiptUploadResponse{Status: "ok", Receipt: receipt, UploadURL: url, ExpiresInSecs: 900, CorrelationID: correlationID(r.Context())})
+			writeJSON(w, http.StatusCreated, filePresignResponse{Status: "ok", File: receipt, UploadURL: url, ExpiresInSecs: 900, CorrelationID: correlationID(r.Context())})
 		})).ServeHTTP(w, r)
 	}
 }
 
-func receiptByID(cfg config.Config, repo ReceiptRepository, store ObjectStore) http.HandlerFunc {
+func fileDownload(cfg config.Config, repo ReceiptRepository, store ObjectStore) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		userID, ok := authenticatedUserID(w, r, cfg)
 		if !ok {
@@ -95,7 +95,8 @@ func receiptByID(cfg config.Config, repo ReceiptRepository, store ObjectStore) h
 			writeJSON(w, http.StatusMethodNotAllowed, ErrorEnvelope("VALIDATION_FAILED", "Method not allowed", correlationID(r.Context())))
 			return
 		}
-		id := strings.TrimPrefix(r.URL.Path, "/api/v1/receipts/")
+		id := strings.TrimPrefix(r.URL.Path, "/api/v1/files/")
+		id = strings.TrimSuffix(id, "/download")
 		if id == "" || strings.Contains(id, "/") {
 			writeJSON(w, http.StatusNotFound, ErrorEnvelope("NOT_FOUND", "Receipt not found", correlationID(r.Context())))
 			return
@@ -114,7 +115,7 @@ func receiptByID(cfg config.Config, repo ReceiptRepository, store ObjectStore) h
 			writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Receipt storage unavailable", correlationID(r.Context())))
 			return
 		}
-		writeJSON(w, http.StatusOK, receiptDownloadResponse{Status: "ok", Receipt: receipt, DownloadURL: url, ExpiresInSecs: 600, CorrelationID: correlationID(r.Context())})
+		writeJSON(w, http.StatusOK, fileDownloadResponse{Status: "ok", File: receipt, DownloadURL: url, ExpiresInSecs: 600, CorrelationID: correlationID(r.Context())})
 	}
 }
 
