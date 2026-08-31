@@ -6,7 +6,7 @@ owner: shared
 human_fields: [data_ownership_decisions, migration_approval]
 ai_fields: [entities, relationships, constraints, migrations, linked_decisions]
 shared_fields: [status, trace]
-updated: 2026-08-24
+updated: 2026-08-31
 ---
 
 # ERD
@@ -196,6 +196,38 @@ Seeded system keys include `expense_food`, `expense_shopping`, `expense_transpor
 | `request_hash` | `text` | Request identity hash |
 | `response_status` | `integer` | Stored HTTP-equivalent response status |
 | `response_json` | `jsonb` | Stored replay response |
+| `created_at` | `timestamptz` | Creation timestamp |
+
+### `sync_cursors`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `user_id` | `uuid` | Primary key; references `users(id)` |
+| `next_cursor` | `bigint` | Next per-user cursor to allocate; must be positive |
+
+### `sync_changes`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `user_id` | `uuid` | Required owner; part of primary key |
+| `cursor` | `bigint` | Required positive per-user cursor; part of primary key |
+| `entity_type` | `text` | `wallet`, `category`, or `transaction` |
+| `entity_id` | `text` | Entity identifier preserved from the client/server command |
+| `operation` | `text` | `create`, `update`, `archive`, `set_default_ai`, or `set_category_active` |
+| `version` | `bigint` | Authoritative entity version or tombstone version |
+| `payload_json` | `jsonb` | Authoritative payload snapshot or tombstone payload |
+| `created_at` | `timestamptz` | Creation timestamp |
+
+`sync_changes_user_entity_idx` supports per-user entity/cursor lookups.
+
+### `sync_mutations`
+
+| Column | Type | Notes |
+| --- | --- | --- |
+| `user_id` | `uuid` | Required owner; part of primary key |
+| `mutation_id` | `text` | Client mutation ID; part of primary key |
+| `request_hash` | `text` | Stable request identity hash used to reject mutation ID reuse with different content |
+| `result_json` | `jsonb` | Stored mutation result for applied, conflict, or rejected replay |
 | `created_at` | `timestamptz` | Creation timestamp |
 
 ## Linked Decisions

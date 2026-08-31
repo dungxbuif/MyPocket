@@ -10,6 +10,7 @@ import (
 	"mypocket/internal/platform/config"
 	"mypocket/internal/platform/db"
 	"mypocket/internal/platform/httpapi"
+	mysync "mypocket/internal/sync"
 )
 
 func main() {
@@ -24,9 +25,11 @@ func main() {
 	}
 	defer conn.Close()
 
+	financeRepo := finance.NewRepository(conn)
 	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{
 		IdentityRepository: identity.NewRepository(conn),
-		FinanceRepository:  finance.NewRepository(conn),
+		FinanceRepository:  financeRepo,
+		SyncService:        mysync.NewService(mysync.NewRepository(conn), financeRepo),
 		ReadyCheck: func() error {
 			return conn.PingContext(context.Background())
 		},

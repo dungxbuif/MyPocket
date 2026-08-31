@@ -85,7 +85,7 @@ Deliver full offline read/write with deterministic reconciliation and user-revie
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
 | TICKET-008 | Ticket | IndexedDB mirror and offline outbox | in_review | [TICKET-008](../tickets/TICKET-008-indexeddb-mirror-outbox.md) |
-| TICKET-009 | Ticket | Idempotent sync API and change feed | ready | [TICKET-009](../tickets/TICKET-009-sync-api-change-feed.md) |
+| TICKET-009 | Ticket | Idempotent sync API and change feed | in_review | [TICKET-009](../tickets/TICKET-009-sync-api-change-feed.md) |
 | TICKET-010 | Ticket | Conflict inbox and recovery flows | ready | [TICKET-010](../tickets/TICKET-010-conflict-inbox-recovery.md) |
 
 ## Dependencies
@@ -125,4 +125,4 @@ Deliver full offline read/write with deterministic reconciliation and user-revie
 
 ## Completion Summary
 
-TICKET-008 is in review. The frontend now has an IndexedDB mirror/outbox with localStorage migration, wallet/category/transaction queue primitives, cached-auth offline reload, degraded read-only UI, and automated build/unit/PWA shell proof. TICKET-009 sync API/change feed, TICKET-010 conflicts, replay/conflict E2E, and human UAT remain pending before PHASE-003 review.
+TICKET-008 and TICKET-009 are in review. The frontend now has an IndexedDB mirror/outbox with localStorage migration, wallet/category/transaction queue primitives, cached-auth offline reload, degraded read-only UI, and automated build/unit/PWA shell proof. The backend now has idempotent sync mutations, a user-scoped change feed, resync snapshot, and mobile reconnect-once E2E proof. TICKET-010 conflicts and final human UAT remain pending before PHASE-003 review.

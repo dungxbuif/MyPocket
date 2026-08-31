@@ -32,6 +32,7 @@ export type CategorySummary = {
   name: string;
   system_key?: string;
   is_system: boolean;
+  version: number;
 };
 
 export type TransactionType = "income" | "expense" | "transfer" | "adjustment";

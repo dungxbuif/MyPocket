@@ -10,6 +10,7 @@ import {
   upsertOfflineTransaction,
   upsertOfflineWallet,
 } from "./db";
+import { submitSyncMutations, type SyncMutationResult } from "./syncApi";
 import type { CategoryCreateInput, CategoryUpdateInput, OfflineMutation, WalletCreateInput, WalletUpdateInput } from "./types";
 
 const NOW_VERSION = 0;
@@ -19,8 +20,8 @@ export async function queueWalletCreate(input: WalletCreateInput): Promise<Walle
     id: randomID("wallet"),
     name: input.name,
     type: input.type,
-    balance_vnd: 0,
-    include_in_total: true,
+    balance_vnd: input.balance_vnd ?? 0,
+    include_in_total: input.include_in_total ?? true,
     is_default_ai: false,
     version: NOW_VERSION,
   };
@@ -29,7 +30,12 @@ export async function queueWalletCreate(input: WalletCreateInput): Promise<Walle
     entity_id: wallet.id,
     operation: "create",
     base_version: NOW_VERSION,
-    payload: input,
+    payload: {
+      name: input.name,
+      type: input.type,
+      balance_vnd: input.balance_vnd ?? 0,
+      include_in_total: input.include_in_total ?? true,
+    },
   });
   await upsertOfflineWallet(wallet);
   return wallet;
@@ -77,6 +83,7 @@ export async function queueCategoryCreate(input: CategoryCreateInput): Promise<C
     kind: input.kind,
     name: input.name,
     is_system: false,
+    version: NOW_VERSION,
   };
   await enqueueMutation({
     entity_type: "category",
@@ -90,7 +97,7 @@ export async function queueCategoryCreate(input: CategoryCreateInput): Promise<C
 }
 
 export async function queueCategoryUpdate(current: CategorySummary, input: CategoryUpdateInput): Promise<CategorySummary> {
-  const baseVersion = input.base_version ?? NOW_VERSION;
+  const baseVersion = input.base_version ?? current.version ?? NOW_VERSION;
   const category = { ...current, name: input.name } satisfies CategorySummary;
   await enqueueMutation({
     entity_type: "category",
@@ -163,6 +170,31 @@ export async function queueTransactionArchive(id: string, baseVersion: number) {
 
 export async function drainLegacyCompatibleOutbox(send: (input: Record<string, unknown>) => Promise<unknown>) {
   const pending = await readPendingMutations();
+  if (pending.length > 0) {
+    try {
+      return await drainSyncOutbox(pending);
+    } catch {
+      return drainCreateOnlyFallback(pending, send);
+    }
+  }
+  return 0;
+}
+
+async function drainSyncOutbox(pending: OfflineMutation[]) {
+  const results = await submitSyncMutations(pending);
+  const completed: string[] = [];
+  for (const result of results) {
+    if (result.state === "applied" || result.state === "replayed") {
+      await applyServerResult(result);
+      completed.push(result.mutation_id);
+    }
+    if (result.state === "conflict" || result.state === "rejected") break;
+  }
+  await markMutationsSynced(completed);
+  return completed.length;
+}
+
+async function drainCreateOnlyFallback(pending: OfflineMutation[], send: (input: Record<string, unknown>) => Promise<unknown>) {
   const completed: string[] = [];
   for (const item of pending) {
     if (item.entity_type !== "transaction" || item.operation !== "create") break;
@@ -197,6 +229,19 @@ function optimisticTransaction(input: TransactionInput, id = randomID()): Transa
     excluded_from_reports: input.excluded_from_reports ?? false,
     version: input.base_version ?? NOW_VERSION,
   };
+}
+
+async function applyServerResult(result: SyncMutationResult) {
+  if (result.operation === "archive") {
+    if (result.entity_type === "wallet") await archiveOfflineWallet(result.entity_id, result.version ?? 0);
+    if (result.entity_type === "category") await archiveOfflineCategory(result.entity_id, result.version ?? 0);
+    if (result.entity_type === "transaction") await archiveOfflineTransaction(result.entity_id, result.version ?? 0);
+    return;
+  }
+  if (!result.payload) return;
+  if (result.entity_type === "wallet") await upsertOfflineWallet(result.payload as unknown as WalletSummary);
+  if (result.entity_type === "category") await upsertOfflineCategory(result.payload as unknown as CategorySummary);
+  if (result.entity_type === "transaction") await upsertOfflineTransaction(result.payload as unknown as Transaction);
 }
 
 function randomID(prefix = "offline") {

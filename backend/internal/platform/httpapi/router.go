@@ -11,12 +11,14 @@ import (
 	"mypocket/internal/finance"
 	"mypocket/internal/identity"
 	"mypocket/internal/platform/config"
+	mysync "mypocket/internal/sync"
 )
 
 type Dependencies struct {
 	ReadyCheck         func() error
 	IdentityRepository IdentityRepository
 	FinanceRepository  FinanceRepository
+	SyncService        SyncService
 }
 
 func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
@@ -31,6 +33,9 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/categories/", categoryByID(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/transactions", transactions(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/transactions/", transactionByID(cfg, deps.FinanceRepository))
+	mux.HandleFunc("/api/v1/sync/mutations", syncMutations(cfg, deps.SyncService))
+	mux.HandleFunc("/api/v1/sync/changes", syncChanges(cfg, deps.SyncService))
+	mux.HandleFunc("/api/v1/sync/resync", syncResync(cfg, deps.SyncService))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
 	mux.HandleFunc("/api/v1/health/ready", readyHealth(deps))
 
@@ -75,6 +80,12 @@ type FinanceRepository interface {
 	CreateTransaction(ctx context.Context, userID string, input finance.CreateTransactionInput) (finance.Transaction, error)
 	UpdateTransaction(ctx context.Context, userID string, transactionID string, input finance.UpdateTransactionInput) (finance.Transaction, error)
 	ArchiveTransaction(ctx context.Context, userID string, transactionID string) error
+}
+
+type SyncService interface {
+	ApplyMutations(ctx context.Context, userID string, mutations []mysync.Mutation) ([]mysync.MutationResult, error)
+	Changes(ctx context.Context, userID string, after int64, limit int) (mysync.ChangesResult, error)
+	Resync(ctx context.Context, userID string) (mysync.Snapshot, error)
 }
 
 func correlationMiddleware(next http.Handler) http.Handler {

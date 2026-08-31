@@ -72,6 +72,7 @@ type categoryBody struct {
 	Name      string               `json:"name"`
 	SystemKey string               `json:"system_key,omitempty"`
 	IsSystem  bool                 `json:"is_system"`
+	Version   int64                `json:"version"`
 }
 
 type createCategoryRequest struct {
@@ -601,6 +602,7 @@ func toCategoryBody(category finance.Category) categoryBody {
 		Name:      category.Name,
 		SystemKey: category.SystemKey,
 		IsSystem:  category.IsSystem,
+		Version:   category.Version,
 	}
 }
 

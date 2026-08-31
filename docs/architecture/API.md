@@ -6,7 +6,7 @@ owner: shared
 human_fields: [contract_intent, approval]
 ai_fields: [contract_rows, errors, auth_notes, versioning, linked_decisions]
 shared_fields: [status, trace]
-updated: 2026-08-24
+updated: 2026-08-31
 ---
 
 # API
@@ -34,7 +34,7 @@ updated: 2026-08-24
 | `POST /categories`, `PATCH /categories/{id}`, `POST /categories/{id}/archive`, `PUT /wallets/{wallet_id}/categories/{category_id}` | REST/command | User | implemented | Creates user categories, edits/archives user-owned categories, rejects system category mutation, and toggles category activation for a user-owned wallet |
 | `GET /transactions`, `POST /transactions`, `PATCH /transactions/{id}`, `POST /transactions/{id}/archive` | REST/command | User | implemented | Income, expense, transfer, adjustment, edit/archive reversal, search filters, and idempotent creates |
 | `/receipts/uploads`, `/receipts/{id}` | REST/object | User | planned | Presigned upload and private metadata |
-| `POST /sync/mutations`, `GET /sync/changes` | Sync | User | planned | Idempotent batches, cursors, versions, tombstones |
+| `POST /sync/mutations`, `GET /sync/changes`, `POST /sync/resync` | Sync | User | implemented | Idempotent batches, per-user cursors, versions, tombstones, and authoritative resync snapshots |
 | `/sync/conflicts` | REST collection | User | planned | Read and resolve explicit conflicts |
 | `/budgets`, `/events`, `/recurring-schedules`, `/debts` | REST collection | User | planned | Planning and automation |
 | `/analytics/*` | Query REST | User | planned | Dashboard, categories, periods, trends |
@@ -155,7 +155,8 @@ Response:
       "kind": "expense",
       "name": "Ăn uống",
       "system_key": "expense_food",
-      "is_system": true
+      "is_system": true,
+      "version": 1
     }
   ],
   "correlation_id": "req_..."
@@ -218,6 +219,79 @@ Request:
 ```
 
 Response status: `200 OK`; activation is scoped to the authenticated user's wallet and the visible system/user category.
+
+## Sync Schemas
+
+### `POST /api/v1/sync/mutations`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request:
+
+```json
+{
+  "mutations": [
+    {
+      "mutation_id": "uuid",
+      "device_id": "browser-device-id",
+      "sequence": 1,
+      "entity_type": "transaction",
+      "entity_id": "uuid",
+      "operation": "create",
+      "base_version": 0,
+      "payload": {
+        "type": "expense",
+        "source_wallet_id": "uuid",
+        "category_id": "uuid",
+        "amount_vnd": 45000,
+        "occurred_at": "2026-08-31T00:00:00Z",
+        "note": "Cafe"
+      }
+    }
+  ]
+}
+```
+
+Response status: `200 OK`; each result has `state` of `applied`, `replayed`, `rejected`, or `conflict`. Duplicate `mutation_id` with the same request hash replays the stored result; a different request hash is rejected without reapplying accounting.
+
+### `GET /api/v1/sync/changes`
+
+Query filters:
+
+- `after`: last observed cursor, defaults to `0`.
+- `limit`: maximum change rows, defaults to `100` and is capped by the service.
+
+Response:
+
+```json
+{
+  "status": "ok",
+  "changes": [
+    {
+      "cursor": 1,
+      "entity_type": "transaction",
+      "entity_id": "uuid",
+      "operation": "create",
+      "version": 1,
+      "payload": {}
+    }
+  ],
+  "next_cursor": 1,
+  "correlation_id": "req_..."
+}
+```
+
+The feed is scoped to the authenticated user and ordered by monotonic per-user cursor.
+
+### `POST /api/v1/sync/resync`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Response status: `200 OK`; body contains `snapshot.wallets`, `snapshot.categories`, `snapshot.transactions`, and `snapshot.next_cursor` from authoritative PostgreSQL state.
 
 ## Transaction Schemas
 

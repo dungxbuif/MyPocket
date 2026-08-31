@@ -17,22 +17,25 @@ const (
 )
 
 type CreateWalletInput struct {
+	ID             string
 	Name           string
 	Type           WalletType
+	BalanceVND     int64
+	IncludeInTotal *bool
 	CreditLimitVND *int64
 	StatementDay   *int
 	PaymentDueDay  *int
 }
 
 type Wallet struct {
-	ID             string
-	UserID         string
-	Name           string
-	Type           WalletType
-	BalanceVND     int64
-	IncludeInTotal bool
-	IsDefaultAI    bool
-	Version        int64
+	ID             string     `json:"id"`
+	UserID         string     `json:"user_id"`
+	Name           string     `json:"name"`
+	Type           WalletType `json:"type"`
+	BalanceVND     int64      `json:"balance_vnd"`
+	IncludeInTotal bool       `json:"include_in_total"`
+	IsDefaultAI    bool       `json:"is_default_ai"`
+	Version        int64      `json:"version"`
 }
 
 type UpdateWalletInput struct {
@@ -49,16 +52,18 @@ const (
 )
 
 type Category struct {
-	ID        string
-	UserID    string
-	ParentID  string
-	Kind      CategoryKind
-	IsSystem  bool
-	SystemKey string
-	Name      string
+	ID        string       `json:"id"`
+	UserID    string       `json:"user_id"`
+	ParentID  string       `json:"parent_id,omitempty"`
+	Kind      CategoryKind `json:"kind"`
+	IsSystem  bool         `json:"is_system"`
+	SystemKey string       `json:"system_key,omitempty"`
+	Name      string       `json:"name"`
+	Version   int64        `json:"version"`
 }
 
 type CreateCategoryInput struct {
+	ID          string
 	Kind        CategoryKind
 	Name        string
 	ParentDepth *int
@@ -95,6 +100,7 @@ type AccountingEffect struct {
 }
 
 type CreateTransactionInput struct {
+	ID                  string
 	IdempotencyKey      string
 	Type                TransactionType
 	SourceWalletID      string

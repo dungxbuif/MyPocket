@@ -43,6 +43,7 @@ shared_fields: [status]
 - Added mobile finance controls for wallet/category management plus income, expense, transfer, adjustment, report exclusion, and transaction edit/archive workflows.
 - Added live mobile Playwright coverage for fixture-login finance CRUD through the real API.
 - Added the PHASE-003 frontend IndexedDB mirror/outbox foundation with legacy localStorage migration/quarantine, wallet/category/transaction offline mutation queueing, cached-auth offline reload, cached finance hydration, degraded read-only UI, and mobile PWA offline reload proof.
+- Added PHASE-003 sync API/change-feed support with PostgreSQL sync cursors/changes/mutation ledger, idempotent mutation replay, stale-version conflict responses, authoritative resync snapshots, frontend sync outbox drain, and mobile reconnect replay proof.
 
 ### Planning
 

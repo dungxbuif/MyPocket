@@ -43,7 +43,7 @@ describe("offline IndexedDB store", () => {
   it("keeps mirrored finance data available after transaction archive tombstones", async () => {
     await saveFinanceMirror({
       wallets: [{ id: "wallet_1", name: "Cash", type: "cash", balance_vnd: 100000, include_in_total: true, is_default_ai: true, version: 2 }],
-      categories: [{ id: "cat_1", kind: "expense", name: "Food", is_system: false }],
+      categories: [{ id: "cat_1", kind: "expense", name: "Food", is_system: false, version: 1 }],
       transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_1", amount_vnd: 10000, balance_after_vnd: 90000, occurred_at: "2026-08-31T00:00:00Z", note: "Lunch", with_person: "", event_ref: "", excluded_from_reports: false, version: 3 }],
     });
 

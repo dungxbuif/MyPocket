@@ -67,7 +67,7 @@ trace:
 | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` | Full backend regression with sync routes and migrations. |
 | `rtk npm test -- --run` | IndexedDB adapter, optimistic reducers, outbox processor, conflict reducer, and mobile component behavior. |
 | `rtk npm run build` | Production PWA build after offline sync implementation. |
-| `rtk npm run test:e2e -- offline-sync.spec.ts` | Mobile offline create/edit, reload offline, reconnect-once replay, and conflict/recovery flows. |
+| `rtk npm run test:e2e -- offline-sync.spec.ts` | Mobile offline transaction create, reconnect-once replay, and reload after authoritative sync. |
 | `rtk npm run test:e2e` | Full frontend browser regression. |
 
 ## Verification Results
@@ -75,10 +75,14 @@ trace:
 | Command | Result | Coverage |
 | --- | --- | --- |
 | `rtk npm run build` from `frontend/` | Passed 2026-08-31 | Production PWA build after IndexedDB/offline UI changes. |
-| `rtk npm test -- --run` from `frontend/` | Passed 2026-08-31, 3 files / 20 tests | IndexedDB mirror, legacy localStorage migration/quarantine, durable sequence, transaction outbox drain, wallet/category mutation queueing, offline cached hydration, cached-auth offline reload with pending mutation visibility, offline transaction create queueing, and degraded read-only UI. |
+| `rtk npm test -- --run` from `frontend/` | Passed 2026-08-31, 3 files / 21 tests | IndexedDB mirror, legacy localStorage migration/quarantine, durable sequence, sync API outbox drain, transaction outbox fallback, wallet/category mutation queueing, offline cached hydration, cached-auth offline reload with pending mutation visibility, offline transaction create queueing, and degraded read-only UI. |
 | `rtk npm run test:e2e -- pwa-shell.spec.ts` from `frontend/` | Passed 2026-08-31 after local-network rerun | Mobile service-worker registration and app-shell reload while offline. |
+| `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` from `backend/` | Passed 2026-08-31 after local-network rerun | Full backend regression with sync migration, sync service integration, authenticated sync HTTP routes, user isolation, stale conflict handling, cursor feed, resync snapshot, and existing finance/identity/platform behavior. |
+| `rtk npm run build` from `frontend/` | Passed 2026-08-31 after sync API wiring | Production PWA build after frontend sync API drain changes. |
+| `rtk npm test -- --run` from `frontend/` | Passed 2026-08-31, 3 files / 21 tests after sync API wiring | IndexedDB/outbox regression including sync API result application to the local mirror. |
+| `rtk npm run test:e2e -- offline-sync.spec.ts` from `frontend/` | Passed 2026-08-31, 1 mobile test | Offline transaction is queued, displayed locally, replayed once through sync API after reconnect, and still visible after reload. |
 
-Notes: First `pwa-shell.spec.ts` attempt failed because the sandbox denied TCP to local PostgreSQL at `127.0.0.1:55433`; rerun with local network permission passed. Backend sync API/change feed, conflict inbox, and full reconnect replay E2E remain pending in TICKET-009/TICKET-010.
+Notes: First `pwa-shell.spec.ts` attempt failed because the sandbox denied TCP to local PostgreSQL at `127.0.0.1:55433`; rerun with local network permission passed. TICKET-009 backend sync API/change feed and reconnect replay E2E now have automated proof. Conflict inbox and final conflict/recovery UAT remain pending in TICKET-010.
 
 ## Fix/Test Attempt Log
 
@@ -86,19 +90,20 @@ Notes: First `pwa-shell.spec.ts` attempt failed because the sandbox denied TCP t
 | --- | --- | --- | --- | --- |
 | 1 | Added IndexedDB mirror/outbox and wired finance UI offline hydration/queue paths. | `rtk npm run build`; `rtk npm test -- --run` | failed then passed after fixes | Fixed async default parameter syntax, add-sheet async wallet initialization, and defensive manager callbacks. |
 | 2 | Tightened migration sequence/quarantine tests, added degraded-mode UI proof, and added cached-auth offline reload proof. | `rtk npm run build`; `rtk npm test -- --run`; `rtk npm run test:e2e -- pwa-shell.spec.ts` | passed | Initial E2E attempt was sandbox-blocked; rerun with local network access passed. |
+| 3 | Added sync migration/service/routes plus frontend sync API outbox drain and mobile reconnect replay E2E. | `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1`; `rtk npm run build`; `rtk npm test -- --run`; `rtk npm run test:e2e -- offline-sync.spec.ts` | passed | Initial backend rerun was sandbox-blocked from local Postgres; after local-network rerun, backend/frontend/E2E passed. |
 
 Loop guard:
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 2 / 5
+- Total fix/test cycles: 3 / 5
 - Blocked: no
 - Human/design input needed: none before starting approved PHASE-003 plan.
 
 ## Automated Tests
 
-- Passed: `frontend/src/offline/db.test.ts`, `frontend/src/app/outbox.test.ts`, `frontend/src/app/App.test.tsx`, and `frontend/e2e/pwa-shell.spec.ts`.
+- Passed: `backend/internal/sync`, `backend/internal/platform/httpapi`, full backend regression, `frontend/src/offline/db.test.ts`, `frontend/src/app/outbox.test.ts`, `frontend/src/app/App.test.tsx`, `frontend/e2e/pwa-shell.spec.ts`, and `frontend/e2e/offline-sync.spec.ts`.
 - Failed: none yet.
-- Skipped: full offline sync API/change-feed tests, conflict inbox tests, and dedicated reconnect replay E2E remain pending until TICKET-009/TICKET-010.
+- Skipped: conflict inbox tests remain pending until TICKET-010.
 
 ## Manual Checks
 
@@ -109,9 +114,9 @@ Loop guard:
 - Required: yes.
 - Reason if not required: not applicable.
 - Expected behavior: mobile PWA supports read/write offline, reconnect syncs each mutation once, and conflicts are reviewed explicitly.
-- Verified behavior: TICKET-008 frontend proof covers IndexedDB hydration, local outbox durability/order, legacy migration/quarantine, optimistic offline create for transactions, wallet/category queue primitives, cached-auth offline reload with pending mutation visibility, degraded read-only UI, and PWA shell offline reload. Reconnect sync and conflict review are pending later tickets.
+- Verified behavior: TICKET-008 frontend proof covers IndexedDB hydration, local outbox durability/order, legacy migration/quarantine, optimistic offline create for transactions, wallet/category queue primitives, cached-auth offline reload with pending mutation visibility, degraded read-only UI, and PWA shell offline reload. TICKET-009 proof covers idempotent sync mutation replay, user-scoped change feed, authoritative resync, stale-version conflict response, CSRF-authenticated sync routes, frontend sync API drain, and mobile reconnect-once replay. Conflict inbox review remains pending in TICKET-010.
 - Sign-off: pending.
 
 ## Evidence Notes
 
-- TICKET-008 frontend IndexedDB/outbox implementation has automated evidence and is in review. PHASE-003 remains in progress because backend sync, conflict recovery, replay E2E, and UAT are not complete.
+- TICKET-008 frontend IndexedDB/outbox implementation and TICKET-009 sync API/change-feed implementation have automated evidence and are in review. PHASE-003 remains in progress because conflict recovery and UAT are not complete.

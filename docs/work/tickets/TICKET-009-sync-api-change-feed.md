@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-009
-status: ready
+status: in_review
 owner: human
 priority: high
 lane: high-risk
@@ -43,7 +43,7 @@ trace:
 ## Status
 
 - ID: TICKET-009
-- Status: ready
+- Status: in_review
 - Type: feature
 - Priority: high
 - Phase: PHASE-003
@@ -64,12 +64,12 @@ AI fill:
 
 ## Acceptance Criteria
 
-- [ ] Given ordered client mutations, when `POST /api/v1/sync/mutations` receives a valid batch, then it applies each mutation at most once and returns per-item `applied`, `replayed`, `rejected`, or `conflict` results.
-- [ ] Given a duplicate `mutation_id` with the same request hash, when replayed, then the server returns the stored result without applying accounting effects again.
-- [ ] Given a duplicate `mutation_id` with a different request hash, when submitted, then the server rejects it with a stable safe error.
-- [ ] Given a stale base version, when the mutation would overwrite a newer server record, then the server preserves authoritative state and returns an explicit conflict result.
-- [ ] Given `GET /api/v1/sync/changes?after={cursor}&limit={n}`, when the user is authenticated, then the server returns only that user's ordered changes, tombstones, and `next_cursor`.
-- [ ] Given an invalid cursor or schema recovery request, when `POST /api/v1/sync/resync` is called, then the server returns an authoritative bounded snapshot without duplicating accounting.
+- [x] Given ordered client mutations, when `POST /api/v1/sync/mutations` receives a valid batch, then it applies each mutation at most once and returns per-item `applied`, `replayed`, `rejected`, or `conflict` results.
+- [x] Given a duplicate `mutation_id` with the same request hash, when replayed, then the server returns the stored result without applying accounting effects again.
+- [x] Given a duplicate `mutation_id` with a different request hash, when submitted, then the server rejects it with a stable safe error.
+- [x] Given a stale base version, when the mutation would overwrite a newer server record, then the server preserves authoritative state and returns an explicit conflict result.
+- [x] Given `GET /api/v1/sync/changes?after={cursor}&limit={n}`, when the user is authenticated, then the server returns only that user's ordered changes, tombstones, and `next_cursor`.
+- [x] Given an invalid cursor or schema recovery request, when `POST /api/v1/sync/resync` is called, then the server returns an authoritative bounded snapshot without duplicating accounting.
 
 ## Small Task Exemption
 
@@ -103,14 +103,20 @@ AI fill:
 
 ## Verification Results
 
-- Command: not run yet
-- Result: pending
-- Notes: Ticket is ready for implementation; no execution evidence is claimed.
+- Command: `rtk env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL='postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./... -count=1` from `backend/`
+- Result: passed 2026-08-31 after local-network rerun; initial sandboxed run was blocked from TCP `127.0.0.1:55433`.
+- Command: `rtk npm run build` from `frontend/`
+- Result: passed 2026-08-31.
+- Command: `rtk npm test -- --run` from `frontend/`
+- Result: passed 2026-08-31, 3 files / 21 tests.
+- Command: `rtk npm run test:e2e -- offline-sync.spec.ts` from `frontend/`
+- Result: passed 2026-08-31, 1 mobile Playwright test.
+- Notes: Sync migration, idempotency ledger, user-scoped change feed, resync snapshot, stale-version conflict response, authenticated/CSRF-protected sync routes, frontend sync API drain, and reconnect-once mobile E2E have automated proof. Human PHASE-003 UAT remains pending after TICKET-010 conflict inbox.
 
 ## Fix/Test Attempt Log
 
 - Same-path failure attempts: 0 / 3
-- Total fix/test cycles: 0 / 5
+- Total fix/test cycles: 1 / 5
 - Blocked by loop guard: no
 - Human/design input needed: none; design approval is recorded.
 
@@ -119,28 +125,28 @@ AI fill:
 - Required: yes
 - Reason if not required: not applicable
 - Expected behavior: reconnect syncs once, handles stale edits as conflicts, and never leaks another user's data.
-- Verified behavior: pending implementation.
+- Verified behavior: backend and mobile browser proof covers ordered offline mutation replay, duplicate replay without duplicate accounting, stale update conflict responses, user-scoped change feeds, and authoritative resync. Human PHASE-003 UAT remains pending after TICKET-010 conflict inbox.
 - Sign-off: pending.
 
 ## Docs Review
 
 - Requirements updated or not needed reason: no requirement change expected.
-- Architecture updated or not needed reason: pending implementation reconciliation.
-- API updated or not needed reason: pending sync route implementation.
-- ERD/data updated or not needed reason: pending sync migration implementation.
+- Architecture updated or not needed reason: updated sync module/runtime notes already describe the implemented API-backed IndexedDB/outbox boundary.
+- API updated or not needed reason: updated `/api/v1/sync/mutations`, `/api/v1/sync/changes`, and `/api/v1/sync/resync` contracts.
+- ERD/data updated or not needed reason: updated implemented `sync_cursors`, `sync_changes`, and `sync_mutations` schema notes.
 - ADR created or not needed reason: not expected; follows approved PHASE-003 detail design.
 - `docs/CONTEXT.md` updated: yes, planning state recorded.
 
 ## Completion Checklist
 
-- [ ] Implementation complete
-- [ ] Tests run and recorded
-- [ ] Fix/test loop guard respected
-- [ ] Validation matrix updated or explicitly not affected
+- [x] Implementation complete
+- [x] Tests run and recorded
+- [x] Fix/test loop guard respected
+- [x] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
-- [ ] Master docs reconciled
-- [ ] Docs review completed
-- [ ] ADR created or explicitly not needed
-- [ ] `docs/CONTEXT.md` updated
-- [ ] `docs/work/BACKLOG.md` updated
+- [x] Master docs reconciled
+- [x] Docs review completed
+- [x] ADR created or explicitly not needed
+- [x] `docs/CONTEXT.md` updated
+- [x] `docs/work/BACKLOG.md` updated
 - [x] Trace links updated

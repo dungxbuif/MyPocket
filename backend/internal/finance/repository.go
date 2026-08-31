@@ -62,19 +62,25 @@ func (r *Repository) CreateWallet(ctx context.Context, userID string, input Crea
 	var wallet Wallet
 	err = r.db.QueryRowContext(ctx, `
 		INSERT INTO wallets (
+			id,
 			user_id,
 			name,
 			type,
+			balance_vnd,
+			include_in_total,
 			credit_limit_vnd,
 			statement_day,
 			payment_due_day
 		)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, $3, $4, $5, coalesce($6, true), $7, $8, $9)
 		RETURNING id::text, user_id::text, name, type, balance_vnd, include_in_total, is_default_ai, version
 	`,
+		input.ID,
 		userID,
 		input.Name,
 		string(input.Type),
+		input.BalanceVND,
+		input.IncludeInTotal,
 		input.CreditLimitVND,
 		input.StatementDay,
 		input.PaymentDueDay,
@@ -232,10 +238,10 @@ func (r *Repository) CreateCategory(ctx context.Context, userID string, input Cr
 
 	var category Category
 	err = r.db.QueryRowContext(ctx, `
-		INSERT INTO categories (user_id, parent_id, kind, name, is_system)
-		VALUES ($1, NULL, $2, $3, false)
-		RETURNING id::text, user_id::text, coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system
-	`, userID, string(input.Kind), input.Name).Scan(
+		INSERT INTO categories (id, user_id, parent_id, kind, name, is_system)
+		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, NULL, $3, $4, false)
+		RETURNING id::text, user_id::text, coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system, version
+	`, input.ID, userID, string(input.Kind), input.Name).Scan(
 		&category.ID,
 		&category.UserID,
 		&category.ParentID,
@@ -243,6 +249,7 @@ func (r *Repository) CreateCategory(ctx context.Context, userID string, input Cr
 		&category.Name,
 		&category.SystemKey,
 		&category.IsSystem,
+		&category.Version,
 	)
 	if err != nil {
 		return Category{}, fmt.Errorf("create category: %w", err)
@@ -252,7 +259,7 @@ func (r *Repository) CreateCategory(ctx context.Context, userID string, input Cr
 
 func (r *Repository) ListCategories(ctx context.Context, userID string) ([]Category, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id::text, coalesce(user_id::text, ''), coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system
+		SELECT id::text, coalesce(user_id::text, ''), coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system, version
 		FROM categories
 		WHERE archived_at IS NULL AND (is_system OR user_id = $1)
 		ORDER BY is_system DESC, kind, name, id
@@ -273,6 +280,7 @@ func (r *Repository) ListCategories(ctx context.Context, userID string) ([]Categ
 			&category.Name,
 			&category.SystemKey,
 			&category.IsSystem,
+			&category.Version,
 		); err != nil {
 			return nil, fmt.Errorf("scan category: %w", err)
 		}
@@ -297,7 +305,7 @@ func (r *Repository) UpdateCategory(ctx context.Context, userID string, category
 		UPDATE categories
 		SET name = $3, updated_at = now(), version = version + 1
 		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
-		RETURNING id::text, user_id::text, coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system
+		RETURNING id::text, user_id::text, coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system, version
 	`, categoryID, userID, trimmed(input.Name)).Scan(
 		&category.ID,
 		&category.UserID,
@@ -306,6 +314,7 @@ func (r *Repository) UpdateCategory(ctx context.Context, userID string, category
 		&category.Name,
 		&category.SystemKey,
 		&category.IsSystem,
+		&category.Version,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Category{}, ErrForbidden
@@ -794,6 +803,7 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 	var transaction Transaction
 	returning := `
 		INSERT INTO transactions (
+			id,
 			user_id,
 			type,
 			source_wallet_id,
@@ -809,7 +819,7 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 			occurred_at,
 			excluded_from_reports
 		)
-		VALUES ($1, $2, $3, NULLIF($4, '')::uuid, NULLIF($5, '')::uuid, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, $3, $4, NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING
 			id::text,
 			user_id::text,
@@ -829,6 +839,7 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 			version
 	`
 	err := tx.QueryRowContext(ctx, returning,
+		input.ID,
 		userID,
 		string(input.Type),
 		input.SourceWalletID,
@@ -985,7 +996,7 @@ func reverseTransactionEffect(balances map[string]int64, transaction Transaction
 func (r *Repository) getCategoryForUser(ctx context.Context, userID string, categoryID string) (Category, error) {
 	var category Category
 	err := r.db.QueryRowContext(ctx, `
-		SELECT id::text, coalesce(user_id::text, ''), coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system
+		SELECT id::text, coalesce(user_id::text, ''), coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system, version
 		FROM categories
 		WHERE id = $1 AND archived_at IS NULL AND (is_system OR user_id = $2)
 	`, categoryID, userID).Scan(
@@ -996,6 +1007,7 @@ func (r *Repository) getCategoryForUser(ctx context.Context, userID string, cate
 		&category.Name,
 		&category.SystemKey,
 		&category.IsSystem,
+		&category.Version,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Category{}, ErrForbidden

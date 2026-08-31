@@ -73,7 +73,7 @@ export type LegacyQueuedTransaction = {
   created_at: string;
 };
 
-export type WalletCreateInput = { name: string; type: WalletSummary["type"] };
+export type WalletCreateInput = { name: string; type: WalletSummary["type"]; balance_vnd?: number; include_in_total?: boolean };
 export type WalletUpdateInput = { name: string; include_in_total: boolean; base_version?: number };
 export type CategoryCreateInput = { kind: CategorySummary["kind"]; name: string };
 export type CategoryUpdateInput = { name: string; base_version?: number };

@@ -51,7 +51,7 @@ describe("App shell", () => {
           { id: "wallet_savings", name: "Tiết kiệm API", type: "savings", balance_vnd: 234567, include_in_total: true, is_default_ai: false, version: 1 },
         ],
       },
-      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
 
@@ -68,7 +68,7 @@ describe("App shell", () => {
     mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
       "/api/v1/wallets": { wallets: [] },
-      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
 
@@ -98,7 +98,7 @@ describe("App shell", () => {
     mockNavigatorOnline(false);
     await saveFinanceMirror({
       wallets: [{ id: "wallet_cached", name: "Ví cached", type: "cash", balance_vnd: 880000, include_in_total: true, is_default_ai: true, version: 3 }],
-      categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống cached", is_system: false }],
+      categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống cached", is_system: false, version: 1 }],
       transactions: [{ id: "tx_cached", type: "expense", source_wallet_id: "wallet_cached", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 868000, occurred_at: "2026-08-31T00:00:00Z", note: "Cached lunch", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }],
     });
     const fetchMock = mockFetchRoutes({
@@ -125,7 +125,7 @@ describe("App shell", () => {
     const onlineFetch = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
       "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví reload", type: "cash", balance_vnd: 990000, include_in_total: true, is_default_ai: true, version: 5 }] },
-      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn reload", is_system: false }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn reload", is_system: false, version: 1 }] },
       "/api/v1/transactions": { transactions: [{ id: "tx_reload", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 11000, balance_after_vnd: 979000, occurred_at: "2026-08-31T00:00:00Z", note: "Online cached", with_person: "", event_ref: "", excluded_from_reports: false, version: 1 }] },
     });
     const firstRender = render(<App />);
@@ -174,7 +174,7 @@ describe("App shell", () => {
       const path = new URL(url, "http://localhost").pathname;
       if (path === "/api/v1/me") return new Response(JSON.stringify({ user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } }), { status: 200 });
       if (path === "/api/v1/wallets") return new Response(JSON.stringify({ wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] }), { status: 200 });
-      if (path === "/api/v1/categories") return new Response(JSON.stringify({ categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true }] }), { status: 200 });
+      if (path === "/api/v1/categories") return new Response(JSON.stringify({ categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] }), { status: 200 });
       if (path === "/api/v1/transactions" && options?.method === "POST") {
         expect(new Headers(options.headers).get("Idempotency-Key")).toBeTruthy();
         const body = JSON.parse(String(options.body));
@@ -197,7 +197,7 @@ describe("App shell", () => {
     const fetchMock = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
       "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
-      "/api/v1/categories": { categories: [{ id: "cat_custom", kind: "expense", name: "Cafe", is_system: false }] },
+      "/api/v1/categories": { categories: [{ id: "cat_custom", kind: "expense", name: "Cafe", is_system: false, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
 
@@ -219,7 +219,7 @@ describe("App shell", () => {
       const path = new URL(url, "http://localhost").pathname;
       if (path === "/api/v1/me") return jsonResponse({ user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } });
       if (path === "/api/v1/wallets") return jsonResponse({ wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] });
-      if (path === "/api/v1/categories") return jsonResponse({ categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true }] });
+      if (path === "/api/v1/categories") return jsonResponse({ categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] });
       if (path === "/api/v1/transactions/tx_1" && options?.method === "PATCH") {
         const body = JSON.parse(String(options.body));
         expect(body.note).toBe("Cà phê chiều");
