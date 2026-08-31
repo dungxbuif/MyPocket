@@ -47,3 +47,47 @@ test("mobile budget CRUD shows threshold progress through the live API", async (
   await page.getByRole("button", { name: "Lưu trữ" }).click();
   await expect(page.getByText(budgetName)).toHaveCount(0);
 });
+
+test("mobile event and debt planning links existing transactions", async ({ page }) => {
+  const suffix = Date.now().toString().slice(-6);
+  const walletName = `Ví plan ${suffix}`;
+  const categoryName = `Plan cafe ${suffix}`;
+  const note = `Khoản plan ${suffix}`;
+  const eventName = `Sự kiện ${suffix}`;
+  const counterparty = `Bạn ${suffix}`;
+
+  await page.goto("/");
+  await page.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
+  await expect(page.getByText("fixture@example.com")).toBeVisible();
+
+  await page.getByRole("button", { name: "Xem tất cả" }).click();
+  await page.getByLabel("Tên ví mới").fill(walletName);
+  await page.getByRole("button", { name: "Tạo ví" }).click();
+  await expect(page.getByLabel(`Tên ví ${walletName}`)).toBeVisible();
+  await page.getByLabel("Tên nhóm mới").fill(categoryName);
+  await page.getByRole("button", { name: "Tạo nhóm" }).click();
+  await expect(page.getByLabel(`Tên nhóm ${categoryName}`)).toBeVisible();
+  await page.getByRole("button", { name: "Đóng" }).click();
+
+  await page.getByRole("button", { name: "Thêm giao dịch" }).click();
+  await page.getByLabel("Số tiền").fill("200000");
+  await page.getByLabel("Ví nguồn").selectOption({ label: walletName });
+  await page.getByLabel("Nhóm").selectOption({ label: categoryName });
+  await page.getByLabel("Ghi chú").fill(note);
+  await page.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Thêm Giao Dịch" })).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Ngân sách" }).click();
+  await page.getByRole("button", { name: "Tạo sự kiện" }).click();
+  await page.getByLabel("Tên sự kiện").fill(eventName);
+  await page.getByLabel("Giao dịch sự kiện").selectOption({ label: `${note} · 200.000 đ` });
+  await page.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page.getByRole("button", { name: new RegExp(`${eventName}[\\s\\S]*200\\.000`) })).toBeVisible();
+
+  await page.getByRole("button", { name: "Tạo khoản nợ" }).click();
+  await page.getByLabel("Đối tác").fill(counterparty);
+  await page.getByLabel("Số tiền gốc").fill("500000");
+  await page.getByLabel("Giao dịch trả nợ").selectOption({ label: `${note} · 200.000 đ` });
+  await page.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page.getByRole("button", { name: new RegExp(`${counterparty}[\\s\\S]*300\\.000`) })).toBeVisible();
+});

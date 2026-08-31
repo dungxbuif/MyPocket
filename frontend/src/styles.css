@@ -154,6 +154,12 @@ button {
   line-height: 1.3;
 }
 
+.offline-warning.neutral {
+  margin: -10px 0 0;
+  background: #eef6f8;
+  color: #42606b;
+}
+
 .content-stack {
   display: grid;
   gap: 28px;
@@ -588,6 +594,44 @@ button {
   margin-top: 12px;
   color: #ff8800;
   font-weight: 900;
+}
+
+.planning-list {
+  display: grid;
+}
+
+.planning-list .section-title {
+  padding: 20px 22px 8px;
+}
+
+.planning-row {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) 22px;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  border: 0;
+  border-top: 1px solid #e8e8ec;
+  background: #ffffff;
+  padding: 18px 22px;
+  color: inherit;
+  text-align: left;
+}
+
+.planning-row strong {
+  display: block;
+  overflow-wrap: anywhere;
+  font-size: 20px;
+}
+
+.planning-row p {
+  margin: 6px 0 0;
+  color: #8e8e93;
+  font-weight: 800;
+}
+
+.debt-dot {
+  background: #7f5af0;
 }
 
 .progress {

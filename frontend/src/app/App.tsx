@@ -51,12 +51,27 @@ import {
 } from "./finance";
 import {
   archiveBudget,
+  archiveEvent,
+  archiveObligation,
   createBudget,
+  createEvent,
+  createObligation,
+  linkEventTransaction,
+  linkObligationRepayment,
   loadBudgets,
+  loadEvents,
+  loadObligations,
   updateBudget,
+  updateEvent,
+  updateObligation,
   type BudgetInput,
   type BudgetPeriodType,
   type BudgetProgress,
+  type EventInput,
+  type EventSummary,
+  type ObligationDirection,
+  type ObligationInput,
+  type ObligationSummary,
 } from "./planning";
 import { drainOutbox, readOutbox } from "./outbox";
 import type { OfflineConflict } from "../offline/types";
@@ -81,8 +96,14 @@ export function App() {
   const [categories, setCategories] = useState<CategorySummary[] | null>(null);
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
   const [budgets, setBudgets] = useState<BudgetProgress[] | null>(null);
+  const [events, setEvents] = useState<EventSummary[] | null>(null);
+  const [obligations, setObligations] = useState<ObligationSummary[] | null>(null);
   const [budgetSheetOpen, setBudgetSheetOpen] = useState(false);
+  const [eventSheetOpen, setEventSheetOpen] = useState(false);
+  const [obligationSheetOpen, setObligationSheetOpen] = useState(false);
   const [editingBudget, setEditingBudget] = useState<BudgetProgress | null>(null);
+  const [editingEvent, setEditingEvent] = useState<EventSummary | null>(null);
+  const [editingObligation, setEditingObligation] = useState<ObligationSummary | null>(null);
   const [offlineStatus, setOfflineStatus] = useState<{ mode: "ready" | "degraded"; pending: number; reason?: string }>({ mode: "ready", pending: 0 });
   const [conflicts, setConflicts] = useState<OfflineConflict[]>([]);
   const offlineReadOnly = !online && offlineStatus.mode === "degraded";
@@ -105,6 +126,8 @@ export function App() {
       setCategories(null);
       setTransactions(null);
       setBudgets(null);
+      setEvents(null);
+      setObligations(null);
       setConflicts([]);
       return;
     }
@@ -142,16 +165,20 @@ export function App() {
     setCategories(null);
     setTransactions(null);
     setBudgets(null);
+    setEvents(null);
+    setObligations(null);
     setConflicts([]);
     setOfflineStatus({ mode: "ready", pending: 0 });
     setActiveTab("overview");
   }
 
   async function refreshFinanceData() {
-    const [nextWallets, nextCategories, nextTransactions, nextBudgets] = await Promise.all([loadWallets(), loadCategories(), loadTransactions(), loadBudgets()]);
+    const [nextWallets, nextCategories, nextTransactions, nextBudgets, nextEvents, nextObligations] = await Promise.all([loadWallets(), loadCategories(), loadTransactions(), loadBudgets(), loadEvents(), loadObligations()]);
     setWallets(nextWallets);
     setCategories(nextCategories);
     setBudgets(nextBudgets);
+    setEvents(nextEvents);
+    setObligations(nextObligations);
     await saveFinanceMirror({ wallets: nextWallets, categories: nextCategories, transactions: nextTransactions });
     const queued = await readOutbox();
     setOfflineStatus((current) => ({ ...current, pending: queued.length }));
@@ -233,7 +260,7 @@ export function App() {
         {authState.status === "forbidden" ? <ForbiddenState authState={authState} onLogout={handleLogout} /> : null}
         {authState.status !== "forbidden" && activeTab === "overview" ? <Overview wallets={wallets} onManageWallets={() => setWalletSheetOpen(true)} /> : null}
         {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions transactions={transactions ?? []} onEdit={setEditingTransaction} /> : null}
-        {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets budgets={budgets} categories={categories ?? []} online={online} onCreate={() => setBudgetSheetOpen(true)} onEdit={setEditingBudget} /> : null}
+        {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets budgets={budgets} events={events ?? []} obligations={obligations ?? []} categories={categories ?? []} transactions={transactions ?? []} online={online} onCreate={() => setBudgetSheetOpen(true)} onCreateEvent={() => setEventSheetOpen(true)} onCreateObligation={() => setObligationSheetOpen(true)} onEdit={setEditingBudget} onEditEvent={setEditingEvent} onEditObligation={setEditingObligation} /> : null}
         {authState.status !== "forbidden" && activeTab === "account" ? <Account authState={authState} onLogout={handleLogout} /> : null}
       </main>
 
@@ -254,6 +281,10 @@ export function App() {
       {editingTransaction ? <EditTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} transaction={editingTransaction} onChanged={upsertTransaction} onArchived={() => { setTransactions((current) => (current ?? []).filter((item) => item.id !== editingTransaction.id)); setEditingTransaction(null); void reconcileAfterLocalChange().catch(() => undefined); }} onClose={() => setEditingTransaction(null)} /> : null}
       {budgetSheetOpen ? <BudgetSheet categories={categories ?? []} onSaved={() => { setBudgetSheetOpen(false); void refreshFinanceData(); }} onClose={() => setBudgetSheetOpen(false)} /> : null}
       {editingBudget ? <BudgetSheet budget={editingBudget} categories={categories ?? []} onSaved={() => { setEditingBudget(null); void refreshFinanceData(); }} onArchived={() => { setEditingBudget(null); void refreshFinanceData(); }} onClose={() => setEditingBudget(null)} /> : null}
+      {eventSheetOpen ? <EventSheet transactions={transactions ?? []} onSaved={() => { setEventSheetOpen(false); void refreshFinanceData(); }} onClose={() => setEventSheetOpen(false)} /> : null}
+      {editingEvent ? <EventSheet event={editingEvent} transactions={transactions ?? []} onSaved={() => { setEditingEvent(null); void refreshFinanceData(); }} onArchived={() => { setEditingEvent(null); void refreshFinanceData(); }} onClose={() => setEditingEvent(null)} /> : null}
+      {obligationSheetOpen ? <ObligationSheet transactions={transactions ?? []} onSaved={() => { setObligationSheetOpen(false); void refreshFinanceData(); }} onClose={() => setObligationSheetOpen(false)} /> : null}
+      {editingObligation ? <ObligationSheet obligation={editingObligation} transactions={transactions ?? []} onSaved={() => { setEditingObligation(null); void refreshFinanceData(); }} onArchived={() => { setEditingObligation(null); void refreshFinanceData(); }} onClose={() => setEditingObligation(null)} /> : null}
     </div>
   );
 }
@@ -417,7 +448,33 @@ function Transactions({ transactions, onEdit }: { transactions: Transaction[]; o
   );
 }
 
-function Budgets({ budgets, categories, online, onCreate, onEdit }: { budgets: BudgetProgress[] | null; categories: CategorySummary[]; online: boolean; onCreate: () => void; onEdit: (budget: BudgetProgress) => void }) {
+function Budgets({
+  budgets,
+  events,
+  obligations,
+  categories,
+  transactions,
+  online,
+  onCreate,
+  onCreateEvent,
+  onCreateObligation,
+  onEdit,
+  onEditEvent,
+  onEditObligation,
+}: {
+  budgets: BudgetProgress[] | null;
+  events: EventSummary[];
+  obligations: ObligationSummary[];
+  categories: CategorySummary[];
+  transactions: Transaction[];
+  online: boolean;
+  onCreate: () => void;
+  onCreateEvent: () => void;
+  onCreateObligation: () => void;
+  onEdit: (budget: BudgetProgress) => void;
+  onEditEvent: (event: EventSummary) => void;
+  onEditObligation: (obligation: ObligationSummary) => void;
+}) {
   const rows = budgets ?? [];
   const totalBudget = rows.reduce((total, item) => total + item.budget.amount_vnd, 0);
   const totalSpent = rows.reduce((total, item) => total + item.spent_vnd, 0);
@@ -438,7 +495,152 @@ function Budgets({ budgets, categories, online, onCreate, onEdit }: { budgets: B
       {rows.length === 0 ? <section className="card list-card"><p className="empty-state">Chưa có ngân sách</p></section> : rows.map((budget) => (
         <BudgetRow key={budget.budget.id} item={budget} categories={categories} disabled={!online} onEdit={() => onEdit(budget)} />
       ))}
+      <section className="card list-card planning-list">
+        <div className="section-title">
+          <h2>Sự kiện</h2>
+          <button type="button" disabled={!online} onClick={onCreateEvent}>Tạo sự kiện</button>
+        </div>
+        {events.length === 0 ? <p className="empty-state">Chưa có sự kiện</p> : events.map((event) => (
+          <button className="planning-row" type="button" key={event.id} disabled={!online} onClick={() => onEditEvent(event)}>
+            <span className="category-dot" />
+            <div>
+              <strong>{event.name}</strong>
+              <p>{formatDate(event.starts_on)} - {formatDate(event.ends_on)}</p>
+              <p>Đã dùng {formatVND(event.total_vnd)} · {event.transaction_count} giao dịch</p>
+            </div>
+            <ChevronRight size={22} />
+          </button>
+        ))}
+      </section>
+      <section className="card list-card planning-list">
+        <div className="section-title">
+          <h2>Khoản vay nợ</h2>
+          <button type="button" disabled={!online} onClick={onCreateObligation}>Tạo khoản nợ</button>
+        </div>
+        {obligations.length === 0 ? <p className="empty-state">Chưa có khoản vay nợ</p> : obligations.map((obligation) => (
+          <button className="planning-row" type="button" key={obligation.id} disabled={!online} onClick={() => onEditObligation(obligation)}>
+            <span className="category-dot debt-dot" />
+            <div>
+              <strong>{obligation.counterparty}</strong>
+              <p>{obligationDirectionLabel(obligation.direction)} · Hạn {formatDate(obligation.due_on)}</p>
+              <p>Còn {formatVND(obligation.remaining_vnd)}</p>
+              <p>Đã trả {formatVND(obligation.repaid_vnd)}</p>
+            </div>
+            <ChevronRight size={22} />
+          </button>
+        ))}
+      </section>
+      {transactions.length === 0 ? <p className="offline-warning neutral">Tạo giao dịch trước khi gắn chi phí sự kiện hoặc trả nợ.</p> : null}
     </section>
+  );
+}
+
+function EventSheet({ event, transactions, onSaved, onArchived, onClose }: { event?: EventSummary; transactions: Transaction[]; onSaved: () => void; onArchived?: () => void; onClose: () => void }) {
+  const [name, setName] = useState(event?.name ?? "");
+  const [startsOn, setStartsOn] = useState(event?.starts_on ?? new Date().toISOString().slice(0, 10));
+  const [endsOn, setEndsOn] = useState(event?.ends_on ?? new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState(event?.note ?? "");
+  const [transactionID, setTransactionID] = useState("");
+  const [saving, setSaving] = useState(false);
+  const canSave = name.trim() !== "" && startsOn !== "" && endsOn !== "";
+  async function save() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      const input: EventInput = { name, starts_on: startsOn, ends_on: endsOn, note };
+      const saved = event ? await updateEvent(event.id, input) : await createEvent(input);
+      if (transactionID) await linkEventTransaction(saved.id, transactionID);
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function archive() {
+    if (!event || saving) return;
+    setSaving(true);
+    try {
+      await archiveEvent(event.id);
+      onArchived?.();
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div className="sheet-backdrop">
+      <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label={event ? "Sửa Sự Kiện" : "Tạo Sự Kiện"}>
+        <header>
+          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <h2>{event ? "Sửa Sự Kiện" : "Tạo Sự Kiện"}</h2>
+          <span />
+        </header>
+        <label className="sheet-row"><MapPin /><input aria-label="Tên sự kiện" value={name} onChange={(change) => setName(change.target.value)} placeholder="Tên sự kiện" /></label>
+        <div className="manager-form two">
+          <input aria-label="Ngày bắt đầu sự kiện" type="date" value={startsOn} onChange={(change) => setStartsOn(change.target.value)} />
+          <input aria-label="Ngày kết thúc sự kiện" type="date" value={endsOn} onChange={(change) => setEndsOn(change.target.value)} />
+        </div>
+        <label className="sheet-row"><List /><input aria-label="Ghi chú sự kiện" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" /></label>
+        <label className="sheet-row"><Wallet /><select aria-label="Giao dịch sự kiện" value={transactionID} onChange={(change) => setTransactionID(change.target.value)}><option value="">Không gắn giao dịch</option>{transactions.map((transaction) => <option key={transaction.id} value={transaction.id}>{transaction.note || transaction.type} · {formatVND(transaction.amount_vnd)}</option>)}</select></label>
+        <div className="sheet-actions">
+          {event ? <button className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</button> : null}
+          <button className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function ObligationSheet({ obligation, transactions, onSaved, onArchived, onClose }: { obligation?: ObligationSummary; transactions: Transaction[]; onSaved: () => void; onArchived?: () => void; onClose: () => void }) {
+  const [counterparty, setCounterparty] = useState(obligation?.counterparty ?? "");
+  const [direction, setDirection] = useState<ObligationDirection>(obligation?.direction ?? "borrowed");
+  const [principal, setPrincipal] = useState(String(obligation?.principal_vnd ?? ""));
+  const [dueOn, setDueOn] = useState(obligation?.due_on ?? new Date().toISOString().slice(0, 10));
+  const [note, setNote] = useState(obligation?.note ?? "");
+  const [transactionID, setTransactionID] = useState("");
+  const [saving, setSaving] = useState(false);
+  const canSave = counterparty.trim() !== "" && Number(principal) > 0 && dueOn !== "";
+  async function save() {
+    if (!canSave || saving) return;
+    setSaving(true);
+    try {
+      const input: ObligationInput = { direction, principal_vnd: Number(principal), counterparty, due_on: dueOn, note };
+      const saved = obligation ? await updateObligation(obligation.id, input) : await createObligation(input);
+      if (transactionID) await linkObligationRepayment(saved.id, transactionID);
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function archive() {
+    if (!obligation || saving) return;
+    setSaving(true);
+    try {
+      await archiveObligation(obligation.id);
+      onArchived?.();
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div className="sheet-backdrop">
+      <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label={obligation ? "Sửa Khoản Nợ" : "Tạo Khoản Nợ"}>
+        <header>
+          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <h2>{obligation ? "Sửa Khoản Nợ" : "Tạo Khoản Nợ"}</h2>
+          <span />
+        </header>
+        <div className="segmented sheet-segmented"><button type="button" className={direction === "borrowed" ? "active" : ""} onClick={() => setDirection("borrowed")}>Tôi vay</button><button type="button" className={direction === "lent" ? "active" : ""} onClick={() => setDirection("lent")}>Tôi cho vay</button></div>
+        <label className="sheet-row"><Users /><input aria-label="Đối tác" value={counterparty} onChange={(change) => setCounterparty(change.target.value)} placeholder="Người liên quan" /></label>
+        <label className="amount-row"><span>VND</span><input aria-label="Số tiền gốc" inputMode="numeric" value={principal} onChange={(change) => setPrincipal(change.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
+        <label className="sheet-row"><CalendarDays /><input aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(change) => setDueOn(change.target.value)} /></label>
+        <label className="sheet-row"><List /><input aria-label="Ghi chú khoản nợ" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" /></label>
+        <label className="sheet-row"><Wallet /><select aria-label="Giao dịch trả nợ" value={transactionID} onChange={(change) => setTransactionID(change.target.value)}><option value="">Không gắn trả nợ</option>{transactions.map((transaction) => <option key={transaction.id} value={transaction.id}>{transaction.note || transaction.type} · {formatVND(transaction.amount_vnd)}</option>)}</select></label>
+        {obligation ? <p className="sheet-meta">Còn {formatVND(obligation.remaining_vnd)} · Đã trả {formatVND(obligation.repaid_vnd)}</p> : null}
+        <div className="sheet-actions">
+          {obligation ? <button className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</button> : null}
+          <button className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button>
+        </div>
+      </section>
+    </div>
   );
 }
 
@@ -938,6 +1140,10 @@ function transactionTypeLabel(type: TransactionType) {
     default:
       return "Chi";
   }
+}
+
+function obligationDirectionLabel(direction: ObligationDirection) {
+  return direction === "borrowed" ? "Tôi vay" : "Tôi cho vay";
 }
 
 function conflictLabel(conflict: OfflineConflict) {

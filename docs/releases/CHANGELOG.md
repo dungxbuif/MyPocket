@@ -46,6 +46,7 @@ shared_fields: [status]
 - Added PHASE-003 sync API/change-feed support with PostgreSQL sync cursors/changes/mutation ledger, idempotent mutation replay, stale-version conflict responses, authoritative resync snapshots, frontend sync outbox drain, and mobile reconnect replay proof.
 - Added PHASE-003 conflict inbox and recovery support with IndexedDB conflict persistence, non-blocking mobile review UI, keep-server, discard-local, edit-and-retry, full resync preservation, and targeted mobile E2E proof.
 - Added PHASE-004 budget and threshold support with planning tables, authenticated budget API routes, Ho Chi Minh period progress, selected/all-category scopes, 80%/100% alert dedupe, and mobile create/edit/archive proof.
+- Added PHASE-004 event and debt planning with event/obligation tables, authenticated API routes, event transaction links, repayment links with overpayment protection, mobile Vietnamese planning screens, and live mobile E2E proof.
 
 ### Planning
 

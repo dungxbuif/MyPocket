@@ -151,11 +151,13 @@ func createPlanningCategory(t *testing.T, repo *finance.Repository, userID strin
 	return category
 }
 
-func createPlanningTransaction(t *testing.T, repo *finance.Repository, userID string, input finance.CreateTransactionInput) {
+func createPlanningTransaction(t *testing.T, repo *finance.Repository, userID string, input finance.CreateTransactionInput) finance.Transaction {
 	t.Helper()
-	if _, err := repo.CreateTransaction(context.Background(), userID, input); err != nil {
+	transaction, err := repo.CreateTransaction(context.Background(), userID, input)
+	if err != nil {
 		t.Fatalf("create transaction %s: %v", input.IdempotencyKey, err)
 	}
+	return transaction
 }
 
 func findPlanningSystemCategory(t *testing.T, conn *sql.DB, key string) string {

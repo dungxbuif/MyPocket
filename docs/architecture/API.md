@@ -37,7 +37,9 @@ updated: 2026-08-31
 | `POST /sync/mutations`, `GET /sync/changes`, `POST /sync/resync` | Sync | User | implemented | Idempotent batches, per-user cursors, versions, tombstones, and authoritative resync snapshots |
 | `/sync/conflicts` | REST collection | User | planned | Optional server-backed conflict collection; current PHASE-003 conflict review is persisted client-side from sync mutation results |
 | `GET /budgets`, `POST /budgets`, `PATCH /budgets/{id}`, `POST /budgets/{id}/archive` | REST/command | User | implemented | Budget CRUD, selected/all expense category scopes, Ho Chi Minh period progress, and 80%/100% alert dedupe |
-| `/events`, `/recurring-schedules`, `/debts` | REST collection | User | planned | Remaining planning and automation |
+| `GET /events`, `POST /events`, `PATCH /events/{id}`, `POST /events/{id}/archive`, `POST /events/{id}/transactions/{transaction_id}` | REST/command | User | implemented | Event CRUD and links to owned confirmed transactions; totals preserve report exclusion |
+| `GET /obligations`, `POST /obligations`, `PATCH /obligations/{id}`, `POST /obligations/{id}/archive`, `POST /obligations/{id}/repayments/{transaction_id}` | REST/command | User | implemented | Borrow/lend obligation CRUD and repayment links with overpayment protection |
+| `/recurring-schedules` | REST collection | User | planned | Remaining planning automation |
 | `/analytics/*` | Query REST | User | planned | Dashboard, categories, periods, trends |
 | `/ai/conversations`, `/ai/conversations/{id}/messages` | REST collection | User | planned | Text and multimodal chat |
 | `POST /receipts/{id}/extract` | Command | User | planned | External OCR path from add transaction |
@@ -342,6 +344,54 @@ Same JSON shape as create. Mutations are scoped to the authenticated owner and r
 ### `POST /api/v1/budgets/{id}/archive`
 
 Archives the budget for the authenticated owner. Archived budgets are hidden from `GET /api/v1/budgets`.
+
+### `GET /api/v1/events`
+
+Returns authenticated-user active events with totals from linked, non-archived, report-included transactions.
+
+### `POST /api/v1/events`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request fields: `name`, `starts_on`, `ends_on`, and optional `note`. Dates use `YYYY-MM-DD`. Response status: `201 Created`.
+
+### `PATCH /api/v1/events/{id}`
+
+Same JSON shape as create. Mutations are scoped to the authenticated owner.
+
+### `POST /api/v1/events/{id}/archive`
+
+Archives the event for the authenticated owner. Archived events are hidden from `GET /api/v1/events`.
+
+### `POST /api/v1/events/{id}/transactions/{transaction_id}`
+
+Links an owned confirmed transaction to an owned active event. The link does not change wallet accounting. Linked transactions marked `excluded_from_reports` are not counted in event totals.
+
+### `GET /api/v1/obligations`
+
+Returns authenticated-user active borrow/lend obligations with `repaid_vnd` and `remaining_vnd` derived from linked repayment transactions.
+
+### `POST /api/v1/obligations`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request fields: `direction` (`borrowed` or `lent`), `principal_vnd`, `counterparty`, `due_on`, and optional `note`. Response status: `201 Created`.
+
+### `PATCH /api/v1/obligations/{id}`
+
+Same JSON shape as create. Mutations are scoped to the authenticated owner.
+
+### `POST /api/v1/obligations/{id}/archive`
+
+Archives the obligation for the authenticated owner. Archived obligations are hidden from `GET /api/v1/obligations`.
+
+### `POST /api/v1/obligations/{id}/repayments/{transaction_id}`
+
+Links an owned confirmed transaction as a repayment. The command returns `400 VALIDATION_FAILED` when the linked repayment total would exceed the obligation principal.
 
 ## Transaction Schemas
 

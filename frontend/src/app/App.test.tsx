@@ -297,6 +297,8 @@ describe("App shell", () => {
           alert_100: false,
         }],
       },
+      "/api/v1/events": { events: [] },
+      "/api/v1/obligations": { obligations: [] },
     });
 
     render(<App />);
@@ -310,6 +312,33 @@ describe("App shell", () => {
 
     await waitFor(() => {
       const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/budgets" && options?.method === "POST");
+      expect(createCall).toBeTruthy();
+    });
+  });
+
+  it("shows event and debt planning flows", async () => {
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [] },
+      "/api/v1/categories": { categories: [] },
+      "/api/v1/transactions": { transactions: [] },
+      "/api/v1/budgets": { budgets: [] },
+      "/api/v1/events": { events: [{ id: "event_1", name: "Đà Lạt", starts_on: "2026-08-31", ends_on: "2026-09-02", note: "Trip", total_vnd: 125000, transaction_count: 1, version: 1 }] },
+      "/api/v1/obligations": { obligations: [{ id: "debt_1", direction: "borrowed", principal_vnd: 1000000, counterparty: "Anh Minh", due_on: "2026-09-30", note: "Vay sửa nhà", repaid_vnd: 600000, remaining_vnd: 400000, version: 1 }] },
+    });
+
+    render(<App />);
+    await userEvent.click(await screen.findByLabelText("Ngân sách"));
+    expect(await screen.findByText("Đà Lạt")).toBeInTheDocument();
+    expect(screen.getByText("Đã dùng 125.000 đ · 1 giao dịch")).toBeInTheDocument();
+    expect(screen.getByText("Anh Minh")).toBeInTheDocument();
+    expect(screen.getByText("Còn 400.000 đ")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Tạo sự kiện" }));
+    await userEvent.type(await screen.findByLabelText("Tên sự kiện"), "Du lịch Huế");
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu", exact: true }).at(-1)!);
+
+    await waitFor(() => {
+      const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/events" && options?.method === "POST");
       expect(createCall).toBeTruthy();
     });
   });
@@ -331,6 +360,12 @@ function mockFetchRoutes(routes: Record<string, unknown>) {
     }
     if (path === "/api/v1/budgets") {
       return jsonResponse({ budgets: [] });
+    }
+    if (path === "/api/v1/events") {
+      return jsonResponse({ events: [] });
+    }
+    if (path === "/api/v1/obligations") {
+      return jsonResponse({ obligations: [] });
     }
     if (options?.method && options.method !== "GET") {
       return jsonResponse({});

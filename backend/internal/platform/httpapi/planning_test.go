@@ -102,18 +102,115 @@ func TestBudgetsAPIUsesAuthenticatedUser(t *testing.T) {
 	}
 }
 
+func TestEventsAPIUsesAuthenticatedUser(t *testing.T) {
+	repo := &planningRepoStub{
+		events:       []planning.EventSummary{{ID: "event-1", UserID: "user_123", Name: "Đà Lạt", StartsOn: "2026-08-31", EndsOn: "2026-09-02", TotalVND: 125000, TransactionCount: 1, Version: 1}},
+		createdEvent: planning.EventSummary{ID: "event-2", UserID: "user_123", Name: "Huế", StartsOn: "2026-09-10", EndsOn: "2026-09-10", Version: 1},
+		updatedEvent: planning.EventSummary{ID: "event-2", UserID: "user_123", Name: "Huế mới", StartsOn: "2026-09-10", EndsOn: "2026-09-12", Version: 2},
+	}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		PlanningRepository: repo,
+	})
+
+	listReq := authenticatedRequest(t, http.MethodGet, "/api/v1/events", "")
+	listRes := httptest.NewRecorder()
+	handler.ServeHTTP(listRes, listReq)
+	if listRes.Code != http.StatusOK || repo.eventListUserID != "user_123" || !strings.Contains(listRes.Body.String(), `"transaction_count":1`) {
+		t.Fatalf("event list failed/scoped wrong: code=%d user=%q body=%s", listRes.Code, repo.eventListUserID, listRes.Body.String())
+	}
+
+	createReq := authenticatedRequest(t, http.MethodPost, "/api/v1/events", `{"name":"Huế","starts_on":"2026-09-10","ends_on":"2026-09-10","note":"Trip"}`)
+	addCSRF(createReq)
+	createRes := httptest.NewRecorder()
+	handler.ServeHTTP(createRes, createReq)
+	if createRes.Code != http.StatusCreated || repo.eventCreateUserID != "user_123" || repo.eventCreateInput.Name != "Huế" {
+		t.Fatalf("event create failed/scoped wrong: code=%d user=%q input=%#v body=%s", createRes.Code, repo.eventCreateUserID, repo.eventCreateInput, createRes.Body.String())
+	}
+
+	linkReq := authenticatedRequest(t, http.MethodPost, "/api/v1/events/event-2/transactions/tx-1", "")
+	addCSRF(linkReq)
+	linkRes := httptest.NewRecorder()
+	handler.ServeHTTP(linkRes, linkReq)
+	if linkRes.Code != http.StatusOK || repo.eventLinkID != "event-2" || repo.eventLinkTxID != "tx-1" {
+		t.Fatalf("event link failed/scoped wrong: code=%d event=%q tx=%q body=%s", linkRes.Code, repo.eventLinkID, repo.eventLinkTxID, linkRes.Body.String())
+	}
+}
+
+func TestObligationsAPIUsesAuthenticatedUser(t *testing.T) {
+	repo := &planningRepoStub{
+		obligations:       []planning.ObligationSummary{{ID: "debt-1", UserID: "user_123", Direction: planning.ObligationBorrowed, PrincipalVND: 1000000, Counterparty: "Anh Minh", DueOn: "2026-09-30", RepaidVND: 600000, RemainingVND: 400000, Version: 1}},
+		createdObligation: planning.ObligationSummary{ID: "debt-2", UserID: "user_123", Direction: planning.ObligationLent, PrincipalVND: 300000, Counterparty: "Chị Lan", DueOn: "2026-09-15", RemainingVND: 300000, Version: 1},
+	}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		PlanningRepository: repo,
+	})
+
+	listReq := authenticatedRequest(t, http.MethodGet, "/api/v1/obligations", "")
+	listRes := httptest.NewRecorder()
+	handler.ServeHTTP(listRes, listReq)
+	if listRes.Code != http.StatusOK || repo.obligationListUserID != "user_123" || !strings.Contains(listRes.Body.String(), `"remaining_vnd":400000`) {
+		t.Fatalf("obligation list failed/scoped wrong: code=%d user=%q body=%s", listRes.Code, repo.obligationListUserID, listRes.Body.String())
+	}
+
+	createReq := authenticatedRequest(t, http.MethodPost, "/api/v1/obligations", `{"direction":"lent","principal_vnd":300000,"counterparty":"Chị Lan","due_on":"2026-09-15","note":"Ứng trước"}`)
+	addCSRF(createReq)
+	createRes := httptest.NewRecorder()
+	handler.ServeHTTP(createRes, createReq)
+	if createRes.Code != http.StatusCreated || repo.obligationCreateUserID != "user_123" || repo.obligationCreateInput.Direction != planning.ObligationLent {
+		t.Fatalf("obligation create failed/scoped wrong: code=%d user=%q input=%#v body=%s", createRes.Code, repo.obligationCreateUserID, repo.obligationCreateInput, createRes.Body.String())
+	}
+
+	linkReq := authenticatedRequest(t, http.MethodPost, "/api/v1/obligations/debt-2/repayments/tx-1", "")
+	addCSRF(linkReq)
+	linkRes := httptest.NewRecorder()
+	handler.ServeHTTP(linkRes, linkReq)
+	if linkRes.Code != http.StatusOK || repo.obligationLinkID != "debt-2" || repo.obligationLinkTxID != "tx-1" {
+		t.Fatalf("obligation link failed/scoped wrong: code=%d obligation=%q tx=%q body=%s", linkRes.Code, repo.obligationLinkID, repo.obligationLinkTxID, linkRes.Body.String())
+	}
+}
+
 type planningRepoStub struct {
-	progress      []planning.BudgetProgress
-	created       planning.Budget
-	updated       planning.Budget
-	listUserID    string
-	createUserID  string
-	createInput   planning.CreateBudgetInput
-	updateUserID  string
-	updateID      string
-	updateInput   planning.UpdateBudgetInput
-	archiveUserID string
-	archiveID     string
+	progress                []planning.BudgetProgress
+	created                 planning.Budget
+	updated                 planning.Budget
+	events                  []planning.EventSummary
+	createdEvent            planning.EventSummary
+	updatedEvent            planning.EventSummary
+	obligations             []planning.ObligationSummary
+	createdObligation       planning.ObligationSummary
+	updatedObligation       planning.ObligationSummary
+	listUserID              string
+	createUserID            string
+	createInput             planning.CreateBudgetInput
+	updateUserID            string
+	updateID                string
+	updateInput             planning.UpdateBudgetInput
+	archiveUserID           string
+	archiveID               string
+	eventListUserID         string
+	eventCreateUserID       string
+	eventCreateInput        planning.CreateEventInput
+	eventUpdateUserID       string
+	eventUpdateID           string
+	eventUpdateInput        planning.UpdateEventInput
+	eventArchiveUserID      string
+	eventArchiveID          string
+	eventLinkUserID         string
+	eventLinkID             string
+	eventLinkTxID           string
+	obligationListUserID    string
+	obligationCreateUserID  string
+	obligationCreateInput   planning.CreateObligationInput
+	obligationUpdateUserID  string
+	obligationUpdateID      string
+	obligationUpdateInput   planning.UpdateObligationInput
+	obligationArchiveUserID string
+	obligationArchiveID     string
+	obligationLinkUserID    string
+	obligationLinkID        string
+	obligationLinkTxID      string
 }
 
 func (s *planningRepoStub) ListBudgetProgress(_ context.Context, userID string, _ time.Time) ([]planning.BudgetProgress, error) {
@@ -137,5 +234,67 @@ func (s *planningRepoStub) UpdateBudget(_ context.Context, userID string, budget
 func (s *planningRepoStub) ArchiveBudget(_ context.Context, userID string, budgetID string) error {
 	s.archiveUserID = userID
 	s.archiveID = budgetID
+	return nil
+}
+
+func (s *planningRepoStub) ListEvents(_ context.Context, userID string) ([]planning.EventSummary, error) {
+	s.eventListUserID = userID
+	return s.events, nil
+}
+
+func (s *planningRepoStub) CreateEvent(_ context.Context, userID string, input planning.CreateEventInput) (planning.EventSummary, error) {
+	s.eventCreateUserID = userID
+	s.eventCreateInput = input
+	return s.createdEvent, nil
+}
+
+func (s *planningRepoStub) UpdateEvent(_ context.Context, userID string, eventID string, input planning.UpdateEventInput) (planning.EventSummary, error) {
+	s.eventUpdateUserID = userID
+	s.eventUpdateID = eventID
+	s.eventUpdateInput = input
+	return s.updatedEvent, nil
+}
+
+func (s *planningRepoStub) ArchiveEvent(_ context.Context, userID string, eventID string) error {
+	s.eventArchiveUserID = userID
+	s.eventArchiveID = eventID
+	return nil
+}
+
+func (s *planningRepoStub) LinkEventTransaction(_ context.Context, userID string, eventID string, transactionID string) error {
+	s.eventLinkUserID = userID
+	s.eventLinkID = eventID
+	s.eventLinkTxID = transactionID
+	return nil
+}
+
+func (s *planningRepoStub) ListObligations(_ context.Context, userID string) ([]planning.ObligationSummary, error) {
+	s.obligationListUserID = userID
+	return s.obligations, nil
+}
+
+func (s *planningRepoStub) CreateObligation(_ context.Context, userID string, input planning.CreateObligationInput) (planning.ObligationSummary, error) {
+	s.obligationCreateUserID = userID
+	s.obligationCreateInput = input
+	return s.createdObligation, nil
+}
+
+func (s *planningRepoStub) UpdateObligation(_ context.Context, userID string, obligationID string, input planning.UpdateObligationInput) (planning.ObligationSummary, error) {
+	s.obligationUpdateUserID = userID
+	s.obligationUpdateID = obligationID
+	s.obligationUpdateInput = input
+	return s.updatedObligation, nil
+}
+
+func (s *planningRepoStub) ArchiveObligation(_ context.Context, userID string, obligationID string) error {
+	s.obligationArchiveUserID = userID
+	s.obligationArchiveID = obligationID
+	return nil
+}
+
+func (s *planningRepoStub) LinkObligationRepayment(_ context.Context, userID string, obligationID string, transactionID string) error {
+	s.obligationLinkUserID = userID
+	s.obligationLinkID = obligationID
+	s.obligationLinkTxID = transactionID
 	return nil
 }

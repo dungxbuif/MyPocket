@@ -38,6 +38,10 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/transactions/", transactionByID(cfg, deps.FinanceRepository))
 	mux.HandleFunc("/api/v1/budgets", budgets(cfg, deps.PlanningRepository))
 	mux.HandleFunc("/api/v1/budgets/", budgetByID(cfg, deps.PlanningRepository))
+	mux.HandleFunc("/api/v1/events", events(cfg, deps.PlanningRepository))
+	mux.HandleFunc("/api/v1/events/", eventByID(cfg, deps.PlanningRepository))
+	mux.HandleFunc("/api/v1/obligations", obligations(cfg, deps.PlanningRepository))
+	mux.HandleFunc("/api/v1/obligations/", obligationByID(cfg, deps.PlanningRepository))
 	mux.HandleFunc("/api/v1/sync/mutations", syncMutations(cfg, deps.SyncService))
 	mux.HandleFunc("/api/v1/sync/changes", syncChanges(cfg, deps.SyncService))
 	mux.HandleFunc("/api/v1/sync/resync", syncResync(cfg, deps.SyncService))
@@ -98,6 +102,16 @@ type PlanningRepository interface {
 	CreateBudget(ctx context.Context, userID string, input planning.CreateBudgetInput) (planning.Budget, error)
 	UpdateBudget(ctx context.Context, userID string, budgetID string, input planning.UpdateBudgetInput) (planning.Budget, error)
 	ArchiveBudget(ctx context.Context, userID string, budgetID string) error
+	ListEvents(ctx context.Context, userID string) ([]planning.EventSummary, error)
+	CreateEvent(ctx context.Context, userID string, input planning.CreateEventInput) (planning.EventSummary, error)
+	UpdateEvent(ctx context.Context, userID string, eventID string, input planning.UpdateEventInput) (planning.EventSummary, error)
+	ArchiveEvent(ctx context.Context, userID string, eventID string) error
+	LinkEventTransaction(ctx context.Context, userID string, eventID string, transactionID string) error
+	ListObligations(ctx context.Context, userID string) ([]planning.ObligationSummary, error)
+	CreateObligation(ctx context.Context, userID string, input planning.CreateObligationInput) (planning.ObligationSummary, error)
+	UpdateObligation(ctx context.Context, userID string, obligationID string, input planning.UpdateObligationInput) (planning.ObligationSummary, error)
+	ArchiveObligation(ctx context.Context, userID string, obligationID string) error
+	LinkObligationRepayment(ctx context.Context, userID string, obligationID string, transactionID string) error
 }
 
 func correlationMiddleware(next http.Handler) http.Handler {

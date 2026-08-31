@@ -31,9 +31,11 @@ updated: 2026-08-31
 | `budgets` | Period category/all-category limits | User | Weekly/monthly/quarterly/yearly/custom periods; versioned/archiveable |
 | `budget_categories` | Selected expense category scope for a budget | User | Composite budget/category uniqueness |
 | `budget_alerts` | Durable 80%/100% budget threshold event | User | Unique budget/threshold/period dedupe |
-| `events` | Trip or event grouping | User | Optional transaction relationship |
+| `events` | Trip or event grouping | User | Versioned/archiveable date range |
+| `event_transactions` | Event-to-transaction link | User | Composite event/transaction uniqueness |
 | `recurring_schedules` | Template and next occurrence | User | Worker emits deterministic drafts |
-| `debts` | Borrowed/lent obligation | User | Related repayment transactions |
+| `obligations` | Borrowed/lent obligation | User | Principal, counterparty, due date; versioned/archiveable |
+| `obligation_repayments` | Obligation-to-transaction repayment link | User | Composite obligation/transaction uniqueness |
 | `notifications` | Durable in-app notice | User | Read state and related entity |
 | `push_subscriptions` | Browser Web Push subscription | User | Encrypted keys and endpoint |
 | `sync_mutations` | Idempotency ledger | User | Unique client mutation ID |
@@ -57,11 +59,14 @@ updated: 2026-08-31
 | `wallets` | `transactions` | one-to-many | Source wallet required |
 | `transactions` | `wallets` | optional destination | Required only for transfer |
 | `transactions` | `categories` | many-to-one | Type and activation must match |
-| `transactions` | `events` | optional many-to-one | Event totals do not alter base accounting |
+| `events` | `event_transactions` | one-to-many | Event totals do not alter base accounting |
+| `event_transactions` | `transactions` | many-to-one | Report-excluded transactions are linkable but excluded from event totals |
 | `transactions` | `receipt_objects` | optional many-to-one | Private attachment |
 | `transaction_drafts` | `transactions` | optional one-to-one confirmation | Idempotent confirmation |
 | `ai_conversations` | `ai_messages` | one-to-many | Ordered messages |
 | `ai_messages` | `transaction_drafts` | one-to-many | Multi-transaction result |
+| `obligations` | `obligation_repayments` | one-to-many | Repayment links cannot exceed principal |
+| `obligation_repayments` | `transactions` | many-to-one | Confirmed owned transaction remains the accounting source of truth |
 | `webhook_sources` | `webhook_events` | one-to-many | Replay and deduplication scope |
 | `webhook_events` | `transaction_drafts` | optional one-to-one | Accepted event result |
 | `users` | `sync_changes` | one-to-many ordered cursor | Pull scope is per user |

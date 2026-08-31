@@ -50,7 +50,7 @@ trace:
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
-- Updated: 2026-08-30
+- Updated: 2026-08-31
 
 ## Trace Links
 
@@ -87,7 +87,7 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 | ID | Type | Title | Status | Link |
 | --- | --- | --- | --- | --- |
 | TICKET-011 | Ticket | Budgets and threshold alerts | in_review | [TICKET-011](../tickets/TICKET-011-budgets-threshold-alerts.md) |
-| TICKET-012 | Ticket | Events, debts, and repayments | ready | [TICKET-012](../tickets/TICKET-012-events-debts-repayments.md) |
+| TICKET-012 | Ticket | Events, debts, and repayments | in_review | [TICKET-012](../tickets/TICKET-012-events-debts-repayments.md) |
 | TICKET-013 | Ticket | Recurring schedules and worker occurrences | ready | [TICKET-013](../tickets/TICKET-013-recurring-schedules-worker.md) |
 | TICKET-014 | Ticket | In-app inbox and Web Push | ready | [TICKET-014](../tickets/TICKET-014-inbox-web-push.md) |
 
@@ -130,4 +130,4 @@ Deliver budgets, events, recurring drafts, debts/loans, durable notices, and bes
 
 ## Completion Summary
 
-TICKET-011 budgets and threshold alerts are in review with automated backend, frontend, and mobile E2E proof. Remaining PHASE-004 work is TICKET-012 events/debts/repayments, TICKET-013 recurring schedules/worker occurrences, and TICKET-014 in-app inbox/Web Push.
+TICKET-011 budgets/threshold alerts and TICKET-012 events/debts/repayments are in review with automated backend, frontend, build, and mobile E2E proof. Remaining PHASE-004 work is TICKET-013 recurring schedules/worker occurrences and TICKET-014 in-app inbox/Web Push.

@@ -57,6 +57,68 @@ type BudgetProgress struct {
 	Alert100     bool   `json:"alert_100"`
 }
 
+type CreateEventInput struct {
+	Name     string
+	StartsOn string
+	EndsOn   string
+	Note     string
+}
+
+type UpdateEventInput struct {
+	Name     string
+	StartsOn string
+	EndsOn   string
+	Note     string
+}
+
+type EventSummary struct {
+	ID               string `json:"id"`
+	UserID           string `json:"user_id"`
+	Name             string `json:"name"`
+	StartsOn         string `json:"starts_on"`
+	EndsOn           string `json:"ends_on"`
+	Note             string `json:"note"`
+	TotalVND         int64  `json:"total_vnd"`
+	TransactionCount int64  `json:"transaction_count"`
+	Version          int64  `json:"version"`
+}
+
+type ObligationDirection string
+
+const (
+	ObligationBorrowed ObligationDirection = "borrowed"
+	ObligationLent     ObligationDirection = "lent"
+)
+
+type CreateObligationInput struct {
+	Direction    ObligationDirection
+	PrincipalVND int64
+	Counterparty string
+	DueOn        string
+	Note         string
+}
+
+type UpdateObligationInput struct {
+	Direction    ObligationDirection
+	PrincipalVND int64
+	Counterparty string
+	DueOn        string
+	Note         string
+}
+
+type ObligationSummary struct {
+	ID           string              `json:"id"`
+	UserID       string              `json:"user_id"`
+	Direction    ObligationDirection `json:"direction"`
+	PrincipalVND int64               `json:"principal_vnd"`
+	Counterparty string              `json:"counterparty"`
+	DueOn        string              `json:"due_on"`
+	Note         string              `json:"note"`
+	RepaidVND    int64               `json:"repaid_vnd"`
+	RemainingVND int64               `json:"remaining_vnd"`
+	Version      int64               `json:"version"`
+}
+
 func trimmed(value string) string {
 	return strings.TrimSpace(value)
 }
