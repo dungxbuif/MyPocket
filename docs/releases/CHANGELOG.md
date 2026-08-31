@@ -52,6 +52,7 @@ shared_fields: [status]
 - Added login email allowlisting through `ALLOWED_LOGIN_EMAILS`, plus asset portfolio REST routes, dashboard investment/combined net-worth fields, Account-tab asset UI, IndexedDB asset cache/outbox, sync replay for asset mutations, and a static-price provider worker path for automatic valuation UAT.
 - Added TICKET-028 production-hardening foundations: structured API/worker logging, safe panic recovery, PostgreSQL audit events, hidden audit event API, audit retention worker, Account-tab user-managed API keys for AI agents/third-party callers, Redis-backed auth cache with DB fallback and revoke invalidation, and production config validation for audit/API-key/cache secrets.
 - Extended TICKET-028 with whitelist-only audit access checking and Account audit-log UI, user-scoped receipt uploads/downloads via S3-compatible presigned URLs, transaction receipt attachment, and IndexedDB offline receipt retry. OCR remains deferred.
+- Expanded the default category seed with the complete Vietnamese expense, income, and debt parent/child catalog in migration `0011_phase002_category_catalog.sql`, preserving legacy keys for existing data.
 
 ### Planning
 

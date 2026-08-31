@@ -262,6 +262,8 @@ Response:
 
 ### `GET /api/v1/categories`
 
+Returns the seeded Vietnamese parent/child system catalog from migration `0011_phase002_category_catalog.sql` together with the caller's own categories.
+
 Response:
 
 ```json

@@ -163,7 +163,7 @@ The implemented identity schema intentionally has no `google_access_token`, `goo
 | `version` | `bigint` | Optimistic version seed; starts at `1` |
 | `created_at`, `updated_at` | `timestamptz` | Audit timestamps |
 
-Seeded system keys include `expense_food`, `expense_shopping`, `expense_transport`, `income_salary`, `income_bonus`, and `debt_loan`.
+The full Vietnamese parent/child catalog is seeded by migration `0011_phase002_category_catalog.sql`. Legacy keys including `expense_food`, `income_salary`, `income_bonus`, and `debt_loan` remain stable for existing transactions.
 
 ### `wallet_category_settings`
 
