@@ -32,11 +32,15 @@ export type OfflineMutation = {
 
 export type OfflineConflict = {
   conflict_id: string;
+  mutation_id: string;
   entity_type: OfflineEntityType;
   entity_id: string;
   operation: OfflineOperation;
+  base_version: number;
+  server_version: number;
   local_payload: Record<string, unknown>;
   server_payload: Record<string, unknown>;
+  reason?: string;
   status: "open" | "resolved";
   created_at: string;
 };

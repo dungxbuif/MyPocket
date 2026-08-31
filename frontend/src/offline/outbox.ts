@@ -6,6 +6,7 @@ import {
   enqueueMutation,
   markMutationsSynced,
   readPendingMutations,
+  saveOfflineConflict,
   upsertOfflineCategory,
   upsertOfflineTransaction,
   upsertOfflineWallet,
@@ -188,7 +189,11 @@ async function drainSyncOutbox(pending: OfflineMutation[]) {
       await applyServerResult(result);
       completed.push(result.mutation_id);
     }
-    if (result.state === "conflict" || result.state === "rejected") break;
+    if (result.state === "conflict") {
+      await saveConflictResult(result);
+      break;
+    }
+    if (result.state === "rejected") break;
   }
   await markMutationsSynced(completed);
   return completed.length;
@@ -242,6 +247,24 @@ async function applyServerResult(result: SyncMutationResult) {
   if (result.entity_type === "wallet") await upsertOfflineWallet(result.payload as unknown as WalletSummary);
   if (result.entity_type === "category") await upsertOfflineCategory(result.payload as unknown as CategorySummary);
   if (result.entity_type === "transaction") await upsertOfflineTransaction(result.payload as unknown as Transaction);
+}
+
+async function saveConflictResult(result: SyncMutationResult) {
+  if (!result.conflict) return;
+  await saveOfflineConflict({
+    conflict_id: result.mutation_id,
+    mutation_id: result.mutation_id,
+    entity_type: result.conflict.entity_type,
+    entity_id: result.conflict.entity_id,
+    operation: result.conflict.operation,
+    base_version: result.conflict.base_version,
+    server_version: result.conflict.server_version,
+    local_payload: result.conflict.local_payload,
+    server_payload: result.conflict.server_payload,
+    reason: result.reason,
+    status: "open",
+    created_at: new Date().toISOString(),
+  });
 }
 
 function randomID(prefix = "offline") {

@@ -73,9 +73,10 @@ MyPocket is a modular monolith deployed as three application processes: a static
 1. Online and offline UI actions create client mutation IDs and optimistic local state.
 2. The sync API validates idempotency, ownership, base versions, and domain rules.
 3. Domain writes, accounting effects, audit records, and sync changes commit transactionally where required.
-4. The client pulls authoritative changes using a per-user cursor.
-5. AI/OCR/webhook/recurring sources create drafts; confirmation invokes the same finance service used by manual entry.
-6. Worker jobs acquire PostgreSQL leases before creating occurrences, sending push, retrying providers, or purging audit rows.
+4. Stale offline writes return explicit conflict payloads; the PWA stores the conflict locally and requires keep-server, discard-local, or edit-and-retry before removing the pending mutation.
+5. The client pulls authoritative changes using a per-user cursor, or requests a full resync snapshot when local mirror state is stale or cleared.
+6. AI/OCR/webhook/recurring sources create drafts; confirmation invokes the same finance service used by manual entry.
+7. Worker jobs acquire PostgreSQL leases before creating occurrences, sending push, retrying providers, or purging audit rows.
 
 ## Runtime Flow
 

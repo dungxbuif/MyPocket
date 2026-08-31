@@ -2,7 +2,7 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { saveFinanceMirror } from "../offline/db";
+import { enqueueMutation, saveFinanceMirror, saveOfflineConflict } from "../offline/db";
 import { App } from "./App";
 import { readOutbox } from "./outbox";
 
@@ -241,6 +241,41 @@ describe("App shell", () => {
     await userEvent.click(await screen.findByText("Cà phê sáng"));
     await userEvent.click(screen.getByRole("button", { name: "Lưu trữ" }));
     await waitFor(() => expect(fetchMock.mock.calls.some(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/transactions/tx_1/archive" && options?.method === "POST")).toBe(true));
+  });
+
+  it("shows conflict inbox and lets the user keep the server version", async () => {
+    await saveFinanceMirror({
+      wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 }],
+      categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }],
+      transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 988000, occurred_at: "2026-08-31T00:00:00Z", note: "Server note", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }],
+    });
+    const mutation = await enqueueMutation({ entity_type: "transaction", entity_id: "tx_1", operation: "update", base_version: 1, payload: { note: "Offline note", amount_vnd: 13000 } });
+    await saveOfflineConflict({
+      conflict_id: mutation.mutation_id,
+      mutation_id: mutation.mutation_id,
+      entity_type: "transaction",
+      entity_id: "tx_1",
+      operation: "update",
+      base_version: 1,
+      server_version: 2,
+      local_payload: { note: "Offline note", amount_vnd: 13000 },
+      server_payload: { id: "tx_1", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 988000, occurred_at: "2026-08-31T00:00:00Z", note: "Server note", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 },
+      status: "open",
+      created_at: "2026-08-31T00:00:00Z",
+    });
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 988000, occurred_at: "2026-08-31T00:00:00Z", note: "Server note", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }] },
+    });
+
+    render(<App />);
+
+    expect(await screen.findByLabelText("Xung đột đồng bộ")).toBeInTheDocument();
+    expect(screen.getByText("Offline: Offline note")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Giữ server" }));
+    await waitFor(() => expect(screen.queryByLabelText("Xung đột đồng bộ")).not.toBeInTheDocument());
   });
 });
 

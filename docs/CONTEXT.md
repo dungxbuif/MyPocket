@@ -32,16 +32,16 @@ updated: 2026-08-31
 
 ## Current Status
 
-- Status: PHASE-002 finance core is in review after automated implementation proof. PHASE-003 offline synchronization is now in progress: TICKET-008 and TICKET-009 are in review. TICKET-008 covers frontend IndexedDB mirror/outbox, cached hydration, cached-auth offline reload, wallet/category/transaction queue primitives, localStorage migration/quarantine, durable sequence, degraded read-only UI, and mobile PWA shell offline reload. TICKET-009 covers backend sync migration/API, idempotent replay, user-scoped change feed, authoritative resync, stale-version conflict responses, frontend sync API drain, and mobile reconnect-once E2E. Human scope decision on 2026-08-31 caps the current M1 release at TICKET-017; TICKET-018 through TICKET-025 move to M2/post-M1 work.
-- Active backlog: [BL-003](work/BACKLOG.md)
-- Current queue focus: implement TICKET-010 conflict inbox/recovery.
-- Active phase: [PHASE-003 Offline Synchronization](work/phases/PHASE-003-offline-sync.md), status `in_progress`.
-- Active ticket: [TICKET-010](work/tickets/TICKET-010-conflict-inbox-recovery.md), status `ready`.
+- Status: PHASE-002 finance core is in review after automated implementation proof. PHASE-003 offline synchronization is in review: TICKET-008, TICKET-009, and TICKET-010 have automated proof. TICKET-008 covers frontend IndexedDB mirror/outbox, cached hydration, cached-auth offline reload, wallet/category/transaction queue primitives, localStorage migration/quarantine, durable sequence, degraded read-only UI, and mobile PWA shell offline reload. TICKET-009 covers backend sync migration/API, idempotent replay, user-scoped change feed, authoritative resync, stale-version conflict responses, frontend sync API drain, and mobile reconnect-once E2E. TICKET-010 covers conflict persistence, non-blocking mobile inbox, keep-server/discard-local/edit-and-retry actions, full resync preservation, and mobile conflict E2E. Human scope decision on 2026-08-31 caps the current M1 release at TICKET-017; TICKET-018 through TICKET-025 move to M2/post-M1 work.
+- Active backlog: [BL-004](work/BACKLOG.md)
+- Current queue focus: implement TICKET-011 budgets and threshold alerts.
+- Active phase: [PHASE-004 Planning and Automation](work/phases/PHASE-004-planning-automation.md), status `ready`.
+- Active ticket: [TICKET-011](work/tickets/TICKET-011-budgets-threshold-alerts.md), status `ready`.
 - Active bug: None.
 
 ## Current Focus
 
-Execute PHASE-003 offline synchronization after PHASE-002 finance core reached review.
+Execute PHASE-004 planning and automation after PHASE-003 reached review.
 
 ## Recently Touched Areas
 
@@ -127,6 +127,8 @@ Execute PHASE-003 offline synchronization after PHASE-002 finance core reached r
 - `backend/internal/platform/httpapi/sync.go`
 - `backend/migrations/0003_phase003_sync.sql`
 - `frontend/src/offline/syncApi.ts`
+- `frontend/src/offline/conflicts.ts`
+- `frontend/src/offline/conflicts.test.ts`
 
 ## Recent Decisions
 
@@ -145,19 +147,20 @@ Execute PHASE-003 offline synchronization after PHASE-002 finance core reached r
 - TICKET-008 uses `frontend/src/offline/` as the IndexedDB boundary for wallets, categories, transactions, outbox mutations, tombstones, conflicts, and sync meta; `frontend/src/app/outbox.ts` remains a compatibility wrapper for the previous localStorage-first transaction outbox.
 - Offline reload for authenticated cached data now uses the last successful `/api/v1/me` envelope only when `navigator.onLine` is false; logout clears both this cached user and IndexedDB offline stores.
 - TICKET-009 preserves client UUIDs for offline-created wallets, categories, and transactions so optimistic IndexedDB rows reconcile to the same authoritative IDs after reconnect.
+- TICKET-010 keeps conflict review local to the PWA for M1: conflict responses are persisted in IndexedDB, the failed mutation remains recoverable until the user chooses an action, keep-server/discard-local remove the pending local intent, edit-and-retry queues a replacement mutation against the authoritative server version, and full resync refreshes the finance mirror without clearing recoverable outbox items.
 
 ## Queue Summary
 
 - BL-001 through BL-005 comprise the current M1 release in dependency order.
 - BL-008 is deferred voice input.
 - BL-006 and BL-007 are deferred to M2 after TICKET-017; BL-008 is deferred after M2.
-- PHASE-001 and PHASE-002 have automated implementation proof pending human review. PHASE-003 is in progress with TICKET-008 and TICKET-009 in review; PHASE-004 and PHASE-005 remain planned and ready after PHASE-003.
+- PHASE-001, PHASE-002, and PHASE-003 have automated implementation proof pending human review. PHASE-004 is now the active M1 implementation phase; PHASE-005 remains planned and ready after PHASE-004.
 
 ## Next Steps
 
-1. Execute TICKET-010 conflict inbox/recovery, then run PHASE-003 replay/conflict E2E and UAT.
-2. Execute PHASE-004 TICKET-011 through TICKET-014, then PHASE-005 TICKET-015 through TICKET-017 for the current M1 release.
-3. Review PHASE-002 with the user/UAT criteria and mark verified if accepted.
+1. Execute PHASE-004 TICKET-011 through TICKET-014, starting with TICKET-011 budgets and threshold alerts.
+2. Execute PHASE-005 TICKET-015 through TICKET-017 for the current M1 release.
+3. Review PHASE-002 and PHASE-003 with the user/UAT criteria and mark verified if accepted.
 4. Keep TICKET-018 through TICKET-025 out of M1 until the user promotes M2.
 
 ## Open Questions

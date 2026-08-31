@@ -5,9 +5,11 @@ import {
   archiveOfflineTransaction,
   enqueueMutation,
   initializeOfflineStore,
+  listOpenConflicts,
   markMutationsSynced,
   readOfflineSnapshot,
   saveFinanceMirror,
+  saveOfflineConflict,
   upsertOfflineTransaction,
 } from "./db";
 
@@ -71,5 +73,29 @@ describe("offline IndexedDB store", () => {
     const snapshot = await readOfflineSnapshot();
 
     expect(snapshot.outbox[0]).toMatchObject({ entity_id: "tx_1", base_version: 4 });
+  });
+
+  it("stores open conflicts without removing recoverable outbox mutations", async () => {
+    const mutation = await enqueueMutation({ entity_type: "transaction", entity_id: "tx_1", operation: "update", base_version: 1, payload: { note: "Offline" } });
+    await saveOfflineConflict({
+      conflict_id: mutation.mutation_id,
+      mutation_id: mutation.mutation_id,
+      entity_type: "transaction",
+      entity_id: "tx_1",
+      operation: "update",
+      base_version: 1,
+      server_version: 2,
+      local_payload: { note: "Offline" },
+      server_payload: { id: "tx_1", note: "Server", version: 2 },
+      status: "open",
+      created_at: "2026-08-31T00:00:00Z",
+    });
+
+    const conflicts = await listOpenConflicts();
+    const snapshot = await readOfflineSnapshot();
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]).toMatchObject({ mutation_id: mutation.mutation_id, server_version: 2 });
+    expect(snapshot.outbox).toHaveLength(1);
   });
 });

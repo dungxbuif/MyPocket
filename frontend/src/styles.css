@@ -139,6 +139,11 @@ button {
   color: #b42332;
 }
 
+.offline-pill.conflict {
+  background: #ffecef;
+  color: #b42332;
+}
+
 .offline-warning {
   margin: 0 0 14px;
   border-radius: 14px;
@@ -431,6 +436,59 @@ button {
 
 .list-card {
   overflow: hidden;
+}
+
+.conflict-inbox {
+  margin-bottom: 24px;
+  overflow: hidden;
+}
+
+.conflict-row {
+  display: grid;
+  gap: 12px;
+  padding: 18px 22px;
+  border-top: 1px solid #e8e8ec;
+}
+
+.conflict-row strong {
+  font-size: 20px;
+}
+
+.conflict-row p {
+  margin: 6px 0 0;
+  color: #8e8e93;
+  overflow-wrap: anywhere;
+}
+
+.conflict-edit {
+  display: grid;
+  grid-template-columns: minmax(96px, 140px) 1fr;
+  gap: 10px;
+}
+
+.conflict-edit input {
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  border-radius: 12px;
+  background: #f2f3f8;
+  padding: 0 12px;
+  font: inherit;
+}
+
+.conflict-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.conflict-actions button {
+  min-height: 42px;
+  border: 0;
+  border-radius: 999px;
+  background: #e8f7ed;
+  color: #237a3d;
+  font-weight: 800;
 }
 
 .transaction-row {

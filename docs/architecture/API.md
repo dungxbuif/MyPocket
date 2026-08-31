@@ -35,7 +35,7 @@ updated: 2026-08-31
 | `GET /transactions`, `POST /transactions`, `PATCH /transactions/{id}`, `POST /transactions/{id}/archive` | REST/command | User | implemented | Income, expense, transfer, adjustment, edit/archive reversal, search filters, and idempotent creates |
 | `/receipts/uploads`, `/receipts/{id}` | REST/object | User | planned | Presigned upload and private metadata |
 | `POST /sync/mutations`, `GET /sync/changes`, `POST /sync/resync` | Sync | User | implemented | Idempotent batches, per-user cursors, versions, tombstones, and authoritative resync snapshots |
-| `/sync/conflicts` | REST collection | User | planned | Read and resolve explicit conflicts |
+| `/sync/conflicts` | REST collection | User | planned | Optional server-backed conflict collection; current PHASE-003 conflict review is persisted client-side from sync mutation results |
 | `/budgets`, `/events`, `/recurring-schedules`, `/debts` | REST collection | User | planned | Planning and automation |
 | `/analytics/*` | Query REST | User | planned | Dashboard, categories, periods, trends |
 | `/ai/conversations`, `/ai/conversations/{id}/messages` | REST collection | User | planned | Text and multimodal chat |
@@ -254,7 +254,7 @@ Request:
 }
 ```
 
-Response status: `200 OK`; each result has `state` of `applied`, `replayed`, `rejected`, or `conflict`. Duplicate `mutation_id` with the same request hash replays the stored result; a different request hash is rejected without reapplying accounting.
+Response status: `200 OK`; each result has `state` of `applied`, `replayed`, `rejected`, or `conflict`. Duplicate `mutation_id` with the same request hash replays the stored result; a different request hash is rejected without reapplying accounting. A `conflict` result includes the entity identity, operation, stale `base_version`, current server version, the local payload, and the authoritative server payload so the PWA can persist an explicit local conflict entry for keep-server, discard-local, or edit-and-retry recovery.
 
 ### `GET /api/v1/sync/changes`
 

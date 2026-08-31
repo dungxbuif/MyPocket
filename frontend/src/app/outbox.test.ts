@@ -57,4 +57,35 @@ describe("transaction outbox", () => {
     expect(await readOutbox()).toHaveLength(0);
     expect(snapshot.wallets.some((wallet) => wallet.name === "Ví server")).toBe(true);
   });
+
+  it("stores sync conflicts and keeps the failed mutation pending", async () => {
+    const transaction = await queueTransaction({ type: "expense", source_wallet_id: "wallet_1", category_id: "cat_1", amount_vnd: 10000, occurred_at: "2026-08-31T00:00:00Z", note: "Offline edit" });
+    const outbox = await readOutbox();
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      status: "ok",
+      correlation_id: "req_test",
+      results: [{
+        mutation_id: outbox[0].id,
+        entity_type: "transaction",
+        entity_id: transaction.id,
+        operation: "create",
+        state: "conflict",
+        conflict: {
+          entity_type: "transaction",
+          entity_id: transaction.id,
+          operation: "create",
+          base_version: 1,
+          server_version: 2,
+          local_payload: { note: "Offline edit" },
+          server_payload: { id: transaction.id, type: "expense", source_wallet_id: "wallet_1", amount_vnd: 10000, balance_after_vnd: 90000, occurred_at: "2026-08-31T00:00:00Z", note: "Server edit", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 },
+        },
+      }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+
+    expect(await drainOutbox(async () => undefined)).toBe(0);
+
+    const snapshot = await readOfflineSnapshot();
+    expect(snapshot.conflicts).toHaveLength(1);
+    expect(await readOutbox()).toHaveLength(1);
+  });
 });

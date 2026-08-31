@@ -10,7 +10,15 @@ export type SyncMutationResult = {
   version?: number;
   payload?: Record<string, unknown>;
   reason?: string;
-  conflict?: Record<string, unknown>;
+  conflict?: {
+    entity_type: OfflineMutation["entity_type"];
+    entity_id: string;
+    operation: OfflineMutation["operation"];
+    base_version: number;
+    server_version: number;
+    local_payload: Record<string, unknown>;
+    server_payload: Record<string, unknown>;
+  };
 };
 
 export async function submitSyncMutations(mutations: OfflineMutation[]) {
@@ -20,4 +28,16 @@ export async function submitSyncMutations(mutations: OfflineMutation[]) {
     body: JSON.stringify({ mutations }),
   });
   return response.results;
+}
+
+export async function fetchAuthoritativeSnapshot() {
+  const response = await apiFetch<{
+    snapshot: {
+      wallets: unknown[];
+      categories: unknown[];
+      transactions: unknown[];
+      next_cursor: number;
+    };
+  }>("/api/v1/sync/resync", { method: "POST" });
+  return response.snapshot;
 }

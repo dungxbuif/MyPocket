@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-003
-status: in_progress
+status: in_review
 owner: human
 priority: High
 human_fields:
@@ -45,7 +45,7 @@ trace:
 ## Status
 
 - ID: PHASE-003
-- Status: in_progress
+- Status: in_review
 - Owner: human
 - Priority: High
 - Created: 2026-08-24
@@ -86,7 +86,7 @@ Deliver full offline read/write with deterministic reconciliation and user-revie
 | --- | --- | --- | --- | --- |
 | TICKET-008 | Ticket | IndexedDB mirror and offline outbox | in_review | [TICKET-008](../tickets/TICKET-008-indexeddb-mirror-outbox.md) |
 | TICKET-009 | Ticket | Idempotent sync API and change feed | in_review | [TICKET-009](../tickets/TICKET-009-sync-api-change-feed.md) |
-| TICKET-010 | Ticket | Conflict inbox and recovery flows | ready | [TICKET-010](../tickets/TICKET-010-conflict-inbox-recovery.md) |
+| TICKET-010 | Ticket | Conflict inbox and recovery flows | in_review | [TICKET-010](../tickets/TICKET-010-conflict-inbox-recovery.md) |
 
 ## Dependencies
 
@@ -125,4 +125,4 @@ Deliver full offline read/write with deterministic reconciliation and user-revie
 
 ## Completion Summary
 
-TICKET-008 and TICKET-009 are in review. The frontend now has an IndexedDB mirror/outbox with localStorage migration, wallet/category/transaction queue primitives, cached-auth offline reload, degraded read-only UI, and automated build/unit/PWA shell proof. The backend now has idempotent sync mutations, a user-scoped change feed, resync snapshot, and mobile reconnect-once E2E proof. TICKET-010 conflicts and final human UAT remain pending before PHASE-003 review.
+TICKET-008, TICKET-009, and TICKET-010 are in review. The frontend now has an IndexedDB mirror/outbox with localStorage migration, wallet/category/transaction queue primitives, cached-auth offline reload, degraded read-only UI, automated build/unit/PWA shell proof, sync outbox drain, a mobile conflict inbox, keep-server/discard-local/edit-and-retry recovery, and full resync support. The backend now has idempotent sync mutations, a user-scoped change feed, resync snapshot, and stale-version conflict responses. Final human UAT remains pending before PHASE-003 can be verified.

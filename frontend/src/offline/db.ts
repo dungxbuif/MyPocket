@@ -181,6 +181,39 @@ export async function markMutationsSynced(ids: string[], db?: IDBDatabase) {
   if (!db) database.close();
 }
 
+export async function removeOfflineMutation(id: string, db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const tx = database.transaction(stores.outbox, "readwrite");
+  tx.objectStore(stores.outbox).delete(id);
+  await transactionDone(tx);
+  if (!db) database.close();
+}
+
+export async function saveOfflineConflict(conflict: OfflineConflict, db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const tx = database.transaction(stores.conflicts, "readwrite");
+  tx.objectStore(stores.conflicts).put(conflict);
+  await transactionDone(tx);
+  if (!db) database.close();
+}
+
+export async function listOpenConflicts(db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const conflicts = await readAll<OfflineConflict>(database, stores.conflicts);
+  if (!db) database.close();
+  return conflicts.filter((conflict) => conflict.status === "open").sort((a, b) => a.created_at.localeCompare(b.created_at));
+}
+
+export async function resolveOfflineConflict(conflictID: string, db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const tx = database.transaction(stores.conflicts, "readwrite");
+  const store = tx.objectStore(stores.conflicts);
+  const conflict = await requestToPromise<OfflineConflict | undefined>(store.get(conflictID));
+  if (conflict) store.put({ ...conflict, status: "resolved" } satisfies OfflineConflict);
+  await transactionDone(tx);
+  if (!db) database.close();
+}
+
 export async function clearOfflineStore(db?: IDBDatabase) {
   const database = db ?? await openOfflineDatabase();
   const tx = database.transaction(Object.values(stores), "readwrite");

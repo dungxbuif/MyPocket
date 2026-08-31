@@ -21,6 +21,13 @@ import { apiBaseURL } from "./apiClient";
 import { loadCurrentUser, logout, type AuthState } from "./auth";
 import { clearOfflineStore, initializeOfflineStore, saveFinanceMirror } from "../offline/db";
 import {
+  discardLocalConflict,
+  editAndRetryTransactionConflict,
+  fullResync,
+  keepServerConflict,
+  listOpenConflicts,
+} from "../offline/conflicts";
+import {
   archiveCategory,
   archiveTransaction,
   archiveWallet,
@@ -43,6 +50,7 @@ import {
   type WalletType,
 } from "./finance";
 import { drainOutbox, readOutbox } from "./outbox";
+import type { OfflineConflict } from "../offline/types";
 
 type Tab = "overview" | "transactions" | "budgets" | "account";
 
@@ -64,6 +72,7 @@ export function App() {
   const [categories, setCategories] = useState<CategorySummary[] | null>(null);
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
   const [offlineStatus, setOfflineStatus] = useState<{ mode: "ready" | "degraded"; pending: number; reason?: string }>({ mode: "ready", pending: 0 });
+  const [conflicts, setConflicts] = useState<OfflineConflict[]>([]);
   const offlineReadOnly = !online && offlineStatus.mode === "degraded";
   const headerWallets = wallets && wallets.length > 0 ? wallets : sampleWallets;
   const totalBalance = totalIncludedVND(headerWallets);
@@ -83,6 +92,7 @@ export function App() {
       setWallets(null);
       setCategories(null);
       setTransactions(null);
+      setConflicts([]);
       return;
     }
     let cancelled = false;
@@ -106,6 +116,7 @@ export function App() {
       if (pending.length === 0) return;
       void drainOutbox(async (input) => { await createTransaction(input as Parameters<typeof createTransaction>[0]); })
         .then(() => refreshFinanceData())
+        .then(() => refreshConflictState())
         .catch(() => undefined);
     });
   }, [authState.status, online]);
@@ -117,6 +128,7 @@ export function App() {
     setWallets(null);
     setCategories(null);
     setTransactions(null);
+    setConflicts([]);
     setOfflineStatus({ mode: "ready", pending: 0 });
     setActiveTab("overview");
   }
@@ -128,6 +140,7 @@ export function App() {
     await saveFinanceMirror({ wallets: nextWallets, categories: nextCategories, transactions: nextTransactions });
     const queued = await readOutbox();
     setOfflineStatus((current) => ({ ...current, pending: queued.length }));
+    setConflicts(await listOpenConflicts());
     const pending = queued.map((item) => ({ id: item.id, ...item.input, amount_vnd: Number(item.input.amount_vnd), balance_after_vnd: 0, occurred_at: String(item.input.occurred_at), note: String(item.input.note ?? ""), with_person: "", event_ref: "", excluded_from_reports: Boolean(item.input.excluded_from_reports), version: 0 } as Transaction));
     setTransactions([...pending, ...nextTransactions]);
   }
@@ -135,9 +148,16 @@ export function App() {
   async function hydrateOfflineData() {
     const snapshot = await initializeOfflineStore();
     setOfflineStatus({ mode: snapshot.mode, pending: snapshot.outbox.length, reason: snapshot.reason });
+    setConflicts(snapshot.conflicts.filter((conflict) => conflict.status === "open"));
     if (snapshot.wallets.length > 0) setWallets(snapshot.wallets);
     if (snapshot.categories.length > 0) setCategories(snapshot.categories);
     if (snapshot.transactions.length > 0 || snapshot.outbox.length > 0) setTransactions(snapshot.transactions);
+  }
+
+  async function refreshConflictState() {
+    setConflicts(await listOpenConflicts());
+    const queued = await readOutbox();
+    setOfflineStatus((current) => ({ ...current, pending: queued.length }));
   }
 
   async function reconcileAfterLocalChange() {
@@ -147,6 +167,17 @@ export function App() {
     }
     const queued = await readOutbox();
     setOfflineStatus((current) => ({ ...current, pending: queued.length }));
+    setConflicts(await listOpenConflicts());
+  }
+
+  async function handleConflictAction(action: () => Promise<void>) {
+    await action();
+    if (online) {
+      await drainOutbox(async (input) => { await createTransaction(input as Parameters<typeof createTransaction>[0]); }).catch(() => undefined);
+      await refreshFinanceData();
+      return;
+    }
+    await hydrateOfflineData();
   }
 
   function upsertTransaction(transaction: Transaction) {
@@ -170,6 +201,7 @@ export function App() {
           <div className="header-actions">
             {!online ? <span className="offline-pill">Offline</span> : null}
             {offlineStatus.pending > 0 ? <span className="offline-pill pending">{offlineStatus.pending} chờ đồng bộ</span> : null}
+            {conflicts.length > 0 ? <span className="offline-pill conflict">{conflicts.length} cần xử lý</span> : null}
             {offlineStatus.mode === "degraded" ? <span className="offline-pill degraded">Chỉ đọc offline</span> : null}
             <button className="plain-icon" aria-label="Tìm kiếm" type="button">
               <Search size={30} />
@@ -182,6 +214,7 @@ export function App() {
         </header>
 
         <AuthBanner authState={authState} />
+        {authState.status === "authenticated" ? <ConflictInbox conflicts={conflicts} onResolve={handleConflictAction} /> : null}
         {authState.status === "forbidden" ? <ForbiddenState authState={authState} onLogout={handleLogout} /> : null}
         {authState.status !== "forbidden" && activeTab === "overview" ? <Overview wallets={wallets} onManageWallets={() => setWalletSheetOpen(true)} /> : null}
         {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions transactions={transactions ?? []} onEdit={setEditingTransaction} /> : null}
@@ -205,6 +238,49 @@ export function App() {
       {walletSheetOpen ? <WalletManagerSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} onWalletChanged={(wallet) => setWallets((current) => [wallet, ...(current ?? []).filter((item) => item.id !== wallet.id)])} onWalletArchived={(walletID) => setWallets((current) => (current ?? []).filter((item) => item.id !== walletID))} onCategoryChanged={(category) => setCategories((current) => [category, ...(current ?? []).filter((item) => item.id !== category.id)])} onCategoryArchived={(categoryID) => setCategories((current) => (current ?? []).filter((item) => item.id !== categoryID))} onChanged={() => void reconcileAfterLocalChange().catch(() => undefined)} onClose={() => setWalletSheetOpen(false)} /> : null}
       {editingTransaction ? <EditTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} transaction={editingTransaction} onChanged={upsertTransaction} onArchived={() => { setTransactions((current) => (current ?? []).filter((item) => item.id !== editingTransaction.id)); setEditingTransaction(null); void reconcileAfterLocalChange().catch(() => undefined); }} onClose={() => setEditingTransaction(null)} /> : null}
     </div>
+  );
+}
+
+function ConflictInbox({ conflicts, onResolve }: { conflicts: OfflineConflict[]; onResolve: (action: () => Promise<void>) => Promise<void> }) {
+  if (conflicts.length === 0) return null;
+  return (
+    <section className="card conflict-inbox" aria-label="Xung đột đồng bộ">
+      <div className="section-title">
+        <h2>Cần xử lý</h2>
+        <button type="button" onClick={() => void onResolve(fullResync)}>Đồng bộ lại</button>
+      </div>
+      {conflicts.map((conflict) => (
+        <ConflictRow key={conflict.conflict_id} conflict={conflict} onResolve={onResolve} />
+      ))}
+    </section>
+  );
+}
+
+function ConflictRow({ conflict, onResolve }: { conflict: OfflineConflict; onResolve: (action: () => Promise<void>) => Promise<void> }) {
+  const serverNote = String(conflict.server_payload.note ?? conflict.server_payload.name ?? "Bản trên server");
+  const localNote = String(conflict.local_payload.note ?? conflict.local_payload.name ?? "Thay đổi offline");
+  const [amount, setAmount] = useState(String(Number(conflict.local_payload.amount_vnd ?? conflict.server_payload.amount_vnd ?? 0)));
+  const [note, setNote] = useState(localNote);
+  const canRetryTransaction = conflict.entity_type === "transaction" && conflict.operation === "update" && Number(amount) > 0;
+  return (
+    <article className="conflict-row">
+      <div>
+        <strong>{conflictLabel(conflict)}</strong>
+        <p>Server: {serverNote}</p>
+        <p>Offline: {localNote}</p>
+      </div>
+      {canRetryTransaction ? (
+        <div className="conflict-edit">
+          <input aria-label={`Số tiền xử lý ${conflict.entity_id}`} inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
+          <input aria-label={`Ghi chú xử lý ${conflict.entity_id}`} value={note} onChange={(event) => setNote(event.target.value)} />
+        </div>
+      ) : null}
+      <div className="conflict-actions">
+        <button type="button" onClick={() => void onResolve(() => keepServerConflict(conflict))}>Giữ server</button>
+        {canRetryTransaction ? <button type="button" onClick={() => void onResolve(() => editAndRetryTransactionConflict(conflict, { amount_vnd: Number(amount), note }))}>Sửa gửi lại</button> : null}
+        <button type="button" onClick={() => void onResolve(() => discardLocalConflict(conflict))}>Bỏ offline</button>
+      </div>
+    </article>
   );
 }
 
@@ -730,6 +806,12 @@ function transactionTypeLabel(type: TransactionType) {
     default:
       return "Chi";
   }
+}
+
+function conflictLabel(conflict: OfflineConflict) {
+  const entity = conflict.entity_type === "transaction" ? "giao dịch" : conflict.entity_type === "wallet" ? "ví" : "nhóm";
+  const action = conflict.operation === "archive" ? "ẩn" : conflict.operation === "create" ? "tạo" : "sửa";
+  return `Xung đột ${action} ${entity}`;
 }
 
 function walletTypeLabel(type: WalletType) {
