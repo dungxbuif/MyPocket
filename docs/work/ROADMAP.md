@@ -20,7 +20,7 @@ updated: 2026-08-31
 ## Field Ownership
 
 - Human approved the milestone scope and phase order during design review.
-- AI maintains phase links and evidence-backed status summaries.
+- AI maintains phase links and evidence-backed status summaries.x`
 
 ## Milestones
 

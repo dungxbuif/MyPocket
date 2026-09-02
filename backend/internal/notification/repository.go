@@ -144,30 +144,62 @@ func (r *Repository) DuePushSubscriptions(ctx context.Context, now time.Time, li
 
 // CreateDueNotices materializes authoritative planning signals without touching accounting balances.
 func (r *Repository) CreateDueNotices(ctx context.Context, now time.Time) (int, error) {
-	result, err := r.db.ExecContext(ctx, `
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, fmt.Errorf("begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	total := 0
+
+	result, err := tx.ExecContext(ctx, `
 		INSERT INTO notifications (user_id, kind, title, body, source_type, source_id, dedupe_key)
 		SELECT ba.user_id, 'budget_threshold', 'Ngân sách cần chú ý',
 			CASE WHEN ba.threshold >= 100 THEN 'Ngân sách đã vượt 100%' ELSE 'Ngân sách đã chạm 80%' END,
 			'budget', ba.budget_id::text, 'budget-alert:' || ba.budget_id::text || ':' || ba.threshold::text || ':' || ba.period_start::text
 		FROM budget_alerts ba
-		ON CONFLICT (user_id, dedupe_key) DO NOTHING;
-		INSERT INTO notifications (user_id, kind, title, body, source_type, source_id, dedupe_key)
-		SELECT o.user_id, 'obligation_due', 'Khoản cần thanh toán', o.counterparty || ' đến hạn ' || o.due_on::text,
-			'obligation', o.id::text, 'obligation-due:' || o.id::text || ':' || o.due_on::text
-		FROM obligations o WHERE o.archived_at IS NULL AND o.due_on <= ($1 AT TIME ZONE 'Asia/Ho_Chi_Minh')::date;
-		INSERT INTO notifications (user_id, kind, title, body, source_type, source_id, dedupe_key)
-		SELECT d.user_id, 'transaction_draft', 'Có bản nháp giao dịch', COALESCE(NULLIF(d.note, ''), 'Bản nháp lặp đang chờ duyệt'),
-			'draft', d.id::text, 'draft:' || d.id::text
-		FROM transaction_drafts d WHERE d.status = 'pending';
-	`, now)
+		ON CONFLICT (user_id, dedupe_key) DO NOTHING`)
 	if err != nil {
-		return 0, fmt.Errorf("create due notices: %w", err)
+		return 0, fmt.Errorf("budget notice: %w", err)
 	}
 	n, err := result.RowsAffected()
 	if err != nil {
 		return 0, err
 	}
-	return int(n), nil
+	total += int(n)
+
+	result, err = tx.ExecContext(ctx, `
+		INSERT INTO notifications (user_id, kind, title, body, source_type, source_id, dedupe_key)
+		SELECT o.user_id, 'obligation_due', 'Khoản cần thanh toán', o.counterparty || ' đến hạn ' || o.due_on::text,
+			'obligation', o.id::text, 'obligation-due:' || o.id::text || ':' || o.due_on::text
+		FROM obligations o WHERE o.archived_at IS NULL AND o.due_on <= ($1 AT TIME ZONE 'Asia/Ho_Chi_Minh')::date`, now)
+	if err != nil {
+		return 0, fmt.Errorf("obligation notice: %w", err)
+	}
+	n, err = result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	total += int(n)
+
+	result, err = tx.ExecContext(ctx, `
+		INSERT INTO notifications (user_id, kind, title, body, source_type, source_id, dedupe_key)
+		SELECT d.user_id, 'transaction_draft', 'Có bản nháp giao dịch', COALESCE(NULLIF(d.note, ''), 'Bản nháp lặp đang chờ duyệt'),
+			'draft', d.id::text, 'draft:' || d.id::text
+		FROM transaction_drafts d WHERE d.status = 'pending'`)
+	if err != nil {
+		return 0, fmt.Errorf("draft notice: %w", err)
+	}
+	n, err = result.RowsAffected()
+	if err != nil {
+		return 0, err
+	}
+	total += int(n)
+
+	if err := tx.Commit(); err != nil {
+		return 0, fmt.Errorf("commit: %w", err)
+	}
+	return total, nil
 }
 
 func (r *Repository) RecordDeliveryFailure(ctx context.Context, id string, expired bool, now time.Time) error {

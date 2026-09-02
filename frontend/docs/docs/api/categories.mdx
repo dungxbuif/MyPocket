@@ -1,0 +1,101 @@
+---
+title: Categories (Danh mục)
+---
+
+# Categories API
+
+## OpenAPI Spec
+
+```yaml
+openapi: 3.0.0
+paths:
+  /api/v1/categories:
+    get:
+      summary: Danh sách danh mục
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  categories:
+                    type: array
+                    items: { $ref: "#/components/schemas/Category" }
+    post:
+      summary: Tạo danh mục
+      security: [{ cookieAuth: [], csrf: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/CreateCategoryInput" }
+      responses:
+        "201": { description: "Created" }
+  /api/v1/categories/{id}:
+    patch:
+      summary: Sửa danh mục
+      security: [{ cookieAuth: [], csrf: [] }]
+      responses:
+        "200": { description: "OK" }
+        "400": { description: "Cannot edit system category" }
+    post:
+      path: /{id}/archive
+      summary: Lưu trữ danh mục
+      security: [{ cookieAuth: [], csrf: [] }]
+      responses:
+        "200": { description: "OK" }
+  /api/v1/wallets/{wallet_id}/categories/{category_id}:
+    put:
+      summary: Kích hoạt/tắt category trong wallet
+      security: [{ cookieAuth: [], csrf: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                active: { type: boolean }
+      responses:
+        "200": { description: "OK" }
+components:
+  schemas:
+    Category:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: ["expense", "income", "debt"] }
+        name: { type: string }
+        parent_id: { type: string, format: uuid, nullable: true }
+        system_key: { type: string, nullable: true }
+        is_system: { type: boolean }
+        version: { type: integer }
+    CreateCategoryInput:
+      type: object
+      required: [kind, name]
+      properties:
+        kind: { type: string, enum: ["expense", "income", "debt"] }
+        name: { type: string, minLength: 1 }
+        parent_id: { type: string, format: uuid, nullable: true }
+```
+
+## System seeds
+
+| Kind | system_key | Name |
+|------|-----------|------|
+| expense | `expense_food` | Ăn uống |
+| expense | `expense_shopping` | Mua sắm |
+| expense | `expense_transport` | Di chuyển |
+| income | `income_salary` | Lương |
+| income | `income_bonus` | Thưởng |
+| debt | `debt_loan` | Vay nợ |
+
+## Rules
+
+- System categories (`is_system = true`) **không thể** sửa, xoá, archive
+- User-created categories có `user_id`, `is_system = false`
+- Depth tối đa 2 cấp (parent → child)
+- Mỗi category có thể active/inactive riêng theo từng wallet
+- `PUT /wallets/{wallet_id}/categories/{category_id}` để toggle active state

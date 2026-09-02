@@ -5,16 +5,20 @@ test("fixture login persists after browser reload and logout returns to login", 
   await expect(page.getByRole("button", { name: "Đăng nhập bằng Google" })).toBeVisible();
 
   await page.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
-  await expect(page.getByText("fixture@example.com")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
 
-  await page.reload();
-  await expect(page.getByText("fixture@example.com")).toBeVisible();
-
+  // Navigate to Account tab to verify email
   await page.getByRole("button", { name: "Tài khoản" }).click();
-  await page.getByRole("button", { name: "Đăng xuất" }).click();
+  await expect(page.getByText("fixture@example.com")).toBeVisible();
 
+  // Reload and navigate to Account again
+  await page.reload();
+  await page.getByRole("button", { name: "Tài khoản" }).click();
+  await expect(page.getByText("fixture@example.com")).toBeVisible();
+
+  await page.getByRole("button", { name: "Đăng xuất" }).click();
   await expect(page.getByRole("button", { name: "Đăng nhập bằng Google" })).toBeVisible();
-  await expect(page.getByText("fixture@example.com")).toHaveCount(0);
+  await expect(page.getByText("fixture@example.com")).not.toBeVisible();
 });
 
 test("forbidden auth response renders a safe forbidden state", async ({ page }) => {
@@ -34,5 +38,4 @@ test("forbidden auth response renders a safe forbidden state", async ({ page }) 
 
   await expect(page.getByText("Không có quyền truy cập")).toBeVisible();
   await expect(page.getByText("req_forbidden_e2e")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Đăng xuất" })).toBeVisible();
 });

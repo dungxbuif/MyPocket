@@ -8,7 +8,7 @@ test("offline transaction syncs once after reconnect and survives reload", async
 
   await page.goto("/");
   await page.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
-  await expect(page.getByText("fixture@example.com")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
 
   await page.getByRole("button", { name: "Xem tất cả" }).click();
   await page.getByLabel("Tên ví mới").fill(walletName);
@@ -51,7 +51,7 @@ test("stale offline edit creates a conflict inbox entry that can keep server", a
 
   await page.goto("/");
   await page.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
-  await expect(page.getByText("fixture@example.com")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
 
   await page.getByRole("button", { name: "Xem tất cả" }).click();
   await page.getByLabel("Tên ví mới").fill(walletName);
@@ -76,7 +76,7 @@ test("stale offline edit creates a conflict inbox entry that can keep server", a
   const secondPage = await secondContext.newPage();
   await secondPage.goto("/");
   await secondPage.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
-  await expect(secondPage.getByText("fixture@example.com")).toBeVisible();
+  await expect(secondPage.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
   await secondPage.getByRole("button", { name: "Sổ giao dịch" }).click();
   await secondPage.getByText(baseNote).click();
   await secondPage.getByLabel("Ghi chú").fill(serverNote);

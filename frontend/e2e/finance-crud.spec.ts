@@ -9,10 +9,10 @@ test("mobile finance CRUD works through the live API", async ({ page }) => {
 
   await page.goto("/");
   await page.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
-  await expect(page.getByText("fixture@example.com")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
 
   await page.getByRole("button", { name: "Xem tất cả" }).click();
-  await expect(page.getByRole("dialog", { name: "Quản lý ví và nhóm" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Ví Của Tôi" })).toBeVisible();
   await page.getByLabel("Tên ví mới").fill(walletName);
   await page.getByRole("button", { name: "Tạo ví" }).click();
   await expect(page.getByLabel(`Tên ví ${walletName}`)).toBeVisible();

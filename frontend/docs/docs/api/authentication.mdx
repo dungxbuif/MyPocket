@@ -1,0 +1,137 @@
+---
+title: Xác thực
+---
+
+# Authentication
+
+## Google OAuth Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Browser
+    participant API
+    participant Google
+    
+    User->>Browser: Click "Đăng nhập bằng Google"
+    Browser->>API: GET /auth/google
+    API->>Google: Redirect với client_id + state + nonce
+    User->>Google: Login + consent
+    Google-->>Browser: Redirect callback với code + state
+    Browser->>API: GET /auth/google/callback?code=...&state=...
+    API->>Google: Exchange code lấy profile
+    alt Email not in whitelist
+        API-->>Browser: 403 AUTH_FORBIDDEN
+    else Success
+        API->>API: Set auth cookie (HttpOnly, Secure)
+        API->>API: Set CSRF cookie (browser-readable)
+        API-->>Browser: 302 Redirect to app
+        Browser->>API: GET /me
+        API-->>Browser: {user: {id, email, display_name}}
+    end
+```
+
+### Fixture mode (dev)
+
+Khi `OAUTH_FIXTURE_MODE=true`, callback không cần Google thật — dùng cho test và development.
+
+## API Keys
+
+### Create key
+
+```http
+POST /api/v1/api-keys
+X-CSRF-Token: ...
+```
+
+```json
+// Request
+{ "name": "AI Agent" }
+```
+
+```json
+// Response 201
+{
+  "key": {
+    "id": "uuid",
+    "name": "AI Agent",
+    "key_prefix": "mpk_a1b2c3d4",
+    "plaintext": "mpk_a1b2c3d4e5f6...",
+    "created_at": "..."
+  }
+}
+```
+
+`plaintext` chỉ trả về 1 lần duy nhất. Key dạng `mpk_...` + 40 ký tự hex.
+
+### List keys
+
+```http
+GET /api/v1/api-keys
+```
+
+```json
+{
+  "keys": [
+    {
+      "id": "uuid",
+      "name": "AI Agent",
+      "key_prefix": "mpk_a1b2c3d4",
+      "last_used_at": "...",
+      "revoked_at": null,
+      "created_at": "..."
+    }
+  ]
+}
+```
+
+### Revoke key
+
+```http
+POST /api/v1/api-keys/{id}/revoke
+X-CSRF-Token: ...
+```
+
+- Cập nhật `revoked_at` trong DB
+- Xoá cache Redis
+- Key cũ không còn dùng được
+
+### Call API với key
+
+```bash
+curl -H "Authorization: Bearer mpk_a1b2c3d4e5f6..." \
+  http://localhost:8080/api/v1/me
+```
+
+Cache: Redis TTL 5 phút. Fallback DB khi cache miss.
+
+## CSRF Protection
+
+- Cookie: `mypocket_csrf` (browser-readable, SameSite=Lax)
+- Header: `X-CSRF-Token` phải match cookie value
+- Áp dụng cho mọi mutation (POST/PATCH/PUT/DELETE)
+- GET requests không cần CSRF
+
+## Logout
+
+```http
+POST /api/v1/auth/logout
+X-CSRF-Token: ...
+```
+
+Xoá auth cookie + CSRF cookie. IndexedDB cũng được clear ở client.
+
+## Auth middleware
+
+```mermaid
+graph TD
+    Req[Request] --> HasBearer{Authorization<br/>Bearer?}
+    HasBearer -->|Yes| CheckCache[Check Redis cache]
+    CheckCache -->|Hit| SetUser[Set user in context]
+    CheckCache -->|Miss| CheckDB[Check DB<br/>WHERE revoked_at IS NULL]
+    CheckDB -->|Found| CacheIt[Cache in Redis 5m]
+    CheckDB -->|Not found| Reject[401 Unauthorized]
+    HasBearer -->|No| CheckCookie[Check auth cookie]
+    CheckCookie -->|Valid| SetUser
+    CheckCookie -->|Invalid| Reject
+```

@@ -29,19 +29,20 @@ func DocsHandler(cfg config.Config) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
-		if !isAuthenticated(r, cfg) {
-			http.Redirect(w, r, "/", http.StatusSeeOther)
-			return
-		}
-
 		path := strings.TrimPrefix(r.URL.Path, "/docs")
 		if path == "" || path == "/" {
 			path = "/index.html"
 		}
 
 		fullPath := filepath.Join(absDir, path)
-		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
-			path = "/index.html"
+		info, err := os.Stat(fullPath)
+		if err != nil {
+			if os.IsNotExist(err) {
+				path = "/index.html"
+				fullPath = filepath.Join(absDir, path)
+			}
+		} else if info.IsDir() {
+			path = filepath.Join(path, "index.html")
 			fullPath = filepath.Join(absDir, path)
 		}
 
@@ -51,7 +52,7 @@ func DocsHandler(cfg config.Config) http.HandlerFunc {
 			return
 		}
 		defer file.Close()
-		info, err := file.Stat()
+		info, err = file.Stat()
 		if err != nil || info.IsDir() {
 			http.NotFound(w, r)
 			return

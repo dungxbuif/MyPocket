@@ -1,0 +1,98 @@
+---
+title: Notifications & Web Push
+---
+
+# Notifications API
+
+## In-app notification inbox
+
+```yaml
+paths:
+  /api/v1/notifications:
+    get:
+      summary: Danh sách thông báo
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+      parameters:
+        - name: limit
+          in: query
+          schema: { type: integer, default: 50 }
+        - name: before
+          in: query
+          schema: { type: string, format: date-time }
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  notifications:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id: { type: string, format: uuid }
+                        kind: { type: string }
+                        title: { type: string }
+                        body: { type: string }
+                        source_type: { type: string }
+                        source_id: { type: string }
+                        read_at: { type: string, format: date-time, nullable: true }
+                        created_at: { type: string, format: date-time }
+                  has_more: { type: boolean }
+  /api/v1/notifications/{id}/read:
+    patch:
+      summary: Đánh dấu đã đọc
+      security: [{ cookieAuth: [], csrf: [] }]
+      responses:
+        "200": { description: "OK" }
+```
+
+- Cursor-bounded pagination (`before` timestamp)
+- Dedupe theo `(user_id, dedupe_key)`
+
+## Push Subscriptions
+
+```yaml
+paths:
+  /api/v1/push-subscriptions:
+    post:
+      summary: Đăng ký Web Push
+      security: [{ cookieAuth: [], csrf: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endpoint, p256dh, auth]
+              properties:
+                endpoint: { type: string }
+                p256dh: { type: string }
+                auth: { type: string }
+      responses:
+        "201": { description: "Created" }
+  /api/v1/push-subscriptions/{id}:
+    delete:
+      summary: Huỷ đăng ký
+      security: [{ cookieAuth: [], csrf: [] }]
+      responses:
+        "200": { description: "OK" }
+```
+
+## Notification sources
+
+| kind | Nguồn | Trigger |
+|------|-------|---------|
+| `budget_alert` | Worker | Budget >= 80% |
+| `recurring_draft` | Worker | Draft created |
+| `event_reminder` | Worker | Event approaching |
+| `obligation_due` | Worker | Obligation due |
+
+## Push delivery
+
+- Worker đọc `push_subscriptions` WHERE `next_attempt_at <= now()`
+- Gửi Web Push qua VAPID
+- Thành công: reset `failure_count = 0`, update `next_attempt_at`
+- Thất bại: tăng `failure_count`, cap `next_attempt_at`
+- Quá nhiều failure: cleanup worker xoá subscription

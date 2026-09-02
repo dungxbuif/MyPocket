@@ -1,0 +1,125 @@
+---
+title: Export
+---
+
+# Export API
+
+```yaml
+openapi: 3.0.0
+paths:
+  /api/v1/exports:
+    post:
+      summary: Tạo export job
+      security: [{ cookieAuth: [], csrf: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                format: { type: string, enum: ["csv"] }
+                wallet_id: { type: string, format: uuid }
+                date_from: { type: string, format: date }
+                date_to: { type: string, format: date }
+      responses:
+        "202": { description: "Accepted" }
+    get:
+      summary: Danh sách export
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+  /api/v1/exports/{id}:
+    get:
+      summary: Chi tiết export
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+```
+
+## Receipts (Upload/Download)
+
+```yaml
+paths:
+  /api/v1/receipts/uploads:
+    post:
+      summary: Chuẩn bị upload receipt — trả về presigned URL
+      security: [{ cookieAuth: [], csrf: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [filename, content_type, size_bytes, checksum_sha256]
+              properties:
+                filename: { type: string }
+                content_type: { type: string, enum: ["image/jpeg", "image/png", "image/webp"] }
+                size_bytes: { type: integer, maximum: 15728640 }
+                checksum_sha256: { type: string }
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  receipt: { $ref: "#/components/schemas/ReceiptObject" }
+                  upload_url: { type: string }
+                  expires_in_seconds: { type: integer }
+  /api/v1/receipts/{id}:
+    get:
+      summary: Lấy download URL
+      security: [{ cookieAuth: [], bearerAuth: [] }]
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  receipt: { $ref: "#/components/schemas/ReceiptObject" }
+                  download_url: { type: string }
+                  expires_in_seconds: { type: integer }
+components:
+  schemas:
+    ReceiptObject:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        object_key: { type: string }
+        content_type: { type: string }
+        size_bytes: { type: integer }
+        original_filename: { type: string }
+        created_at: { type: string, format: date-time }
+```
+
+## Receipt upload flow
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant API
+    participant DB
+    participant S3
+
+    Client->>Client: Compute SHA-256 of file
+    Client->>API: POST /receipts/uploads<br/>{filename, content_type, size, checksum}
+    API->>DB: INSERT receipt_objects
+    API->>S3: PresignPut (15 min)
+    S3-->>API: upload_url
+    API-->>Client: {receipt, upload_url}
+    Client->>S3: PUT <upload_url><br/>body: file bytes
+    S3-->>Client: 200 OK
+    Client->>API: PATCH /transactions/{id}<br/>{receipt_object_id: receipt.id}
+
+    alt Offline
+        Client->>Client: Queue in IndexedDB
+        Note over Client: Upload when online
+    end
+```
+
+## Upload constraints
+
+| Field | Giới hạn |
+|-------|---------|
+| `content_type` | `image/jpeg`, `image/png`, `image/webp` |
+| `size_bytes` | Max 15MB |
+| `filename` | Base name, no path traversal |
+| `checksum_sha256` | 64 hex characters |

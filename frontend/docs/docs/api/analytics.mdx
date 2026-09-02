@@ -1,0 +1,80 @@
+---
+title: Analytics & Reports
+---
+
+# Analytics & Reports API
+
+## Dashboard
+
+```http
+GET /api/v1/dashboard
+```
+
+```json
+{
+  "dashboard": {
+    "net_worth_vnd": 12000000,
+    "income_vnd": 5000000,
+    "expense_vnd": 3500000,
+    "savings_vnd": 1500000,
+    "investment_market_value_vnd": 187500000,
+    "combined_net_worth_vnd": 199500000,
+    "missing_asset_price_count": 0
+  }
+}
+```
+
+## Reports
+
+```http
+GET /api/v1/reports/cash-flow?date_from=...&date_to=...&wallet_id=...
+GET /api/v1/reports/categories?date_from=...&date_to=...&wallet_id=...
+GET /api/v1/reports/daily?date_from=...&date_to=...&wallet_id=...
+GET /api/v1/reports/comparison?date_from=...&date_to=...
+GET /api/v1/reports/cumulative?date_from=...&date_to=...
+GET /api/v1/reports/insider?date_from=...&date_to=...
+```
+
+| Report | Mô tả |
+|--------|-------|
+| `cash-flow` | Thu chi ròng theo kỳ |
+| `categories` | Tổng thu/chi theo danh mục (support parent roll-up) |
+| `daily` | Chi tiêu từng ngày |
+| `comparison` | So sánh kỳ hiện tại với kỳ trước |
+| `cumulative` | Cumulative từ đầu kỳ |
+| `insider` | Money Insider |
+
+## Money Insider
+
+```json
+{
+  "selected_category": { "id": "uuid", "name": "Ăn uống" },
+  "spent_vnd": 472718,
+  "elapsed_days": 30,
+  "average_daily_vnd": 15757,
+  "change_percent": 75.0,
+  "not_comparable": false,
+  "projected_spending_vnd": 472718,
+  "budget_vnd": 500000,
+  "budget_progress_percent": 94.5,
+  "top_expenses": [
+    { "id": "uuid", "note": "Nhà hàng", "amount_vnd": 250000, "occurred_at": "..." }
+  ]
+}
+```
+
+- `selected_category`: category có nhiều giao dịch nhất (tie-break by amount, then ID)
+- `average_daily_vnd`: `spent_vnd / elapsed_days`
+- `change_percent`: so sánh với daily average của equal prior period
+- `not_comparable`: true nếu không có dữ liệu kỳ trước
+- `projected_spending_vnd`: `spent_vnd / elapsed_days * period_days`
+
+## Search
+
+```http
+GET /api/v1/search?q=keyword
+```
+
+Cross-entity search trong:
+- Transaction notes, with_person, event_ref
+- Wallet names

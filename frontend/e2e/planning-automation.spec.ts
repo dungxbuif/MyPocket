@@ -9,7 +9,7 @@ test("mobile budget CRUD shows threshold progress through the live API", async (
 
   await page.goto("/");
   await page.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
-  await expect(page.getByText("fixture@example.com")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
 
   await page.getByRole("button", { name: "Xem tất cả" }).click();
   await page.getByLabel("Tên ví mới").fill(walletName);
@@ -59,7 +59,7 @@ test("mobile event and debt planning links existing transactions", async ({ page
 
   await page.goto("/");
   await page.getByRole("button", { name: "Đăng nhập bằng Google" }).click();
-  await expect(page.getByText("fixture@example.com")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
 
   await page.getByRole("button", { name: "Xem tất cả" }).click();
   await page.getByLabel("Tên ví mới").fill(walletName);
