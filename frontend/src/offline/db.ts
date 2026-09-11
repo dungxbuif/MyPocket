@@ -8,6 +8,8 @@ const DB_VERSION = 3;
 const META_CURSOR = "sync_cursor";
 const META_DEVICE_ID = "device_id";
 const META_SEQUENCE = "mutation_sequence";
+const META_OWNER_ID = "owner_id";
+let activeOwnerID = "";
 
 export type OfflineDB = IDBDatabase;
 
@@ -15,7 +17,8 @@ export async function openOfflineDatabase(factory?: IDBFactory): Promise<Offline
   const databaseFactory = factory ?? globalThis.indexedDB;
   if (!databaseFactory) throw new Error("IndexedDB unavailable");
   return new Promise((resolve, reject) => {
-    const request = databaseFactory.open(DB_NAME, DB_VERSION);
+    const name = activeOwnerID ? `${DB_NAME}:user:${encodeURIComponent(activeOwnerID)}` : DB_NAME;
+    const request = databaseFactory.open(name, DB_VERSION);
     request.onupgradeneeded = () => {
       const db = request.result;
       const tx = request.transaction;
@@ -75,6 +78,24 @@ export async function initializeOfflineStore(factory?: IDBFactory): Promise<Offl
   }
 }
 
+// Keep each owner's pending work separate; never assign a legacy unowned outbox
+// to whichever account happens to sign in next.
+export async function initializeOfflineStoreForUser(userID: string, factory?: IDBFactory): Promise<OfflineSnapshot> {
+  let db: IDBDatabase | undefined;
+  try {
+    if (!userID) throw new Error("Offline owner required");
+    activeOwnerID = userID;
+    db = await openOfflineDatabase(factory);
+    await ensureOfflineStoreOwner(db, userID);
+    await ensureDeviceID(db);
+    return readOfflineSnapshot(db);
+  } catch (error) {
+    return emptyDegradedSnapshot(error instanceof Error ? error.message : "IndexedDB unavailable");
+  } finally {
+    db?.close();
+  }
+}
+
 export async function readOfflineSnapshot(db?: IDBDatabase): Promise<OfflineSnapshot> {
   const database = db ?? await openOfflineDatabase();
   const [wallets, categories, transactions, assets, outbox, conflicts, tombstones, cursor] = await Promise.all([
@@ -87,7 +108,7 @@ export async function readOfflineSnapshot(db?: IDBDatabase): Promise<OfflineSnap
     readAll<OfflineTombstone>(database, stores.tombstones),
     readMetaNumber(database, META_CURSOR, 0),
   ]);
-  const snapshot = {
+  const snapshot: OfflineSnapshot = {
     wallets,
     categories,
     transactions: applyPendingArchives(transactions, tombstones, "transaction"),
@@ -103,13 +124,16 @@ export async function readOfflineSnapshot(db?: IDBDatabase): Promise<OfflineSnap
 }
 
 export async function saveFinanceMirror(input: {
+  userID?: string;
   wallets?: WalletSummary[];
   categories?: CategorySummary[];
   transactions?: Transaction[];
   assets?: AssetPosition[];
   cursor?: number;
 }, db?: IDBDatabase) {
+  if (input.userID && !db) activeOwnerID = input.userID;
   const database = db ?? await openOfflineDatabase();
+  if (input.userID) await ensureOfflineStoreOwner(database, input.userID);
   const names: string[] = [];
   if (input.wallets) names.push(stores.wallets);
   if (input.categories) names.push(stores.categories);
@@ -267,6 +291,15 @@ export async function clearOfflineStore(db?: IDBDatabase) {
   if (!db) database.close();
 }
 
+async function ensureOfflineStoreOwner(db: IDBDatabase, userID: string) {
+  const owner = await readMetaString(db, META_OWNER_ID);
+  if (owner === userID) return;
+  const tx = db.transaction(Object.values(stores), "readwrite");
+  Object.values(stores).forEach((name) => tx.objectStore(name).clear());
+  tx.objectStore(stores.meta).put({ key: META_OWNER_ID, value: userID } satisfies OfflineMeta);
+  await transactionDone(tx);
+}
+
 function ensureStore(db: IDBDatabase, name: string, keyPath: string, tx?: IDBTransaction | null) {
   if (db.objectStoreNames.contains(name)) {
     if (!tx) throw new Error(`Store already exists outside upgrade transaction: ${name}`);
@@ -290,6 +323,12 @@ async function readMetaNumber(db: IDBDatabase, key: string, fallback: number) {
   const tx = db.transaction(stores.meta, "readonly");
   const record = await requestToPromise<OfflineMeta | undefined>(tx.objectStore(stores.meta).get(key));
   return typeof record?.value === "number" ? record.value : fallback;
+}
+
+async function readMetaString(db: IDBDatabase, key: string) {
+  const tx = db.transaction(stores.meta, "readonly");
+  const record = await requestToPromise<OfflineMeta | undefined>(tx.objectStore(stores.meta).get(key));
+  return typeof record?.value === "string" ? record.value : "";
 }
 
 async function getDeviceID(db: IDBDatabase) {

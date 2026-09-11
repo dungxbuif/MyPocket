@@ -1,4 +1,5 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
+import { mergePendingTransactions } from "./pendingTransactions";
 import {
   Bell,
   Activity,
@@ -15,7 +16,6 @@ import {
   List,
   MapPin,
   Plus,
-  RefreshCw,
   Search,
   User,
   Users,
@@ -24,9 +24,22 @@ import {
 
 import { useOnlineStatus } from "./offline";
 import { apiBaseURL } from "./apiClient";
-import { Card, IconButton, PillButton, SectionTitle, SheetFrame, cx } from "./components";
+import { ActionButton, Card, IconButton, PillButton, SectionTitle, SheetFrame, cx } from "./components";
 import { loadCurrentUser, logout, type AuthState } from "./auth";
-import { clearOfflineStore, initializeOfflineStore, queueReceiptUpload, saveFinanceMirror } from "../offline/db";
+import { clearUserDataCaches } from "./userDataCache";
+import { buildTransactionInput, calendarDateInHoChiMinh } from "./transactionInput";
+import { SearchPanel } from "./SearchPanel";
+import { initializeOfflineStoreForUser, queueReceiptUpload, saveFinanceMirror } from "../offline/db";
+import { OverviewScreen } from "../screens/OverviewScreen";
+import { ReportsPanel } from "../screens/ReportsPanel";
+import { TransactionsScreen } from "../screens/TransactionsScreen";
+import { BudgetsScreen } from "../screens/BudgetsScreen";
+import { AccountScreen } from "../screens/AccountScreen";
+import { PWAInstallPrompt, type InstallPromptEvent } from "../components/feedback/PWAInstallPrompt";
+import { OperationError, operationFailure, type OperationFailure } from "../components/feedback/OperationError";
+import { UnavailableAction } from "../components/feedback/UnavailableAction";
+import { FilePickerInput } from "../components/inputs/FilePickerInput";
+import { Select } from "../components/ui/select";
 import { listPendingReceiptUploads, markReceiptUploadComplete } from "../offline/receipts";
 import {
   discardLocalConflict,
@@ -39,14 +52,19 @@ import {
   archiveTransaction,
   archiveWallet,
   createTransaction,
+  createCategory,
   createWallet,
   loadCategories,
+  loadWalletCategorySettings,
   loadTransactions,
   loadWallets,
   setDefaultAIWallet,
+  setWalletCategoryActive,
+  updateCategory,
   updateTransaction,
   updateWallet,
   type CategorySummary,
+  type WalletCategorySetting,
   type Transaction,
   type TransactionInput,
   type TransactionType,
@@ -58,6 +76,7 @@ import {
   archiveEvent,
   archiveRecurringSchedule,
   archiveObligation,
+  confirmTransactionDraft,
   createBudget,
   createEvent,
   createRecurringSchedule,
@@ -69,6 +88,7 @@ import {
   loadRecurringSchedules,
   loadObligations,
   loadTransactionDrafts,
+  rejectTransactionDraft,
   updateBudget,
   updateEvent,
   updateObligation,
@@ -84,10 +104,11 @@ import {
   type RecurringSchedule,
   type RecurringScheduleInput,
   type TransactionDraft,
+  type TransactionDraftDecision,
 } from "./planning";
 import { drainOutbox, readOutbox } from "./outbox";
 import { loadNotifications, markNotificationRead, subscribeToPush, type NotificationNotice } from "./notifications";
-import { loadDashboard, loadInsider, loadReport, loadWalletDetail, searchRecords, type Dashboard, type InsiderReport, type Report, type SearchResult, type WalletDetail } from "./analytics";
+import { loadDashboard, loadInsider, loadReport, loadWalletDetail, type Dashboard, type InsiderReport, type Report, type WalletDetail } from "./analytics";
 import { addAssetPrice, addAssetTrade, archiveAsset, createAsset, loadAssets, loadPortfolioSummary, type AssetPosition, type AssetType, type PortfolioSummary, type TradeSide } from "./portfolio";
 import { createAPIKey, loadAPIKeys, revokeAPIKey, type APIKeySummary, type CreatedAPIKey } from "./apiKeys";
 import { checkAuditAccess, loadAuditEvents, type AuditEvent } from "./audit";
@@ -110,6 +131,7 @@ export function App() {
   const [walletSheetOpen, setWalletSheetOpen] = useState(false);
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [authState, setAuthState] = useState<AuthState>({ status: "loading" });
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
   const [wallets, setWallets] = useState<WalletSummary[] | null>(null);
   const [categories, setCategories] = useState<CategorySummary[] | null>(null);
   const [transactions, setTransactions] = useState<Transaction[] | null>(null);
@@ -126,9 +148,20 @@ export function App() {
   const [insider, setInsider] = useState<InsiderReport | null>(null);
   const [privacyMasked, setPrivacyMasked] = useState(() => localStorage.getItem("mypocket:privacy-masked") === "true");
   const [searchOpen, setSearchOpen] = useState(false);
+  const [reportsOpen, setReportsOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [walletDetail, setWalletDetail] = useState<WalletDetail | null>(null);
+  const [walletDetailFailure, setWalletDetailFailure] = useState<OperationFailure | null>(null);
+  const [walletDetailBusy, setWalletDetailBusy] = useState(false);
+  const [readFailure, setReadFailure] = useState<OperationFailure | null>(null);
+  const [readBusy, setReadBusy] = useState(false);
+  const [notificationFailure, setNotificationFailure] = useState<OperationFailure | null>(null);
+  const [notificationBusyID, setNotificationBusyID] = useState<string | null>(null);
+  const [failedNotificationID, setFailedNotificationID] = useState<string | null>(null);
+  const [insiderFailure, setInsiderFailure] = useState<OperationFailure | null>(null);
+  const [insiderBusy, setInsiderBusy] = useState(false);
+  const [logoutFailure, setLogoutFailure] = useState<OperationFailure | null>(null);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const [assets, setAssets] = useState<AssetPosition[] | null>(null);
   const [portfolioSummary, setPortfolioSummary] = useState<PortfolioSummary | null>(null);
   const [assetSheetOpen, setAssetSheetOpen] = useState(false);
@@ -143,8 +176,40 @@ export function App() {
   const [offlineStatus, setOfflineStatus] = useState<{ mode: "ready" | "degraded"; pending: number; reason?: string }>({ mode: "ready", pending: 0 });
   const [conflicts, setConflicts] = useState<OfflineConflict[]>([]);
   const offlineReadOnly = !online && offlineStatus.mode === "degraded";
+  const authenticatedUserID = authState.status === "authenticated" ? authState.user.id : "";
+  const ownerRef = useRef(authenticatedUserID);
+  const refreshGeneration = useRef(0);
+  const walletDetailGeneration = useRef(0);
+  const walletDetailSelection = useRef<string | null>(null);
+  const walletDetailBusyID = useRef<string | null>(null);
+  const notificationGeneration = useRef(0);
+  const notificationBusyIDRef = useRef<string | null>(null);
+  const insiderGeneration = useRef(0);
+  const insiderBusyRef = useRef(false);
+  const logoutGeneration = useRef(0);
+  const logoutBusyRef = useRef(false);
+  const draftRefreshGeneration = useRef(0);
+  ownerRef.current = authenticatedUserID;
   const headerWallets = wallets ?? [];
   const totalBalance = dashboard?.net_worth_vnd ?? totalIncludedVND(headerWallets);
+
+  useEffect(() => () => {
+    ownerRef.current = "";
+    ++refreshGeneration.current;
+    ++walletDetailGeneration.current;
+    ++notificationGeneration.current;
+    ++insiderGeneration.current;
+    ++logoutGeneration.current;
+    ++draftRefreshGeneration.current;
+  }, []);
+
+  useEffect(() => {
+    const onInstallPrompt = (event: Event) => { event.preventDefault(); setInstallPrompt(event as InstallPromptEvent); };
+    const onInstalled = () => setInstallPrompt(null);
+    window.addEventListener("beforeinstallprompt", onInstallPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => { window.removeEventListener("beforeinstallprompt", onInstallPrompt); window.removeEventListener("appinstalled", onInstalled); };
+  }, []);
 
   useEffect(() => {
     if (window.location.pathname === "/auth/google") {
@@ -152,7 +217,10 @@ export function App() {
       return;
     }
     let cancelled = false;
-    void loadCurrentUser().then((nextAuthState) => {
+    void loadCurrentUser().then(async (nextAuthState) => {
+      if (nextAuthState.status === "authenticated") {
+        await initializeOfflineStoreForUser(nextAuthState.user.id);
+      }
       if (!cancelled) {
         setAuthState(nextAuthState);
         // Accept a backend/provider redirect landing on the explicit FE
@@ -169,6 +237,18 @@ export function App() {
 
   useEffect(() => {
     if (authState.status !== "authenticated") {
+      ++refreshGeneration.current;
+      ++walletDetailGeneration.current;
+      ++notificationGeneration.current;
+      ++insiderGeneration.current;
+      ++draftRefreshGeneration.current;
+      walletDetailSelection.current = null;
+      walletDetailBusyID.current = null;
+      notificationBusyIDRef.current = null;
+      insiderBusyRef.current = false;
+      setSearchQuery("");
+      setSearchOpen(false);
+      setReportsOpen(false);
       setWallets(null);
       setCategories(null);
       setTransactions(null);
@@ -183,24 +263,37 @@ export function App() {
       setReport(null);
       setInsider(null);
       setWalletDetail(null);
+      setWalletDetailFailure(null);
+      setWalletDetailBusy(false);
+      setReadFailure(null);
+      setReadBusy(false);
+      setNotificationFailure(null);
+      setNotificationBusyID(null);
+      setFailedNotificationID(null);
+      setInsiderFailure(null);
+      setInsiderBusy(false);
+      setLogoutFailure(null);
+      setLogoutBusy(false);
       setAssets(null);
       setPortfolioSummary(null);
       setConflicts([]);
       return;
     }
     let cancelled = false;
-    const load = online ? refreshFinanceData : hydrateOfflineData;
-    void load().catch(() => {
-        if (!cancelled) {
-          setWallets([]);
-          setCategories([]);
-          setTransactions([]);
-        }
-      });
+    const load = online
+      ? async () => {
+        await initializeOfflineStoreForUser(authState.user.id);
+        if (!cancelled) await refreshFinanceData();
+      }
+      : () => hydrateOfflineData(authState.user.id);
+    void load().catch((error) => {
+      if (!cancelled) setReadFailure(operationFailure(error, "Không tải được dữ liệu. Dữ liệu đã xác nhận vẫn được giữ lại."));
+    });
     return () => {
       cancelled = true;
+      ++refreshGeneration.current;
     };
-  }, [authState.status, online]);
+  }, [authState.status, authenticatedUserID, online]);
 
   useEffect(() => {
     if (authState.status !== "authenticated" || !online) return;
@@ -211,7 +304,7 @@ export function App() {
         .then(() => drainPendingReceiptUploads())
         .then(() => refreshConflictState())
         .catch(() => undefined);
-    });
+    }).catch(() => undefined);
   }, [authState.status, online]);
 
   async function drainPendingReceiptUploads() {
@@ -242,8 +335,35 @@ export function App() {
   }
 
   async function handleLogout() {
-    await logout().catch(() => undefined);
-    await clearOfflineStore().catch(() => undefined);
+    if (authState.status !== "authenticated" || logoutBusyRef.current) return;
+    const userID = authState.user.id;
+    const generation = ++logoutGeneration.current;
+    logoutBusyRef.current = true;
+    setLogoutBusy(true);
+    setLogoutFailure(null);
+    closeWalletDetail();
+    ++refreshGeneration.current;
+    ++notificationGeneration.current;
+    ++insiderGeneration.current;
+    notificationBusyIDRef.current = null;
+    insiderBusyRef.current = false;
+    setNotificationBusyID(null);
+    setInsiderBusy(false);
+    try {
+      await logout();
+    } catch (error) {
+      if (generation === logoutGeneration.current && ownerRef.current === userID) {
+        setLogoutFailure(operationFailure(error, "Không đăng xuất được. Phiên trên máy chủ có thể vẫn còn hoạt động; bạn vẫn đang đăng nhập. Hãy thử lại."));
+      }
+      return;
+    } finally {
+      if (generation === logoutGeneration.current) {
+        logoutBusyRef.current = false;
+        setLogoutBusy(false);
+      }
+    }
+    if (generation !== logoutGeneration.current || ownerRef.current !== userID) return;
+    clearUserDataCaches(userID);
     setAuthState({ status: "unauthenticated" });
     setWallets(null);
     setCategories(null);
@@ -267,33 +387,192 @@ export function App() {
   }
 
   async function refreshFinanceData() {
-    const [nextWallets, nextCategories, nextTransactions] = await Promise.all([loadWallets(), loadCategories(), loadTransactions()]);
-    setWallets(nextWallets);
-    setCategories(nextCategories);
-    const [nextBudgets, nextEvents, nextObligations, nextSchedules, nextDrafts, nextNotifications, nextDashboard, nextReport, nextInsider, nextAssets, nextPortfolioSummary] = await Promise.all([loadBudgets(), loadEvents(), loadObligations(), loadRecurringSchedules(), loadTransactionDrafts(), loadNotifications().catch(() => []), loadDashboard().catch(() => null), loadReport("daily").catch(() => null), loadInsider().catch(() => null), loadAssets().catch(() => []), loadPortfolioSummary().catch(() => null)]);
-    setWallets(nextWallets);
-    setCategories(nextCategories);
-    setBudgets(nextBudgets);
-    setEvents(nextEvents);
-    setObligations(nextObligations);
-    setSchedules(nextSchedules);
-    setDrafts(nextDrafts);
-    setNotifications(nextNotifications);
-    setDashboard(nextDashboard);
-    setReport(nextReport);
-    setInsider(nextInsider);
-    setAssets(nextAssets);
-    setPortfolioSummary(nextPortfolioSummary);
-    await saveFinanceMirror({ wallets: nextWallets, categories: nextCategories, transactions: nextTransactions, assets: nextAssets });
-    const queued = await readOutbox();
-    setOfflineStatus((current) => ({ ...current, pending: queued.length }));
-    setConflicts(await listOpenConflicts());
-    const pending = queued.map((item) => ({ id: item.id, ...item.input, amount_vnd: Number(item.input.amount_vnd), balance_after_vnd: 0, occurred_at: String(item.input.occurred_at), note: String(item.input.note ?? ""), with_person: "", event_ref: "", excluded_from_reports: Boolean(item.input.excluded_from_reports), version: 0 } as Transaction));
-    setTransactions([...pending, ...nextTransactions]);
+    if (authState.status !== "authenticated") return;
+    const userID = authState.user.id;
+    const generation = ++refreshGeneration.current;
+    const ownsRefresh = () => generation === refreshGeneration.current && ownerRef.current === userID;
+    let financeData: { wallets: WalletSummary[]; categories: CategorySummary[]; transactions: Transaction[] } | null = null;
+    let refreshedAssets: AssetPosition[] | null = null;
+    setReadFailure(null);
+    setReadBusy(true);
+    const recordReadFailure = (error: unknown) => {
+      if (ownsRefresh()) setReadFailure(operationFailure(error, "Không tải được một phần dữ liệu. Dữ liệu đã xác nhận vẫn được giữ lại."));
+    };
+
+    const financeRefresh = Promise.all([loadWallets(), loadCategories(), loadTransactions()])
+      .then(([nextWallets, nextCategories, nextTransactions]) => {
+        if (!ownsRefresh()) return;
+        financeData = { wallets: nextWallets, categories: nextCategories, transactions: nextTransactions };
+        setWallets(nextWallets);
+        setCategories(nextCategories);
+        setTransactions(nextTransactions);
+      })
+      .catch(recordReadFailure);
+    const planningRefresh = Promise.all([loadBudgets(), loadEvents(), loadObligations(), loadRecurringSchedules(), loadTransactionDrafts()])
+      .then(([nextBudgets, nextEvents, nextObligations, nextSchedules, nextDrafts]) => {
+        if (!ownsRefresh()) return;
+        setBudgets(nextBudgets);
+        setEvents(nextEvents);
+        setObligations(nextObligations);
+        setSchedules(nextSchedules);
+        setDrafts(nextDrafts);
+      })
+      .catch(recordReadFailure);
+    const notificationRefresh = loadNotifications()
+      .then((nextNotifications) => { if (ownsRefresh()) setNotifications(nextNotifications); })
+      .catch(recordReadFailure);
+    const dashboardRefresh = loadDashboard(userID)
+      .then((nextDashboard) => { if (ownsRefresh()) setDashboard(nextDashboard); })
+      .catch(recordReadFailure);
+    const reportRefresh = loadReport(userID, "daily")
+      .then((nextReport) => { if (ownsRefresh()) setReport(nextReport); })
+      .catch(recordReadFailure);
+    const insiderRefresh = refreshInsider(userID);
+    const assetRefresh = loadAssets(userID)
+      .then((nextAssets) => { if (ownsRefresh()) { refreshedAssets = nextAssets; setAssets(nextAssets); } })
+      .catch(recordReadFailure);
+    const portfolioRefresh = loadPortfolioSummary(userID)
+      .then((nextPortfolioSummary) => { if (ownsRefresh()) setPortfolioSummary(nextPortfolioSummary); })
+      .catch(recordReadFailure);
+
+    await Promise.all([financeRefresh, planningRefresh, notificationRefresh, dashboardRefresh, reportRefresh, insiderRefresh, assetRefresh, portfolioRefresh]);
+    if (!ownsRefresh()) return;
+    if (financeData) {
+      const confirmed = financeData as { wallets: WalletSummary[]; categories: CategorySummary[]; transactions: Transaction[] };
+      try {
+        await saveFinanceMirror({ userID, wallets: confirmed.wallets, categories: confirmed.categories, transactions: confirmed.transactions, assets: refreshedAssets ?? assets ?? [] });
+        if (!ownsRefresh()) return;
+        const queued = await readOutbox();
+        if (!ownsRefresh()) return;
+        setOfflineStatus((current) => ({ ...current, pending: queued.length }));
+        const nextConflicts = await listOpenConflicts();
+        if (!ownsRefresh()) return;
+        setConflicts(nextConflicts);
+        setTransactions(mergePendingTransactions(confirmed.transactions, queued));
+      } catch (error) {
+        recordReadFailure(error);
+      }
+    }
+    if (ownsRefresh()) setReadBusy(false);
   }
 
-  async function hydrateOfflineData() {
-    const snapshot = await initializeOfflineStore();
+  async function refreshInsider(userID = authenticatedUserID) {
+    if (!userID || insiderBusyRef.current) return;
+    const generation = ++insiderGeneration.current;
+    insiderBusyRef.current = true;
+    setInsiderBusy(true);
+    setInsiderFailure(null);
+    try {
+      const nextInsider = await loadInsider(userID);
+      if (generation === insiderGeneration.current && ownerRef.current === userID) setInsider(nextInsider);
+    } catch (error) {
+      if (generation === insiderGeneration.current && ownerRef.current === userID && insider) {
+        setInsiderFailure(operationFailure(error, "Không tải được Money Insider. Dữ liệu đã xác nhận vẫn được giữ lại."));
+      }
+    } finally {
+      if (generation === insiderGeneration.current && ownerRef.current === userID) {
+        insiderBusyRef.current = false;
+        setInsiderBusy(false);
+      }
+    }
+  }
+
+  function handleDraftDecision(decision: TransactionDraftDecision) {
+    if (authState.status !== "authenticated") return;
+    ++refreshGeneration.current;
+    setReadBusy(false);
+    setDrafts((current) => [decision.draft, ...(current ?? []).filter((draft) => draft.id !== decision.draft.id)]);
+    if (decision.transaction) {
+      setTransactions((current) => [decision.transaction!, ...(current ?? []).filter((transaction) => transaction.id !== decision.transaction!.id)]);
+    }
+    void refreshAfterDraftDecision(authState.user.id);
+  }
+
+  async function refreshAfterDraftDecision(userID: string) {
+    const generation = ++draftRefreshGeneration.current;
+    const ownsRefresh = () => generation === draftRefreshGeneration.current && ownerRef.current === userID;
+    try {
+      const [nextDrafts, nextWallets, nextTransactions, nextBudgets, nextDashboard] = await Promise.all([
+        loadTransactionDrafts(),
+        loadWallets(),
+        loadTransactions(),
+        loadBudgets(),
+        loadDashboard(userID),
+      ]);
+      if (!ownsRefresh()) return;
+      setDrafts(nextDrafts);
+      setWallets(nextWallets);
+      setTransactions(nextTransactions);
+      setBudgets(nextBudgets);
+      setDashboard(nextDashboard);
+      await saveFinanceMirror({ userID, wallets: nextWallets, categories: categories ?? [], transactions: nextTransactions, assets: assets ?? [] });
+    } catch (error) {
+      if (ownsRefresh()) {
+        setReadFailure(operationFailure(error, "Quyết định bản nháp đã được ghi nhận nhưng chưa tải lại được toàn bộ dữ liệu đã xác nhận."));
+      }
+    }
+  }
+
+  async function openWalletDetail(walletID: string) {
+    if (!online || authState.status !== "authenticated" || walletDetailBusyID.current === walletID) return;
+    const userID = authState.user.id;
+    const generation = ++walletDetailGeneration.current;
+    walletDetailSelection.current = walletID;
+    walletDetailBusyID.current = walletID;
+    setWalletDetailBusy(true);
+    setWalletDetailFailure(null);
+    try {
+      const detail = await loadWalletDetail(walletID);
+      if (generation === walletDetailGeneration.current && ownerRef.current === userID && walletDetailSelection.current === walletID) setWalletDetail(detail);
+    } catch (error) {
+      if (generation === walletDetailGeneration.current && ownerRef.current === userID && walletDetailSelection.current === walletID) {
+        setWalletDetailFailure(operationFailure(error, "Không tải được chi tiết ví. Hãy thử lại."));
+      }
+    } finally {
+      if (generation === walletDetailGeneration.current && ownerRef.current === userID && walletDetailSelection.current === walletID) {
+        walletDetailBusyID.current = null;
+        setWalletDetailBusy(false);
+      }
+    }
+  }
+
+  function closeWalletDetail() {
+    ++walletDetailGeneration.current;
+    walletDetailSelection.current = null;
+    walletDetailBusyID.current = null;
+    setWalletDetail(null);
+    setWalletDetailFailure(null);
+    setWalletDetailBusy(false);
+  }
+
+  async function markNoticeRead(notificationID: string) {
+    if (authState.status !== "authenticated" || notificationBusyIDRef.current) return;
+    const userID = authState.user.id;
+    const generation = ++notificationGeneration.current;
+    notificationBusyIDRef.current = notificationID;
+    setNotificationBusyID(notificationID);
+    setNotificationFailure(null);
+    try {
+      await markNotificationRead(notificationID);
+      if (generation === notificationGeneration.current && ownerRef.current === userID) {
+        setNotifications((current) => (current ?? []).map((item) => item.id === notificationID ? { ...item, read_at: new Date().toISOString() } : item));
+        setFailedNotificationID(null);
+      }
+    } catch (error) {
+      if (generation === notificationGeneration.current && ownerRef.current === userID) {
+        setFailedNotificationID(notificationID);
+        setNotificationFailure(operationFailure(error, "Chưa đánh dấu đã đọc. Thông báo vẫn được giữ là chưa đọc."));
+      }
+    } finally {
+      if (generation === notificationGeneration.current && ownerRef.current === userID) {
+        notificationBusyIDRef.current = null;
+        setNotificationBusyID(null);
+      }
+    }
+  }
+
+  async function hydrateOfflineData(userID: string) {
+    const snapshot = await initializeOfflineStoreForUser(userID);
     setOfflineStatus({ mode: snapshot.mode, pending: snapshot.outbox.length, reason: snapshot.reason });
     setConflicts(snapshot.conflicts.filter((conflict) => conflict.status === "open"));
     if (snapshot.wallets.length > 0) setWallets(snapshot.wallets);
@@ -325,7 +604,7 @@ export function App() {
       await refreshFinanceData();
       return;
     }
-    await hydrateOfflineData();
+    if (authState.status === "authenticated") await hydrateOfflineData(authState.user.id);
   }
 
   function upsertTransaction(transaction: Transaction) {
@@ -340,8 +619,10 @@ export function App() {
   return (
     <div className="app-shell">
       <main className="phone-frame">
-        <header className="home-header">
+        <header className="home-header command-header">
           <div>
+            <span className="command-label">Money Command</span>
+            <h1>Today Desk</h1>
             <div className="balance-line">
               <strong>{privacyMasked ? "••••••" : formatVND(totalBalance)}</strong>
               <button className="icon-button" aria-label={privacyMasked ? "Hiện số dư" : "Ẩn số dư"} type="button" onClick={() => setPrivacyMasked((masked) => { const next = !masked; localStorage.setItem("mypocket:privacy-masked", String(next)); return next; })}>
@@ -365,20 +646,31 @@ export function App() {
           </div>
         </header>
 
-        {searchOpen ? <SearchPanel online={online} query={searchQuery} results={searchResults} onQueryChange={(query) => { setSearchQuery(query); if (!online || query.trim().length < 2) { setSearchResults([]); return; } void searchRecords(query).then(setSearchResults).catch(() => setSearchResults([])); }} /> : null}
+        {searchOpen ? <SearchPanel key={authenticatedUserID} userID={authenticatedUserID} online={online} query={searchQuery} onQueryChange={setSearchQuery} /> : null}
 
-        {notificationOpen ? <NotificationInbox online={online} notices={notifications ?? []} pushState={pushState} onEnablePush={() => { void subscribeToPush().then(() => setPushState("enabled")).catch((error: Error) => setPushState(error.message === "denied" ? "denied" : error.message === "unsupported" || error.message === "unconfigured" ? "unsupported" : error.message === "offline" ? "offline" : "failed")); }} onRead={(id) => { void markNotificationRead(id).then(() => setNotifications((current) => (current ?? []).map((item) => item.id === id ? { ...item, read_at: new Date().toISOString() } : item))).catch(() => undefined); }} /> : null}
+        {notificationOpen ? <NotificationInbox online={online} notices={notifications ?? []} pushState={pushState} failure={notificationFailure} busyID={notificationBusyID} onEnablePush={() => { void subscribeToPush().then(() => setPushState("enabled")).catch((error: Error) => setPushState(error.message === "denied" ? "denied" : error.message === "unsupported" || error.message === "unconfigured" ? "unsupported" : error.message === "offline" ? "offline" : "failed")); }} onRead={(id) => { void markNoticeRead(id); }} onRetry={() => { if (failedNotificationID) void markNoticeRead(failedNotificationID); }} /> : null}
 
         <AuthBanner authState={authState} />
+        {activeTab === "budgets" ? <OperationError failure={readFailure} onRetry={() => { void refreshFinanceData(); }} retryLabel="Thử lại" busy={readBusy} /> : null}
         {authState.status === "authenticated" ? <ConflictInbox conflicts={conflicts} onResolve={handleConflictAction} /> : null}
-        {authState.status === "forbidden" ? <ForbiddenState authState={authState} onLogout={handleLogout} /> : null}
-        {authState.status !== "forbidden" && activeTab === "overview" ? <Overview online={online} wallets={wallets} dashboard={dashboard} report={report} insider={insider} privacyMasked={privacyMasked} walletDetail={walletDetail} onCloseWalletDetail={() => setWalletDetail(null)} onManageWallets={() => setWalletSheetOpen(true)} onRefreshInsider={() => void loadInsider().then(setInsider).catch(() => undefined)} /> : null}
-        {authState.status !== "forbidden" && activeTab === "transactions" ? <Transactions transactions={transactions ?? []} onEdit={setEditingTransaction} /> : null}
-        {authState.status !== "forbidden" && activeTab === "budgets" ? <Budgets budgets={budgets} events={events ?? []} obligations={obligations ?? []} schedules={schedules ?? []} drafts={drafts ?? []} categories={categories ?? []} wallets={wallets ?? []} transactions={transactions ?? []} online={online} onCreate={() => setBudgetSheetOpen(true)} onCreateEvent={() => setEventSheetOpen(true)} onCreateObligation={() => setObligationSheetOpen(true)} onCreateSchedule={() => setScheduleSheetOpen(true)} onEdit={setEditingBudget} onEditEvent={setEditingEvent} onEditObligation={setEditingObligation} onEditSchedule={setEditingSchedule} /> : null}
-        {authState.status !== "forbidden" && activeTab === "account" ? <Account authState={authState} assets={assets ?? []} portfolioSummary={portfolioSummary} privacyMasked={privacyMasked} online={online} onCreateAsset={() => setAssetSheetOpen(true)} onAssetChanged={(asset) => { setAssets((current) => [asset, ...(current ?? []).filter((item) => item.id !== asset.id)]); void refreshFinanceData(); }} onAssetArchived={(assetID) => { setAssets((current) => (current ?? []).filter((item) => item.id !== assetID)); void refreshFinanceData(); }} onLogout={handleLogout} /> : null}
+        {activeTab === "overview" ? reportsOpen && authState.status === "authenticated" ? <ReportsPanel key={authState.user.id} userID={authState.user.id} online={online} privacyMasked={privacyMasked} wallets={wallets ?? []} onClose={() => setReportsOpen(false)} /> : <>
+          <OperationError failure={walletDetailFailure} onRetry={() => { if (walletDetailSelection.current) void openWalletDetail(walletDetailSelection.current); }} retryLabel="Thử lại" busy={walletDetailBusy} />
+          <OperationError failure={insiderFailure} onRetry={() => { void refreshInsider(); }} retryLabel="Thử lại" busy={insiderBusy} />
+          <OverviewScreen online={online} wallets={wallets} dashboard={dashboard} report={report} insider={insider} privacyMasked={privacyMasked} walletDetail={walletDetail} onCloseWalletDetail={closeWalletDetail} onManageWallets={() => setWalletSheetOpen(true)} onViewReports={() => setReportsOpen(true)} onWalletClick={(walletID) => { void openWalletDetail(walletID); }} onRefreshInsider={() => { void refreshInsider(); }} formatVND={formatVND} formatPercent={formatPercent} />
+        </> : null}
+        {activeTab === "transactions" ? <TransactionsScreen transactions={transactions ?? []} onEdit={setEditingTransaction} /> : null}
+        {activeTab === "budgets" ? <>
+          <BudgetsScreen budgets={budgets} events={events ?? []} obligations={obligations ?? []} schedules={schedules ?? []} drafts={[]} categories={categories ?? []} wallets={wallets ?? []} transactions={transactions ?? []} online={online} onCreate={() => setBudgetSheetOpen(true)} onCreateEvent={() => setEventSheetOpen(true)} onCreateObligation={() => setObligationSheetOpen(true)} onCreateSchedule={() => setScheduleSheetOpen(true)} onEdit={setEditingBudget} onEditEvent={setEditingEvent} onEditObligation={setEditingObligation} onEditSchedule={setEditingSchedule} formatVND={formatVND} formatDate={formatDate} obligationDirectionLabel={obligationDirectionLabel} recurrenceLabel={recurrenceLabel} transactionTypeLabel={transactionTypeLabel} />
+          <DraftDecisionPanel key={authenticatedUserID} drafts={drafts ?? []} wallets={wallets ?? []} online={online} onDecided={handleDraftDecision} />
+        </> : null}
+        {activeTab === "account" ? <>
+          {logoutBusy ? <p role="status">Đang đăng xuất…</p> : null}
+          <OperationError failure={logoutFailure} onRetry={() => { void handleLogout(); }} retryLabel="Thử lại" busy={logoutBusy} />
+          <AccountScreen authState={authState} assets={assets ?? []} portfolioSummary={portfolioSummary} privacyMasked={privacyMasked} online={online} onCreateAsset={() => setAssetSheetOpen(true)} onAssetChanged={(asset) => { setAssets((current) => [asset, ...(current ?? []).filter((item) => item.id !== asset.id)]); void refreshFinanceData(); }} onAssetArchived={(assetID) => { setAssets((current) => (current ?? []).filter((item) => item.id !== assetID)); void refreshFinanceData(); }} onLogout={handleLogout} formatVND={formatVND} />
+        </> : null}
       </main>
 
-      <nav className="bottom-nav" aria-label="Điều hướng chính">
+      <nav className="bottom-nav dock-nav" aria-label="Điều hướng chính">
         {tabs.slice(0, 2).map((tab) => (
           <TabButton key={tab.id} tab={tab} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} />
         ))}
@@ -389,9 +681,10 @@ export function App() {
           <TabButton key={tab.id} tab={tab} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} />
         ))}
       </nav>
+      <PWAInstallPrompt prompt={installPrompt} onConsumed={() => setInstallPrompt(null)} />
 
       {sheetOpen ? <AddTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} onCreated={upsertTransaction} onDebtCreated={() => void refreshFinanceData()} onClose={() => setSheetOpen(false)} /> : null}
-      {walletSheetOpen ? <WalletManagerSheet wallets={wallets ?? []} readOnly={offlineReadOnly} onWalletChanged={(wallet) => setWallets((current) => [wallet, ...(current ?? []).filter((item) => item.id !== wallet.id)])} onWalletArchived={(walletID) => setWallets((current) => (current ?? []).filter((item) => item.id !== walletID))} onChanged={() => void reconcileAfterLocalChange().catch(() => undefined)} onClose={() => setWalletSheetOpen(false)} /> : null}
+      {walletSheetOpen ? <WalletManagerSheet wallets={wallets ?? []} categories={categories ?? []} online={online} readOnly={offlineReadOnly} onWalletChanged={(wallet) => setWallets((current) => [wallet, ...(current ?? []).filter((item) => item.id !== wallet.id)])} onWalletArchived={(walletID) => setWallets((current) => (current ?? []).filter((item) => item.id !== walletID))} onCategoryChanged={(category) => setCategories((current) => [category, ...(current ?? []).filter((item) => item.id !== category.id)])} onChanged={() => reconcileAfterLocalChange()} onClose={() => setWalletSheetOpen(false)} /> : null}
       {editingTransaction ? <EditTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} transaction={editingTransaction} onChanged={upsertTransaction} onArchived={() => { setTransactions((current) => (current ?? []).filter((item) => item.id !== editingTransaction.id)); setEditingTransaction(null); void reconcileAfterLocalChange().catch(() => undefined); }} onClose={() => setEditingTransaction(null)} /> : null}
       {budgetSheetOpen ? <BudgetSheet categories={categories ?? []} onSaved={() => { setBudgetSheetOpen(false); void refreshFinanceData(); }} onClose={() => setBudgetSheetOpen(false)} /> : null}
       {editingBudget ? <BudgetSheet budget={editingBudget} categories={categories ?? []} onSaved={() => { setEditingBudget(null); void refreshFinanceData(); }} onArchived={() => { setEditingBudget(null); void refreshFinanceData(); }} onClose={() => setEditingBudget(null)} /> : null}
@@ -404,6 +697,146 @@ export function App() {
       {assetSheetOpen ? <AssetSheet onSaved={(asset) => { setAssetSheetOpen(false); setAssets((current) => [asset, ...(current ?? [])]); void refreshFinanceData(); }} onClose={() => setAssetSheetOpen(false)} /> : null}
     </div>
   );
+}
+
+function DraftDecisionPanel({ drafts, wallets, online, onDecided }: {
+  drafts: TransactionDraft[];
+  wallets: WalletSummary[];
+  online: boolean;
+  onDecided: (decision: TransactionDraftDecision) => void;
+}) {
+  return (
+    <Card className="list-card planning-list" aria-label="Duyệt bản nháp giao dịch">
+      <SectionTitle title="Bản nháp giao dịch" />
+      {!online && drafts.some((draft) => draft.status === "pending") ? (
+        <p className="offline-warning">Cần online để xác nhận hoặc từ chối bản nháp. Thay đổi chưa được xếp hàng chờ.</p>
+      ) : null}
+      {drafts.length === 0 ? <p className="empty-state">Chưa có bản nháp giao dịch</p> : drafts.map((draft) => (
+        <DraftDecisionRow key={draft.id} draft={draft} wallets={wallets} online={online} onDecided={onDecided} />
+      ))}
+    </Card>
+  );
+}
+
+function DraftDecisionRow({ draft, wallets, online, onDecided }: {
+  draft: TransactionDraft;
+  wallets: WalletSummary[];
+  online: boolean;
+  onDecided: (decision: TransactionDraftDecision) => void;
+}) {
+  const label = draft.note.trim() || `Bản nháp ${draft.id}`;
+  const [amount, setAmount] = useState(String(draft.amount_vnd));
+  const [note, setNote] = useState(draft.note);
+  const [busy, setBusy] = useState(false);
+  const [failure, setFailure] = useState<OperationFailure | null>(null);
+  const [failedAction, setFailedAction] = useState<"confirm" | "reject" | null>(null);
+  const busyRef = useRef(false);
+  const confirmAttemptRef = useRef<{ key: string; input: { version: number; amount_vnd: number; note: string } } | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => () => { mountedRef.current = false; }, []);
+
+  const sourceName = wallets.find((wallet) => wallet.id === draft.source_wallet_id)?.name ?? draft.source_wallet_id;
+  const destinationName = draft.destination_wallet_id
+    ? wallets.find((wallet) => wallet.id === draft.destination_wallet_id)?.name ?? draft.destination_wallet_id
+    : "";
+  const route = draft.type === "transfer" ? `${sourceName} → ${destinationName}` : sourceName;
+  const numericAmount = Number(amount);
+  const canConfirm = Number.isSafeInteger(numericAmount) && numericAmount > 0;
+
+  function clearConfirmRetry() {
+    if (!confirmAttemptRef.current) return;
+    confirmAttemptRef.current = null;
+    if (failedAction === "confirm") {
+      setFailedAction(null);
+      setFailure(null);
+    }
+  }
+
+  async function decide(action: "confirm" | "reject") {
+    if (!online || draft.status !== "pending" || busyRef.current || (action === "confirm" && !canConfirm)) return;
+    busyRef.current = true;
+    setBusy(true);
+    setFailure(null);
+    try {
+      let decision: TransactionDraftDecision;
+      if (action === "confirm") {
+        const attempt = confirmAttemptRef.current ?? {
+          key: createDraftDecisionKey(),
+          input: { version: draft.version, amount_vnd: numericAmount, note },
+        };
+        confirmAttemptRef.current = attempt;
+        decision = await confirmTransactionDraft(draft.id, attempt.input, attempt.key);
+      } else {
+        decision = await rejectTransactionDraft(draft.id, { version: draft.version });
+      }
+      if (!mountedRef.current) return;
+      setFailedAction(null);
+      onDecided(decision);
+    } catch (error) {
+      if (!mountedRef.current) return;
+      setFailedAction(action);
+      setFailure(operationFailure(error, action === "confirm"
+        ? "Chưa xác nhận được bản nháp. Số tiền và ghi chú vẫn được giữ; hãy thử lại."
+        : "Chưa từ chối được bản nháp. Nội dung vẫn được giữ; hãy thử lại."));
+    } finally {
+      if (mountedRef.current) {
+        busyRef.current = false;
+        setBusy(false);
+      }
+    }
+  }
+
+  return (
+    <article className="planning-row draft-row" aria-label={`Bản nháp ${label}`}>
+      <span className="category-dot draft-dot" />
+      <div>
+        <strong>{label}</strong>
+        <p>{transactionTypeLabel(draft.type)} · {route}</p>
+        <p>{new Date(draft.occurred_at).toLocaleDateString("vi-VN")} · {formatVND(draft.amount_vnd)}</p>
+        {draft.status === "pending" ? <p>{formatVND(draft.amount_vnd)} · Chờ duyệt</p> : null}
+        {draft.status === "pending" ? <>
+          <label className="form-row">
+            Số tiền
+            <input
+              aria-label={`Số tiền bản nháp ${label}`}
+              inputMode="numeric"
+              value={amount}
+              disabled={busy}
+              onChange={(event) => {
+                setAmount(event.target.value.replace(/\D/g, ""));
+                clearConfirmRetry();
+              }}
+            />
+          </label>
+          <label className="form-row">
+            Ghi chú
+            <input aria-label={`Ghi chú bản nháp ${label}`} value={note} disabled={busy} onChange={(event) => {
+              setNote(event.target.value);
+              clearConfirmRetry();
+            }} />
+          </label>
+          <OperationError
+            failure={failure}
+            onRetry={failedAction ? () => { void decide(failedAction); } : undefined}
+            retryLabel={failedAction === "reject" ? "Thử từ chối" : "Thử xác nhận"}
+            busy={busy}
+          />
+          <div className="conflict-actions">
+            <PillButton disabled={!online || busy || !canConfirm} onClick={() => { void decide("confirm"); }}>Xác nhận {label}</PillButton>
+            <PillButton disabled={!online || busy} onClick={() => { void decide("reject"); }}>Từ chối {label}</PillButton>
+          </div>
+        </> : <>
+          <p>{draft.status === "confirmed" ? "Đã xác nhận" : "Đã từ chối"}</p>
+          {draft.confirmed_transaction_id ? <p>Giao dịch: {draft.confirmed_transaction_id}</p> : null}
+        </>}
+      </div>
+    </article>
+  );
+}
+
+function createDraftDecisionKey() {
+  return `draft-confirm-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(36).slice(2)}`}`;
 }
 
 function ConflictInbox({ conflicts, onResolve }: { conflicts: OfflineConflict[]; onResolve: (action: () => Promise<void>) => Promise<void> }) {
@@ -425,29 +858,32 @@ function NotificationInbox({
   online,
   notices,
   pushState,
+  failure,
+  busyID,
   onEnablePush,
   onRead,
+  onRetry,
 }: {
   online: boolean;
   notices: NotificationNotice[];
   pushState: "idle" | "enabled" | "denied" | "unsupported" | "offline" | "failed";
+  failure: OperationFailure | null;
+  busyID: string | null;
   onEnablePush: () => void;
   onRead: (id: string) => void;
+  onRetry: () => void;
 }) {
   const pushMessage = pushState === "denied" ? "Bạn đã từ chối quyền thông báo" : pushState === "unsupported" ? "Trình duyệt chưa hỗ trợ Web Push" : pushState === "offline" ? "Kết nối mạng để bật Web Push" : pushState === "failed" ? "Không thể bật Web Push lúc này" : pushState === "enabled" ? "Web Push đã bật" : "";
   return (
     <section className="card notification-inbox" role="dialog" aria-modal="false" aria-label="Hộp thư thông báo">
       <div className="section-title"><h2>Thông báo</h2><button type="button" onClick={onEnablePush} disabled={!online || pushState === "enabled"}>Bật Web Push</button></div>
       {pushMessage ? <p className="notification-status">{pushMessage}</p> : null}
+      <OperationError failure={failure} onRetry={onRetry} retryLabel="Thử lại" busy={Boolean(busyID)} />
       {!online && notices.length === 0 ? <p className="notification-status">Đang offline. Hộp thư sẽ tải lại khi có mạng.</p> : null}
       {notices.length === 0 && online ? <p className="notification-status">Chưa có thông báo mới.</p> : null}
-      {notices.map((notice) => <button className={notice.read_at ? "notice-row read" : "notice-row"} key={notice.id} type="button" onClick={() => !notice.read_at && onRead(notice.id)}><span><strong>{notice.title}</strong><small>{notice.body}</small></span><time>{new Date(notice.created_at).toLocaleDateString("vi-VN")}</time></button>)}
+      {notices.map((notice) => <button className={notice.read_at ? "notice-row read" : "notice-row"} disabled={busyID === notice.id} key={notice.id} type="button" onClick={() => !notice.read_at && onRead(notice.id)}><span><strong>{notice.title}</strong><small>{notice.body}</small></span><time>{new Date(notice.created_at).toLocaleDateString("vi-VN")}</time></button>)}
     </section>
   );
-}
-
-function SearchPanel({ online, query, results, onQueryChange }: { online: boolean; query: string; results: SearchResult[]; onQueryChange: (query: string) => void }) {
-  return <section className="card search-panel" aria-label="Tìm kiếm"><input autoFocus aria-label="Tìm kiếm giao dịch và ví" placeholder="Tìm ví, giao dịch, nhóm..." value={query} onChange={(event) => onQueryChange(event.target.value)} />{!online ? <p className="notification-status">Kết quả offline có thể cũ và chỉ đọc.</p> : null}{query.trim().length >= 2 && results.length === 0 ? <p className="notification-status">Không tìm thấy kết quả.</p> : null}{results.map((item) => <div className="search-result" key={`${item.kind}-${item.id}`}><strong>{item.label || "Không có ghi chú"}</strong><small>{item.detail ?? item.kind}</small></div>)}</section>;
 }
 
 function ConflictRow({ conflict, onResolve }: { conflict: OfflineConflict; onResolve: (action: () => Promise<void>) => Promise<void> }) {
@@ -538,213 +974,10 @@ function TabButton({
   );
 }
 
-function Overview({ online, wallets, dashboard, report, insider, privacyMasked, walletDetail, onCloseWalletDetail, onManageWallets, onRefreshInsider }: { online: boolean; wallets: WalletSummary[] | null; dashboard: Dashboard | null; report: Report | null; insider: InsiderReport | null; privacyMasked: boolean; walletDetail: WalletDetail | null; onCloseWalletDetail: () => void; onManageWallets: () => void; onRefreshInsider: () => void }) {
-  const visibleWallets = wallets ?? [];
-
-  return (
-    <section className="content-stack">
-      <Card className="wallet-card">
-        {!online ? <p className="offline-warning neutral">Dữ liệu đang hiển thị từ lần đồng bộ cuối</p> : null}
-        <SectionTitle title="Ví của tôi" action={<button type="button" onClick={onManageWallets}>Xem tất cả</button>} />
-        {visibleWallets.length === 0 ? <p className="empty-state">Chưa có ví</p> : null}
-        {visibleWallets.map((wallet) => (
-          <WalletRow key={wallet.id} icon={walletIcon(wallet.type)} name={wallet.name} amount={privacyMasked ? "••••••" : formatVND(wallet.balance_vnd)} onClick={() => { if (online) void loadWalletDetail(wallet.id).then(setWalletDetail).catch(() => undefined); }} />
-        ))}
-      </Card>
-      {walletDetail ? <WalletDetailPanel detail={walletDetail} onClose={onCloseWalletDetail} privacyMasked={privacyMasked} /> : null}
-      {dashboard?.investment_market_value_vnd || dashboard?.missing_asset_price_count ? (
-        <Card className="wallet-card">
-          <SectionTitle title="Tài sản đầu tư" />
-          <WalletRow icon="◆" name="Giá trị đầu tư" amount={privacyMasked ? "••••••" : formatVND(dashboard.investment_market_value_vnd ?? 0)} />
-          <WalletRow icon="₫" name="Tổng tài sản" amount={privacyMasked ? "••••••" : formatVND(dashboard.combined_net_worth_vnd ?? totalBalance)} />
-          {dashboard.missing_asset_price_count ? <p className="notification-status">{dashboard.missing_asset_price_count} tài sản chưa có giá hiện tại</p> : null}
-        </Card>
-      ) : null}
-
-      <SectionHeading title="Money Insider" action={<RefreshCw size={20} />} actionLabel="Làm mới Money Insider" onAction={onRefreshInsider} />
-      <section className="card insider-card">
-        {!insider ? <p className="empty-state">Đang tổng hợp chi tiêu...</p> : !insider.selected_category ? <p className="empty-state">Chưa đủ dữ liệu chi tiêu tháng này</p> : <>
-          <h2>{insider.selected_category.name} <span className="info" title="Danh mục có nhiều giao dịch nhất">i</span></h2>
-          <p className="muted">Tổng đã chi <strong className="expense">{privacyMasked ? "••••••" : formatVND(insider.spent_vnd)}</strong></p>
-          <div className="insider-grid">
-            <div>
-              <h3>Tháng này</h3>
-              <p className="muted">Trung bình trong {insider.elapsed_days} ngày</p>
-              <strong>{privacyMasked ? "••••••" : formatVND(insider.average_daily_vnd)}<span>/ngày</span></strong>
-            </div>
-            <div className="ring" aria-label={insider.not_comparable ? "Chưa đủ dữ liệu tháng trước" : `${formatPercent(insider.change_percent ?? 0)} so với tháng trước`}>{insider.not_comparable ? "—" : formatPercent(insider.change_percent ?? 0)}</div>
-          </div>
-          <p className="insider-comparison">{insider.not_comparable ? "Chưa đủ dữ liệu tháng trước để so sánh" : `${formatPercent(insider.change_percent ?? 0)} so với trung bình mỗi ngày tháng trước`}</p>
-        </>}
-      </section>
-
-      <SectionHeading title="Báo cáo tháng này" action="Xem báo cáo" />
-      <section className="card report-card" aria-label="Báo cáo chi tiêu">
-        <div className="segmented"><span>Tuần</span><strong>Tháng</strong></div>
-        <div className="chart">
-          <span className="chart-line red" />
-          <span className="chart-line gray" />
-        </div>
-        <div className="report-stats">
-              <p>Tổng đã chi <strong className="expense">{formatVND(report?.summary.expense_vnd ?? 0)}</strong></p>
-              <p>Tổng thu <strong className="income">{formatVND(report?.summary.income_vnd ?? 0)}</strong></p>
-        </div>
-      </section>
-    </section>
-  );
-}
-
-function Transactions({ transactions, onEdit }: { transactions: Transaction[]; onEdit: (transaction: Transaction) => void }) {
-  const [query, setQuery] = useState("");
-  const visible = transactions.filter((transaction) => `${transaction.note} ${transaction.type}`.toLowerCase().includes(query.toLowerCase()));
-  return (
-    <section className="content-stack">
-      <div className="sub-header">
-        <h1>Sổ giao dịch</h1>
-        <button className="pill-button" type="button">Tháng 08/2026</button>
-      </div>
-      <section className="card list-card">
-        <label className="transaction-search"><Search size={18} /><input aria-label="Tìm giao dịch" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Tìm giao dịch" /></label>
-        {visible.length === 0 ? <p className="empty-state">Chưa có giao dịch</p> : visible.map((transaction) => <TransactionRow key={transaction.id} title={transaction.note || transaction.type} subtitle={new Date(transaction.occurred_at).toLocaleDateString("vi-VN")} amount={signedAmount(transaction)} positive={transaction.type === "income"} onClick={() => onEdit(transaction)} />)}
-      </section>
-    </section>
-  );
-}
-
-function Budgets({
-  budgets,
-  events,
-  obligations,
-  schedules,
-  drafts,
-  categories,
-  wallets,
-  transactions,
-  online,
-  onCreate,
-  onCreateEvent,
-  onCreateObligation,
-  onCreateSchedule,
-  onEdit,
-  onEditEvent,
-  onEditObligation,
-  onEditSchedule,
-}: {
-  budgets: BudgetProgress[] | null;
-  events: EventSummary[];
-  obligations: ObligationSummary[];
-  schedules: RecurringSchedule[];
-  drafts: TransactionDraft[];
-  categories: CategorySummary[];
-  wallets: WalletSummary[];
-  transactions: Transaction[];
-  online: boolean;
-  onCreate: () => void;
-  onCreateEvent: () => void;
-  onCreateObligation: () => void;
-  onCreateSchedule: () => void;
-  onEdit: (budget: BudgetProgress) => void;
-  onEditEvent: (event: EventSummary) => void;
-  onEditObligation: (obligation: ObligationSummary) => void;
-  onEditSchedule: (schedule: RecurringSchedule) => void;
-}) {
-  const rows = budgets ?? [];
-  const totalBudget = rows.reduce((total, item) => total + item.budget.amount_vnd, 0);
-  const totalSpent = rows.reduce((total, item) => total + item.spent_vnd, 0);
-  const daysLeft = rows[0] ? Math.max(0, Math.ceil((new Date(rows[0].period_end).getTime() - Date.now()) / 86400000)) : 0;
-  return (
-    <section className="content-stack">
-      <div className="sub-header">
-        <h1>Ngân sách</h1>
-        <button className="pill-button" type="button" disabled={!online} onClick={onCreate}>Tạo</button>
-      </div>
-      <section className="card budget-hero">
-        <p>{rows[0] ? `${formatDate(rows[0].period_start)} - ${formatDate(rows[0].period_end)}` : "Kỳ hiện tại"}</p>
-        <strong>{formatVND(totalBudget)}</strong>
-        <div className="budget-stats"><span>{formatVND(totalBudget)}<br />Tổng ngân sách</span><span>{formatVND(totalSpent)}<br />Tổng đã chi</span><span>{daysLeft} ngày<br />Còn lại</span></div>
-        <button className="primary-cta compact" type="button" disabled={!online} onClick={onCreate}>Tạo Ngân sách</button>
-      </section>
-      {!online ? <p className="offline-warning">Cần online để tạo hoặc sửa ngân sách. Dữ liệu đã tải vẫn có thể xem.</p> : null}
-      {rows.length === 0 ? <section className="card list-card"><p className="empty-state">Chưa có ngân sách</p></section> : rows.map((budget) => (
-        <BudgetRow key={budget.budget.id} item={budget} categories={categories} disabled={!online} onEdit={() => onEdit(budget)} />
-      ))}
-      <section className="card list-card planning-list">
-        <div className="section-title">
-          <h2>Sự kiện</h2>
-          <button type="button" disabled={!online} onClick={onCreateEvent}>Tạo sự kiện</button>
-        </div>
-        {events.length === 0 ? <p className="empty-state">Chưa có sự kiện</p> : events.map((event) => (
-          <button className="planning-row" type="button" key={event.id} disabled={!online} onClick={() => onEditEvent(event)}>
-            <span className="category-dot" />
-            <div>
-              <strong>{event.name}</strong>
-              <p>{formatDate(event.starts_on)} - {formatDate(event.ends_on)}</p>
-              <p>Đã dùng {formatVND(event.total_vnd)} · {event.transaction_count} giao dịch</p>
-            </div>
-            <ChevronRight size={22} />
-          </button>
-        ))}
-      </section>
-      <section className="card list-card planning-list">
-        <div className="section-title">
-          <h2>Khoản vay nợ</h2>
-          <button type="button" disabled={!online} onClick={onCreateObligation}>Tạo khoản nợ</button>
-        </div>
-        {obligations.length === 0 ? <p className="empty-state">Chưa có khoản vay nợ</p> : obligations.map((obligation) => (
-          <button className="planning-row" type="button" key={obligation.id} disabled={!online} onClick={() => onEditObligation(obligation)}>
-            <span className="category-dot debt-dot" />
-            <div>
-              <strong>{obligation.counterparty}</strong>
-              <p>{obligationDirectionLabel(obligation.direction)} · Hạn {formatDate(obligation.due_on)}</p>
-              <p>Còn {formatVND(obligation.remaining_vnd)}</p>
-              <p>Đã trả {formatVND(obligation.repaid_vnd)}</p>
-            </div>
-            <ChevronRight size={22} />
-          </button>
-        ))}
-      </section>
-      <section className="card list-card planning-list">
-        <div className="section-title">
-          <h2>Lặp lại</h2>
-          <button type="button" disabled={!online || wallets.length === 0} onClick={onCreateSchedule}>Tạo lịch</button>
-        </div>
-        {schedules.length === 0 ? <p className="empty-state">Chưa có lịch lặp</p> : schedules.map((schedule) => (
-          <button className="planning-row" type="button" key={schedule.id} disabled={!online} onClick={() => onEditSchedule(schedule)}>
-            <span className="category-dot schedule-dot" />
-            <div>
-              <strong>{schedule.name}</strong>
-              <p>{recurrenceLabel(schedule.frequency)} · Tiếp theo {new Date(schedule.next_occurs_at).toLocaleDateString("vi-VN")}</p>
-              <p>{formatVND(schedule.amount_vnd)} · {transactionTypeLabel(schedule.type)}</p>
-            </div>
-            <ChevronRight size={22} />
-          </button>
-        ))}
-      </section>
-      <section className="card list-card planning-list">
-        <div className="section-title">
-          <h2>Bản nháp</h2>
-          <button type="button">Xem</button>
-        </div>
-        {drafts.filter((draft) => draft.status === "pending").length === 0 ? <p className="empty-state">Chưa có bản nháp cần duyệt</p> : drafts.filter((draft) => draft.status === "pending").map((draft) => (
-          <div className="planning-row draft-row" key={draft.id}>
-            <span className="category-dot draft-dot" />
-            <div>
-              <strong>{draft.note || "Bản nháp lặp lại"}</strong>
-              <p>{new Date(draft.occurred_at).toLocaleDateString("vi-VN")} · {transactionTypeLabel(draft.type)}</p>
-              <p>{formatVND(draft.amount_vnd)} · Chờ duyệt</p>
-            </div>
-          </div>
-        ))}
-      </section>
-      {transactions.length === 0 ? <p className="offline-warning neutral">Tạo giao dịch trước khi gắn chi phí sự kiện hoặc trả nợ.</p> : null}
-    </section>
-  );
-}
-
 function EventSheet({ event, transactions, onSaved, onArchived, onClose }: { event?: EventSummary; transactions: Transaction[]; onSaved: () => void; onArchived?: () => void; onClose: () => void }) {
   const [name, setName] = useState(event?.name ?? "");
-  const [startsOn, setStartsOn] = useState(event?.starts_on ?? new Date().toISOString().slice(0, 10));
-  const [endsOn, setEndsOn] = useState(event?.ends_on ?? new Date().toISOString().slice(0, 10));
+  const [startsOn, setStartsOn] = useState(event?.starts_on ?? calendarDateInHoChiMinh());
+  const [endsOn, setEndsOn] = useState(event?.ends_on ?? calendarDateInHoChiMinh());
   const [note, setNote] = useState(event?.note ?? "");
   const [transactionID, setTransactionID] = useState("");
   const [saving, setSaving] = useState(false);
@@ -754,7 +987,7 @@ function EventSheet({ event, transactions, onSaved, onArchived, onClose }: { eve
     setSaving(true);
     try {
       const input: EventInput = { name, starts_on: startsOn, ends_on: endsOn, note };
-      const saved = event ? await updateEvent(event.id, input) : await createEvent(input);
+      const saved = event ? await updateEvent(event.id, input, event.version) : await createEvent(input);
       if (transactionID) await linkEventTransaction(saved.id, transactionID);
       onSaved();
     } finally {
@@ -765,7 +998,7 @@ function EventSheet({ event, transactions, onSaved, onArchived, onClose }: { eve
     if (!event || saving) return;
     setSaving(true);
     try {
-      await archiveEvent(event.id);
+      await archiveEvent(event.id, event.version);
       onArchived?.();
     } finally {
       setSaving(false);
@@ -799,7 +1032,7 @@ function ObligationSheet({ obligation, transactions, onSaved, onArchived, onClos
   const [counterparty, setCounterparty] = useState(obligation?.counterparty ?? "");
   const [direction, setDirection] = useState<ObligationDirection>(obligation?.direction ?? "borrowed");
   const [principal, setPrincipal] = useState(String(obligation?.principal_vnd ?? ""));
-  const [dueOn, setDueOn] = useState(obligation?.due_on ?? new Date().toISOString().slice(0, 10));
+  const [dueOn, setDueOn] = useState(obligation?.due_on ?? calendarDateInHoChiMinh());
   const [note, setNote] = useState(obligation?.note ?? "");
   const [transactionID, setTransactionID] = useState("");
   const [saving, setSaving] = useState(false);
@@ -809,7 +1042,7 @@ function ObligationSheet({ obligation, transactions, onSaved, onArchived, onClos
     setSaving(true);
     try {
       const input: ObligationInput = { direction, principal_vnd: Number(principal), counterparty, due_on: dueOn, note };
-      const saved = obligation ? await updateObligation(obligation.id, input) : await createObligation(input);
+      const saved = obligation ? await updateObligation(obligation.id, input, obligation.version) : await createObligation(input);
       if (transactionID) await linkObligationRepayment(saved.id, transactionID);
       onSaved();
     } finally {
@@ -820,7 +1053,7 @@ function ObligationSheet({ obligation, transactions, onSaved, onArchived, onClos
     if (!obligation || saving) return;
     setSaving(true);
     try {
-      await archiveObligation(obligation.id);
+      await archiveObligation(obligation.id, obligation.version);
       onArchived?.();
     } finally {
       setSaving(false);
@@ -858,7 +1091,7 @@ function ScheduleSheet({ schedule, wallets, categories, onSaved, onArchived, onC
   const [sourceWalletID, setSourceWalletID] = useState(schedule?.source_wallet_id ?? wallets[0]?.id ?? "");
   const [destinationWalletID, setDestinationWalletID] = useState(schedule?.destination_wallet_id ?? wallets.find((wallet) => wallet.id !== sourceWalletID)?.id ?? "");
   const [categoryID, setCategoryID] = useState(schedule?.category_id ?? "");
-  const [startsOn, setStartsOn] = useState(schedule ? new Date(schedule.starts_at).toISOString().slice(0, 10) : new Date().toISOString().slice(0, 10));
+  const [startsOn, setStartsOn] = useState(schedule ? calendarDateInHoChiMinh(new Date(schedule.starts_at)) : calendarDateInHoChiMinh());
   const [note, setNote] = useState(schedule?.note ?? "");
   const [saving, setSaving] = useState(false);
   const selectableCategories = categories.filter((category) => category.kind === type);
@@ -896,7 +1129,7 @@ function ScheduleSheet({ schedule, wallets, categories, onSaved, onArchived, onC
     if (!schedule || saving) return;
     setSaving(true);
     try {
-      await archiveRecurringSchedule(schedule.id);
+      await archiveRecurringSchedule(schedule.id, schedule.version);
       onArchived?.();
     } finally {
       setSaving(false);
@@ -960,7 +1193,7 @@ function BudgetSheet({ budget, categories, onSaved, onArchived, onClose }: { bud
     if (!canSave || saving) return;
     setSaving(true);
     try {
-      if (editing) await updateBudget(editing.id, input());
+      if (editing) await updateBudget(editing.id, input(), editing.version);
       else await createBudget(input());
       onSaved();
     } finally {
@@ -971,7 +1204,7 @@ function BudgetSheet({ budget, categories, onSaved, onArchived, onClose }: { bud
     if (!editing || saving) return;
     setSaving(true);
     try {
-      await archiveBudget(editing.id);
+      await archiveBudget(editing.id, editing.version);
       onArchived?.();
     } finally {
       setSaving(false);
@@ -1006,184 +1239,6 @@ function BudgetSheet({ budget, categories, onSaved, onArchived, onClose }: { bud
         </div>
       </section>
     </div>
-  );
-}
-
-function Account({
-  authState,
-  assets,
-  portfolioSummary,
-  privacyMasked,
-  online,
-  onCreateAsset,
-  onAssetChanged,
-  onAssetArchived,
-  onLogout,
-}: {
-  authState: AuthState;
-  assets: AssetPosition[];
-  portfolioSummary: PortfolioSummary | null;
-  privacyMasked: boolean;
-  online: boolean;
-  onCreateAsset: () => void;
-  onAssetChanged: (asset: AssetPosition) => void;
-  onAssetArchived: (assetID: string) => void;
-  onLogout: () => void;
-}) {
-  const email = authState.status === "authenticated" ? authState.user.email : "Chưa đăng nhập";
-  const displayName = authState.status === "authenticated" ? authState.user.display_name || authState.user.email : "Tài khoản MyPocket";
-  const [apiKeys, setAPIKeys] = useState<APIKeySummary[]>([]);
-  const [apiKeyName, setAPIKeyName] = useState("AI Agent");
-  const [createdKey, setCreatedKey] = useState<CreatedAPIKey | null>(null);
-  const [apiKeyBusy, setAPIKeyBusy] = useState(false);
-  const [auditAllowed, setAuditAllowed] = useState(false);
-  const [auditEvents, setAuditEvents] = useState<AuditEvent[]>([]);
-  const [auditCorrelationID, setAuditCorrelationID] = useState("");
-  const [auditBusy, setAuditBusy] = useState(false);
-
-  useEffect(() => {
-    if (!online || authState.status !== "authenticated") return;
-    void loadAPIKeys().then(setAPIKeys).catch(() => undefined);
-  }, [authState.status, online]);
-
-  useEffect(() => {
-    if (!online || authState.status !== "authenticated") {
-      setAuditAllowed(false);
-      setAuditEvents([]);
-      return;
-    }
-    let active = true;
-    setAuditBusy(true);
-    void checkAuditAccess()
-      .then((result) => {
-        if (!active) return;
-        setAuditAllowed(result.allowed);
-        if (result.allowed) return loadAuditEvents().then((events) => { if (active) setAuditEvents(events); });
-        return undefined;
-      })
-      .catch(() => { if (active) setAuditAllowed(false); })
-      .finally(() => { if (active) setAuditBusy(false); });
-    return () => { active = false; };
-  }, [authState.status, online]);
-
-  async function handleCreateAPIKey() {
-    if (!online || apiKeyName.trim() === "") return;
-    setAPIKeyBusy(true);
-    try {
-      const key = await createAPIKey(apiKeyName.trim());
-      setCreatedKey(key);
-      setAPIKeys((current) => [key, ...current.filter((item) => item.id !== key.id)]);
-    } finally {
-      setAPIKeyBusy(false);
-    }
-  }
-
-  async function handleRevokeAPIKey(id: string) {
-    if (!online) return;
-    setAPIKeyBusy(true);
-    try {
-      await revokeAPIKey(id);
-      setAPIKeys((current) => current.map((item) => item.id === id ? { ...item, revoked_at: new Date().toISOString() } : item));
-    } finally {
-      setAPIKeyBusy(false);
-    }
-  }
-
-  async function refreshAuditEvents() {
-    if (!auditAllowed || !online) return;
-    setAuditBusy(true);
-    try {
-      setAuditEvents(await loadAuditEvents(auditCorrelationID));
-    } finally {
-      setAuditBusy(false);
-    }
-  }
-
-  return (
-    <section className="content-stack">
-      <div className="sub-header">
-        <h1>Quản Lý Tài Khoản</h1>
-      </div>
-      <section className="card profile-card">
-        <div className="avatar">D</div>
-        <div className="ribbon">TÀI KHOẢN PREMIUM</div>
-        <h2>{displayName}</h2>
-        <p>{email}</p>
-        <strong className="google-mark">G</strong>
-      </section>
-      <section className="card list-card">
-        <SectionTitle title="Tài sản" action={<button type="button" onClick={onCreateAsset}>Thêm</button>} />
-        <div className="asset-total-row">
-          <span>Giá trị đầu tư</span>
-          <strong>{privacyMasked ? "••••••" : formatVND(portfolioSummary?.investment_market_value_vnd ?? 0)}</strong>
-        </div>
-        {portfolioSummary?.missing_price_count ? <p className="notification-status">{portfolioSummary.missing_price_count} tài sản chưa có giá hiện tại</p> : null}
-        {assets.length === 0 ? <p className="empty-state">Chưa có tài sản</p> : assets.map((asset) => <AssetRow key={asset.id} asset={asset} privacyMasked={privacyMasked} online={online} onChanged={onAssetChanged} onArchived={onAssetArchived} />)}
-      </section>
-      <section className="card list-card">
-        <TransactionRow title="iPhone" subtitle="Thiết bị này" amount="" positive />
-      </section>
-      <section className="card list-card api-key-card">
-        <SectionTitle title="API keys" action={<KeyRound size={18} />} />
-        <div className="manager-form api-key-form">
-          <input aria-label="Tên API key" value={apiKeyName} onChange={(event) => setAPIKeyName(event.target.value)} placeholder="Tên key" disabled={!online || apiKeyBusy} />
-          <button type="button" disabled={!online || apiKeyBusy || apiKeyName.trim() === ""} onClick={() => void handleCreateAPIKey()}>{apiKeyBusy ? "Đang xử lý" : "Tạo key"}</button>
-        </div>
-        {createdKey ? (
-          <div className="api-key-secret">
-            <span>Chỉ hiển thị một lần</span>
-            <code>{createdKey.plaintext}</code>
-            <button type="button" onClick={() => void navigator.clipboard?.writeText(createdKey.plaintext)}>Copy</button>
-          </div>
-        ) : null}
-        {apiKeys.length === 0 ? <p className="empty-state">{online ? "Chưa có API key" : "Cần online để quản lý API key"}</p> : (
-          <div className="api-key-list">
-            {apiKeys.map((key) => (
-              <div className="api-key-row" key={key.id}>
-                <div>
-                  <strong>{key.name}</strong>
-                  <p>{key.key_prefix}... · {key.revoked_at ? "Đã revoke" : key.last_used_at ? `Dùng ${new Date(key.last_used_at).toLocaleDateString("vi-VN")}` : "Chưa dùng"}</p>
-                </div>
-                <button className="danger-text" type="button" disabled={!online || apiKeyBusy || Boolean(key.revoked_at)} onClick={() => void handleRevokeAPIKey(key.id)}>Revoke</button>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-      {auditAllowed ? (
-        <section className="card list-card audit-log-card">
-          <SectionTitle title="Nhật ký hệ thống" action={<Activity size={18} />} />
-          <div className="manager-form audit-log-form">
-            <input aria-label="Correlation ID" value={auditCorrelationID} onChange={(event) => setAuditCorrelationID(event.target.value)} placeholder="Correlation ID" />
-            <button type="button" disabled={auditBusy || !online} onClick={() => void refreshAuditEvents()}>{auditBusy ? "Đang tải" : "Làm mới"}</button>
-          </div>
-          {auditEvents.length === 0 ? <p className="empty-state">Không có sự kiện phù hợp</p> : (
-            <div className="audit-log-list">
-              {auditEvents.map((event) => (
-                <article className="audit-log-row" key={event.id}>
-                  <div><strong>{event.action}</strong><p>{event.request_method ?? ""} {event.request_path ?? ""}</p></div>
-                  <span className={`audit-severity ${event.severity}`}>{event.outcome}</span>
-                  <time dateTime={event.occurred_at}>{new Date(event.occurred_at).toLocaleString("vi-VN")}</time>
-                  <code>{event.correlation_id}</code>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-      ) : null}
-      {auditBusy && !auditAllowed ? <p className="notification-status">Đang kiểm tra quyền nhật ký…</p> : null}
-      <section className="card list-card">
-        <a className="planning-row" href="/docs/" target="_blank" rel="noopener noreferrer">
-          <BookOpen size={24} />
-          <div>
-            <strong>Tài liệu</strong>
-            <p>Sơ đồ CSDL và tài liệu API</p>
-          </div>
-          <ChevronRight size={22} />
-        </a>
-      </section>
-      <button className="wide-pill destructive" type="button" onClick={onLogout}>Đăng xuất</button>
-    </section>
   );
 }
 
@@ -1302,28 +1357,35 @@ function AssetSheet({ onSaved, onClose }: { onSaved: (asset: AssetPosition) => v
 }
 
 function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtCreated, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; readOnly: boolean; onCreated: (transaction: Transaction) => void; onDebtCreated: () => void; onClose: () => void }) {
-  const [type, setType] = useState<"expense" | "income" | "debt">("expense");
+  const [type, setType] = useState<"expense" | "income" | "debt" | "transfer">("expense");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [sourceWalletID, setSourceWalletID] = useState(wallets[0]?.id ?? "");
+  const [destinationWalletID, setDestinationWalletID] = useState(wallets[1]?.id ?? "");
   const [categoryID, setCategoryID] = useState("");
   const [excludedFromReports, setExcludedFromReports] = useState(false);
   const [debtDirection, setDebtDirection] = useState<ObligationDirection>("borrowed");
   const [counterparty, setCounterparty] = useState("");
-  const [dueOn, setDueOn] = useState(() => new Date().toISOString().slice(0, 10));
-  const [occurredOn, setOccurredOn] = useState(() => new Date().toISOString().slice(0, 10));
+  const [dueOn, setDueOn] = useState(() => calendarDateInHoChiMinh());
+  const [occurredOn, setOccurredOn] = useState(() => calendarDateInHoChiMinh());
   const [saving, setSaving] = useState(false);
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const receiptInput = useRef<HTMLInputElement>(null);
+  const [operationError, setOperationError] = useState<OperationFailure | null>(null);
+  const [completed, setCompleted] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const filteredCategories = categories.filter((category) => category.kind === (type === "income" ? "income" : "expense"));
-  const chosenCategoryID = type !== "debt" ? categoryID || filteredCategories[0]?.id : "";
-  const canSave = !readOnly && wallets.length > 0 && Number(amount) > 0 && (type === "debt" ? counterparty.trim() !== "" && dueOn !== "" : Boolean(sourceWalletID));
+  const chosenCategoryID = type === "income" || type === "expense" ? categoryID || filteredCategories[0]?.id : "";
+  const receiptLocked = readOnly || saving || completed;
+  const canSave = !completed && !readOnly && wallets.length > 0 && Number.isSafeInteger(Number(amount)) && Number(amount) > 0 && (type === "debt" ? !receiptFile && counterparty.trim() !== "" && dueOn !== "" : Boolean(sourceWalletID)) && (type !== "transfer" || Boolean(destinationWalletID && destinationWalletID !== sourceWalletID));
   useEffect(() => {
     if (!sourceWalletID && wallets[0]) setSourceWalletID(wallets[0].id);
   }, [sourceWalletID, wallets]);
   async function save() {
     if (!canSave || saving) return;
     setSaving(true);
+    setOperationError(null);
+    let transactionSaved = false;
     try {
       if (type === "debt") {
         await createObligation({ direction: debtDirection, principal_vnd: Number(amount), counterparty: counterparty.trim(), due_on: dueOn, note });
@@ -1332,51 +1394,62 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
         return;
       }
       const receipt = receiptFile && navigator.onLine ? await uploadFile(receiptFile) : undefined;
-      const transaction = await createTransaction(buildTransactionInput({ type, amount, sourceWalletID, categoryID: chosenCategoryID, note, excludedFromReports, occurredOn, receiptObjectID: receipt?.id }));
+      const transaction = await createTransaction(buildTransactionInput({ type, amount, sourceWalletID, destinationWalletID, categoryID: chosenCategoryID, note, excludedFromReports, occurredOn, receiptObjectID: receipt?.id }));
+      transactionSaved = true;
+      setCompleted(true);
+      onCreated(transaction);
       if (receiptFile && !navigator.onLine) {
         await queueReceiptUpload({ transaction_id: transaction.id, file: receiptFile, filename: receiptFile.name, content_type: receiptFile.type });
       }
-      onCreated(transaction);
       onClose();
+    } catch (error) {
+      setOperationError(operationFailure(error, transactionSaved
+        ? "Giao dịch đã lưu, nhưng chưa lưu được ảnh vào hàng đợi. Không tạo lại giao dịch; hãy giữ ảnh gốc để bổ sung sau."
+        : "Chưa xác nhận được việc lưu giao dịch. Nội dung vẫn được giữ; hãy kiểm tra sổ giao dịch trước khi gửi lại."));
     } finally {
       setSaving(false);
     }
   }
   return (
-    <div className="sheet-backdrop">
-      <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label="Thêm Giao Dịch">
-        <header>
-          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
-          <h2>Thêm Giao Dịch</h2>
-          <span />
-        </header>
+    <SheetFrame title="Thêm Giao Dịch" leading={<PillButton onClick={onClose}>Hủy</PillButton>} trailing={<span />}
+      footer={<div className="save-bar"><ActionButton disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</ActionButton><ActionButton className="receipt" aria-label="Đính kèm ảnh" disabled={receiptLocked || type === "debt"} onClick={() => receiptInput.current?.click()}><ImagePlus size={24} /></ActionButton></div>}
+    >
         {readOnly ? <p className="offline-warning">Offline storage chưa sẵn sàng. Mở mạng lại để lưu giao dịch.</p> : null}
+        <OperationError failure={operationError} />
+        {completed ? <PillButton onClick={onClose}>Đóng</PillButton> : null}
         <div className="transaction-form-card">
           <div className="segmented sheet-segmented">
-            {(["expense", "income", "debt"] as const).map((option) => (
-              <button className={type === option ? "active" : ""} type="button" key={option} onClick={() => setType(option)}>{quickAddTypeLabel(option)}</button>
+            {(["expense", "income", "debt", "transfer"] as const).map((option) => (
+              <ActionButton className={type === option ? "active" : ""} disabled={receiptLocked} key={option} onClick={() => setType(option)}>{quickAddTypeLabel(option)}</ActionButton>
             ))}
           </div>
           <label className="amount-row"><span>VND</span><input aria-label="Số tiền" type="text" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
           {type === "debt" ? <div className="segmented debt-segmented"><button type="button" className={debtDirection === "borrowed" ? "active" : ""} onClick={() => setDebtDirection("borrowed")}>Tôi vay</button><button type="button" className={debtDirection === "lent" ? "active" : ""} onClick={() => setDebtDirection("lent")}>Tôi cho vay</button></div> : null}
-          {type !== "debt" ? <label className="sheet-row"><Wallet /><select aria-label="Ví nguồn" value={sourceWalletID} onChange={(event) => setSourceWalletID(event.target.value)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</select></label> : <label className="sheet-row"><Users /><input aria-label="Đối tác" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder="Người liên quan" /></label>}
-          {type !== "debt" ? <label className="sheet-row"><span className="dot-icon" /><select aria-label="Nhóm" value={chosenCategoryID} onChange={(event) => setCategoryID(event.target.value)}><option value="">Chọn nhóm</option>{filteredCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label> : <label className="sheet-row"><CalendarDays /><input aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} /></label>}
+          {type !== "debt" ? <label className="sheet-row"><Wallet /><Select aria-label="Ví nguồn" value={sourceWalletID} disabled={receiptLocked} onChange={(event) => setSourceWalletID(event.target.value)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label> : <label className="sheet-row"><Users /><input aria-label="Đối tác" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder="Người liên quan" /></label>}
+          {type === "transfer" ? <>
+            <label className="sheet-row"><Wallet /><Select aria-label="Ví đích" value={destinationWalletID} disabled={receiptLocked} onChange={(event) => setDestinationWalletID(event.target.value)}><option value="">Chọn ví nhận</option>{wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label>
+            <p className="px-4 py-2 text-sm">Chuyển giữa hai ví khác nhau, không tính vào thu/chi báo cáo.</p>
+          </> : type !== "debt" ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Nhóm" value={chosenCategoryID} onChange={(event) => setCategoryID(event.target.value)}><option value="">Chọn nhóm</option>{filteredCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></label> : <label className="sheet-row"><CalendarDays /><input aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} /></label>}
           {type !== "debt" ? <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label> : null}
           {type !== "debt" ? <label className="date-row"><CalendarDays /><input aria-label="Ngày giao dịch" type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} /></label> : null}
           {type !== "debt" ? <label className="exclude-row"><input type="checkbox" checked={excludedFromReports} onChange={(event) => setExcludedFromReports(event.target.checked)} /><span>Không tính vào báo cáo</span></label> : null}
-          <button className="details-trigger" type="button" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails}>{showDetails ? "Ẩn chi tiết" : "Thêm chi tiết"}</button>
+          <ActionButton className="details-trigger" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails}>{showDetails ? "Ẩn chi tiết" : "Thêm chi tiết"}</ActionButton>
           {showDetails ? <div className="details-panel">
             <label className="sheet-row"><List /><input aria-label="Ghi chú chi tiết" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label>
-            <SheetRow icon={<Users />} label="Với" muted />
-            <SheetRow icon={<MapPin />} label="Đặt vị trí" muted />
-            <SheetRow icon={<BriefcaseBusiness />} label="Chọn sự kiện" muted />
-            <SheetRow icon={<Bell />} label="Đặt nhắc nhở" muted />
-            <label className="image-row" htmlFor="receipt-image"><ImagePlus size={22} />{receiptFile ? receiptFile.name : "Thêm Hình Ảnh"}<input id="receipt-image" type="file" accept="image/jpeg,image/png,image/webp" onChange={(event) => setReceiptFile(event.target.files?.[0] ?? null)} hidden /></label>
+            <UnavailableAction icon={<Users />} label="Với" reason="Chưa hỗ trợ trong form này" />
+            <UnavailableAction icon={<MapPin />} label="Đặt vị trí" reason="Chưa hỗ trợ trong form này" />
+            <UnavailableAction icon={<BriefcaseBusiness />} label="Chọn sự kiện" reason="Chưa hỗ trợ trong form này" />
+            <UnavailableAction icon={<Bell />} label="Đặt nhắc nhở" reason="Chưa hỗ trợ trong form này" />
+            <ActionButton className="image-row" disabled={receiptLocked || type === "debt"} onClick={() => receiptInput.current?.click()}><ImagePlus size={22} /><span>{receiptFile ? "Đổi ảnh" : "Thêm Hình Ảnh"}</span></ActionButton>
           </div> : null}
+          <FilePickerInput id="receipt-image" ref={receiptInput} aria-label="Ảnh đính kèm" accept="image/jpeg,image/png,image/webp" hidden disabled={receiptLocked || type === "debt"} onFileSelected={setReceiptFile} />
+          {receiptFile ? <div className="px-4 py-2">
+            <p role="status" className="break-all text-sm">Ảnh đã chọn: {receiptFile.name}</p>
+            <PillButton disabled={receiptLocked} onClick={() => setReceiptFile(null)}>Bỏ ảnh</PillButton>
+          </div> : null}
+          {type === "debt" ? <p className="px-4 py-2 text-sm">Ảnh chỉ hỗ trợ cho khoản thu/chi. {receiptFile ? "Bỏ ảnh hoặc quay lại khoản thu/chi trước khi lưu." : "Vay/nợ chưa hỗ trợ ảnh đính kèm."}</p> : null}
         </div>
-        <div className="save-bar"><button type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button><button type="button" className="receipt"><ImagePlus size={24} /></button></div>
-      </section>
-    </div>
+    </SheetFrame>
   );
 }
 
@@ -1385,11 +1458,13 @@ function EditTransactionSheet({ categories, wallets, readOnly, transaction, onCh
   const [note, setNote] = useState(transaction.note);
   const [excludedFromReports, setExcludedFromReports] = useState(transaction.excluded_from_reports);
   const [saving, setSaving] = useState(false);
+  const [operationError, setOperationError] = useState<OperationFailure | null>(null);
   const category = categories.find((item) => item.id === transaction.category_id);
   const sourceWallet = wallets.find((item) => item.id === transaction.source_wallet_id);
   async function save() {
     if (readOnly || Number(amount) <= 0 || saving) return;
     setSaving(true);
+    setOperationError(null);
     try {
       const next = await updateTransaction(transaction.id, {
         type: transaction.type,
@@ -1406,6 +1481,8 @@ function EditTransactionSheet({ categories, wallets, readOnly, transaction, onCh
       });
       onChanged(next);
       onClose();
+    } catch (error) {
+      setOperationError(operationFailure(error, "Chưa xác nhận được việc sửa giao dịch. Nội dung vẫn được giữ; hãy kiểm tra lại dữ liệu trước khi gửi lại."));
     } finally {
       setSaving(false);
     }
@@ -1413,9 +1490,12 @@ function EditTransactionSheet({ categories, wallets, readOnly, transaction, onCh
   async function archive() {
     if (readOnly || saving) return;
     setSaving(true);
+    setOperationError(null);
     try {
       await archiveTransaction(transaction.id, transaction.version);
       onArchived();
+    } catch (error) {
+      setOperationError(operationFailure(error, "Chưa xác nhận được việc lưu trữ giao dịch. Hãy kiểm tra lại sổ giao dịch trước khi thử lại."));
     } finally {
       setSaving(false);
     }
@@ -1429,13 +1509,14 @@ function EditTransactionSheet({ categories, wallets, readOnly, transaction, onCh
           <span />
         </header>
         {readOnly ? <p className="offline-warning">Offline storage chưa sẵn sàng. Mở mạng lại để sửa giao dịch.</p> : null}
+        <OperationError failure={operationError} />
         <p className="sheet-meta">{transactionTypeLabel(transaction.type)} · {sourceWallet?.name ?? "Ví"} · {category?.name ?? "Không nhóm"}</p>
         <label className="amount-row"><span>VND</span><input aria-label="Số tiền" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" disabled={readOnly} /></label>
         <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" disabled={readOnly} /></label>
         <button className={excludedFromReports ? "toggle-row active" : "toggle-row"} type="button" disabled={readOnly} onClick={() => setExcludedFromReports((current) => !current)}>Không tính vào báo cáo<span /></button>
         <div className="sheet-actions">
-          <button className="wide-pill destructive" type="button" disabled={readOnly || saving} onClick={() => void archive()}>Lưu trữ</button>
-          <button className="primary-cta" type="button" disabled={readOnly || saving || Number(amount) <= 0} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu thay đổi"}</button>
+          <ActionButton className="wide-pill destructive" disabled={readOnly || saving} onClick={() => void archive()}>Lưu trữ</ActionButton>
+          <ActionButton className="primary-cta" disabled={readOnly || saving || Number(amount) <= 0} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu thay đổi"}</ActionButton>
         </div>
       </section>
     </div>
@@ -1444,37 +1525,54 @@ function EditTransactionSheet({ categories, wallets, readOnly, transaction, onCh
 
 function WalletManagerSheet({
   wallets,
+  categories,
+  online,
   readOnly,
   onWalletChanged,
   onWalletArchived,
+  onCategoryChanged,
   onChanged,
   onClose,
 }: {
   wallets: WalletSummary[];
+  categories: CategorySummary[];
+  online: boolean;
   readOnly: boolean;
   onWalletChanged: (wallet: WalletSummary) => void;
   onWalletArchived: (walletID: string) => void;
-  onChanged: () => void;
+  onCategoryChanged: (category: CategorySummary) => void;
+  onChanged: () => void | Promise<void>;
   onClose: () => void;
 }) {
   const [walletName, setWalletName] = useState("");
   const [walletType, setWalletType] = useState<WalletType>("cash");
   const [creatingWallet, setCreatingWallet] = useState(false);
+  const [categoryName, setCategoryName] = useState("");
+  const [categoryKind, setCategoryKind] = useState<"income" | "expense">("expense");
+  const [categoryParentID, setCategoryParentID] = useState("");
+  const [managerError, setManagerError] = useState<OperationFailure | null>(null);
   const [editingWallets, setEditingWallets] = useState(false);
   const [busy, setBusy] = useState(false);
   const includedWallets = wallets.filter((wallet) => wallet.include_in_total);
   const excludedWallets = wallets.filter((wallet) => !wallet.include_in_total);
   const totalVND = totalIncludedVND(wallets);
-  async function run(action: () => Promise<unknown>) {
-    if (busy) return;
+  async function run(action: () => Promise<unknown>, failureMessage = "Chưa lưu được thay đổi. Dữ liệu đã xác nhận vẫn được giữ lại.", afterSuccess?: () => void) {
+    if (busy) return false;
     setBusy(true);
+    setManagerError(null);
     try {
       await action();
-      onChanged();
+      await onChanged();
+      afterSuccess?.();
+      return true;
+    } catch (error) {
+      setManagerError(operationFailure(error, failureMessage));
+      return false;
     } finally {
       setBusy(false);
     }
   }
+  const createParentOptions = categories.filter((category) => category.kind === categoryKind);
   return (
     <SheetFrame
       title="Ví Của Tôi"
@@ -1534,8 +1632,151 @@ function WalletManagerSheet({
           </section>
         ) : null}
 
+        <section className="manager-section" aria-label="Tạo nhóm giao dịch">
+          <h3>Nhóm giao dịch</h3>
+          <div className="manager-form">
+            <input aria-label="Tên nhóm mới" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} disabled={readOnly || busy} />
+            <Select aria-label="Loại nhóm" value={categoryKind} onChange={(event) => { setCategoryKind(event.target.value as "income" | "expense"); setCategoryParentID(""); }} disabled={readOnly || busy}>
+              <option value="expense">Chi</option><option value="income">Thu</option>
+            </Select>
+            <Select aria-label="Nhóm cha mới" value={categoryParentID} onChange={(event) => setCategoryParentID(event.target.value)} disabled={readOnly || busy}>
+              <option value="">Không có nhóm cha</option>
+              {createParentOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
+            </Select>
+            <button type="button" disabled={readOnly || busy || !categoryName.trim()} onClick={() => void run(async () => {
+              const category = await createCategory({ name: categoryName, kind: categoryKind, ...(categoryParentID ? { parent_id: categoryParentID } : {}) });
+              onCategoryChanged(category);
+            }, "Chưa lưu được thay đổi nhóm. Nội dung và nhóm cha vẫn được giữ để bạn kiểm tra.", () => { setCategoryName(""); setCategoryParentID(""); })}>Tạo nhóm</button>
+          </div>
+          {categories.filter((category) => !category.is_system).map((category) => (
+            <CategoryEditor key={category.id} category={category} categories={categories} readOnly={readOnly} busy={busy} onCategoryChanged={onCategoryChanged} onSave={run} />
+          ))}
+          {categories.filter((category) => category.is_system).map((category) => <p key={category.id}>{category.name} · Nhóm hệ thống</p>)}
+        </section>
+        <OperationError failure={managerError} />
+
+        <WalletCategorySettingsPanel wallets={wallets} online={online} readOnly={readOnly} />
+
     </SheetFrame>
   );
+}
+
+function CategoryEditor({ category, categories, readOnly, busy, onCategoryChanged, onSave }: {
+  category: CategorySummary;
+  categories: CategorySummary[];
+  readOnly: boolean;
+  busy: boolean;
+  onCategoryChanged: (category: CategorySummary) => void;
+  onSave: (action: () => Promise<unknown>, failureMessage?: string) => Promise<boolean>;
+}) {
+  const [name, setName] = useState(category.name);
+  const [parentID, setParentID] = useState(category.parent_id ?? "");
+  const blockedParentIDs = categoryDescendantIDs(category.id, categories);
+  blockedParentIDs.add(category.id);
+  const parentOptions = categories.filter((candidate) => candidate.kind === category.kind && !blockedParentIDs.has(candidate.id));
+  return (
+    <div className="manager-row">
+      <input aria-label={`Tên nhóm ${category.name}`} value={name} onChange={(event) => setName(event.target.value)} disabled={readOnly || busy} />
+      <Select aria-label={`Nhóm cha ${category.name}`} value={parentID} onChange={(event) => setParentID(event.target.value)} disabled={readOnly || busy}>
+        <option value="">Không có nhóm cha</option>
+        {parentOptions.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
+      </Select>
+      <button type="button" aria-label={`Lưu nhóm ${category.name}`} disabled={readOnly || busy || !name.trim()} onClick={() => void onSave(async () => {
+        const updated = await updateCategory(category.id, { name, parent_id: parentID || null, base_version: category.version, current_category: category });
+        onCategoryChanged(updated);
+      }, "Chưa lưu được thay đổi nhóm. Nội dung và nhóm cha vẫn được giữ để bạn kiểm tra.")}>Lưu</button>
+    </div>
+  );
+}
+
+function WalletCategorySettingsPanel({ wallets, online, readOnly }: { wallets: WalletSummary[]; online: boolean; readOnly: boolean }) {
+  const [walletID, setWalletID] = useState(wallets[0]?.id ?? "");
+  const [settings, setSettings] = useState<WalletCategorySetting[] | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busyCategoryID, setBusyCategoryID] = useState<string | null>(null);
+  const [failure, setFailure] = useState<OperationFailure | null>(null);
+  const generation = useRef(0);
+
+  async function reload() {
+    if (!walletID || !online) return;
+    const currentGeneration = ++generation.current;
+    setLoading(true);
+    setFailure(null);
+    try {
+      const next = await loadWalletCategorySettings(walletID);
+      if (currentGeneration === generation.current) setSettings(next);
+    } catch (error) {
+      if (currentGeneration === generation.current) setFailure(operationFailure(error, "Chưa tải được cài đặt nhóm theo ví. Trạng thái đã xác nhận vẫn được giữ lại."));
+    } finally {
+      if (currentGeneration === generation.current) setLoading(false);
+    }
+  }
+
+  useEffect(() => {
+    if (!online || !walletID) {
+      ++generation.current;
+      setLoading(false);
+      return;
+    }
+    void reload();
+    return () => { ++generation.current; };
+  }, [walletID, online]);
+
+  async function toggle(setting: WalletCategorySetting) {
+    if (!online || readOnly || loading || busyCategoryID) return;
+    setBusyCategoryID(setting.id);
+    setFailure(null);
+    try {
+      await setWalletCategoryActive(walletID, setting.id, !setting.active);
+      await reload();
+    } catch (error) {
+      setFailure(operationFailure(error, "Chưa cập nhật được cài đặt nhóm. Trạng thái đã xác nhận vẫn được giữ; hãy tải lại."));
+    } finally {
+      setBusyCategoryID(null);
+    }
+  }
+
+  return (
+    <section className="manager-section" aria-label="Cài đặt nhóm theo ví">
+      <h3>Nhóm theo ví</h3>
+      {wallets.length > 0 ? (
+        <Select aria-label="Ví cài đặt nhóm" value={walletID} onChange={(event) => { setWalletID(event.target.value); setSettings(null); setFailure(null); }} disabled={loading || busyCategoryID != null}>
+          {wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}
+        </Select>
+      ) : <p className="empty-state">Tạo ví trước khi cài đặt nhóm</p>}
+      {!online ? <p className="offline-warning neutral">Cần online để tải và thay đổi cài đặt nhóm theo ví.</p> : null}
+      {loading ? <p role="status">Đang tải cài đặt nhóm…</p> : null}
+      <OperationError failure={failure} onRetry={() => { void reload(); }} retryLabel="Tải lại cài đặt nhóm" busy={loading || busyCategoryID != null} />
+      {settings?.map((setting) => (
+        <div className="manager-row" key={setting.id}>
+          <span>{setting.name}</span>
+          <button
+            type="button"
+            className={setting.active ? "mini-toggle active" : "mini-toggle"}
+            aria-label={`${setting.name} đang ${setting.active ? "bật" : "tắt"}`}
+            aria-pressed={setting.active}
+            disabled={!online || readOnly || loading || busyCategoryID != null}
+            onClick={() => void toggle(setting)}
+          >{busyCategoryID === setting.id ? "Đang lưu" : setting.active ? "Bật" : "Tắt"}</button>
+        </div>
+      ))}
+    </section>
+  );
+}
+
+function categoryDescendantIDs(categoryID: string, categories: CategorySummary[]) {
+  const descendants = new Set<string>();
+  const pending = [categoryID];
+  while (pending.length > 0) {
+    const parentID = pending.shift();
+    for (const category of categories) {
+      if (category.parent_id === parentID && !descendants.has(category.id)) {
+        descendants.add(category.id);
+        pending.push(category.id);
+      }
+    }
+  }
+  return descendants;
 }
 
 function WalletManageRow({
@@ -1555,7 +1796,7 @@ function WalletManageRow({
   editMode: boolean;
   onWalletChanged: (wallet: WalletSummary) => void;
   onWalletArchived: (walletID: string) => void;
-  onChanged: (action: () => Promise<unknown>) => Promise<void>;
+  onChanged: (action: () => Promise<unknown>) => Promise<unknown>;
 }) {
   const [name, setName] = useState(wallet.name);
   const [include, setInclude] = useState(wallet.include_in_total);
@@ -1581,40 +1822,6 @@ function WalletManageRow({
   );
 }
 
-function WalletRow({ icon, name, amount, onClick }: { icon: string; name: string; amount: string; onClick?: () => void }) {
-  return <button className="wallet-row" type="button" onClick={onClick}><span>{icon}</span><strong>{name}</strong><b>{amount}</b></button>;
-}
-
-function WalletDetailPanel({ detail, onClose, privacyMasked }: { detail: WalletDetail; onClose: () => void; privacyMasked: boolean }) {
-  return <section className="card wallet-detail" aria-label={`Chi tiết ${detail.wallet.name}`}><div className="section-title"><h2>{detail.wallet.name}</h2><button type="button" onClick={onClose}>Đóng</button></div><p>Trạng thái: {detail.wallet.include_in_total ? "Đang tính tổng" : "Không tính tổng"}</p><strong>{privacyMasked ? "••••••" : formatVND(detail.wallet.balance_vnd)}</strong>{detail.transactions.length === 0 ? <p className="empty-state">Chưa có giao dịch</p> : detail.transactions.map((transaction) => <div className="search-result" key={transaction.id}><span>{transaction.note || "Giao dịch"}</span><b>{privacyMasked ? "••••••" : formatVND(transaction.amount_vnd)}</b></div>)}</section>;
-}
-
-function TransactionRow({ title, subtitle, amount, positive = false, onClick }: { title: string; subtitle: string; amount: string; positive?: boolean; onClick?: () => void }) {
-  return <button className="transaction-row" type="button" onClick={onClick}><span className="category-dot" /><div><strong>{title}</strong><p>{subtitle}</p></div><b className={positive ? "income" : "expense"}>{amount}</b><ChevronRight size={22} /></button>;
-}
-
-function BudgetRow({ item, categories, disabled, onEdit }: { item: BudgetProgress; categories: CategorySummary[]; disabled: boolean; onEdit: () => void }) {
-  const categoryNames = item.budget.all_categories ? "Tất cả nhóm chi" : (item.budget.category_ids ?? []).map((id) => categories.find((category) => category.id === id)?.name ?? "Nhóm").join(", ");
-  const progress = Math.min(100, item.percent);
-  return (
-    <button className="card budget-row" type="button" disabled={disabled} onClick={onEdit}>
-      <div><span className="category-dot" /><strong>{item.budget.name}</strong></div>
-      <b>{formatVND(item.budget.amount_vnd)}</b>
-      <p>{categoryNames}</p>
-      <p>Đã chi {formatVND(item.spent_vnd)} · Còn {formatVND(item.remaining_vnd)}</p>
-      <span className="progress"><i style={{ width: `${progress}%` }} /></span>
-      {item.alert_100 ? <small className="budget-alert">Đã vượt 100%</small> : item.alert_80 ? <small className="budget-alert">Đã chạm 80%</small> : null}
-    </button>
-  );
-}
-
-function SheetRow({ icon, label, muted = false, green = false }: { icon: ReactNode; label: string; muted?: boolean; green?: boolean }) {
-  return <button className={muted ? "sheet-row muted" : green ? "sheet-row green" : "sheet-row"} type="button">{icon}<span>{label}</span><ChevronRight size={22} /></button>;
-}
-
-function SectionHeading({ title, action, actionLabel, onAction }: { title: string; action: ReactNode; actionLabel?: string; onAction?: () => void }) {
-  return <div className="section-heading"><h2>{title}</h2><button type="button" aria-label={actionLabel} onClick={onAction}>{action}</button></div>;
-}
 
 function formatVND(amount: number) {
   return `${new Intl.NumberFormat("vi-VN").format(amount)} đ`;
@@ -1719,40 +1926,10 @@ function budgetPeriodLabel(period: BudgetPeriodType) {
   }
 }
 
-function buildTransactionInput({
-  type,
-  amount,
-  sourceWalletID,
-  categoryID,
-  note,
-  excludedFromReports,
-  occurredOn,
-  receiptObjectID,
-}: {
-  type: "expense" | "income";
-  amount: string;
-  sourceWalletID: string;
-  categoryID: string;
-  note: string;
-  excludedFromReports: boolean;
-  occurredOn: string;
-  receiptObjectID?: string;
-}): TransactionInput {
-  return {
-    type,
-    source_wallet_id: sourceWalletID,
-    category_id: categoryID,
-    receipt_object_id: receiptObjectID,
-    amount_vnd: Number(amount),
-    target_balance_vnd: null,
-    occurred_at: new Date(`${occurredOn}T12:00:00`).toISOString(),
-    note,
-    excluded_from_reports: excludedFromReports,
-  };
-}
-
-function quickAddTypeLabel(type: "expense" | "income" | "debt") {
+function quickAddTypeLabel(type: "expense" | "income" | "debt" | "transfer") {
   switch (type) {
+    case "transfer":
+      return "Chuyển ví";
     case "income":
       return "Khoản thu";
     case "debt":

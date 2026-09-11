@@ -5,6 +5,7 @@ import {
   archiveOfflineTransaction,
   enqueueMutation,
   initializeOfflineStore,
+  initializeOfflineStoreForUser,
   listOpenConflicts,
   markMutationsSynced,
   readOfflineSnapshot,
@@ -56,6 +57,24 @@ describe("offline IndexedDB store", () => {
     expect(snapshot.categories[0].name).toBe("Food");
     expect(snapshot.transactions).toEqual([]);
     expect(snapshot.tombstones[0]).toMatchObject({ entity_type: "transaction", entity_id: "tx_1", version: 3 });
+  });
+
+  it("isolates snapshots and preserves pending work when switching users", async () => {
+    await initializeOfflineStoreForUser("user-a");
+    await saveFinanceMirror({
+      userID: "user-a",
+      wallets: [{ id: "wallet-a", name: "A", type: "cash", balance_vnd: 100000, include_in_total: true, is_default_ai: true, version: 1 }],
+    });
+    await enqueueMutation({ entity_type: "wallet", entity_id: "pending-a", operation: "create", base_version: 0, payload: { name: "Pending A" } });
+
+    const snapshot = await initializeOfflineStoreForUser("user-b");
+
+    expect(snapshot.mode).toBe("ready");
+    expect(snapshot.wallets).toEqual([]);
+    expect(snapshot.outbox).toEqual([]);
+    const restored = await initializeOfflineStoreForUser("user-a");
+    expect(restored.wallets[0]?.id).toBe("wallet-a");
+    expect(restored.outbox).toHaveLength(1);
   });
 
   it("keeps outbox sequence monotonic after synced mutations are removed", async () => {

@@ -1,9 +1,18 @@
 import { describe, expect, it, vi } from "vitest";
-import { queueCategoryCreate, queueWalletCreate } from "../offline/outbox";
+import { queueCategoryCreate, queueWalletCategoryActive, queueWalletCreate } from "../offline/outbox";
 import { readOfflineSnapshot } from "../offline/db";
 import { drainOutbox, queueTransaction, readOutbox } from "./outbox";
 
 describe("transaction outbox", () => {
+  it("retains mutation identity after an ambiguous sync failure without creating a second transaction", async () => {
+    await queueTransaction({ type: "expense", source_wallet_id: "wallet_1", amount_vnd: 42000, occurred_at: "2026-09-10T00:00:00Z" });
+    const before = (await readOfflineSnapshot()).outbox;
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new TypeError("response lost after commit"); }));
+    const directCreate = vi.fn(async () => undefined);
+    expect(await drainOutbox(directCreate)).toBe(0);
+    expect(directCreate).not.toHaveBeenCalled();
+    expect((await readOfflineSnapshot()).outbox).toEqual(before);
+  });
   it("stores an optimistic transaction for offline replay", async () => {
     const transaction = await queueTransaction({ type: "expense", source_wallet_id: "wallet_1", amount_vnd: 42000, occurred_at: "2026-08-31T00:00:00Z", note: "Offline coffee" });
     expect(transaction.version).toBe(0);
@@ -16,7 +25,12 @@ describe("transaction outbox", () => {
     await queueTransaction({ type: "expense", source_wallet_id: "wallet_1", amount_vnd: 1, occurred_at: "2026-08-31T00:00:00Z" });
     await queueTransaction({ type: "expense", source_wallet_id: "wallet_1", amount_vnd: 2, occurred_at: "2026-08-31T00:00:00Z" });
     const amounts: number[] = [];
-    expect(await drainOutbox(async (input) => { amounts.push(Number(input.amount_vnd)); })).toBe(2);
+    vi.stubGlobal("fetch", vi.fn(async (_url: RequestInfo | URL, init?: RequestInit) => {
+      const { mutations } = JSON.parse(String(init?.body));
+      amounts.push(...mutations.map((item: { payload: { amount_vnd: number } }) => item.payload.amount_vnd));
+      return new Response(JSON.stringify({ status: "ok", results: mutations.map((item: { mutation_id: string; entity_type: string; entity_id: string; operation: string }) => ({ ...item, payload: undefined, state: "applied" })) }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }));
+    expect(await drainOutbox(async () => undefined)).toBe(2);
     expect(amounts).toEqual([1, 2]);
     expect(await readOutbox()).toHaveLength(0);
   });
@@ -87,5 +101,36 @@ describe("transaction outbox", () => {
     const snapshot = await readOfflineSnapshot();
     expect(snapshot.conflicts).toHaveLength(1);
     expect(await readOutbox()).toHaveLength(1);
+  });
+
+  it("does not overwrite a cached category with category-activation payload", async () => {
+    const category = await queueCategoryCreate({ name: "Ăn uống", kind: "expense" });
+    await queueWalletCategoryActive("wallet_1", category.id, false);
+    const outbox = (await readOfflineSnapshot()).outbox;
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      status: "ok",
+      correlation_id: "req_test",
+      results: outbox.map((mutation) => mutation.operation === "create" ? {
+        mutation_id: mutation.mutation_id,
+        entity_type: "category",
+        entity_id: category.id,
+        operation: "create",
+        state: "applied",
+        version: 1,
+        payload: { ...category, version: 1 },
+      } : {
+        mutation_id: mutation.mutation_id,
+        entity_type: "category",
+        entity_id: category.id,
+        operation: "set_category_active",
+        state: "applied",
+        version: 0,
+        payload: { wallet_id: "wallet_1", active: false },
+      }),
+    }), { status: 200, headers: { "Content-Type": "application/json" } })));
+
+    expect(await drainOutbox(async () => undefined)).toBe(2);
+    const snapshot = await readOfflineSnapshot();
+    expect(snapshot.categories).toEqual([expect.objectContaining({ id: category.id, name: "Ăn uống", kind: "expense", version: 1 })]);
   });
 });

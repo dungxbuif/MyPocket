@@ -10,8 +10,11 @@ import { GaugeArcSummary } from "../components/charts/GaugeArcSummary";
 import { ProgressBarWithMarker } from "../components/charts/ProgressBarWithMarker";
 import { ComparisonBarChart } from "../components/charts/ComparisonBarChart";
 import { WalletFilterChip } from "../components/navigation/WalletFilterChip";
+import { WalletRow } from "../components/finance/WalletRow";
+import { TransactionRow } from "../components/finance/TransactionRow";
 import { ExpenseDetailSheet } from "../screens/sheets/ExpenseDetailSheet";
 import { WalletPickerSheet } from "../screens/sheets/WalletPickerSheet";
+import { buildDailyExpenseBars } from "../screens/OverviewScreen";
 
 describe("Base UI Components & Charts", () => {
   it("renders AmountInputHero with VND currency badge and numeric input", async () => {
@@ -136,9 +139,46 @@ describe("Base UI Components & Charts", () => {
     expect(screen.getByText("250.000 đ")).toBeInTheDocument();
   });
 
+  it("derives overview bars from report expenses instead of sample chart values", () => {
+    const bars = buildDailyExpenseBars({
+      summary: { income_vnd: 0, expense_vnd: 300000, net_income_vnd: -300000, generated_at: "", timezone: "Asia/Ho_Chi_Minh", from: "", to: "", data_version: 1 },
+      daily: [
+        { date: "2026-09-01", income_vnd: 0, expense_vnd: 120000, net_income_vnd: -120000, cumulative_net_vnd: -120000 },
+        { date: "2026-09-02", income_vnd: 0, expense_vnd: 180000, net_income_vnd: -180000, cumulative_net_vnd: -300000 },
+      ],
+    }, new Date("2026-09-01T17:00:00Z"));
+
+    expect(bars).toEqual([
+      { label: "01/09", amount: 120000, amountFormatted: "120.000 đ" },
+      { label: "02/09", amount: 180000, amountFormatted: "180.000 đ", isCurrent: true },
+    ]);
+  });
+
   it("renders WalletFilterChip with wallet title", () => {
     render(<WalletFilterChip walletName="Techcombank" />);
     expect(screen.getByText("Techcombank")).toBeInTheDocument();
+  });
+
+  it("activates a reusable wallet row from the keyboard", async () => {
+    const onClick = vi.fn();
+    render(<WalletRow id="wallet_1" name="Ví tiền mặt" balance={250000} type="cash" onClick={onClick} />);
+
+    const row = screen.getByRole("button", { name: /ví tiền mặt/i });
+    row.focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(onClick).toHaveBeenCalledOnce();
+  });
+
+  it("activates a reusable transaction row from the keyboard", async () => {
+    const onClick = vi.fn();
+    render(<TransactionRow id="transaction_1" categoryName="Ăn uống" amount={-120000} onClick={onClick} />);
+
+    const row = screen.getByRole("button", { name: /ăn uống/i });
+    row.focus();
+    await userEvent.keyboard("{Enter}");
+
+    expect(onClick).toHaveBeenCalledOnce();
   });
 
   it("renders ExpenseDetailSheet with donut breakdown and close button", async () => {

@@ -13,9 +13,10 @@ test("mobile finance CRUD works through the live API", async ({ page }) => {
 
   await page.getByRole("button", { name: "Xem tất cả" }).click();
   await expect(page.getByRole("dialog", { name: "Ví Của Tôi" })).toBeVisible();
+  await page.getByRole("button", { name: "Thêm ví", exact: true }).click();
   await page.getByLabel("Tên ví mới").fill(walletName);
   await page.getByRole("button", { name: "Tạo ví" }).click();
-  await expect(page.getByLabel(`Tên ví ${walletName}`)).toBeVisible();
+  await expect(page.getByRole("dialog").locator("strong").filter({ hasText: walletName })).toBeVisible();
 
   await page.getByLabel("Tên nhóm mới").fill(categoryName);
   await page.getByRole("button", { name: "Tạo nhóm" }).click();

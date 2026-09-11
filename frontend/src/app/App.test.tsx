@@ -1,12 +1,189 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { enqueueMutation, saveFinanceMirror, saveOfflineConflict } from "../offline/db";
 import { App } from "./App";
 import { readOutbox } from "./outbox";
+import * as offlineDB from "../offline/db";
 
 describe("App shell", () => {
+  async function openReceiptForm() {
+    const fetcher = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [] },
+    });
+    render(<App />);
+    await screen.findByText("Ví API");
+    await userEvent.click(screen.getByRole("button", { name: "Thêm giao dịch" }));
+    return fetcher;
+  }
+
+  it("keeps receipt selection visible without opening details and after cancelling the picker", async () => {
+    await openReceiptForm();
+    const input = screen.getByLabelText("Ảnh đính kèm") as HTMLInputElement;
+    await userEvent.upload(input, new File(["receipt"], "bill.png", { type: "image/png" }));
+    expect(screen.getByRole("status")).toHaveTextContent("bill.png");
+    await userEvent.click(screen.getByRole("button", { name: "Thêm chi tiết" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ẩn chi tiết" }));
+    fireEvent.change(input, { target: { files: [] } });
+    expect(screen.getByRole("status")).toHaveTextContent("bill.png");
+  });
+
+  it("lets the user remove and reselect the same receipt", async () => {
+    await openReceiptForm();
+    const input = screen.getByLabelText("Ảnh đính kèm") as HTMLInputElement;
+    const file = new File(["receipt"], "same.png", { type: "image/png" });
+    await userEvent.upload(input, file);
+    await userEvent.click(screen.getByRole("button", { name: "Bỏ ảnh" }));
+    expect(screen.queryByText(/same.png/)).not.toBeInTheDocument();
+    await userEvent.upload(input, file);
+    expect(screen.getByRole("status")).toHaveTextContent("same.png");
+  });
+
+  it("links the selected receipt to exactly the queued offline transaction", async () => {
+    await openReceiptForm();
+    await userEvent.upload(screen.getByLabelText("Ảnh đính kèm"), new File(["receipt"], "offline.png", { type: "image/png" }));
+    await userEvent.type(screen.getByLabelText("Số tiền"), "23000");
+    mockNavigatorOnline(false);
+    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Thêm Giao Dịch" })).not.toBeInTheDocument());
+    const transactions = await offlineDB.readPendingMutations();
+    const receipts = await offlineDB.readPendingReceiptUploads();
+    expect(transactions).toHaveLength(1);
+    expect(receipts).toHaveLength(1);
+    expect(transactions[0]).toMatchObject({ entity_type: "transaction", operation: "create", payload: { amount_vnd: 23000 } });
+    expect(receipts[0]).toMatchObject({ transaction_id: transactions[0].entity_id, filename: "offline.png", content_type: "image/png" });
+  });
+
+  it("does not silently discard an income or expense receipt when switching to debt", async () => {
+    await openReceiptForm();
+    await userEvent.upload(screen.getByLabelText("Ảnh đính kèm"), new File(["receipt"], "keep.png", { type: "image/png" }));
+    await userEvent.type(screen.getByLabelText("Số tiền"), "23000");
+    await userEvent.click(screen.getByRole("button", { name: "Vay/nợ" }));
+    await userEvent.type(screen.getByLabelText("Đối tác"), "Lan");
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Đính kèm ảnh" })).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("keep.png");
+    expect(screen.getByText(/Ảnh chỉ hỗ trợ/)).toBeVisible();
+    await userEvent.click(screen.getByRole("button", { name: "Bỏ ảnh" }));
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeEnabled();
+  });
+
+  it("locks receipt controls and transaction type while a save is pending", async () => {
+    const fetcher = await openReceiptForm();
+    const base = fetcher.getMockImplementation()!;
+    let finish!: () => void;
+    fetcher.mockImplementation(async (url, options) => {
+      if (String(url).endsWith('/transactions') && options?.method === 'POST') {
+        await new Promise<void>(resolve => { finish = resolve; });
+        return jsonResponse({ transaction: { id: "saved", ...JSON.parse(String(options.body)), balance_after_vnd: 965000, version: 1 } });
+      }
+      return base(url, options);
+    });
+    await userEvent.type(screen.getByLabelText("Số tiền"), "23000");
+    await userEvent.click(screen.getByRole("button", { name: "Thêm chi tiết" }));
+    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+    expect(screen.getByRole("button", { name: "Đính kèm ảnh" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Thêm Hình Ảnh" })).toBeDisabled();
+    expect(screen.getByLabelText("Ảnh đính kèm")).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Vay/nợ" })).toBeDisabled();
+    await act(async () => { finish(); });
+  });
+
+  it("locks selected receipt controls when storage-degraded mode goes offline", async () => {
+    await openReceiptForm();
+    await userEvent.upload(screen.getByLabelText("Ảnh đính kèm"), new File(["receipt"], "read-only.png", { type: "image/png" }));
+    await userEvent.click(screen.getByRole("button", { name: "Thêm chi tiết" }));
+    vi.stubGlobal("indexedDB", undefined);
+    await act(async () => { mockNavigatorOnline(false); window.dispatchEvent(new Event("offline")); });
+    await screen.findByText("Offline storage chưa sẵn sàng. Mở mạng lại để lưu giao dịch.");
+    expect(screen.getByRole("button", { name: "Đính kèm ảnh" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Đổi ảnh" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Bỏ ảnh" })).toBeDisabled();
+    expect(screen.getByLabelText("Ảnh đính kèm")).toBeDisabled();
+    expect(screen.getByRole("status")).toHaveTextContent("read-only.png");
+  });
+
+  it("marks unsupported quick-add details as unavailable rather than inert actions", async () => {
+    await openReceiptForm();
+    await userEvent.click(screen.getByRole("button", { name: "Thêm chi tiết" }));
+    for (const label of ["Với", "Đặt vị trí", "Chọn sự kiện", "Đặt nhắc nhở"]) {
+      const button = screen.getByRole("button", { name: new RegExp(label) });
+      expect(button).toBeDisabled();
+      expect(button).toHaveTextContent("Chưa hỗ trợ trong form này");
+    }
+  });
+
+  it("does not recreate a saved offline transaction when its receipt queue fails", async () => {
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [] },
+    });
+    render(<App />);
+    await screen.findByText("Ví API");
+    await userEvent.click(screen.getByRole("button", { name: "Thêm giao dịch" }));
+    await userEvent.type(screen.getByLabelText("Số tiền"), "12000");
+    await userEvent.click(screen.getByRole("button", { name: "Thêm chi tiết" }));
+    await userEvent.upload(document.getElementById("receipt-image") as HTMLInputElement, new File(["receipt"], "bill.png", { type: "image/png" }));
+    vi.spyOn(offlineDB, "queueReceiptUpload").mockRejectedValue(new DOMException("Quota exceeded", "QuotaExceededError"));
+    mockNavigatorOnline(false);
+    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("Giao dịch đã lưu");
+    expect(screen.getByRole("button", { name: "Lưu" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Đính kèm ảnh" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Đổi ảnh" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Bỏ ảnh" })).toBeDisabled();
+    expect(screen.getByLabelText("Ảnh đính kèm")).toBeDisabled();
+    expect(await readOutbox()).toHaveLength(1);
+    expect((await readOutbox())[0].input).toMatchObject({ type: "expense", amount_vnd: 12000 });
+  });
+
+  it.each(["create", "edit", "archive"])("preserves the transaction form and reports a rejected %s without automatic retry", async operation => {
+    const transaction = { id: "tx_error", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 988000, occurred_at: "2026-09-09T00:00:00Z", note: "Giữ ghi chú", with_person: "", event_ref: "", excluded_from_reports: false, version: 1 };
+    const fetcher = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [transaction] },
+    });
+    const base = fetcher.getMockImplementation()!;
+    fetcher.mockImplementation(async (url, options) => options?.method && String(url).includes('/transactions')
+      ? jsonResponse({ status: "error", error: { code: "VALIDATION_FAILED", message: "RAW_NOT_FOR_UI" }, correlation_id: "req_transaction_failure" }, 422)
+      : base(url, options));
+    render(<App />);
+    await screen.findByText("Ví API");
+    if (operation === "create") {
+      await userEvent.click(screen.getByRole("button", { name: "Thêm giao dịch" }));
+      await userEvent.type(screen.getByLabelText("Số tiền"), "12000");
+      await userEvent.type(screen.getByLabelText("Ghi chú"), "Giữ ghi chú");
+    } else {
+      await userEvent.click(screen.getByRole("button", { name: "Sổ giao dịch" }));
+      await userEvent.click(await screen.findByRole("button", { name: /Giữ ghi chú/ }));
+    }
+    await userEvent.click(screen.getByRole("button", { name: operation === "create" ? "Lưu" : operation === "edit" ? "Lưu thay đổi" : "Lưu trữ" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("req_transaction_failure");
+    expect(screen.getByLabelText("Số tiền")).toHaveValue("12000");
+    expect(screen.getByLabelText("Ghi chú")).toHaveValue("Giữ ghi chú");
+    expect(screen.queryByText("RAW_NOT_FOR_UI")).not.toBeInTheDocument();
+    expect(fetcher.mock.calls.filter(([url, options]) => options?.method && String(url).includes('/transactions'))).toHaveLength(1);
+  });
+
+  it("does not submit the previous owner's queued wallet after account switching", async () => {
+    await saveFinanceMirror({ userID: "previous-owner", wallets: [] });
+    await enqueueMutation({ entity_type: "wallet", entity_id: "private-wallet", operation: "create", base_version: 0, payload: { name: "Private previous owner", type: "cash" } });
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } },
+      "/api/v1/wallets": { wallets: [] }, "/api/v1/categories": { categories: [] }, "/api/v1/transactions": { transactions: [] },
+    });
+    render(<App />);
+    await waitFor(async () => expect(await readOutbox()).toEqual([]));
+    expect(fetchMock.mock.calls.filter(([input]) => String(input).includes("/sync/mutations"))).toHaveLength(0);
+  });
   afterEach(() => {
     mockNavigatorOnline(true);
     vi.unstubAllGlobals();
@@ -23,6 +200,100 @@ describe("App shell", () => {
     expect(screen.getByLabelText("Thêm giao dịch")).toBeInTheDocument();
     expect(screen.getByLabelText("Ngân sách")).toBeInTheDocument();
     expect(screen.getByLabelText("Tài khoản")).toBeInTheDocument();
+  });
+
+  it("renders the renewed product shell with a distinct operating desk header", async () => {
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [] },
+      "/api/v1/categories": { categories: [] },
+      "/api/v1/transactions": { transactions: [] },
+    });
+    render(<App />);
+
+    expect(await screen.findByText("Money Command")).toBeInTheDocument();
+    expect(screen.getByText("Today Desk")).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Điều hướng chính" })).toHaveClass("dock-nav");
+  });
+
+  it("shows a bottom-corner PWA install prompt when the browser offers installation", async () => {
+    mockFetchRoutes({ "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } } });
+    render(<App />);
+    const installEvent = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: "accepted" }),
+    });
+
+    window.dispatchEvent(installEvent);
+
+    expect(await screen.findByRole("dialog", { name: "Cài MyPocket" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Cài ứng dụng" }));
+    expect(installEvent.prompt).toHaveBeenCalledOnce();
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Cài MyPocket" })).not.toBeInTheDocument());
+  });
+
+  it.each(["dismissed", "rejected"])("keeps install help recoverable after native prompt is %s", async outcome => {
+    mockFetchRoutes({ "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } } });
+    render(<App />);
+    const installEvent = Object.assign(new Event("beforeinstallprompt", { cancelable: true }), {
+      prompt: outcome === "rejected" ? vi.fn().mockRejectedValue(new Error("browser failure")) : vi.fn().mockResolvedValue(undefined),
+      userChoice: Promise.resolve({ outcome: "dismissed" }),
+    });
+    window.dispatchEvent(installEvent);
+    await userEvent.click(await screen.findByRole("button", { name: "Cài ứng dụng" }));
+    if (outcome === "rejected") expect(await screen.findByRole("alert")).toHaveTextContent("Không mở được cài đặt");
+    await userEvent.click(await screen.findByRole("button", { name: "Cài ứng dụng" }));
+    expect(screen.getByText("Safari: Chia sẻ → Thêm vào Màn hình chính")).toBeInTheDocument();
+    expect(installEvent.prompt).toHaveBeenCalledOnce();
+    await userEvent.click(screen.getByRole("button", { name: "Để sau" }));
+    expect(screen.queryByRole("dialog", { name: "Cài MyPocket" })).not.toBeInTheDocument();
+  });
+
+  it("shows iPhone installation instructions when no native install prompt is available", async () => {
+    mockFetchRoutes({ "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } } });
+    render(<App />);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Cài ứng dụng" }));
+
+    expect(screen.getByText("Safari: Chia sẻ → Thêm vào Màn hình chính")).toBeInTheDocument();
+  });
+
+  it("allows dismissing installation help without losing account navigation", async () => {
+    mockFetchRoutes({ "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } } });
+    render(<App />);
+    await userEvent.click(await screen.findByRole("button", { name: "Để sau" }));
+    expect(screen.queryByRole("dialog", { name: "Cài MyPocket" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Tài khoản" }));
+    expect(screen.getByRole("button", { name: "Đăng xuất" })).toBeInTheDocument();
+  });
+
+  it("removes the install suggestion after appinstalled", async () => {
+    mockFetchRoutes({ "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } } });
+    render(<App />);
+    await screen.findByRole("dialog", { name: "Cài MyPocket" });
+    window.dispatchEvent(new Event("appinstalled"));
+    await waitFor(() => expect(screen.queryByRole("dialog", { name: "Cài MyPocket" })).not.toBeInTheDocument());
+  });
+
+  it("does not suggest installing when already running standalone", async () => {
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query === "(display-mode: standalone)", addEventListener: vi.fn(), removeEventListener: vi.fn() }));
+    mockFetchRoutes({ "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } } });
+    render(<App />);
+    await screen.findByRole("navigation");
+    expect(screen.queryByRole("dialog", { name: "Cài MyPocket" })).not.toBeInTheDocument();
+  });
+
+  it("renders the overview expense chart from the daily API report", async () => {
+    mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [] }, "/api/v1/categories": { categories: [] }, "/api/v1/transactions": { transactions: [] },
+      "/api/v1/reports/daily": { report: { summary: { income_vnd: 0, expense_vnd: 42000, net_income_vnd: -42000, generated_at: "2026-09-08T00:00:00Z", timezone: "Asia/Ho_Chi_Minh", from: "2026-09-01", to: "2026-09-08", data_version: 1 }, daily: [{ date: "2026-09-07", income_vnd: 0, expense_vnd: 42000, net_income_vnd: -42000, cumulative_net_vnd: -42000 }] } },
+    });
+
+    render(<App />);
+
+    expect((await screen.findAllByText("42.000 đ")).length).toBeGreaterThan(1);
+    expect(screen.getByText("07/09")).toBeInTheDocument();
   });
 
   it("shows offline state when the browser is offline", async () => {
@@ -128,6 +399,7 @@ describe("App shell", () => {
   it("hydrates cached finance data and queues a transaction while offline", async () => {
     mockNavigatorOnline(false);
     await saveFinanceMirror({
+      userID: "user_123",
       wallets: [{ id: "wallet_cached", name: "Ví cached", type: "cash", balance_vnd: 880000, include_in_total: true, is_default_ai: true, version: 3 }],
       categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống cached", is_system: false, version: 1 }],
       transactions: [{ id: "tx_cached", type: "expense", source_wallet_id: "wallet_cached", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 868000, occurred_at: "2026-08-31T00:00:00Z", note: "Cached lunch", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }],
@@ -213,6 +485,7 @@ describe("App shell", () => {
     });
     vi.stubGlobal("fetch", fetchMock);
     render(<App />);
+    await waitFor(() => expect(screen.getByLabelText("Thêm giao dịch")).toBeEnabled());
     await userEvent.click(await screen.findByLabelText("Thêm giao dịch"));
     await userEvent.type(await screen.findByLabelText("Số tiền"), "50000");
     await userEvent.type(screen.getByLabelText("Ghi chú"), "Ăn sáng");
@@ -252,6 +525,7 @@ describe("App shell", () => {
       if (path === "/api/v1/transactions/tx_1" && options?.method === "PATCH") {
         const body = JSON.parse(String(options.body));
         expect(body.note).toBe("Cà phê chiều");
+        expect(body.base_version).toBe(1);
         return jsonResponse({ transaction: { id: "tx_1", ...body, balance_after_vnd: 850000, version: 2 } });
       }
       if (path === "/api/v1/transactions/tx_1/archive" && options?.method === "POST") return jsonResponse({});
@@ -274,6 +548,7 @@ describe("App shell", () => {
 
   it("shows conflict inbox and lets the user keep the server version", async () => {
     await saveFinanceMirror({
+      userID: "user_123",
       wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 }],
       categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }],
       transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 988000, occurred_at: "2026-08-31T00:00:00Z", note: "Server note", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }],
@@ -335,7 +610,7 @@ describe("App shell", () => {
     await userEvent.click(await screen.findByLabelText("Ngân sách"));
     expect((await screen.findAllByText("Ăn uống")).length).toBeGreaterThan(0);
     expect(screen.getByText("Đã chạm 80%")).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Tạo", exact: true }));
+    await userEvent.click(screen.getByRole("button", { name: "Tạo" }));
     await userEvent.type(await screen.findByLabelText("Tên ngân sách"), "Mua sắm");
     await userEvent.type(screen.getByLabelText("Số tiền ngân sách"), "1200000");
     await userEvent.click(screen.getAllByRole("button", { name: "Lưu" }).at(-1)!);
@@ -369,7 +644,7 @@ describe("App shell", () => {
     expect(screen.getByText("3.500.000 đ · Chờ duyệt")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Tạo sự kiện" }));
     await userEvent.type(await screen.findByLabelText("Tên sự kiện"), "Du lịch Huế");
-    await userEvent.click(screen.getAllByRole("button", { name: "Lưu", exact: true }).at(-1)!);
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu" }).at(-1)!);
 
     await waitFor(() => {
       const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/events" && options?.method === "POST");
@@ -395,7 +670,7 @@ describe("App shell", () => {
     await userEvent.click(screen.getByRole("button", { name: "Tạo lịch" }));
     await userEvent.type(await screen.findByLabelText("Tên lịch lặp"), "Tiền nhà");
     await userEvent.type(screen.getByLabelText("Số tiền lịch lặp"), "3500000");
-    await userEvent.click(screen.getAllByRole("button", { name: "Lưu", exact: true }).at(-1)!);
+    await userEvent.click(screen.getAllByRole("button", { name: "Lưu" }).at(-1)!);
 
     await waitFor(() => {
       const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/recurring-schedules" && options?.method === "POST");

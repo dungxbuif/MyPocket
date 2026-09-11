@@ -4,8 +4,17 @@ export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
 }
 
+// For existing class-based controls: shared native semantics without restyling.
+export function ActionButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <button type="button" {...props} />;
+}
+
 export function Card({ className, ...props }: HTMLAttributes<HTMLElement>) {
   return <section className={cx("card", className)} {...props} />;
+}
+
+export function ActionCard({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
+  return <button type="button" className={cx("card w-full text-left disabled:cursor-not-allowed", className)} {...props} />;
 }
 
 export function PillButton({ className, ...props }: ButtonHTMLAttributes<HTMLButtonElement>) {
@@ -23,6 +32,7 @@ export function SheetFrame({
   trailing,
   className,
   headerClassName,
+  footer,
   children,
 }: {
   title: string;
@@ -31,17 +41,18 @@ export function SheetFrame({
   trailing: ReactNode;
   className?: string;
   headerClassName?: string;
+  footer?: ReactNode;
   children: ReactNode;
 }) {
   return (
     <div className="sheet-backdrop">
-      <section className={cx("transaction-sheet", className)} role="dialog" aria-modal="true" aria-label={label ?? title}>
+      <section className={cx("transaction-sheet", footer != null && "sheet-with-footer", className)} role="dialog" aria-modal="true" aria-label={label ?? title}>
         <header className={headerClassName}>
           {leading}
           <h2>{title}</h2>
           {trailing}
         </header>
-        {children}
+        {footer != null ? <><div className="sheet-scroll-body">{children}</div>{footer}</> : children}
       </section>
     </div>
   );

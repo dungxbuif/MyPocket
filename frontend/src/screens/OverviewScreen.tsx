@@ -1,9 +1,33 @@
 import * as React from "react";
 import { RefreshCw } from "lucide-react";
-import type { WalletSummary, Dashboard, Report, InsiderReport, WalletDetail } from "../app/finance";
+import type { WalletSummary } from "../app/finance";
+import type { Dashboard, Report, InsiderReport, WalletDetail } from "../app/analytics";
 import { Card } from "../components/ui/card";
+import { Button } from "../components/ui/button";
 import { ComparisonBarChart } from "../components/charts/ComparisonBarChart";
-import { TrendAreaLineChart } from "../components/charts/TrendAreaLineChart";
+import type { BarItem } from "../components/charts/ComparisonBarChart";
+import { WalletRow } from "../components/finance/WalletRow";
+
+function hoChiMinhDayKey(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+export function buildDailyExpenseBars(report: Report | null, now = new Date()): BarItem[] {
+  const today = hoChiMinhDayKey(now);
+  return (report?.daily ?? []).filter((item) => item.date <= today).slice(-7).map((item) => ({
+    label: item.date.slice(8, 10) + "/" + item.date.slice(5, 7),
+    amount: item.expense_vnd,
+    amountFormatted: `${new Intl.NumberFormat("vi-VN").format(item.expense_vnd)} đ`,
+    ...(item.date === today ? { isCurrent: true } : {}),
+  }));
+}
 
 export interface OverviewScreenProps {
   online: boolean;
@@ -16,10 +40,10 @@ export interface OverviewScreenProps {
   onCloseWalletDetail: () => void;
   onManageWallets: () => void;
   onRefreshInsider: () => void;
+  onViewReports?: () => void;
   onWalletClick?: (walletId: string) => void;
   formatVND: (val: number) => string;
   formatPercent: (val: number) => string;
-  walletIcon: (type: string) => string;
 }
 
 export function OverviewScreen({
@@ -33,32 +57,13 @@ export function OverviewScreen({
   onCloseWalletDetail,
   onManageWallets,
   onRefreshInsider,
+  onViewReports,
   onWalletClick,
   formatVND,
   formatPercent,
-  walletIcon,
 }: OverviewScreenProps) {
   const visibleWallets = wallets ?? [];
-  const [reportView, setReportView] = React.useState<"week" | "month">("month");
-
-  // Mock bar data for period comparison
-  const weeklyData = [
-    { label: "Tuần trước", amount: 150000, amountFormatted: "150.000 đ" },
-    { label: "Tuần này", amount: 250000, amountFormatted: "250.000 đ", isCurrent: true },
-  ];
-
-  const monthlyData = [
-    { label: "Tháng trước", amount: 3200000, amountFormatted: "3.200.000 đ" },
-    { label: "Tháng này", amount: 4800000, amountFormatted: "4.800.000 đ", isCurrent: true },
-  ];
-
-  const trendPoints = [
-    { dateLabel: "01/08", actualAmount: 300000, baselineAmount: 400000 },
-    { dateLabel: "08/08", actualAmount: 1200000, baselineAmount: 1100000 },
-    { dateLabel: "15/08", actualAmount: 2100000, baselineAmount: 2200000 },
-    { dateLabel: "23/08", actualAmount: 3500000, baselineAmount: 3100000 },
-    { dateLabel: "31/08", actualAmount: 4800000, baselineAmount: 4200000 },
-  ];
+  const expenseBars = buildDailyExpenseBars(report);
 
   return (
     <section className="content-stack">
@@ -67,25 +72,23 @@ export function OverviewScreen({
         {!online ? <p className="offline-warning neutral">Dữ liệu đang hiển thị từ lần đồng bộ cuối</p> : null}
         <div className="section-title">
           <h2>Ví của tôi</h2>
-          <button type="button" onClick={onManageWallets}>Xem tất cả</button>
+          <Button variant="ghost" size="sm" onClick={onManageWallets}>Xem tất cả</Button>
         </div>
         {visibleWallets.length === 0 ? <p className="empty-state">Chưa có ví</p> : null}
         {visibleWallets.map((wallet) => (
-          <div
+          <WalletRow
             key={wallet.id}
-            role="button"
-            tabIndex={0}
+            id={wallet.id}
+            name={wallet.name}
+            type={wallet.type}
+            balance={wallet.balance_vnd}
+            privacyMasked={privacyMasked}
             onClick={() => onWalletClick?.(wallet.id)}
-            className="wallet-row"
-          >
-            <span className="wallet-row-icon">{walletIcon(wallet.type)}</span>
-            <span className="wallet-row-name">{wallet.name}</span>
-            <span className="wallet-row-amount">
-              {privacyMasked ? "••••••" : formatVND(wallet.balance_vnd)}
-            </span>
-          </div>
+          />
         ))}
       </Card>
+
+      {walletDetail ? <WalletDetailCard detail={walletDetail} privacyMasked={privacyMasked} formatVND={formatVND} onClose={onCloseWalletDetail} /> : null}
 
       {/* Investment Position Card */}
       {dashboard?.investment_market_value_vnd || dashboard?.missing_asset_price_count ? (
@@ -175,39 +178,54 @@ export function OverviewScreen({
       {/* Monthly Report Card */}
       <div className="section-heading">
         <h2>Báo cáo tháng này</h2>
-        <span className="section-heading-action">Xem báo cáo</span>
+        <Button variant="ghost" size="sm" onClick={onViewReports}>Xem báo cáo</Button>
       </div>
 
       <section className="card report-card" aria-label="Báo cáo chi tiêu">
-        <div className="segmented">
-          <button
-            type="button"
-            className={reportView === "week" ? "active" : ""}
-            onClick={() => setReportView("week")}
-          >
-            Tuần
-          </button>
-          <button
-            type="button"
-            className={reportView === "month" ? "active" : ""}
-            onClick={() => setReportView("month")}
-          >
-            Tháng
-          </button>
-        </div>
+        {!report ? <p className="empty-state">Chưa tải được dữ liệu báo cáo. Mở báo cáo để thử lại.</p> : privacyMasked ? <p className="empty-state">Số liệu đang được ẩn.</p> : expenseBars.length > 0 ? (
+          <ComparisonBarChart data={expenseBars} height={120} />
+        ) : (
+          <p className="empty-state">Chưa có dữ liệu chi tiêu để hiển thị biểu đồ</p>
+        )}
 
-        {/* Charts Presentation */}
-        <ComparisonBarChart data={reportView === "week" ? weeklyData : monthlyData} height={120} />
-
-        <div className="report-stats">
+        {report ? <div className="report-stats">
           <p>
-            Tổng đã chi <strong className="expense">{formatVND(report?.summary.expense_vnd ?? 0)}</strong>
+            Tổng đã chi <strong className="expense">{privacyMasked ? "••••••" : formatVND(report.summary.expense_vnd)}</strong>
           </p>
           <p>
-            Tổng thu <strong className="income">{formatVND(report?.summary.income_vnd ?? 0)}</strong>
+            Tổng thu <strong className="income">{privacyMasked ? "••••••" : formatVND(report.summary.income_vnd)}</strong>
           </p>
-        </div>
+        </div> : null}
       </section>
     </section>
+  );
+}
+
+function WalletDetailCard({
+  detail,
+  privacyMasked,
+  formatVND,
+  onClose,
+}: {
+  detail: WalletDetail;
+  privacyMasked: boolean;
+  formatVND: (value: number) => string;
+  onClose: () => void;
+}) {
+  return (
+    <Card className="wallet-detail" aria-label={`Chi tiết ${detail.wallet.name}`}>
+      <div className="section-title">
+        <h2>{detail.wallet.name}</h2>
+        <Button variant="ghost" size="sm" onClick={onClose}>Đóng</Button>
+      </div>
+      <p>Trạng thái: {detail.wallet.include_in_total ? "Đang tính tổng" : "Không tính tổng"}</p>
+      <strong>{privacyMasked ? "••••••" : formatVND(detail.wallet.balance_vnd)}</strong>
+      {detail.transactions.length === 0 ? <p className="empty-state">Chưa có giao dịch</p> : detail.transactions.map((transaction) => (
+        <div className="search-result" key={transaction.id}>
+          <span>{transaction.note || "Giao dịch"}</span>
+          <b>{privacyMasked ? "••••••" : formatVND(transaction.amount_vnd)}</b>
+        </div>
+      ))}
+    </Card>
   );
 }

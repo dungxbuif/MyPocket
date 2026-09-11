@@ -24,5 +24,9 @@ export default defineConfig({
     environment: "jsdom",
     setupFiles: "./src/test/setup.ts",
     exclude: ["docs/**", "e2e/**", "node_modules/**"],
+    // App suites replace process-wide browser primitives (fetch, IndexedDB,
+    // online state). Keep files serial so one suite cannot steal another's
+    // mocked network/storage while an async render is still hydrating.
+    fileParallelism: false,
   },
 });

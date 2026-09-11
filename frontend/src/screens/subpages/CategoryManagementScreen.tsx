@@ -89,7 +89,6 @@ export function CategoryManagementScreen({ onBack, onSelectCategory }: CategoryM
               id="cat_meal"
               name="Cơm Bữa"
               isChild
-              isLastChild
               onClick={() => onSelectCategory?.({ id: "cat_meal", name: "Cơm Bữa" })}
             />
 

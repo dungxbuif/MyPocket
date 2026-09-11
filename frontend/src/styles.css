@@ -19,6 +19,7 @@
 }
 
 @layer base {
+  html { scroll-padding-bottom: calc(120px + var(--install-prompt-height, 0px) + env(safe-area-inset-bottom)); }
   :root {
   color: var(--color-app-ink);
   background: var(--color-app-bg);
@@ -71,14 +72,21 @@
 @layer components {
 .app-shell {
   min-height: 100vh;
-  background: #f2f3f8;
-  color: #111111;
+  background:
+    linear-gradient(90deg, rgba(15, 23, 42, 0.035) 1px, transparent 1px),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
+  background-size: 28px 28px, auto;
+  color: #0f172a;
 }
 
+.pwa-install-prompt { position: fixed; right: 16px; bottom: calc(94px + env(safe-area-inset-bottom)); z-index: 20; display: grid; gap: 4px; max-width: 290px; padding: 14px; border-radius: 16px; background: rgba(41, 73, 90, .82); color: #fff; box-shadow: 0 14px 32px rgba(0,0,0,.25); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); }
+.pwa-install-prompt span { font-size: 14px; opacity: .9; }
+.pwa-install-prompt button { margin-top: 6px; border: 0; border-radius: 10px; padding: 9px 12px; background: #39c85f; color: #111; font-weight: 800; }
+
 .phone-frame {
-  width: min(100%, 760px);
+  width: min(100%, 860px);
   margin: 0 auto;
-  padding: calc(22px + env(safe-area-inset-top)) 14px 118px;
+  padding: calc(18px + env(safe-area-inset-top)) 12px calc(120px + var(--install-prompt-height, 0px) + env(safe-area-inset-bottom));
 }
 
 .home-header,
@@ -93,8 +101,42 @@
 
 .home-header {
   justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 26px;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.command-header {
+  align-items: flex-start;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 8px;
+  background: linear-gradient(135deg, #0f172a 0%, #172033 58%, #184e4b 100%);
+  color: #f8fafc;
+  padding: 14px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.18);
+}
+
+.command-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  min-height: 22px;
+  padding: 0 8px;
+  border: 1px solid rgba(226, 232, 240, 0.34);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #b7f7d4;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0;
+  text-transform: uppercase;
+}
+
+.command-header h1 {
+  margin: 10px 0 12px;
+  font-size: 17px;
+  line-height: 1.1;
+  letter-spacing: 0;
 }
 
 .home-header > div:first-child {
@@ -106,7 +148,7 @@
 }
 
 .balance-line strong {
-  font-size: clamp(34px, 9.8vw, 58px);
+  font-size: clamp(28px, 8.2vw, 48px);
   line-height: 1;
   white-space: nowrap;
 }
@@ -118,6 +160,10 @@
 .profile-card p {
   margin: 6px 0 0;
   color: #8e8e93;
+}
+
+.command-header p {
+  color: rgba(248, 250, 252, 0.72);
 }
 
 .header-actions {
@@ -262,9 +308,10 @@
 }
 
 .card {
-  border-radius: 18px;
-  background: #ffffff;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(148, 163, 184, 0.34);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
 }
 
 .section-title,
@@ -273,23 +320,26 @@
 }
 
 .section-title {
-  padding: 16px 16px 10px;
+  padding: 12px 14px 8px;
 }
 
 .section-title h2,
 .section-heading h2,
 .sub-header h1 {
   margin: 0;
-  font-size: 20px;
+  color: #0f172a;
+  font-size: 18px;
+  letter-spacing: 0;
 }
 
 .section-title button,
 .section-heading button {
-  border: 0;
-  background: transparent;
-  color: #2dbd4f;
+  border: 1px solid rgba(20, 184, 166, 0.22);
+  border-radius: 6px;
+  background: #ecfeff;
+  color: #0f766e;
   font-weight: 800;
-  font-size: 16px;
+  font-size: 13px;
 }
 
 .wallet-row,
@@ -298,8 +348,9 @@
   align-items: center;
   gap: 12px;
   min-height: 62px;
-  padding: 0 16px;
-  border-top: 1px solid #e8e8ec;
+  padding: 0 14px;
+  border-top: 1px solid rgba(148, 163, 184, 0.24);
+  background: transparent;
 }
 
 .wallet-row {
@@ -810,14 +861,18 @@
   grid-template-columns: 1fr 1fr 58px 1fr 1fr;
   align-items: center;
   gap: 2px;
-  min-height: 68px;
-  padding: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 999px;
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.74), rgba(255, 255, 255, 0.58));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82), 0 16px 46px rgba(31, 45, 58, 0.16);
-  backdrop-filter: blur(22px) saturate(1.45);
-  -webkit-backdrop-filter: blur(22px) saturate(1.45);
+  min-height: 66px;
+  padding: 7px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.94);
+  box-shadow: 0 18px 46px rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(18px) saturate(1.25);
+  -webkit-backdrop-filter: blur(18px) saturate(1.25);
+}
+
+.dock-nav {
+  color: #e2e8f0;
 }
 
 .tab-button {
@@ -828,9 +883,9 @@
   min-height: 52px;
   padding: 4px 2px;
   border: 0;
-  border-radius: 999px;
+  border-radius: 8px;
   background: transparent;
-  color: #111111;
+  color: #cbd5e1;
   font-weight: 800;
 }
 
@@ -844,8 +899,9 @@
 }
 
 .tab-button.active {
-  background: rgba(232, 232, 236, 0.76);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.62);
+  background: #f8fafc;
+  color: #0f172a;
+  box-shadow: none;
 }
 
 .add-button {
@@ -854,10 +910,11 @@
   width: 58px;
   height: 58px;
   border: 0;
-  border-radius: 999px;
-  background: #39c85f;
+  border: 1px solid rgba(20, 184, 166, 0.45);
+  border-radius: 10px;
+  background: #14b8a6;
   color: #ffffff;
-  box-shadow: 0 10px 28px rgba(45, 189, 79, 0.32);
+  box-shadow: 0 10px 28px rgba(20, 184, 166, 0.32);
 }
 
 .sheet-backdrop {
@@ -1063,7 +1120,7 @@
 
 @media (max-width: 819px) {
   .phone-frame {
-    padding: calc(16px + env(safe-area-inset-top)) 10px 92px;
+    padding: calc(16px + env(safe-area-inset-top)) 10px calc(120px + var(--install-prompt-height, 0px) + env(safe-area-inset-bottom));
   }
 
   .home-header {
@@ -1568,6 +1625,29 @@
   color: #ff1717 !important;
 }
 
+.transaction-sheet.sheet-with-footer {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding-bottom: calc(10px + env(safe-area-inset-bottom));
+}
+
+.sheet-with-footer > header {
+  flex-shrink: 0;
+}
+
+.sheet-scroll-body {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.sheet-with-footer > .save-bar {
+  position: static;
+  flex-shrink: 0;
+  margin-top: 12px;
+}
+
 .save-bar {
   position: fixed;
   left: max(18px, calc((100vw - 720px) / 2 + 18px));
@@ -1622,7 +1702,7 @@
 
   .phone-frame {
     width: 100%;
-    padding: calc(12px + env(safe-area-inset-top)) 8px 78px;
+    padding: calc(12px + env(safe-area-inset-top)) 8px calc(120px + var(--install-prompt-height, 0px) + env(safe-area-inset-bottom));
   }
 
   .home-header {

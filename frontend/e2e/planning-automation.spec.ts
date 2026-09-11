@@ -12,9 +12,10 @@ test("mobile budget CRUD shows threshold progress through the live API", async (
   await expect(page.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
 
   await page.getByRole("button", { name: "Xem tất cả" }).click();
+  await page.getByRole("button", { name: "Thêm ví", exact: true }).click();
   await page.getByLabel("Tên ví mới").fill(walletName);
   await page.getByRole("button", { name: "Tạo ví" }).click();
-  await expect(page.getByLabel(`Tên ví ${walletName}`)).toBeVisible();
+  await expect(page.getByRole("dialog").locator("strong").filter({ hasText: walletName })).toBeVisible();
   await page.getByLabel("Tên nhóm mới").fill(categoryName);
   await page.getByRole("button", { name: "Tạo nhóm" }).click();
   await expect(page.getByLabel(`Tên nhóm ${categoryName}`)).toBeVisible();
@@ -62,9 +63,10 @@ test("mobile event and debt planning links existing transactions", async ({ page
   await expect(page.getByRole("heading", { name: "Ví của tôi" })).toBeVisible();
 
   await page.getByRole("button", { name: "Xem tất cả" }).click();
+  await page.getByRole("button", { name: "Thêm ví", exact: true }).click();
   await page.getByLabel("Tên ví mới").fill(walletName);
   await page.getByRole("button", { name: "Tạo ví" }).click();
-  await expect(page.getByLabel(`Tên ví ${walletName}`)).toBeVisible();
+  await expect(page.getByRole("dialog").locator("strong").filter({ hasText: walletName })).toBeVisible();
   await page.getByLabel("Tên nhóm mới").fill(categoryName);
   await page.getByRole("button", { name: "Tạo nhóm" }).click();
   await expect(page.getByLabel(`Tên nhóm ${categoryName}`)).toBeVisible();

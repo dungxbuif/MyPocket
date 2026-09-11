@@ -9,6 +9,7 @@ export interface TransactionRowProps {
   walletBadgeIcon?: React.ReactNode;
   note?: string;
   amount: number;
+  amountTone?: "signed" | "neutral";
   currency?: string;
   dateFormatted?: string;
   onClick?: () => void;
@@ -21,18 +22,25 @@ export function TransactionRow({
   walletName,
   note,
   amount,
+  amountTone = "signed",
   currency = "VND",
   dateFormatted,
   onClick,
   className,
 }: TransactionRowProps) {
-  const isExpense = amount < 0;
-  const isIncome = amount > 0;
+  const isExpense = amountTone === "signed" && amount < 0;
+  const isIncome = amountTone === "signed" && amount > 0;
   const formattedAbs = new Intl.NumberFormat("vi-VN").format(Math.abs(amount));
 
   return (
     <div
       onClick={onClick}
+      onKeyDown={(event) => {
+        if (onClick && (event.key === "Enter" || event.key === " ")) {
+          event.preventDefault();
+          onClick();
+        }
+      }}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       className={cn(
@@ -74,7 +82,7 @@ export function TransactionRow({
             !isExpense && !isIncome && "text-[#111111]"
           )}
         >
-          {isExpense ? `-${formattedAbs} đ` : isIncome ? `+${formattedAbs} đ` : `0 đ`}
+          {amount < 0 ? "-" : isIncome ? "+" : ""}{formattedAbs} đ
         </span>
       </div>
     </div>

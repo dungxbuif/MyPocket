@@ -84,6 +84,7 @@ export async function queueWalletDefaultAI(id: string, wallets: WalletSummary[],
 export async function queueCategoryCreate(input: CategoryCreateInput): Promise<CategorySummary> {
   const category: CategorySummary = {
     id: randomID("category"),
+    ...(input.parent_id ? { parent_id: input.parent_id } : {}),
     kind: input.kind,
     name: input.name,
     is_system: false,
@@ -102,13 +103,14 @@ export async function queueCategoryCreate(input: CategoryCreateInput): Promise<C
 
 export async function queueCategoryUpdate(current: CategorySummary, input: CategoryUpdateInput): Promise<CategorySummary> {
   const baseVersion = input.base_version ?? current.version ?? NOW_VERSION;
-  const category = { ...current, name: input.name } satisfies CategorySummary;
+  const parentID = input.parent_id === undefined ? current.parent_id : input.parent_id || undefined;
+  const category = { ...current, name: input.name, parent_id: parentID } satisfies CategorySummary;
   await enqueueMutation({
     entity_type: "category",
     entity_id: current.id,
     operation: "update",
     base_version: baseVersion,
-    payload: { name: input.name },
+    payload: { name: input.name, parent_id: input.parent_id ?? null },
   });
   await upsertOfflineCategory(category);
   return category;
@@ -172,13 +174,15 @@ export async function queueTransactionArchive(id: string, baseVersion: number) {
   await archiveOfflineTransaction(id, baseVersion);
 }
 
-export async function drainLegacyCompatibleOutbox(send: (input: Record<string, unknown>) => Promise<unknown>) {
+export async function drainLegacyCompatibleOutbox(_send: (input: Record<string, unknown>) => Promise<unknown>) {
   const pending = await readPendingMutations();
   if (pending.length > 0) {
     try {
       return await drainSyncOutbox(pending);
     } catch {
-      return drainCreateOnlyFallback(pending, send);
+      // A lost response may follow a successful server commit. Retain the same
+      // mutation ID for replay; a fresh direct POST could apply money twice.
+      return 0;
     }
   }
   return 0;
@@ -202,26 +206,11 @@ async function drainSyncOutbox(pending: OfflineMutation[]) {
   return completed.length;
 }
 
-async function drainCreateOnlyFallback(pending: OfflineMutation[], send: (input: Record<string, unknown>) => Promise<unknown>) {
-  const completed: string[] = [];
-  for (const item of pending) {
-    if (item.entity_type !== "transaction" || item.operation !== "create") break;
-    try {
-      await send(item.payload);
-      completed.push(item.mutation_id);
-    } catch {
-      break;
-    }
-  }
-  await markMutationsSynced(completed);
-  return completed.length;
-}
-
 export async function listOutbox(): Promise<OfflineMutation[]> {
   return readPendingMutations();
 }
 
-function optimisticTransaction(input: TransactionInput, id = randomID()): Transaction {
+function optimisticTransaction(input: TransactionInput, id: string = randomID()): Transaction {
   return {
     id,
     type: input.type,
@@ -247,6 +236,9 @@ async function applyServerResult(result: SyncMutationResult) {
     if (result.entity_type === "asset") await archiveOfflineAsset(result.entity_id, result.version ?? 0);
     return;
   }
+  // This payload describes a wallet/category setting, not a CategorySummary.
+  // Settings are refreshed from their dedicated endpoint when the manager opens.
+  if (result.operation === "set_category_active") return;
   if (!result.payload) return;
   if (result.entity_type === "wallet") await upsertOfflineWallet(result.payload as unknown as WalletSummary);
   if (result.entity_type === "category") await upsertOfflineCategory(result.payload as unknown as CategorySummary);

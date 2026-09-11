@@ -35,6 +35,8 @@ export type CategorySummary = {
   version: number;
 };
 
+export type WalletCategorySetting = CategorySummary & { active: boolean };
+
 export type TransactionType = "income" | "expense" | "transfer" | "adjustment";
 
 export type Transaction = {
@@ -74,8 +76,8 @@ export type TransactionInput = {
 
 export type WalletCreateInput = { name: string; type: WalletType };
 export type WalletUpdateInput = { name: string; include_in_total: boolean; base_version?: number; current_wallet?: WalletSummary };
-export type CategoryCreateInput = { kind: CategorySummary["kind"]; name: string };
-export type CategoryUpdateInput = { name: string; base_version?: number; current_category?: CategorySummary };
+export type CategoryCreateInput = { kind: CategorySummary["kind"]; name: string; parent_id?: string };
+export type CategoryUpdateInput = { name: string; parent_id: string | null; base_version?: number; current_category?: CategorySummary };
 
 export async function loadWallets() {
   const response = await apiFetch<{ wallets: WalletSummary[] }>("/api/v1/wallets");
@@ -84,6 +86,11 @@ export async function loadWallets() {
 
 export async function loadCategories() {
   const response = await apiFetch<{ categories: CategorySummary[] }>("/api/v1/categories");
+  return response.categories;
+}
+
+export async function loadWalletCategorySettings(walletID: string) {
+  const response = await apiFetch<{ categories: WalletCategorySetting[] }>(`/api/v1/wallets/${encodeURIComponent(walletID)}/category-settings`);
   return response.categories;
 }
 
@@ -108,19 +115,27 @@ export async function updateWallet(id: string, input: WalletUpdateInput) {
   const response = await apiFetch<{ wallet: WalletSummary }>(`/api/v1/wallets/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: input.name, include_in_total: input.include_in_total }),
+    body: JSON.stringify({ name: input.name, include_in_total: input.include_in_total, base_version: input.base_version ?? input.current_wallet?.version ?? 0 }),
   });
   return response.wallet;
 }
 
 export async function archiveWallet(id: string, baseVersion = 0) {
   if (!navigator.onLine) return queueWalletArchive(id, baseVersion);
-  await apiFetch(`/api/v1/wallets/${encodeURIComponent(id)}/archive`, { method: "POST" });
+  await apiFetch(`/api/v1/wallets/${encodeURIComponent(id)}/archive`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base_version: baseVersion }),
+  });
 }
 
 export async function setDefaultAIWallet(id: string, wallets: WalletSummary[] = [], baseVersion = 0) {
   if (!navigator.onLine) return queueWalletDefaultAI(id, wallets, baseVersion);
-  await apiFetch(`/api/v1/wallets/${encodeURIComponent(id)}/default-ai`, { method: "POST" });
+  await apiFetch(`/api/v1/wallets/${encodeURIComponent(id)}/default-ai`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base_version: baseVersion }),
+  });
 }
 
 export async function createCategory(input: CategoryCreateInput) {
@@ -138,14 +153,14 @@ export async function updateCategory(id: string, input: CategoryUpdateInput) {
   const response = await apiFetch<{ category: CategorySummary }>(`/api/v1/categories/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name: input.name }),
+    body: JSON.stringify({ name: input.name, parent_id: input.parent_id ?? null, base_version: input.base_version ?? input.current_category?.version ?? 0 }),
   });
   return response.category;
 }
 
-export async function archiveCategory(id: string, baseVersion = 0) {
+export async function archiveCategory(id: string, baseVersion: number) {
   if (!navigator.onLine) return queueCategoryArchive(id, baseVersion);
-  await apiFetch(`/api/v1/categories/${encodeURIComponent(id)}/archive`, { method: "POST" });
+  await apiFetch(`/api/v1/categories/${encodeURIComponent(id)}/archive`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_version: baseVersion }) });
 }
 
 export async function setWalletCategoryActive(walletID: string, categoryID: string, active: boolean) {
@@ -171,11 +186,10 @@ export async function createTransaction(input: TransactionInput) {
 
 export async function updateTransaction(id: string, input: TransactionInput) {
   if (!navigator.onLine) return queueTransactionUpdate(id, input, input.base_version ?? 0);
-  const { base_version: _baseVersion, ...body } = input;
   const response = await apiFetch<{ transaction: Transaction }>(`/api/v1/transactions/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
+    body: JSON.stringify(input),
   });
   return response.transaction;
 }
@@ -185,5 +199,9 @@ export async function archiveTransaction(id: string, baseVersion = 0) {
     await queueTransactionArchive(id, baseVersion);
     return;
   }
-  await apiFetch(`/api/v1/transactions/${encodeURIComponent(id)}/archive`, { method: "POST" });
+  await apiFetch(`/api/v1/transactions/${encodeURIComponent(id)}/archive`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base_version: baseVersion }),
+  });
 }

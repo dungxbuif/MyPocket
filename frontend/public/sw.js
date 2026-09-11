@@ -1,4 +1,4 @@
-const CACHE_NAME = "mypocket-shell-v3";
+const CACHE_NAME = "mypocket-shell-v5";
 const APP_SHELL = ["/", "/manifest.webmanifest", "/pwa-icon.svg"];
 
 self.addEventListener("install", (event) => {
@@ -20,14 +20,20 @@ self.addEventListener("fetch", (event) => {
   if (url.protocol !== "http:" && url.protocol !== "https:") {
     return;
   }
-  if (url.pathname.startsWith("/api/") || event.request.method !== "GET") {
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/") || url.pathname.startsWith("/docs") || event.request.method !== "GET") {
+    return;
+  }
+  // A known-offline navigation can use the installed shell immediately.
+  // Avoid initiating a navigation network load when it cannot succeed.
+  if (event.request.mode === "navigate" && self.navigator.onLine === false) {
+    event.respondWith(caches.match(event.request).then((cached) => cached || caches.match("/")));
     return;
   }
   event.respondWith(
     fetch(event.request)
       .then((response) => {
         const copy = response.clone();
-        if (response.ok) {
+        if (response.ok && !/no-store|private/i.test(response.headers.get("Cache-Control") || "")) {
           event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)));
         }
         return response;

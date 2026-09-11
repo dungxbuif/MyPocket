@@ -3,18 +3,18 @@ import { KeyRound, Activity, BookOpen, ChevronRight } from "lucide-react";
 import type { AuthState } from "../app/auth";
 import type { AssetPosition, PortfolioSummary } from "../app/portfolio";
 import {
-  checkAuditAccess,
   createAPIKey,
   loadAPIKeys,
-  loadAuditEvents,
   revokeAPIKey,
   type APIKeySummary,
-  type AuditEvent,
   type CreatedAPIKey,
 } from "../app/apiKeys";
+import { checkAuditAccess, loadAuditEvents, type AuditEvent } from "../app/audit";
 import { Card } from "../components/ui/card";
 import { GroupedCard } from "../components/cards/GroupedCard";
 import { DestructiveActionRow } from "../components/cards/DestructiveActionRow";
+import { ActionButton } from "../app/components";
+import { OperationError, operationFailure, type OperationFailure } from "../components/feedback/OperationError";
 
 export interface AccountScreenProps {
   authState: AuthState;
@@ -51,15 +51,44 @@ export function AccountScreen({
   const [apiKeyName, setAPIKeyName] = React.useState("AI Agent");
   const [createdKey, setCreatedKey] = React.useState<CreatedAPIKey | null>(null);
   const [apiKeyBusy, setAPIKeyBusy] = React.useState(false);
+  const [keyListBusy, setKeyListBusy] = React.useState(online);
+  const [keyListError, setKeyListError] = React.useState<OperationFailure | null>(null);
+  const [keyActionError, setKeyActionError] = React.useState<OperationFailure | null>(null);
+  const [copyError, setCopyError] = React.useState<OperationFailure | null>(null);
+  const [copied, setCopied] = React.useState(false);
+  const keyListGeneration = React.useRef(0);
+  const copyGeneration = React.useRef(0);
+  React.useEffect(() => () => { ++copyGeneration.current; }, []);
   const [auditAllowed, setAuditAllowed] = React.useState(false);
   const [auditEvents, setAuditEvents] = React.useState<AuditEvent[]>([]);
   const [auditCorrelationID, setAuditCorrelationID] = React.useState("");
   const [auditBusy, setAuditBusy] = React.useState(false);
 
   React.useEffect(() => {
-    if (!online || authState.status !== "authenticated") return;
-    void loadAPIKeys().then(setAPIKeys).catch(() => undefined);
+    const generation = ++keyListGeneration.current;
+    if (!online || authState.status !== "authenticated") {
+      setKeyListBusy(false);
+      return;
+    }
+    setKeyListBusy(true);
+    setKeyListError(null);
+    void loadAPIKeys().then(keys => { if (generation === keyListGeneration.current) setAPIKeys(keys); })
+      .catch(error => { if (generation === keyListGeneration.current) setKeyListError(operationFailure(error, "Không tải được danh sách API key.")); })
+      .finally(() => { if (generation === keyListGeneration.current) setKeyListBusy(false); });
+    return () => { ++keyListGeneration.current; };
   }, [authState.status, online]);
+
+  async function refreshKeys() {
+    const generation = ++keyListGeneration.current;
+    setKeyListBusy(true);
+    setKeyListError(null);
+    try {
+      const keys = await loadAPIKeys();
+      if (generation === keyListGeneration.current) { setAPIKeys(keys); setKeyActionError(null); }
+    }
+    catch (error) { if (generation === keyListGeneration.current) setKeyListError(operationFailure(error, "Chưa cập nhật được danh sách API key. Kết quả thao tác đã xác nhận vẫn được giữ lại.")); }
+    finally { if (generation === keyListGeneration.current) setKeyListBusy(false); }
+  }
 
   React.useEffect(() => {
     if (!online || authState.status !== "authenticated") {
@@ -91,32 +120,55 @@ export function AccountScreen({
   }, [authState.status, online]);
 
   async function handleCreateAPIKey() {
-    if (!online || apiKeyName.trim() === "") return;
+    if (!online || apiKeyBusy || keyListBusy || apiKeyName.trim() === "") return;
     setAPIKeyBusy(true);
+    setKeyActionError(null);
+    setCopyError(null);
+    setCopied(false);
     try {
       const created = await createAPIKey(apiKeyName.trim());
+      ++copyGeneration.current;
+      setCopied(false);
+      setCopyError(null);
       setCreatedKey(created);
+      const { plaintext: _plaintext, ...summary } = created;
+      setAPIKeys(current => [summary, ...current.filter(key => key.id !== summary.id)]);
       setAPIKeyName("AI Agent");
-      const updated = await loadAPIKeys();
-      setAPIKeys(updated);
-    } catch {
-      // Ignored for now
+      await refreshKeys();
+    } catch (error) {
+      setKeyActionError(operationFailure(error, "Chưa xác nhận được việc tạo API key. Kiểm tra lại danh sách trước khi tạo lại."));
     } finally {
       setAPIKeyBusy(false);
     }
   }
 
   async function handleRevokeAPIKey(id: string) {
-    if (!online || apiKeyBusy) return;
+    if (!online || apiKeyBusy || keyListBusy) return;
     setAPIKeyBusy(true);
+    setKeyActionError(null);
     try {
       await revokeAPIKey(id);
-      const updated = await loadAPIKeys();
-      setAPIKeys(updated);
-    } catch {
-      // Ignored for now
+      setAPIKeys(current => current.map(key => key.id === id ? { ...key, revoked_at: new Date().toISOString() } : key));
+      if (createdKey?.id === id) { ++copyGeneration.current; setCreatedKey(null); setCopied(false); setCopyError(null); }
+      await refreshKeys();
+    } catch (error) {
+      setKeyActionError(operationFailure(error, "Chưa xác nhận được việc thu hồi API key. Tải lại danh sách để kiểm tra trạng thái."));
     } finally {
       setAPIKeyBusy(false);
+    }
+  }
+
+  async function copyKey() {
+    if (!createdKey) return;
+    const generation = ++copyGeneration.current;
+    setCopied(false);
+    setCopyError(null);
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('clipboard unavailable');
+      await navigator.clipboard.writeText(createdKey.plaintext);
+      if (generation === copyGeneration.current) setCopied(true);
+    } catch (error) {
+      if (generation === copyGeneration.current) setCopyError(operationFailure(error, "Không sao chép được API key. Bạn có thể chọn và sao chép chuỗi key đang hiển thị."));
     }
   }
 
@@ -169,7 +221,7 @@ export function AccountScreen({
               <div className="flex-1">
                 <strong>{asset.symbol}</strong>
                 <p>
-                  {asset.units} {asset.asset_class} · {formatVND(asset.market_value_vnd)}
+                  {asset.summary.quantity} {asset.unit} · {formatVND(asset.summary.market_value_vnd ?? 0)}
                 </p>
               </div>
             </div>
@@ -194,6 +246,9 @@ export function AccountScreen({
       <section className="card list-card api-key-card">
         <div className="section-title">
           <h2>API keys</h2>
+          <ActionButton disabled={!online || keyListBusy || apiKeyBusy} onClick={() => void refreshKeys()}>
+            Tải lại danh sách key
+          </ActionButton>
           <KeyRound size={18} />
         </div>
         <div className="manager-form api-key-form">
@@ -204,29 +259,34 @@ export function AccountScreen({
             placeholder="Tên key"
             disabled={!online || apiKeyBusy}
           />
-          <button
+          <ActionButton
             type="button"
-            disabled={!online || apiKeyBusy || apiKeyName.trim() === ""}
+            disabled={!online || apiKeyBusy || keyListBusy || apiKeyName.trim() === ""}
             onClick={() => void handleCreateAPIKey()}
           >
             {apiKeyBusy ? "Đang xử lý" : "Tạo key"}
-          </button>
+          </ActionButton>
         </div>
 
         {createdKey ? (
           <div className="api-key-secret">
             <span>Chỉ hiển thị một lần</span>
             <code>{createdKey.plaintext}</code>
-            <button
+            <ActionButton
               type="button"
-              onClick={() => void navigator.clipboard?.writeText(createdKey.plaintext)}
+              onClick={() => void copyKey()}
             >
               Copy
-            </button>
+            </ActionButton>
           </div>
         ) : null}
 
-        {apiKeys.length === 0 ? (
+        <OperationError failure={keyActionError} />
+        <OperationError failure={copyError} />
+        {copied ? <p role="status">Đã sao chép API key.</p> : null}
+        <OperationError failure={keyListError} />
+        {keyListBusy ? <p role="status">Đang tải danh sách API key…</p> : null}
+        {apiKeys.length === 0 && !keyListBusy && !keyListError ? (
           <p className="empty-state">{online ? "Chưa có API key" : "Cần online để quản lý API key"}</p>
         ) : (
           <div className="api-key-list">
@@ -243,14 +303,14 @@ export function AccountScreen({
                       : "Chưa dùng"}
                   </p>
                 </div>
-                <button
+                <ActionButton
                   className="danger-text"
                   type="button"
-                  disabled={!online || apiKeyBusy || Boolean(key.revoked_at)}
+                  disabled={!online || apiKeyBusy || keyListBusy || Boolean(key.revoked_at)}
                   onClick={() => void handleRevokeAPIKey(key.id)}
                 >
                   Revoke
-                </button>
+                </ActionButton>
               </div>
             ))}
           </div>

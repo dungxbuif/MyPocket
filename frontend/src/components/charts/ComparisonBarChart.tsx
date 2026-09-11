@@ -18,14 +18,14 @@ export function ComparisonBarChart({ data, height = 150, className }: Comparison
   const maxAmount = Math.max(...data.map((d) => d.amount), 1);
 
   return (
-    <div className={cn("w-full flex flex-col select-none py-2", className)}>
-      <div className="flex items-end justify-around gap-6 px-4" style={{ height }}>
+    <div className={cn("w-full min-w-0 flex flex-col select-none py-2", className)}>
+      <div className="grid items-end gap-2 px-2" style={{ height, gridTemplateColumns: `repeat(${Math.max(data.length, 1)}, minmax(0, 1fr))` }}>
         {data.map((item, idx) => {
           const heightPercent = Math.max(12, Math.round((item.amount / maxAmount) * 100));
 
           return (
-            <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end max-w-[90px]">
-              <span className="text-[11px] font-bold text-[#111111] tabular-nums truncate">
+            <div key={idx} className="min-w-0 w-full flex flex-col items-center gap-1.5 h-full justify-end">
+              <span title={item.amountFormatted} className="max-w-full text-[11px] font-bold text-[#111111] tabular-nums truncate">
                 {item.amountFormatted}
               </span>
               <div
@@ -41,12 +41,13 @@ export function ComparisonBarChart({ data, height = 150, className }: Comparison
       </div>
 
       {/* Baseline Divider & Labels */}
-      <div className="w-full border-t border-[#e8e8ec] mt-1 pt-1.5 flex justify-around px-4">
+      <div className="w-full min-w-0 border-t border-[#e8e8ec] mt-1 pt-1.5 grid gap-2 px-2" style={{ gridTemplateColumns: `repeat(${Math.max(data.length, 1)}, minmax(0, 1fr))` }}>
         {data.map((item, idx) => (
           <span
             key={idx}
+            title={item.label}
             className={cn(
-              "text-xs font-semibold text-center flex-1 max-w-[90px]",
+              "min-w-0 truncate text-xs font-semibold text-center",
               item.isCurrent ? "text-[#111111] font-bold" : "text-[#8e8e93]"
             )}
           >

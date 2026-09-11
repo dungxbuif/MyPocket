@@ -1,4 +1,5 @@
 import { apiFetch } from "./apiClient";
+import type { Transaction } from "./finance";
 
 export type BudgetPeriodType = "weekly" | "monthly" | "quarterly" | "yearly" | "custom";
 
@@ -116,8 +117,26 @@ export type TransactionDraft = {
   amount_vnd: number;
   occurred_at: string;
   note: string;
-  status: string;
+  status: "pending" | "confirmed" | "rejected";
+  confirmed_transaction_id?: string;
   version: number;
+};
+
+export type ConfirmTransactionDraftInput = {
+  version: number;
+  amount_vnd: number;
+  note: string;
+};
+
+export type RejectTransactionDraftInput = {
+  version: number;
+};
+
+export type TransactionDraftDecision = {
+  status: "ok";
+  draft: TransactionDraft;
+  transaction?: Transaction;
+  correlation_id: string;
 };
 
 export async function loadBudgets() {
@@ -134,17 +153,17 @@ export async function createBudget(input: BudgetInput) {
   return response.budget;
 }
 
-export async function updateBudget(id: string, input: BudgetInput) {
+export async function updateBudget(id: string, input: BudgetInput, baseVersion: number) {
   const response = await apiFetch<{ budget: BudgetSummary }>(`/api/v1/budgets/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, base_version: baseVersion }),
   });
   return response.budget;
 }
 
-export async function archiveBudget(id: string) {
-  await apiFetch(`/api/v1/budgets/${encodeURIComponent(id)}/archive`, { method: "POST" });
+export async function archiveBudget(id: string, baseVersion: number) {
+  await apiFetch(`/api/v1/budgets/${encodeURIComponent(id)}/archive`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_version: baseVersion }) });
 }
 
 export async function loadEvents() {
@@ -161,17 +180,17 @@ export async function createEvent(input: EventInput) {
   return response.event;
 }
 
-export async function updateEvent(id: string, input: EventInput) {
+export async function updateEvent(id: string, input: EventInput, baseVersion: number) {
   const response = await apiFetch<{ event: EventSummary }>(`/api/v1/events/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, base_version: baseVersion }),
   });
   return response.event;
 }
 
-export async function archiveEvent(id: string) {
-  await apiFetch(`/api/v1/events/${encodeURIComponent(id)}/archive`, { method: "POST" });
+export async function archiveEvent(id: string, baseVersion: number) {
+  await apiFetch(`/api/v1/events/${encodeURIComponent(id)}/archive`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_version: baseVersion }) });
 }
 
 export async function linkEventTransaction(eventID: string, transactionID: string) {
@@ -192,17 +211,17 @@ export async function createObligation(input: ObligationInput) {
   return response.obligation;
 }
 
-export async function updateObligation(id: string, input: ObligationInput) {
+export async function updateObligation(id: string, input: ObligationInput, baseVersion: number) {
   const response = await apiFetch<{ obligation: ObligationSummary }>(`/api/v1/obligations/${encodeURIComponent(id)}`, {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(input),
+    body: JSON.stringify({ ...input, base_version: baseVersion }),
   });
   return response.obligation;
 }
 
-export async function archiveObligation(id: string) {
-  await apiFetch(`/api/v1/obligations/${encodeURIComponent(id)}/archive`, { method: "POST" });
+export async function archiveObligation(id: string, baseVersion: number) {
+  await apiFetch(`/api/v1/obligations/${encodeURIComponent(id)}/archive`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_version: baseVersion }) });
 }
 
 export async function linkObligationRepayment(obligationID: string, transactionID: string) {
@@ -223,11 +242,30 @@ export async function createRecurringSchedule(input: RecurringScheduleInput) {
   return response.schedule;
 }
 
-export async function archiveRecurringSchedule(id: string) {
-  await apiFetch(`/api/v1/recurring-schedules/${encodeURIComponent(id)}/archive`, { method: "POST" });
+export async function archiveRecurringSchedule(id: string, baseVersion: number) {
+  await apiFetch(`/api/v1/recurring-schedules/${encodeURIComponent(id)}/archive`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ base_version: baseVersion }) });
 }
 
 export async function loadTransactionDrafts() {
   const response = await apiFetch<{ drafts: TransactionDraft[] }>("/api/v1/transaction-drafts");
   return response.drafts;
+}
+
+export async function confirmTransactionDraft(id: string, input: ConfirmTransactionDraftInput, idempotencyKey: string) {
+  return apiFetch<TransactionDraftDecision>(`/api/v1/transaction-drafts/${encodeURIComponent(id)}/confirm`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function rejectTransactionDraft(id: string, input: RejectTransactionDraftInput) {
+  return apiFetch<TransactionDraftDecision>(`/api/v1/transaction-drafts/${encodeURIComponent(id)}/reject`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
 }

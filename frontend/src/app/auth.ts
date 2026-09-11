@@ -20,7 +20,10 @@ const OFFLINE_USER_KEY = "mypocket.current-user.v1";
 export async function loadCurrentUser(): Promise<AuthState> {
   try {
     const response = await apiFetch<{ user: CurrentUser }>("/api/v1/me");
-    if (!isCurrentUser(response.user)) return { status: "unauthenticated" };
+    if (!isCurrentUser(response.user)) {
+      const cached = !navigator.onLine ? readCachedCurrentUser() : null;
+      return cached ? { status: "authenticated", user: cached } : { status: "unauthenticated" };
+    }
     cacheCurrentUser(response.user);
     return { status: "authenticated", user: response.user };
   } catch (error) {
@@ -28,10 +31,11 @@ export async function loadCurrentUser(): Promise<AuthState> {
       localStorage.removeItem(OFFLINE_USER_KEY);
       return { status: "forbidden", message: error.message, correlationID: error.correlationID };
     }
-    if (!navigator.onLine) {
+    if (error instanceof TypeError) {
       const cached = readCachedCurrentUser();
       if (cached) return { status: "authenticated", user: cached };
     }
+    if (error instanceof APIClientError && error.code === "AUTH_REQUIRED") localStorage.removeItem(OFFLINE_USER_KEY);
     return { status: "unauthenticated" };
   }
 }
@@ -43,11 +47,8 @@ function isCurrentUser(user: unknown): user is CurrentUser {
 }
 
 export async function logout() {
-  try {
-    await apiFetch("/api/v1/auth/logout", { method: "POST" });
-  } finally {
-    localStorage.removeItem(OFFLINE_USER_KEY);
-  }
+  await apiFetch("/api/v1/auth/logout", { method: "POST" });
+  localStorage.removeItem(OFFLINE_USER_KEY);
 }
 
 function cacheCurrentUser(user: CurrentUser) {

@@ -2,18 +2,40 @@ import * as React from "react";
 import { ChevronRight } from "lucide-react";
 import type {
   BudgetProgress,
-  CategorySummary,
   EventSummary,
+  ObligationDirection,
   ObligationSummary,
+  RecurrenceFrequency,
   RecurringSchedule,
-  Transaction,
   TransactionDraft,
-  WalletSummary,
-} from "../app/finance";
-import { Card } from "../components/ui/card";
+} from "../app/planning";
+import type { CategorySummary, Transaction, TransactionType, WalletSummary } from "../app/finance";
+import { ActionCard } from "../app/components";
 import { GaugeArcSummary } from "../components/charts/GaugeArcSummary";
-import { NoticeBanner } from "../components/feedback/NoticeBanner";
 import { WalletFilterChip } from "../components/navigation/WalletFilterChip";
+import { Select } from "../components/ui/select";
+
+const DAY_MS = 86400000;
+
+function hoChiMinhDayKey(date: Date): string {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: "Asia/Ho_Chi_Minh",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(date);
+  const value = (type: Intl.DateTimeFormatPartTypes) => parts.find((part) => part.type === type)?.value ?? "";
+  return `${value("year")}-${value("month")}-${value("day")}`;
+}
+
+function calendarDayNumber(day: string): number {
+  const [year, month, date] = day.slice(0, 10).split("-").map(Number);
+  return Date.UTC(year, month - 1, date) / DAY_MS;
+}
+
+function remainingCalendarDays(periodEnd: string, now = new Date()): number {
+  return Math.max(0, calendarDayNumber(periodEnd) - calendarDayNumber(hoChiMinhDayKey(now)));
+}
 
 export interface BudgetsScreenProps {
   budgets: BudgetProgress[] | null;
@@ -35,9 +57,9 @@ export interface BudgetsScreenProps {
   onEditSchedule: (schedule: RecurringSchedule) => void;
   formatVND: (val: number) => string;
   formatDate: (val: string) => string;
-  obligationDirectionLabel: (dir: string) => string;
-  recurrenceLabel: (freq: string) => string;
-  transactionTypeLabel: (type: string) => string;
+  obligationDirectionLabel: (dir: ObligationDirection) => string;
+  recurrenceLabel: (freq: RecurrenceFrequency) => string;
+  transactionTypeLabel: (type: TransactionType) => string;
 }
 
 export function BudgetsScreen({
@@ -64,15 +86,15 @@ export function BudgetsScreen({
   recurrenceLabel,
   transactionTypeLabel,
 }: BudgetsScreenProps) {
-  const [showNotice, setShowNotice] = React.useState(true);
   const rows = budgets ?? [];
-  const totalBudget = rows.reduce((total, item) => total + item.budget.amount_vnd, 0);
-  const totalSpent = rows.reduce((total, item) => total + item.spent_vnd, 0);
-  const daysLeft = rows[0]
-    ? Math.max(0, Math.ceil((new Date(rows[0].period_end).getTime() - Date.now()) / 86400000))
-    : 12;
-
-  const availableAmount = Math.max(0, totalBudget - totalSpent);
+  const [selectedID, setSelectedID] = React.useState("");
+  const selectedBudget = rows.find((row) => row.budget.id === selectedID) ?? rows[0];
+  const totalBudget = selectedBudget?.budget.amount_vnd ?? 0;
+  const totalSpent = selectedBudget?.spent_vnd ?? 0;
+  const availableAmount = selectedBudget?.remaining_vnd ?? 0;
+  const daysLeft = selectedBudget
+    ? remainingCalendarDays(selectedBudget.period_end)
+    : 0;
 
   return (
     <section className="content-stack">
@@ -88,58 +110,74 @@ export function BudgetsScreen({
       </div>
 
       {/* Hero Card with Gauge Arc */}
-      <section className="card budget-hero">
-        <p>{rows[0] ? `${formatDate(rows[0].period_start)} - ${formatDate(rows[0].period_end)}` : "Kỳ hiện tại"}</p>
-        <strong className="hidden">{formatVND(totalBudget)}</strong>
+      {budgets === null ? (
+        <p className="empty-state" role="status">Chưa có dữ liệu ngân sách. Nếu chưa tải được, hãy kết nối mạng và tải lại.</p>
+      ) : selectedBudget ? (
+        <section className="card budget-hero" aria-label="Ngân sách đã chọn">
+          <label className="form-row" htmlFor="displayed-budget">
+            Ngân sách hiển thị
+            <Select
+              id="displayed-budget"
+              value={selectedBudget.budget.id}
+              onChange={(event) => setSelectedID(event.target.value)}
+            >
+              {rows.map((row) => (
+                <option key={row.budget.id} value={row.budget.id}>{row.budget.name}</option>
+              ))}
+            </Select>
+          </label>
+          <h2>{selectedBudget.budget.name}</h2>
+          <p>{formatDate(selectedBudget.period_start)} - {formatDate(selectedBudget.period_end)}</p>
 
-        <GaugeArcSummary
-          availableAmount={availableAmount > 0 ? availableAmount : 45075000}
-          totalBudget={totalBudget > 0 ? totalBudget : 65000000}
-          totalSpent={totalSpent > 0 ? totalSpent : 19920000}
-          daysRemaining={daysLeft}
-        />
+          <GaugeArcSummary
+            availableAmount={availableAmount}
+            totalBudget={totalBudget}
+            totalSpent={totalSpent}
+            daysRemaining={daysLeft}
+          />
 
-        <div className="budget-stats hidden">
-          <span>{formatVND(totalBudget)}<br />Tổng ngân sách</span>
-          <span>{formatVND(totalSpent)}<br />Tổng đã chi</span>
-          <span>{daysLeft} ngày<br />Còn lại</span>
-        </div>
+          <div className="budget-stats" role="group" aria-label="Số liệu ngân sách đã chọn">
+            <span>{formatVND(totalBudget)}<br />Tổng ngân sách</span>
+            <span>{formatVND(totalSpent)}<br />Tổng đã chi</span>
+            <span>{daysLeft} ngày<br />Còn lại</span>
+          </div>
 
-        <button className="primary-cta compact" type="button" disabled={!online} onClick={onCreate}>
-          Tạo Ngân sách
-        </button>
-      </section>
+          <button className="primary-cta compact" type="button" disabled={!online} onClick={onCreate}>
+            Tạo Ngân sách
+          </button>
+        </section>
+      ) : null}
 
       {!online ? (
         <p className="offline-warning">Cần online để tạo hoặc sửa ngân sách. Dữ liệu đã tải vẫn có thể xem.</p>
       ) : null}
 
       {/* Category Budgets */}
-      {rows.length === 0 ? (
+      {budgets === null ? null : rows.length === 0 ? (
         <section className="card list-card">
           <p className="empty-state">Chưa có ngân sách</p>
         </section>
       ) : (
         rows.map((budget) => {
-          const categoryNames = budget.budget.category_ids
+          const categoryNames = (budget.budget.category_ids ?? [])
             .map((id) => categories.find((c) => c.id === id)?.name)
             .filter(Boolean)
             .join(", ") || "Tất cả các nhóm";
 
           return (
-            <div
+            <ActionCard
               key={budget.budget.id}
-              role="button"
-              tabIndex={0}
-              onClick={() => online && onEdit(budget)}
+              disabled={!online}
+              onClick={() => onEdit(budget)}
               className="card budget-item-card p-3 my-2"
             >
               <div className="flex justify-between items-center mb-1">
-                <span className="font-bold text-sm text-[#111111]">{categoryNames}</span>
+                <span className="font-bold text-sm text-[#111111]">{budget.budget.name}</span>
                 <span className="text-xs text-[#8e8e93] font-medium">
                   {formatVND(budget.budget.amount_vnd)}
                 </span>
               </div>
+              <p className="text-xs text-[#8e8e93]">{categoryNames}</p>
               <div className="w-full bg-[#e9eaef] h-2 rounded-full overflow-hidden my-1.5">
                 <div
                   className="bg-[#2dbd4f] h-full rounded-full"
@@ -150,17 +188,10 @@ export function BudgetsScreen({
                 <span>Đã chi {formatVND(budget.spent_vnd)}</span>
                 <span>Còn {formatVND(Math.max(0, budget.budget.amount_vnd - budget.spent_vnd))}</span>
               </div>
-            </div>
+              {budget.alert_100 ? <p className="budget-alert">Đã vượt 100%</p> : budget.alert_80 ? <p className="budget-alert">Đã chạm 80%</p> : null}
+            </ActionCard>
           );
         })
-      )}
-
-      {/* Sample Test Data Notice Banner */}
-      {showNotice && (
-        <NoticeBanner
-          message="Dữ liệu trên là ví dụ minh họa dựa trên mẫu thiết kế."
-          onDismiss={() => setShowNotice(false)}
-        />
       )}
 
       {/* Events */}

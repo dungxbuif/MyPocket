@@ -1,15 +1,14 @@
 import * as React from "react";
 import { Wallet, Users, CalendarDays, List, ImagePlus, MapPin, BriefcaseBusiness, Bell } from "lucide-react";
 import {
-  buildTransactionInput,
-  createObligation,
   createTransaction,
-  uploadFile,
   type CategorySummary,
-  type ObligationDirection,
   type Transaction,
   type WalletSummary,
 } from "../../app/finance";
+import { buildTransactionInput, calendarDateInHoChiMinh } from "../../app/transactionInput";
+import { createObligation, type ObligationDirection } from "../../app/planning";
+import { uploadFile } from "../../app/receipts";
 import { queueReceiptUpload } from "../../offline/db";
 
 export interface AddTransactionSheetProps {
@@ -48,8 +47,8 @@ export function AddTransactionSheet({
   const [excludedFromReports, setExcludedFromReports] = React.useState(false);
   const [debtDirection, setDebtDirection] = React.useState<ObligationDirection>("borrowed");
   const [counterparty, setCounterparty] = React.useState("");
-  const [dueOn, setDueOn] = React.useState(() => new Date().toISOString().slice(0, 10));
-  const [occurredOn, setOccurredOn] = React.useState(() => new Date().toISOString().slice(0, 10));
+  const [dueOn, setDueOn] = React.useState(() => calendarDateInHoChiMinh());
+  const [occurredOn, setOccurredOn] = React.useState(() => calendarDateInHoChiMinh());
   const [saving, setSaving] = React.useState(false);
   const [receiptFile, setReceiptFile] = React.useState<File | null>(null);
   const [showDetails, setShowDetails] = React.useState(false);

@@ -1,5 +1,6 @@
 import { apiFetch } from "./apiClient";
 import { archiveOfflineAsset, enqueueMutation, readOfflineSnapshot, upsertOfflineAsset } from "../offline/db";
+import { readUserDataCache, writeUserDataCache } from "./userDataCache";
 
 export type AssetType = "gold" | "stock" | "crypto" | "foreign_currency" | "other";
 export type PricingMode = "manual" | "automatic";
@@ -83,32 +84,34 @@ export type AssetCreateInput = {
   include_in_net_worth?: boolean;
 };
 
-export async function loadAssets() {
+export async function loadAssets(userID: string) {
   try {
     const response = await apiFetch<{ assets: AssetPosition[] }>("/api/v1/assets");
-    localStorage.setItem("mypocket:assets-cache", JSON.stringify(response.assets));
+    writeUserDataCache(userID, "assets", response.assets);
     return response.assets;
   } catch (error) {
-    const cached = localStorage.getItem("mypocket:assets-cache");
-    if (cached) return JSON.parse(cached) as AssetPosition[];
+    if (!(error instanceof TypeError)) throw error;
+    const cached = readUserDataCache<AssetPosition[]>(userID, "assets");
+    if (cached) return cached;
     throw error;
   }
 }
 
-export async function loadPortfolioSummary() {
+export async function loadPortfolioSummary(userID: string) {
   try {
     const response = await apiFetch<{ summary: PortfolioSummary }>("/api/v1/portfolio/summary");
-    localStorage.setItem("mypocket:portfolio-summary-cache", JSON.stringify(response.summary));
+    writeUserDataCache(userID, "portfolio-summary", response.summary);
     return response.summary;
   } catch (error) {
-    const cached = localStorage.getItem("mypocket:portfolio-summary-cache");
-    if (cached) return JSON.parse(cached) as PortfolioSummary;
+    if (!(error instanceof TypeError)) throw error;
+    const cached = readUserDataCache<PortfolioSummary>(userID, "portfolio-summary");
+    if (cached) return cached;
     throw error;
   }
 }
 
 export async function createAsset(input: AssetCreateInput) {
-  const payload = { pricing_mode: "manual", include_in_net_worth: true, ...input };
+  const payload: AssetCreateInput = { pricing_mode: "manual", include_in_net_worth: true, ...input };
   return withOfflineFallback(
     () => apiFetch<{ asset: AssetPosition }>("/api/v1/assets", {
       method: "POST",
@@ -200,12 +203,6 @@ async function cachedAsset(assetID: string) {
   const snapshot = await readOfflineSnapshot().catch(() => null);
   const offlineAsset = snapshot?.assets.find((item) => item.id === assetID);
   if (offlineAsset) return offlineAsset;
-  const cached = localStorage.getItem("mypocket:assets-cache");
-  if (cached) {
-    const assets = JSON.parse(cached) as AssetPosition[];
-    const asset = assets.find((item) => item.id === assetID);
-    if (asset) return asset;
-  }
   throw new Error("Asset mutation queued offline");
 }
 

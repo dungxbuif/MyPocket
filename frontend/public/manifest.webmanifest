@@ -1,8 +1,13 @@
 {
   "name": "MyPocket",
   "short_name": "MyPocket",
+  "id": "/",
+  "description": "Quản lý tài chính cá nhân, ưu tiên cho điện thoại.",
+  "lang": "vi",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#f2f3f8",
   "theme_color": "#f2f3f8",
   "icons": [
