@@ -12,6 +12,7 @@ export type DetailedReport = {
   categories?: Array<{ category_id?: string; category_name: string; amount_vnd: number; share_percent: number }>;
   daily?: Array<{ date: string; income_vnd: number; expense_vnd: number; net_income_vnd: number; cumulative_net_vnd: number }>;
   prior?: ReportSummary;
+  periods?: ReportSummary[];
 };
 
 export async function queryReport(filters: ReportFilters, signal: AbortSignal): Promise<DetailedReport> {

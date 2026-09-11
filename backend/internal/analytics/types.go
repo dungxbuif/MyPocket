@@ -38,6 +38,7 @@ type Report struct {
 	Categories []CategoryTotal `json:"categories,omitempty"`
 	Daily      []DailyTotal    `json:"daily,omitempty"`
 	Prior      *Summary        `json:"prior,omitempty"`
+	Periods    []Summary       `json:"periods,omitempty"`
 }
 type Dashboard struct {
 	Summary                  Summary             `json:"summary"`

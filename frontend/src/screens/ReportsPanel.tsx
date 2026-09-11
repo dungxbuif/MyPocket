@@ -140,6 +140,7 @@ export function ReportsPanel({ userID, online, privacyMasked, wallets, onClose }
             <tr><th scope="row">Thu</th><td className={cell}>{money(report.prior.income_vnd)}</td><td className={cell}>{money(report.summary.income_vnd)}</td><td className={cell}>{privacyMasked ? "••••••" : report.summary.not_comparable || report.prior.income_vnd === 0 ? "Không thể so sánh" : percent(report.summary.income_change_percent ?? 0)}</td></tr>
             <tr><th scope="row">Chi</th><td className={cell}>{money(report.prior.expense_vnd)}</td><td className={cell}>{money(report.summary.expense_vnd)}</td><td className={cell}>{privacyMasked ? "••••••" : report.summary.not_comparable || report.prior.expense_vnd === 0 ? "Không thể so sánh" : percent(report.summary.expense_change_percent ?? 0)}</td></tr>
           </tbody></table></div>
+          {report.periods?.length === 6 ? <div className="overflow-x-auto"><table className="w-full" aria-label="So sánh 6 kỳ"><thead><tr><th scope="col">Kỳ</th><th scope="col">Thu</th><th scope="col">Chi</th><th scope="col">Ròng</th></tr></thead><tbody>{report.periods.map(period => <tr key={`${period.from}:${period.to}`}><th scope="row" className="text-left">{period.from} – {period.to}</th><td className={cell}>{money(period.income_vnd)}</td><td className={cell}>{money(period.expense_vnd)}</td><td className={cell}>{money(period.net_income_vnd)}</td></tr>)}</tbody></table></div> : <p>Chưa đủ dữ liệu so sánh 6 kỳ.</p>}
         </> : <p>Không có dữ liệu kỳ trước để so sánh.</p>) : null}
       </Card> : null}
     </section>

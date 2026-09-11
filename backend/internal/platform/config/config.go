@@ -31,6 +31,10 @@ type Config struct {
 	LogLevel           string
 	HTTPAddr           string
 	DocsDir            string
+	WebPushEnabled     bool
+	VAPIDPublicKey     string
+	VAPIDPrivateKey    string
+	VAPIDSubject       string
 }
 
 func Load(env map[string]string) (Config, error) {
@@ -58,6 +62,10 @@ func Load(env map[string]string) (Config, error) {
 		LogLevel:           valueOrDefault(env["LOG_LEVEL"], "info"),
 		HTTPAddr:           valueOrDefault(env["HTTP_ADDR"], ":8080"),
 		DocsDir:            strings.TrimSpace(env["DOCS_DIR"]),
+		WebPushEnabled:     env["WEB_PUSH_ENABLED"] == "true",
+		VAPIDPublicKey:     strings.TrimSpace(env["VAPID_PUBLIC_KEY"]),
+		VAPIDPrivateKey:    env["VAPID_PRIVATE_KEY"],
+		VAPIDSubject:       strings.TrimSpace(env["VAPID_SUBJECT"]),
 	}
 
 	missing := make([]string, 0, 4)
@@ -110,6 +118,23 @@ func Load(env map[string]string) (Config, error) {
 	if cfg.LogLevel != "debug" && cfg.LogLevel != "info" && cfg.LogLevel != "warn" && cfg.LogLevel != "error" {
 		return Config{}, fmt.Errorf("invalid config: LOG_LEVEL must be debug, info, warn, or error")
 	}
+	if cfg.WebPushEnabled {
+		pushMissing := make([]string, 0, 3)
+		if cfg.VAPIDPublicKey == "" {
+			pushMissing = append(pushMissing, "VAPID_PUBLIC_KEY")
+		}
+		if cfg.VAPIDPrivateKey == "" {
+			pushMissing = append(pushMissing, "VAPID_PRIVATE_KEY")
+		}
+		if cfg.VAPIDSubject == "" {
+			pushMissing = append(pushMissing, "VAPID_SUBJECT")
+		}
+		if len(pushMissing) > 0 {
+			return Config{}, fmt.Errorf("missing required config: %s", strings.Join(pushMissing, ", "))
+		}
+	} else if cfg.VAPIDPublicKey != "" || cfg.VAPIDPrivateKey != "" || cfg.VAPIDSubject != "" {
+		return Config{}, fmt.Errorf("invalid config: WEB_PUSH_ENABLED must be true when VAPID settings are present")
+	}
 	if cfg.AppEnv == "production" {
 		if !strings.HasPrefix(cfg.PublicWebURL, "https://") {
 			return Config{}, fmt.Errorf("invalid config: PUBLIC_WEB_URL must use https in production")
@@ -128,6 +153,9 @@ func Load(env map[string]string) (Config, error) {
 		}
 		if cfg.LogFormat != "json" {
 			return Config{}, fmt.Errorf("invalid config: LOG_FORMAT must be json in production")
+		}
+		if !cfg.WebPushEnabled {
+			return Config{}, fmt.Errorf("invalid config: WEB_PUSH_ENABLED must be true in production")
 		}
 	}
 	return cfg, nil

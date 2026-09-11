@@ -94,6 +94,7 @@ services:
       dockerfile: backend/Dockerfile
     entrypoint: ["/app/worker"]
     environment:
+      WEB_PUSH_ENABLED: "false"
       APP_ENV: development
       DATABASE_URL: postgres://mypocket:mypocket@postgres:5432/mypocket?sslmode=disable
       PUBLIC_WEB_URL: "${PUBLIC_WEB_URL:-http://127.0.0.1:5173}"
@@ -117,6 +118,8 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_WEB_PUSH_PUBLIC_KEY: "${VAPID_PUBLIC_KEY:-}"
     ports:
       - "5173:80"
     depends_on:

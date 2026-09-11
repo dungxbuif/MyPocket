@@ -1,4 +1,6 @@
 FROM node:22-alpine AS build
+ARG VITE_WEB_PUSH_PUBLIC_KEY
+ENV VITE_WEB_PUSH_PUBLIC_KEY=$VITE_WEB_PUSH_PUBLIC_KEY
 WORKDIR /app/frontend
 COPY package.json package-lock.json ./
 RUN npm ci

@@ -1,13 +1,20 @@
 package notification
 
-import "strings"
+import (
+	"errors"
+	"net/http"
+	"strings"
+)
 
 func IsExpiredDeliveryError(err error) bool {
 	if err == nil {
 		return false
 	}
-	message := strings.ToLower(err.Error())
-	return strings.Contains(message, "404") || strings.Contains(message, "410") || strings.Contains(message, "expired") || strings.Contains(message, "gone")
+	var deliveryErr *DeliveryError
+	if errors.As(err, &deliveryErr) {
+		return deliveryErr.StatusCode == http.StatusNotFound || deliveryErr.StatusCode == http.StatusGone
+	}
+	return false
 }
 
 func RedactEndpoint(endpoint string) string {

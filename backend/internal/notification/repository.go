@@ -126,7 +126,7 @@ func (r *Repository) DuePushSubscriptions(ctx context.Context, now time.Time, li
 	if limit <= 0 {
 		limit = 50
 	}
-	rows, err := r.db.QueryContext(ctx, `SELECT user_id::text, id::text, endpoint, p256dh, auth FROM push_subscriptions WHERE next_attempt_at <= $1 AND (expires_at IS NULL OR expires_at > $1) AND failure_count < $2 ORDER BY next_attempt_at, id LIMIT $3`, now, MaxDeliveryAttempts, limit)
+	rows, err := r.db.QueryContext(ctx, `SELECT s.user_id::text, s.id::text, s.endpoint, s.p256dh, s.auth FROM push_subscriptions s WHERE s.next_attempt_at <= $1 AND (s.expires_at IS NULL OR s.expires_at > $1) AND s.failure_count < $2 AND EXISTS (SELECT 1 FROM notifications n WHERE n.user_id = s.user_id AND n.created_at > s.last_delivered_at) ORDER BY s.next_attempt_at, s.id LIMIT $3`, now, MaxDeliveryAttempts, limit)
 	if err != nil {
 		return nil, fmt.Errorf("list due push subscriptions: %w", err)
 	}
@@ -211,8 +211,8 @@ func (r *Repository) RecordDeliveryFailure(ctx context.Context, id string, expir
 	return err
 }
 
-func (r *Repository) RecordDeliverySuccess(ctx context.Context, id string, now time.Time) error {
-	_, err := r.db.ExecContext(ctx, `UPDATE push_subscriptions SET failure_count = 0, next_attempt_at = $2, updated_at = $2 WHERE id = $1`, id, now)
+func (r *Repository) RecordDeliverySuccess(ctx context.Context, id string, deliveredThrough time.Time) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE push_subscriptions SET failure_count = 0, last_delivered_at = GREATEST(last_delivered_at, $2), next_attempt_at = $2, updated_at = now() WHERE id = $1`, id, deliveredThrough)
 	return err
 }
 

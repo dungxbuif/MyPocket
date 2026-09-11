@@ -191,6 +191,7 @@ rtk proxy git commit -m "feat: prove atomic migration and recoverable resync"
 - Modify: `backend/cmd/worker/main.go`
 - Modify: `backend/go.mod`
 - Modify: `backend/go.sum`
+- Create: `backend/migrations/0013_notification_delivery_state.sql`
 - Modify: `backend/internal/platform/httpapi/*_test.go`
 - Modify: `frontend/Dockerfile`
 - Modify: `frontend/src/app/notifications.ts`
@@ -207,7 +208,7 @@ rtk proxy git commit -m "feat: prove atomic migration and recoverable resync"
 - Consumes: existing domain repositories and versioned REST routes
 - Produces: executable proof for wallet/category CRUD, all transaction types, exact reversal, neutral transfer reporting, recurring drafts, budgets, events, obligations, portfolio, six-period analytics, durable inbox, and real Web Push delivery
 
-- [ ] **Step 1: Add one ledger fixture with independently calculated expectations**
+- [x] **Step 1: Add one ledger fixture with independently calculated expectations**
 
 ```go
 type ledgerExpectation struct {
@@ -220,13 +221,13 @@ type ledgerExpectation struct {
 
 The fixture must cover income, expense, transfer, adjustment, excluded expense, edited amount/wallet/category, archived transaction, repayment, and portfolio trade. Assert wallet balances independently from analytics queries.
 
-- [ ] **Step 2: Run domain/integration tests and verify any RED result is reproducible**
+- [x] **Step 2: Run domain/integration tests and verify any RED result is reproducible**
 
 ```bash
 rtk proxy env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./internal/finance ./internal/planning ./internal/portfolio ./internal/analytics ./internal/notification ./internal/platform/httpapi -count=1
 ```
 
-- [ ] **Step 3: Correct only proven invariant failures**
+- [x] **Step 3: Correct only proven invariant failures**
 
 Use checked helpers for every add/subtract/multiply and preserve the existing atomic command transaction. A representative boundary remains:
 
@@ -239,7 +240,7 @@ func checkedAdd(left, right int64) (int64, error) {
 }
 ```
 
-- [ ] **Step 4: Complete six-period report behavior and mounted UI states**
+- [x] **Step 4: Complete six-period report behavior and mounted UI states**
 
 `ReportsPanel` must render loading, error with retry, empty, privacy-masked, current-period, six-period comparison, cumulative series, and drilldown states from server data. Do not calculate authoritative totals from DOM-visible rows.
 
@@ -253,7 +254,7 @@ export type ReportQuery = {
 };
 ```
 
-- [ ] **Step 5: Replace no-op push delivery with production Web Push**
+- [x] **Step 5: Replace no-op push delivery with production Web Push**
 
 Add `github.com/SherClockHolmes/webpush-go` at reviewed release `v1.4.0` and wrap it behind the existing `notification.Delivery` interface. Read `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `VAPID_SUBJECT`; production rejects partial configuration and never logs private keys, endpoints, `p256dh`, or auth secrets. Classify HTTP `404/410` as expired subscriptions; retry only transient failures using the existing bounded schedule.
 
@@ -268,7 +269,7 @@ type WebPushDelivery struct {
 
 Expose `VITE_WEB_PUSH_PUBLIC_KEY` as a Docker build argument sourced from the same public key, and keep `NoopDelivery` only when push is explicitly disabled outside production.
 
-- [ ] **Step 6: Expand real-browser journeys without force clicks**
+- [x] **Step 6: Expand real-browser journeys without force clicks**
 
 Create data only through the real API/UI. Assert a transfer changes both wallet balances but not income/expense reports; an excluded expense changes its wallet but not reports; edit and archive reverse the exact original effect; recurring execution creates a draft and never changes a balance before confirmation.
 
@@ -276,7 +277,7 @@ Create data only through the real API/UI. Assert a transfer changes both wallet 
 rtk npm run test:e2e -- accounting-correctness.spec.ts business-core.spec.ts planning-automation.spec.ts notifications.spec.ts
 ```
 
-- [ ] **Step 7: Run full regressions and commit**
+- [x] **Step 7: Run full regressions and commit**
 
 ```bash
 rtk proxy go test -race -p 1 ./... -count=1
@@ -291,7 +292,7 @@ rtk proxy git commit -m "fix: close personal finance correctness gaps"
 ### Task 4: Add Import, Export, and Account Lifecycle Jobs
 
 **Files:**
-- Create: `backend/migrations/0013_data_lifecycle.sql`
+- Create: `backend/migrations/0014_data_lifecycle.sql`
 - Create: `backend/internal/lifecycle/types.go`
 - Create: `backend/internal/lifecycle/repository.go`
 - Create: `backend/internal/lifecycle/repository_test.go`
@@ -409,7 +410,7 @@ rtk npm run test:e2e -- account-lifecycle.spec.ts import-export.spec.ts
 ```bash
 rtk proxy go test -race -p 1 ./... -count=1
 rtk npm test -- --run
-rtk proxy git add backend/migrations/0013_data_lifecycle.sql backend/internal/lifecycle backend/internal/platform/objectstore/s3.go backend/internal/platform/objectstore/objectstore_test.go backend/internal/platform/httpapi/lifecycle.go backend/internal/platform/httpapi/lifecycle_test.go backend/internal/platform/httpapi/router.go backend/internal/worker/lifecycle.go backend/internal/worker/lifecycle_test.go backend/cmd/api/main.go backend/cmd/worker/main.go frontend/src/app/lifecycle.ts frontend/src/screens/AccountScreen.tsx frontend/src/screens/AccountScreen.test.tsx frontend/e2e/account-lifecycle.spec.ts frontend/e2e/import-export.spec.ts
+rtk proxy git add backend/migrations/0014_data_lifecycle.sql backend/internal/lifecycle backend/internal/platform/objectstore/s3.go backend/internal/platform/objectstore/objectstore_test.go backend/internal/platform/httpapi/lifecycle.go backend/internal/platform/httpapi/lifecycle_test.go backend/internal/platform/httpapi/router.go backend/internal/worker/lifecycle.go backend/internal/worker/lifecycle_test.go backend/cmd/api/main.go backend/cmd/worker/main.go frontend/src/app/lifecycle.ts frontend/src/screens/AccountScreen.tsx frontend/src/screens/AccountScreen.test.tsx frontend/e2e/account-lifecycle.spec.ts frontend/e2e/import-export.spec.ts
 rtk proxy git commit -m "feat: add export and account lifecycle jobs"
 ```
 

@@ -49,7 +49,7 @@ func (p Processor) RunOnce(ctx context.Context) (int, error) {
 			}
 			continue
 		}
-		if err := p.Repo.RecordDeliverySuccess(ctx, sub.ID, now); err != nil {
+		if err := p.Repo.RecordDeliverySuccess(ctx, sub.ID, items[0].CreatedAt); err != nil {
 			return delivered, err
 		}
 		delivered++

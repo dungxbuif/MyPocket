@@ -38,7 +38,14 @@ func main() {
 	portfolioRepo := portfolio.NewRepository(conn)
 	auditRepo := audit.NewRepository(conn)
 	runner := worker.RecurringRunner{Processor: planning.NewRepository(conn)}
-	notificationProcessor := notification.Processor{Repo: notification.NewRepository(conn), Delivery: notification.NoopDelivery{}}
+	var pushDelivery notification.Delivery = notification.NoopDelivery{}
+	if cfg.WebPushEnabled {
+		pushDelivery, err = notification.NewWebPushDelivery(cfg.VAPIDPublicKey, cfg.VAPIDPrivateKey, cfg.VAPIDSubject, nil)
+		if err != nil {
+			log.Fatalf("web push configuration error: %v", err)
+		}
+	}
+	notificationProcessor := notification.Processor{Repo: notification.NewRepository(conn), Delivery: pushDelivery}
 	portfolioPriceRunner, err := worker.NewPortfolioPriceRunnerFromEnv(portfolioRepo)
 	if err != nil {
 		log.Fatalf("portfolio price worker configuration error: %v", err)

@@ -4,7 +4,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ReportsPanel, type ReportsPanelProps } from "./ReportsPanel";
 
 const summary = { income_vnd: 900000, expense_vnd: 120000, net_income_vnd: 780000, daily_average_vnd: 4000, from: "2026-08-01", to: "2026-08-31", timezone: "Asia/Ho_Chi_Minh", generated_at: "2026-09-09T03:00:00Z", data_version: 1, not_comparable: false, income_change_percent: 50, expense_change_percent: 20 };
-const report = { summary, categories: [{ category_name: "Ăn uống", amount_vnd: 120000, share_percent: 100 }], daily: [{ date: "2026-08-02", income_vnd: 500000, expense_vnd: 25000, net_income_vnd: 475000, cumulative_net_vnd: 650000 }], prior: { ...summary, from: "2026-07-01", to: "2026-07-31", income_vnd: 600000, expense_vnd: 100000, net_income_vnd: 500000 } };
+const periods = Array.from({ length: 6 }, (_, index) => ({ ...summary, from: `2026-0${3 + index}-01`, to: `2026-0${3 + index}-28`, income_vnd: 400000 + index * 100000, expense_vnd: 50000 + index * 10000, net_income_vnd: 350000 + index * 90000 }));
+const report = { summary, categories: [{ category_name: "Ăn uống", amount_vnd: 120000, share_percent: 100 }], daily: [{ date: "2026-08-02", income_vnd: 500000, expense_vnd: 25000, net_income_vnd: 475000, cumulative_net_vnd: 650000 }], prior: { ...summary, from: "2026-07-01", to: "2026-07-31", income_vnd: 600000, expense_vnd: 100000, net_income_vnd: 500000 }, periods };
 const props: ReportsPanelProps = { userID: "owner", online: true, privacyMasked: false, wallets: [{ id: "cash", name: "Tiền mặt", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: false, version: 1 }], onClose: vi.fn() };
 const ok = (value: unknown = report) => new Response(JSON.stringify({ report: value }), { status: 200 });
 
@@ -132,6 +133,17 @@ describe("ReportsPanel", () => {
     const comparison = await screen.findByRole("table", { name: "So sánh kỳ" });
     expect(within(comparison).getByRole("row", { name: /^Thu / })).toHaveTextContent("Không thể so sánh");
     expect(within(comparison).getByRole("row", { name: /^Chi / })).toHaveTextContent("20%");
+  });
+
+  it("renders six server-derived periods for comparison", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => ok()));
+    render(<ReportsPanel {...props} />);
+    filters("comparison");
+    await userEvent.click(screen.getByRole("button", { name: "Xem báo cáo" }));
+    const history = await screen.findByRole("table", { name: "So sánh 6 kỳ" });
+    expect(within(history).getAllByRole("row")).toHaveLength(7);
+    expect(within(history).getByText("400.000 đ")).toBeVisible();
+    expect(within(history).getByText("900.000 đ")).toBeVisible();
   });
 
   it("closes the report panel through its close control", async () => {

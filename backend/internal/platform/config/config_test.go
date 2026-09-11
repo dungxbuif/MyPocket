@@ -128,3 +128,31 @@ func TestProductionRejectsInsecurePublicWebURL(t *testing.T) {
 		t.Fatalf("expected https public web URL error, got %v", err)
 	}
 }
+
+func TestWebPushConfigurationMustBeCompleteAndEnabledInProduction(t *testing.T) {
+	base := map[string]string{
+		"APP_ENV":             "production",
+		"DATABASE_URL":        "postgres://localhost/mypocket",
+		"PUBLIC_WEB_URL":      "https://app.example.com",
+		"COOKIE_SECRET":       "01234567890123456789012345678901",
+		"CSRF_SECRET":         "abcdefghijklmnopqrstuvwxyz123456",
+		"AUDIT_VIEWER_EMAIL":  "owner@example.com",
+		"AUDIT_HASH_SECRET":   "01234567890123456789012345678901",
+		"API_KEY_HASH_SECRET": "01234567890123456789012345678901",
+		"REDIS_URL":           "redis://localhost:6379/0",
+		"LOG_FORMAT":          "json",
+	}
+	if _, err := config.Load(base); err == nil || !strings.Contains(err.Error(), "WEB_PUSH_ENABLED") {
+		t.Fatalf("expected production Web Push requirement, got %v", err)
+	}
+	base["WEB_PUSH_ENABLED"] = "true"
+	base["VAPID_PUBLIC_KEY"] = "public"
+	if _, err := config.Load(base); err == nil || !strings.Contains(err.Error(), "VAPID_PRIVATE_KEY") {
+		t.Fatalf("expected complete VAPID configuration, got %v", err)
+	}
+	base["VAPID_PRIVATE_KEY"] = "private"
+	base["VAPID_SUBJECT"] = "owner@example.com"
+	if cfg, err := config.Load(base); err != nil || !cfg.WebPushEnabled {
+		t.Fatalf("expected valid production Web Push config, cfg=%#v err=%v", cfg, err)
+	}
+}

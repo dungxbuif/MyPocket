@@ -89,12 +89,20 @@ func reports(cfg config.Config, repo AnalyticsRepository) http.HandlerFunc {
 			report.Categories, err = repo.Categories(r.Context(), userID, filter)
 		}
 		if err == nil && kind == "comparison" {
-			span := filter.To.Sub(filter.From) + time.Nanosecond
-			prior := analytics.Filter{From: filter.From.Add(-span), To: filter.To.Add(-span), WalletID: filter.WalletID}
-			priorSummary, priorErr := repo.Summary(r.Context(), userID, prior)
-			if priorErr != nil {
-				err = priorErr
-			} else {
+			periodFilters := comparisonPeriods(filter)
+			report.Periods = make([]analytics.Summary, 0, len(periodFilters))
+			for index, periodFilter := range periodFilters {
+				periodSummary := report.Summary
+				if index != len(periodFilters)-1 {
+					periodSummary, err = repo.Summary(r.Context(), userID, periodFilter)
+					if err != nil {
+						break
+					}
+				}
+				report.Periods = append(report.Periods, periodSummary)
+			}
+			if err == nil {
+				priorSummary := report.Periods[len(report.Periods)-2]
 				report.Prior = &priorSummary
 				report.Summary.NotComparable = priorSummary.IncomeVND == 0 && priorSummary.ExpenseVND == 0
 				if priorSummary.IncomeVND > 0 {
@@ -128,6 +136,17 @@ func reports(cfg config.Config, repo AnalyticsRepository) http.HandlerFunc {
 		}
 		writeJSON(w, http.StatusOK, analyticsEnvelope{Status: "ok", Report: report, GeneratedAt: report.Summary.GeneratedAt, Timezone: report.Summary.Timezone, From: report.Summary.From, To: report.Summary.To, DataVersion: report.Summary.DataVersion, CorrelationID: correlationID(r.Context())})
 	}
+}
+
+func comparisonPeriods(current analytics.Filter) []analytics.Filter {
+	periods := make([]analytics.Filter, 6)
+	periods[len(periods)-1] = current
+	span := current.To.Sub(current.From) + time.Nanosecond
+	for index := len(periods) - 2; index >= 0; index-- {
+		next := periods[index+1]
+		periods[index] = analytics.Filter{From: next.From.Add(-span), To: next.To.Add(-span), WalletID: current.WalletID}
+	}
+	return periods
 }
 
 func parseAnalyticsFilter(r *http.Request) (analytics.Filter, error) {

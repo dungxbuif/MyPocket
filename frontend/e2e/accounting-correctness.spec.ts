@@ -108,7 +108,10 @@ test('report APIs and mounted report controls agree with a known ledger across t
     { date: '2026-09-01', income_vnd: 1000000, expense_vnd: 120000, net_income_vnd: 880000, cumulative_net_vnd: 880000 },
     { date: '2026-09-02', income_vnd: 0, expense_vnd: 80000, net_income_vnd: -80000, cumulative_net_vnd: 800000 },
   ]);
-  expect((await get(`reports/comparison${range}`)).report.prior).toMatchObject({ income_vnd: 999999, expense_vnd: 0 });
+  const comparison = (await get(`reports/comparison${range}`)).report;
+  expect(comparison.prior).toMatchObject({ income_vnd: 999999, expense_vnd: 0 });
+  expect(comparison.periods).toHaveLength(6);
+  expect(comparison.periods.at(-1)).toMatchObject({ income_vnd: 1000000, expense_vnd: 200000, from: '2026-09-01', to: '2026-09-02' });
   expect((await get(`reports/insider${range}`)).report).toMatchObject({ spent_vnd: 200000, average_daily_vnd: 100000, selected_category: { name: 'Chi kiểm chứng', transaction_count: 2 } });
   const dashboard = (await get(`dashboard${range}`)).report;
   expect(dashboard.summary).toMatchObject({ income_vnd: 1000000, expense_vnd: 200000 });
@@ -127,6 +130,9 @@ test('report APIs and mounted report controls agree with a known ledger across t
     await expect(summary).toContainText('200.000 đ');
     await expect(summary).toContainText('800.000 đ');
   }
+  await panel.getByRole('combobox', { name: 'Loại báo cáo', exact: true }).selectOption('comparison');
+  await panel.getByRole('button', { name: 'Xem báo cáo', exact: true }).click();
+  await expect(panel.getByRole('table', { name: 'So sánh 6 kỳ' }).getByRole('row')).toHaveCount(7);
   await panel.getByRole('combobox', { name: 'Ví báo cáo', exact: true }).selectOption(b.id);
   await panel.getByRole('button', { name: 'Xem báo cáo', exact: true }).click();
   const summary = panel.getByRole('table', { name: 'Tổng hợp báo cáo' });

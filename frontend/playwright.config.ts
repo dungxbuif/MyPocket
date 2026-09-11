@@ -11,7 +11,7 @@ export default defineConfig({
       timeout: 30_000,
     },
     {
-      command: 'VITE_API_BASE_URL="http://127.0.0.1:18173" npm run build && npm run preview -- --host 0.0.0.0 --port 4173',
+      command: 'VITE_API_BASE_URL="http://127.0.0.1:18173" VITE_WEB_PUSH_PUBLIC_KEY="test-public-key" npm run build && npm run preview -- --host 0.0.0.0 --port 4173',
       url: 'http://127.0.0.1:4173',
       reuseExistingServer: false,
       timeout: 30_000,
