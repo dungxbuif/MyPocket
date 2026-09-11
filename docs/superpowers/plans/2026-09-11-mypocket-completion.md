@@ -521,7 +521,7 @@ rtk proxy git commit -m "feat: publish and protect the public API contract"
 ### Task 6: Add the OpenAI-Compatible Agent and Review-First Drafts
 
 **Files:**
-- Create: `backend/migrations/0014_agent.sql`
+- Create: `backend/migrations/0015_agent.sql`
 - Create: `backend/internal/agent/types.go`
 - Create: `backend/internal/agent/validation.go`
 - Create: `backend/internal/agent/validation_test.go`
@@ -549,7 +549,7 @@ rtk proxy git commit -m "feat: publish and protect the public API contract"
 - Produces: `POST /api/v1/agent/messages`, `GET /api/v1/agent/runs/{id}`, and existing draft confirm/reject interoperability
 - Produces: `agent.Model`, `agent.Service`, a leased `worker.AgentRunner`, and an OpenAI-compatible Responses/Chat Completions adapter selected by configuration
 
-- [ ] **Step 1: Write config and provider contract tests**
+- [x] **Step 1: Write config and provider contract tests**
 
 ```go
 type Model interface {
@@ -565,13 +565,13 @@ type ModelRequest struct {
 
 Tests must cover custom base URL, model, Bearer key, timeout, bounded retry only for retryable status, maximum response bytes, malformed JSON, refusal, and redacted errors.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 rtk proxy go test ./internal/platform/config ./internal/platform/openai ./internal/agent ./internal/platform/httpapi -count=1
 ```
 
-- [ ] **Step 3: Add production-safe configuration**
+- [x] **Step 3: Add production-safe configuration**
 
 ```go
 type AIConfig struct {
@@ -586,7 +586,7 @@ type AIConfig struct {
 
 Read `AI_ENABLED`, `AI_BASE_URL`, `AI_API_KEY`, `AI_MODEL`, `AI_TIMEOUT`, and `AI_MAX_RETRIES`. Production with `AI_ENABLED=true` must reject missing URL/key/model, non-HTTPS URL, timeout outside `1s..120s`, or retries outside `0..3`. Never include the key in formatted config/errors.
 
-Migration `0014_agent.sql` adds an immutable agent-run request/provenance row and extends existing `transaction_drafts` with nullable agent source/provenance fields without changing recurring-draft behavior:
+Migration `0015_agent.sql` adds an immutable agent-run request/provenance row and extends existing `transaction_drafts` with nullable agent source/provenance fields without changing recurring-draft behavior:
 
 ```sql
 CREATE TABLE agent_runs (
@@ -606,7 +606,7 @@ ALTER TABLE transaction_drafts ADD COLUMN IF NOT EXISTS agent_run_id uuid REFERE
 ALTER TABLE transaction_drafts ADD COLUMN IF NOT EXISTS provenance jsonb NOT NULL DEFAULT '{}'::jsonb;
 ```
 
-- [ ] **Step 4: Implement typed queued agent runs and finance-context minimization**
+- [x] **Step 4: Implement typed queued agent runs and finance-context minimization**
 
 ```go
 type ProposedTransaction struct {
@@ -622,7 +622,7 @@ type ProposedTransaction struct {
 
 The HTTP service stores an idempotent queued run and returns immediately. `worker.AgentRunner` claims due runs with a PostgreSQL lease/`FOR UPDATE SKIP LOCKED`, commits the claim, calls the provider outside the transaction, then persists the terminal result. Send only owned active wallet/category IDs plus display names and the minimum requested aggregate context. Validate schema, ownership, transaction shape, integer money, dates, and stale versions before inserting a pending draft. Analysis responses are read-only and cite the date/filter scope used.
 
-- [ ] **Step 5: Prove confirmation is the only accounting boundary**
+- [x] **Step 5: Prove confirmation is the only accounting boundary**
 
 Tests must assert provider success, retry, timeout, injection text, foreign IDs, overflow, unknown fields, and duplicate requests leave wallet balances unchanged. Only existing `ConfirmTransactionDraft` may call the finance command, with user ownership, optimistic version, and idempotency.
 
@@ -630,10 +630,10 @@ Tests must assert provider success, retry, timeout, injection text, foreign IDs,
 rtk proxy env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./internal/agent ./internal/planning ./internal/finance ./internal/platform/httpapi -count=1
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
-rtk proxy git add backend/migrations/0014_agent.sql backend/internal/agent backend/internal/platform/openai backend/internal/worker/agent.go backend/internal/worker/agent_test.go backend/internal/platform/httpapi/agent.go backend/internal/platform/httpapi/agent_test.go backend/internal/platform/httpapi/openapi.json backend/internal/platform/httpapi/openapi_test.go backend/internal/platform/httpapi/router.go backend/internal/platform/config backend/cmd/api/main.go backend/cmd/worker/main.go .env.example compose.yaml
+rtk proxy git add backend/migrations/0015_agent.sql backend/internal/agent backend/internal/platform/openai backend/internal/worker/agent.go backend/internal/worker/agent_test.go backend/internal/platform/httpapi/agent.go backend/internal/platform/httpapi/agent_test.go backend/internal/platform/httpapi/openapi.json backend/internal/platform/httpapi/openapi_test.go backend/internal/platform/httpapi/router.go backend/internal/platform/config backend/cmd/api/main.go backend/cmd/worker/main.go .env.example compose.yaml
 rtk proxy git commit -m "feat: add review-first OpenAI-compatible agent"
 ```
 
@@ -642,7 +642,7 @@ rtk proxy git commit -m "feat: add review-first OpenAI-compatible agent"
 ### Task 7: Add OCR Platform as a Third-Party Agent Image Tool
 
 **Files:**
-- Create: `backend/migrations/0015_agent_image_tools.sql`
+- Create: `backend/migrations/0016_agent_image_tools.sql`
 - Create: `backend/internal/platform/ocr/client.go`
 - Create: `backend/internal/platform/ocr/client_test.go`
 - Create: `backend/internal/agent/image_tool.go`
@@ -705,7 +705,7 @@ Submit JSON Base64 because MyPocket's 15 MiB limit is below OCR Platform's 25 Mi
 
 - [ ] **Step 4: Add migration 0015, persist generic agent tool runs, and process them with a lease**
 
-Migration `0015_agent_image_tools.sql` creates the tool-run storage after Task 6's general agent schema. Store owning user, image object ID, optional agent/receipt association, provider document ID, state, attempt count, timestamps, result expiry, safe result/provenance, and redacted error code. Claim rows with `FOR UPDATE SKIP LOCKED`; never hold a database transaction across an HTTP provider call.
+Migration `0016_agent_image_tools.sql` creates the tool-run storage after Task 6's general agent schema. Store owning user, image object ID, optional agent/receipt association, provider document ID, state, attempt count, timestamps, result expiry, safe result/provenance, and redacted error code. Claim rows with `FOR UPDATE SKIP LOCKED`; never hold a database transaction across an HTTP provider call.
 
 ```sql
 CREATE TABLE agent_tool_runs (
@@ -754,7 +754,7 @@ Read `OCR_ENABLED`, `OCR_BASE_URL`, `OCR_API_KEY`, `OCR_TIMEOUT`, `OCR_POLL_INTE
 ```bash
 rtk proxy go test -race ./... -count=1
 rtk proxy go vet ./...
-rtk proxy git add backend/migrations/0015_agent_image_tools.sql backend/internal/platform/ocr backend/internal/platform/objectstore backend/internal/agent backend/internal/worker/agent_tools.go backend/internal/worker/agent_tools_test.go backend/internal/platform/httpapi/agent.go backend/internal/platform/httpapi/agent_test.go backend/internal/platform/httpapi/openapi.json backend/internal/platform/httpapi/openapi_test.go backend/internal/platform/config backend/cmd/api/main.go backend/cmd/worker/main.go .env.example compose.yaml
+rtk proxy git add backend/migrations/0016_agent_image_tools.sql backend/internal/platform/ocr backend/internal/platform/objectstore backend/internal/agent backend/internal/worker/agent_tools.go backend/internal/worker/agent_tools_test.go backend/internal/platform/httpapi/agent.go backend/internal/platform/httpapi/agent_test.go backend/internal/platform/httpapi/openapi.json backend/internal/platform/httpapi/openapi_test.go backend/internal/platform/httpapi/router.go backend/internal/platform/config backend/cmd/api/main.go backend/cmd/worker/main.go .env.example compose.yaml
 rtk proxy git commit -m "feat: add third-party OCR agent tool"
 ```
 

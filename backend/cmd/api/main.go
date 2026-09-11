@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"mypocket/internal/agent"
 	"mypocket/internal/analytics"
 	"mypocket/internal/audit"
 	"mypocket/internal/finance"
@@ -37,6 +38,11 @@ func main() {
 	defer conn.Close()
 
 	financeRepo := finance.NewRepository(conn)
+	agentRepo := agent.NewRepository(conn)
+	var agentService httpapi.AgentService
+	if cfg.AI.Enabled {
+		agentService = agent.Service{Store: agentRepo}
+	}
 	portfolioRepo := portfolio.NewRepository(conn)
 	auditRepo := audit.NewRepository(conn)
 	identityRepo := identity.NewRepository(conn)
@@ -82,6 +88,7 @@ func main() {
 		LifecycleRepository:    lifecycle.NewRepository(conn),
 		LifecycleObjectStore:   lifecycleStore,
 		APIKeyLimiter:          apiLimiter,
+		AgentService:           agentService,
 		ReadyCheck: func() error {
 			return conn.PingContext(context.Background())
 		},

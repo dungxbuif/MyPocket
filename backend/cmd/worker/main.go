@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"mypocket/internal/agent"
 	"mypocket/internal/audit"
 	"mypocket/internal/lifecycle"
 	"mypocket/internal/notification"
@@ -16,6 +17,7 @@ import (
 	"mypocket/internal/platform/db"
 	"mypocket/internal/platform/logging"
 	"mypocket/internal/platform/objectstore"
+	openaiadapter "mypocket/internal/platform/openai"
 	"mypocket/internal/portfolio"
 	"mypocket/internal/worker"
 )
@@ -61,6 +63,14 @@ func main() {
 		}
 	}
 	lifecycleRunner := worker.LifecycleRunner{Repo: lifecycle.NewRepository(conn), Store: lifecycleStore}
+	var agentRunner worker.AgentRunner
+	if cfg.AI.Enabled {
+		model, modelErr := openaiadapter.New(cfg.AI.BaseURL, cfg.AI.APIKey, cfg.AI.Model, cfg.AI.Timeout, cfg.AI.MaxRetries)
+		if modelErr != nil {
+			log.Fatalf("AI provider configuration error: %v", modelErr)
+		}
+		agentRunner = worker.AgentRunner{Repo: agent.NewRepository(conn), Model: model, Owner: "worker-agent"}
+	}
 
 	log.Printf("worker ready in %s", cfg.AppEnv)
 	for {
@@ -95,6 +105,12 @@ func main() {
 			_ = auditRepo.Append(context.Background(), audit.Event{CorrelationID: "worker", Action: "worker.lifecycle", Outcome: audit.OutcomeFailure, Severity: audit.SeverityError, Source: audit.SourceWorker})
 		} else if processed > 0 {
 			log.Printf("lifecycle worker processed %d job(s)", processed)
+		}
+		if processed, err := agentRunner.RunOnce(context.Background()); err != nil {
+			log.Printf("agent worker error: %v", err)
+			_ = auditRepo.Append(context.Background(), audit.Event{CorrelationID: "worker", Action: "worker.agent", Outcome: audit.OutcomeFailure, Severity: audit.SeverityError, Source: audit.SourceWorker})
+		} else if processed {
+			log.Printf("agent worker processed one run")
 		}
 		select {
 		case <-ticker.C:

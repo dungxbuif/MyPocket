@@ -40,6 +40,7 @@ type Dependencies struct {
 	LifecycleRepository    LifecycleRepository
 	LifecycleObjectStore   LifecycleObjectStore
 	APIKeyLimiter          APIKeyLimiter
+	AgentService           AgentService
 }
 
 func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
@@ -90,6 +91,8 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/account/reset", destructiveAccount(cfg, deps.LifecycleRepository, lifecycle.KindReset))
 	mux.HandleFunc("/api/v1/account/delete", destructiveAccount(cfg, deps.LifecycleRepository, lifecycle.KindDelete))
 	mux.HandleFunc("/api/v1/account/jobs/", accountJob(cfg, deps.LifecycleRepository))
+	mux.HandleFunc("/api/v1/agent/messages", agentMessages(cfg, deps.AgentService))
+	mux.HandleFunc("/api/v1/agent/runs/", agentRunByID(cfg, deps.AgentService))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
 	mux.HandleFunc("/api/v1/health/ready", readyHealth(deps))
 	mux.HandleFunc("/api/v1/openapi.json", openAPI)

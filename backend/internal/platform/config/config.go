@@ -5,7 +5,17 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"time"
 )
+
+type AIConfig struct {
+	Enabled    bool
+	BaseURL    string
+	APIKey     string
+	Model      string
+	Timeout    time.Duration
+	MaxRetries int
+}
 
 type Config struct {
 	AppEnv                string
@@ -36,6 +46,7 @@ type Config struct {
 	VAPIDPrivateKey       string
 	VAPIDSubject          string
 	APIRateLimitPerMinute int
+	AI                    AIConfig
 }
 
 func Load(env map[string]string) (Config, error) {
@@ -68,6 +79,14 @@ func Load(env map[string]string) (Config, error) {
 		VAPIDPrivateKey:       env["VAPID_PRIVATE_KEY"],
 		VAPIDSubject:          strings.TrimSpace(env["VAPID_SUBJECT"]),
 		APIRateLimitPerMinute: intOrDefault(env["API_RATE_LIMIT_PER_MINUTE"], 120),
+		AI: AIConfig{
+			Enabled:    env["AI_ENABLED"] == "true",
+			BaseURL:    strings.TrimRight(strings.TrimSpace(env["AI_BASE_URL"]), "/"),
+			APIKey:     env["AI_API_KEY"],
+			Model:      strings.TrimSpace(env["AI_MODEL"]),
+			Timeout:    durationOrDefault(env["AI_TIMEOUT"], 30*time.Second),
+			MaxRetries: intOrDefault(env["AI_MAX_RETRIES"], 2),
+		},
 	}
 
 	missing := make([]string, 0, 4)
@@ -140,6 +159,22 @@ func Load(env map[string]string) (Config, error) {
 	if cfg.APIRateLimitPerMinute <= 0 || cfg.APIRateLimitPerMinute > 10_000 {
 		return Config{}, fmt.Errorf("invalid config: API_RATE_LIMIT_PER_MINUTE must be between 1 and 10000")
 	}
+	if cfg.AI.Enabled {
+		if cfg.AI.BaseURL == "" || cfg.AI.APIKey == "" || cfg.AI.Model == "" {
+			return Config{}, fmt.Errorf("missing required config: AI_BASE_URL, AI_API_KEY, and AI_MODEL are required when AI_ENABLED=true")
+		}
+		if cfg.AI.Timeout < time.Second || cfg.AI.Timeout > 120*time.Second {
+			return Config{}, fmt.Errorf("invalid config: AI_TIMEOUT must be between 1s and 120s")
+		}
+		if cfg.AI.MaxRetries < 0 || cfg.AI.MaxRetries > 3 {
+			return Config{}, fmt.Errorf("invalid config: AI_MAX_RETRIES must be between 0 and 3")
+		}
+		if cfg.AppEnv == "production" && !strings.HasPrefix(cfg.AI.BaseURL, "https://") {
+			return Config{}, fmt.Errorf("invalid config: AI_BASE_URL must use https in production")
+		}
+	} else if cfg.AI.BaseURL != "" || cfg.AI.APIKey != "" || cfg.AI.Model != "" {
+		return Config{}, fmt.Errorf("invalid config: AI_ENABLED must be true when AI settings are present")
+	}
 	if cfg.AppEnv == "production" {
 		if !strings.HasPrefix(cfg.PublicWebURL, "https://") {
 			return Config{}, fmt.Errorf("invalid config: PUBLIC_WEB_URL must use https in production")
@@ -209,6 +244,18 @@ func intOrDefault(value string, fallback int) int {
 	parsed, err := strconv.Atoi(value)
 	if err != nil {
 		return fallback
+	}
+	return parsed
+}
+
+func durationOrDefault(value string, fallback time.Duration) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return 0
 	}
 	return parsed
 }

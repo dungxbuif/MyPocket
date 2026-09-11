@@ -172,3 +172,22 @@ func TestAPIRateLimitDefaultsAndRejectsUnsafeBounds(t *testing.T) {
 		t.Fatal("expected upper bound error")
 	}
 }
+
+func TestLoadAIConfigurationIsFailClosedAndSecretFree(t *testing.T) {
+	env := map[string]string{"DATABASE_URL": "postgres://localhost/mypocket", "PUBLIC_WEB_URL": "http://localhost", "COOKIE_SECRET": "01234567890123456789012345678901", "CSRF_SECRET": "abcdefghijklmnopqrstuvwxyz123456", "AI_ENABLED": "true", "AI_BASE_URL": "http://provider.test", "AI_API_KEY": "do-not-leak", "AI_MODEL": "model-a"}
+	cfg, err := config.Load(env)
+	if err != nil || !cfg.AI.Enabled || cfg.AI.Timeout.String() != "30s" || cfg.AI.MaxRetries != 2 {
+		t.Fatalf("unexpected config %#v error=%v", cfg.AI, err)
+	}
+	env["AI_TIMEOUT"] = "500ms"
+	_, err = config.Load(env)
+	if err == nil || strings.Contains(err.Error(), "do-not-leak") {
+		t.Fatalf("expected redacted timeout error, got %v", err)
+	}
+	env["AI_TIMEOUT"] = "30s"
+	env["APP_ENV"] = "production"
+	_, err = config.Load(env)
+	if err == nil || !strings.Contains(err.Error(), "AI_BASE_URL must use https") || strings.Contains(err.Error(), "do-not-leak") {
+		t.Fatalf("expected production TLS validation, got %v", err)
+	}
+}

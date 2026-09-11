@@ -218,7 +218,7 @@ func (r *Repository) ResetUserData(ctx context.Context, userID string) error {
 		return err
 	}
 	defer func() { _ = tx.Rollback() }()
-	for _, table := range []string{"push_subscriptions", "notifications", "transaction_drafts", "recurring_occurrences", "recurring_schedules", "budget_alerts", "budget_categories", "budgets", "event_transactions", "obligation_repayments", "events", "obligations", "asset_price_history", "asset_trades", "asset_positions", "sync_changes", "sync_mutations", "sync_cursors", "finance_idempotency_keys", "transactions", "wallet_category_settings", "receipt_objects", "wallets", "categories"} {
+	for _, table := range []string{"push_subscriptions", "notifications", "transaction_drafts", "agent_runs", "recurring_occurrences", "recurring_schedules", "budget_alerts", "budget_categories", "budgets", "event_transactions", "obligation_repayments", "events", "obligations", "asset_price_history", "asset_trades", "asset_positions", "sync_changes", "sync_mutations", "sync_cursors", "finance_idempotency_keys", "transactions", "wallet_category_settings", "receipt_objects", "wallets", "categories"} {
 		if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` WHERE user_id=$1`, userID); err != nil {
 			return fmt.Errorf("reset %s: %w", table, err)
 		}
