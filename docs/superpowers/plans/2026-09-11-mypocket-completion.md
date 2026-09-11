@@ -319,7 +319,7 @@ rtk proxy git commit -m "fix: close personal finance correctness gaps"
 - Produces: `POST /api/v1/imports`, `GET /api/v1/imports/{id}`, `POST /api/v1/imports/{id}/confirm`, `POST /api/v1/exports`, `GET /api/v1/exports/{id}`, `GET /api/v1/exports/{id}/download`, `POST /api/v1/account/reset`, `POST /api/v1/account/delete`, `GET /api/v1/account/jobs/{id}`
 - Produces: `lifecycle.Repository`, `lifecycle.ImportParser`, `lifecycle.ExportFormatter`, `ObjectStore.PutObject`, and `worker.LifecycleRunner`
 
-- [ ] **Step 1: Write the failing schema and repository tests**
+- [x] **Step 1: Write the failing schema and repository tests**
 
 ```sql
 CREATE TABLE data_jobs (
@@ -343,13 +343,13 @@ CREATE TABLE data_jobs (
 
 Tests must prove two-user isolation, import preview/confirmation, immutable export snapshot selection, idempotent replay, exact reset scope, immediate access disable for delete, resumable jobs, and failure on foreign S3 prefixes.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 rtk proxy go test ./internal/lifecycle ./internal/platform/httpapi ./internal/worker -count=1
 ```
 
-- [ ] **Step 3: Implement CSV export and private download**
+- [x] **Step 3: Implement CSV export and private download**
 
 ```go
 type ExportRequest struct {
@@ -371,7 +371,7 @@ Extend the object-store adapter with a bounded streaming upload used by the work
 func (s *S3Store) PutObject(ctx context.Context, key, contentType string, body io.Reader, size int64) error
 ```
 
-- [ ] **Step 4: Implement review-first CSV import**
+- [x] **Step 4: Implement review-first CSV import**
 
 Before destructive operations, implement import as a review-first job. Accept only a private owned CSV object up to 15 MiB and 10,000 rows; require UTF-8 stable headers, parse dates/time zones explicitly, accept integer VND only, resolve wallet/category references to owned records, and return a preview containing valid rows plus row-numbered errors. Confirmation revalidates the preview version and applies valid rows through existing finance commands with stable per-row idempotency keys; any validation error prevents the entire import from posting.
 
@@ -385,7 +385,7 @@ type ImportPreview struct {
 }
 ```
 
-- [ ] **Step 5: Implement reset/delete planning and resumable cleanup**
+- [x] **Step 5: Implement reset/delete planning and resumable cleanup**
 
 Require recent authentication, exact typed confirmation, CSRF for cookie callers, `Idempotency-Key`, and a server-produced affected-count preview token. Reset preserves identity and lifecycle audit evidence. Delete disables authentication first, revokes API keys/cache, then deletes only `users/{userID}/` objects and documented database rows.
 
@@ -396,7 +396,7 @@ type DestructiveRequest struct {
 }
 ```
 
-- [ ] **Step 6: Mount Account UI and E2E states**
+- [x] **Step 6: Mount Account UI and E2E states**
 
 Use existing base dialog/button/error components for import preview/errors/confirm, export progress/download, destructive preview, typed confirmation, cancel, terminal failure, retry, and success. Tests must prove import preview never mutates balances, cancel is non-mutating, confirmed valid import applies once, and cross-user job/download URLs return `404`.
 
@@ -405,7 +405,7 @@ rtk npm test -- --run src/screens/AccountScreen.test.tsx
 rtk npm run test:e2e -- account-lifecycle.spec.ts import-export.spec.ts
 ```
 
-- [ ] **Step 7: Run regressions and commit**
+- [x] **Step 7: Run regressions and commit**
 
 ```bash
 rtk proxy go test -race -p 1 ./... -count=1

@@ -138,3 +138,33 @@ describe('API key operation feedback', () => {
     expect(screen.queryByText('Đã sao chép API key.')).not.toBeInTheDocument();
   });
 });
+
+describe('data lifecycle controls', () => {
+  it('creates an export job and exposes its explicit progress state', async () => {
+    vi.stubGlobal('crypto', { ...crypto, randomUUID: () => 'export-request' });
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, options?: RequestInit) => {
+      const path = String(url);
+      if (path.includes('/api-keys')) return ok({ keys: [] });
+      if (path.includes('/audit/access')) return ok({ allowed: false });
+      if (path.endsWith('/exports') && options?.method === 'POST') return new Response(JSON.stringify({ job: { id: 'export-1', kind: 'export', status: 'queued', version: 1 } }), { status: 202 });
+      return failure();
+    }));
+    render(<AccountScreen {...input} />);
+    await userEvent.click(screen.getByRole('button', { name: 'Tạo bản xuất CSV' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('export: queued');
+  });
+
+  it('uploads CSV into a review-first import job', async () => {
+    vi.stubGlobal('crypto', { ...crypto, randomUUID: () => 'import-request' });
+    vi.stubGlobal('fetch', vi.fn(async (url: RequestInfo | URL, options?: RequestInit) => {
+      const path = String(url);
+      if (path.includes('/api-keys')) return ok({ keys: [] });
+      if (path.includes('/audit/access')) return ok({ allowed: false });
+      if (path.endsWith('/imports') && options?.method === 'POST') return new Response(JSON.stringify({ job: { id: 'import-1', kind: 'import', status: 'queued', version: 1 } }), { status: 202 });
+      return failure();
+    }));
+    render(<AccountScreen {...input} />);
+    await userEvent.upload(screen.getByLabelText('Chọn CSV để nhập'), new File(['occurred_at,type\n'], 'input.csv', { type: 'text/csv' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('import: queued');
+  });
+});

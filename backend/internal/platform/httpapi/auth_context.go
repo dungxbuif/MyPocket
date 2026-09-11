@@ -68,7 +68,14 @@ func resolveCookieUserID(ctx context.Context, cfg config.Config, repo IdentityRe
 	}
 	cacheKey := "auth:session:" + authcache.DigestToken(cookie.Value)
 	if userID, ok, err := cache.Get(ctx, cacheKey); err == nil && ok && userID != "" {
-		return userID, true
+		if repo == nil {
+			return userID, true
+		}
+		if _, findErr := repo.FindByID(ctx, userID); findErr == nil {
+			return userID, true
+		}
+		_ = cache.Delete(ctx, cacheKey)
+		return "", false
 	}
 	claims, err := identity.NewCookieSigner([]byte(cfg.CookieSecret)).Verify(cookie.Value)
 	if err != nil {

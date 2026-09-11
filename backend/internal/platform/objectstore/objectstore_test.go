@@ -1,8 +1,10 @@
 package objectstore_test
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"os"
 	"strings"
 	"testing"
@@ -67,6 +69,23 @@ func TestS3SmokeObjectLifecycle(t *testing.T) {
 	}
 	if err := store.DeleteSmokeObject(context.Background()); err != nil {
 		t.Fatalf("delete smoke object: %v", err)
+	}
+	payload := []byte("dataset,id\nwallets,w1\n")
+	key := "users/test/exports/lifecycle.csv"
+	if err := store.PutObject(context.Background(), key, "text/csv", bytes.NewReader(payload), int64(len(payload))); err != nil {
+		t.Fatalf("put lifecycle object: %v", err)
+	}
+	body, size, err := store.GetObject(context.Background(), key, 1024)
+	if err != nil {
+		t.Fatalf("get lifecycle object: %v", err)
+	}
+	defer body.Close()
+	got, err := io.ReadAll(body)
+	if err != nil || size != int64(len(payload)) || !bytes.Equal(got, payload) {
+		t.Fatalf("lifecycle object mismatch size=%d body=%q err=%v", size, got, err)
+	}
+	if err := store.DeleteObject(context.Background(), key); err != nil {
+		t.Fatalf("delete lifecycle object: %v", err)
 	}
 }
 

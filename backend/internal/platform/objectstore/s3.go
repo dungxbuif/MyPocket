@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"strings"
 	"time"
 
@@ -80,6 +81,56 @@ func (s *S3Store) DeleteObject(ctx context.Context, key string) error {
 		return fmt.Errorf("delete object: %w", err)
 	}
 	return nil
+}
+
+func (s *S3Store) PutObject(ctx context.Context, key, contentType string, body io.Reader, size int64) error {
+	if size < 0 || size > 20<<20 {
+		return fmt.Errorf("object size is outside the allowed range")
+	}
+	payload, err := io.ReadAll(io.LimitReader(body, size+1))
+	if err != nil || int64(len(payload)) != size {
+		return fmt.Errorf("object body does not match declared size")
+	}
+	_, err = s.client.PutObject(ctx, &s3.PutObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key), ContentType: aws.String(contentType), Body: bytes.NewReader(payload), ContentLength: aws.Int64(size)})
+	if err != nil {
+		return fmt.Errorf("put object failed")
+	}
+	return nil
+}
+
+func (s *S3Store) GetObject(ctx context.Context, key string, maxSize int64) (io.ReadCloser, int64, error) {
+	result, err := s.client.GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(s.bucket), Key: aws.String(key)})
+	if err != nil {
+		return nil, 0, fmt.Errorf("get object failed")
+	}
+	size := aws.ToInt64(result.ContentLength)
+	if size < 0 || size > maxSize {
+		result.Body.Close()
+		return nil, 0, fmt.Errorf("object size is outside the allowed range")
+	}
+	return result.Body, size, nil
+}
+
+func (s *S3Store) DeletePrefix(ctx context.Context, prefix string) error {
+	if !strings.HasPrefix(prefix, "users/") || !strings.HasSuffix(prefix, "/") {
+		return fmt.Errorf("invalid private object prefix")
+	}
+	var token *string
+	for {
+		listed, err := s.client.ListObjectsV2(ctx, &s3.ListObjectsV2Input{Bucket: aws.String(s.bucket), Prefix: aws.String(prefix), ContinuationToken: token})
+		if err != nil {
+			return fmt.Errorf("list private objects failed")
+		}
+		for _, object := range listed.Contents {
+			if _, err = s.client.DeleteObject(ctx, &s3.DeleteObjectInput{Bucket: aws.String(s.bucket), Key: object.Key}); err != nil {
+				return fmt.Errorf("delete private object failed")
+			}
+		}
+		if !aws.ToBool(listed.IsTruncated) {
+			return nil
+		}
+		token = listed.NextContinuationToken
+	}
 }
 
 func (s *S3Store) PutSmokeObject(ctx context.Context) error {

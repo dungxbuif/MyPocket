@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -14,6 +15,7 @@ import (
 	"mypocket/internal/audit"
 	"mypocket/internal/finance"
 	"mypocket/internal/identity"
+	"mypocket/internal/lifecycle"
 	"mypocket/internal/notification"
 	"mypocket/internal/planning"
 	"mypocket/internal/platform/config"
@@ -35,6 +37,8 @@ type Dependencies struct {
 	AnalyticsRepository    AnalyticsRepository
 	PortfolioRepository    PortfolioRepository
 	SyncService            SyncService
+	LifecycleRepository    LifecycleRepository
+	LifecycleObjectStore   LifecycleObjectStore
 }
 
 func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
@@ -78,6 +82,13 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/sync/resync", syncResync(cfg, deps.SyncService))
 	mux.HandleFunc("/api/v1/audit/events", auditEvents(cfg, deps.IdentityRepository, deps.AuditRepository))
 	mux.HandleFunc("/api/v1/audit/access", auditAccess(cfg, deps.IdentityRepository))
+	mux.HandleFunc("/api/v1/imports", imports(cfg, deps.LifecycleRepository, deps.LifecycleObjectStore))
+	mux.HandleFunc("/api/v1/imports/", importByID(cfg, deps.LifecycleRepository))
+	mux.HandleFunc("/api/v1/exports", exports(cfg, deps.LifecycleRepository))
+	mux.HandleFunc("/api/v1/exports/", exportByID(cfg, deps.LifecycleRepository, deps.LifecycleObjectStore))
+	mux.HandleFunc("/api/v1/account/reset", destructiveAccount(cfg, deps.LifecycleRepository, lifecycle.KindReset))
+	mux.HandleFunc("/api/v1/account/delete", destructiveAccount(cfg, deps.LifecycleRepository, lifecycle.KindDelete))
+	mux.HandleFunc("/api/v1/account/jobs/", accountJob(cfg, deps.LifecycleRepository))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
 	mux.HandleFunc("/api/v1/health/ready", readyHealth(deps))
 	mux.HandleFunc("/docs", http.RedirectHandler("/docs/", http.StatusMovedPermanently).ServeHTTP)
@@ -131,6 +142,20 @@ type ObjectStore interface {
 	PresignPut(ctx context.Context, key string, contentType string, expires time.Duration) (string, error)
 	PresignGet(ctx context.Context, key string, expires time.Duration) (string, error)
 	DeleteObject(ctx context.Context, key string) error
+}
+
+type LifecycleObjectStore interface {
+	PutObject(context.Context, string, string, io.Reader, int64) error
+	GetObject(context.Context, string, int64) (io.ReadCloser, int64, error)
+	PresignGet(context.Context, string, time.Duration) (string, error)
+}
+
+type LifecycleRepository interface {
+	CreateJob(context.Context, string, lifecycle.Kind, string, any) (lifecycle.Job, error)
+	GetJob(context.Context, string, string) (lifecycle.Job, error)
+	ConfirmImport(context.Context, string, string, int64) (lifecycle.Job, error)
+	Counts(context.Context, string) (map[string]int, error)
+	DisableUser(context.Context, string) error
 }
 
 type AuditRepository interface {

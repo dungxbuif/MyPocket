@@ -15,6 +15,8 @@ import { GroupedCard } from "../components/cards/GroupedCard";
 import { DestructiveActionRow } from "../components/cards/DestructiveActionRow";
 import { ActionButton } from "../app/components";
 import { OperationError, operationFailure, type OperationFailure } from "../components/feedback/OperationError";
+import { FilePickerInput } from "../components/inputs/FilePickerInput";
+import { confirmDestructive, confirmImport, createExport, getExportDownload, getLifecycleJob, previewDestructive, uploadImport, type DestructivePreview, type LifecycleJob } from "../app/lifecycle";
 
 export interface AccountScreenProps {
   authState: AuthState;
@@ -63,6 +65,12 @@ export function AccountScreen({
   const [auditEvents, setAuditEvents] = React.useState<AuditEvent[]>([]);
   const [auditCorrelationID, setAuditCorrelationID] = React.useState("");
   const [auditBusy, setAuditBusy] = React.useState(false);
+  const [lifecycleJob, setLifecycleJob] = React.useState<LifecycleJob | null>(null);
+  const [lifecycleBusy, setLifecycleBusy] = React.useState(false);
+  const [lifecycleError, setLifecycleError] = React.useState<OperationFailure | null>(null);
+  const [destructiveKind, setDestructiveKind] = React.useState<"reset"|"delete"|null>(null);
+  const [destructivePreview, setDestructivePreview] = React.useState<DestructivePreview|null>(null);
+  const [typedConfirmation, setTypedConfirmation] = React.useState("");
 
   React.useEffect(() => {
     const generation = ++keyListGeneration.current;
@@ -184,6 +192,13 @@ export function AccountScreen({
       setAuditBusy(false);
     }
   }
+
+  async function runLifecycle(action:()=>Promise<LifecycleJob>){if(lifecycleBusy)return;setLifecycleBusy(true);setLifecycleError(null);try{setLifecycleJob(await action())}catch(error){setLifecycleError(operationFailure(error,"Thao tác dữ liệu chưa hoàn tất."))}finally{setLifecycleBusy(false)}}
+  async function chooseImport(file:File){await runLifecycle(()=>uploadImport(file))}
+  async function refreshLifecycle(){if(!lifecycleJob)return;await runLifecycle(()=>getLifecycleJob(lifecycleJob))}
+  async function downloadExport(){if(!lifecycleJob)return;setLifecycleBusy(true);try{const url=await getExportDownload(lifecycleJob);window.location.assign(url)}catch(error){setLifecycleError(operationFailure(error,"Không tạo được liên kết tải xuống."))}finally{setLifecycleBusy(false)}}
+  async function openDestructive(kind:"reset"|"delete"){setLifecycleBusy(true);setLifecycleError(null);try{setDestructiveKind(kind);setDestructivePreview(await previewDestructive(kind));setTypedConfirmation("")}catch(error){setLifecycleError(operationFailure(error,"Không tải được bản xem trước."))}finally{setLifecycleBusy(false)}}
+  async function applyDestructive(){if(!destructiveKind||!destructivePreview)return;await runLifecycle(()=>confirmDestructive(destructiveKind,typedConfirmation,destructivePreview.preview_token));setDestructiveKind(null);setDestructivePreview(null);setTypedConfirmation("")}
 
   return (
     <section className="content-stack">
@@ -366,6 +381,23 @@ export function AccountScreen({
       {auditBusy && !auditAllowed ? (
         <p className="notification-status">Đang kiểm tra quyền nhật ký…</p>
       ) : null}
+
+      <GroupedCard title="Nhập và xuất dữ liệu">
+        <div className="content-stack">
+          <FilePickerInput aria-label="Chọn CSV để nhập" accept="text/csv,.csv" disabled={!online||lifecycleBusy} onFileSelected={(file)=>void chooseImport(file)} />
+          <ActionButton disabled={!online||lifecycleBusy} onClick={()=>void runLifecycle(createExport)}>Tạo bản xuất CSV</ActionButton>
+          {lifecycleJob ? <div role="status"><strong>{lifecycleJob.kind}: {lifecycleJob.status}</strong>{lifecycleJob.error_code?<p>{lifecycleJob.error_code}</p>:null}<ActionButton disabled={lifecycleBusy} onClick={()=>void refreshLifecycle()}>Cập nhật trạng thái</ActionButton>{lifecycleJob.kind==="import"&&lifecycleJob.status==="awaiting_confirmation"&&lifecycleJob.result?.confirmable?<ActionButton disabled={lifecycleBusy} onClick={()=>void runLifecycle(()=>confirmImport(lifecycleJob))}>Xác nhận nhập</ActionButton>:null}{lifecycleJob.kind==="import"&&lifecycleJob.result?.errors?.map(error=><p key={error.row}>Dòng {error.row}: {error.message}</p>)}{lifecycleJob.kind==="export"&&lifecycleJob.status==="completed"?<ActionButton disabled={lifecycleBusy} onClick={()=>void downloadExport()}>Tải CSV</ActionButton>:null}</div>:null}
+          <OperationError failure={lifecycleError} onRetry={lifecycleJob?()=>void refreshLifecycle():undefined} busy={lifecycleBusy} />
+        </div>
+      </GroupedCard>
+
+      <GroupedCard title="Vùng nguy hiểm">
+        <p>Xóa dữ liệu tài chính nhưng giữ tài khoản.</p>
+        <DestructiveActionRow label="Xem trước đặt lại dữ liệu" onClick={()=>void openDestructive("reset")} />
+        <p>Vô hiệu hóa truy cập ngay và xóa dữ liệu.</p>
+        <DestructiveActionRow label="Xem trước xóa tài khoản" onClick={()=>void openDestructive("delete")} />
+        {destructiveKind&&destructivePreview?<div role="dialog" aria-label={destructiveKind==="reset"?"Xác nhận đặt lại":"Xác nhận xóa tài khoản"}><p>{Object.values(destructivePreview.affected_counts).reduce((sum,value)=>sum+value,0)} bản ghi sẽ bị ảnh hưởng.</p><label>Nhập {destructiveKind.toUpperCase()}<input aria-label="Chuỗi xác nhận" value={typedConfirmation} onChange={event=>setTypedConfirmation(event.target.value)} /></label><ActionButton onClick={()=>{setDestructiveKind(null);setDestructivePreview(null)}}>Hủy</ActionButton><ActionButton disabled={typedConfirmation!==destructiveKind.toUpperCase()||lifecycleBusy} onClick={()=>void applyDestructive()}>Xác nhận</ActionButton></div>:null}
+      </GroupedCard>
 
       {/* Documentation Link */}
       <section className="card list-card">

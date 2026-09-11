@@ -9,11 +9,13 @@ import (
 	"time"
 
 	"mypocket/internal/audit"
+	"mypocket/internal/lifecycle"
 	"mypocket/internal/notification"
 	"mypocket/internal/planning"
 	"mypocket/internal/platform/config"
 	"mypocket/internal/platform/db"
 	"mypocket/internal/platform/logging"
+	"mypocket/internal/platform/objectstore"
 	"mypocket/internal/portfolio"
 	"mypocket/internal/worker"
 )
@@ -51,6 +53,14 @@ func main() {
 		log.Fatalf("portfolio price worker configuration error: %v", err)
 	}
 	auditRetentionRunner := worker.AuditRetentionRunner{Repo: auditRepo, RetentionDays: cfg.AuditRetentionDays}
+	var lifecycleStore worker.LifecycleObjectStore
+	if cfg.S3Endpoint != "" {
+		lifecycleStore, err = objectstore.NewS3(cfg)
+		if err != nil {
+			log.Fatalf("lifecycle object store configuration error: %v", err)
+		}
+	}
+	lifecycleRunner := worker.LifecycleRunner{Repo: lifecycle.NewRepository(conn), Store: lifecycleStore}
 
 	log.Printf("worker ready in %s", cfg.AppEnv)
 	for {
@@ -79,6 +89,12 @@ func main() {
 		} else if purged > 0 {
 			log.Printf("audit retention worker purged %d event(s)", purged)
 			_ = auditRepo.Append(context.Background(), audit.Event{CorrelationID: "worker", Action: "worker.audit_retention", Outcome: audit.OutcomeSuccess, Severity: audit.SeverityInfo, Source: audit.SourceWorker, Metadata: audit.SafeMetadata(map[string]any{"count": purged})})
+		}
+		if processed, err := lifecycleRunner.RunOnce(context.Background()); err != nil {
+			log.Printf("lifecycle worker error: %v", err)
+			_ = auditRepo.Append(context.Background(), audit.Event{CorrelationID: "worker", Action: "worker.lifecycle", Outcome: audit.OutcomeFailure, Severity: audit.SeverityError, Source: audit.SourceWorker})
+		} else if processed > 0 {
+			log.Printf("lifecycle worker processed %d job(s)", processed)
 		}
 		select {
 		case <-ticker.C:

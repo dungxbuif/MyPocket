@@ -9,6 +9,7 @@ import (
 	"mypocket/internal/audit"
 	"mypocket/internal/finance"
 	"mypocket/internal/identity"
+	"mypocket/internal/lifecycle"
 	"mypocket/internal/notification"
 	"mypocket/internal/planning"
 	"mypocket/internal/platform/authcache"
@@ -46,12 +47,14 @@ func main() {
 		defer cache.Close()
 	}
 	var objectStore httpapi.ObjectStore
+	var lifecycleStore httpapi.LifecycleObjectStore
 	if cfg.S3Endpoint != "" {
 		store, storeErr := objectstore.NewS3(cfg)
 		if storeErr != nil {
 			log.Fatalf("object store configuration error: %v", storeErr)
 		}
 		objectStore = store
+		lifecycleStore = store
 	}
 	syncService := mysync.NewService(mysync.NewRepository(conn), financeRepo, portfolioRepo)
 	syncService.SetAuditSink(auditRepo)
@@ -68,6 +71,8 @@ func main() {
 		AnalyticsRepository:    analytics.NewRepository(conn),
 		PortfolioRepository:    portfolioRepo,
 		SyncService:            syncService,
+		LifecycleRepository:    lifecycle.NewRepository(conn),
+		LifecycleObjectStore:   lifecycleStore,
 		ReadyCheck: func() error {
 			return conn.PingContext(context.Background())
 		},

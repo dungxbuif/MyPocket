@@ -104,10 +104,11 @@ func (r *Repository) AuthenticateAPIKey(ctx context.Context, plaintext string, s
 		return User{}, APIKey{}, err
 	}
 	row := r.conn.QueryRowContext(ctx, `
-		UPDATE api_keys
+		UPDATE api_keys k
 		SET last_used_at = now(), updated_at = now()
-		WHERE key_hash = $1 AND revoked_at IS NULL
-		RETURNING id::text, user_id::text, name, key_prefix, key_hash, last_used_at, revoked_at, created_at
+		FROM users u
+		WHERE k.key_hash = $1 AND k.revoked_at IS NULL AND u.id = k.user_id AND u.disabled_at IS NULL
+		RETURNING k.id::text, k.user_id::text, k.name, k.key_prefix, k.key_hash, k.last_used_at, k.revoked_at, k.created_at
 	`, keyHash)
 	var key APIKey
 	if err := row.Scan(&key.ID, &key.UserID, &key.Name, &key.KeyPrefix, &key.KeyHash, &key.LastUsedAt, &key.RevokedAt, &key.CreatedAt); err != nil {

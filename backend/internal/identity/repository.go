@@ -33,6 +33,7 @@ func (r *Repository) FindOrCreateGoogleUser(ctx context.Context, profile GoogleP
 			display_name = EXCLUDED.display_name,
 			avatar_url = EXCLUDED.avatar_url,
 			updated_at = now()
+		WHERE users.disabled_at IS NULL
 		RETURNING id::text, google_subject, email, email_verified, display_name, avatar_url, created_at, updated_at
 	`, profile.Subject, profile.Email, profile.EmailVerified, profile.DisplayName, profile.AvatarURL)
 
@@ -47,7 +48,7 @@ func (r *Repository) FindByID(ctx context.Context, id string) (User, error) {
 	row := r.conn.QueryRowContext(ctx, `
 		SELECT id::text, google_subject, email, email_verified, display_name, avatar_url, created_at, updated_at
 		FROM users
-		WHERE id = $1
+		WHERE id = $1 AND disabled_at IS NULL
 	`, id)
 
 	var user User
