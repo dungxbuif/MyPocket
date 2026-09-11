@@ -6,6 +6,7 @@ import {
   archiveOfflineTransaction,
   archiveOfflineWallet,
   listOpenConflicts,
+  readServerEpoch,
   removeOfflineMutation,
   resolveOfflineConflict,
   saveFinanceMirror,
@@ -19,6 +20,8 @@ import { fetchAuthoritativeSnapshot } from "./syncApi";
 import type { OfflineConflict } from "./types";
 
 export { listOpenConflicts };
+
+export const REQUIRED_SERVER_EPOCH = "atomic-sync-v1";
 
 export async function keepServerConflict(conflict: OfflineConflict) {
   await mirrorConflictServerPayload(conflict);
@@ -57,12 +60,27 @@ export async function editAndRetryTransactionConflict(conflict: OfflineConflict,
 
 export async function fullResync() {
   const snapshot = await fetchAuthoritativeSnapshot();
+  await saveAuthoritativeSnapshot(snapshot);
+}
+
+export async function reconcileServerEpoch(requiredServerEpoch = REQUIRED_SERVER_EPOCH) {
+  if (await readServerEpoch() === requiredServerEpoch) return false;
+  const snapshot = await fetchAuthoritativeSnapshot();
+  if (snapshot.server_epoch !== requiredServerEpoch) {
+    throw new Error(`Unsupported sync epoch: ${snapshot.server_epoch || "missing"}`);
+  }
+  await saveAuthoritativeSnapshot(snapshot);
+  return true;
+}
+
+async function saveAuthoritativeSnapshot(snapshot: Awaited<ReturnType<typeof fetchAuthoritativeSnapshot>>) {
   await saveFinanceMirror({
     wallets: snapshot.wallets as WalletSummary[],
     categories: snapshot.categories as CategorySummary[],
     transactions: snapshot.transactions as Transaction[],
     assets: snapshot.assets as AssetPosition[],
     cursor: snapshot.next_cursor,
+    serverEpoch: snapshot.server_epoch,
   });
 }
 

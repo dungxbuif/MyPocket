@@ -9,6 +9,7 @@ const META_CURSOR = "sync_cursor";
 const META_DEVICE_ID = "device_id";
 const META_SEQUENCE = "mutation_sequence";
 const META_OWNER_ID = "owner_id";
+const META_SERVER_EPOCH = "server_epoch";
 let activeOwnerID = "";
 
 export type OfflineDB = IDBDatabase;
@@ -130,6 +131,7 @@ export async function saveFinanceMirror(input: {
   transactions?: Transaction[];
   assets?: AssetPosition[];
   cursor?: number;
+  serverEpoch?: string;
 }, db?: IDBDatabase) {
   if (input.userID && !db) activeOwnerID = input.userID;
   const database = db ?? await openOfflineDatabase();
@@ -139,7 +141,7 @@ export async function saveFinanceMirror(input: {
   if (input.categories) names.push(stores.categories);
   if (input.transactions) names.push(stores.transactions);
   if (input.assets) names.push(stores.assets);
-  if (typeof input.cursor === "number") names.push(stores.meta);
+  if (typeof input.cursor === "number" || input.serverEpoch) names.push(stores.meta);
   if (names.length === 0) {
     if (!db) database.close();
     return;
@@ -150,8 +152,16 @@ export async function saveFinanceMirror(input: {
   if (input.transactions) replaceStore(tx.objectStore(stores.transactions), input.transactions);
   if (input.assets) replaceStore(tx.objectStore(stores.assets), input.assets);
   if (typeof input.cursor === "number") tx.objectStore(stores.meta).put({ key: META_CURSOR, value: input.cursor } satisfies OfflineMeta);
+  if (input.serverEpoch) tx.objectStore(stores.meta).put({ key: META_SERVER_EPOCH, value: input.serverEpoch } satisfies OfflineMeta);
   await transactionDone(tx);
   if (!db) database.close();
+}
+
+export async function readServerEpoch(db?: IDBDatabase) {
+  const database = db ?? await openOfflineDatabase();
+  const epoch = await readMetaString(database, META_SERVER_EPOCH);
+  if (!db) database.close();
+  return epoch;
 }
 
 export async function enqueueMutation(input: Omit<OfflineMutation, "mutation_id" | "device_id" | "sequence" | "attempts" | "state" | "created_at" | "updated_at">, db?: IDBDatabase) {

@@ -97,6 +97,9 @@ func TestSyncChangesAndResyncUseAuthenticatedUser(t *testing.T) {
 	if service.resyncUserID != "user_123" {
 		t.Fatalf("resync not scoped to auth user: %q", service.resyncUserID)
 	}
+	if !strings.Contains(resyncRes.Body.String(), `"server_epoch":"atomic-sync-v1"`) {
+		t.Fatalf("resync response missing stable server epoch: %s", resyncRes.Body.String())
+	}
 }
 
 type syncServiceStub struct {
@@ -125,5 +128,5 @@ func (s *syncServiceStub) Changes(_ context.Context, userID string, after int64,
 
 func (s *syncServiceStub) Resync(_ context.Context, userID string) (mysync.Snapshot, error) {
 	s.resyncUserID = userID
-	return mysync.Snapshot{NextCursor: 7}, nil
+	return mysync.Snapshot{ServerEpoch: mysync.ServerEpoch, NextCursor: 7}, nil
 }

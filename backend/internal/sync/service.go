@@ -143,7 +143,7 @@ func (s *Service) Resync(ctx context.Context, userID string) (Snapshot, error) {
 	if err != nil {
 		return Snapshot{}, err
 	}
-	return Snapshot{Wallets: wallets, Categories: categories, Transactions: transactions, Assets: assets, NextCursor: cursor}, nil
+	return Snapshot{ServerEpoch: ServerEpoch, Wallets: wallets, Categories: categories, Transactions: transactions, Assets: assets, NextCursor: cursor}, nil
 }
 
 func (s *Service) applyOne(ctx context.Context, userID string, mutation Mutation) (MutationResult, error) {

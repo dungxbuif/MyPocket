@@ -132,6 +132,9 @@ func TestRepositoryIntegrationResyncReturnsBoundedAuthoritativeSnapshot(t *testi
 	if len(snapshot.Categories) == 0 {
 		t.Fatalf("expected system categories in snapshot")
 	}
+	if snapshot.ServerEpoch != mysync.ServerEpoch {
+		t.Fatalf("expected server epoch %q, got %q", mysync.ServerEpoch, snapshot.ServerEpoch)
+	}
 }
 
 func migratedSyncPostgres(t *testing.T) *sql.DB {

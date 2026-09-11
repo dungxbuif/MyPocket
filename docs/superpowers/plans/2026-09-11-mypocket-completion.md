@@ -106,7 +106,7 @@ rtk proxy git commit -m "docs: record completion baseline"
 - Consumes: migration `backend/migrations/0012_atomic_sync_asset_feed.sql`, `GET /api/v1/sync/resync`, user-scoped IndexedDB database names
 - Produces: migration lock/checksum proof, one-time client full-resync marker, encrypted/permission-restricted PostgreSQL plus S3 backup, isolated restore verification
 
-- [ ] **Step 1: Write failing migration and resync tests**
+- [x] **Step 1: Write failing migration and resync tests**
 
 Add tests proving concurrent migrators serialize, modified applied migrations fail checksum validation, migration 0012 upgrades a production-shaped fixture, and clients with a pre-0012 schema marker perform exactly one full resync while retaining outbox/conflicts.
 
@@ -126,14 +126,14 @@ it("performs one post-0012 full resync without deleting pending intent", async (
 });
 ```
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 rtk proxy go test ./internal/platform/db ./internal/sync -count=1
 rtk npm test -- --run src/offline/db.test.ts
 ```
 
-- [ ] **Step 3: Implement the migration epoch and full-resync gate**
+- [x] **Step 3: Implement the migration epoch and full-resync gate**
 
 Return a stable server epoch from resync metadata and persist it only after the complete authoritative snapshot commits to IndexedDB. Keep pending mutations, receipt bytes, and conflicts in separate stores during snapshot replacement.
 
@@ -147,7 +147,7 @@ type Snapshot struct {
 const ServerEpoch = "atomic-sync-v1"
 ```
 
-- [ ] **Step 4: Implement backup and isolated restore scripts**
+- [x] **Step 4: Implement backup and isolated restore scripts**
 
 `backup-production.sh` must use `pg_dump --format=custom --no-owner`, capture an S3 object inventory, write SHA-256 checksums, create files with mode `0600`, and fail on an unset destination. `restore-drill.sh` must reject a production database URL, restore into an explicit isolated database/bucket prefix, compare row counts and object checksums, then leave evidence for manual inspection.
 
@@ -157,7 +157,7 @@ umask 077
 pg_dump --format=custom --no-owner --file "$MYPOCKET_BACKUP_DIR/database.dump" "$DATABASE_URL"
 ```
 
-- [ ] **Step 5: Run focused and browser proof**
+- [x] **Step 5: Run focused and browser proof**
 
 ```bash
 rtk proxy go test ./internal/platform/db ./internal/sync -count=1
@@ -166,7 +166,7 @@ rtk npm run test:e2e -- offline-sync.spec.ts
 rtk proxy ./scripts/restore-drill.sh
 ```
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 rtk proxy git add backend/internal/platform/db backend/internal/sync frontend/src/offline frontend/e2e/offline-sync.spec.ts scripts/backup-production.sh scripts/restore-drill.sh docs/operations/backup-restore.md docs/work/completion/DATA-SAFETY.md

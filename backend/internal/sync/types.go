@@ -13,6 +13,8 @@ type Operation string
 type ResultState string
 
 const (
+	ServerEpoch = "atomic-sync-v1"
+
 	EntityWallet      EntityType = "wallet"
 	EntityCategory    EntityType = "category"
 	EntityTransaction EntityType = "transaction"
@@ -83,6 +85,7 @@ type ChangesResult struct {
 }
 
 type Snapshot struct {
+	ServerEpoch  string                `json:"server_epoch"`
 	Wallets      []finance.Wallet      `json:"wallets"`
 	Categories   []finance.Category    `json:"categories"`
 	Transactions []finance.Transaction `json:"transactions"`

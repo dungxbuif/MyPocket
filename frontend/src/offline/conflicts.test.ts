@@ -3,7 +3,10 @@ import { describe, expect, it, vi } from "vitest";
 import { readOutbox } from "../app/outbox";
 import {
   enqueueMutation,
+  readPendingReceiptUploads,
   readOfflineSnapshot,
+  readServerEpoch,
+  queueReceiptUpload,
   saveFinanceMirror,
   saveOfflineConflict,
 } from "./db";
@@ -11,6 +14,7 @@ import {
   discardLocalConflict,
   editAndRetryTransactionConflict,
   fullResync,
+  reconcileServerEpoch,
   keepServerConflict,
   listOpenConflicts,
 } from "./conflicts";
@@ -61,6 +65,7 @@ describe("offline conflict recovery", () => {
         wallets: [{ id: "wallet_1", name: "Ví server", type: "cash", balance_vnd: 1000, include_in_total: true, is_default_ai: true, version: 1 }],
         categories: [{ id: "cat_1", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }],
         transactions: [transaction("tx_server", "Server only", 3)],
+        server_epoch: "atomic-sync-v1",
         next_cursor: 12,
       },
     }), { status: 200, headers: { "Content-Type": "application/json" } })));
@@ -72,6 +77,37 @@ describe("offline conflict recovery", () => {
     expect(snapshot.transactions.map((item) => item.note)).toEqual(["Server only"]);
     expect(snapshot.cursor).toBe(12);
     expect(await readOutbox()).toHaveLength(1);
+  });
+
+  it("performs one post-0012 full resync without deleting pending intent", async () => {
+    await enqueueMutation({ entity_type: "transaction", entity_id: "tx_pending", operation: "create", base_version: 0, payload: { note: "Pending" } });
+    const pending = await createTransactionConflict("tx_conflict", "Local", "Server");
+    await queueReceiptUpload({ transaction_id: "tx_pending", file: new Blob(["receipt"]), filename: "bill.jpg", content_type: "image/jpeg" });
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+      status: "ok",
+      correlation_id: "req_epoch",
+      snapshot: {
+        wallets: [{ id: "wallet_epoch", name: "Ví server", type: "cash", balance_vnd: 1000, include_in_total: true, is_default_ai: true, version: 1 }],
+        categories: [],
+        transactions: [],
+        assets: [],
+        server_epoch: "atomic-sync-v1",
+        next_cursor: 21,
+      },
+    }), { status: 200, headers: { "Content-Type": "application/json" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    expect(await reconcileServerEpoch("atomic-sync-v1")).toBe(true);
+    expect(await reconcileServerEpoch("atomic-sync-v1")).toBe(false);
+
+    const snapshot = await readOfflineSnapshot();
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(snapshot.wallets.map((wallet) => wallet.id)).toEqual(["wallet_epoch"]);
+    expect(snapshot.cursor).toBe(21);
+    expect(await readServerEpoch()).toBe("atomic-sync-v1");
+    expect(await readOutbox()).toHaveLength(2);
+    expect(snapshot.conflicts).toContainEqual(pending);
+    expect(await readPendingReceiptUploads()).toHaveLength(1);
   });
 });
 

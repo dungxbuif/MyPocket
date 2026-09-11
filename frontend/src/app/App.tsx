@@ -47,6 +47,7 @@ import {
   fullResync,
   keepServerConflict,
   listOpenConflicts,
+  reconcileServerEpoch,
 } from "../offline/conflicts";
 import {
   archiveTransaction,
@@ -283,6 +284,9 @@ export function App() {
     const load = online
       ? async () => {
         await initializeOfflineStoreForUser(authState.user.id);
+        // Epoch reconciliation is a retryable cache upgrade. A temporarily old
+        // or unavailable sync endpoint must never block the live finance reads.
+        await reconcileServerEpoch().catch(() => false);
         if (!cancelled) await refreshFinanceData();
       }
       : () => hydrateOfflineData(authState.user.id);

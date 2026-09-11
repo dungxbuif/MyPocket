@@ -12,6 +12,20 @@ import (
 )
 
 func Migrate(ctx context.Context, conn *sql.DB, migrations fs.FS) error {
+	locked, err := conn.Conn(ctx)
+	if err != nil {
+		return fmt.Errorf("reserve migration connection: %w", err)
+	}
+	defer locked.Close()
+	if _, err := locked.ExecContext(ctx, `SELECT pg_advisory_lock(7424374638811478388)`); err != nil {
+		return fmt.Errorf("lock migrations: %w", err)
+	}
+	defer func() {
+		// Closing the dedicated connection also releases the session lock. The
+		// explicit unlock keeps a healthy pooled connection immediately reusable.
+		_, _ = locked.ExecContext(context.Background(), `SELECT pg_advisory_unlock(7424374638811478388)`)
+	}()
+
 	entries, err := fs.ReadDir(migrations, ".")
 	if err != nil {
 		return fmt.Errorf("read migrations: %w", err)
@@ -27,7 +41,7 @@ func Migrate(ctx context.Context, conn *sql.DB, migrations fs.FS) error {
 	}
 	sort.Strings(files)
 
-	if err := ensureMigrationTable(ctx, conn); err != nil {
+	if err := ensureMigrationTable(ctx, locked); err != nil {
 		return err
 	}
 	for _, name := range files {
@@ -36,14 +50,22 @@ func Migrate(ctx context.Context, conn *sql.DB, migrations fs.FS) error {
 			return fmt.Errorf("read migration %s: %w", name, err)
 		}
 		sum := checksum(body)
-		if err := applyMigration(ctx, conn, name, sum, string(body)); err != nil {
+		if err := applyMigration(ctx, locked, name, sum, string(body)); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func ensureMigrationTable(ctx context.Context, conn *sql.DB) error {
+type migrationExecutor interface {
+	ExecContext(context.Context, string, ...any) (sql.Result, error)
+}
+
+type migrationBeginner interface {
+	BeginTx(context.Context, *sql.TxOptions) (*sql.Tx, error)
+}
+
+func ensureMigrationTable(ctx context.Context, conn migrationExecutor) error {
 	_, err := conn.ExecContext(ctx, `
 		CREATE TABLE IF NOT EXISTS schema_migrations (
 			version text PRIMARY KEY,
@@ -57,7 +79,7 @@ func ensureMigrationTable(ctx context.Context, conn *sql.DB) error {
 	return nil
 }
 
-func applyMigration(ctx context.Context, conn *sql.DB, version string, checksum string, sqlText string) error {
+func applyMigration(ctx context.Context, conn migrationBeginner, version string, checksum string, sqlText string) error {
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin migration %s: %w", version, err)
