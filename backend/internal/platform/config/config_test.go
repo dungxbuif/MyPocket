@@ -3,6 +3,7 @@ package config_test
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"mypocket/internal/platform/config"
 )
@@ -189,5 +190,18 @@ func TestLoadAIConfigurationIsFailClosedAndSecretFree(t *testing.T) {
 	_, err = config.Load(env)
 	if err == nil || !strings.Contains(err.Error(), "AI_BASE_URL must use https") || strings.Contains(err.Error(), "do-not-leak") {
 		t.Fatalf("expected production TLS validation, got %v", err)
+	}
+}
+
+func TestLoadOCRConfigurationIsBoundedAndSecretFree(t *testing.T) {
+	env := map[string]string{"DATABASE_URL": "postgres://localhost/mypocket", "PUBLIC_WEB_URL": "http://localhost", "COOKIE_SECRET": "01234567890123456789012345678901", "CSRF_SECRET": "abcdefghijklmnopqrstuvwxyz123456", "S3_ENDPOINT": "http://s3.test", "S3_BUCKET": "bucket", "S3_ACCESS_KEY": "access", "S3_SECRET_KEY": "secret", "AI_ENABLED": "true", "AI_BASE_URL": "http://ai.test", "AI_API_KEY": "ai-secret", "AI_MODEL": "model", "OCR_ENABLED": "true", "OCR_BASE_URL": "http://ocr.test", "OCR_API_KEY": "do-not-leak"}
+	cfg, err := config.Load(env)
+	if err != nil || !cfg.OCR.Enabled || cfg.OCR.PollInterval != 5*time.Second {
+		t.Fatalf("cfg=%#v err=%v", cfg.OCR, err)
+	}
+	env["OCR_MAX_PROCESSING_TIME"] = "30s"
+	_, err = config.Load(env)
+	if err == nil || strings.Contains(err.Error(), "do-not-leak") {
+		t.Fatalf("expected redacted bound error: %v", err)
 	}
 }

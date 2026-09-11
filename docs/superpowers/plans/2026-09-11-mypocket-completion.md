@@ -670,7 +670,7 @@ rtk proxy git commit -m "feat: add review-first OpenAI-compatible agent"
 - Produces: `agent.ImageTool`, `ocr.Client`, `ObjectStore.GetObject`, and leased `worker.AgentToolRunner`
 - Does not produce: a generic MyPocket OCR proxy or receipt-owned OCR lifecycle
 
-- [ ] **Step 1: Write fake-provider and private-object RED tests**
+- [x] **Step 1: Write fake-provider and private-object RED tests**
 
 ```go
 type ImageTool interface {
@@ -687,13 +687,13 @@ type ImageInput struct {
 
 Cover capabilities drift, correct Bearer header, 202 submission, pending `Retry-After`, completed result, failed/cancelled, 404, 410 expiry, 429 quota, timeout, oversized response, and secret-free errors. Object-store tests must fail reads over 15 MiB and checksum mismatch before OCR submission.
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 rtk proxy go test ./internal/platform/ocr ./internal/platform/objectstore ./internal/agent ./internal/worker ./internal/platform/httpapi -count=1
 ```
 
-- [ ] **Step 3: Implement size-bounded S3 reads and OCR adapter**
+- [x] **Step 3: Implement size-bounded S3 reads and OCR adapter**
 
 ```go
 func (s *S3Store) GetObject(ctx context.Context, key string, maxBytes int64) ([]byte, error) {
@@ -703,7 +703,7 @@ func (s *S3Store) GetObject(ctx context.Context, key string, maxBytes int64) ([]
 
 Submit JSON Base64 because MyPocket's 15 MiB limit is below OCR Platform's 25 MiB decoded limit. Keep the external client inside `platform/ocr`; agent code depends only on `ImageTool`.
 
-- [ ] **Step 4: Add migration 0015, persist generic agent tool runs, and process them with a lease**
+- [x] **Step 4: Add migration 0016, persist generic agent tool runs, and process them with a lease**
 
 Migration `0016_agent_image_tools.sql` creates the tool-run storage after Task 6's general agent schema. Store owning user, image object ID, optional agent/receipt association, provider document ID, state, attempt count, timestamps, result expiry, safe result/provenance, and redacted error code. Claim rows with `FOR UPDATE SKIP LOCKED`; never hold a database transaction across an HTTP provider call.
 
@@ -741,15 +741,15 @@ const (
 )
 ```
 
-- [ ] **Step 5: Feed completed OCR into agent context and optional receipt drafts**
+- [x] **Step 5: Feed completed OCR into agent context and optional receipt drafts**
 
 The agent may summarize/general-analyze OCR output. If `receipt_id` is supplied and owned, it may request the typed transaction schema from Task 6; the result remains a pending draft. Tests prove a completed tool run alone creates no transaction or wallet change.
 
-- [ ] **Step 6: Add fail-fast/degraded configuration behavior**
+- [x] **Step 6: Add fail-fast/degraded configuration behavior**
 
 Read `OCR_ENABLED`, `OCR_BASE_URL`, `OCR_API_KEY`, `OCR_TIMEOUT`, `OCR_POLL_INTERVAL`, and `OCR_MAX_PROCESSING_TIME`. Production release requires enabled valid HTTPS configuration, but a runtime outage marks only OCR capability/jobs unavailable while `/health/ready` continues to represent MyPocket's core database readiness.
 
-- [ ] **Step 7: Run provider-contract and regression tests, then commit**
+- [x] **Step 7: Run provider-contract and regression tests, then commit**
 
 ```bash
 rtk proxy go test -race ./... -count=1

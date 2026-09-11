@@ -32,6 +32,7 @@ type Run struct {
 	ErrorCode      string    `json:"error_code,omitempty"`
 	Attempts       int       `json:"attempts"`
 	DraftIDs       []string  `json:"draft_ids"`
+	ToolRuns       []ToolRun `json:"tool_runs,omitempty"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
 	NextAttemptAt  time.Time `json:"-"`

@@ -12,7 +12,7 @@ import (
 )
 
 type AgentService interface {
-	Submit(context.Context, string, string, agent.Kind, string) (agent.Run, error)
+	Submit(context.Context, string, string, agent.Kind, string, string) (agent.Run, error)
 	Get(context.Context, string, string) (agent.Run, error)
 }
 
@@ -38,8 +38,9 @@ func agentMessages(cfg config.Config, service AgentService) http.HandlerFunc {
 				return
 			}
 			var request struct {
-				Kind    agent.Kind `json:"kind"`
-				Message string     `json:"message"`
+				Kind      agent.Kind `json:"kind"`
+				Message   string     `json:"message"`
+				ReceiptID string     `json:"receipt_id,omitempty"`
 			}
 			decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 16<<10))
 			decoder.DisallowUnknownFields()
@@ -47,7 +48,7 @@ func agentMessages(cfg config.Config, service AgentService) http.HandlerFunc {
 				writeJSON(w, 400, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
 				return
 			}
-			run, err := service.Submit(r.Context(), userID, strings.TrimSpace(r.Header.Get("Idempotency-Key")), request.Kind, request.Message)
+			run, err := service.Submit(r.Context(), userID, strings.TrimSpace(r.Header.Get("Idempotency-Key")), request.Kind, request.Message, strings.TrimSpace(request.ReceiptID))
 			if err != nil {
 				writeAgentError(w, r, err)
 				return

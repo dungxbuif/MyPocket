@@ -11,7 +11,7 @@ import (
 
 type AgentRunRepository interface {
 	ClaimDue(context.Context, string, time.Time, time.Duration) (agent.Run, bool, error)
-	Context(context.Context, string) (string, error)
+	Context(context.Context, string, string) (string, error)
 	Complete(context.Context, agent.Run, agent.ModelResult, map[string]any) error
 	Fail(context.Context, agent.Run, string, bool) error
 }
@@ -35,7 +35,7 @@ func (r AgentRunner) RunOnce(ctx context.Context) (bool, error) {
 	if err != nil || !claimed {
 		return claimed, err
 	}
-	financeContext, err := r.Repo.Context(ctx, run.UserID)
+	financeContext, err := r.Repo.Context(ctx, run.UserID, run.ID)
 	if err != nil {
 		_ = r.Repo.Fail(ctx, run, "CONTEXT_UNAVAILABLE", true)
 		return true, err

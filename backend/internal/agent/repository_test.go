@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -69,6 +70,59 @@ func TestAgentCompletionCreatesReviewDraftWithoutAccounting(t *testing.T) {
 	bad, _ := agent.ParseModelResult(`{"transaction":{"type":"expense","amount_vnd":1,"source_wallet_id":"`+foreign.ID+`","category_id":"`+category+`","occurred_at":"2026-09-11T00:00:00Z","note":""}}`, agent.KindTransactionDraft)
 	if err := repo.Complete(ctx, second, bad, nil); !errors.Is(err, agent.ErrValidation) {
 		t.Fatalf("expected foreign reference rejection, got %v", err)
+	}
+}
+
+func TestAgentWaitsForOwnedOCRToolAndExposesOnlyThatResult(t *testing.T) {
+	db := agentDB(t)
+	ctx := context.Background()
+	user := agentUser(t, db, "ocr-owner@example.com")
+	other := agentUser(t, db, "ocr-other@example.com")
+	financeRepo := finance.NewRepository(db)
+	receipt, err := financeRepo.CreateReceiptObject(ctx, user, finance.CreateReceiptObjectInput{ObjectKey: "users/" + user + "/receipts/a.jpg", ContentType: "image/jpeg", SizeBytes: 5, ChecksumSHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", OriginalFilename: "a.jpg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	foreign, err := financeRepo.CreateReceiptObject(ctx, other, finance.CreateReceiptObjectInput{ObjectKey: "users/" + other + "/receipts/b.jpg", ContentType: "image/jpeg", SizeBytes: 5, ChecksumSHA256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef", OriginalFilename: "b.jpg"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo := agent.NewRepository(db)
+	if _, err = repo.CreateRunWithTool(ctx, user, "foreign-image", agent.KindAnalysis, "read", foreign.ID); !errors.Is(err, agent.ErrNotFound) {
+		t.Fatalf("expected foreign image hiding, got %v", err)
+	}
+	run, err := repo.CreateRunWithTool(ctx, user, "image", agent.KindAnalysis, "read", receipt.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, claimed, err := repo.ClaimDue(ctx, "agent", time.Now().UTC(), time.Minute); err != nil || claimed {
+		t.Fatalf("agent must wait for OCR claimed=%v err=%v", claimed, err)
+	}
+	tool, claimed, err := repo.ClaimToolDue(ctx, "ocr", time.Now().UTC(), time.Minute)
+	if err != nil || !claimed || tool.AgentRunID != run.ID || tool.ObjectKey != receipt.ObjectKey {
+		t.Fatalf("tool=%#v claimed=%v err=%v", tool, claimed, err)
+	}
+	if err = repo.MarkToolSubmitted(ctx, tool, agent.ToolSubmission{ProviderID: "doc", Status: agent.ToolProcessing}, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	tool, claimed, err = repo.ClaimToolDue(ctx, "ocr", time.Now().UTC().Add(time.Second), time.Minute)
+	if err != nil || !claimed {
+		t.Fatalf("poll claim=%v err=%v", claimed, err)
+	}
+	if err = repo.CompleteTool(ctx, tool, agent.ToolResult{Status: agent.ToolCompleted, Text: "Total 120000", Fields: map[string]any{"total": 120000}}); err != nil {
+		t.Fatal(err)
+	}
+	claimedRun, claimed, err := repo.ClaimDue(ctx, "agent", time.Now().UTC(), time.Minute)
+	if err != nil || !claimed || claimedRun.ID != run.ID {
+		t.Fatalf("run=%#v claimed=%v err=%v", claimedRun, claimed, err)
+	}
+	contextJSON, err := repo.Context(ctx, user, run.ID)
+	if err != nil || !strings.Contains(contextJSON, "Total 120000") {
+		t.Fatalf("context=%s err=%v", contextJSON, err)
+	}
+	var count int
+	if err = db.QueryRow(`SELECT count(*) FROM transactions WHERE user_id=$1`, user).Scan(&count); err != nil || count != 0 {
+		t.Fatalf("OCR created accounting rows count=%d err=%v", count, err)
 	}
 }
 

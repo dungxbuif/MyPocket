@@ -17,6 +17,15 @@ type AIConfig struct {
 	MaxRetries int
 }
 
+type OCRConfig struct {
+	Enabled           bool
+	BaseURL           string
+	APIKey            string
+	Timeout           time.Duration
+	PollInterval      time.Duration
+	MaxProcessingTime time.Duration
+}
+
 type Config struct {
 	AppEnv                string
 	DatabaseURL           string
@@ -47,6 +56,7 @@ type Config struct {
 	VAPIDSubject          string
 	APIRateLimitPerMinute int
 	AI                    AIConfig
+	OCR                   OCRConfig
 }
 
 func Load(env map[string]string) (Config, error) {
@@ -86,6 +96,10 @@ func Load(env map[string]string) (Config, error) {
 			Model:      strings.TrimSpace(env["AI_MODEL"]),
 			Timeout:    durationOrDefault(env["AI_TIMEOUT"], 30*time.Second),
 			MaxRetries: intOrDefault(env["AI_MAX_RETRIES"], 2),
+		},
+		OCR: OCRConfig{
+			Enabled: env["OCR_ENABLED"] == "true", BaseURL: strings.TrimRight(strings.TrimSpace(env["OCR_BASE_URL"]), "/"), APIKey: env["OCR_API_KEY"],
+			Timeout: durationOrDefault(env["OCR_TIMEOUT"], 30*time.Second), PollInterval: durationOrDefault(env["OCR_POLL_INTERVAL"], 5*time.Second), MaxProcessingTime: durationOrDefault(env["OCR_MAX_PROCESSING_TIME"], 10*time.Minute),
 		},
 	}
 
@@ -174,6 +188,31 @@ func Load(env map[string]string) (Config, error) {
 		}
 	} else if cfg.AI.BaseURL != "" || cfg.AI.APIKey != "" || cfg.AI.Model != "" {
 		return Config{}, fmt.Errorf("invalid config: AI_ENABLED must be true when AI settings are present")
+	}
+	if cfg.OCR.Enabled {
+		if !cfg.AI.Enabled {
+			return Config{}, fmt.Errorf("invalid config: AI_ENABLED must be true when OCR_ENABLED=true")
+		}
+		if cfg.S3Endpoint == "" {
+			return Config{}, fmt.Errorf("invalid config: S3 storage is required when OCR_ENABLED=true")
+		}
+		if cfg.OCR.BaseURL == "" || cfg.OCR.APIKey == "" {
+			return Config{}, fmt.Errorf("missing required config: OCR_BASE_URL and OCR_API_KEY are required when OCR_ENABLED=true")
+		}
+		if cfg.OCR.Timeout < time.Second || cfg.OCR.Timeout > 120*time.Second {
+			return Config{}, fmt.Errorf("invalid config: OCR_TIMEOUT must be between 1s and 120s")
+		}
+		if cfg.OCR.PollInterval < time.Second || cfg.OCR.PollInterval > time.Minute {
+			return Config{}, fmt.Errorf("invalid config: OCR_POLL_INTERVAL must be between 1s and 1m")
+		}
+		if cfg.OCR.MaxProcessingTime < time.Minute || cfg.OCR.MaxProcessingTime > time.Hour {
+			return Config{}, fmt.Errorf("invalid config: OCR_MAX_PROCESSING_TIME must be between 1m and 1h")
+		}
+		if cfg.AppEnv == "production" && !strings.HasPrefix(cfg.OCR.BaseURL, "https://") {
+			return Config{}, fmt.Errorf("invalid config: OCR_BASE_URL must use https in production")
+		}
+	} else if cfg.OCR.BaseURL != "" || cfg.OCR.APIKey != "" {
+		return Config{}, fmt.Errorf("invalid config: OCR_ENABLED must be true when OCR settings are present")
 	}
 	if cfg.AppEnv == "production" {
 		if !strings.HasPrefix(cfg.PublicWebURL, "https://") {

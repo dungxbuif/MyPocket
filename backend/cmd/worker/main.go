@@ -17,6 +17,7 @@ import (
 	"mypocket/internal/platform/db"
 	"mypocket/internal/platform/logging"
 	"mypocket/internal/platform/objectstore"
+	"mypocket/internal/platform/ocr"
 	openaiadapter "mypocket/internal/platform/openai"
 	"mypocket/internal/portfolio"
 	"mypocket/internal/worker"
@@ -63,6 +64,14 @@ func main() {
 		}
 	}
 	lifecycleRunner := worker.LifecycleRunner{Repo: lifecycle.NewRepository(conn), Store: lifecycleStore}
+	var agentToolRunner worker.AgentToolRunner
+	if cfg.OCR.Enabled {
+		tool, toolErr := ocr.New(cfg.OCR.BaseURL, cfg.OCR.APIKey, cfg.OCR.Timeout)
+		if toolErr != nil {
+			log.Fatalf("OCR provider configuration error: %v", toolErr)
+		}
+		agentToolRunner = worker.AgentToolRunner{Repo: agent.NewRepository(conn), Store: lifecycleStore, Tool: tool, Owner: "worker-ocr", PollInterval: cfg.OCR.PollInterval, MaxProcessingTime: cfg.OCR.MaxProcessingTime}
+	}
 	var agentRunner worker.AgentRunner
 	if cfg.AI.Enabled {
 		model, modelErr := openaiadapter.New(cfg.AI.BaseURL, cfg.AI.APIKey, cfg.AI.Model, cfg.AI.Timeout, cfg.AI.MaxRetries)
@@ -105,6 +114,12 @@ func main() {
 			_ = auditRepo.Append(context.Background(), audit.Event{CorrelationID: "worker", Action: "worker.lifecycle", Outcome: audit.OutcomeFailure, Severity: audit.SeverityError, Source: audit.SourceWorker})
 		} else if processed > 0 {
 			log.Printf("lifecycle worker processed %d job(s)", processed)
+		}
+		if processed, err := agentToolRunner.RunOnce(context.Background()); err != nil {
+			log.Printf("agent OCR worker error: %v", err)
+			_ = auditRepo.Append(context.Background(), audit.Event{CorrelationID: "worker", Action: "worker.agent_ocr", Outcome: audit.OutcomeFailure, Severity: audit.SeverityError, Source: audit.SourceWorker})
+		} else if processed {
+			log.Printf("agent OCR worker processed one tool run")
 		}
 		if processed, err := agentRunner.RunOnce(context.Background()); err != nil {
 			log.Printf("agent worker error: %v", err)

@@ -20,7 +20,7 @@ type agentServiceStub struct {
 	err       error
 }
 
-func (s *agentServiceStub) Submit(_ context.Context, user, key string, _ agent.Kind, _ string) (agent.Run, error) {
+func (s *agentServiceStub) Submit(_ context.Context, user, key string, _ agent.Kind, _, _ string) (agent.Run, error) {
 	s.submitted++
 	s.user = user
 	s.key = key

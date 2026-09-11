@@ -19,7 +19,9 @@ type agentRepoStub struct {
 func (s *agentRepoStub) ClaimDue(context.Context, string, time.Time, time.Duration) (agent.Run, bool, error) {
 	return s.run, true, nil
 }
-func (s *agentRepoStub) Context(context.Context, string) (string, error) { return s.context, nil }
+func (s *agentRepoStub) Context(context.Context, string, string) (string, error) {
+	return s.context, nil
+}
 func (s *agentRepoStub) Complete(_ context.Context, _ agent.Run, _ agent.ModelResult, _ map[string]any) error {
 	s.completed++
 	return nil
