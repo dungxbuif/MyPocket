@@ -17,7 +17,7 @@ export function NoticeBanner({
   return (
     <div
       className={cn(
-        "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-[#2f80ed] text-white text-xs font-medium shadow-sm select-none",
+        "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-2xl bg-black text-white text-xs font-medium shadow-none select-none",
         className
       )}
     >

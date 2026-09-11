@@ -65,7 +65,7 @@ export function TrendAreaLineChart({ points, height = 140, className }: TrendAre
         <path
           d={pathD}
           fill="none"
-          stroke="#ff5a66"
+          stroke="#9f1d1d"
           strokeWidth="3"
           strokeLinecap="round"
           strokeLinejoin="round"
@@ -79,7 +79,7 @@ export function TrendAreaLineChart({ points, height = 140, className }: TrendAre
             cy={c.y}
             r="4"
             fill="#ffffff"
-            stroke="#ff5a66"
+            stroke="#9f1d1d"
             strokeWidth="2.5"
           />
         ))}
@@ -90,7 +90,7 @@ export function TrendAreaLineChart({ points, height = 140, className }: TrendAre
         <span>{points[0]?.dateLabel}</span>
         <div className="flex items-center gap-3">
           <span className="flex items-center gap-1">
-            <span className="w-2 h-0.5 bg-[#ff5a66] inline-block" /> Tháng này
+            <span className="w-2 h-0.5 bg-[#9f1d1d] inline-block" /> Tháng này
           </span>
           <span className="flex items-center gap-1">
             <span className="w-2 h-0.5 border-t border-dashed border-[#8e8e93] inline-block" /> Trung bình 3T

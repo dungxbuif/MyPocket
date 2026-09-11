@@ -25,7 +25,7 @@ import {
 
 import { useOnlineStatus } from "./offline";
 import { apiBaseURL } from "./apiClient";
-import { ActionButton, Card, IconButton, PillButton, SectionTitle, SheetFrame, cx } from "./components";
+import { ActionButton, Card, IconButton, InputControl, PillButton, SectionTitle, SheetFrame, cx } from "./components";
 import { loadCurrentUser, logout, type AuthState } from "./auth";
 import { clearUserDataCaches } from "./userDataCache";
 import { buildTransactionInput, calendarDateInHoChiMinh } from "./transactionInput";
@@ -632,9 +632,9 @@ export function App() {
             <h1>Today Desk</h1>
             <div className="balance-line">
               <strong>{privacyMasked ? "••••••" : formatVND(totalBalance)}</strong>
-              <button className="icon-button" aria-label={privacyMasked ? "Hiện số dư" : "Ẩn số dư"} type="button" onClick={() => setPrivacyMasked((masked) => { const next = !masked; localStorage.setItem("mypocket:privacy-masked", String(next)); return next; })}>
+              <ActionButton className="icon-button" aria-label={privacyMasked ? "Hiện số dư" : "Ẩn số dư"} type="button" onClick={() => setPrivacyMasked((masked) => { const next = !masked; localStorage.setItem("mypocket:privacy-masked", String(next)); return next; })}>
                 <Eye size={24} />
-              </button>
+              </ActionButton>
             </div>
             <p>Tổng số dư <span className="help-dot">?</span></p>
           </div>
@@ -679,16 +679,13 @@ export function App() {
       </main>
 
       <nav className="bottom-nav dock-nav" aria-label="Điều hướng chính">
-        {tabs.slice(0, 2).map((tab) => (
-          <TabButton key={tab.id} tab={tab} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} />
-        ))}
-        <button className="add-button" aria-label="Thêm giao dịch" type="button" disabled={(wallets ?? []).length === 0} onClick={() => setSheetOpen(true)}>
-          <Plus size={36} />
-        </button>
-        {tabs.slice(2).map((tab) => (
+        {tabs.map((tab) => (
           <TabButton key={tab.id} tab={tab} active={activeTab === tab.id} onClick={() => setActiveTab(tab.id)} />
         ))}
       </nav>
+      <ActionButton className="add-button floating-add" aria-label="Thêm giao dịch" type="button" disabled={(wallets ?? []).length === 0} onClick={() => setSheetOpen(true)}>
+        <Plus size={30} />
+      </ActionButton>
       <PWAInstallPrompt prompt={installPrompt} onConsumed={() => setInstallPrompt(null)} />
 
       {sheetOpen ? <AddTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} onCreated={upsertTransaction} onDebtCreated={() => void refreshFinanceData()} onClose={() => setSheetOpen(false)} /> : null}
@@ -806,7 +803,7 @@ function DraftDecisionRow({ draft, wallets, online, onDecided }: {
         {draft.status === "pending" ? <>
           <label className="form-row">
             Số tiền
-            <input
+            <InputControl
               aria-label={`Số tiền bản nháp ${label}`}
               inputMode="numeric"
               value={amount}
@@ -819,7 +816,7 @@ function DraftDecisionRow({ draft, wallets, online, onDecided }: {
           </label>
           <label className="form-row">
             Ghi chú
-            <input aria-label={`Ghi chú bản nháp ${label}`} value={note} disabled={busy} onChange={(event) => {
+            <InputControl aria-label={`Ghi chú bản nháp ${label}`} value={note} disabled={busy} onChange={(event) => {
               setNote(event.target.value);
               clearConfirmRetry();
             }} />
@@ -853,7 +850,7 @@ function ConflictInbox({ conflicts, onResolve }: { conflicts: OfflineConflict[];
     <section className="card conflict-inbox" aria-label="Xung đột đồng bộ">
       <div className="section-title">
         <h2>Cần xử lý</h2>
-        <button type="button" onClick={() => void onResolve(fullResync)}>Đồng bộ lại</button>
+        <ActionButton type="button" onClick={() => void onResolve(fullResync)}>Đồng bộ lại</ActionButton>
       </div>
       {conflicts.map((conflict) => (
         <ConflictRow key={conflict.conflict_id} conflict={conflict} onResolve={onResolve} />
@@ -884,12 +881,12 @@ function NotificationInbox({
   const pushMessage = pushState === "denied" ? "Bạn đã từ chối quyền thông báo" : pushState === "unsupported" ? "Trình duyệt chưa hỗ trợ Web Push" : pushState === "offline" ? "Kết nối mạng để bật Web Push" : pushState === "failed" ? "Không thể bật Web Push lúc này" : pushState === "enabled" ? "Web Push đã bật" : "";
   return (
     <section className="card notification-inbox" role="dialog" aria-modal="false" aria-label="Hộp thư thông báo">
-      <div className="section-title"><h2>Thông báo</h2><button type="button" onClick={onEnablePush} disabled={!online || pushState === "enabled"}>Bật Web Push</button></div>
+      <div className="section-title"><h2>Thông báo</h2><ActionButton type="button" onClick={onEnablePush} disabled={!online || pushState === "enabled"}>Bật Web Push</ActionButton></div>
       {pushMessage ? <p className="notification-status">{pushMessage}</p> : null}
       <OperationError failure={failure} onRetry={onRetry} retryLabel="Thử lại" busy={Boolean(busyID)} />
       {!online && notices.length === 0 ? <p className="notification-status">Đang offline. Hộp thư sẽ tải lại khi có mạng.</p> : null}
       {notices.length === 0 && online ? <p className="notification-status">Chưa có thông báo mới.</p> : null}
-      {notices.map((notice) => <button className={notice.read_at ? "notice-row read" : "notice-row"} disabled={busyID === notice.id} key={notice.id} type="button" onClick={() => !notice.read_at && onRead(notice.id)}><span><strong>{notice.title}</strong><small>{notice.body}</small></span><time>{new Date(notice.created_at).toLocaleDateString("vi-VN")}</time></button>)}
+      {notices.map((notice) => <ActionButton className={notice.read_at ? "notice-row read" : "notice-row"} disabled={busyID === notice.id} key={notice.id} type="button" onClick={() => !notice.read_at && onRead(notice.id)}><span><strong>{notice.title}</strong><small>{notice.body}</small></span><time>{new Date(notice.created_at).toLocaleDateString("vi-VN")}</time></ActionButton>)}
     </section>
   );
 }
@@ -909,14 +906,14 @@ function ConflictRow({ conflict, onResolve }: { conflict: OfflineConflict; onRes
       </div>
       {canRetryTransaction ? (
         <div className="conflict-edit">
-          <input aria-label={`Số tiền xử lý ${conflict.entity_id}`} inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
-          <input aria-label={`Ghi chú xử lý ${conflict.entity_id}`} value={note} onChange={(event) => setNote(event.target.value)} />
+          <InputControl aria-label={`Số tiền xử lý ${conflict.entity_id}`} inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} />
+          <InputControl aria-label={`Ghi chú xử lý ${conflict.entity_id}`} value={note} onChange={(event) => setNote(event.target.value)} />
         </div>
       ) : null}
       <div className="conflict-actions">
-        <button type="button" onClick={() => void onResolve(() => keepServerConflict(conflict))}>Giữ server</button>
-        {canRetryTransaction ? <button type="button" onClick={() => void onResolve(() => editAndRetryTransactionConflict(conflict, { amount_vnd: Number(amount), note }))}>Sửa gửi lại</button> : null}
-        <button type="button" onClick={() => void onResolve(() => discardLocalConflict(conflict))}>Bỏ offline</button>
+        <ActionButton type="button" onClick={() => void onResolve(() => keepServerConflict(conflict))}>Giữ server</ActionButton>
+        {canRetryTransaction ? <ActionButton type="button" onClick={() => void onResolve(() => editAndRetryTransactionConflict(conflict, { amount_vnd: Number(amount), note }))}>Sửa gửi lại</ActionButton> : null}
+        <ActionButton type="button" onClick={() => void onResolve(() => discardLocalConflict(conflict))}>Bỏ offline</ActionButton>
       </div>
     </article>
   );
@@ -929,9 +926,9 @@ function AuthBanner({ authState }: { authState: AuthState }) {
   if (authState.status === "unauthenticated") {
     return (
       <section className="auth-panel">
-        <button className="primary-cta login-button" type="button" onClick={() => { window.location.href = `${apiBaseURL()}/api/v1/auth/google`; }}>
+        <ActionButton className="primary-cta login-button" type="button" onClick={() => { window.location.href = `${apiBaseURL()}/api/v1/auth/google`; }}>
           Đăng nhập bằng Google
-        </button>
+        </ActionButton>
       </section>
     );
   }
@@ -948,7 +945,7 @@ function AuthGate({ authState }: { authState: AuthState }) {
   if (authState.status === "forbidden") {
     return <main className="auth-gate"><section className="auth-gate-panel"><h1>Không có quyền truy cập</h1><p>Phiên hiện tại không thể mở dữ liệu này.</p>{authState.correlationID ? <small>{authState.correlationID}</small> : null}</section></main>;
   }
-  return <main className="auth-gate"><section className="auth-gate-panel"><div className="brand-mark">MyPocket</div><h1>Quản lý tiền rõ ràng hơn</h1><p>Đăng nhập để xem ví, giao dịch và kế hoạch của bạn.</p><button className="primary-cta login-button" type="button" onClick={() => { window.location.href = `${apiBaseURL()}/api/v1/auth/google`; }}>Đăng nhập bằng Google</button></section></main>;
+  return <main className="auth-gate"><section className="auth-gate-panel"><div className="brand-mark">MyPocket</div><h1>Quản lý tiền rõ ràng hơn</h1><p>Đăng nhập để xem ví, giao dịch và kế hoạch của bạn.</p><ActionButton className="primary-cta login-button" type="button" onClick={() => { window.location.href = `${apiBaseURL()}/api/v1/auth/google`; }}>Đăng nhập bằng Google</ActionButton></section></main>;
 }
 
 function ForbiddenState({ authState, onLogout }: { authState: Extract<AuthState, { status: "forbidden" }>; onLogout: () => void }) {
@@ -958,7 +955,7 @@ function ForbiddenState({ authState, onLogout }: { authState: Extract<AuthState,
         <h1>Không có quyền truy cập</h1>
         <p>Phiên hiện tại không thể mở dữ liệu này.</p>
         {authState.correlationID ? <small>{authState.correlationID}</small> : null}
-        <button className="wide-pill destructive" type="button" onClick={onLogout}>Đăng xuất</button>
+        <ActionButton className="wide-pill destructive" type="button" onClick={onLogout}>Đăng xuất</ActionButton>
       </section>
     </section>
   );
@@ -975,10 +972,10 @@ function TabButton({
 }) {
   const Icon = tab.icon;
   return (
-    <button className={cx("tab-button", active && "active")} aria-label={tab.label} type="button" onClick={onClick}>
+    <ActionButton className={cx("tab-button", active && "active")} aria-label={tab.label} type="button" onClick={onClick}>
       <Icon size={27} strokeWidth={2.4} />
       <span>{tab.label}</span>
-    </button>
+    </ActionButton>
   );
 }
 
@@ -1016,20 +1013,20 @@ function EventSheet({ event, transactions, onSaved, onArchived, onClose }: { eve
     <div className="sheet-backdrop">
       <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label={event ? "Sửa Sự Kiện" : "Tạo Sự Kiện"}>
         <header>
-          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <ActionButton className="pill-button" type="button" onClick={onClose}>Hủy</ActionButton>
           <h2>{event ? "Sửa Sự Kiện" : "Tạo Sự Kiện"}</h2>
           <span />
         </header>
-        <label className="sheet-row"><MapPin /><input aria-label="Tên sự kiện" value={name} onChange={(change) => setName(change.target.value)} placeholder="Tên sự kiện" /></label>
+        <label className="sheet-row"><MapPin /><InputControl aria-label="Tên sự kiện" value={name} onChange={(change) => setName(change.target.value)} placeholder="Tên sự kiện" /></label>
         <div className="manager-form two">
-          <input aria-label="Ngày bắt đầu sự kiện" type="date" value={startsOn} onChange={(change) => setStartsOn(change.target.value)} />
-          <input aria-label="Ngày kết thúc sự kiện" type="date" value={endsOn} onChange={(change) => setEndsOn(change.target.value)} />
+          <InputControl aria-label="Ngày bắt đầu sự kiện" type="date" value={startsOn} onChange={(change) => setStartsOn(change.target.value)} />
+          <InputControl aria-label="Ngày kết thúc sự kiện" type="date" value={endsOn} onChange={(change) => setEndsOn(change.target.value)} />
         </div>
-        <label className="sheet-row"><List /><input aria-label="Ghi chú sự kiện" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" /></label>
-        <label className="sheet-row"><Wallet /><select aria-label="Giao dịch sự kiện" value={transactionID} onChange={(change) => setTransactionID(change.target.value)}><option value="">Không gắn giao dịch</option>{transactions.map((transaction) => <option key={transaction.id} value={transaction.id}>{transaction.note || transaction.type} · {formatVND(transaction.amount_vnd)}</option>)}</select></label>
+        <label className="sheet-row"><List /><InputControl aria-label="Ghi chú sự kiện" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" /></label>
+        <label className="sheet-row"><Wallet /><Select aria-label="Giao dịch sự kiện" value={transactionID} onChange={(change) => setTransactionID(change.target.value)}><option value="">Không gắn giao dịch</option>{transactions.map((transaction) => <option key={transaction.id} value={transaction.id}>{transaction.note || transaction.type} · {formatVND(transaction.amount_vnd)}</option>)}</Select></label>
         <div className="sheet-actions">
-          {event ? <button className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</button> : null}
-          <button className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button>
+          {event ? <ActionButton className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</ActionButton> : null}
+          <ActionButton className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</ActionButton>
         </div>
       </section>
     </div>
@@ -1071,20 +1068,20 @@ function ObligationSheet({ obligation, transactions, onSaved, onArchived, onClos
     <div className="sheet-backdrop">
       <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label={obligation ? "Sửa Khoản Nợ" : "Tạo Khoản Nợ"}>
         <header>
-          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <ActionButton className="pill-button" type="button" onClick={onClose}>Hủy</ActionButton>
           <h2>{obligation ? "Sửa Khoản Nợ" : "Tạo Khoản Nợ"}</h2>
           <span />
         </header>
-        <div className="segmented sheet-segmented"><button type="button" className={direction === "borrowed" ? "active" : ""} onClick={() => setDirection("borrowed")}>Tôi vay</button><button type="button" className={direction === "lent" ? "active" : ""} onClick={() => setDirection("lent")}>Tôi cho vay</button></div>
-        <label className="sheet-row"><Users /><input aria-label="Đối tác" value={counterparty} onChange={(change) => setCounterparty(change.target.value)} placeholder="Người liên quan" /></label>
-        <label className="amount-row"><span>VND</span><input aria-label="Số tiền gốc" inputMode="numeric" value={principal} onChange={(change) => setPrincipal(change.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
-        <label className="sheet-row"><CalendarDays /><input aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(change) => setDueOn(change.target.value)} /></label>
-        <label className="sheet-row"><List /><input aria-label="Ghi chú khoản nợ" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" /></label>
-        <label className="sheet-row"><Wallet /><select aria-label="Giao dịch trả nợ" value={transactionID} onChange={(change) => setTransactionID(change.target.value)}><option value="">Không gắn trả nợ</option>{transactions.map((transaction) => <option key={transaction.id} value={transaction.id}>{transaction.note || transaction.type} · {formatVND(transaction.amount_vnd)}</option>)}</select></label>
+        <div className="segmented sheet-segmented"><ActionButton type="button" className={direction === "borrowed" ? "active" : ""} onClick={() => setDirection("borrowed")}>Tôi vay</ActionButton><ActionButton type="button" className={direction === "lent" ? "active" : ""} onClick={() => setDirection("lent")}>Tôi cho vay</ActionButton></div>
+        <label className="sheet-row"><Users /><InputControl aria-label="Đối tác" value={counterparty} onChange={(change) => setCounterparty(change.target.value)} placeholder="Người liên quan" /></label>
+        <label className="amount-row"><span>VND</span><InputControl aria-label="Số tiền gốc" inputMode="numeric" value={principal} onChange={(change) => setPrincipal(change.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
+        <label className="sheet-row"><CalendarDays /><InputControl aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(change) => setDueOn(change.target.value)} /></label>
+        <label className="sheet-row"><List /><InputControl aria-label="Ghi chú khoản nợ" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" /></label>
+        <label className="sheet-row"><Wallet /><Select aria-label="Giao dịch trả nợ" value={transactionID} onChange={(change) => setTransactionID(change.target.value)}><option value="">Không gắn trả nợ</option>{transactions.map((transaction) => <option key={transaction.id} value={transaction.id}>{transaction.note || transaction.type} · {formatVND(transaction.amount_vnd)}</option>)}</Select></label>
         {obligation ? <p className="sheet-meta">Còn {formatVND(obligation.remaining_vnd)} · Đã trả {formatVND(obligation.repaid_vnd)}</p> : null}
         <div className="sheet-actions">
-          {obligation ? <button className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</button> : null}
-          <button className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button>
+          {obligation ? <ActionButton className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</ActionButton> : null}
+          <ActionButton className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</ActionButton>
         </div>
       </section>
     </div>
@@ -1147,25 +1144,25 @@ function ScheduleSheet({ schedule, wallets, categories, onSaved, onArchived, onC
     <div className="sheet-backdrop">
       <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label={schedule ? "Sửa Lịch Lặp" : "Tạo Lịch Lặp"}>
         <header>
-          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <ActionButton className="pill-button" type="button" onClick={onClose}>Hủy</ActionButton>
           <h2>{schedule ? "Sửa Lịch Lặp" : "Tạo Lịch Lặp"}</h2>
           <span />
         </header>
         {schedule ? <p className="sheet-meta">Lịch đang chỉ hỗ trợ lưu trữ; tạo lịch mới để đổi mẫu.</p> : null}
-        <label className="sheet-row"><CalendarDays /><input aria-label="Tên lịch lặp" value={name} onChange={(change) => setName(change.target.value)} placeholder="Tên lịch lặp" disabled={Boolean(schedule)} /></label>
-        <label className="amount-row"><span>VND</span><input aria-label="Số tiền lịch lặp" inputMode="numeric" value={amount} onChange={(change) => setAmount(change.target.value.replace(/\D/g, ""))} placeholder="0" disabled={Boolean(schedule)} /></label>
-        <label className="sheet-row"><CalendarDays /><select aria-label="Chu kỳ lặp" value={frequency} onChange={(change) => setFrequency(change.target.value as RecurrenceFrequency)} disabled={Boolean(schedule)}><option value="daily">Hàng ngày</option><option value="weekly">Hàng tuần</option><option value="monthly">Hàng tháng</option></select></label>
-        <label className="sheet-row"><CalendarDays /><input aria-label="Ngày bắt đầu lịch lặp" type="date" value={startsOn} onChange={(change) => setStartsOn(change.target.value)} disabled={Boolean(schedule)} /></label>
+        <label className="sheet-row"><CalendarDays /><InputControl aria-label="Tên lịch lặp" value={name} onChange={(change) => setName(change.target.value)} placeholder="Tên lịch lặp" disabled={Boolean(schedule)} /></label>
+        <label className="amount-row"><span>VND</span><InputControl aria-label="Số tiền lịch lặp" inputMode="numeric" value={amount} onChange={(change) => setAmount(change.target.value.replace(/\D/g, ""))} placeholder="0" disabled={Boolean(schedule)} /></label>
+        <label className="sheet-row"><CalendarDays /><Select aria-label="Chu kỳ lặp" value={frequency} onChange={(change) => setFrequency(change.target.value as RecurrenceFrequency)} disabled={Boolean(schedule)}><option value="daily">Hàng ngày</option><option value="weekly">Hàng tuần</option><option value="monthly">Hàng tháng</option></Select></label>
+        <label className="sheet-row"><CalendarDays /><InputControl aria-label="Ngày bắt đầu lịch lặp" type="date" value={startsOn} onChange={(change) => setStartsOn(change.target.value)} disabled={Boolean(schedule)} /></label>
         <div className="segmented sheet-segmented">
-          {(["expense", "income", "transfer"] as const).map((option) => <button className={type === option ? "active" : ""} type="button" key={option} disabled={Boolean(schedule)} onClick={() => setType(option)}>{transactionTypeLabel(option)}</button>)}
+          {(["expense", "income", "transfer"] as const).map((option) => <ActionButton className={type === option ? "active" : ""} type="button" key={option} disabled={Boolean(schedule)} onClick={() => setType(option)}>{transactionTypeLabel(option)}</ActionButton>)}
         </div>
-        <label className="sheet-row"><Wallet /><select aria-label="Ví lịch lặp" value={sourceWalletID} onChange={(change) => setSourceWalletID(change.target.value)} disabled={Boolean(schedule)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</select></label>
-        {type === "transfer" ? <label className="sheet-row"><Wallet /><select aria-label="Ví nhận lịch lặp" value={destinationWalletID} onChange={(change) => setDestinationWalletID(change.target.value)} disabled={Boolean(schedule)}>{wallets.filter((wallet) => wallet.id !== sourceWalletID).map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</select></label> : null}
-        {type !== "transfer" ? <label className="sheet-row"><span className="dot-icon" /><select aria-label="Nhóm lịch lặp" value={chosenCategoryID} onChange={(change) => setCategoryID(change.target.value)} disabled={Boolean(schedule)}>{selectableCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label> : null}
-        <label className="sheet-row"><List /><input aria-label="Ghi chú lịch lặp" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" disabled={Boolean(schedule)} /></label>
+        <label className="sheet-row"><Wallet /><Select aria-label="Ví lịch lặp" value={sourceWalletID} onChange={(change) => setSourceWalletID(change.target.value)} disabled={Boolean(schedule)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label>
+        {type === "transfer" ? <label className="sheet-row"><Wallet /><Select aria-label="Ví nhận lịch lặp" value={destinationWalletID} onChange={(change) => setDestinationWalletID(change.target.value)} disabled={Boolean(schedule)}>{wallets.filter((wallet) => wallet.id !== sourceWalletID).map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label> : null}
+        {type !== "transfer" ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Nhóm lịch lặp" value={chosenCategoryID} onChange={(change) => setCategoryID(change.target.value)} disabled={Boolean(schedule)}>{selectableCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></label> : null}
+        <label className="sheet-row"><List /><InputControl aria-label="Ghi chú lịch lặp" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" disabled={Boolean(schedule)} /></label>
         <div className="sheet-actions">
-          {schedule ? <button className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</button> : null}
-          {!schedule ? <button className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button> : null}
+          {schedule ? <ActionButton className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</ActionButton> : null}
+          {!schedule ? <ActionButton className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</ActionButton> : null}
         </div>
       </section>
     </div>
@@ -1222,28 +1219,28 @@ function BudgetSheet({ budget, categories, onSaved, onArchived, onClose }: { bud
     <div className="sheet-backdrop">
       <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label={editing ? "Sửa Ngân Sách" : "Tạo Ngân Sách"}>
         <header>
-          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <ActionButton className="pill-button" type="button" onClick={onClose}>Hủy</ActionButton>
           <h2>{editing ? "Sửa Ngân Sách" : "Tạo Ngân Sách"}</h2>
           <span />
         </header>
-        <label className="sheet-row"><List /><input aria-label="Tên ngân sách" value={name} onChange={(event) => setName(event.target.value)} placeholder="Tên ngân sách" /></label>
-        <label className="amount-row"><span>VND</span><input aria-label="Số tiền ngân sách" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
-        <label className="sheet-row"><CalendarDays /><select aria-label="Kỳ ngân sách" value={periodType} onChange={(event) => setPeriodType(event.target.value as BudgetPeriodType)}>{budgetPeriods.map((period) => <option key={period} value={period}>{budgetPeriodLabel(period)}</option>)}</select></label>
+        <label className="sheet-row"><List /><InputControl aria-label="Tên ngân sách" value={name} onChange={(event) => setName(event.target.value)} placeholder="Tên ngân sách" /></label>
+        <label className="amount-row"><span>VND</span><InputControl aria-label="Số tiền ngân sách" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
+        <label className="sheet-row"><CalendarDays /><Select aria-label="Kỳ ngân sách" value={periodType} onChange={(event) => setPeriodType(event.target.value as BudgetPeriodType)}>{budgetPeriods.map((period) => <option key={period} value={period}>{budgetPeriodLabel(period)}</option>)}</Select></label>
         {periodType === "custom" ? (
           <div className="manager-form two">
-            <input aria-label="Ngày bắt đầu" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} />
-            <input aria-label="Ngày kết thúc" type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} />
+            <InputControl aria-label="Ngày bắt đầu" type="date" value={customStart} onChange={(event) => setCustomStart(event.target.value)} />
+            <InputControl aria-label="Ngày kết thúc" type="date" value={customEnd} onChange={(event) => setCustomEnd(event.target.value)} />
           </div>
         ) : null}
-        <button className={allCategories ? "toggle-row active" : "toggle-row"} type="button" onClick={() => setAllCategories((current) => !current)}>Tất cả nhóm chi<span /></button>
+        <ActionButton className={allCategories ? "toggle-row active" : "toggle-row"} type="button" onClick={() => setAllCategories((current) => !current)}>Tất cả nhóm chi<span /></ActionButton>
         {!allCategories ? (
           <div className="category-picker">
-            {expenseCategories.map((category) => <button className={categoryIDs.includes(category.id) ? "mini-toggle active" : "mini-toggle"} type="button" key={category.id} onClick={() => toggleCategory(category.id)}>{category.name}</button>)}
+            {expenseCategories.map((category) => <ActionButton className={categoryIDs.includes(category.id) ? "mini-toggle active" : "mini-toggle"} type="button" key={category.id} onClick={() => toggleCategory(category.id)}>{category.name}</ActionButton>)}
           </div>
         ) : null}
         <div className="sheet-actions">
-          {editing ? <button className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</button> : null}
-          <button className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</button>
+          {editing ? <ActionButton className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</ActionButton> : null}
+          <ActionButton className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</ActionButton>
         </div>
       </section>
     </div>
@@ -1256,24 +1253,24 @@ function AssetRow({ asset, privacyMasked, online, onChanged, onArchived }: { ass
   const pnl = asset.summary.unrealized_pnl_vnd;
   return (
     <article className="asset-row">
-      <button type="button" className="asset-main" onClick={() => setMode((current) => current === "idle" ? "price" : "idle")}>
+      <ActionButton type="button" className="asset-main" onClick={() => setMode((current) => current === "idle" ? "price" : "idle")}>
         <span className="category-dot" />
         <div>
           <strong>{asset.name}</strong>
           <p>{assetLabel(asset)} · {asset.summary.quantity} {unitLabel(asset.unit)}</p>
         </div>
         <b>{privacyMasked ? "••••••" : marketValue == null ? "Chưa có giá" : formatVND(marketValue)}</b>
-      </button>
+      </ActionButton>
       <div className="asset-meta">
         <span>{asset.pricing_mode === "automatic" ? "Tự động" : "Thủ công"}</span>
         <span>{asset.latest_price?.priced_at ? `Giá ${new Date(asset.latest_price.priced_at).toLocaleDateString("vi-VN")}` : "Chưa định giá"}</span>
         {pnl != null ? <strong className={pnl >= 0 ? "income" : "expense"}>{privacyMasked ? "••••••" : formatVND(pnl)}</strong> : null}
       </div>
       <div className="asset-actions">
-        <button type="button" onClick={() => setMode("buy")}>Mua</button>
-        <button type="button" onClick={() => setMode("sell")}>Bán</button>
-        <button type="button" onClick={() => setMode("price")}>Giá</button>
-        <button type="button" className="danger-text" onClick={() => void archiveAsset(asset.id, asset.version).then(() => onArchived(asset.id)).catch(() => undefined)}>Ẩn</button>
+        <ActionButton type="button" onClick={() => setMode("buy")}>Mua</ActionButton>
+        <ActionButton type="button" onClick={() => setMode("sell")}>Bán</ActionButton>
+        <ActionButton type="button" onClick={() => setMode("price")}>Giá</ActionButton>
+        <ActionButton type="button" className="danger-text" onClick={() => void archiveAsset(asset.id, asset.version).then(() => onArchived(asset.id)).catch(() => undefined)}>Ẩn</ActionButton>
       </div>
       {mode !== "idle" ? <AssetActionForm asset={asset} mode={mode} onSaved={(next) => { setMode("idle"); onChanged(next); }} /> : null}
     </article>
@@ -1301,10 +1298,10 @@ function AssetActionForm({ asset, mode, onSaved }: { asset: AssetPosition; mode:
   }
   return (
     <div className="manager-form asset-form">
-      {mode !== "price" ? <input aria-label="Số lượng tài sản" inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value.replace(/[^0-9.]/g, ""))} placeholder="Số lượng" /> : null}
-      <input aria-label="Giá VND" inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} placeholder="Giá VND" />
-      {mode !== "price" ? <input aria-label="Phí VND" inputMode="numeric" value={fee} onChange={(event) => setFee(event.target.value.replace(/\D/g, ""))} placeholder="Phí" /> : null}
-      <button type="button" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Đang lưu" : "Lưu"}</button>
+      {mode !== "price" ? <InputControl aria-label="Số lượng tài sản" inputMode="decimal" value={quantity} onChange={(event) => setQuantity(event.target.value.replace(/[^0-9.]/g, ""))} placeholder="Số lượng" /> : null}
+      <InputControl aria-label="Giá VND" inputMode="numeric" value={price} onChange={(event) => setPrice(event.target.value.replace(/\D/g, ""))} placeholder="Giá VND" />
+      {mode !== "price" ? <InputControl aria-label="Phí VND" inputMode="numeric" value={fee} onChange={(event) => setFee(event.target.value.replace(/\D/g, ""))} placeholder="Phí" /> : null}
+      <ActionButton type="button" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Đang lưu" : "Lưu"}</ActionButton>
     </div>
   );
 }
@@ -1342,23 +1339,23 @@ function AssetSheet({ onSaved, onClose }: { onSaved: (asset: AssetPosition) => v
     }
   }
   return (
-    <SheetFrame title="Thêm tài sản" label="Thêm tài sản" leading={<button type="button" onClick={onClose}>Đóng</button>} trailing={<Info size={22} />}>
+    <SheetFrame title="Thêm tài sản" label="Thêm tài sản" leading={<ActionButton type="button" onClick={onClose}>Đóng</ActionButton>} trailing={<Info size={22} />}>
       <section className="manager-section">
-        <label className="sheet-row"><BriefcaseBusiness /><select aria-label="Loại tài sản" value={type} onChange={(event) => setType(event.target.value as AssetType)}>{assetTypes.map((item) => <option key={item} value={item}>{assetTypeLabel(item)}</option>)}</select></label>
-        <label className="sheet-row"><List /><input aria-label="Tên tài sản" value={name} onChange={(event) => setName(event.target.value)} placeholder="Tên tài sản" /></label>
-        <label className="sheet-row"><Search /><input aria-label="Mã tài sản" value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="Mã, ví dụ FPT hoặc BTC" /></label>
-        <label className="sheet-row"><Wallet /><select aria-label="Đơn vị tài sản" value={unit} onChange={(event) => setUnit(event.target.value)}>{unitsForAsset(type).map((item) => <option key={item} value={item}>{unitLabel(item)}</option>)}</select></label>
+        <label className="sheet-row"><BriefcaseBusiness /><Select aria-label="Loại tài sản" value={type} onChange={(event) => setType(event.target.value as AssetType)}>{assetTypes.map((item) => <option key={item} value={item}>{assetTypeLabel(item)}</option>)}</Select></label>
+        <label className="sheet-row"><List /><InputControl aria-label="Tên tài sản" value={name} onChange={(event) => setName(event.target.value)} placeholder="Tên tài sản" /></label>
+        <label className="sheet-row"><Search /><InputControl aria-label="Mã tài sản" value={symbol} onChange={(event) => setSymbol(event.target.value)} placeholder="Mã, ví dụ FPT hoặc BTC" /></label>
+        <label className="sheet-row"><Wallet /><Select aria-label="Đơn vị tài sản" value={unit} onChange={(event) => setUnit(event.target.value)}>{unitsForAsset(type).map((item) => <option key={item} value={item}>{unitLabel(item)}</option>)}</Select></label>
         <div className="segmented sheet-segmented">
-          <button type="button" className={pricingMode === "manual" ? "active" : ""} onClick={() => setPricingMode("manual")}>Thủ công</button>
-          <button type="button" className={pricingMode === "automatic" ? "active" : ""} onClick={() => setPricingMode("automatic")}>Tự động</button>
+          <ActionButton type="button" className={pricingMode === "manual" ? "active" : ""} onClick={() => setPricingMode("manual")}>Thủ công</ActionButton>
+          <ActionButton type="button" className={pricingMode === "automatic" ? "active" : ""} onClick={() => setPricingMode("automatic")}>Tự động</ActionButton>
         </div>
         {pricingMode === "automatic" ? (
           <>
-            <label className="sheet-row"><List /><input aria-label="Provider key" value={providerKey} onChange={(event) => setProviderKey(event.target.value)} placeholder="Provider" /></label>
-            <label className="sheet-row"><Search /><input aria-label="Provider symbol" value={providerSymbol} onChange={(event) => setProviderSymbol(event.target.value)} placeholder="Symbol provider" /></label>
+            <label className="sheet-row"><List /><InputControl aria-label="Provider key" value={providerKey} onChange={(event) => setProviderKey(event.target.value)} placeholder="Provider" /></label>
+            <label className="sheet-row"><Search /><InputControl aria-label="Provider symbol" value={providerSymbol} onChange={(event) => setProviderSymbol(event.target.value)} placeholder="Symbol provider" /></label>
           </>
         ) : null}
-        <button className="primary-cta" type="button" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Đang lưu" : "Lưu"}</button>
+        <ActionButton className="primary-cta" type="button" disabled={!canSave || busy} onClick={() => void save()}>{busy ? "Đang lưu" : "Lưu"}</ActionButton>
       </section>
     </SheetFrame>
   );
@@ -1431,19 +1428,19 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
               <ActionButton className={type === option ? "active" : ""} disabled={receiptLocked} key={option} onClick={() => setType(option)}>{quickAddTypeLabel(option)}</ActionButton>
             ))}
           </div>
-          <label className="amount-row"><span>VND</span><input aria-label="Số tiền" type="text" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
-          {type === "debt" ? <div className="segmented debt-segmented"><button type="button" className={debtDirection === "borrowed" ? "active" : ""} onClick={() => setDebtDirection("borrowed")}>Tôi vay</button><button type="button" className={debtDirection === "lent" ? "active" : ""} onClick={() => setDebtDirection("lent")}>Tôi cho vay</button></div> : null}
-          {type !== "debt" ? <label className="sheet-row"><Wallet /><Select aria-label="Ví nguồn" value={sourceWalletID} disabled={receiptLocked} onChange={(event) => setSourceWalletID(event.target.value)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label> : <label className="sheet-row"><Users /><input aria-label="Đối tác" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder="Người liên quan" /></label>}
+          <label className="amount-row"><span>VND</span><InputControl aria-label="Số tiền" type="text" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
+          {type === "debt" ? <div className="segmented debt-segmented"><ActionButton type="button" className={debtDirection === "borrowed" ? "active" : ""} onClick={() => setDebtDirection("borrowed")}>Tôi vay</ActionButton><ActionButton type="button" className={debtDirection === "lent" ? "active" : ""} onClick={() => setDebtDirection("lent")}>Tôi cho vay</ActionButton></div> : null}
+          {type !== "debt" ? <label className="sheet-row"><Wallet /><Select aria-label="Ví nguồn" value={sourceWalletID} disabled={receiptLocked} onChange={(event) => setSourceWalletID(event.target.value)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label> : <label className="sheet-row"><Users /><InputControl aria-label="Đối tác" value={counterparty} onChange={(event) => setCounterparty(event.target.value)} placeholder="Người liên quan" /></label>}
           {type === "transfer" ? <>
             <label className="sheet-row"><Wallet /><Select aria-label="Ví đích" value={destinationWalletID} disabled={receiptLocked} onChange={(event) => setDestinationWalletID(event.target.value)}><option value="">Chọn ví nhận</option>{wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label>
             <p className="px-4 py-2 text-sm">Chuyển giữa hai ví khác nhau, không tính vào thu/chi báo cáo.</p>
-          </> : type !== "debt" ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Nhóm" value={chosenCategoryID} onChange={(event) => setCategoryID(event.target.value)}><option value="">Chọn nhóm</option>{filteredCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></label> : <label className="sheet-row"><CalendarDays /><input aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} /></label>}
-          {type !== "debt" ? <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label> : null}
-          {type !== "debt" ? <label className="date-row"><CalendarDays /><input aria-label="Ngày giao dịch" type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} /></label> : null}
-          {type !== "debt" ? <label className="exclude-row"><input type="checkbox" checked={excludedFromReports} onChange={(event) => setExcludedFromReports(event.target.checked)} /><span>Không tính vào báo cáo</span></label> : null}
+          </> : type !== "debt" ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Nhóm" value={chosenCategoryID} onChange={(event) => setCategoryID(event.target.value)}><option value="">Chọn nhóm</option>{filteredCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></label> : <label className="sheet-row"><CalendarDays /><InputControl aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} /></label>}
+          {type !== "debt" ? <label className="sheet-row"><List /><InputControl aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label> : null}
+          {type !== "debt" ? <label className="date-row"><CalendarDays /><InputControl aria-label="Ngày giao dịch" type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} /></label> : null}
+          {type !== "debt" ? <label className="exclude-row"><InputControl type="checkbox" checked={excludedFromReports} onChange={(event) => setExcludedFromReports(event.target.checked)} /><span>Không tính vào báo cáo</span></label> : null}
           <ActionButton className="details-trigger" onClick={() => setShowDetails((current) => !current)} aria-expanded={showDetails}>{showDetails ? "Ẩn chi tiết" : "Thêm chi tiết"}</ActionButton>
           {showDetails ? <div className="details-panel">
-            <label className="sheet-row"><List /><input aria-label="Ghi chú chi tiết" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label>
+            <label className="sheet-row"><List /><InputControl aria-label="Ghi chú chi tiết" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label>
             <UnavailableAction icon={<Users />} label="Với" reason="Chưa hỗ trợ trong form này" />
             <UnavailableAction icon={<MapPin />} label="Đặt vị trí" reason="Chưa hỗ trợ trong form này" />
             <UnavailableAction icon={<BriefcaseBusiness />} label="Chọn sự kiện" reason="Chưa hỗ trợ trong form này" />
@@ -1512,16 +1509,16 @@ function EditTransactionSheet({ categories, wallets, readOnly, transaction, onCh
     <div className="sheet-backdrop">
       <section className="transaction-sheet" role="dialog" aria-modal="true" aria-label="Sửa Giao Dịch">
         <header>
-          <button className="pill-button" type="button" onClick={onClose}>Hủy</button>
+          <ActionButton className="pill-button" type="button" onClick={onClose}>Hủy</ActionButton>
           <h2>Sửa Giao Dịch</h2>
           <span />
         </header>
         {readOnly ? <p className="offline-warning">Offline storage chưa sẵn sàng. Mở mạng lại để sửa giao dịch.</p> : null}
         <OperationError failure={operationError} />
         <p className="sheet-meta">{transactionTypeLabel(transaction.type)} · {sourceWallet?.name ?? "Ví"} · {category?.name ?? "Không nhóm"}</p>
-        <label className="amount-row"><span>VND</span><input aria-label="Số tiền" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" disabled={readOnly} /></label>
-        <label className="sheet-row"><List /><input aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" disabled={readOnly} /></label>
-        <button className={excludedFromReports ? "toggle-row active" : "toggle-row"} type="button" disabled={readOnly} onClick={() => setExcludedFromReports((current) => !current)}>Không tính vào báo cáo<span /></button>
+        <label className="amount-row"><span>VND</span><InputControl aria-label="Số tiền" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" disabled={readOnly} /></label>
+        <label className="sheet-row"><List /><InputControl aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" disabled={readOnly} /></label>
+        <ActionButton className={excludedFromReports ? "toggle-row active" : "toggle-row"} type="button" disabled={readOnly} onClick={() => setExcludedFromReports((current) => !current)}>Không tính vào báo cáo<span /></ActionButton>
         <div className="sheet-actions">
           <ActionButton className="wide-pill destructive" disabled={readOnly || saving} onClick={() => void archive()}>Lưu trữ</ActionButton>
           <ActionButton className="primary-cta" disabled={readOnly || saving || Number(amount) <= 0} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu thay đổi"}</ActionButton>
@@ -1619,23 +1616,23 @@ function WalletManagerSheet({
         ) : null}
 
         <section className="wallet-actions-card" aria-label="Thao tác ví">
-          <button className="wallet-action-row" type="button" disabled={readOnly} onClick={() => setCreatingWallet((current) => !current)}>
+          <ActionButton className="wallet-action-row" type="button" disabled={readOnly} onClick={() => setCreatingWallet((current) => !current)}>
             <span className="wallet-action-icon"><Plus size={28} /></span>
             <strong>Thêm ví</strong>
-          </button>
-          <button className="wallet-action-row" type="button" disabled>
+          </ActionButton>
+          <ActionButton className="wallet-action-row" type="button" disabled>
             <span className="wallet-action-icon"><Link size={24} /></span>
             <strong>Liên kết dịch vụ</strong>
-          </button>
+          </ActionButton>
         </section>
 
         {creatingWallet ? (
           <section className="manager-section wallet-create-panel">
             <h3>Thêm ví</h3>
             <div className="manager-form">
-              <input aria-label="Tên ví mới" value={walletName} onChange={(event) => setWalletName(event.target.value)} placeholder="Tên ví mới" disabled={readOnly} />
-              <select aria-label="Loại ví" value={walletType} onChange={(event) => setWalletType(event.target.value as WalletType)} disabled={readOnly}>{walletTypes.map((type) => <option key={type} value={type}>{walletTypeLabel(type)}</option>)}</select>
-              <button type="button" disabled={readOnly || !walletName.trim() || busy} onClick={() => void run(async () => { const wallet = await createWallet({ name: walletName, type: walletType }); if (wallet) onWalletChanged(wallet); setWalletName(""); setCreatingWallet(false); })}>Tạo ví</button>
+              <InputControl aria-label="Tên ví mới" value={walletName} onChange={(event) => setWalletName(event.target.value)} placeholder="Tên ví mới" disabled={readOnly} />
+              <Select aria-label="Loại ví" value={walletType} onChange={(event) => setWalletType(event.target.value as WalletType)} disabled={readOnly}>{walletTypes.map((type) => <option key={type} value={type}>{walletTypeLabel(type)}</option>)}</Select>
+              <ActionButton type="button" disabled={readOnly || !walletName.trim() || busy} onClick={() => void run(async () => { const wallet = await createWallet({ name: walletName, type: walletType }); if (wallet) onWalletChanged(wallet); setWalletName(""); setCreatingWallet(false); })}>Tạo ví</ActionButton>
             </div>
           </section>
         ) : null}
@@ -1643,7 +1640,7 @@ function WalletManagerSheet({
         <section className="manager-section" aria-label="Tạo nhóm giao dịch">
           <h3>Nhóm giao dịch</h3>
           <div className="manager-form">
-            <input aria-label="Tên nhóm mới" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} disabled={readOnly || busy} />
+            <InputControl aria-label="Tên nhóm mới" value={categoryName} onChange={(event) => setCategoryName(event.target.value)} disabled={readOnly || busy} />
             <Select aria-label="Loại nhóm" value={categoryKind} onChange={(event) => { setCategoryKind(event.target.value as "income" | "expense"); setCategoryParentID(""); }} disabled={readOnly || busy}>
               <option value="expense">Chi</option><option value="income">Thu</option>
             </Select>
@@ -1651,10 +1648,10 @@ function WalletManagerSheet({
               <option value="">Không có nhóm cha</option>
               {createParentOptions.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}
             </Select>
-            <button type="button" disabled={readOnly || busy || !categoryName.trim()} onClick={() => void run(async () => {
+            <ActionButton type="button" disabled={readOnly || busy || !categoryName.trim()} onClick={() => void run(async () => {
               const category = await createCategory({ name: categoryName, kind: categoryKind, ...(categoryParentID ? { parent_id: categoryParentID } : {}) });
               onCategoryChanged(category);
-            }, "Chưa lưu được thay đổi nhóm. Nội dung và nhóm cha vẫn được giữ để bạn kiểm tra.", () => { setCategoryName(""); setCategoryParentID(""); })}>Tạo nhóm</button>
+            }, "Chưa lưu được thay đổi nhóm. Nội dung và nhóm cha vẫn được giữ để bạn kiểm tra.", () => { setCategoryName(""); setCategoryParentID(""); })}>Tạo nhóm</ActionButton>
           </div>
           {categories.filter((category) => !category.is_system).map((category) => (
             <CategoryEditor key={category.id} category={category} categories={categories} readOnly={readOnly} busy={busy} onCategoryChanged={onCategoryChanged} onSave={run} />
@@ -1684,15 +1681,15 @@ function CategoryEditor({ category, categories, readOnly, busy, onCategoryChange
   const parentOptions = categories.filter((candidate) => candidate.kind === category.kind && !blockedParentIDs.has(candidate.id));
   return (
     <div className="manager-row">
-      <input aria-label={`Tên nhóm ${category.name}`} value={name} onChange={(event) => setName(event.target.value)} disabled={readOnly || busy} />
+      <InputControl aria-label={`Tên nhóm ${category.name}`} value={name} onChange={(event) => setName(event.target.value)} disabled={readOnly || busy} />
       <Select aria-label={`Nhóm cha ${category.name}`} value={parentID} onChange={(event) => setParentID(event.target.value)} disabled={readOnly || busy}>
         <option value="">Không có nhóm cha</option>
         {parentOptions.map((candidate) => <option key={candidate.id} value={candidate.id}>{candidate.name}</option>)}
       </Select>
-      <button type="button" aria-label={`Lưu nhóm ${category.name}`} disabled={readOnly || busy || !name.trim()} onClick={() => void onSave(async () => {
+      <ActionButton type="button" aria-label={`Lưu nhóm ${category.name}`} disabled={readOnly || busy || !name.trim()} onClick={() => void onSave(async () => {
         const updated = await updateCategory(category.id, { name, parent_id: parentID || null, base_version: category.version, current_category: category });
         onCategoryChanged(updated);
-      }, "Chưa lưu được thay đổi nhóm. Nội dung và nhóm cha vẫn được giữ để bạn kiểm tra.")}>Lưu</button>
+      }, "Chưa lưu được thay đổi nhóm. Nội dung và nhóm cha vẫn được giữ để bạn kiểm tra.")}>Lưu</ActionButton>
     </div>
   );
 }
@@ -1758,14 +1755,14 @@ function WalletCategorySettingsPanel({ wallets, online, readOnly }: { wallets: W
       {settings?.map((setting) => (
         <div className="manager-row" key={setting.id}>
           <span>{setting.name}</span>
-          <button
+          <ActionButton
             type="button"
             className={setting.active ? "mini-toggle active" : "mini-toggle"}
             aria-label={`${setting.name} đang ${setting.active ? "bật" : "tắt"}`}
             aria-pressed={setting.active}
             disabled={!online || readOnly || loading || busyCategoryID != null}
             onClick={() => void toggle(setting)}
-          >{busyCategoryID === setting.id ? "Đang lưu" : setting.active ? "Bật" : "Tắt"}</button>
+          >{busyCategoryID === setting.id ? "Đang lưu" : setting.active ? "Bật" : "Tắt"}</ActionButton>
         </div>
       ))}
     </section>
@@ -1821,11 +1818,11 @@ function WalletManageRow({
   }
   return (
     <div className="manager-row">
-      <input aria-label={`Tên ví ${wallet.name}`} value={name} onChange={(event) => setName(event.target.value)} disabled={readOnly} />
-      <button type="button" disabled={readOnly} className={include ? "mini-toggle active" : "mini-toggle"} onClick={() => setInclude((current) => !current)}>{include ? "Tổng" : "Ẩn"}</button>
-      <button type="button" disabled={readOnly || busy || !name.trim()} onClick={() => void onChanged(async () => { const next = await updateWallet(wallet.id, { name, include_in_total: include, base_version: wallet.version, current_wallet: wallet }); if (next) onWalletChanged(next); })}>Lưu</button>
-      <button type="button" disabled={readOnly || busy} onClick={() => void onChanged(async () => { await setDefaultAIWallet(wallet.id, wallets, wallet.version); wallets.forEach((item) => onWalletChanged({ ...item, is_default_ai: item.id === wallet.id })); })}>{wallet.is_default_ai ? "AI" : "Đặt AI"}</button>
-      <button type="button" className="danger-text" disabled={readOnly || busy} onClick={() => void onChanged(async () => { await archiveWallet(wallet.id, wallet.version); onWalletArchived(wallet.id); })}>Ẩn</button>
+      <InputControl aria-label={`Tên ví ${wallet.name}`} value={name} onChange={(event) => setName(event.target.value)} disabled={readOnly} />
+      <ActionButton type="button" disabled={readOnly} className={include ? "mini-toggle active" : "mini-toggle"} onClick={() => setInclude((current) => !current)}>{include ? "Tổng" : "Ẩn"}</ActionButton>
+      <ActionButton type="button" disabled={readOnly || busy || !name.trim()} onClick={() => void onChanged(async () => { const next = await updateWallet(wallet.id, { name, include_in_total: include, base_version: wallet.version, current_wallet: wallet }); if (next) onWalletChanged(next); })}>Lưu</ActionButton>
+      <ActionButton type="button" disabled={readOnly || busy} onClick={() => void onChanged(async () => { await setDefaultAIWallet(wallet.id, wallets, wallet.version); wallets.forEach((item) => onWalletChanged({ ...item, is_default_ai: item.id === wallet.id })); })}>{wallet.is_default_ai ? "AI" : "Đặt AI"}</ActionButton>
+      <ActionButton type="button" className="danger-text" disabled={readOnly || busy} onClick={() => void onChanged(async () => { await archiveWallet(wallet.id, wallet.version); onWalletArchived(wallet.id); })}>Ẩn</ActionButton>
     </div>
   );
 }

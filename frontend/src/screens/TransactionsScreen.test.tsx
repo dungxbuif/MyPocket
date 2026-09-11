@@ -29,7 +29,7 @@ describe("TransactionsScreen accounting presentation", () => {
     const amount = within(rows[0]).getByText("350.000 đ");
     expect(amount).toBeVisible();
     expect(amount).toHaveClass("text-[#111111]");
-    expect(amount).not.toHaveClass("text-[#32a9df]", "text-[#ff5a66]");
+    expect(amount).not.toHaveClass("text-[#111111]", "text-[#9f1d1d]");
     expect(within(rows[0]).getByText("Chuyển khoản")).toBeVisible();
     await userEvent.click(rows[0]);
     expect(onEdit).toHaveBeenCalledExactlyOnceWith(transfer);
@@ -51,7 +51,7 @@ describe("TransactionsScreen accounting presentation", () => {
     const amount = within(row).getByText("800.000 đ");
     expect(amount).toBeVisible();
     expect(amount).toHaveClass("text-[#111111]");
-    expect(amount).not.toHaveClass("text-[#32a9df]", "text-[#ff5a66]");
+    expect(amount).not.toHaveClass("text-[#111111]", "text-[#9f1d1d]");
     expect(within(row).getByText("Số dư sau điều chỉnh")).toBeVisible();
   });
 
@@ -61,7 +61,7 @@ describe("TransactionsScreen accounting presentation", () => {
       { ...transfer, id: "expense-1", type: "expense", destination_wallet_id: undefined, amount_vnd: 125000, note: "Ăn uống" },
     ]} onEdit={vi.fn()} />);
 
-    expect(within(screen.getByRole("button", { name: /Lương/ })).getByText("+900.000 đ")).toHaveClass("text-[#32a9df]");
-    expect(within(screen.getByRole("button", { name: /Ăn uống/ })).getByText("-125.000 đ")).toHaveClass("text-[#ff5a66]");
+    expect(within(screen.getByRole("button", { name: /Lương/ })).getByText("+900.000 đ")).toHaveClass("text-[#111111]");
+    expect(within(screen.getByRole("button", { name: /Ăn uống/ })).getByText("-125.000 đ")).toHaveClass("text-[#9f1d1d]");
   });
 });

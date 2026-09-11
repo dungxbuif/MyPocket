@@ -31,7 +31,7 @@ export function ExpenseDetailSheet({
   ];
 
   const donutSlices = [
-    { key: "food", label: categoryName, percentage: 100, color: "#2dbd4f" },
+    { key: "food", label: categoryName, percentage: 100, color: "#111111" },
   ];
 
   const formattedTotal = new Intl.NumberFormat("vi-VN").format(totalSpent);
@@ -62,7 +62,7 @@ export function ExpenseDetailSheet({
         {/* Aggregated Numbers */}
         <div className="rounded-2xl bg-white p-4 text-center shadow-xs flex flex-col gap-1">
           <span className="text-xs text-[#8e8e93]">Tổng cộng</span>
-          <span className="text-2xl font-bold text-[#ff5a66] tabular-nums">
+          <span className="text-2xl font-bold text-[#9f1d1d] tabular-nums">
             {formattedTotal} đ
           </span>
           <span className="text-xs text-[#8e8e93] mt-1">
@@ -89,7 +89,7 @@ export function ExpenseDetailSheet({
             />
             <div className="w-full mt-4 border-t border-[#e8e8ec] pt-3 flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 rounded-full bg-[#2dbd4f]" />
+                <span className="w-3 h-3 rounded-full bg-[#111111]" />
                 <span className="text-sm font-semibold text-[#111111]">{categoryName}</span>
               </div>
               <span className="text-sm font-bold text-[#111111] tabular-nums">{formattedTotal} đ</span>
@@ -102,11 +102,11 @@ export function ExpenseDetailSheet({
             <div className="mt-4 border-t border-[#e8e8ec] pt-2 flex flex-col divide-y divide-[#e8e8ec]/60">
               <div className="flex justify-between py-2 text-xs">
                 <span className="text-[#8e8e93]">Thứ Năm, 13/08</span>
-                <span className="font-bold text-[#ff5a66]">90.000 đ</span>
+                <span className="font-bold text-[#9f1d1d]">90.000 đ</span>
               </div>
               <div className="flex justify-between py-2 text-xs">
                 <span className="text-[#8e8e93]">Thứ Sáu, 14/08</span>
-                <span className="font-bold text-[#ff5a66]">160.000 đ</span>
+                <span className="font-bold text-[#9f1d1d]">160.000 đ</span>
               </div>
             </div>
           </div>

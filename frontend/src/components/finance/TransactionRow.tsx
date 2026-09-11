@@ -51,10 +51,10 @@ export function TransactionRow({
     >
       {/* Leading Category Icon with Mini Wallet Emblem */}
       <div className="flex items-center gap-3 min-w-0 pr-2">
-        <div className="relative w-11 h-11 rounded-full bg-[#29495a] text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
+        <div className="relative w-11 h-11 rounded-full bg-[#333333] text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
           {categoryIcon || categoryName.slice(0, 1).toUpperCase()}
           {walletName && (
-            <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white border border-[#e8e8ec] flex items-center justify-center text-[9px] text-[#29495a]">
+            <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-white border border-[#e8e8ec] flex items-center justify-center text-[9px] text-[#333333]">
               💼
             </span>
           )}
@@ -77,8 +77,8 @@ export function TransactionRow({
         <span
           className={cn(
             "text-[15px] font-bold tabular-nums",
-            isExpense && "text-[#ff5a66]",
-            isIncome && "text-[#32a9df]",
+            isExpense && "text-[#9f1d1d]",
+            isIncome && "text-[#111111]",
             !isExpense && !isIncome && "text-[#111111]"
           )}
         >

@@ -21,7 +21,7 @@ export function GroupedCard({ title, headerAction, children, className }: Groupe
             <button
               type="button"
               onClick={headerAction.onClick}
-              className="text-xs font-semibold text-[#2dbd4f] hover:underline"
+              className="text-xs font-semibold text-[#111111] hover:underline"
             >
               {headerAction.label}
             </button>

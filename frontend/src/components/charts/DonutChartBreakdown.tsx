@@ -68,7 +68,7 @@ export function DonutChartBreakdown({
       {/* Center Icon & Badge */}
       <div className="absolute flex flex-col items-center justify-center">
         {centerIcon && (
-          <div className="w-10 h-10 rounded-full bg-[#29495a] text-white flex items-center justify-center font-bold text-sm shadow-xs mb-1">
+          <div className="w-10 h-10 rounded-full bg-[#333333] text-white flex items-center justify-center font-bold text-sm shadow-xs mb-1">
             {centerIcon}
           </div>
         )}

@@ -9,10 +9,10 @@ export function Badge({ className, variant = "default", ...props }: BadgeProps) 
   const variantStyles: Record<string, string> = {
     default: "bg-[#111111] text-white",
     secondary: "bg-[#eef0f4] text-[#111111]",
-    destructive: "bg-[#ffebee] text-[#ff5a66]",
+    destructive: "bg-[#ffebee] text-[#9f1d1d]",
     outline: "border border-[#e8e8ec] text-[#8e8e93]",
-    success: "bg-[#e8f7ed] text-[#1c8535]",
-    warning: "bg-[#fff3e0] text-[#ff8800]",
+    success: "bg-[#f1f1ee] text-[#111111]",
+    warning: "bg-[#fff3e0] text-[#6b4f00]",
   };
 
   return (

@@ -13,13 +13,13 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       "inline-flex items-center justify-center font-medium transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 select-none active:scale-[0.98]";
 
     const variantStyles: Record<string, string> = {
-      default: "bg-[#2dbd4f] text-white hover:bg-[#25a443] shadow-sm",
-      secondary: "bg-[#e8f7ed] text-[#1c8535] hover:bg-[#d8f2df]",
-      destructive: "bg-[#ff5a66] text-white hover:bg-[#e04a55] shadow-sm",
-      pill: "bg-[#2dbd4f] text-white rounded-full hover:bg-[#25a443]",
-      outline: "border border-[#e8e8ec] bg-white text-[#111111] hover:bg-[#f8f9fa]",
-      ghost: "text-[#111111] hover:bg-[#eef0f4]",
-      icon: "rounded-full p-2 text-[#8e8e93] hover:text-[#111111] hover:bg-[#eef0f4] active:scale-95",
+      default: "bg-black text-white hover:bg-neutral-800 shadow-none",
+      secondary: "bg-neutral-100 text-black hover:bg-neutral-200",
+      destructive: "bg-white text-[#9f1d1d] border border-[#9f1d1d] hover:bg-[#fff5f5] shadow-none",
+      pill: "bg-black text-white rounded-full hover:bg-neutral-800",
+      outline: "border border-neutral-300 bg-white text-black hover:bg-neutral-100",
+      ghost: "text-black hover:bg-neutral-100",
+      icon: "rounded-full p-2 text-neutral-600 hover:text-black hover:bg-neutral-100 active:scale-95",
     };
 
     const sizeStyles: Record<string, string> = {

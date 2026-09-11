@@ -11,7 +11,7 @@ export interface WalletFilterChipProps {
 
 export function WalletFilterChip({
   walletName,
-  icon = <Globe className="w-3.5 h-3.5 text-[#29495a]" />,
+  icon = <Globe className="w-3.5 h-3.5 text-[#333333]" />,
   onClick,
   className,
 }: WalletFilterChipProps) {

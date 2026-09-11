@@ -57,7 +57,7 @@ export function WalletRow({
       )}
     >
       <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-[#29495a] flex items-center justify-center shrink-0 shadow-xs">
+        <div className="w-10 h-10 rounded-full bg-[#333333] flex items-center justify-center shrink-0 shadow-xs">
           {renderIcon()}
         </div>
         <div className="flex flex-col">
@@ -69,12 +69,12 @@ export function WalletRow({
         <span
           className={cn(
             "text-[15px] font-bold tabular-nums",
-            isNegative ? "text-[#ff5a66]" : "text-[#111111]"
+            isNegative ? "text-[#9f1d1d]" : "text-[#111111]"
           )}
         >
           {formattedBalance}
         </span>
-        {selected ? <Check className="w-5 h-5 text-[#2dbd4f] stroke-[2.5]" /> : null}
+        {selected ? <Check className="w-5 h-5 text-[#111111] stroke-[2.5]" /> : null}
       </div>
     </div>
   );

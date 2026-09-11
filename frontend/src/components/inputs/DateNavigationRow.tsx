@@ -38,7 +38,7 @@ export function DateNavigationRow({
   return (
     <div className={cn("flex items-center justify-between py-3 px-2 w-full", className)}>
       <div className="flex items-center gap-2">
-        <Calendar className="w-5 h-5 text-[#29495a]" />
+        <Calendar className="w-5 h-5 text-[#333333]" />
         <span className="text-sm font-semibold text-[#111111]">Ngày</span>
       </div>
 

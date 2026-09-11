@@ -24,7 +24,7 @@ export function SearchInputField({
 }: SearchInputFieldProps) {
   return (
     <div className={cn("relative flex items-center w-full", className)}>
-      <Search className="absolute left-3.5 w-4 h-4 text-[#8e8e93] pointer-events-none" />
+      <Search className="absolute left-3.5 w-4 h-4 text-neutral-500 pointer-events-none" />
       <input
         type="text"
         aria-label={ariaLabel}
@@ -32,13 +32,13 @@ export function SearchInputField({
         autoFocus={autoFocus}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full h-10 pl-10 pr-9 rounded-full bg-[#eef0f4] text-sm text-[#111111] placeholder:text-[#8e8e93] focus:outline-none focus:ring-2 focus:ring-[#2dbd4f] transition-all"
+        className="w-full h-10 pl-10 pr-9 rounded-full bg-neutral-100 text-sm text-black placeholder:text-neutral-500 focus:outline-none focus:ring-2 focus:ring-black transition-all"
       />
       {value ? (
         <ActionButton
           aria-label="Xóa từ khóa tìm kiếm"
           onClick={() => (onClear ? onClear() : onChange(""))}
-          className="absolute right-3 w-5 h-5 rounded-full bg-[#8e8e93]/30 text-[#111111] flex items-center justify-center hover:bg-[#8e8e93]/50 transition-colors"
+          className="absolute right-3 w-5 h-5 rounded-full bg-neutral-300 text-black flex items-center justify-center hover:bg-neutral-400 transition-colors"
         >
           <X className="w-3 h-3" />
         </ActionButton>

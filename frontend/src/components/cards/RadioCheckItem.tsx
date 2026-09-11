@@ -30,7 +30,7 @@ export function RadioCheckItem({
     >
       <div className="flex items-center gap-3">
         {leadingIcon && (
-          <div className="w-8 h-8 rounded-full bg-[#eef0f4] flex items-center justify-center text-[#29495a]">
+          <div className="w-8 h-8 rounded-full bg-[#eef0f4] flex items-center justify-center text-[#333333]">
             {leadingIcon}
           </div>
         )}
@@ -39,7 +39,7 @@ export function RadioCheckItem({
           {sublabel && <span className="text-xs text-[#8e8e93]">{sublabel}</span>}
         </div>
       </div>
-      {selected ? <Check className="w-5 h-5 text-[#2dbd4f] stroke-[2.5]" /> : null}
+      {selected ? <Check className="w-5 h-5 text-[#111111] stroke-[2.5]" /> : null}
     </button>
   );
 }

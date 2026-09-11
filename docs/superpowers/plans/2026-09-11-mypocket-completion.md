@@ -845,11 +845,11 @@ rtk proxy git commit -m "feat: mount text and image agent workflows"
 - Consumes: all mounted workflows from Tasks 3–8
 - Produces: one black/white-first responsive design system, no legacy duplicate UI, accessible install/receipt/offline behavior
 
-- [ ] **Step 1: Inventory repeated controls and legacy duplicates**
+- [x] **Step 1: Inventory repeated controls and legacy duplicates**
 
 Record every button, input, select, dialog/sheet, card, table/list row, status, error, empty state, skeleton, toast, and install prompt. Each repeated interaction must map to an existing base component or a new focused base component before screen changes.
 
-- [ ] **Step 2: Write visual-contract and accessibility tests**
+- [x] **Step 2: Write visual-contract and accessibility tests**
 
 ```ts
 test("mobile sheets keep the primary action above the safe area and keyboard", async ({ page }) => {
@@ -860,7 +860,7 @@ test("mobile sheets keep the primary action above the safe area and keyboard", a
 
 Add keyboard navigation, focus restore, visible labels, contrast, 44px touch targets, reduced motion, safe-area, overflow, and loading/error/empty assertions. Install tests must call the captured `beforeinstallprompt.prompt()` only after a user click and fall back to iOS instructions when the event is unavailable.
 
-- [ ] **Step 3: Verify RED and implement base-component migration**
+- [x] **Step 3: Verify RED and implement base-component migration**
 
 ```bash
 rtk npm test -- --run src/test/baseComponents.test.tsx
@@ -873,7 +873,7 @@ Replace legacy screen-local primitives only after each replacement has equivalen
 
 On a real device verify install instructions, installed launch, standalone navigation, safe areas, camera/file receipt selection, airplane-mode save, reconnect upload, exact receipt byte recovery, agent image submission, keyboard/focus, and no blank page. Record device/OS/browser, build SHA, screenshots, and outcome in `PHYSICAL-DEVICE-UAT.md`.
 
-- [ ] **Step 5: Remove proven legacy UI and run full frontend proof**
+- [x] **Step 5: Remove proven legacy UI and run full frontend proof**
 
 ```bash
 rtk proxy rg -n "legacy|deprecated|old-ui" frontend/src

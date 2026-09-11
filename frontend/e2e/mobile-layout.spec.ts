@@ -35,3 +35,18 @@ for (const count of [0, 100]) {
     await expect(page.getByRole('button', { name: 'Đăng xuất', exact: true })).toBeVisible();
   });
 }
+
+test('mobile primary controls meet touch and safe-area contracts', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Đăng nhập bằng Google' }).click();
+  await page.getByRole('button', { name: 'Để sau', exact: true }).click();
+  for (const button of await page.locator('.bottom-nav .tab-button').all()) {
+    const box = await button.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+  const add = page.getByRole('button', { name: 'Thêm giao dịch', exact: true });
+  await expect(add).toBeInViewport();
+  expect((await add.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+  await add.click();
+  await expect(page.getByRole('button', { name: 'Lưu', exact: true })).toBeInViewport();
+});

@@ -39,7 +39,7 @@ export function FormRowItem({
     >
       <div className="flex items-center gap-3 min-w-0 pr-2">
         {leadingIcon && (
-          <div className="w-8 h-8 rounded-full bg-[#eef0f4] flex items-center justify-center shrink-0 text-[#29495a]">
+          <div className="w-8 h-8 rounded-full bg-[#eef0f4] flex items-center justify-center shrink-0 text-[#333333]">
             {leadingIcon}
           </div>
         )}

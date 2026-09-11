@@ -7,6 +7,7 @@ import { FilePickerInput } from "../components/inputs/FilePickerInput";
 import { OperationError, operationFailure, type OperationFailure } from "../components/feedback/OperationError";
 import { AgentMessage } from "../components/agent/AgentMessage";
 import { AgentRunStatus } from "../components/agent/AgentRunStatus";
+import { TextAreaControl } from "../app/components";
 
 export function AgentScreen({ online, onDraftReady }: { online: boolean; onDraftReady: () => void }) {
   const [kind,setKind]=React.useState<AgentRunView["kind"]>("transaction_draft");
@@ -40,7 +41,7 @@ export function AgentScreen({ online, onDraftReady }: { online: boolean; onDraft
         <Button variant={kind==="transaction_draft"?"default":"outline"} size="sm" onClick={()=>setKind("transaction_draft")}>Tạo bản nháp</Button>
         <Button variant={kind==="analysis"?"default":"outline"} size="sm" onClick={()=>setKind("analysis")}>Phân tích</Button>
       </div>
-      <label className="agent-composer"><span>Yêu cầu</span><textarea aria-label="Yêu cầu cho trợ lý" value={message} onChange={event=>setMessage(event.target.value)} maxLength={8000} placeholder="Ví dụ: Tạo khoản chi 120.000đ cho bữa trưa…" /></label>
+      <label className="agent-composer"><span>Yêu cầu</span><TextAreaControl aria-label="Yêu cầu cho trợ lý" value={message} onChange={event=>setMessage(event.target.value)} maxLength={8000} placeholder="Ví dụ: Tạo khoản chi 120.000đ cho bữa trưa…" /></label>
       <div className="agent-image-row">
         <FilePickerInput aria-label="Đính kèm ảnh hóa đơn" accept="image/*" capture="environment" disabled={!online||busy} onFileSelected={chooseImage}/>
         <ImagePlus aria-hidden="true"/>

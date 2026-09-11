@@ -28,7 +28,7 @@ export function EmptyStateView({
         <button
           type="button"
           onClick={actionButton.onClick}
-          className="mt-4 px-5 py-2 rounded-full bg-[#2dbd4f] text-white text-xs font-bold hover:bg-[#25a443] active:scale-95 transition-all shadow-xs"
+          className="mt-4 px-5 py-2 rounded-full bg-[#111111] text-white text-xs font-bold hover:bg-[#242424] active:scale-95 transition-all shadow-xs"
         >
           {actionButton.label}
         </button>

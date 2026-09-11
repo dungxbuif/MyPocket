@@ -41,7 +41,7 @@ export function CategoryTreeRow({
       )}
 
       <div className="flex items-center gap-3 min-w-0 pr-2">
-        <div className="w-9 h-9 rounded-full bg-[#29495a] text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
+        <div className="w-9 h-9 rounded-full bg-[#333333] text-white flex items-center justify-center shrink-0 font-bold text-sm shadow-xs">
           {icon || name.slice(0, 1).toUpperCase()}
         </div>
 

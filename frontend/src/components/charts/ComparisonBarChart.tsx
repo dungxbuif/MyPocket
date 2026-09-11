@@ -31,7 +31,7 @@ export function ComparisonBarChart({ data, height = 150, className }: Comparison
               <div
                 className={cn(
                   "w-full rounded-t-xl transition-all duration-300",
-                  item.isCurrent ? "bg-[#ff5a66]" : "bg-[#ffd2d6]"
+                  item.isCurrent ? "bg-[#9f1d1d]" : "bg-[#ffd2d6]"
                 )}
                 style={{ height: `${heightPercent}%` }}
               />

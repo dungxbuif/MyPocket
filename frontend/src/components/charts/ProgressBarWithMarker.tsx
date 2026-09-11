@@ -15,7 +15,7 @@ export function ProgressBarWithMarker({
   dayProgressPercent,
   spentAmountFormatted,
   remainingAmountFormatted,
-  color = "#2dbd4f",
+  color = "#111111",
   className,
 }: ProgressBarWithMarkerProps) {
   const safeSpent = Math.min(100, Math.max(0, spentPercent));

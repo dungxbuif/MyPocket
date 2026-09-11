@@ -119,14 +119,14 @@ export function OverviewScreen({
       {/* Money Insider */}
       <div className="section-heading">
         <h2>Money Insider</h2>
-        <button
+        <Button
           type="button"
           aria-label="Làm mới Money Insider"
           className="section-heading-action"
           onClick={onRefreshInsider}
         >
           <RefreshCw size={20} />
-        </button>
+        </Button>
       </div>
 
       <section className="card insider-card">

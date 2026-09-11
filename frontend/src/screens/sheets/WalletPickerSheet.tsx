@@ -5,6 +5,7 @@ import { Sheet } from "../../components/ui/sheet";
 import { ModalHeader } from "../../components/navigation/ModalHeader";
 import { GroupedCard } from "../../components/cards/GroupedCard";
 import { RadioCheckItem } from "../../components/cards/RadioCheckItem";
+import { ActionButton } from "../../app/components";
 
 export interface WalletPickerSheetProps {
   isOpen: boolean;
@@ -68,21 +69,21 @@ export function WalletPickerSheet({
 
         {/* Bottom Actions */}
         <div className="flex flex-col gap-2 mt-2">
-          <button
+          <ActionButton
             type="button"
             onClick={onAddWallet}
-            className="w-full h-12 rounded-full bg-white text-[#2dbd4f] font-semibold text-sm flex items-center justify-center gap-2 shadow-xs hover:bg-[#f8f9fa] active:scale-98 transition-all"
+            className="w-full h-12 rounded-full bg-white text-[#111111] font-semibold text-sm flex items-center justify-center gap-2 shadow-xs hover:bg-[#f8f9fa] active:scale-98 transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>Thêm ví</span>
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             type="button"
             className="w-full h-12 rounded-full bg-white text-[#111111] font-semibold text-sm flex items-center justify-center gap-2 shadow-xs hover:bg-[#f8f9fa] active:scale-98 transition-all"
           >
             <Link2 className="w-4 h-4" />
             <span>Liên kết dịch vụ</span>
-          </button>
+          </ActionButton>
         </div>
       </div>
     </Sheet>

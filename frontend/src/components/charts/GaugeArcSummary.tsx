@@ -51,7 +51,7 @@ export function GaugeArcSummary({
             cy="80"
             r={radius}
             fill="none"
-            stroke={spentRatio > 1 ? "#ff5a66" : spentRatio > 0.8 ? "#ff8800" : "#2dbd4f"}
+            stroke={spentRatio > 1 ? "#9f1d1d" : spentRatio > 0.8 ? "#6b4f00" : "#111111"}
             strokeWidth={strokeWidth}
             strokeDasharray={`${fillLength} ${circumference}`}
             strokeLinecap="round"

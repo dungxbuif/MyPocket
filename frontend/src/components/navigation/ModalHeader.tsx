@@ -43,7 +43,7 @@ export function ModalHeader({
             className={cn(
               "px-3 py-1.5 rounded-full text-sm font-semibold active:scale-95 transition-all outline-none disabled:opacity-50",
               rightAction.isPrimary
-                ? "text-[#2dbd4f] hover:bg-[#e8f7ed]"
+                ? "text-[#111111] hover:bg-[#f1f1ee]"
                 : "text-[#111111] hover:bg-[#eef0f4]"
             )}
           >

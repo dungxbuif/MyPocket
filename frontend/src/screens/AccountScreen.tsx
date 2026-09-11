@@ -13,7 +13,7 @@ import { checkAuditAccess, loadAuditEvents, type AuditEvent } from "../app/audit
 import { Card } from "../components/ui/card";
 import { GroupedCard } from "../components/cards/GroupedCard";
 import { DestructiveActionRow } from "../components/cards/DestructiveActionRow";
-import { ActionButton } from "../app/components";
+import { ActionButton, InputControl } from "../app/components";
 import { OperationError, operationFailure, type OperationFailure } from "../components/feedback/OperationError";
 import { FilePickerInput } from "../components/inputs/FilePickerInput";
 import { confirmDestructive, confirmImport, createExport, getExportDownload, getLifecycleJob, previewDestructive, uploadImport, type DestructivePreview, type LifecycleJob } from "../app/lifecycle";
@@ -204,10 +204,10 @@ export function AccountScreen({
     <section className="content-stack">
       {/* Profile Card */}
       <section className="card user-profile-card flex flex-col items-center text-center p-5 rounded-[28px] bg-white shadow-xs">
-        <div className="w-16 h-16 rounded-full bg-[#ff8800] text-white flex items-center justify-center font-bold text-2xl mb-2 shadow-xs">
+        <div className="w-16 h-16 rounded-full bg-[#6b4f00] text-white flex items-center justify-center font-bold text-2xl mb-2 shadow-xs">
           {displayName.slice(0, 1).toUpperCase()}
         </div>
-        <span className="px-3 py-0.5 rounded-full bg-[#fff3e0] text-[#ff8800] text-[11px] font-bold tracking-wide uppercase mb-1">
+        <span className="px-3 py-0.5 rounded-full bg-[#fff3e0] text-[#6b4f00] text-[11px] font-bold tracking-wide uppercase mb-1">
           TÀI KHOẢN PREMIUM
         </span>
         <h2 className="text-lg font-bold text-[#111111]">{displayName}</h2>
@@ -218,9 +218,9 @@ export function AccountScreen({
       <section className="card list-card">
         <div className="section-title">
           <h2>Tài sản danh mục</h2>
-          <button type="button" disabled={!online} onClick={onCreateAsset}>
+          <ActionButton type="button" disabled={!online} onClick={onCreateAsset}>
             Thêm vị thế
-          </button>
+          </ActionButton>
         </div>
         {portfolioSummary?.missing_price_count ? (
           <p className="notification-status">
@@ -251,7 +251,7 @@ export function AccountScreen({
             <span className="transaction-icon">📱</span>
             <div>
               <strong>iPhone</strong>
-              <p className="text-[#2dbd4f]">Thiết bị này</p>
+              <p className="text-[#111111]">Thiết bị này</p>
             </div>
           </div>
         </div>
@@ -267,7 +267,7 @@ export function AccountScreen({
           <KeyRound size={18} />
         </div>
         <div className="manager-form api-key-form">
-          <input
+          <InputControl
             aria-label="Tên API key"
             value={apiKeyName}
             onChange={(event) => setAPIKeyName(event.target.value)}
@@ -340,19 +340,19 @@ export function AccountScreen({
             <Activity size={18} />
           </div>
           <div className="manager-form audit-log-form">
-            <input
+            <InputControl
               aria-label="Correlation ID"
               value={auditCorrelationID}
               onChange={(event) => setAuditCorrelationID(event.target.value)}
               placeholder="Correlation ID"
             />
-            <button
+            <ActionButton
               type="button"
               disabled={auditBusy || !online}
               onClick={() => void refreshAuditEvents()}
             >
               {auditBusy ? "Đang tải" : "Làm mới"}
-            </button>
+            </ActionButton>
           </div>
           {auditEvents.length === 0 ? (
             <p className="empty-state">Không có sự kiện phù hợp</p>
@@ -396,7 +396,7 @@ export function AccountScreen({
         <DestructiveActionRow label="Xem trước đặt lại dữ liệu" onClick={()=>void openDestructive("reset")} />
         <p>Vô hiệu hóa truy cập ngay và xóa dữ liệu.</p>
         <DestructiveActionRow label="Xem trước xóa tài khoản" onClick={()=>void openDestructive("delete")} />
-        {destructiveKind&&destructivePreview?<div role="dialog" aria-label={destructiveKind==="reset"?"Xác nhận đặt lại":"Xác nhận xóa tài khoản"}><p>{Object.values(destructivePreview.affected_counts).reduce((sum,value)=>sum+value,0)} bản ghi sẽ bị ảnh hưởng.</p><label>Nhập {destructiveKind.toUpperCase()}<input aria-label="Chuỗi xác nhận" value={typedConfirmation} onChange={event=>setTypedConfirmation(event.target.value)} /></label><ActionButton onClick={()=>{setDestructiveKind(null);setDestructivePreview(null)}}>Hủy</ActionButton><ActionButton disabled={typedConfirmation!==destructiveKind.toUpperCase()||lifecycleBusy} onClick={()=>void applyDestructive()}>Xác nhận</ActionButton></div>:null}
+        {destructiveKind&&destructivePreview?<div role="dialog" aria-label={destructiveKind==="reset"?"Xác nhận đặt lại":"Xác nhận xóa tài khoản"}><p>{Object.values(destructivePreview.affected_counts).reduce((sum,value)=>sum+value,0)} bản ghi sẽ bị ảnh hưởng.</p><label>Nhập {destructiveKind.toUpperCase()}<InputControl aria-label="Chuỗi xác nhận" value={typedConfirmation} onChange={event=>setTypedConfirmation(event.target.value)} /></label><ActionButton onClick={()=>{setDestructiveKind(null);setDestructivePreview(null)}}>Hủy</ActionButton><ActionButton disabled={typedConfirmation!==destructiveKind.toUpperCase()||lifecycleBusy} onClick={()=>void applyDestructive()}>Xác nhận</ActionButton></div>:null}
       </GroupedCard>
 
       {/* Documentation Link */}
@@ -412,9 +412,9 @@ export function AccountScreen({
       </section>
 
       {/* Logout Action */}
-      <button className="wide-pill destructive" type="button" onClick={onLogout}>
+      <ActionButton className="wide-pill destructive" type="button" onClick={onLogout}>
         Đăng xuất
-      </button>
+      </ActionButton>
 
       {/* Footer Version Info */}
       <div className="text-center py-4 text-xs text-[#8e8e93]">

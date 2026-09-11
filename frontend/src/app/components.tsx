@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, HTMLAttributes, ReactNode } from "react";
+import { forwardRef, type ButtonHTMLAttributes, type HTMLAttributes, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes } from "react";
 
 export function cx(...classes: Array<string | false | null | undefined>) {
   return classes.filter(Boolean).join(" ");
@@ -8,6 +8,14 @@ export function cx(...classes: Array<string | false | null | undefined>) {
 export function ActionButton(props: ButtonHTMLAttributes<HTMLButtonElement>) {
   return <button type="button" {...props} />;
 }
+
+export const InputControl = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function InputControl(props, ref) {
+  return <input ref={ref} {...props} />;
+});
+
+export const TextAreaControl = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function TextAreaControl(props, ref) {
+  return <textarea ref={ref} {...props} />;
+});
 
 export function Card({ className, ...props }: HTMLAttributes<HTMLElement>) {
   return <section className={cx("card", className)} {...props} />;

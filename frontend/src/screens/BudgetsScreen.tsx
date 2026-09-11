@@ -10,7 +10,7 @@ import type {
   TransactionDraft,
 } from "../app/planning";
 import type { CategorySummary, Transaction, TransactionType, WalletSummary } from "../app/finance";
-import { ActionCard } from "../app/components";
+import { ActionButton, ActionCard } from "../app/components";
 import { GaugeArcSummary } from "../components/charts/GaugeArcSummary";
 import { WalletFilterChip } from "../components/navigation/WalletFilterChip";
 import { Select } from "../components/ui/select";
@@ -104,9 +104,9 @@ export function BudgetsScreen({
           <h1>Ngân sách</h1>
           <WalletFilterChip walletName="Tất cả các nhóm" />
         </div>
-        <button className="pill-button" type="button" disabled={!online} onClick={onCreate}>
+        <ActionButton className="pill-button" type="button" disabled={!online} onClick={onCreate}>
           Tạo
-        </button>
+        </ActionButton>
       </div>
 
       {/* Hero Card with Gauge Arc */}
@@ -142,9 +142,9 @@ export function BudgetsScreen({
             <span>{daysLeft} ngày<br />Còn lại</span>
           </div>
 
-          <button className="primary-cta compact" type="button" disabled={!online} onClick={onCreate}>
+          <ActionButton className="primary-cta compact" type="button" disabled={!online} onClick={onCreate}>
             Tạo Ngân sách
-          </button>
+          </ActionButton>
         </section>
       ) : null}
 
@@ -180,7 +180,7 @@ export function BudgetsScreen({
               <p className="text-xs text-[#8e8e93]">{categoryNames}</p>
               <div className="w-full bg-[#e9eaef] h-2 rounded-full overflow-hidden my-1.5">
                 <div
-                  className="bg-[#2dbd4f] h-full rounded-full"
+                  className="bg-[#111111] h-full rounded-full"
                   style={{ width: `${Math.min(100, Math.round((budget.spent_vnd / (budget.budget.amount_vnd || 1)) * 100))}%` }}
                 />
               </div>
@@ -198,15 +198,15 @@ export function BudgetsScreen({
       <section className="card list-card planning-list">
         <div className="section-title">
           <h2>Sự kiện</h2>
-          <button type="button" disabled={!online} onClick={onCreateEvent}>
+          <ActionButton type="button" disabled={!online} onClick={onCreateEvent}>
             Tạo sự kiện
-          </button>
+          </ActionButton>
         </div>
         {events.length === 0 ? (
           <p className="empty-state">Chưa có sự kiện</p>
         ) : (
           events.map((event) => (
-            <button
+            <ActionButton
               className="planning-row"
               type="button"
               key={event.id}
@@ -220,7 +220,7 @@ export function BudgetsScreen({
                 <p>Đã dùng {formatVND(event.total_vnd)} · {event.transaction_count} giao dịch</p>
               </div>
               <ChevronRight size={22} />
-            </button>
+            </ActionButton>
           ))
         )}
       </section>
@@ -229,15 +229,15 @@ export function BudgetsScreen({
       <section className="card list-card planning-list">
         <div className="section-title">
           <h2>Khoản vay nợ</h2>
-          <button type="button" disabled={!online} onClick={onCreateObligation}>
+          <ActionButton type="button" disabled={!online} onClick={onCreateObligation}>
             Tạo khoản nợ
-          </button>
+          </ActionButton>
         </div>
         {obligations.length === 0 ? (
           <p className="empty-state">Chưa có khoản vay nợ</p>
         ) : (
           obligations.map((obligation) => (
-            <button
+            <ActionButton
               className="planning-row"
               type="button"
               key={obligation.id}
@@ -252,7 +252,7 @@ export function BudgetsScreen({
                 <p>Đã trả {formatVND(obligation.repaid_vnd)}</p>
               </div>
               <ChevronRight size={22} />
-            </button>
+            </ActionButton>
           ))
         )}
       </section>
@@ -261,15 +261,15 @@ export function BudgetsScreen({
       <section className="card list-card planning-list">
         <div className="section-title">
           <h2>Lặp lại</h2>
-          <button type="button" disabled={!online || wallets.length === 0} onClick={onCreateSchedule}>
+          <ActionButton type="button" disabled={!online || wallets.length === 0} onClick={onCreateSchedule}>
             Tạo lịch
-          </button>
+          </ActionButton>
         </div>
         {schedules.length === 0 ? (
           <p className="empty-state">Chưa có lịch lặp</p>
         ) : (
           schedules.map((schedule) => (
-            <button
+            <ActionButton
               className="planning-row"
               type="button"
               key={schedule.id}
@@ -283,7 +283,7 @@ export function BudgetsScreen({
                 <p>{formatVND(schedule.amount_vnd)} · {transactionTypeLabel(schedule.type)}</p>
               </div>
               <ChevronRight size={22} />
-            </button>
+            </ActionButton>
           ))
         )}
       </section>
@@ -292,7 +292,7 @@ export function BudgetsScreen({
       <section className="card list-card planning-list">
         <div className="section-title">
           <h2>Bản nháp</h2>
-          <button type="button">Xem</button>
+          <ActionButton type="button">Xem</ActionButton>
         </div>
         {drafts.filter((draft) => draft.status === "pending").length === 0 ? (
           <p className="empty-state">Chưa có bản nháp cần duyệt</p>
