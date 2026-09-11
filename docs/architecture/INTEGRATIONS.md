@@ -13,7 +13,7 @@ updated: 2026-08-24
 
 ## Field Ownership
 
-- Human-approved provider classes: Google OAuth, OpenAI-compatible AI, external OCR API, S3-compatible object storage, Web Push, and external bank-notification webhook sender.
+- Current provider classes: Google OAuth, OpenAI-compatible AI, third-party OCR Platform, S3-compatible object storage, and Web Push. Bank notification integration is deferred.
 - Exact production URLs, credentials, models, and connection strings are supplied through deployment secrets.
 - AI documents contracts and secret names without storing values.
 
@@ -25,10 +25,10 @@ updated: 2026-08-24
 | Google OAuth | User authentication and verified identity | OAuth 2.0 authorization code callback | Homelab operator | approved |
 | S3-compatible storage | Private receipts and generated exports | S3 API and presigned URLs | Homelab operator | approved |
 | OpenAI-compatible text API | Parse chat text into structured drafts | Chat/responses-compatible JSON schema output | Homelab operator | approved |
-| OpenAI-compatible multimodal API | Parse AI-chat images into structured drafts | Image-capable chat/responses contract | Homelab operator | approved |
-| External OCR API | Extract receipt text in add-transaction flow | Configurable HTTP adapter | Homelab operator | approved |
+| OpenAI-compatible API | Structured Agent analysis and transaction proposals | Chat completions-compatible JSON schema contract | Homelab operator | implemented locally |
+| OCR Platform | Extract text/fields from an owned receipt attached to Agent | `GET /v1/ocr/capabilities`, `POST /v1/documents`, `GET /v1/documents/{id}` | Homelab operator | implemented locally |
 | Web Push service | Deliver best-effort browser notifications | Web Push protocol with VAPID | Browser endpoint/provider | approved |
-| External notification sender | Forward bank notification text | MyPocket HMAC webhook | User/operator | approved |
+| Bank notification sender | Not integrated in the current release | None | N/A | deferred |
 | Manual export consumer | Open CSV/Sheets-compatible snapshots | Downloaded file | User | approved |
 
 ## Credentials And Configuration
@@ -63,7 +63,7 @@ Store names only; never commit values:
 - `AUDIT_RETENTION_DAYS` with default `180`
 - `LOG_LEVEL`
 
-Per-source bank webhook secrets are generated and displayed once, then stored encrypted with `DATA_ENCRYPTION_KEY`; they are not global environment variables.
+Agent providers use `AI_*` and `OCR_*` server-side environment variables. Provider API keys are never sent to the browser, public API responses, audit metadata, or docs. Bank webhook credentials are not configured because that integration is outside the current release.
 
 ## Failure Modes
 
@@ -73,7 +73,7 @@ Per-source bank webhook secrets are generated and displayed once, then stored en
 - AI/OCR unavailable, timed out, rate-limited, or malformed: preserve safe input references, return a provider error, and create no confirmed transaction.
 - Web Push denied or delivery fails: durable in-app notification remains; retry policy is capped.
 - Webhook signature/timestamp/nonce invalid: reject before parsing and record a redacted security audit event.
-- Duplicate webhook source event or payload digest: return an idempotent duplicate result without a new draft.
+- Duplicate Agent idempotency key with the same payload returns the existing run; reuse with another payload returns `IDEMPOTENCY_CONFLICT` without a new draft.
 - Misconfigured `AUDIT_VIEWER_EMAIL`: audit API remains forbidden to ordinary users; startup/config diagnostics expose no sensitive values.
 
 ## Linked Decisions

@@ -49,6 +49,8 @@ func openAPIDocument() []byte {
 		return openAPIBase
 	}
 	paths := document["paths"].(map[string]any)
+	components := document["components"].(map[string]any)
+	schemas := components["schemas"].(map[string]any)
 	for _, descriptor := range versionedRoutes {
 		path := strings.TrimPrefix(descriptor.Path, "/api/v1")
 		if path == "" {
@@ -59,10 +61,14 @@ func openAPIDocument() []byte {
 			entry = map[string]any{}
 			paths[path] = entry
 		}
+		responseName := schemaName(descriptor, "Response")
+		schemas[responseName] = operationSchema(descriptor, false)
 		operation := map[string]any{
 			"operationId": operationID(descriptor), "summary": descriptor.Summary,
+			"externalDocs":   map[string]any{"description": "MyPocket public API guide", "url": docsURL(descriptor.Path)},
+			"x-curl-example": curlExample(descriptor),
 			"responses": map[string]any{
-				"200": map[string]any{"description": "Success", "headers": map[string]any{"X-Correlation-ID": map[string]any{"schema": map[string]any{"type": "string"}}}, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object"}}}},
+				"200": map[string]any{"description": "Success", "headers": map[string]any{"X-Correlation-ID": map[string]any{"schema": map[string]any{"type": "string"}}}, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"$ref": "#/components/schemas/" + responseName}}}},
 				"400": map[string]any{"description": "Validation error", "content": errorContent()}, "401": map[string]any{"description": "Authentication required", "content": errorContent()},
 				"404": map[string]any{"description": "Resource not found", "content": errorContent()}, "409": map[string]any{"description": "Version conflict", "content": errorContent()},
 				"429": map[string]any{"description": "Rate limited", "headers": map[string]any{"Retry-After": map[string]any{"schema": map[string]any{"type": "integer"}}}, "content": errorContent()},
@@ -91,7 +97,9 @@ func openAPIDocument() []byte {
 			operation["parameters"] = parameters
 		}
 		if descriptor.Mutating {
-			operation["requestBody"] = map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"type": "object"}}}}
+			requestName := schemaName(descriptor, "Request")
+			schemas[requestName] = operationSchema(descriptor, true)
+			operation["requestBody"] = map[string]any{"required": true, "content": map[string]any{"application/json": map[string]any{"schema": map[string]any{"$ref": "#/components/schemas/" + requestName}}}}
 		}
 		entry[strings.ToLower(descriptor.Method)] = operation
 	}
@@ -100,6 +108,91 @@ func openAPIDocument() []byte {
 		return openAPIBase
 	}
 	return body
+}
+
+func schemaName(descriptor RouteDescriptor, suffix string) string {
+	parts := strings.FieldsFunc(operationID(descriptor), func(r rune) bool { return r == '_' })
+	var name strings.Builder
+	for _, part := range parts {
+		if part == "" {
+			continue
+		}
+		name.WriteString(strings.ToUpper(part[:1]))
+		name.WriteString(part[1:])
+	}
+	name.WriteString(suffix)
+	return name.String()
+}
+
+func operationSchema(descriptor RouteDescriptor, request bool) map[string]any {
+	kind := "response"
+	properties := map[string]any{
+		"status":         map[string]any{"type": "string"},
+		"correlation_id": map[string]any{"type": "string"},
+	}
+	required := []any{"status", "correlation_id"}
+	if request {
+		kind = "request"
+		properties = map[string]any{}
+		required = []any{}
+	}
+	return map[string]any{
+		"type":                 "object",
+		"description":          descriptor.Method + " " + descriptor.Path + " " + kind + ". Exact fields and examples are documented in the public API guide.",
+		"properties":           properties,
+		"required":             required,
+		"additionalProperties": true,
+	}
+}
+
+func docsURL(path string) string {
+	slug := "overview"
+	switch {
+	case strings.Contains(path, "/auth/") || strings.Contains(path, "/api-keys") || path == "/api/v1/me":
+		slug = "authentication"
+	case strings.Contains(path, "/wallets"):
+		slug = "wallets"
+	case strings.Contains(path, "/categories"):
+		slug = "categories"
+	case strings.Contains(path, "/transactions") || strings.Contains(path, "/files/"):
+		slug = "transactions"
+	case strings.Contains(path, "/budgets"):
+		slug = "budgets"
+	case strings.Contains(path, "/events") || strings.Contains(path, "/obligations") || strings.Contains(path, "/recurring-schedules") || strings.Contains(path, "/transaction-drafts"):
+		slug = "planning"
+	case strings.Contains(path, "/reports/") || strings.Contains(path, "/dashboard") || strings.Contains(path, "/search"):
+		slug = "analytics"
+	case strings.Contains(path, "/assets") || strings.Contains(path, "/portfolio/"):
+		slug = "assets"
+	case strings.Contains(path, "/sync/"):
+		slug = "sync"
+	case strings.Contains(path, "/notifications") || strings.Contains(path, "/push-subscriptions"):
+		slug = "notifications"
+	case strings.Contains(path, "/imports") || strings.Contains(path, "/exports") || strings.Contains(path, "/account/"):
+		slug = "export"
+	case strings.Contains(path, "/agent/"):
+		slug = "agent"
+	case strings.Contains(path, "/openapi.json"):
+		slug = "openapi"
+	}
+	return "/docs/api/" + slug
+}
+
+func curlExample(descriptor RouteDescriptor) string {
+	command := "curl"
+	if descriptor.Method != http.MethodGet {
+		command += " -X " + descriptor.Method
+	}
+	if descriptor.Owned {
+		command += " -H 'Authorization: Bearer <user-api-key>'"
+	}
+	if descriptor.Idempotent {
+		command += " -H 'Idempotency-Key: <stable-logical-request-id>'"
+	}
+	if descriptor.Mutating {
+		command += " -H 'Content-Type: application/json' -d '<request-json>'"
+	}
+	return command + " 'https://money.dungxbuif.com" + descriptor.Path + "'"
 }
 func errorContent() map[string]any {
 	return map[string]any{"application/json": map[string]any{"schema": map[string]any{"$ref": "#/components/schemas/ErrorEnvelope"}}}

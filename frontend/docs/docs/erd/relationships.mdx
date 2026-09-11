@@ -63,8 +63,11 @@ sync_mutations ──┐1:1── transaction (khi mutation là create transacti
 sync_changes ── dòng change feed, mỗi user một cursor riêng
 ```
 
-## Webhook → Draft
+## Agent → OCR tool → Draft
 
 ```
-webhook_sources ──┐1:N── webhook_events ──┐??:1── transaction_drafts
+agent_runs ──┐1:N── agent_tool_runs
+agent_runs ──┐0:1── transaction_drafts ──┐0:1── transactions
 ```
+
+OCR output is scoped to the owning run. The draft has no accounting effect until explicit confirmation. Bank/webhook ingestion is not part of the current schema.

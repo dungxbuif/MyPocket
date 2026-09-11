@@ -4,6 +4,7 @@ const sidebars: SidebarsConfig = {
   docsSidebar: [
     'intro',
     'updates/2026-09-10-audit',
+    'updates/2026-09-11-completion',
     'updates/2026-09-09',
     {
       type: 'category',
@@ -36,7 +37,13 @@ const sidebars: SidebarsConfig = {
         'api/sync',
         'api/notifications',
         'api/export',
+        'api/agent',
       ],
+    },
+    {
+      type: 'category',
+      label: 'Hướng dẫn tích hợp',
+      items: ['guides/agent-and-images', 'guides/export-and-account-lifecycle'],
     },
   ],
 };

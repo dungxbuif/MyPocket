@@ -1,0 +1,30 @@
+---
+title: Dùng Agent với text và ảnh
+---
+
+# Agent review-first
+
+Luồng an toàn là upload ảnh tùy chọn → gửi message → poll run → đọc draft → người dùng confirm/reject. Không bỏ qua bước review, kể cả khi OCR hoặc model trả độ tin cậy cao.
+
+```mermaid
+sequenceDiagram
+  participant Client
+  participant API
+  participant Worker
+  participant OCR as OCR Platform
+  participant Model as OpenAI-compatible provider
+  Client->>API: POST /files/presign + PUT bytes (optional)
+  Client->>API: POST /agent/messages
+  API-->>Client: 202 queued run
+  Worker->>OCR: submit/read owned image (optional)
+  OCR-->>Worker: extracted text/fields
+  Worker->>Model: minimized user context + message/OCR
+  Model-->>Worker: structured proposal/analysis
+  Worker->>API: persist response and reviewable draft
+  Client->>API: GET /agent/runs/{id}
+  Client->>API: explicit draft confirm or reject
+```
+
+Chỉ gửi dữ liệu cần thiết: ví/danh mục liên quan và aggregate 30 ngày. Không đưa API key, cookie, raw provider error hoặc dữ liệu user khác vào prompt/log. Hiển thị `response_text` như text, không render HTML từ provider.
+
+OCR là dependency bên thứ ba dành cho agent. Không xây workflow ngân hàng dựa trên OCR; không coi OCR fields là giao dịch đã xác nhận.

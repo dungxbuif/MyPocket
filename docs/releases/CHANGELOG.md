@@ -10,6 +10,14 @@ shared_fields: [status]
 
 # Changelog
 
+## Unreleased — 2026-09-11 completion contract
+
+- Added review-first OpenAI-compatible Agent text/analysis endpoints and worker; provider output can create transaction drafts but never confirmed ledger entries.
+- Added optional owned-receipt attachment with OCR Platform as a server-side third-party image tool, including leases, checksum/size checks and user/run scoping. No bank integration is included.
+- Published the complete route inventory through OpenAPI 3.1 with named operation schemas, Bearer/cookie authorization rules, Redis rate limiting and API-agent skill guidance.
+- Mounted Agent text/image UI and consolidated the product into a monochrome shared-component interface with five-tab navigation and non-blocking blurred PWA install prompt.
+- Local verification: 177 frontend tests, production build and 105 Playwright E2E pass; physical iPhone/Safari UAT and production provider smoke remain release blockers.
+
 ## Unreleased — 2026-09-11 correctness follow-up
 
 - Constrain shared comparison-chart columns and labels to available width. Large seven-day report values no longer expand the mobile viewport and displace fixed navigation/PWA hit targets; complete values remain in label text/title.

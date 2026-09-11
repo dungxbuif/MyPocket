@@ -6,7 +6,7 @@ owner: shared
 human_fields: [scope_approval, constraints, architectural_decisions]
 ai_fields: [system_decomposition, flows, risks, verification, reconciliation]
 shared_fields: [status, trace]
-updated: 2026-08-24
+updated: 2026-09-11
 trace:
   source_srs: ../../SRS.md
   approved_design: ../superpowers/specs/2026-08-23-mypocket-system-design.md
@@ -18,7 +18,7 @@ trace:
 
 ## Approval
 
-The user approved the architecture, scope decomposition, security rules, two distinct image-ingestion flows, testing strategy, hidden audit viewer, and configurable 180-day default audit retention during design review on 2026-08-23 and 2026-08-24.
+The original design was approved on 2026-08-23/24. The 2026-09-11 completion design supersedes ingestion scope: Agent text plus optional owned-receipt OCR is current; bank/webhook ingestion is deferred and has no runtime route.
 
 ## Design Sources
 
@@ -35,7 +35,7 @@ The user approved the architecture, scope decomposition, security rules, two dis
 - Private S3-compatible object storage for receipts and generated exports.
 - Google OAuth with a signed stateless cookie, no server session table, no linked-device management, and no persisted Google access/refresh token.
 - Multi-user isolation enforced in every Go query and command.
-- Review-first shared transaction drafts for AI text, receipt OCR, AI-chat images, bank webhooks, and recurring occurrences.
+- Review-first shared transaction drafts for Agent text, third-party OCR-assisted images, imports, and recurring occurrences.
 - Full offline read/write with idempotent mutations, per-record versions, per-user change cursors, tombstones, and explicit user-reviewed conflicts.
 - Market-valued asset positions are separate from wallet accounting and track quantity, moving-average cost basis, manual/provider price history, and realized/unrealized P&L.
 - Hidden append-only audit page authorized by exact verified email equality with `AUDIT_VIEWER_EMAIL`; retention defaults to 180 days.
@@ -61,14 +61,14 @@ The user approved the architecture, scope decomposition, security rules, two dis
 | PHASE-004 | Budgets, events, recurring drafts, debts/loans, inbox, and Web Push |
 | PHASE-005 | PWA navigation, dashboard, search, wallet views, analytics, comparison, and cumulative trend |
 | PHASE-005 extension | User-owned asset portfolio valuation with offline manual mutations, provider-refresh boundary, and separate investment/combined net-worth totals |
-| PHASE-006 | AI text, receipt OCR, AI-chat images, bank webhook, and shared draft confirmation |
+| PHASE-006 | Agent text, owned-receipt OCR image tool, and shared draft confirmation; bank ingestion deferred |
 | PHASE-007 | Hidden audit viewer, retention, exports, account lifecycle, backup/restore, and production release proof |
 | PHASE-008 | Deferred voice transcription feeding the established draft contract |
 
 ## Verification Contract
 
 - Pure finance, analytics, parsing, redaction, and scheduling rules receive Go unit proof.
-- Persistence, migrations, isolation, atomicity, sync, webhooks, jobs, and audit authorization receive PostgreSQL integration proof.
+- Persistence, migrations, isolation, atomicity, sync, Agent/OCR jobs, lifecycle jobs, and audit authorization receive PostgreSQL integration proof.
 - React forms, drafts, conflict resolution, charts, and hidden-route behavior receive component proof.
 - IndexedDB hydration, outbox replay, reconnect, tombstones, and conflicts receive browser-storage proof.
 - User-visible workflows receive Playwright-style E2E and UAT proof.

@@ -6,7 +6,7 @@ Status: implementation and local verification complete; production URL smoke rem
 
 - Public unauthenticated OpenAPI 3.1 at `GET /api/v1/openapi.json`.
 - Explicit route inventory for finance, planning, reports, portfolio, notification, sync, audit, import/export and account lifecycle.
-- Machine checks for operation coverage, cookie+CSRF and Bearer security, path parameters, idempotency headers, stable error envelopes, correlation IDs, `429`, `Retry-After`, and retryable `503`.
+- Machine checks for operation coverage, named operation request/response schemas, per-operation Docusaurus links and curl examples, cookie+CSRF and Bearer security, path parameters, idempotency headers, stable error envelopes, correlation IDs, `429`, `Retry-After`, and retryable `503`.
 - Redis fixed-window limiter at the authenticated Bearer boundary, default 120 requests/minute and bounded to 1–10,000.
 - Fail-closed Bearer behavior when Redis cannot enforce a limit; cookie UI traffic remains independent.
 - Repository skill `skills/mypocket-api` plus a public Docusaurus skill page and API quick reference.

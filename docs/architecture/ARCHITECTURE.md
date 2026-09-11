@@ -6,7 +6,7 @@ owner: shared
 human_fields: [approved_boundaries, architectural_constraints, tradeoff_approval]
 ai_fields: [overview, modules, diagrams, flows, dependencies, risks]
 shared_fields: [status, linked_decisions]
-updated: 2026-08-31
+updated: 2026-09-11
 ---
 
 # Architecture
@@ -51,8 +51,8 @@ MyPocket is a modular monolith deployed as three application processes: a static
 - PostgreSQL owns authoritative relational state and atomicity.
 - Redis owns short-lived auth lookup cache only; cache misses and outages fall back to PostgreSQL-backed auth.
 - S3-compatible storage owns private receipt bytes; PostgreSQL stores metadata and object keys.
-- External Android automation is outside this repository and only calls the signed bank webhook.
-- OpenAI-compatible and OCR services extract proposals; they never own or confirm financial records.
+- External Android/bank automation is outside the current product scope; no signed bank webhook route is deployed.
+- OpenAI-compatible and third-party OCR services analyze proposals/images; they never own or confirm financial records.
 
 ## Modules
 
@@ -64,9 +64,9 @@ MyPocket is a modular monolith deployed as three application processes: a static
 | sync | Idempotency, versions, cursors, tombstones, conflicts | `backend/internal/sync/` | Calls finance/portfolio application services for offline replay |
 | planning | Budgets, events, recurring schedules, debts/loans | `backend/internal/planning/` | Recurring occurrences produce drafts |
 | analytics | Net worth and report aggregations | `backend/internal/analytics/` | Reads confirmed reportable transactions |
-| ingestion | Drafts, AI chat, OCR, multimodal images, bank webhooks | `backend/internal/ingestion/` | Shared `TransactionDraft` contract |
+| agent | Review-first text/image runs, OpenAI-compatible model and OCR image tool | `backend/internal/agent/` | May create `TransactionDraft`; never confirms it |
 | notification | In-app inbox and Web Push | `backend/internal/notification/` | Inbox remains authoritative when push fails |
-| export | Manual CSV/Sheets-compatible snapshots | `backend/internal/export/` | No spreadsheet import |
+| lifecycle | Review-first imports, exports, reset and delete jobs | `backend/internal/lifecycle/` | Browser-only recent auth for destructive jobs |
 | audit | Append-only audit writes and restricted queries | `backend/internal/audit/` | Viewer email is environment-configured |
 | platform | HTTP, config, database, object store, logging, jobs | `backend/internal/platform/` | Provider interfaces and adapters |
 | web app | Mobile PWA workflows and finance screens | `frontend/src/app/` | Online path uses the Go API; offline write acceptance depends on the offline adapter |
@@ -79,7 +79,7 @@ MyPocket is a modular monolith deployed as three application processes: a static
 3. Finance/portfolio domain writes and sync changes commit together through `platform/commandtx` and `platform/changefeed`. Sync stores its replay receipt before the same commit; draft confirmation shares the accounting transaction. Per-user locks precede entity locks. Audit emission follows commit and remains best-effort. See [ADR-008](../decisions/ADR-008-atomic-offline-sync-commit.md).
 4. Stale offline writes return explicit conflict payloads; the PWA stores the conflict locally and requires keep-server, discard-local, or edit-and-retry before removing the pending mutation.
 5. The client pulls authoritative changes using a per-user cursor, or requests a full resync snapshot when local mirror state is stale or cleared.
-6. AI/OCR/webhook/recurring sources create drafts; confirmation invokes the same finance service used by manual entry.
+6. Agent/OCR/import/recurring sources create reviewable state or drafts; confirmation invokes the same finance service used by manual entry.
 7. Worker jobs acquire PostgreSQL leases before creating occurrences, sending push, refreshing configured portfolio prices, retrying providers, or purging audit rows.
 
 ## Runtime Flow

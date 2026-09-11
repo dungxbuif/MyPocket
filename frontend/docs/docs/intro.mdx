@@ -47,7 +47,7 @@ graph TB
 
 ## Phạm vi hiện tại
 
-MyPocket có nền tảng ví, danh mục, giao dịch, đồng bộ offline, ngân sách, planning, báo cáo và tài sản. Mức hoàn thiện khác nhau giữa API và các màn hình đang sử dụng; không coi toàn bộ danh sách thiết kế là chức năng đã nghiệm thu.
+MyPocket có ví, danh mục, giao dịch, chuyển ví, đồng bộ offline, ngân sách, planning, báo cáo, tài sản, import/export, vòng đời tài khoản và trợ lý review-first. Ảnh gửi cho trợ lý có thể được xử lý bằng OCR Platform bên thứ ba; OCR không phải dịch vụ ngân hàng và không tự ghi sổ.
 
 Xem [cập nhật 09/09/2026 và giới hạn](/docs/updates/2026-09-09) để biết thay đổi web mới nhất, bằng chứng kiểm thử và các phần chưa hoàn tất. Ảnh hoá đơn/PWA offline trên iPhone thật vẫn cần kiểm chứng.
 
@@ -61,7 +61,10 @@ Các đường dẫn API bắt đầu bằng `/api/v1`. API nghiệp vụ chấp
 - [Ngân sách](/docs/api/budgets), [planning](/docs/api/planning)
 - [Analytics và tìm kiếm](/docs/api/analytics), [tài sản](/docs/api/assets)
 - [Đồng bộ offline](/docs/api/sync), [thông báo](/docs/api/notifications)
-- [Trạng thái export và tính năng chưa triển khai](/docs/api/export)
+- [Import, export, file và vòng đời tài khoản](/docs/api/export)
+- [Agent review-first và ảnh OCR](/docs/api/agent)
+- [Hướng dẫn Agent và ảnh](/docs/guides/agent-and-images)
+- [Hướng dẫn export và vòng đời tài khoản](/docs/guides/export-and-account-lifecycle)
 - [Cơ sở dữ liệu (ERD)](/docs/erd/overview)
 
-Đây là tài liệu contract theo source, chưa phải bộ OpenAPI máy đọc được đã kiểm chứng toàn bộ. Bản phát hành web/docs không tự động triển khai các thay đổi backend chưa phát hành.
+OpenAPI 3.1 máy đọc tại `/api/v1/openapi.json` là inventory route chính thức. Các trang domain này bổ sung payload, workflow và giới hạn vận hành. Bản phát hành docs không tự chứng minh rằng cùng commit đã được deploy; xem trang cập nhật release để biết bằng chứng.

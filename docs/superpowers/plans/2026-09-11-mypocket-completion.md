@@ -913,15 +913,15 @@ rtk proxy git commit -m "feat: complete monochrome responsive PWA UI"
 - Consumes: implemented routes, schemas, UI behavior, verification artifacts, and public skill
 - Produces: public docs that describe the deployed product exactly and trace every requirement to current evidence
 
-- [ ] **Step 1: Write a docs-to-router drift checklist**
+- [x] **Step 1: Write a docs-to-router drift checklist**
 
 For every route descriptor, record its OpenAPI operation, Docusaurus page, authentication modes, success schema, failure codes, idempotency/version semantics, and a curl example. Marking a requirement complete requires a linked test/UAT artifact, not a code-path assertion.
 
-- [ ] **Step 2: Update requirements and remove stale scope statements**
+- [x] **Step 2: Update requirements and remove stale scope statements**
 
 Change old references that call OCR receipt-owned, AI deferred, export deferred, or bank active. Preserve historical verification documents as historical evidence; add a dated superseding note rather than rewriting old test outcomes.
 
-- [ ] **Step 3: Build docs and validate links/content**
+- [x] **Step 3: Build docs and validate links/content**
 
 ```bash
 rtk npm --prefix docs run build
@@ -931,7 +931,7 @@ rtk proxy git diff --check
 
 Every remaining match must be either removed or explicitly identified as historical/out-of-scope context.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 rtk proxy git add docs frontend/docs skills

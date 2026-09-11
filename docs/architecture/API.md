@@ -11,6 +11,14 @@ updated: 2026-08-31
 
 # API
 
+## Current contract — supersedes older planning tables below (2026-09-11)
+
+The authoritative machine inventory is `GET /api/v1/openapi.json`; router coverage tests fail when any `/api/v1` operation is absent. User-owned routes accept cookie auth or `Authorization: Bearer <user-api-key>` unless the OpenAPI security entry narrows them. Cookie mutations require CSRF. Bearer identity is owner-scoped, Redis-rate-limited and fail-closed if the limit cannot be enforced.
+
+Agent is implemented at `POST /agent/messages` and `GET /agent/runs/{id}`. An optional owned `receipt_id` invokes OCR Platform as an internal third-party image tool, then supplies minimized OCR context to the OpenAI-compatible model. Only reviewable `transaction_drafts` may be created; confirmation remains a separate user/API action. No generic OCR proxy or bank endpoint exists.
+
+Import/export and account lifecycle jobs are implemented. Reset/delete remain browser-only with recent auth, signed preview and exact confirmation. See the Docusaurus domain pages and `skills/mypocket-api` for current payload examples and integration rules. Historical planned endpoint names below are retained only as design history and must not be treated as live routes.
+
 ## Field Ownership
 
 - Human-approved contract intent is recorded in the product spec and system design.

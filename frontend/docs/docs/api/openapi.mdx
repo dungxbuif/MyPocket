@@ -4,7 +4,7 @@ title: OpenAPI 3.1
 
 # OpenAPI máy đọc
 
-Contract chính thức được phục vụ công khai tại [`/api/v1/openapi.json`](https://money.dungxbuif.com/api/v1/openapi.json). CI kiểm tra mỗi operation có security, error envelope, correlation ID, rate-limit response và `Idempotency-Key` khi route yêu cầu.
+Contract chính thức được phục vụ công khai tại [`/api/v1/openapi.json`](https://money.dungxbuif.com/api/v1/openapi.json). CI kiểm tra mọi route versioned đều có operation, named request/response schema, security, error envelope, correlation ID, rate-limit response và `Idempotency-Key` khi route yêu cầu.
 
 ```bash
 curl https://money.dungxbuif.com/api/v1/openapi.json > mypocket-openapi.json
@@ -12,4 +12,12 @@ curl https://money.dungxbuif.com/api/v1/openapi.json > mypocket-openapi.json
 
 Bearer API key bị giới hạn mặc định 120 request/phút theo cặp user/key. Khi vượt giới hạn, API trả `429` và `Retry-After`. Nếu Redis không thể cưỡng chế giới hạn, Bearer request trả `503`; cookie browser không phụ thuộc limiter này.
 
-Các snippet YAML theo domain là ví dụ, không thay thế contract tổng thể này.
+Mỗi operation trỏ tới schema có tên riêng để client generator không phải dựa vào một `object` ẩn danh. Các trang domain ghi payload và ví dụ nghiệp vụ chi tiết. Khi OpenAPI và một trang ví dụ khác nhau, dừng mutation và báo drift; không đoán field.
+
+## Quy ước tích hợp
+
+- API key dùng `Authorization: Bearer <user-api-key>` và đại diện đúng một user.
+- Mutation có khai báo `Idempotency-Key` phải tái sử dụng cùng key chỉ khi retry cùng payload.
+- Update/archive dùng `base_version`; `409` yêu cầu đọc lại, không ghi đè mù.
+- Mọi lỗi JSON có `error.code`, `error.message`, `correlation_id`.
+- `429` tuân theo `Retry-After`; Bearer limiter phụ thuộc Redis và fail closed bằng `503` nếu không cưỡng chế được.

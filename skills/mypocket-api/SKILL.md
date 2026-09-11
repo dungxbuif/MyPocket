@@ -23,6 +23,8 @@ Use this skill only for data belonging to the user represented by the supplied M
 - Paginate notifications with `before`, sync changes with `after`, and preserve server cursors.
 - On sync retry, reuse the same mutation ID and payload. Resolve `409` from server state instead of overwriting blindly.
 - Do not automatically confirm imports, destructive operations, OCR-derived values, or uncertain drafts.
+- For text/image analysis, submit `POST /agent/messages`, poll `GET /agent/runs/{id}`, then inspect every returned draft before a separate confirm/reject call.
+- Treat OCR as a server-side third-party image tool used by the agent. Do not look for a generic OCR proxy and do not infer any bank integration.
 
 ## Error handling
 

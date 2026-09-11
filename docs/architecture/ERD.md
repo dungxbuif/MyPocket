@@ -45,14 +45,12 @@ updated: 2026-08-31
 | `sync_mutations` | Idempotency ledger | User | Unique client mutation ID |
 | `sync_changes` | Incremental authoritative change feed | User | Monotonic per-user cursor |
 | `sync_conflicts` | Rejected client mutation and server snapshot | User | Explicit resolution lifecycle |
-| `webhook_sources` | User-owned bank notification sender | User | Encrypted HMAC material and enable state |
-| `webhook_events` | Replay/deduplication ledger | User/source | Unique source event and payload digest |
-| `ai_conversations` | AI chat container | User | Provider-independent metadata |
-| `ai_messages` | Text/image-reference message | User/conversation | Links structured draft results |
+| `agent_runs` | Text/image Agent request and review-first result | User | Idempotent, leased, provider-independent state |
+| `agent_tool_runs` | OCR image-tool execution | User/agent run | Owned receipt reference; provider identifier remains private |
 | `api_keys` | Third-party/API-agent credentials | User | Stores HMAC hash and display prefix only; revocable; Redis-cached lookup |
 | `audit_events` | Append-only state/security event | System | Redacted; restricted read; retention-managed |
-| `job_leases` | Worker ownership/idempotency state | System | Bounded leases and occurrence keys |
-| `exports` | Manual export job and object result | User | Expiring snapshot metadata |
+| `worker_leases` | Worker ownership/idempotency state | System | Bounded leases and occurrence keys |
+| `data_jobs` | Import/export/reset/delete job and result metadata | User | Review/confirmation or background lifecycle state |
 
 ## Relationships
 
@@ -70,12 +68,10 @@ updated: 2026-08-31
 | `transaction_drafts` | `transactions` | optional one-to-one confirmation | Idempotent confirmation |
 | `recurring_schedules` | `recurring_occurrences` | one-to-many | Worker locks due schedules and advances next occurrence |
 | `recurring_occurrences` | `transaction_drafts` | one-to-one by occurrence key | Deterministic draft generation without wallet accounting |
-| `ai_conversations` | `ai_messages` | one-to-many | Ordered messages |
-| `ai_messages` | `transaction_drafts` | one-to-many | Multi-transaction result |
+| `agent_runs` | `agent_tool_runs` | one-to-many | Optional image tools are scoped to one owned run |
+| `agent_runs` | `transaction_drafts` | optional one-to-one | Structured proposal remains review-only until explicit confirmation |
 | `obligations` | `obligation_repayments` | one-to-many | Repayment links cannot exceed principal |
 | `obligation_repayments` | `transactions` | many-to-one | Confirmed owned transaction remains the accounting source of truth |
-| `webhook_sources` | `webhook_events` | one-to-many | Replay and deduplication scope |
-| `webhook_events` | `transaction_drafts` | optional one-to-one | Accepted event result |
 | `users` | `sync_changes` | one-to-many ordered cursor | Pull scope is per user |
 | `users` | `asset_positions` | one-to-many | Portfolio ownership is separate from wallet accounting |
 | `asset_positions` | `asset_trades` | one-to-many | Composite `(asset_id, user_id)` FK enforces same-user ownership |
@@ -88,7 +84,7 @@ updated: 2026-08-31
 - Transfer source and destination wallets differ and belong to one user.
 - At most one active default AI wallet exists per user.
 - Category depth is at most two; system categories cannot be renamed or deleted.
-- Mutation IDs, confirmation commands, recurring occurrences, and source webhook event IDs are unique in their intended scope.
+- Mutation IDs, confirmation commands, recurring occurrences, Agent idempotency keys and provider document IDs are unique in their intended scope.
 - API keys store only HMAC hashes plus a short display prefix; plaintext key material is returned only once at creation.
 - Version increments occur only with accepted authoritative mutations.
 - Audit rows have no application update/delete endpoint; retention deletion is worker-only.

@@ -62,10 +62,8 @@ title: Danh sách entities
 
 | Bảng | Mục đích | Ghi chú |
 |------|----------|---------|
-| `webhook_sources` | Bank webhook sender | Encrypted HMAC |
-| `webhook_events` | Replay/dedup ledger | Unique source event |
-| `ai_conversations` | AI chat container | Provider metadata |
-| `ai_messages` | Message + draft links | Multi-transaction result |
+| `agent_runs` | Text/image Agent run | Idempotent, leased, review-first |
+| `agent_tool_runs` | Third-party OCR execution | Owned receipt + agent-run scope |
 
 ## Operations
 
@@ -73,5 +71,5 @@ title: Danh sách entities
 |------|----------|---------|
 | `api_keys` | API key cho third-party | HMAC hash; revocable |
 | `audit_events` | Audit log | Append-only; restricted read |
-| `job_leases` | Worker ownership | Bounded leases |
-| `exports` | Export job | Expiring snapshot |
+| `worker_leases` | Worker ownership | Bounded leases |
+| `data_jobs` | Import/export/reset/delete | Review/background lifecycle state |

@@ -9,7 +9,7 @@ title: Export
 ## Authentication
 
 - `POST /files/presign` là mutation nên dùng cookie + `X-CSRF-Token` hoặc Bearer API key.
-- `GET /files/{id}/download`, `GET /exports`, `GET /exports/{id}` là read endpoint: dùng cookie hoặc Bearer API key.
+- `GET /files/{id}/download`, `GET /exports/{id}`, `GET /exports/{id}/download` là read endpoint: dùng cookie hoặc Bearer API key. Không có `GET /exports` collection route.
 - Quy tắc sở hữu: chỉ file/đối tượng thuộc `user_id` trong context.
 
 ```yaml
@@ -25,11 +25,12 @@ paths:
           application/json:
             schema:
               type: object
+              required: [datasets]
               properties:
-                format: { type: string, enum: ["csv"] }
-                wallet_id: { type: string, format: uuid }
-                date_from: { type: string, format: date }
-                date_to: { type: string, format: date }
+                datasets: { type: array, items: { type: string } }
+                from: { type: string, format: date-time }
+                to: { type: string, format: date-time }
+                snapshot_at: { type: string, format: date-time }
       responses:
         "202": { description: "Accepted" }
   /api/v1/exports/{id}:

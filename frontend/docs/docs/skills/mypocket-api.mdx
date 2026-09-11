@@ -6,6 +6,6 @@ title: Skill MyPocket API
 
 Repository phát hành skill tại `skills/mypocket-api/`. Agent đọc OpenAPI live trước khi gọi, dùng `Authorization: Bearer <user-api-key>`, giữ nguyên idempotency key khi retry, tôn trọng version/cursor, và không ghi key vào log.
 
-Skill bao phủ ví, danh mục, giao dịch, báo cáo, planning, portfolio, notification, sync, import/export và review-first drafts. Reset/xóa tài khoản yêu cầu recent browser authentication nên agent chỉ có API key không được tự động thực hiện.
+Skill bao phủ ví, danh mục, giao dịch, báo cáo, planning, portfolio, notification, sync, import/export, Agent text/image và review-first drafts. OCR được mô tả đúng là image tool bên thứ ba chạy server-side, không phải API ngân hàng. Reset/xóa tài khoản yêu cầu recent browser authentication nên agent chỉ có API key không được tự động thực hiện.
 
 Luôn dùng skill cùng phiên bản code triển khai để tránh lệch contract.

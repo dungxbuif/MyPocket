@@ -53,3 +53,32 @@ func TestEmbeddedOpenAPIHasStableErrorEnvelopeAndNoProductionSecret(t *testing.T
 		t.Fatal("contract contains secret-like material")
 	}
 }
+
+func TestOpenAPIOperationsUseNamedRequestAndResponseSchemas(t *testing.T) {
+	var doc map[string]any
+	if err := json.Unmarshal(openAPIDocument(), &doc); err != nil {
+		t.Fatal(err)
+	}
+	paths := doc["paths"].(map[string]any)
+	for _, route := range RegisteredRoutesForTest() {
+		path := strings.TrimPrefix(route.Path, "/api/v1")
+		operation := paths[path].(map[string]any)[strings.ToLower(route.Method)].(map[string]any)
+		responses := operation["responses"].(map[string]any)
+		success := responses["200"].(map[string]any)["content"].(map[string]any)["application/json"].(map[string]any)["schema"].(map[string]any)
+		if _, ok := success["$ref"]; !ok {
+			t.Errorf("%s %s success response must use a named schema", route.Method, route.Path)
+		}
+		if _, ok := operation["externalDocs"].(map[string]any); !ok {
+			t.Errorf("%s %s must link its public guide", route.Method, route.Path)
+		}
+		if example, ok := operation["x-curl-example"].(string); !ok || !strings.Contains(example, route.Path) {
+			t.Errorf("%s %s must include a matching curl example", route.Method, route.Path)
+		}
+		if route.Mutating {
+			request := operation["requestBody"].(map[string]any)["content"].(map[string]any)["application/json"].(map[string]any)["schema"].(map[string]any)
+			if _, ok := request["$ref"]; !ok {
+				t.Errorf("%s %s request must use a named schema", route.Method, route.Path)
+			}
+		}
+	}
+}
