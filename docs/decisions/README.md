@@ -37,3 +37,6 @@ Start from `docs/templates/ADR.md`.
 - [ADR-003: Offline Sync with Explicit Conflict Review](ADR-003-offline-sync-conflict-review.md)
 - [ADR-004: Review-First Shared Transaction Ingestion](ADR-004-review-first-ingestion.md)
 - [ADR-005: Restricted Append-Only Audit Log](ADR-005-restricted-audit-log.md)
+- [ADR-006: Separate Asset Portfolio Valuation](ADR-006-separate-asset-portfolio-valuation.md)
+- [ADR-007: Separate Offline Databases per User](ADR-007-offline-user-databases.md)
+- [ADR-008: Atomic Offline Sync Commit](ADR-008-atomic-offline-sync-commit.md)

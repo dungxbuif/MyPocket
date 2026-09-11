@@ -18,10 +18,12 @@ updated: 2026-08-31
 
 ## Contract Rules
 
+- Audit qualification 2026-09-10: [parity/contract review](../research/moneylover/PARITY-AUDIT-2026-09-08.md) found portal drift and incomplete journeys. API route presence is not full Money Lover parity. Export, AI/OCR extraction and account reset/delete remain unimplemented; recurring draft confirm/reject and category hierarchy are implemented in the current workspace. Analytics accepts `from/to` (not `date_from/date_to`) and Insider only returns its Home summary. Full machine-validated OpenAPI and route-by-route integration acceptance remain follow-up work.
+
 - Base prefix: `/api/v1`.
 - Browser contracts use JSON except presigned object upload and generated export download.
-- Authenticated finance routes derive `user_id` from the signed cookie and never accept ownership from request payloads.
-- State-changing requests require CSRF protection, an idempotency key where retryable, and optimistic `base_version` where offline-capable.
+- Authenticated routes derive `user_id` from either the signed browser cookie or `Authorization: Bearer mpk_...`; ownership is never accepted from request payloads.
+- Browser cookie mutations require CSRF protection. Bearer API-key mutations are CSRF-exempt, while retaining idempotency keys where retryable and optimistic `base_version` where offline-capable.
 - Detailed request and response schemas are added by the owning phase before implementation.
 
 ## API Surface
@@ -29,8 +31,8 @@ updated: 2026-08-31
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `GET /api/v1/auth/google`, `GET /api/v1/auth/google/callback`, `POST /api/v1/auth/logout`, `GET /api/v1/me` | OAuth/HTTP | Mixed | implemented | Fixture callback is available only when explicitly enabled; sets stateless signed `mypocket_auth` cookie and browser-readable `mypocket_csrf`; no session API |
-| `GET /api/v1/api-keys`, `POST /api/v1/api-keys`, `POST /api/v1/api-keys/{id}/revoke` | REST/command | User | implemented | Browser-authenticated users can create/list/revoke API keys from the Account tab or API for third-party systems and AI agents; plaintext `mpk_...` key is returned only once on create; key management requires browser cookie + CSRF |
-| `GET /wallets`, `POST /wallets`, `PATCH /wallets/{id}`, `POST /wallets/{id}/archive`, `POST /wallets/{id}/default-ai` | REST/command | User | implemented | Lists, creates, edits, archives, and selects the default AI wallet for the authenticated user; mutations require CSRF; `user_id` is always derived from the signed cookie |
+| `GET /api/v1/api-keys`, `POST /api/v1/api-keys`, `POST /api/v1/api-keys/{id}/revoke` | REST/command | Browser user | implemented | Cookie-authenticated users create/list/revoke keys; plaintext `mpk_...` is returned only once. Bearer keys cannot manage keys. |
+| `GET /wallets`, `POST /wallets`, `PATCH /wallets/{id}`, `POST /wallets/{id}/archive`, `POST /wallets/{id}/default-ai` | REST/command | User | implemented | Lists, creates, edits, archives, and selects the default AI wallet for the authenticated user; mutations require CSRF when cookie-authenticated; bearer key calls derive `user_id` from authenticated key owner |
 | `GET /categories` | REST collection | User | implemented | Lists system and authenticated-user categories; `system_key` is returned for locked system rows |
 | `POST /categories`, `PATCH /categories/{id}`, `POST /categories/{id}/archive`, `PUT /wallets/{wallet_id}/categories/{category_id}` | REST/command | User | implemented | Creates user categories, edits/archives user-owned categories, rejects system category mutation, and toggles category activation for a user-owned wallet |
 | `GET /transactions`, `POST /transactions`, `PATCH /transactions/{id}`, `POST /transactions/{id}/archive` | REST/command | User | implemented | Income, expense, transfer, adjustment, edit/archive reversal, search filters, and idempotent creates |
@@ -45,7 +47,7 @@ updated: 2026-08-31
 | `GET /assets`, `POST /assets`, `GET /assets/{id}`, `POST /assets/{id}/archive`, `POST /assets/{id}/trades`, `PATCH /assets/{id}/trades/{trade_id}`, `POST /assets/{id}/trades/{trade_id}/archive`, `POST /assets/{id}/prices`, `GET /portfolio/summary` | REST/command | User | implemented | User-owned market-valued assets, moving-average buy/sell trades, append-only manual/provider VND price snapshots, archive retention, optimistic versions, and separate investment totals |
 | `/ai/conversations`, `/ai/conversations/{id}/messages` | REST collection | User | planned | Text and multimodal chat |
 | `POST /receipts/{id}/extract` | Command | User | planned | External OCR path from add transaction |
-| `GET /transaction-drafts`, `POST /transaction-drafts/{id}/confirm` | REST/command | User | partial | Draft listing implemented; confirmation remains planned |
+| `GET /transaction-drafts`, `POST /transaction-drafts/{id}/confirm`, `POST /transaction-drafts/{id}/reject` | REST/command | User | implemented | Versioned draft decisions; confirmation creates one idempotent transaction, rejection has no accounting effect |
 | `POST /webhooks/bank/{source_id}` | Webhook | HMAC | planned | Timestamp, nonce, signature, deduplication |
 | `GET /notifications`, `PATCH /notifications/{id}/read`, `POST /push-subscriptions`, `DELETE /push-subscriptions/{id}` | REST collection | User | implemented | Cursor-bounded inbox, ownership checks, private subscription keys, best-effort worker delivery |
 | `POST /exports`, `GET /exports/{id}` | Job REST | User | planned | Manual snapshot export |
@@ -53,11 +55,13 @@ updated: 2026-08-31
 | `GET /api/v1/audit/access`, `GET /api/v1/audit/events` | Query REST | Audit viewer | implemented | Access check and read-only filtered audit access; both require signed-cookie auth and exact verified `AUDIT_VIEWER_EMAIL`; the Account UI only renders the log panel after the access check succeeds |
 | `GET /api/v1/health/live`, `GET /api/v1/health/ready` | Operations | None/internal | implemented | Liveness is process-only; readiness returns `503 INTERNAL_RETRYABLE` when the required database dependency is unavailable and never exposes sensitive dependency details |
 
+Trong các endpoint cột `Auth = User`, `user` thể hiện quyền sở hữu dữ liệu qua cookie hoặc Bearer API key (nếu route không thuộc ngoại lệ).
+
 ## Errors
 
 | Error | Meaning | Consumer Impact |
 | --- | --- | --- |
-| `AUTH_REQUIRED` | No valid application cookie | Redirect to Google login |
+| `AUTH_REQUIRED` | No valid authentication (missing valid cookie or Bearer API key) | Redirect to Google login (cookie users) or obtain a valid API key (third-party) |
 | `FORBIDDEN` | Authenticated principal lacks access | Show forbidden state; do not retry |
 | `VALIDATION_FAILED` | Stable field-level domain validation failed | Display correctable fields |
 | `NOT_FOUND` | Object absent within authenticated scope | Display missing/removed state |
@@ -126,7 +130,8 @@ Request:
 ```json
 {
   "name": "Ví chính",
-  "include_in_total": true
+  "include_in_total": true,
+  "base_version": 3
 }
 ```
 
@@ -138,7 +143,9 @@ Headers:
 
 - `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
 
-Response status: `200 OK`; archived wallets are removed from ordinary list results and cannot remain the default AI wallet.
+Request body: `{ "base_version": 3 }`.
+
+Response status: `200 OK`; archived wallets are removed from ordinary list results and cannot remain the default AI wallet. Referenced transaction history is retained and read-only because accounting commands require active wallets.
 
 ### `POST /api/v1/wallets/{id}/default-ai`
 
@@ -342,6 +349,12 @@ Response status: `200 OK`; activation is scoped to the authenticated user's wall
 
 ## Sync Schemas
 
+Local correctness follow-up 2026-09-11: pending transaction rendering reconciles by entity ID and operation, never by mutation ID. Committed creates are deduplicated, pending updates overlay the same entity, archives hide it, and non-transaction mutations do not become ledger rows.
+
+Portfolio arithmetic rejects out-of-range signed 64-bit VND products, fees, cost basis, P&L and aggregate valuations via the existing validation error path. Failed trade/price commands roll back version and feed with their domain state; no schema or request format change.
+
+Each mutation commits domain state, change-feed entries and the stored result in one database transaction. Batches commit per mutation, not all-or-nothing: after a network failure retry the same mutation IDs and payloads, never substitute fresh direct creates. Direct finance/portfolio writes and draft confirmation also publish changes. Resync returns a repeatable-read snapshot and its cursor. Migration 0012 is required before the new binary; clients need full resync for historical feed omissions. This describes the locally verified ADR-008 implementation, not deployment status.
+
 ### `POST /api/v1/sync/mutations`
 
 Headers:
@@ -456,11 +469,11 @@ Response status: `201 Created`.
 
 ### `PATCH /api/v1/budgets/{id}`
 
-Same JSON shape as create. Mutations are scoped to the authenticated owner and return `403 FORBIDDEN` for another user's budget or category scope.
+Same JSON shape as create plus required `base_version`. Mutations are scoped to the authenticated owner, return `403 FORBIDDEN` for another user's budget/category scope, and return `409 VERSION_CONFLICT` without writing when stale.
 
 ### `POST /api/v1/budgets/{id}/archive`
 
-Archives the budget for the authenticated owner. Archived budgets are hidden from `GET /api/v1/budgets`.
+Requires JSON `{ "base_version": n }`. Archives the budget for the authenticated owner. Archived budgets are hidden from `GET /api/v1/budgets`; stale versions return `409 VERSION_CONFLICT`.
 
 ### `GET /api/v1/events`
 
@@ -476,11 +489,11 @@ Request fields: `name`, `starts_on`, `ends_on`, and optional `note`. Dates use `
 
 ### `PATCH /api/v1/events/{id}`
 
-Same JSON shape as create. Mutations are scoped to the authenticated owner.
+Same JSON shape as create plus required `base_version`. Mutations are scoped to the authenticated owner; stale versions return `409 VERSION_CONFLICT`.
 
 ### `POST /api/v1/events/{id}/archive`
 
-Archives the event for the authenticated owner. Archived events are hidden from `GET /api/v1/events`.
+Requires JSON `{ "base_version": n }`. Archives the event for the authenticated owner. Archived events are hidden from `GET /api/v1/events`; stale versions return `409 VERSION_CONFLICT`.
 
 ### `POST /api/v1/events/{id}/transactions/{transaction_id}`
 
@@ -500,15 +513,15 @@ Request fields: `direction` (`borrowed` or `lent`), `principal_vnd`, `counterpar
 
 ### `PATCH /api/v1/obligations/{id}`
 
-Same JSON shape as create. Mutations are scoped to the authenticated owner.
+Same JSON shape as create plus required `base_version`. Mutations are scoped to the authenticated owner; stale versions return `409 VERSION_CONFLICT`.
 
 ### `POST /api/v1/obligations/{id}/archive`
 
-Archives the obligation for the authenticated owner. Archived obligations are hidden from `GET /api/v1/obligations`.
+Requires JSON `{ "base_version": n }`. Archives the obligation for the authenticated owner. Archived obligations are hidden from `GET /api/v1/obligations`; stale versions return `409 VERSION_CONFLICT`.
 
 ### `POST /api/v1/obligations/{id}/repayments/{transaction_id}`
 
-Links an owned confirmed transaction as a repayment. The command returns `400 VALIDATION_FAILED` when the linked repayment total would exceed the obligation principal.
+Links an owned confirmed transaction as a repayment. Borrowed obligations require an expense transaction; lent obligations require income. The obligation row is locked while checking/inserting the repayment, and the command returns `400 VALIDATION_FAILED` for a wrong direction or a total above principal.
 
 ### `GET /api/v1/recurring-schedules`
 
@@ -524,11 +537,19 @@ Request fields: `name`, `frequency` (`daily`, `weekly`, or `monthly`), `timezone
 
 ### `POST /api/v1/recurring-schedules/{id}/archive`
 
-Archives the recurring schedule for the authenticated owner. Existing generated drafts remain visible for review.
+Requires JSON `{ "base_version": n }`. Archives the recurring schedule for the authenticated owner. Existing generated drafts remain visible for review; stale versions return `409 VERSION_CONFLICT`.
 
 ### `GET /api/v1/transaction-drafts`
 
-Returns authenticated-user transaction drafts generated by recurring schedules. Drafts are reviewable records and do not modify wallet balances until an explicit confirmation API is added.
+Returns authenticated-user transaction drafts generated by recurring schedules. Pending drafts are reviewable records and do not modify wallet balances.
+
+### `POST /api/v1/transaction-drafts/{id}/confirm`
+
+Requires `Idempotency-Key` and JSON `version`, `amount_vnd`, and `note`. Creates one finance transaction and applies its accounting effect, or replays the stored decision. Stale versions return `409 DRAFT_VERSION_CONFLICT`.
+
+### `POST /api/v1/transaction-drafts/{id}/reject`
+
+Requires JSON `version`. Marks a pending draft rejected without changing wallet balances. Stale versions return `409 DRAFT_VERSION_CONFLICT`.
 
 ## Transaction Schemas
 
@@ -625,6 +646,40 @@ Response status: `200 OK`; the backend reverses the stored balance effect exactl
 - API key hashes are stored in PostgreSQL and cached through Redis by the same HMAC hash so revoke can invalidate the cached key immediately. Redis is an acceleration/cache layer; PostgreSQL remains authoritative.
 - Audit queries additionally require verified email equality with `AUDIT_VIEWER_EMAIL`.
 - Webhooks authenticate through a per-source HMAC contract rather than the browser cookie.
+
+### Third-party API-key integration
+
+Third parties authenticate each request with `Authorization: Bearer mpk_...`. The key is always resolved to its owning user by the HTTP middleware; callers must never send or select a `user_id`. The following user-owned API groups accept a valid API key: wallets, categories, transactions, file upload/download, budgets, events, obligations, recurring schedules, transaction drafts, notifications, push subscriptions, dashboard, assets, portfolio, reports, search, and sync.
+
+Use the API key only from a trusted server-side integration. CORS allows credentialed browser access solely from `PUBLIC_WEB_URL`, so a browser application on another origin cannot call the API directly. Do not expose an `mpk_...` key in browser code, mobile bundles, logs, screenshots, or client-side storage.
+
+For write requests, send `Idempotency-Key` whenever a retry could create a duplicate record; use the current `base_version` on endpoints that expose optimistic concurrency. A bearer key does not require `X-CSRF-Token`; that header is required only for cookie-authenticated browser mutations. API keys cannot create, list, revoke, or rotate API keys — those management actions require the owner's browser cookie and CSRF token.
+
+Every response includes a correlation ID. Persist it with integration logs and include it when reporting an issue. API-key authentication and mutations are recorded in the audit stream; access to audit records remains restricted to the configured audit viewer.
+
+The API-key contract is covered by HTTP tests for identity, Finance/Wallets, Planning/Budgets, Notifications, Files/Receipts, Sync, and audit actor attribution. These tests assert that the repository or service receives the key owner's user ID, not a caller-controlled identity.
+
+Example server-to-server request:
+
+```bash
+curl --fail-with-body \
+  -H "Authorization: Bearer $MYPOCKET_API_KEY" \
+  -H "Accept: application/json" \
+  https://money.dungxbuif.com/api/v1/wallets
+```
+
+Example retry-safe mutation:
+
+```bash
+curl --fail-with-body -X POST \
+  -H "Authorization: Bearer $MYPOCKET_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: integration-transaction-20260908-001" \
+  -d '{"type":"expense","amount_vnd":120000,"source_wallet_id":"wallet_id","category_id":"category_id","occurred_at":"2026-09-08T10:00:00+07:00"}' \
+  https://money.dungxbuif.com/api/v1/transactions
+```
+
+`/api/v1/auth/*`, API-key management, health, and documentation endpoints are not third-party data APIs. In particular, do not use an API key for browser sign-out flows; key management requires the owner's cookie-authenticated browser session.
 
 ## Versioning
 

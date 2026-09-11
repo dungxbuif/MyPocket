@@ -4,6 +4,8 @@ title: Tổng quan API
 
 # API Overview
 
+> Audit 2026-09-10: tài liệu đang được đối chiếu với router và kiểu dữ liệu. Export/AI/OCR/account reset-delete chưa có implementation. Confirm/reject recurring draft đã có API và kiểm tra version/idempotency. Không coi các YAML minh họa rời rạc hoặc diagram là OpenAPI máy đọc đã được kiểm định; kiểm tra trạng thái từng nhóm API. Có bearer auth không đồng nghĩa mọi chức năng Money Lover đã được expose.
+
 **Base URL:** `/api/v1`
 
 **Content-Type:** `application/json`
@@ -12,10 +14,22 @@ title: Tổng quan API
 
 | Method | Header/Cookie | Áp dụng cho |
 |--------|-------------|-------------|
-| **Cookie** | `mypocket_auth` (HttpOnly, Secure, SameSite=Lax) | Browser mutations |
+| **Cookie** | `mypocket_auth` (HttpOnly, Secure, SameSite=Lax) | Browser (UI và automation) |
 | **API Key** | `Authorization: Bearer mpk_...` | Third-party, server-to-server |
 
-Mutations bằng cookie yêu cầu thêm `X-CSRF-Token` header.
+Mutations bằng cookie yêu cầu thêm `X-CSRF-Token` header. Với Bearer API key, không dùng CSRF.
+
+### Quy tắc xác thực theo route
+
+- Tất cả endpoint nghiệp vụ user-owned (`wallets`, `categories`, `transactions`, `planning`, `reports`, `assets`, `files`, `sync`, `notifications`, `budgets`) chấp nhận cả cookie và Bearer API key.
+- Không chấp nhận bearer cho: `GET /api/v1/auth/*`, `POST /api/v1/auth/logout`, `GET /api/v1/health/*`, docs pages, và route quản lý API key.
+
+### Quy tắc phân quyền
+
+- `user_id` luôn lấy từ context auth (cookie hoặc API key), không được đọc từ payload.
+- Mọi truy vấn/mutation user-owned phải lọc theo `user_id` hiện tại.
+- Truy cập tài nguyên không thuộc scope của caller trả `403 FORBIDDEN`.
+- Truy cập thiếu auth hợp lệ trả `401 AUTH_REQUIRED`.
 
 ## Response envelope
 
@@ -83,8 +97,20 @@ sequenceDiagram
         API->>DB: INSERT audit_event
         DB-->>API: Success
         API-->>Client: 201 Created
-    end
+end
 ```
+
+## Redis cache và Audit
+
+Redis là lớp cache/hint cho xác thực:
+
+- Lưu hint API key hash → `user_id`; PostgreSQL vẫn xác nhận key active trên từng Bearer request
+- Lookup token/cookie đã ký
+- TTL ngắn; miss/lỗi/stale Redis không thể thay thế PostgreSQL (nguồn dữ liệu chính)
+
+Audit event **không** truy xuất từ Redis như nguồn chính. Các event thay đổi trạng thái/sự kiện bảo mật được ghi vào PostgreSQL append-only.
+
+`/api/v1/audit/access` và `/api/v1/audit/events` là route đọc-only riêng biệt. Chỉ tài khoản có email trùng chính xác `AUDIT_VIEWER_EMAIL` mới được truy cập sau xác thực thành công.
 
 ## Sequence diagram — Offline sync flow
 

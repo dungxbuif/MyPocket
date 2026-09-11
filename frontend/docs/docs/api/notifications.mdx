@@ -43,7 +43,7 @@ paths:
   /api/v1/notifications/{id}/read:
     patch:
       summary: Đánh dấu đã đọc
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: "OK" }
 ```
@@ -58,7 +58,7 @@ paths:
   /api/v1/push-subscriptions:
     post:
       summary: Đăng ký Web Push
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -75,7 +75,7 @@ paths:
   /api/v1/push-subscriptions/{id}:
     delete:
       summary: Huỷ đăng ký
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: "OK" }
 ```

@@ -35,7 +35,7 @@ paths:
                         alert_100: { type: boolean }
     post:
       summary: Tạo ngân sách
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -45,16 +45,32 @@ paths:
         "201": { description: "Created" }
   /api/v1/budgets/{id}:
     patch:
-      summary: Sửa ngân sách
-      security: [{ cookieAuth: [], csrf: [] }]
+      summary: Sửa ngân sách với optimistic concurrency
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/UpdateBudgetInput" }
       responses:
         "200": { description: "OK" }
+        "409": { description: "VERSION_CONFLICT" }
+  /api/v1/budgets/{id}/archive:
     post:
-      path: /{id}/archive
       summary: Lưu trữ ngân sách
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_version]
+              properties:
+                base_version: { type: integer, minimum: 1 }
       responses:
         "200": { description: "OK" }
+        "409": { description: "VERSION_CONFLICT" }
 components:
   schemas:
     Budget:
@@ -77,6 +93,13 @@ components:
         category_ids: { type: array, items: { type: string, format: uuid } }
         custom_start: { type: string, format: date }
         custom_end: { type: string, format: date }
+    UpdateBudgetInput:
+      allOf:
+        - { $ref: "#/components/schemas/CreateBudgetInput" }
+        - type: object
+          required: [base_version]
+          properties:
+            base_version: { type: integer, minimum: 1 }
 ```
 
 ## Period types
@@ -106,6 +129,8 @@ spent_vnd = SUM(transactions.amount_vnd) WHERE category IN budget_categories
 remaining_vnd = amount_vnd - spent_vnd
 percent = (spent_vnd * 100) / amount_vnd
 ```
+
+Phép tính phần trăm dùng số nguyên lớn nội bộ và bão hòa ở `MaxInt64`, không được wrap khi dữ liệu cực trị. Update/archive bắt buộc gửi `base_version` lấy từ `budget.version`; version cũ trả `409 VERSION_CONFLICT` và không ghi đè dữ liệu mới hơn.
 
 ## Sequence diagram
 

@@ -4,6 +4,8 @@ title: Planning (Sự kiện, Nợ, Lịch lặp, Bản nháp)
 
 # Planning API
 
+> Đối chiếu 2026-09-10: tạo obligation chỉ ghi thông tin khoản nợ, không tự tăng/giảm số dư ví; repayment liên kết giao dịch đã có. Recurring draft hỗ trợ list/confirm/reject với version và idempotency. Bills và travel auto-tag chưa có luồng hoàn chỉnh.
+
 ## Events
 
 ```yaml
@@ -24,7 +26,7 @@ paths:
                     items: { $ref: "#/components/schemas/Event" }
     post:
       summary: Tạo sự kiện
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -34,16 +36,16 @@ paths:
         "201": { description: "Created" }
   /api/v1/events/{id}:
     patch:
-      summary: Sửa sự kiện
-      security: [{ cookieAuth: [], csrf: [] }]
+      summary: Sửa sự kiện; JSON bắt buộc base_version hiện tại
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
     post:
       path: /{id}/archive
-      summary: Lưu trữ sự kiện
-      security: [{ cookieAuth: [], csrf: [] }]
+      summary: Lưu trữ sự kiện; JSON bắt buộc base_version hiện tại
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
   /api/v1/events/{id}/transactions/{transaction_id}:
     post:
       summary: Gắn giao dịch vào sự kiện
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
 components:
   schemas:
     Event:
@@ -80,7 +82,7 @@ paths:
       security: [{ cookieAuth: [], bearerAuth: [] }]
     post:
       summary: Tạo khoản nợ
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -88,10 +90,18 @@ paths:
             schema: { $ref: "#/components/schemas/CreateObligationInput" }
       responses:
         "201": { description: "Created" }
+  /api/v1/obligations/{id}:
+    patch:
+      summary: Sửa khoản vay/nợ; JSON bắt buộc base_version hiện tại
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+  /api/v1/obligations/{id}/archive:
+    post:
+      summary: Lưu trữ khoản vay/nợ; JSON bắt buộc base_version hiện tại
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
   /api/v1/obligations/{id}/repayments/{transaction_id}:
     post:
       summary: Gắn giao dịch trả nợ
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: "OK" }
         "400": { description: "Over principal" }
@@ -123,6 +133,9 @@ components:
 - `repaid_vnd` = tổng các repayment transactions
 - `remaining_vnd` = `principal_vnd - repaid_vnd`
 - Overpayment protection: trả về `VALIDATION_FAILED` nếu vượt quá principal
+- `direction="borrowed"` chỉ nhận giao dịch `expense`; `direction="lent"` chỉ nhận giao dịch `income`.
+- Obligation row được khóa trong lúc kiểm tra tổng repayment và insert link, vì vậy hai request đồng thời không thể cùng vượt principal.
+- Một transaction chỉ được tính cho một obligation vì API không có trường phân bổ một phần; link lặp lại cùng obligation là idempotent.
 
 ## Recurring Schedules (Lịch lặp)
 
@@ -134,7 +147,7 @@ paths:
       security: [{ cookieAuth: [], bearerAuth: [] }]
     post:
       summary: Tạo lịch lặp
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -144,8 +157,8 @@ paths:
         "201": { description: "Created" }
   /api/v1/recurring-schedules/{id}/archive:
     post:
-      summary: Lưu trữ lịch lặp
-      security: [{ cookieAuth: [], csrf: [] }]
+      summary: Lưu trữ lịch lặp; JSON bắt buộc base_version hiện tại
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
 components:
   schemas:
     RecurringSchedule:
@@ -188,6 +201,45 @@ paths:
     get:
       summary: Danh sách bản nháp
       security: [{ cookieAuth: [], bearerAuth: [] }]
+  /api/v1/transaction-drafts/{id}/confirm:
+    post:
+      summary: Xác nhận draft thành đúng một giao dịch
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: integer, minimum: 1 }
+                amount_vnd: { type: integer, minimum: 1 }
+                note: { type: string }
+      responses:
+        "200": { description: Confirmed or idempotently replayed }
+        "409": { description: VERSION_CONFLICT }
+  /api/v1/transaction-drafts/{id}/reject:
+    post:
+      summary: Từ chối draft mà không đổi số dư
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: integer, minimum: 1 }
+      responses:
+        "200": { description: Rejected }
+        "409": { description: VERSION_CONFLICT }
 components:
   schemas:
     TransactionDraft:
@@ -210,6 +262,15 @@ components:
 - `status = "pending"` — chưa được xác nhận
 - `confirmed_transaction_id` nullable — khi được confirm
 - Không ảnh hưởng balance
+- Confirm tạo đúng một finance transaction và áp dụng accounting; gọi lại cùng idempotency key không nhân đôi số dư.
+- Reject chuyển trạng thái sang `rejected` và không tạo transaction.
+
+## Optimistic concurrency cho planning
+
+- `PATCH /budgets/{id}`, `PATCH /events/{id}` và `PATCH /obligations/{id}` bắt buộc có `base_version` trong JSON cùng các field cập nhật.
+- Các lệnh `/budgets/{id}/archive`, `/events/{id}/archive`, `/obligations/{id}/archive` và `/recurring-schedules/{id}/archive` nhận JSON `{ "base_version": <version hiện tại> }`.
+- Thiếu/sai `base_version` trả `400 VALIDATION_FAILED`; version cũ trả `409 VERSION_CONFLICT` và không thay đổi bản ghi.
+- Draft confirm/reject dùng field tên `version` (không phải `base_version`) theo contract hiện tại.
 
 ## Sequence diagram — Recurring schedule worker
 

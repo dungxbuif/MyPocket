@@ -29,7 +29,7 @@ paths:
                     items: { $ref: "#/components/schemas/Wallet" }
     post:
       summary: Tạo ví mới
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -40,7 +40,7 @@ paths:
   /api/v1/wallets/{id}:
     patch:
       summary: Cập nhật ví
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       parameters:
         - name: id
           in: path
@@ -52,18 +52,31 @@ paths:
             schema: { $ref: "#/components/schemas/UpdateWalletInput" }
       responses:
         "200": { description: "OK" }
+        "409": { description: "VERSION_CONFLICT" }
   /api/v1/wallets/{id}/archive:
     post:
       summary: Lưu trữ ví
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VersionCommand" }
       responses:
         "200": { description: "OK" }
+        "409": { description: "VERSION_CONFLICT" }
   /api/v1/wallets/{id}/default-ai:
     post:
       summary: Set ví mặc định cho AI
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/VersionCommand" }
       responses:
         "200": { description: "OK" }
+        "409": { description: "VERSION_CONFLICT" }
 components:
   schemas:
     Wallet:
@@ -87,10 +100,21 @@ components:
         payment_due_day: { type: integer, nullable: true, minimum: 1, maximum: 31 }
     UpdateWalletInput:
       type: object
+      required: [name, include_in_total, base_version]
       properties:
         name: { type: string }
         include_in_total: { type: boolean }
+        base_version: { type: integer, minimum: 1 }
+    VersionCommand:
+      type: object
+      required: [base_version]
+      properties:
+        base_version: { type: integer, minimum: 1 }
 ```
+
+Ví archived bị ẩn khỏi danh sách thường và không còn là ví mặc định AI. Giao dịch lịch sử vẫn được giữ để bảo toàn audit/accounting, nhưng trở thành read-only vì hệ thống không có lệnh restore ví và không cho reversal áp dụng vào ví không còn active.
+
+Lệnh bật/tắt category theo ví là `PUT` đặt trạng thái tuyệt đối và idempotent. Setting hiện chưa có version riêng; nếu hai thiết bị đặt hai trạng thái đối nghịch đồng thời thì commit sau cùng thắng.
 
 ## Schema
 

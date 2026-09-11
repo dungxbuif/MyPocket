@@ -71,6 +71,7 @@ paths:
       security:
         - cookieAuth: []
         - csrf: []
+        - bearerAuth: []
       parameters:
         - name: Idempotency-Key
           in: header
@@ -89,6 +90,27 @@ paths:
           description: Created
         "200":
           description: Replayed (idempotent)
+  /api/v1/transactions/{id}:
+    patch:
+      summary: Sửa giao dịch với optimistic concurrency
+      security:
+        - cookieAuth: []
+        - csrf: []
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              allOf:
+                - $ref: "#/components/schemas/CreateTransactionInput"
+                - type: object
+                  required: [base_version]
+                  properties:
+                    base_version: { type: integer, minimum: 1 }
+      responses:
+        "200": { description: Updated }
+        "409": { description: VERSION_CONFLICT }
 ```
 
 ## Transaction type rules
@@ -144,3 +166,7 @@ Tìm kiếm trong notes, with_person, event_ref của transactions và tên wall
 | `NOT_FOUND` | 404 | Wallet/category không tồn tại |
 | `VERSION_CONFLICT` | 409 | base_version cũ |
 | `IDEMPOTENT_REPLAY` | 200 | Mutation đã được xử lý |
+
+`base_version` phải lấy từ `version` gần nhất đã đọc. Server khóa bản ghi và từ chối version cũ trước khi đảo/apply lại delta kế toán. Client API key cũng gửi field này như browser; bearer request không cần CSRF.
+
+Lưu trữ dùng `POST /api/v1/transactions/{id}/archive` với JSON `{ "base_version": <version> }`; stale version trả `409 VERSION_CONFLICT` và không đảo số dư.

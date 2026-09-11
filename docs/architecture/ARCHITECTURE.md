@@ -18,6 +18,8 @@ updated: 2026-08-31
 
 ## Overview
 
+Local frontend follow-up 2026-09-09: mounted App quick-add supports existing transfer API; ReportsPanel queries the five existing report endpoints through reportQueries with cancellation/owner guards and renders server numbers. Shared Select joins Button/Input/Card/OperationError boundaries. Empty wallet-detail transaction collections are normalized in the analytics client, without changing API/DB semantics. Report offline state is in-memory only, not persistent query caching. [Verification and gaps](../work/test-verification/R0-FUNCTIONAL-E2E-2026-09-09.md); not deployed.
+
 MyPocket is a modular monolith deployed as three application processes: a static React TypeScript PWA, a Go HTTP API, and a Go worker. The API and worker share domain/application packages. PostgreSQL is authoritative; Redis accelerates API key/session auth lookups; IndexedDB provides offline state and an outbox; S3-compatible storage keeps private receipt objects.
 
 ```text
@@ -74,7 +76,7 @@ MyPocket is a modular monolith deployed as three application processes: a static
 
 1. Online and offline UI actions create client mutation IDs and optimistic local state.
 2. The sync API validates idempotency, ownership, base versions, and domain rules.
-3. Domain writes, accounting effects, audit records, and sync changes commit transactionally where required.
+3. Finance/portfolio domain writes and sync changes commit together through `platform/commandtx` and `platform/changefeed`. Sync stores its replay receipt before the same commit; draft confirmation shares the accounting transaction. Per-user locks precede entity locks. Audit emission follows commit and remains best-effort. See [ADR-008](../decisions/ADR-008-atomic-offline-sync-commit.md).
 4. Stale offline writes return explicit conflict payloads; the PWA stores the conflict locally and requires keep-server, discard-local, or edit-and-retry before removing the pending mutation.
 5. The client pulls authoritative changes using a per-user cursor, or requests a full resync snapshot when local mirror state is stale or cleared.
 6. AI/OCR/webhook/recurring sources create drafts; confirmation invokes the same finance service used by manual entry.
@@ -83,7 +85,7 @@ MyPocket is a modular monolith deployed as three application processes: a static
 ## Runtime Flow
 
 - Web assets are served over HTTPS and call the API on an approved origin.
-- The browser caches the last successful current-user envelope only to keep authenticated IndexedDB data visible when `navigator.onLine` is false; logout clears the cached user and local offline stores.
+- The browser may reuse the last successful current-user envelope after a network transport failure, but never after an explicit authentication rejection. IndexedDB is namespaced by user so account switching preserves each user's pending work without cross-account replay; logout clears the cached user and the active user's local offline store. See [ADR-007](../decisions/ADR-007-offline-user-databases.md).
 - API and worker connect to the homelab PostgreSQL instance using environment configuration.
 - API and worker startup currently requires a successful PostgreSQL ping through `DATABASE_URL`.
 - Receipt upload uses short-lived presigned URLs and private S3 objects; the platform layer now includes an S3-compatible smoke adapter for endpoint/bucket access verification.

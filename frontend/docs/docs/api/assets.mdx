@@ -4,6 +4,10 @@ title: Assets (Tài sản đầu tư)
 
 # Assets API
 
+## Giới hạn số tiền
+
+Giá, phí, giá vốn, lãi/lỗ và valuation dùng số nguyên VND trong miền `int64`. Phép nhân số lượng với giá được làm tròn trước khi kiểm tra giới hạn; phép cộng/trừ không được wrap thành số sai. Lệnh tạo/sửa trade hoặc giá gây overflow trả lỗi validation và rollback dữ liệu, version và change feed. Nếu tổng danh mục vượt miền biểu diễn, API trả lỗi thay vì trả một tổng âm sai. Bản kiểm chứng local 11/09/2026 chưa phải thông báo deploy.
+
 ## OpenAPI Spec
 
 ```yaml
@@ -25,7 +29,7 @@ paths:
                     items: { $ref: "#/components/schemas/AssetPosition" }
     post:
       summary: Tạo tài sản
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -40,7 +44,7 @@ paths:
     post:
       path: /{id}/archive
       summary: Lưu trữ tài sản
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -52,7 +56,7 @@ paths:
   /api/v1/assets/{id}/trades:
     post:
       summary: Thêm giao dịch mua/bán
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -64,15 +68,15 @@ paths:
   /api/v1/assets/{id}/trades/{trade_id}:
     patch:
       summary: Sửa giao dịch
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
     post:
       path: /{trade_id}/archive
       summary: Xoá giao dịch
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
   /api/v1/assets/{id}/prices:
     post:
       summary: Thêm giá
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:

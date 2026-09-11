@@ -291,14 +291,14 @@ Latest price is selected by `(priced_at DESC, created_at DESC, id DESC)`. Manual
 | --- | --- | --- |
 | `user_id` | `uuid` | Required owner; part of primary key |
 | `cursor` | `bigint` | Required positive per-user cursor; part of primary key |
-| `entity_type` | `text` | `wallet`, `category`, or `transaction` |
+| `entity_type` | `text` | `wallet`, `category`, `transaction`, or `asset` |
 | `entity_id` | `text` | Entity identifier preserved from the client/server command |
-| `operation` | `text` | `create`, `update`, `archive`, `set_default_ai`, or `set_category_active` |
+| `operation` | `text` | `create`, `update`, `archive`, `set_default_ai`, `set_category_active`, `add_trade`, `update_trade`, `archive_trade`, or `add_price` |
 | `version` | `bigint` | Authoritative entity version or tombstone version |
 | `payload_json` | `jsonb` | Authoritative payload snapshot or tombstone payload |
 | `created_at` | `timestamptz` | Creation timestamp |
 
-`sync_changes_user_entity_idx` supports per-user entity/cursor lookups.
+`sync_changes_user_entity_idx` supports per-user entity/cursor lookups. Additive migration `0012_atomic_sync_asset_feed.sql` expands existing CHECK constraints for asset commands; no new table is introduced. Cursor allocation and feed insertion share the domain transaction.
 
 ### `sync_mutations`
 

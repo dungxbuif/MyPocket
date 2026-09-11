@@ -1,5 +1,7 @@
 # MoneyLover Complete Feature Research
 
+> Historical research (2026-08-31), not implementation proof. Superseded for current comparison by the [2026-09-08 audit](PARITY-AUDIT-2026-09-08.md), [96-article catalog](SOURCE-CATALOG-2026-09-08.md) and [code/UI feature matrix](FEATURE-PARITY-2026-09-08.md). Source conflicts and retired features must be resolved there before implementation.
+
 > Crawled from moneylover.zendesk.com/hc/en-us  
 > Date: 2026-08-31  
 > Purpose: Reference for MyPocket implementation gap analysis

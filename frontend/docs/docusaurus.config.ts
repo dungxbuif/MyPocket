@@ -7,7 +7,7 @@ const config: Config = {
   tagline: 'Quản lý tiền rõ ràng hơn',
   favicon: 'img/favicon.ico',
 
-  url: 'https://mypocket.app',
+  url: 'https://money.dungxbuif.com',
   baseUrl: '/docs/',
 
   onBrokenLinks: 'warn',

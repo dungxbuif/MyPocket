@@ -4,6 +4,8 @@ title: Categories (Danh mục)
 
 # Categories API
 
+> Đối chiếu code 2026-09-10: create nhận `kind`, `name`, `parent_id`; update nhận `name`, `parent_id`, `base_version`. Chưa có API merge category hoặc cascade activation cha/con. Các snippet YAML là mô tả từng phần, chưa phải một OpenAPI hoàn chỉnh đã validate.
+
 ## OpenAPI Spec
 
 ```yaml
@@ -25,7 +27,7 @@ paths:
                     items: { $ref: "#/components/schemas/Category" }
     post:
       summary: Tạo danh mục
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -36,20 +38,30 @@ paths:
   /api/v1/categories/{id}:
     patch:
       summary: Sửa danh mục
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       responses:
         "200": { description: "OK" }
         "400": { description: "Cannot edit system category" }
+  /api/v1/categories/{id}/archive:
     post:
-      path: /{id}/archive
       summary: Lưu trữ danh mục
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base_version]
+              properties:
+                base_version: { type: integer, minimum: 1 }
       responses:
         "200": { description: "OK" }
+        "409": { description: "VERSION_CONFLICT" }
   /api/v1/wallets/{wallet_id}/categories/{category_id}:
     put:
       summary: Kích hoạt/tắt category trong wallet
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -96,6 +108,8 @@ components:
 
 - System categories (`is_system = true`) **không thể** sửa, xoá, archive
 - User-created categories có `user_id`, `is_system = false`
-- Depth tối đa 2 cấp (parent → child)
+- Catalog seed và category của người dùng hỗ trợ cây tối đa 2 cấp; cha/con phải cùng `kind` và cùng scope chủ sở hữu.
 - Mỗi category có thể active/inactive riêng theo từng wallet
 - `PUT /wallets/{wallet_id}/categories/{category_id}` để toggle active state
+- Sửa và archive category tự tạo bắt buộc gửi `base_version`; version cũ trả `409 VERSION_CONFLICT` và không ghi đè/archive trạng thái mới hơn.
+- Wallet-category activation hiện là lệnh đặt trạng thái idempotent (`active: true|false`), chưa có version riêng cho row setting.

@@ -3,6 +3,13 @@ import type {SidebarsConfig} from '@docusaurus/plugin-content-docs';
 const sidebars: SidebarsConfig = {
   docsSidebar: [
     'intro',
+    'updates/2026-09-10-audit',
+    'updates/2026-09-09',
+    {
+      type: 'category',
+      label: 'Skills cho AI agents',
+      items: ['skills/business-logic-audit'],
+    },
     {
       type: 'category',
       label: 'Cơ sở dữ liệu (ERD)',

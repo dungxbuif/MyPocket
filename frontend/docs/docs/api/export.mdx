@@ -4,13 +4,21 @@ title: Export
 
 # Export API
 
+> Trạng thái đối chiếu 2026-09-08: export vẫn **planned**, chưa có handler `/api/v1/exports` trong router. Khối bên dưới là thiết kế dự kiến, không phải endpoint dùng được. Upload/download ảnh ở phần sau đã có implementation và không bao gồm OCR.
+
+## Authentication
+
+- `POST /files/presign` là mutation nên dùng cookie + `X-CSRF-Token` hoặc Bearer API key.
+- `GET /files/{id}/download`, `GET /exports`, `GET /exports/{id}` là read endpoint: dùng cookie hoặc Bearer API key.
+- Quy tắc sở hữu: chỉ file/đối tượng thuộc `user_id` trong context.
+
 ```yaml
 openapi: 3.0.0
 paths:
   /api/v1/exports:
     post:
       summary: Tạo export job
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -37,10 +45,10 @@ paths:
 
 ```yaml
 paths:
-  /api/v1/receipts/uploads:
+  /api/v1/files/presign:
     post:
       summary: Chuẩn bị upload receipt — trả về presigned URL
-      security: [{ cookieAuth: [], csrf: [] }]
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
       requestBody:
         required: true
         content:
@@ -60,10 +68,10 @@ paths:
               schema:
                 type: object
                 properties:
-                  receipt: { $ref: "#/components/schemas/ReceiptObject" }
+                  file: { $ref: "#/components/schemas/ReceiptObject" }
                   upload_url: { type: string }
                   expires_in_seconds: { type: integer }
-  /api/v1/receipts/{id}:
+  /api/v1/files/{id}/download:
     get:
       summary: Lấy download URL
       security: [{ cookieAuth: [], bearerAuth: [] }]
@@ -74,7 +82,7 @@ paths:
               schema:
                 type: object
                 properties:
-                  receipt: { $ref: "#/components/schemas/ReceiptObject" }
+                  file: { $ref: "#/components/schemas/ReceiptObject" }
                   download_url: { type: string }
                   expires_in_seconds: { type: integer }
 components:
@@ -100,14 +108,14 @@ sequenceDiagram
     participant S3
 
     Client->>Client: Compute SHA-256 of file
-    Client->>API: POST /receipts/uploads<br/>{filename, content_type, size, checksum}
+    Client->>API: POST /api/v1/files/presign<br/>{filename, content_type, size_bytes, checksum_sha256}
     API->>DB: INSERT receipt_objects
     API->>S3: PresignPut (15 min)
     S3-->>API: upload_url
-    API-->>Client: {receipt, upload_url}
+    API-->>Client: {file, upload_url, expires_in_seconds}
     Client->>S3: PUT <upload_url><br/>body: file bytes
     S3-->>Client: 200 OK
-    Client->>API: PATCH /transactions/{id}<br/>{receipt_object_id: receipt.id}
+    Client->>API: PATCH /api/v1/transactions/{id}<br/>{receipt_object_id: file.id, other required transaction fields}
 
     alt Offline
         Client->>Client: Queue in IndexedDB
@@ -116,6 +124,8 @@ sequenceDiagram
 ```
 
 ## Upload constraints
+
+Các file response còn có `status` và `correlation_id`. Upload URL hết hạn sau 900 giây, download URL sau 600 giây. Browser cookie mutation cần CSRF; bearer API key dùng được và không cần CSRF. Presign kiểm tra metadata; không suy ra đã có OCR hoặc đã xác minh toàn bộ nội dung file upload.
 
 | Field | Giới hạn |
 |-------|---------|

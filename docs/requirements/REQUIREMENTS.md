@@ -18,6 +18,8 @@ updated: 2026-08-31
 
 ## Functional Requirements
 
+2026-09-08 evidence note: `accepted` means approved intent, not delivered/verified functionality. The [Money Lover parity matrix](../research/moneylover/FEATURE-PARITY-2026-09-08.md) maps current implementation and missing journeys against all 96 public source articles. It records new candidate gaps without silently amending human-approved acceptance or exclusions. Legacy `SRS.md` links below are unresolved in the current checkout and need source-trace reconciliation; the referenced file must not be invented.
+
 | ID | Requirement | Priority | Source | Status |
 | --- | --- | --- | --- | --- |
 | REQ-F-001 | Authenticate multiple users with Google OAuth, provision isolated user identities, and maintain login with a signed stateless cookie. | High | [SPEC](SPEC.md) | accepted |

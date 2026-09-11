@@ -10,14 +10,105 @@ shared_fields: [status]
 
 # Changelog
 
+## Unreleased — 2026-09-11 correctness follow-up
+
+- Constrain shared comparison-chart columns and labels to available width. Large seven-day report values no longer expand the mobile viewport and displace fixed navigation/PWA hit targets; complete values remain in label text/title.
+- Reject portfolio overflow in rounded quantities × prices, fees, cost basis, realized/unrealized profit and aggregate valuation; rejected commands preserve state/version/change feed.
+- Reconcile pending transaction rows by entity ID, overlay edits, hide archives and exclude wallet/category/asset commands from transaction rows.
+- Use UUIDs for concurrent offline browser fixtures; retain strict single-transaction assertions.
+- Local-only. Full release gates remain tracked in the business-logic audit; not deployment evidence.
+
 ## Field Ownership
 
 - Human owns release approval.
 - AI maintains planned and released change entries with trace links.
 
-## [Unreleased]
+## [Unreleased — business-logic and integration audit]
+
+- Added a repository-owned AI audit skill plus public Docusaurus guidance so future agents can reproduce the finance/planning/analytics/sync/auth review contract.
+- Fixed checked balance and reporting arithmetic, exact edit/archive reversals, receipt-preserving idempotency, recurring transaction validation, obligation repayment direction/reuse/locking and HCM calendar-date defaults.
+- Added optimistic versions to wallet and transaction update/archive commands, including default-AI wallet selection.
+- Hardened API-key authorization: an Authorization header is authoritative, every Bearer request is revalidated in PostgreSQL, and Redis is only a short-lived hint.
+- Converted a sync version race into an explicit conflict response with authoritative server state.
+- Bounded recurring catch-up by the worker batch limit so a long-offline daily schedule cannot create an unbounded transaction.
+- Atomic sync now commits domain/feed/receipt together, serializes concurrent retries, emits direct finance/portfolio and draft-confirmation changes, and reads consistent resync snapshots.
+- Ambiguous offline responses retain the original mutation ID instead of falling back to a fresh direct create. Sync preserves category parent clearing and canonical default-wallet responses.
+- Local-only: apply migration 0012 before the binary and full client resync for historical feed omissions. No deployment is implied.
+
+## [2026-09-10 prod-2026.09.10.3]
+
+- Deployed production API and web images for the merged category hierarchy + recurring draft slice and e2e selector stability fixes:
+  - Backend image: `registry.dungxbuif.com/mypocket-api:prod-2026.09.10.3` (`sha256:f8e1b9301e918bb6b9b7727643f3bf5113611c88c778f5386785179ea010208b`)
+  - Web image: `registry.dungxbuif.com/mypocket-web:prod-2026.09.10.3` (`sha256:d36c7dc99cb78d3f9d013b63da96fe4ac92a2584dc59d06b317ad24180d7dacf`)
+- Production deploy commands executed under `/Users/dungxbuif/production/mypocket/docker-compose.yml` for `api worker web` via `docker compose up -d --no-deps --pull never --force-recreate --wait --wait-timeout 60`, and migration run via `docker compose run --rm migrate`.
+- Production proof:
+  - `https://money.dungxbuif.com/api/v1/health/live` returns `{"status":"ok",...}`.
+  - `https://money.dungxbuif.com/` returns HTML shell (HTTP 200).
+- Verification at deploy time: `go test -p 1 ./... -count=1` (backend, with test DB), `npm test -- --run` (154), `npm run build` (typecheck + Vite build), `npx playwright test --config=playwright.r0.config.ts --workers=1` (72 passed).
+
+## [2026-09-09 web/docs rollout]
+
+### Planned — Sổ tiền redesign after functional completion
+
+- Local-only F1 2026-09-10: corrected independent selected-budget totals, HCM date boundaries and asynchronous read/retry lifecycle feedback. Evidence: [SO-TIEN-F1](../work/test-verification/SO-TIEN-F1-2026-09-10.md). Not released; F2/F3 and redesign acceptance remain open.
+
+- Owner approved the monochrome editorial direction. [Written specification](../superpowers/specs/2026-09-09-so-tien-design.md) is in review: correctness and docs first, shared components and all-screen migration next, safe old-UI cleanup last. No implementation or deployment in this design turn.
+
+### Later local corrections — not deployed
+
+- Empty-wallet detail normalizes null transactions instead of crashing. Transfer/adjustment rows show actual neutral amounts; quick-add exposes transfer between distinct wallets.
+- Overview opens five server-backed report types with date/wallet filters, safe retry, privacy and numeric tables; unloaded reports no longer imply zero. Persistent offline report cache/charts/full parity remain absent.
+- [Evidence and residual inventory](../work/test-verification/R0-FUNCTIONAL-E2E-2026-09-09.md): 120 frontend pass, full browsers 61 pass/2 retained WebKit failures; all new nine accounting checks pass. No deployment or Docusaurus publication in this run.
+
+- Update at 21:25 Vietnam: redeployed the same web/docs images on explicit owner request. Public HTTPS/readiness/assets now pass, docs enforce login, and both images are published with verified registry manifests. Earlier connectivity/local-only limitations below describe the first rollout. No infrastructure repair, API behavior change or full/device acceptance is claimed. [Fresh evidence](../work/test-verification/R0-WEB-DOCS-RELEASE-2026-09-09.md).
+
+- Owner authorized deployment. Current web deployed as `prod-2026.09.09.1`; API image `prod-2026.09.09.1-docs` updates Docusaurus only and retains previous API executables. Database, migrations and worker unchanged.
+- Docusaurus now includes the recent functional fixes, integration links and remaining limits; canonical URL is `https://money.dungxbuif.com/docs/`. Corrected intro endpoint inventory and logout/cache description; existing API audit edits retained.
+- [Release evidence](../work/test-verification/R0-WEB-DOCS-RELEASE-2026-09-09.md): 100 frontend tests, builds and local platform checks pass. Public HTTPS/registry connectivity is blocked from this host; new images are local-only, not published remotely. Authenticated public docs and physical Safari/PWA/receipt acceptance remain open.
+
+## [Earlier implementation records]
+
+The dated “not deployed” notes below describe their original verification runs. The web changes are now included in the bounded rollout above; diagnostic test changes and unrelated backend work are not implied to be released.
+
+### Fixed — 2026-09-09 search feedback (not deployed)
+
+- Search distinguishes loading, API failure and successful empty results. Query survives failures and panel toggles; explicit retry uses shared safe error/correlation-ID feedback. Obsolete responses cannot replace the current query's state.
+- Reuses shared card/search input/buttons; clear action is named for accessibility. Offline search explicitly requires connectivity. [Verification](../work/test-verification/R0-SEARCH-FEEDBACK-2026-09-09.md): 100 frontend tests and 6 targeted browser checks pass. No API/DB change; full R0 and physical-device acceptance remain open.
+
+### Investigated — 2026-09-09 receipt readback (not deployed)
+
+- [Focused evidence](../work/test-verification/R0-RECEIPT-READBACK-2026-09-09.md) isolates the local WebKit readback symptom to offline emulation: the same stored bytes become readable again without rewriting. Added a separate real HTTP-abort plus offline-signal scenario, passing on Chrome and WebKit; original failing PWA/emulation proof remains active (targeted 8 pass/1 fail).
+- No app/storage-format changes. Physical Safari/PWA and receipt-provider acceptance remain open; no release claim.
+
+### In progress — 2026-09-09 R0 receipt controls (blocked, not deployed)
+
+- One shared file picker serves both image actions; selected filename remains visible, removal/reselection is explicit, and debt/pending/read-only states prevent silent attachment loss.
+- Four unsupported quick-add detail controls show an explicit unavailable state. Shared `SheetFrame` optionally separates its scroll body and footer so the save toolbar does not cover the remove action.
+- [Verification](../work/test-verification/R0-RECEIPT-CONTROLS-2026-09-09.md): frontend 92 pass; receipt browser checks 5 pass/1 fail. WebKit stored image readback remains blocked with `NotReadableError`; no complete receipt-flow, iPhone-readiness or release claim.
+
+### Fixed — 2026-09-09 R0 error feedback (not deployed)
+
+- Existing transaction add/edit/archive keeps input and shows shared safe error feedback, without automatic financial retries. A saved offline transaction is not recreated when the separate receipt queue fails.
+- API-key list/create/revoke/copy has loading/error/success feedback and read-only reload. Confirmed mutations survive a failed refresh; old list and copy completions cannot overwrite current feedback/state.
+- [Verification](../work/test-verification/R0-ERROR-FEEDBACK-2026-09-09.md): frontend 85 pass; Chrome mobile/desktop 26 pass. Standalone WebKit probe isolates an offline-emulation/reload failure even with a minimal worker; no physical Safari acceptance or worker rewrite. Current UI style and API/schema remain unchanged; full R0 remains open.
+
+### Fixed — 2026-09-09 R0 first slice (not deployed)
+
+- Keep the existing UI style while reserving scroll space for the installation prompt and bottom dock on mobile; add dismiss/installed states and retain install help. Logout works with help expanded, using real browser clicks.
+- Show persisted budget names with category context; native reusable action cards support keyboard and offline disabling. Budget gauges no longer replace valid zero values with sample amounts; unloaded data has an explicit unavailable state.
+- [Verification](../work/test-verification/R0-FUNCTIONAL-STABILITY-2026-09-09.md): frontend 72 pass, Chrome mobile/desktop 22 pass. WebKit offline reload remains a reproduced failure; neither full R0 nor production readiness is claimed. [Remaining action inventory](../work/test-verification/R0-MOUNTED-ACTIONS-2026-09-09.md).
+
+### Audit — 2026-09-08 Money Lover parity
+
+- Added a source-linked inventory of 96 public Money Lover Help Center articles, 50 code/UI assessment rows, fresh test evidence and ordered remediation. This is original summary/comparison material, not a verbatim vendor-doc mirror.
+- Corrected verified API portal drift for file upload/download paths, analytics parameters/envelopes/unsupported Insider fields and category-parent input; marked exports and other unimplemented contracts clearly. Portal snippets are not yet a fully validated OpenAPI contract.
+- Recorded unresolved mobile logout-overlay obstruction and budget-name E2E mismatch; no application fix or production deploy included. Existing tests/build do not establish full functional or visual parity.
 
 ### Added
+
+- Hardened the beta PWA install metadata for mobile/standalone use, repaired cached-auth recovery after an offline service-worker navigation, and added live mobile offline-reload proof. Financial browser caches and IndexedDB are user-namespaced; account switches preserve each owner's queued work separately. Bearer `mpk_...` keys are explicitly documented as full user-owned business API credentials, while API-key management remains browser-session only.
+- Beta reliability fixes: secure cookies for configured HTTPS behind a reverse proxy, private/no-store docs, service-worker exclusion of private/cross-origin requests, restored category creation, wallet-detail runtime fixes, strict TypeScript build checks, and cache failure/expired-session regressions. Docker contexts exclude host dependencies and secrets; repeatable checks are in `scripts/verify-beta.sh`.
+- Removed sample values from the newly introduced Overview report chart; it now renders only daily expense values returned by the reporting API or a Vietnamese empty state.
 
 - Added Go API and worker runtime entrypoints with safe configuration validation, stable JSON error envelopes, correlation IDs, and health routes for PHASE-001.
 - Added a PostgreSQL migration runner with idempotent ordered migrations, checksum mismatch protection, and the PHASE-001 `users` schema without provider-token or server-session persistence.
