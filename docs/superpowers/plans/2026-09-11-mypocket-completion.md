@@ -39,7 +39,7 @@
 - Consumes: current `main` at design commit `a7bc52b` plus the complete dirty worktree
 - Produces: reviewable feature commits and a baseline evidence document containing exact commands, results, and unresolved gates
 
-- [ ] **Step 1: Capture an immutable inventory before changing code**
+- [x] **Step 1: Capture an immutable inventory before changing code**
 
 ```bash
 rtk proxy git status --short
@@ -50,7 +50,7 @@ rtk proxy git log -8 --oneline
 
 Write `BASELINE-2026-09-11.md` with the HEAD SHA, every dirty path grouped as `accounting-sync`, `frontend-pwa`, `docs`, `generated`, or `unrelated/needs-owner-preservation`, and never stage the final group.
 
-- [ ] **Step 2: Run the existing proof before reconciliation**
+- [x] **Step 2: Run the existing proof before reconciliation**
 
 ```bash
 rtk proxy env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' MYPOCKET_TEST_REDIS_URL=redis://127.0.0.1:6380/0 go test -race -p 1 ./... -count=1
@@ -63,7 +63,7 @@ rtk npm --prefix docs run build
 
 Run Go commands from `backend/` and npm commands from `frontend/`. Record exact pass/fail counts; a failure is a real baseline finding, not permission to weaken a test.
 
-- [ ] **Step 3: Reconcile related changes in dependency order**
+- [x] **Step 3: Reconcile related changes in dependency order**
 
 Commit only reviewed groups in this order: migration/shared transaction primitives; finance/planning/portfolio/sync domain changes and tests; HTTP/API changes and tests; frontend/offline/PWA changes and tests; docs/evidence. Generated Docusaurus output is committed only if the repository already tracks that exact output path.
 
@@ -73,11 +73,11 @@ rtk proxy git diff --cached --stat
 rtk proxy git commit -m "fix: preserve atomic finance and sync invariants"
 ```
 
-- [ ] **Step 4: Re-run the full baseline at reconciled HEAD**
+- [x] **Step 4: Re-run the full baseline at reconciled HEAD**
 
 Use the six commands from Step 2 and update the evidence document with the new commit SHAs. The task is complete only when the tree contains no unclassified change and unrelated preserved edits remain unstaged.
 
-- [ ] **Step 5: Commit the evidence**
+- [x] **Step 5: Commit the evidence**
 
 ```bash
 rtk proxy git add docs/work/completion/BASELINE-2026-09-11.md
