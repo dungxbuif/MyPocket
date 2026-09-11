@@ -1,6 +1,6 @@
 # MyPocket Complete Personal Finance Design
 
-**Status:** revised and approved in chat; awaiting written-spec review
+**Status:** approved for implementation
 **Date:** 2026-09-11  
 **Scope:** complete a production-grade personal-finance product from the existing MyPocket brownfield codebase.
 
