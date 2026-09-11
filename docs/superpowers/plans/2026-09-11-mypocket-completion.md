@@ -53,7 +53,7 @@ Write `BASELINE-2026-09-11.md` with the HEAD SHA, every dirty path grouped as `a
 - [ ] **Step 2: Run the existing proof before reconciliation**
 
 ```bash
-rtk proxy env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable MYPOCKET_TEST_REDIS_URL=redis://127.0.0.1:6379/0 go test -race ./... -count=1
+rtk proxy env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' MYPOCKET_TEST_REDIS_URL=redis://127.0.0.1:6380/0 go test -race -p 1 ./... -count=1
 rtk proxy go vet ./...
 rtk npm test -- --run
 rtk npm run build
@@ -223,7 +223,7 @@ The fixture must cover income, expense, transfer, adjustment, excluded expense, 
 - [ ] **Step 2: Run domain/integration tests and verify any RED result is reproducible**
 
 ```bash
-rtk proxy env MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable go test -p 1 ./internal/finance ./internal/planning ./internal/portfolio ./internal/analytics ./internal/notification ./internal/platform/httpapi -count=1
+rtk proxy env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./internal/finance ./internal/planning ./internal/portfolio ./internal/analytics ./internal/notification ./internal/platform/httpapi -count=1
 ```
 
 - [ ] **Step 3: Correct only proven invariant failures**
@@ -279,7 +279,7 @@ rtk npm run test:e2e -- accounting-correctness.spec.ts business-core.spec.ts pla
 - [ ] **Step 7: Run full regressions and commit**
 
 ```bash
-rtk proxy go test -race ./... -count=1
+rtk proxy go test -race -p 1 ./... -count=1
 rtk npm test -- --run
 rtk npm run test:e2e
 rtk proxy git add backend/internal/finance backend/internal/planning backend/internal/portfolio backend/internal/analytics backend/internal/notification backend/internal/platform/config backend/internal/platform/httpapi backend/cmd/worker/main.go backend/go.mod backend/go.sum frontend/Dockerfile frontend/src/app/notifications.ts frontend/src/screens/ReportsPanel.tsx frontend/src/screens/ReportsPanel.test.tsx frontend/e2e/accounting-correctness.spec.ts frontend/e2e/business-core.spec.ts frontend/e2e/planning-automation.spec.ts frontend/e2e/notifications.spec.ts compose.yaml docs/work/completion/BUSINESS-CORRECTNESS.md
@@ -407,7 +407,7 @@ rtk npm run test:e2e -- account-lifecycle.spec.ts import-export.spec.ts
 - [ ] **Step 7: Run regressions and commit**
 
 ```bash
-rtk proxy go test -race ./... -count=1
+rtk proxy go test -race -p 1 ./... -count=1
 rtk npm test -- --run
 rtk proxy git add backend/migrations/0013_data_lifecycle.sql backend/internal/lifecycle backend/internal/platform/objectstore/s3.go backend/internal/platform/objectstore/objectstore_test.go backend/internal/platform/httpapi/lifecycle.go backend/internal/platform/httpapi/lifecycle_test.go backend/internal/platform/httpapi/router.go backend/internal/worker/lifecycle.go backend/internal/worker/lifecycle_test.go backend/cmd/api/main.go backend/cmd/worker/main.go frontend/src/app/lifecycle.ts frontend/src/screens/AccountScreen.tsx frontend/src/screens/AccountScreen.test.tsx frontend/e2e/account-lifecycle.spec.ts frontend/e2e/import-export.spec.ts
 rtk proxy git commit -m "feat: add export and account lifecycle jobs"
@@ -626,7 +626,7 @@ The HTTP service stores an idempotent queued run and returns immediately. `worke
 Tests must assert provider success, retry, timeout, injection text, foreign IDs, overflow, unknown fields, and duplicate requests leave wallet balances unchanged. Only existing `ConfirmTransactionDraft` may call the finance command, with user ownership, optimistic version, and idempotency.
 
 ```bash
-rtk proxy env MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable go test -p 1 ./internal/agent ./internal/planning ./internal/finance ./internal/platform/httpapi -count=1
+rtk proxy env 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' go test -p 1 ./internal/agent ./internal/planning ./internal/finance ./internal/platform/httpapi -count=1
 ```
 
 - [ ] **Step 6: Commit**
@@ -1015,7 +1015,7 @@ Before claiming completion, independently map every item in the design spec's `A
 Run the final evidence commands from the exact release commit:
 
 ```bash
-rtk proxy env GOCACHE=/private/tmp/mypocket-go-cache MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable MYPOCKET_TEST_REDIS_URL=redis://127.0.0.1:6379/0 go test -race ./... -count=1
+rtk proxy env GOCACHE=/private/tmp/mypocket-go-cache 'MYPOCKET_TEST_DATABASE_URL=postgres://mypocket:mypocket@127.0.0.1:55433/mypocket?sslmode=disable' MYPOCKET_TEST_REDIS_URL=redis://127.0.0.1:6380/0 go test -race -p 1 ./... -count=1
 rtk proxy go vet ./...
 rtk npm test -- --run
 rtk npm run build
