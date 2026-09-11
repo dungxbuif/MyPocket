@@ -91,8 +91,7 @@ paths:
 
 ## Push delivery
 
-- Worker đọc `push_subscriptions` WHERE `next_attempt_at <= now()`
-- Gửi Web Push qua VAPID
-- Thành công: reset `failure_count = 0`, update `next_attempt_at`
-- Thất bại: tăng `failure_count`, cap `next_attempt_at`
-- Quá nhiều failure: cleanup worker xoá subscription
+- Worker chỉ chọn subscription có notification mới hơn delivery cursor.
+- Gửi payload mã hóa qua VAPID; private key chỉ tồn tại ở backend worker.
+- Thành công tiến delivery cursor nên notification cũ không bị gửi lại.
+- HTTP 404/410 xóa subscription hết hạn; lỗi tạm thời dùng retry bounded.

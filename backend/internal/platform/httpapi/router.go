@@ -39,6 +39,7 @@ type Dependencies struct {
 	SyncService            SyncService
 	LifecycleRepository    LifecycleRepository
 	LifecycleObjectStore   LifecycleObjectStore
+	APIKeyLimiter          APIKeyLimiter
 }
 
 func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
@@ -91,10 +92,11 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/account/jobs/", accountJob(cfg, deps.LifecycleRepository))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
 	mux.HandleFunc("/api/v1/health/ready", readyHealth(deps))
+	mux.HandleFunc("/api/v1/openapi.json", openAPI)
 	mux.HandleFunc("/docs", http.RedirectHandler("/docs/", http.StatusMovedPermanently).ServeHTTP)
 	mux.HandleFunc("/docs/", DocsHandler(cfg))
 
-	return corsMiddleware(cfg, correlationMiddleware(authContextMiddleware(cfg, deps.IdentityRepository, deps.APIKeyRepository, deps.AuthCache, deps.AuditRepository, observabilityMiddleware(cfg, deps.AuditRepository, mux))))
+	return corsMiddleware(cfg, correlationMiddleware(authContextMiddleware(cfg, deps.IdentityRepository, deps.APIKeyRepository, deps.AuthCache, deps.APIKeyLimiter, deps.AuditRepository, observabilityMiddleware(cfg, deps.AuditRepository, mux))))
 }
 
 func corsMiddleware(cfg config.Config, next http.Handler) http.Handler {
@@ -131,6 +133,10 @@ type AuthCache interface {
 	Get(ctx context.Context, key string) (string, bool, error)
 	Set(ctx context.Context, key string, value string, ttl time.Duration) error
 	Delete(ctx context.Context, key string) error
+}
+
+type APIKeyLimiter interface {
+	Allow(context.Context, string, int, time.Duration) (bool, time.Duration, error)
 }
 
 type ReceiptRepository interface {

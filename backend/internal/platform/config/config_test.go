@@ -156,3 +156,19 @@ func TestWebPushConfigurationMustBeCompleteAndEnabledInProduction(t *testing.T) 
 		t.Fatalf("expected valid production Web Push config, cfg=%#v err=%v", cfg, err)
 	}
 }
+
+func TestAPIRateLimitDefaultsAndRejectsUnsafeBounds(t *testing.T) {
+	base := map[string]string{"DATABASE_URL": "postgres://localhost/mypocket", "PUBLIC_WEB_URL": "http://localhost", "COOKIE_SECRET": "01234567890123456789012345678901", "CSRF_SECRET": "abcdefghijklmnopqrstuvwxyz123456"}
+	cfg, err := config.Load(base)
+	if err != nil || cfg.APIRateLimitPerMinute != 120 {
+		t.Fatalf("default rate limit cfg=%#v err=%v", cfg, err)
+	}
+	base["API_RATE_LIMIT_PER_MINUTE"] = "0"
+	if _, err = config.Load(base); err == nil || !strings.Contains(err.Error(), "API_RATE_LIMIT_PER_MINUTE") {
+		t.Fatalf("expected rate limit error, got %v", err)
+	}
+	base["API_RATE_LIMIT_PER_MINUTE"] = "10001"
+	if _, err = config.Load(base); err == nil {
+		t.Fatal("expected upper bound error")
+	}
+}

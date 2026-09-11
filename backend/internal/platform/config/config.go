@@ -8,64 +8,66 @@ import (
 )
 
 type Config struct {
-	AppEnv             string
-	DatabaseURL        string
-	PublicWebURL       string
-	CookieSecret       string
-	CSRFSecret         string
-	S3Endpoint         string
-	S3Bucket           string
-	S3AccessKey        string
-	S3SecretKey        string
-	OAuthFixtureMode   bool
-	GoogleClientID     string
-	GoogleClientSecret string
-	GoogleRedirectURL  string
-	AllowedLoginEmails []string
-	APIKeyHashSecret   string
-	RedisURL           string
-	AuditViewerEmail   string
-	AuditHashSecret    string
-	AuditRetentionDays int
-	LogFormat          string
-	LogLevel           string
-	HTTPAddr           string
-	DocsDir            string
-	WebPushEnabled     bool
-	VAPIDPublicKey     string
-	VAPIDPrivateKey    string
-	VAPIDSubject       string
+	AppEnv                string
+	DatabaseURL           string
+	PublicWebURL          string
+	CookieSecret          string
+	CSRFSecret            string
+	S3Endpoint            string
+	S3Bucket              string
+	S3AccessKey           string
+	S3SecretKey           string
+	OAuthFixtureMode      bool
+	GoogleClientID        string
+	GoogleClientSecret    string
+	GoogleRedirectURL     string
+	AllowedLoginEmails    []string
+	APIKeyHashSecret      string
+	RedisURL              string
+	AuditViewerEmail      string
+	AuditHashSecret       string
+	AuditRetentionDays    int
+	LogFormat             string
+	LogLevel              string
+	HTTPAddr              string
+	DocsDir               string
+	WebPushEnabled        bool
+	VAPIDPublicKey        string
+	VAPIDPrivateKey       string
+	VAPIDSubject          string
+	APIRateLimitPerMinute int
 }
 
 func Load(env map[string]string) (Config, error) {
 	cfg := Config{
-		AppEnv:             valueOrDefault(env["APP_ENV"], "development"),
-		DatabaseURL:        strings.TrimSpace(env["DATABASE_URL"]),
-		PublicWebURL:       strings.TrimSpace(env["PUBLIC_WEB_URL"]),
-		CookieSecret:       env["COOKIE_SECRET"],
-		CSRFSecret:         env["CSRF_SECRET"],
-		S3Endpoint:         strings.TrimSpace(env["S3_ENDPOINT"]),
-		S3Bucket:           strings.TrimSpace(env["S3_BUCKET"]),
-		S3AccessKey:        env["S3_ACCESS_KEY"],
-		S3SecretKey:        env["S3_SECRET_KEY"],
-		OAuthFixtureMode:   env["OAUTH_FIXTURE_MODE"] == "true",
-		GoogleClientID:     strings.TrimSpace(env["GOOGLE_CLIENT_ID"]),
-		GoogleClientSecret: env["GOOGLE_CLIENT_SECRET"],
-		GoogleRedirectURL:  strings.TrimSpace(env["GOOGLE_REDIRECT_URL"]),
-		AllowedLoginEmails: parseCSV(env["ALLOWED_LOGIN_EMAILS"]),
-		APIKeyHashSecret:   env["API_KEY_HASH_SECRET"],
-		RedisURL:           strings.TrimSpace(env["REDIS_URL"]),
-		AuditViewerEmail:   strings.ToLower(strings.TrimSpace(env["AUDIT_VIEWER_EMAIL"])),
-		AuditHashSecret:    env["AUDIT_HASH_SECRET"],
-		AuditRetentionDays: intOrDefault(env["AUDIT_RETENTION_DAYS"], 180),
-		LogFormat:          valueOrDefault(env["LOG_FORMAT"], "text"),
-		LogLevel:           valueOrDefault(env["LOG_LEVEL"], "info"),
-		HTTPAddr:           valueOrDefault(env["HTTP_ADDR"], ":8080"),
-		DocsDir:            strings.TrimSpace(env["DOCS_DIR"]),
-		WebPushEnabled:     env["WEB_PUSH_ENABLED"] == "true",
-		VAPIDPublicKey:     strings.TrimSpace(env["VAPID_PUBLIC_KEY"]),
-		VAPIDPrivateKey:    env["VAPID_PRIVATE_KEY"],
-		VAPIDSubject:       strings.TrimSpace(env["VAPID_SUBJECT"]),
+		AppEnv:                valueOrDefault(env["APP_ENV"], "development"),
+		DatabaseURL:           strings.TrimSpace(env["DATABASE_URL"]),
+		PublicWebURL:          strings.TrimSpace(env["PUBLIC_WEB_URL"]),
+		CookieSecret:          env["COOKIE_SECRET"],
+		CSRFSecret:            env["CSRF_SECRET"],
+		S3Endpoint:            strings.TrimSpace(env["S3_ENDPOINT"]),
+		S3Bucket:              strings.TrimSpace(env["S3_BUCKET"]),
+		S3AccessKey:           env["S3_ACCESS_KEY"],
+		S3SecretKey:           env["S3_SECRET_KEY"],
+		OAuthFixtureMode:      env["OAUTH_FIXTURE_MODE"] == "true",
+		GoogleClientID:        strings.TrimSpace(env["GOOGLE_CLIENT_ID"]),
+		GoogleClientSecret:    env["GOOGLE_CLIENT_SECRET"],
+		GoogleRedirectURL:     strings.TrimSpace(env["GOOGLE_REDIRECT_URL"]),
+		AllowedLoginEmails:    parseCSV(env["ALLOWED_LOGIN_EMAILS"]),
+		APIKeyHashSecret:      env["API_KEY_HASH_SECRET"],
+		RedisURL:              strings.TrimSpace(env["REDIS_URL"]),
+		AuditViewerEmail:      strings.ToLower(strings.TrimSpace(env["AUDIT_VIEWER_EMAIL"])),
+		AuditHashSecret:       env["AUDIT_HASH_SECRET"],
+		AuditRetentionDays:    intOrDefault(env["AUDIT_RETENTION_DAYS"], 180),
+		LogFormat:             valueOrDefault(env["LOG_FORMAT"], "text"),
+		LogLevel:              valueOrDefault(env["LOG_LEVEL"], "info"),
+		HTTPAddr:              valueOrDefault(env["HTTP_ADDR"], ":8080"),
+		DocsDir:               strings.TrimSpace(env["DOCS_DIR"]),
+		WebPushEnabled:        env["WEB_PUSH_ENABLED"] == "true",
+		VAPIDPublicKey:        strings.TrimSpace(env["VAPID_PUBLIC_KEY"]),
+		VAPIDPrivateKey:       env["VAPID_PRIVATE_KEY"],
+		VAPIDSubject:          strings.TrimSpace(env["VAPID_SUBJECT"]),
+		APIRateLimitPerMinute: intOrDefault(env["API_RATE_LIMIT_PER_MINUTE"], 120),
 	}
 
 	missing := make([]string, 0, 4)
@@ -134,6 +136,9 @@ func Load(env map[string]string) (Config, error) {
 		}
 	} else if cfg.VAPIDPublicKey != "" || cfg.VAPIDPrivateKey != "" || cfg.VAPIDSubject != "" {
 		return Config{}, fmt.Errorf("invalid config: WEB_PUSH_ENABLED must be true when VAPID settings are present")
+	}
+	if cfg.APIRateLimitPerMinute <= 0 || cfg.APIRateLimitPerMinute > 10_000 {
+		return Config{}, fmt.Errorf("invalid config: API_RATE_LIMIT_PER_MINUTE must be between 1 and 10000")
 	}
 	if cfg.AppEnv == "production" {
 		if !strings.HasPrefix(cfg.PublicWebURL, "https://") {

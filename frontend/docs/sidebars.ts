@@ -8,7 +8,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Skills cho AI agents',
-      items: ['skills/business-logic-audit'],
+      items: ['skills/business-logic-audit', 'skills/mypocket-api'],
     },
     {
       type: 'category',
@@ -24,6 +24,7 @@ const sidebars: SidebarsConfig = {
       label: 'API',
       items: [
         'api/overview',
+        'api/openapi',
         'api/authentication',
         'api/wallets',
         'api/categories',

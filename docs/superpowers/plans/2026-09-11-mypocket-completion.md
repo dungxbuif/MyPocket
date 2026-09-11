@@ -440,7 +440,7 @@ rtk proxy git commit -m "feat: add export and account lifecycle jobs"
 - Produces: unauthenticated `GET /api/v1/openapi.json`, API-key rate limiting, exhaustive authorization evidence, and public Docusaurus API/skill pages
 - Produces: repository-versioned `mypocket-api` skill whose examples authenticate with `Authorization: Bearer <user-api-key>`
 
-- [ ] **Step 1: Write a failing router-contract test**
+- [x] **Step 1: Write a failing router-contract test**
 
 ```go
 func TestOpenAPICoversEveryVersionedRoute(t *testing.T) {
@@ -457,13 +457,13 @@ Also validate that every mutating operation documents cookie CSRF and Bearer API
 
 Add a table-driven authorization matrix generated from the same route descriptors. For every user-owned route, prove unauthenticated `401`, invalid/revoked Bearer `401` without cookie fallback, valid cookie behavior, valid API-key behavior, foreign ownership `404`, malformed input `400`, stale version `409`, and audit actor/action/outcome/correlation metadata where the operation changes state.
 
-- [ ] **Step 2: Verify OpenAPI, authorization-matrix, and limiter tests are RED**
+- [x] **Step 2: Verify OpenAPI, authorization-matrix, and limiter tests are RED**
 
 ```bash
 rtk proxy go test ./internal/platform/httpapi ./internal/platform/ratelimit -count=1
 ```
 
-- [ ] **Step 3: Add the embedded OpenAPI 3.1 contract and route inventory**
+- [x] **Step 3: Add the embedded OpenAPI 3.1 contract and route inventory**
 
 ```go
 //go:embed openapi.json
@@ -477,7 +477,7 @@ func openAPI(w http.ResponseWriter, _ *http.Request) {
 
 Define explicit route descriptors beside router registration so contract tests compare normalized `{id}` templates rather than scraping handler source.
 
-- [ ] **Step 4: Add API-key rate limiting**
+- [x] **Step 4: Add API-key rate limiting**
 
 Before documentation, add a Redis-backed per-user/per-key rate limiter at the authenticated boundary. `API_RATE_LIMIT_PER_MINUTE` defaults to `120`, production requires a positive bounded value, responses return `429` plus `Retry-After`, and Bearer requests fail with a retryable `503` if the limiter cannot enforce its limit. Browser-cookie traffic keeps its existing UI-oriented protections and does not inherit an unavailable Redis dependency.
 
@@ -487,7 +487,7 @@ type Limiter interface {
 }
 ```
 
-- [ ] **Step 5: Write and validate the repository skill**
+- [x] **Step 5: Write and validate the repository skill**
 
 The skill must tell agents how to discover OpenAPI, create/revoke user API keys, authenticate, paginate, send idempotency/version headers, handle `401/403/404/409/429/5xx`, use sync safely, confirm drafts, and avoid logging keys. It must not contain a real key or production private data.
 
@@ -498,7 +498,7 @@ description: Use MyPocket's public API to manage an authenticated user's persona
 ---
 ```
 
-- [ ] **Step 6: Build docs and run secret/contract/authorization checks**
+- [x] **Step 6: Build docs and run secret/contract/authorization checks**
 
 ```bash
 rtk proxy go test ./internal/platform/httpapi -count=1
@@ -509,7 +509,7 @@ rtk proxy rg -n "sk_[A-Za-z0-9_-]{16,}|BEGIN (RSA|OPENSSH|EC) PRIVATE KEY" skill
 
 The secret scan must return no real secret; documented placeholders are written as `<user-api-key>`.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 rtk proxy git add backend/internal/platform/httpapi/openapi.json backend/internal/platform/httpapi/openapi.go backend/internal/platform/httpapi/openapi_test.go backend/internal/platform/httpapi/authorization_matrix_test.go backend/internal/platform/httpapi/router.go backend/internal/platform/ratelimit backend/internal/platform/config backend/cmd/api/main.go skills/mypocket-api frontend/docs

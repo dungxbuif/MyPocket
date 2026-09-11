@@ -62,7 +62,7 @@ X-CSRF-Token: ...
 }
 ```
 
-`plaintext` chỉ trả về 1 lần duy nhất. Key dạng `mpk_...` + 40 ký tự hex.
+`plaintext` chỉ trả về 1 lần duy nhất. Không ghi key vào log hay source code.
 
 ### List keys
 
@@ -112,9 +112,11 @@ curl -H "Authorization: Bearer mpk_a1b2c3d4e5f6..." \
 Redis giữ hint ánh xạ trong TTL 5 phút, nhưng PostgreSQL vẫn xác nhận key còn active trên mỗi Bearer request. Vì vậy entry Redis cũ hoặc lỗi xoá cache không thể giữ quyền của key đã revoke.
 
 Bearer key có toàn quyền với dữ liệu thuộc chính chủ key trên các API nghiệp vụ (`wallets`, `categories`, `transactions`, planning, reports, assets, files và sync). Không gửi `X-CSRF-Token` khi gọi bằng key.
-OAuth, health endpoint và tạo/thu hồi API key không chấp nhận bearer key.
+OAuth và health endpoint không cần bearer. API key hợp lệ có thể quản lý key cùng chủ sở hữu; thao tác xóa/reset tài khoản vẫn bắt buộc recent browser cookie authentication.
 
-Audit API (`/api/v1/audit/access`, `/api/v1/audit/events`) không cho phép truy cập bằng API key; chỉ session cookie đã xác thực và email đúng `AUDIT_VIEWER_EMAIL`.
+Audit API vẫn kiểm tra email đúng `AUDIT_VIEWER_EMAIL` sau xác thực, dù principal đến từ cookie hay API key.
+
+Bearer API bị giới hạn mặc định 120 request/phút theo user/key. `429` có `Retry-After`; Redis không sẵn sàng làm Bearer request fail-closed bằng `503`.
 
 ## CSRF Protection
 

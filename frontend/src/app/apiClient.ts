@@ -4,7 +4,11 @@ export type APIErrorCode =
   | "VALIDATION_FAILED"
   | "CSRF_REQUIRED"
   | "INTERNAL_RETRYABLE"
-  | "INTERNAL_FAILURE";
+  | "INTERNAL_FAILURE"
+  | "NOT_FOUND"
+  | "VERSION_CONFLICT"
+  | "RATE_LIMITED"
+  | "RECENT_AUTH_REQUIRED";
 
 export class APIClientError extends Error {
   constructor(

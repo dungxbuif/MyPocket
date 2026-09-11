@@ -18,6 +18,7 @@ import (
 	"mypocket/internal/platform/httpapi"
 	"mypocket/internal/platform/logging"
 	"mypocket/internal/platform/objectstore"
+	"mypocket/internal/platform/ratelimit"
 	"mypocket/internal/portfolio"
 	mysync "mypocket/internal/sync"
 )
@@ -58,6 +59,13 @@ func main() {
 	}
 	syncService := mysync.NewService(mysync.NewRepository(conn), financeRepo, portfolioRepo)
 	syncService.SetAuditSink(auditRepo)
+	var apiLimiter httpapi.APIKeyLimiter
+	if cfg.RedisURL != "" {
+		apiLimiter, err = ratelimit.NewRedis(cfg.RedisURL)
+		if err != nil {
+			log.Fatalf("rate limiter configuration error: %v", err)
+		}
+	}
 	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{
 		AuditRepository:        auditRepo,
 		AuthCache:              cache,
@@ -73,6 +81,7 @@ func main() {
 		SyncService:            syncService,
 		LifecycleRepository:    lifecycle.NewRepository(conn),
 		LifecycleObjectStore:   lifecycleStore,
+		APIKeyLimiter:          apiLimiter,
 		ReadyCheck: func() error {
 			return conn.PingContext(context.Background())
 		},

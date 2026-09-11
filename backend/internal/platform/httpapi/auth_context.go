@@ -3,6 +3,7 @@ package httpapi
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
@@ -13,13 +14,35 @@ import (
 	"mypocket/internal/platform/config"
 )
 
-func authContextMiddleware(cfg config.Config, identityRepo IdentityRepository, apiKeyRepo APIKeyRepository, cache AuthCache, auditRepo AuditRepository, next http.Handler) http.Handler {
+func authContextMiddleware(cfg config.Config, identityRepo IdentityRepository, apiKeyRepo APIKeyRepository, cache AuthCache, limiter APIKeyLimiter, auditRepo AuditRepository, next http.Handler) http.Handler {
 	if cache == nil {
 		cache = authcache.Noop{}
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if strings.TrimSpace(r.Header.Get("Authorization")) != "" {
 			if userID, ok := resolveBearerUserID(r.Context(), cfg, apiKeyRepo, cache, bearerToken(r)); ok {
+				if limiter == nil {
+					if cfg.AppEnv == "production" {
+						writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "API rate limiter unavailable", correlationID(r.Context())))
+						return
+					}
+				} else {
+					tokenHash, _ := identity.HashAPIKey(cfg.APIKeyHashSecret, bearerToken(r))
+					allowed, retryAfter, err := limiter.Allow(r.Context(), userID+":"+tokenHash, cfg.APIRateLimitPerMinute, time.Minute)
+					if err != nil {
+						writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "API rate limiter unavailable", correlationID(r.Context())))
+						return
+					}
+					if !allowed {
+						seconds := int(retryAfter.Round(time.Second) / time.Second)
+						if seconds < 1 {
+							seconds = 1
+						}
+						w.Header().Set("Retry-After", fmt.Sprint(seconds))
+						writeJSON(w, http.StatusTooManyRequests, ErrorEnvelope("RATE_LIMITED", "API rate limit exceeded", correlationID(r.Context())))
+						return
+					}
+				}
 				appendAudit(r.Context(), auditRepo, audit.Event{CorrelationID: correlationID(r.Context()), ActorUserID: userID, Action: "api_key.authenticate", EntityType: "api_key", Outcome: audit.OutcomeSuccess, Severity: audit.SeveritySecurity, Source: audit.SourceAPI, RequestMethod: r.Method, RequestPath: safeRequestPath(r)})
 				next.ServeHTTP(w, r.WithContext(withAuthenticatedUser(r.Context(), userID, "api_key")))
 				return

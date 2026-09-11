@@ -59,7 +59,7 @@ Không có `savings_vnd`. `include_in_total=false` chỉ loại ví khỏi tổn
 | --- | --- | --- |
 | cash-flow, daily | summary, daily | Các dòng ngày gồm income, expense, net, cumulative_net_vnd. |
 | categories | summary, categories | Chỉ chi tiêu, roll-up cha; chưa có income, flat tree hoặc category_id filter. |
-| comparison | summary, prior | Kỳ trước cùng độ dài, không bảo đảm là tháng lịch trước. |
+| comparison | summary, prior, periods | Sáu kỳ liên tiếp cùng độ dài, cũ nhất đến hiện tại; `prior` là kỳ ngay trước hiện tại. |
 | cumulative | summary, daily | Cộng dồn thu nhập ròng, không phải trung bình ba tháng Money Lover. |
 | insider | Payload riêng | Mới có tóm tắt Home. |
 
@@ -92,7 +92,7 @@ Ví dụ payload bên trong `report`:
 
 Chọn danh mục nhiều giao dịch nhất, hòa thì xét tổng tiền rồi ID. `selected_category` và `change_percent` có thể vắng; kiểm tra `not_comparable` trước khi hiển thị tỷ lệ.
 
-Các field `projected_spending_vnd`, `budget_vnd`, `budget_progress_percent`, `top_expenses` và series sáu kỳ **chưa được trả về**.
+Các field `projected_spending_vnd`, `budget_vnd`, `budget_progress_percent` và `top_expenses` chưa được trả về; series sáu kỳ đã có trong `periods`.
 
 ## Search
 

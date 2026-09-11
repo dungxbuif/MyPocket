@@ -4,7 +4,7 @@ title: Tổng quan API
 
 # API Overview
 
-> Audit 2026-09-10: tài liệu đang được đối chiếu với router và kiểu dữ liệu. Export/AI/OCR/account reset-delete chưa có implementation. Confirm/reject recurring draft đã có API và kiểm tra version/idempotency. Không coi các YAML minh họa rời rạc hoặc diagram là OpenAPI máy đọc đã được kiểm định; kiểm tra trạng thái từng nhóm API. Có bearer auth không đồng nghĩa mọi chức năng Money Lover đã được expose.
+> Cập nhật 2026-09-11: route tài chính, planning, portfolio, báo cáo, notification, sync, import/export và account lifecycle đã có trong OpenAPI 3.1 máy đọc. AI/OCR được phát hành ở phase riêng; không suy diễn endpoint chưa có trong `/api/v1/openapi.json`.
 
 **Base URL:** `/api/v1`
 
@@ -28,7 +28,7 @@ Mutations bằng cookie yêu cầu thêm `X-CSRF-Token` header. Với Bearer API
 
 - `user_id` luôn lấy từ context auth (cookie hoặc API key), không được đọc từ payload.
 - Mọi truy vấn/mutation user-owned phải lọc theo `user_id` hiện tại.
-- Truy cập tài nguyên không thuộc scope của caller trả `403 FORBIDDEN`.
+- Truy cập tài nguyên user-owned không thuộc scope của caller được che bằng `404 NOT_FOUND`.
 - Truy cập thiếu auth hợp lệ trả `401 AUTH_REQUIRED`.
 
 ## Response envelope
@@ -59,6 +59,7 @@ Lỗi:
 | `VALIDATION_FAILED` | 400 | Input không hợp lệ |
 | `NOT_FOUND` | 404 | Object không tồn tại |
 | `VERSION_CONFLICT` | 409 | base_version cũ |
+| `RATE_LIMITED` | 429 | Chờ số giây trong `Retry-After` |
 | `IDEMPOTENT_REPLAY` | 200 | Mutation đã được xử lý |
 | `ASSET_OVERSELL` | 400 | Bán vượt quá số lượng |
 | `UPLOAD_REJECTED` | 400 | File không hợp lệ |
