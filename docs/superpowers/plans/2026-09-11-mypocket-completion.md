@@ -884,7 +884,7 @@ rtk npm run test:e2e
 
 Remove only paths proven replaced; any remaining search match must be explained in the UAT document.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 rtk proxy git add frontend docs/work/completion/PHYSICAL-DEVICE-UAT.md
@@ -955,7 +955,7 @@ rtk proxy git commit -m "docs: publish complete MyPocket product and API guidanc
 - Consumes: tested application images, production database/Redis/S3, OpenAI-compatible provider, OCR Platform, DNS/TLS, public docs
 - Produces: deployed MyPocket and docs URLs, authenticated web/API-key/provider smoke evidence, rollback tag and exercised recovery procedure
 
-- [ ] **Step 1: Add a fail-closed release verifier**
+- [x] **Step 1: Add a fail-closed release verifier**
 
 ```bash
 required_files=(
