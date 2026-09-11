@@ -779,7 +779,7 @@ rtk proxy git commit -m "feat: add third-party OCR agent tool"
 - Consumes: agent message/run APIs from Tasks 6–7 and existing transaction draft confirmation routes
 - Produces: text/image agent workflow, provider-independent statuses, draft review, and optional receipt-result reuse
 
-- [ ] **Step 1: Write failing component tests**
+- [x] **Step 1: Write failing component tests**
 
 Test text submission, image validation, queued/processing/completed/failed/expired states, retry, safe error copy, result-to-draft review, reject, edit, and confirm. Verify agent output is rendered as text, never unsafe HTML.
 
@@ -793,21 +793,21 @@ export type AgentRunView = {
 };
 ```
 
-- [ ] **Step 2: Verify RED**
+- [x] **Step 2: Verify RED**
 
 ```bash
 rtk npm test -- --run src/screens/AgentScreen.test.tsx src/screens/sheets/AddTransactionSheet.test.tsx
 ```
 
-- [ ] **Step 3: Implement focused API/state modules and base-component UI**
+- [x] **Step 3: Implement focused API/state modules and base-component UI**
 
 Keep networking and polling in `frontend/src/app/agent.ts`; keep rendering in focused agent components; add only route/sheet composition to `App.tsx`. Reuse `ActionButton`, `FilePickerInput`, `OperationError`, card, select, dialog/sheet, and status primitives.
 
-- [ ] **Step 4: Implement optional receipt reuse**
+- [x] **Step 4: Implement optional receipt reuse**
 
 An owned receipt can be attached to an agent request. A completed OCR result can populate a visible editable draft, but the existing Save/Confirm action remains the only ledger mutation. Failure leaves the original receipt accessible.
 
-- [ ] **Step 5: Run real-browser E2E**
+- [x] **Step 5: Run real-browser E2E**
 
 ```bash
 rtk npm run test:e2e -- agent.spec.ts agent-image.spec.ts
@@ -815,7 +815,7 @@ rtk npm run test:e2e -- agent.spec.ts agent-image.spec.ts
 
 Assert cookie and API-key flows, foreign image isolation, provider timeout/retry, no balance change before confirmation, exactly one change after confirmation, and no forced clicks.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 rtk proxy git add frontend/src/app/agent.ts frontend/src/screens/AgentScreen.tsx frontend/src/screens/AgentScreen.test.tsx frontend/src/components/agent frontend/src/components/inputs/FilePickerInput.tsx frontend/src/app/App.tsx frontend/src/screens/sheets frontend/e2e/agent.spec.ts frontend/e2e/agent-image.spec.ts

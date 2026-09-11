@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { mergePendingTransactions } from "./pendingTransactions";
 import {
   Bell,
+  Bot,
   Activity,
   BookOpen,
   BriefcaseBusiness,
@@ -35,6 +36,7 @@ import { ReportsPanel } from "../screens/ReportsPanel";
 import { TransactionsScreen } from "../screens/TransactionsScreen";
 import { BudgetsScreen } from "../screens/BudgetsScreen";
 import { AccountScreen } from "../screens/AccountScreen";
+import { AgentScreen } from "../screens/AgentScreen";
 import { PWAInstallPrompt, type InstallPromptEvent } from "../components/feedback/PWAInstallPrompt";
 import { OperationError, operationFailure, type OperationFailure } from "../components/feedback/OperationError";
 import { UnavailableAction } from "../components/feedback/UnavailableAction";
@@ -116,11 +118,12 @@ import { checkAuditAccess, loadAuditEvents, type AuditEvent } from "./audit";
 import { uploadFile } from "./receipts";
 import type { OfflineConflict } from "../offline/types";
 
-type Tab = "overview" | "transactions" | "budgets" | "account";
+type Tab = "overview" | "transactions" | "agent" | "budgets" | "account";
 
 const tabs: Array<{ id: Tab; label: string; icon: typeof Home }> = [
   { id: "overview", label: "Tổng quan", icon: Home },
   { id: "transactions", label: "Sổ giao dịch", icon: Wallet },
+  { id: "agent", label: "Trợ lý", icon: Bot },
   { id: "budgets", label: "Ngân sách", icon: BriefcaseBusiness },
   { id: "account", label: "Tài khoản", icon: User },
 ];
@@ -663,6 +666,7 @@ export function App() {
           <OverviewScreen online={online} wallets={wallets} dashboard={dashboard} report={report} insider={insider} privacyMasked={privacyMasked} walletDetail={walletDetail} onCloseWalletDetail={closeWalletDetail} onManageWallets={() => setWalletSheetOpen(true)} onViewReports={() => setReportsOpen(true)} onWalletClick={(walletID) => { void openWalletDetail(walletID); }} onRefreshInsider={() => { void refreshInsider(); }} formatVND={formatVND} formatPercent={formatPercent} />
         </> : null}
         {activeTab === "transactions" ? <TransactionsScreen transactions={transactions ?? []} onEdit={setEditingTransaction} /> : null}
+        {activeTab === "agent" ? <AgentScreen online={online} onDraftReady={() => { setActiveTab("budgets"); void refreshFinanceData(); }} /> : null}
         {activeTab === "budgets" ? <>
           <BudgetsScreen budgets={budgets} events={events ?? []} obligations={obligations ?? []} schedules={schedules ?? []} drafts={[]} categories={categories ?? []} wallets={wallets ?? []} transactions={transactions ?? []} online={online} onCreate={() => setBudgetSheetOpen(true)} onCreateEvent={() => setEventSheetOpen(true)} onCreateObligation={() => setObligationSheetOpen(true)} onCreateSchedule={() => setScheduleSheetOpen(true)} onEdit={setEditingBudget} onEditEvent={setEditingEvent} onEditObligation={setEditingObligation} onEditSchedule={setEditingSchedule} formatVND={formatVND} formatDate={formatDate} obligationDirectionLabel={obligationDirectionLabel} recurrenceLabel={recurrenceLabel} transactionTypeLabel={transactionTypeLabel} />
           <DraftDecisionPanel key={authenticatedUserID} drafts={drafts ?? []} wallets={wallets ?? []} online={online} onDecided={handleDraftDecision} />

@@ -8,7 +8,9 @@ export type APIErrorCode =
   | "NOT_FOUND"
   | "VERSION_CONFLICT"
   | "RATE_LIMITED"
-  | "RECENT_AUTH_REQUIRED";
+  | "RECENT_AUTH_REQUIRED"
+  | "CAPABILITY_UNAVAILABLE"
+  | "IDEMPOTENCY_CONFLICT";
 
 export class APIClientError extends Error {
   constructor(
