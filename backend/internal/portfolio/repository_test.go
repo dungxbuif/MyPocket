@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"os"
 	"testing"
 	"time"
@@ -146,6 +147,55 @@ func TestRepositoryArchivesPositionOutsideActiveSummary(t *testing.T) {
 	}
 	if loaded.ArchivedAt == nil || len(loaded.Trades) != 1 || len(loaded.PriceHistory) != 1 {
 		t.Fatalf("archive should retain history: %#v", loaded)
+	}
+}
+
+func TestRepositoryOverflowRollsBackTradeAndPrice(t *testing.T) {
+	conn := migratedPortfolioPostgres(t)
+	repo := portfolio.NewRepository(conn)
+	ctx := context.Background()
+	userID := createPortfolioUser(t, conn, "asset-overflow@example.com")
+	p := createGoldPosition(t, repo, userID)
+	p = addPortfolioTrade(t, repo, userID, p.ID, p.Version, portfolio.TradeBuy, "2", 1, 0, fixedPortfolioTime())
+	var beforeCursor int64
+	if err := conn.QueryRow(`SELECT next_cursor FROM sync_cursors WHERE user_id=$1`, userID).Scan(&beforeCursor); err != nil {
+		t.Fatal(err)
+	}
+	_, err := repo.AddTrade(ctx, userID, p.ID, portfolio.AddTradeInput{Side: portfolio.TradeBuy, Quantity: "2", UnitPriceVND: math.MaxInt64, BaseVersion: p.Version, OccurredAt: fixedPortfolioTime().Add(time.Hour)})
+	if !errors.Is(err, portfolio.ErrValidation) {
+		t.Fatalf("overflow trade: %v", err)
+	}
+	_, err = repo.AddPrice(ctx, userID, p.ID, portfolio.AddPriceInput{UnitPriceVND: math.MaxInt64, BaseVersion: p.Version, PricedAt: fixedPortfolioTime(), Source: "manual"})
+	if !errors.Is(err, portfolio.ErrValidation) {
+		t.Fatalf("overflow valuation: %v", err)
+	}
+	loaded, err := repo.GetPosition(ctx, userID, p.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Version != p.Version || len(loaded.Trades) != 1 || len(loaded.PriceHistory) != 0 || loaded.Summary.CostBasisVND != 2 {
+		t.Fatalf("failed commands changed position: %+v", loaded)
+	}
+	var afterCursor int64
+	if err := conn.QueryRow(`SELECT next_cursor FROM sync_cursors WHERE user_id=$1`, userID).Scan(&afterCursor); err != nil {
+		t.Fatal(err)
+	}
+	if afterCursor != beforeCursor {
+		t.Fatalf("failed command changed feed: %d -> %d", beforeCursor, afterCursor)
+	}
+}
+
+func TestRepositorySummaryRejectsAggregateOverflow(t *testing.T) {
+	conn := migratedPortfolioPostgres(t)
+	repo := portfolio.NewRepository(conn)
+	userID := createPortfolioUser(t, conn, "asset-total-overflow@example.com")
+	for _, price := range []int64{math.MaxInt64, 1} {
+		p := createGoldPosition(t, repo, userID)
+		p = addPortfolioTrade(t, repo, userID, p.ID, p.Version, portfolio.TradeBuy, "1", 1, 0, fixedPortfolioTime())
+		addPortfolioPrice(t, repo, userID, p.ID, p.Version, price, fixedPortfolioTime(), "manual", "")
+	}
+	if result, err := repo.Summary(context.Background(), userID); !errors.Is(err, portfolio.ErrValidation) {
+		t.Fatalf("expected aggregate overflow validation, got %+v %v", result, err)
 	}
 }
 

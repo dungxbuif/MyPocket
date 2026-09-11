@@ -178,8 +178,15 @@ func issueAuthRedirect(w http.ResponseWriter, r *http.Request, cfg config.Config
 		writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Authentication unavailable", correlationID(r.Context())))
 		return err
 	}
-	http.SetCookie(w, authCookie(authValue, time.Now().Add(30*24*time.Hour), r))
-	http.SetCookie(w, csrfCookie(csrfValue, time.Now().Add(30*24*time.Hour), r))
+	auth := authCookie(authValue, time.Now().Add(30*24*time.Hour), r)
+	csrf := csrfCookie(csrfValue, time.Now().Add(30*24*time.Hour), r)
+	// PublicWebURL is trusted deployment configuration; TLS may terminate at a proxy.
+	if strings.HasPrefix(strings.ToLower(cfg.PublicWebURL), "https://") {
+		auth.Secure = true
+		csrf.Secure = true
+	}
+	http.SetCookie(w, auth)
+	http.SetCookie(w, csrf)
 	http.Redirect(w, r, cfg.PublicWebURL, http.StatusFound)
 	return nil
 }

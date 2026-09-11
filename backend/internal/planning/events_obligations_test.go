@@ -71,7 +71,7 @@ func TestObligationRepaymentsCannotOverpayPrincipal(t *testing.T) {
 	if err := planningRepo.LinkObligationRepayment(context.Background(), owner, obligation.ID, second.ID); !errors.Is(err, planning.ErrValidation) {
 		t.Fatalf("expected overpayment validation, got %v", err)
 	}
-	_, err = planningRepo.UpdateObligation(context.Background(), owner, obligation.ID, planning.UpdateObligationInput{Direction: planning.ObligationBorrowed, PrincipalVND: 500000, Counterparty: "Anh Minh", DueOn: "2026-09-30", Note: "Vay sửa nhà"})
+	_, err = planningRepo.UpdateObligation(context.Background(), owner, obligation.ID, planning.UpdateObligationInput{BaseVersion: obligation.Version, Direction: planning.ObligationBorrowed, PrincipalVND: 500000, Counterparty: "Anh Minh", DueOn: "2026-09-30", Note: "Vay sửa nhà"})
 	if !errors.Is(err, planning.ErrValidation) {
 		t.Fatalf("expected lower-principal validation, got %v", err)
 	}
@@ -81,5 +81,64 @@ func TestObligationRepaymentsCannotOverpayPrincipal(t *testing.T) {
 	}
 	if len(obligations) != 1 || obligations[0].RepaidVND != 600000 || obligations[0].RemainingVND != 400000 {
 		t.Fatalf("wrong obligation remaining amount: %#v", obligations)
+	}
+}
+
+func TestObligationRepaymentRequiresMatchingTransactionDirection(t *testing.T) {
+	conn := migratedPlanningPostgres(t)
+	owner := createPlanningUser(t, conn, "obligation-direction@example.com")
+	financeRepo := finance.NewRepository(conn)
+	planningRepo := planning.NewRepository(conn)
+	wallet := createPlanningWallet(t, financeRepo, owner)
+	expenseCategoryID := findPlanningSystemCategory(t, conn, "expense_food")
+	incomeCategoryID := findPlanningSystemCategory(t, conn, "income_salary")
+	occurred := time.Date(2026, 9, 10, 5, 0, 0, 0, time.UTC)
+	expense := createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "direction-expense", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, AmountVND: 100000, OccurredAt: occurred})
+	income := createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "direction-income", Type: finance.TransactionIncome, SourceWalletID: wallet.ID, CategoryID: incomeCategoryID, AmountVND: 100000, OccurredAt: occurred})
+
+	borrowed, err := planningRepo.CreateObligation(context.Background(), owner, planning.CreateObligationInput{Direction: planning.ObligationBorrowed, PrincipalVND: 500000, Counterparty: "Anh Minh", DueOn: "2026-09-30"})
+	if err != nil {
+		t.Fatalf("create borrowed obligation: %v", err)
+	}
+	lent, err := planningRepo.CreateObligation(context.Background(), owner, planning.CreateObligationInput{Direction: planning.ObligationLent, PrincipalVND: 500000, Counterparty: "Chị Lan", DueOn: "2026-09-30"})
+	if err != nil {
+		t.Fatalf("create lent obligation: %v", err)
+	}
+
+	if err := planningRepo.LinkObligationRepayment(context.Background(), owner, borrowed.ID, income.ID); !errors.Is(err, planning.ErrValidation) {
+		t.Fatalf("borrowed repayment must be an expense, got %v", err)
+	}
+	if err := planningRepo.LinkObligationRepayment(context.Background(), owner, lent.ID, expense.ID); !errors.Is(err, planning.ErrValidation) {
+		t.Fatalf("lent repayment must be income, got %v", err)
+	}
+	if err := planningRepo.LinkObligationRepayment(context.Background(), owner, borrowed.ID, expense.ID); err != nil {
+		t.Fatalf("borrowed expense repayment should pass: %v", err)
+	}
+	if err := planningRepo.LinkObligationRepayment(context.Background(), owner, lent.ID, income.ID); err != nil {
+		t.Fatalf("lent income repayment should pass: %v", err)
+	}
+}
+
+func TestObligationRepaymentCannotCountOneTransactionTwice(t *testing.T) {
+	conn := migratedPlanningPostgres(t)
+	owner := createPlanningUser(t, conn, "obligation-double-count@example.com")
+	financeRepo := finance.NewRepository(conn)
+	planningRepo := planning.NewRepository(conn)
+	wallet := createPlanningWallet(t, financeRepo, owner)
+	categoryID := findPlanningSystemCategory(t, conn, "expense_food")
+	repayment := createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "one-repayment", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: categoryID, AmountVND: 100000, OccurredAt: time.Date(2026, 9, 10, 5, 0, 0, 0, time.UTC)})
+	first, err := planningRepo.CreateObligation(context.Background(), owner, planning.CreateObligationInput{Direction: planning.ObligationBorrowed, PrincipalVND: 500000, Counterparty: "A", DueOn: "2026-09-30"})
+	if err != nil {
+		t.Fatalf("create first obligation: %v", err)
+	}
+	second, err := planningRepo.CreateObligation(context.Background(), owner, planning.CreateObligationInput{Direction: planning.ObligationBorrowed, PrincipalVND: 500000, Counterparty: "B", DueOn: "2026-09-30"})
+	if err != nil {
+		t.Fatalf("create second obligation: %v", err)
+	}
+	if err := planningRepo.LinkObligationRepayment(context.Background(), owner, first.ID, repayment.ID); err != nil {
+		t.Fatalf("link first obligation: %v", err)
+	}
+	if err := planningRepo.LinkObligationRepayment(context.Background(), owner, second.ID, repayment.ID); !errors.Is(err, planning.ErrValidation) {
+		t.Fatalf("same transaction must not repay two obligations, got %v", err)
 	}
 }

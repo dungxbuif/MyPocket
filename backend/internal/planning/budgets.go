@@ -2,6 +2,8 @@ package planning
 
 import (
 	"fmt"
+	"math"
+	"math/big"
 	"time"
 )
 
@@ -30,8 +32,17 @@ func ValidateCreateBudget(input CreateBudgetInput) (CreateBudgetInput, error) {
 }
 
 func ValidateUpdateBudget(input UpdateBudgetInput) (UpdateBudgetInput, error) {
-	created, err := ValidateCreateBudget(CreateBudgetInput(input))
-	return UpdateBudgetInput(created), err
+	if input.BaseVersion <= 0 {
+		return UpdateBudgetInput{}, fmt.Errorf("%w: base version is required", ErrValidation)
+	}
+	created, err := ValidateCreateBudget(CreateBudgetInput{
+		Name: input.Name, PeriodType: input.PeriodType, AmountVND: input.AmountVND,
+		CategoryIDs: input.CategoryIDs, CustomStart: input.CustomStart, CustomEnd: input.CustomEnd,
+	})
+	if err != nil {
+		return UpdateBudgetInput{}, err
+	}
+	return UpdateBudgetInput{BaseVersion: input.BaseVersion, Name: created.Name, PeriodType: created.PeriodType, AmountVND: created.AmountVND, CategoryIDs: created.CategoryIDs, CustomStart: created.CustomStart, CustomEnd: created.CustomEnd}, nil
 }
 
 func PeriodWindow(period BudgetPeriodType, customStart *time.Time, customEnd *time.Time, now time.Time) (time.Time, time.Time, error) {
@@ -67,7 +78,12 @@ func percentSpent(spent int64, amount int64) int64 {
 	if amount <= 0 || spent <= 0 {
 		return 0
 	}
-	return spent * 100 / amount
+	percent := new(big.Int).Mul(big.NewInt(spent), big.NewInt(100))
+	percent.Quo(percent, big.NewInt(amount))
+	if !percent.IsInt64() {
+		return math.MaxInt64
+	}
+	return percent.Int64()
 }
 
 func validBudgetPeriod(value BudgetPeriodType) bool {

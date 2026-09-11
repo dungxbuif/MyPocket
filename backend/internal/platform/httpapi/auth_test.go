@@ -15,7 +15,9 @@ import (
 
 func TestOAuthFixtureCallbackSetsSecureAuthCookie(t *testing.T) {
 	repo := &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true, DisplayName: "A"}}
-	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: repo})
+	cfg := authTestConfig()
+	cfg.PublicWebURL = "https://pocket.example.test"
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: repo})
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/auth/google/callback?subject=google-sub-1&email=a@example.com&email_verified=true&name=A", nil)
 	res := httptest.NewRecorder()
 
@@ -168,13 +170,36 @@ func TestBearerAPIKeyAuthenticatesCurrentUserWithoutCookie(t *testing.T) {
 	}
 
 	repo.authenticatedToken = ""
-	repo.failAPIKeyAuth = true
 	cachedReq := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
 	cachedReq.Header.Set("Authorization", "Bearer mpk_test")
 	cachedRes := httptest.NewRecorder()
 	handler.ServeHTTP(cachedRes, cachedReq)
-	if cachedRes.Code != http.StatusOK || repo.authenticatedToken != "" {
-		t.Fatalf("expected cached api key auth to avoid DB auth, code=%d token=%q body=%s", cachedRes.Code, repo.authenticatedToken, cachedRes.Body.String())
+	if cachedRes.Code != http.StatusOK || repo.authenticatedToken != "mpk_test" {
+		t.Fatalf("expected Redis hint to retain DB-backed key validation, code=%d token=%q body=%s", cachedRes.Code, repo.authenticatedToken, cachedRes.Body.String())
+	}
+}
+
+func TestStaleRedisAPIKeyEntryDoesNotBypassRevocation(t *testing.T) {
+	repo := &authRepoStub{user: identity.User{ID: "user_123", Email: "agent@example.com", EmailVerified: true}}
+	cache := &authCacheStub{}
+	cfg := authTestConfig()
+	cfg.APIKeyHashSecret = "change-this-development-api-key-hash-secret-32-bytes"
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: repo, APIKeyRepository: repo, AuthCache: cache})
+	first := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	first.Header.Set("Authorization", "Bearer mpk_test")
+	firstRes := httptest.NewRecorder()
+	handler.ServeHTTP(firstRes, first)
+	if firstRes.Code != http.StatusOK {
+		t.Fatalf("prime API key cache: %d %s", firstRes.Code, firstRes.Body.String())
+	}
+
+	repo.failAPIKeyAuth = true
+	revoked := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	revoked.Header.Set("Authorization", "Bearer mpk_test")
+	revokedRes := httptest.NewRecorder()
+	handler.ServeHTTP(revokedRes, revoked)
+	if revokedRes.Code != http.StatusUnauthorized {
+		t.Fatalf("stale Redis entry must not authenticate a revoked key, got %d: %s", revokedRes.Code, revokedRes.Body.String())
 	}
 }
 
@@ -194,6 +219,24 @@ func TestBearerAPIKeyCannotCreateAnotherAPIKey(t *testing.T) {
 	}
 	if len(repo.keys) != 0 {
 		t.Fatalf("api key auth should not create more keys: %#v", repo.keys)
+	}
+}
+
+func TestInvalidBearerDoesNotFallBackToCookieSession(t *testing.T) {
+	repo := &authRepoStub{user: identity.User{ID: "user_123", Email: "owner@example.com", EmailVerified: true}, failAPIKeyAuth: true}
+	cfg := authTestConfig()
+	cfg.APIKeyHashSecret = "change-this-development-api-key-hash-secret-32-bytes"
+	authValue, _ := signedAuthPair(t, cfg, "user_123")
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: repo, APIKeyRepository: repo, AuthCache: &authCacheStub{}})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/me", nil)
+	req.Header.Set("Authorization", "Bearer mpk_revoked")
+	req.AddCookie(&http.Cookie{Name: identity.AuthCookieName, Value: authValue})
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusUnauthorized {
+		t.Fatalf("invalid bearer must not inherit cookie identity, got %d: %s", res.Code, res.Body.String())
 	}
 }
 

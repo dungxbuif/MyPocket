@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"math"
 )
 
 func ValidateCreateReceiptObject(input CreateReceiptObjectInput) (CreateReceiptObjectInput, error) {
@@ -39,8 +40,12 @@ func ApplyAccountingEffect(input AccountingInput) (AccountingEffect, error) {
 		if input.DestinationWalletID != "" {
 			return AccountingEffect{}, fmt.Errorf("%w: income cannot have destination wallet", ErrValidation)
 		}
+		sourceBalance, ok := checkedAdd(input.SourceBalanceVND, input.AmountVND)
+		if !ok {
+			return AccountingEffect{}, fmt.Errorf("%w: income would overflow source balance", ErrValidation)
+		}
 		return AccountingEffect{
-			SourceBalanceVND: input.SourceBalanceVND + input.AmountVND,
+			SourceBalanceVND: sourceBalance,
 			SourceDeltaVND:   input.AmountVND,
 		}, nil
 	case TransactionExpense:
@@ -50,8 +55,12 @@ func ApplyAccountingEffect(input AccountingInput) (AccountingEffect, error) {
 		if input.DestinationWalletID != "" {
 			return AccountingEffect{}, fmt.Errorf("%w: expense cannot have destination wallet", ErrValidation)
 		}
+		sourceBalance, ok := checkedSub(input.SourceBalanceVND, input.AmountVND)
+		if !ok {
+			return AccountingEffect{}, fmt.Errorf("%w: expense would overflow source balance", ErrValidation)
+		}
 		return AccountingEffect{
-			SourceBalanceVND: input.SourceBalanceVND - input.AmountVND,
+			SourceBalanceVND: sourceBalance,
 			SourceDeltaVND:   -input.AmountVND,
 		}, nil
 	case TransactionTransfer:
@@ -64,9 +73,14 @@ func ApplyAccountingEffect(input AccountingInput) (AccountingEffect, error) {
 		if input.SourceWalletID == input.DestinationWalletID {
 			return AccountingEffect{}, fmt.Errorf("%w: transfer wallets must differ", ErrValidation)
 		}
+		sourceBalance, sourceOK := checkedSub(input.SourceBalanceVND, input.AmountVND)
+		destinationBalance, destinationOK := checkedAdd(input.DestinationBalanceVND, input.AmountVND)
+		if !sourceOK || !destinationOK {
+			return AccountingEffect{}, fmt.Errorf("%w: transfer would overflow wallet balance", ErrValidation)
+		}
 		return AccountingEffect{
-			SourceBalanceVND:      input.SourceBalanceVND - input.AmountVND,
-			DestinationBalanceVND: input.DestinationBalanceVND + input.AmountVND,
+			SourceBalanceVND:      sourceBalance,
+			DestinationBalanceVND: destinationBalance,
 			SourceDeltaVND:        -input.AmountVND,
 			DestinationDeltaVND:   input.AmountVND,
 		}, nil
@@ -77,7 +91,10 @@ func ApplyAccountingEffect(input AccountingInput) (AccountingEffect, error) {
 		if input.DestinationWalletID != "" {
 			return AccountingEffect{}, fmt.Errorf("%w: adjustment cannot have destination wallet", ErrValidation)
 		}
-		delta := *input.TargetBalanceVND - input.SourceBalanceVND
+		delta, ok := checkedSub(*input.TargetBalanceVND, input.SourceBalanceVND)
+		if !ok {
+			return AccountingEffect{}, fmt.Errorf("%w: adjustment delta would overflow", ErrValidation)
+		}
 		if delta == 0 {
 			return AccountingEffect{}, fmt.Errorf("%w: adjustment must change balance", ErrValidation)
 		}
@@ -88,6 +105,20 @@ func ApplyAccountingEffect(input AccountingInput) (AccountingEffect, error) {
 	default:
 		return AccountingEffect{}, fmt.Errorf("%w: unsupported transaction type", ErrValidation)
 	}
+}
+
+func checkedAdd(left int64, right int64) (int64, bool) {
+	if (right > 0 && left > math.MaxInt64-right) || (right < 0 && left < math.MinInt64-right) {
+		return 0, false
+	}
+	return left + right, true
+}
+
+func checkedSub(left int64, right int64) (int64, bool) {
+	if (right > 0 && left < math.MinInt64+right) || (right < 0 && left > math.MaxInt64+right) {
+		return 0, false
+	}
+	return left - right, true
 }
 
 func validatePositiveAmount(amountVND int64) error {
@@ -112,6 +143,7 @@ func ValidateUpdateTransaction(input UpdateTransactionInput) (CreateTransactionI
 		SourceWalletID:      input.SourceWalletID,
 		DestinationWalletID: input.DestinationWalletID,
 		CategoryID:          input.CategoryID,
+		ReceiptObjectID:     input.ReceiptObjectID,
 		AmountVND:           input.AmountVND,
 		TargetBalanceVND:    input.TargetBalanceVND,
 		OccurredAt:          input.OccurredAt,
@@ -126,6 +158,7 @@ func validateTransactionFields(input CreateTransactionInput) (CreateTransactionI
 	input.SourceWalletID = trimmed(input.SourceWalletID)
 	input.DestinationWalletID = trimmed(input.DestinationWalletID)
 	input.CategoryID = trimmed(input.CategoryID)
+	input.ReceiptObjectID = trimmed(input.ReceiptObjectID)
 	input.Note = trimmed(input.Note)
 	input.WithPerson = trimmed(input.WithPerson)
 	input.EventRef = trimmed(input.EventRef)
@@ -194,6 +227,7 @@ func transactionRequestHash(input CreateTransactionInput) (string, error) {
 		SourceWalletID      string          `json:"source_wallet_id"`
 		DestinationWalletID string          `json:"destination_wallet_id"`
 		CategoryID          string          `json:"category_id"`
+		ReceiptObjectID     string          `json:"receipt_object_id"`
 		AmountVND           int64           `json:"amount_vnd"`
 		TargetBalanceVND    *int64          `json:"target_balance_vnd"`
 		OccurredAt          string          `json:"occurred_at"`
@@ -206,6 +240,7 @@ func transactionRequestHash(input CreateTransactionInput) (string, error) {
 		SourceWalletID:      input.SourceWalletID,
 		DestinationWalletID: input.DestinationWalletID,
 		CategoryID:          input.CategoryID,
+		ReceiptObjectID:     input.ReceiptObjectID,
 		AmountVND:           input.AmountVND,
 		TargetBalanceVND:    input.TargetBalanceVND,
 		OccurredAt:          input.OccurredAt.UTC().Format("2006-01-02T15:04:05.999999999Z07:00"),

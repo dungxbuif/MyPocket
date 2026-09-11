@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -25,6 +26,7 @@ type budgetResponse struct {
 }
 
 type budgetRequest struct {
+	BaseVersion int64                     `json:"base_version"`
 	Name        string                    `json:"name"`
 	PeriodType  planning.BudgetPeriodType `json:"period_type"`
 	AmountVND   int64                     `json:"amount_vnd"`
@@ -46,10 +48,11 @@ type eventResponse struct {
 }
 
 type eventRequest struct {
-	Name     string `json:"name"`
-	StartsOn string `json:"starts_on"`
-	EndsOn   string `json:"ends_on"`
-	Note     string `json:"note"`
+	BaseVersion int64  `json:"base_version"`
+	Name        string `json:"name"`
+	StartsOn    string `json:"starts_on"`
+	EndsOn      string `json:"ends_on"`
+	Note        string `json:"note"`
 }
 
 type obligationsResponse struct {
@@ -65,6 +68,7 @@ type obligationResponse struct {
 }
 
 type obligationRequest struct {
+	BaseVersion  int64                        `json:"base_version"`
 	Direction    planning.ObligationDirection `json:"direction"`
 	PrincipalVND int64                        `json:"principal_vnd"`
 	Counterparty string                       `json:"counterparty"`
@@ -97,10 +101,31 @@ type recurringScheduleRequest struct {
 	Note                string                       `json:"note"`
 }
 
+type planningVersionRequest struct {
+	BaseVersion int64 `json:"base_version"`
+}
+
 type transactionDraftsResponse struct {
 	Status        string                      `json:"status"`
 	Drafts        []planning.TransactionDraft `json:"drafts"`
 	CorrelationID string                      `json:"correlation_id"`
+}
+
+type transactionDraftDecisionResponse struct {
+	Status        string                    `json:"status"`
+	Draft         planning.TransactionDraft `json:"draft"`
+	Transaction   *finance.Transaction      `json:"transaction,omitempty"`
+	CorrelationID string                    `json:"correlation_id"`
+}
+
+type confirmTransactionDraftRequest struct {
+	Version   int64  `json:"version"`
+	AmountVND int64  `json:"amount_vnd"`
+	Note      string `json:"note"`
+}
+
+type rejectTransactionDraftRequest struct {
+	Version int64 `json:"version"`
 }
 
 func budgets(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
@@ -177,7 +202,7 @@ func events(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
 			writeJSON(w, http.StatusOK, eventsResponse{Status: "ok", Events: items, CorrelationID: correlationID(r.Context())})
 		case http.MethodPost:
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				input, ok := decodeEventRequest(w, r)
+				input, _, ok := decodeEventRequest(w, r)
 				if !ok {
 					return
 				}
@@ -212,11 +237,15 @@ func eventByID(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
 		switch {
 		case r.Method == http.MethodPatch && action == "":
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				input, ok := decodeEventRequest(w, r)
+				input, baseVersion, ok := decodeEventRequest(w, r)
 				if !ok {
 					return
 				}
-				event, err := repo.UpdateEvent(r.Context(), userID, eventID, planning.UpdateEventInput(input))
+				if baseVersion <= 0 {
+					writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+					return
+				}
+				event, err := repo.UpdateEvent(r.Context(), userID, eventID, planning.UpdateEventInput{BaseVersion: baseVersion, Name: input.Name, StartsOn: input.StartsOn, EndsOn: input.EndsOn, Note: input.Note})
 				if err != nil {
 					writePlanningError(w, r, err, "Event unavailable")
 					return
@@ -225,7 +254,11 @@ func eventByID(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
 			})).ServeHTTP(w, r)
 		case r.Method == http.MethodPost && action == "archive":
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if err := repo.ArchiveEvent(r.Context(), userID, eventID); err != nil {
+				baseVersion, ok := decodePlanningBaseVersion(w, r)
+				if !ok {
+					return
+				}
+				if err := repo.ArchiveEvent(r.Context(), userID, eventID, baseVersion); err != nil {
 					writePlanningError(w, r, err, "Event unavailable")
 					return
 				}
@@ -265,7 +298,7 @@ func obligations(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
 			writeJSON(w, http.StatusOK, obligationsResponse{Status: "ok", Obligations: items, CorrelationID: correlationID(r.Context())})
 		case http.MethodPost:
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				input, ok := decodeObligationRequest(w, r)
+				input, _, ok := decodeObligationRequest(w, r)
 				if !ok {
 					return
 				}
@@ -300,11 +333,15 @@ func obligationByID(cfg config.Config, repo PlanningRepository) http.HandlerFunc
 		switch {
 		case r.Method == http.MethodPatch && action == "":
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				input, ok := decodeObligationRequest(w, r)
+				input, baseVersion, ok := decodeObligationRequest(w, r)
 				if !ok {
 					return
 				}
-				obligation, err := repo.UpdateObligation(r.Context(), userID, obligationID, planning.UpdateObligationInput(input))
+				if baseVersion <= 0 {
+					writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+					return
+				}
+				obligation, err := repo.UpdateObligation(r.Context(), userID, obligationID, planning.UpdateObligationInput{BaseVersion: baseVersion, Direction: input.Direction, PrincipalVND: input.PrincipalVND, Counterparty: input.Counterparty, DueOn: input.DueOn, Note: input.Note})
 				if err != nil {
 					writePlanningError(w, r, err, "Obligation unavailable")
 					return
@@ -313,7 +350,11 @@ func obligationByID(cfg config.Config, repo PlanningRepository) http.HandlerFunc
 			})).ServeHTTP(w, r)
 		case r.Method == http.MethodPost && action == "archive":
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if err := repo.ArchiveObligation(r.Context(), userID, obligationID); err != nil {
+				baseVersion, ok := decodePlanningBaseVersion(w, r)
+				if !ok {
+					return
+				}
+				if err := repo.ArchiveObligation(r.Context(), userID, obligationID, baseVersion); err != nil {
 					writePlanningError(w, r, err, "Obligation unavailable")
 					return
 				}
@@ -387,7 +428,11 @@ func recurringScheduleByID(cfg config.Config, repo PlanningRepository) http.Hand
 		}
 		if r.Method == http.MethodPost && action == "archive" {
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				if err := repo.ArchiveRecurringSchedule(r.Context(), userID, scheduleID); err != nil {
+				baseVersion, ok := decodePlanningBaseVersion(w, r)
+				if !ok {
+					return
+				}
+				if err := repo.ArchiveRecurringSchedule(r.Context(), userID, scheduleID, baseVersion); err != nil {
 					writePlanningError(w, r, err, "Recurring schedule unavailable")
 					return
 				}
@@ -422,6 +467,98 @@ func transactionDrafts(cfg config.Config, repo PlanningRepository) http.HandlerF
 	}
 }
 
+func transactionDraftByID(cfg config.Config, repo PlanningRepository) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID, ok := authenticatedUserID(w, r, cfg)
+		if !ok {
+			return
+		}
+		if repo == nil {
+			writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Planning repository unavailable", correlationID(r.Context())))
+			return
+		}
+		draftID, action, valid := parseTransactionDraftPath(r.URL.Path)
+		if !valid {
+			writeJSON(w, http.StatusNotFound, ErrorEnvelope("NOT_FOUND", "Draft not found", correlationID(r.Context())))
+			return
+		}
+		if r.Method != http.MethodPost {
+			writeJSON(w, http.StatusMethodNotAllowed, ErrorEnvelope("VALIDATION_FAILED", "Method not allowed", correlationID(r.Context())))
+			return
+		}
+		requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			switch action {
+			case "confirm":
+				confirmTransactionDraft(w, r, repo, userID, draftID)
+			case "reject":
+				rejectTransactionDraft(w, r, repo, userID, draftID)
+			}
+		})).ServeHTTP(w, r)
+	}
+}
+
+func confirmTransactionDraft(w http.ResponseWriter, r *http.Request, repo PlanningRepository, userID string, draftID string) {
+	idempotencyKey := strings.TrimSpace(r.Header.Get("Idempotency-Key"))
+	if idempotencyKey == "" {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Idempotency-Key is required", correlationID(r.Context())))
+		return
+	}
+	var req confirmTransactionDraftRequest
+	if err := decodeDraftDecisionRequest(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
+		return
+	}
+	if req.Version <= 0 || req.AmountVND <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Version and positive amount are required", correlationID(r.Context())))
+		return
+	}
+	decision, err := repo.ConfirmTransactionDraft(r.Context(), userID, draftID, planning.ConfirmTransactionDraftInput{
+		Version:        req.Version,
+		AmountVND:      req.AmountVND,
+		Note:           req.Note,
+		IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		writePlanningError(w, r, err, "Draft confirmation unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, transactionDraftDecisionResponse{Status: "ok", Draft: decision.Draft, Transaction: decision.Transaction, CorrelationID: correlationID(r.Context())})
+}
+
+func rejectTransactionDraft(w http.ResponseWriter, r *http.Request, repo PlanningRepository, userID string, draftID string) {
+	var req rejectTransactionDraftRequest
+	if err := decodeDraftDecisionRequest(r, &req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
+		return
+	}
+	if req.Version <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Version is required", correlationID(r.Context())))
+		return
+	}
+	decision, err := repo.RejectTransactionDraft(r.Context(), userID, draftID, planning.RejectTransactionDraftInput{Version: req.Version})
+	if err != nil {
+		writePlanningError(w, r, err, "Draft rejection unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, transactionDraftDecisionResponse{Status: "ok", Draft: decision.Draft, CorrelationID: correlationID(r.Context())})
+}
+
+func decodeDraftDecisionRequest(r *http.Request, target any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("multiple JSON values")
+		}
+		return err
+	}
+	return nil
+}
+
 func listBudgets(w http.ResponseWriter, r *http.Request, repo PlanningRepository, userID string) {
 	progress, err := repo.ListBudgetProgress(r.Context(), userID, time.Now())
 	if err != nil {
@@ -432,7 +569,7 @@ func listBudgets(w http.ResponseWriter, r *http.Request, repo PlanningRepository
 }
 
 func createBudget(w http.ResponseWriter, r *http.Request, repo PlanningRepository, userID string) {
-	input, ok := decodeBudgetRequest(w, r)
+	input, _, ok := decodeBudgetRequest(w, r)
 	if !ok {
 		return
 	}
@@ -445,11 +582,15 @@ func createBudget(w http.ResponseWriter, r *http.Request, repo PlanningRepositor
 }
 
 func updateBudget(w http.ResponseWriter, r *http.Request, repo PlanningRepository, userID string, budgetID string) {
-	input, ok := decodeBudgetRequest(w, r)
+	input, baseVersion, ok := decodeBudgetRequest(w, r)
 	if !ok {
 		return
 	}
-	budget, err := repo.UpdateBudget(r.Context(), userID, budgetID, planning.UpdateBudgetInput(input))
+	if baseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+		return
+	}
+	budget, err := repo.UpdateBudget(r.Context(), userID, budgetID, planning.UpdateBudgetInput{BaseVersion: baseVersion, Name: input.Name, PeriodType: input.PeriodType, AmountVND: input.AmountVND, CategoryIDs: input.CategoryIDs, CustomStart: input.CustomStart, CustomEnd: input.CustomEnd})
 	if err != nil {
 		writePlanningError(w, r, err, "Budget unavailable")
 		return
@@ -458,26 +599,30 @@ func updateBudget(w http.ResponseWriter, r *http.Request, repo PlanningRepositor
 }
 
 func archiveBudget(w http.ResponseWriter, r *http.Request, repo PlanningRepository, userID string, budgetID string) {
-	if err := repo.ArchiveBudget(r.Context(), userID, budgetID); err != nil {
+	baseVersion, ok := decodePlanningBaseVersion(w, r)
+	if !ok {
+		return
+	}
+	if err := repo.ArchiveBudget(r.Context(), userID, budgetID, baseVersion); err != nil {
 		writePlanningError(w, r, err, "Budget unavailable")
 		return
 	}
 	writeJSON(w, http.StatusOK, commandResponse{Status: "ok", CorrelationID: correlationID(r.Context())})
 }
 
-func decodeBudgetRequest(w http.ResponseWriter, r *http.Request) (planning.CreateBudgetInput, bool) {
+func decodeBudgetRequest(w http.ResponseWriter, r *http.Request) (planning.CreateBudgetInput, int64, bool) {
 	var req budgetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
-		return planning.CreateBudgetInput{}, false
+		return planning.CreateBudgetInput{}, 0, false
 	}
 	customStart, ok := parseOptionalDate(w, r, req.CustomStart)
 	if !ok {
-		return planning.CreateBudgetInput{}, false
+		return planning.CreateBudgetInput{}, 0, false
 	}
 	customEnd, ok := parseOptionalDate(w, r, req.CustomEnd)
 	if !ok {
-		return planning.CreateBudgetInput{}, false
+		return planning.CreateBudgetInput{}, 0, false
 	}
 	return planning.CreateBudgetInput{
 		Name:        req.Name,
@@ -486,25 +631,34 @@ func decodeBudgetRequest(w http.ResponseWriter, r *http.Request) (planning.Creat
 		CategoryIDs: req.CategoryIDs,
 		CustomStart: customStart,
 		CustomEnd:   customEnd,
-	}, true
+	}, req.BaseVersion, true
 }
 
-func decodeEventRequest(w http.ResponseWriter, r *http.Request) (planning.CreateEventInput, bool) {
+func decodePlanningBaseVersion(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	var req planningVersionRequest
+	if err := decodeDraftDecisionRequest(r, &req); err != nil || req.BaseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+		return 0, false
+	}
+	return req.BaseVersion, true
+}
+
+func decodeEventRequest(w http.ResponseWriter, r *http.Request) (planning.CreateEventInput, int64, bool) {
 	var req eventRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
-		return planning.CreateEventInput{}, false
+		return planning.CreateEventInput{}, 0, false
 	}
-	return planning.CreateEventInput{Name: req.Name, StartsOn: req.StartsOn, EndsOn: req.EndsOn, Note: req.Note}, true
+	return planning.CreateEventInput{Name: req.Name, StartsOn: req.StartsOn, EndsOn: req.EndsOn, Note: req.Note}, req.BaseVersion, true
 }
 
-func decodeObligationRequest(w http.ResponseWriter, r *http.Request) (planning.CreateObligationInput, bool) {
+func decodeObligationRequest(w http.ResponseWriter, r *http.Request) (planning.CreateObligationInput, int64, bool) {
 	var req obligationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
-		return planning.CreateObligationInput{}, false
+		return planning.CreateObligationInput{}, 0, false
 	}
-	return planning.CreateObligationInput{Direction: req.Direction, PrincipalVND: req.PrincipalVND, Counterparty: req.Counterparty, DueOn: req.DueOn, Note: req.Note}, true
+	return planning.CreateObligationInput{Direction: req.Direction, PrincipalVND: req.PrincipalVND, Counterparty: req.Counterparty, DueOn: req.DueOn, Note: req.Note}, req.BaseVersion, true
 }
 
 func decodeRecurringScheduleRequest(w http.ResponseWriter, r *http.Request) (planning.CreateRecurringScheduleInput, bool) {
@@ -577,12 +731,27 @@ func parseBudgetPathWithPrefix(path string, prefix string) (budgetID string, act
 	return "", "", false
 }
 
+func parseTransactionDraftPath(path string) (draftID string, action string, valid bool) {
+	rest := strings.TrimPrefix(path, "/api/v1/transaction-drafts/")
+	parts := strings.Split(strings.Trim(rest, "/"), "/")
+	if len(parts) != 2 || parts[0] == "" || (parts[1] != "confirm" && parts[1] != "reject") {
+		return "", "", false
+	}
+	return parts[0], parts[1], true
+}
+
 func writePlanningError(w http.ResponseWriter, r *http.Request, err error, fallback string) {
 	switch {
 	case errors.Is(err, planning.ErrValidation):
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", err.Error(), correlationID(r.Context())))
 	case errors.Is(err, planning.ErrForbidden):
-		writeJSON(w, http.StatusForbidden, ErrorEnvelope("FORBIDDEN", "Budget is not available", correlationID(r.Context())))
+		writeJSON(w, http.StatusForbidden, ErrorEnvelope("FORBIDDEN", "Planning object is not available", correlationID(r.Context())))
+	case errors.Is(err, planning.ErrDraftAlreadyResolved):
+		writeJSON(w, http.StatusConflict, ErrorEnvelope("DRAFT_ALREADY_RESOLVED", "Draft is already resolved", correlationID(r.Context())))
+	case errors.Is(err, planning.ErrDraftVersionConflict):
+		writeJSON(w, http.StatusConflict, ErrorEnvelope("DRAFT_VERSION_CONFLICT", "Draft version has changed", correlationID(r.Context())))
+	case errors.Is(err, planning.ErrVersionConflict):
+		writeJSON(w, http.StatusConflict, ErrorEnvelope("VERSION_CONFLICT", "Planning object version has changed", correlationID(r.Context())))
 	default:
 		writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", fallback, correlationID(r.Context())))
 	}

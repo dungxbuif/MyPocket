@@ -5,17 +5,20 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"mypocket/internal/platform/commandtx"
 )
 
 type Repository struct {
-	db *sql.DB
+	db *commandtx.Handle
 }
+
+func NewRepositoryInTx(tx *sql.Tx) *Repository { return &Repository{db: commandtx.Bound(tx)} }
 
 func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+	return &Repository{db: commandtx.New(db)}
 }
 
-func (r *Repository) CreatePosition(ctx context.Context, userID string, input CreatePositionInput) (Position, error) {
+func (r *Repository) commandCreatePosition(ctx context.Context, userID string, input CreatePositionInput) (Position, error) {
 	input, err := ValidateCreatePosition(input)
 	if err != nil {
 		return Position{}, err
@@ -45,8 +48,8 @@ func (r *Repository) CreatePosition(ctx context.Context, userID string, input Cr
 	if err != nil {
 		return Position{}, fmt.Errorf("create asset position: %w", err)
 	}
-	p.Summary = summarize("0", 0, 0, nil)
-	return p, nil
+	p.Summary, err = summarize("0", 0, 0, nil)
+	return p, err
 }
 
 func (r *Repository) ListPositions(ctx context.Context, userID string, includeArchived bool) ([]Position, error) {
@@ -68,12 +71,22 @@ func (r *Repository) ListPositions(ctx context.Context, userID string, includeAr
 		if err := scanPosition(rows, &p); err != nil {
 			return nil, err
 		}
-		if err := r.attachSummary(ctx, userID, &p, false); err != nil {
-			return nil, err
-		}
 		positions = append(positions, p)
 	}
-	return positions, rows.Err()
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	// A bound repository uses one connection; finish the row stream before
+	// issuing the summary queries needed for the same consistent snapshot.
+	for i := range positions {
+		if err := r.attachSummary(ctx, userID, &positions[i], false); err != nil {
+			return nil, err
+		}
+	}
+	return positions, nil
 }
 
 func (r *Repository) GetPosition(ctx context.Context, userID, assetID string) (Position, error) {
@@ -101,7 +114,7 @@ func (r *Repository) GetPosition(ctx context.Context, userID, assetID string) (P
 	return p, nil
 }
 
-func (r *Repository) ArchivePosition(ctx context.Context, userID, assetID string, baseVersion int64) error {
+func (r *Repository) commandArchivePosition(ctx context.Context, userID, assetID string, baseVersion int64) error {
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE asset_positions
 		SET archived_at = now(), updated_at = now(), version = version + 1
@@ -125,7 +138,7 @@ func (r *Repository) ArchivePosition(ctx context.Context, userID, assetID string
 	return nil
 }
 
-func (r *Repository) AddTrade(ctx context.Context, userID, assetID string, input AddTradeInput) (Position, error) {
+func (r *Repository) commandAddTrade(ctx context.Context, userID, assetID string, input AddTradeInput) (Position, error) {
 	input, err := ValidateAddTrade(input)
 	if err != nil {
 		return Position{}, err
@@ -163,7 +176,7 @@ func (r *Repository) AddTrade(ctx context.Context, userID, assetID string, input
 	return r.GetPosition(ctx, userID, assetID)
 }
 
-func (r *Repository) UpdateTrade(ctx context.Context, userID, assetID, tradeID string, input UpdateTradeInput) (Position, error) {
+func (r *Repository) commandUpdateTrade(ctx context.Context, userID, assetID, tradeID string, input UpdateTradeInput) (Position, error) {
 	input, err := ValidateUpdateTrade(input)
 	if err != nil {
 		return Position{}, err
@@ -209,7 +222,7 @@ func (r *Repository) UpdateTrade(ctx context.Context, userID, assetID, tradeID s
 	return r.GetPosition(ctx, userID, assetID)
 }
 
-func (r *Repository) ArchiveTrade(ctx context.Context, userID, assetID, tradeID string, baseVersion int64) (Position, error) {
+func (r *Repository) commandArchiveTrade(ctx context.Context, userID, assetID, tradeID string, baseVersion int64) (Position, error) {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return Position{}, fmt.Errorf("begin archive asset trade: %w", err)
@@ -246,7 +259,7 @@ func (r *Repository) ArchiveTrade(ctx context.Context, userID, assetID, tradeID 
 	return r.GetPosition(ctx, userID, assetID)
 }
 
-func (r *Repository) AddPrice(ctx context.Context, userID, assetID string, input AddPriceInput) (Position, error) {
+func (r *Repository) commandAddPrice(ctx context.Context, userID, assetID string, input AddPriceInput) (Position, error) {
 	input, err := ValidateAddPrice(input)
 	if err != nil {
 		return Position{}, err
@@ -313,7 +326,10 @@ func (r *Repository) Summary(ctx context.Context, userID string) (PortfolioSumma
 			s.MissingPriceCount++
 			continue
 		}
-		s.InvestmentMarketValueVND += *position.Summary.MarketValueVND
+		s.InvestmentMarketValueVND, err = addMoney(s.InvestmentMarketValueVND, *position.Summary.MarketValueVND)
+		if err != nil {
+			return PortfolioSummary{}, err
+		}
 	}
 	return s, nil
 }
@@ -396,7 +412,10 @@ func (r *Repository) attachSummary(ctx context.Context, userID string, p *Positi
 		return err
 	}
 	p.LatestPrice = latest
-	p.Summary = summarize(quantity, costBasis, realized, latest)
+	p.Summary, err = summarize(quantity, costBasis, realized, latest)
+	if err != nil {
+		return err
+	}
 	if includeDetail {
 		p.Trades = trades
 		history, err := r.priceHistory(ctx, userID, p.ID, 30)
@@ -439,7 +458,10 @@ func (r *Repository) loadTradesAndTotals(ctx context.Context, userID, assetID st
 		trade.QuantityAfter = ratToDecimalString(parseStoredDecimal(trade.QuantityAfter))
 		quantity = trade.QuantityAfter
 		costBasis = trade.CostBasisAfterVND
-		realized += trade.RealizedPNLVND
+		realized, err = addMoney(realized, trade.RealizedPNLVND)
+		if err != nil {
+			return nil, "", 0, 0, err
+		}
 		trades = append(trades, trade)
 	}
 	if err := rows.Err(); err != nil {
@@ -512,7 +534,7 @@ func scanPosition(scanner rowScanner, p *Position) error {
 	return nil
 }
 
-func lockActivePosition(ctx context.Context, tx *sql.Tx, userID, assetID string, baseVersion int64) error {
+func lockActivePosition(ctx context.Context, tx commandtx.Queryer, userID, assetID string, baseVersion int64) error {
 	var version int64
 	err := tx.QueryRowContext(ctx, `
 		SELECT version
@@ -532,7 +554,7 @@ func lockActivePosition(ctx context.Context, tx *sql.Tx, userID, assetID string,
 	return nil
 }
 
-func replayPosition(ctx context.Context, tx *sql.Tx, userID, assetID string) error {
+func replayPosition(ctx context.Context, tx commandtx.Queryer, userID, assetID string) error {
 	rows, err := tx.QueryContext(ctx, `
 		SELECT id::text, side, quantity::text, unit_price_vnd, fee_vnd
 		FROM asset_trades

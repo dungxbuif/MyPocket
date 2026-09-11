@@ -2,7 +2,9 @@ package finance_test
 
 import (
 	"errors"
+	"math"
 	"testing"
+	"time"
 
 	"mypocket/internal/finance"
 )
@@ -146,5 +148,55 @@ func TestApplyAccountingEffectRejectsAdjustmentWithoutTarget(t *testing.T) {
 
 	if !errors.Is(err, finance.ErrValidation) {
 		t.Fatalf("expected validation error, got %v", err)
+	}
+}
+
+func TestApplyAccountingEffectRejectsBalanceOverflow(t *testing.T) {
+	tests := []struct {
+		name  string
+		input finance.AccountingInput
+	}{
+		{
+			name: "income cannot overflow the source balance",
+			input: finance.AccountingInput{Type: finance.TransactionIncome, AmountVND: 1, SourceWalletID: "source", SourceBalanceVND: math.MaxInt64},
+		},
+		{
+			name: "expense cannot underflow the source balance",
+			input: finance.AccountingInput{Type: finance.TransactionExpense, AmountVND: 1, SourceWalletID: "source", SourceBalanceVND: math.MinInt64},
+		},
+		{
+			name: "transfer cannot overflow the destination balance",
+			input: finance.AccountingInput{Type: finance.TransactionTransfer, AmountVND: 1, SourceWalletID: "source", DestinationWalletID: "destination", DestinationBalanceVND: math.MaxInt64},
+		},
+		{
+			name: "adjustment cannot overflow its recorded delta",
+			input: finance.AccountingInput{Type: finance.TransactionAdjustment, SourceWalletID: "source", SourceBalanceVND: math.MinInt64, TargetBalanceVND: ptrMoney(math.MaxInt64)},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := finance.ApplyAccountingEffect(tt.input)
+			if !errors.Is(err, finance.ErrValidation) {
+				t.Fatalf("expected overflow validation error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestValidateUpdateTransactionPreservesReceiptReference(t *testing.T) {
+	normalized, err := finance.ValidateUpdateTransaction(finance.UpdateTransactionInput{
+		Type:            finance.TransactionExpense,
+		SourceWalletID:  "wallet_cash",
+		CategoryID:      "category_food",
+		ReceiptObjectID: "receipt_123",
+		AmountVND:       50_000,
+		OccurredAt:      time.Date(2026, 9, 10, 10, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("validate update: %v", err)
+	}
+	if normalized.ReceiptObjectID != "receipt_123" {
+		t.Fatalf("receipt reference = %q, want receipt_123", normalized.ReceiptObjectID)
 	}
 }

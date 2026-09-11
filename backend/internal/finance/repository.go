@@ -6,17 +6,21 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mypocket/internal/platform/changefeed"
+	"mypocket/internal/platform/commandtx"
 	"sort"
 
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
 type Repository struct {
-	db *sql.DB
+	db *commandtx.Handle
 }
 
+func NewRepositoryInTx(tx *sql.Tx) *Repository { return &Repository{db: commandtx.Bound(tx)} }
+
 func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+	return &Repository{db: commandtx.New(db)}
 }
 
 func (r *Repository) CreateReceiptObject(ctx context.Context, userID string, input CreateReceiptObjectInput) (ReceiptObject, error) {
@@ -53,12 +57,11 @@ func (r *Repository) GetReceiptObject(ctx context.Context, userID, receiptID str
 	return receipt, nil
 }
 
-func (r *Repository) CreateWallet(ctx context.Context, userID string, input CreateWalletInput) (Wallet, error) {
+func (r *Repository) commandCreateWallet(ctx context.Context, userID string, input CreateWalletInput) (Wallet, error) {
 	input, err := ValidateCreateWallet(input)
 	if err != nil {
 		return Wallet{}, err
 	}
-
 	var wallet Wallet
 	err = r.db.QueryRowContext(ctx, `
 		INSERT INTO wallets (
@@ -135,18 +138,42 @@ func (r *Repository) ListWallets(ctx context.Context, userID string) ([]Wallet, 
 	return wallets, nil
 }
 
-func (r *Repository) UpdateWallet(ctx context.Context, userID string, walletID string, input UpdateWalletInput) (Wallet, error) {
+func (r *Repository) commandUpdateWallet(ctx context.Context, userID string, walletID string, input UpdateWalletInput) (Wallet, error) {
 	input, err := ValidateUpdateWallet(input)
 	if err != nil {
 		return Wallet{}, err
+	}
+	if input.BaseVersion <= 0 {
+		return Wallet{}, fmt.Errorf("%w: base version is required", ErrValidation)
 	}
 	includeInTotal := true
 	if input.IncludeInTotal != nil {
 		includeInTotal = *input.IncludeInTotal
 	}
 
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Wallet{}, fmt.Errorf("begin update wallet: %w", err)
+	}
+	defer func() { _ = tx.Rollback() }()
+	var currentVersion int64
+	err = tx.QueryRowContext(ctx, `
+		SELECT version FROM wallets
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+		FOR UPDATE
+	`, walletID, userID).Scan(&currentVersion)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Wallet{}, ErrForbidden
+	}
+	if err != nil {
+		return Wallet{}, fmt.Errorf("lock wallet update: %w", err)
+	}
+	if input.BaseVersion != currentVersion {
+		return Wallet{}, ErrConflict
+	}
+
 	var wallet Wallet
-	err = r.db.QueryRowContext(ctx, `
+	err = tx.QueryRowContext(ctx, `
 		UPDATE wallets
 		SET name = $3, include_in_total = $4, updated_at = now(), version = version + 1
 		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
@@ -167,15 +194,21 @@ func (r *Repository) UpdateWallet(ctx context.Context, userID string, walletID s
 	if err != nil {
 		return Wallet{}, fmt.Errorf("update wallet: %w", err)
 	}
+	if err := tx.Commit(); err != nil {
+		return Wallet{}, fmt.Errorf("commit update wallet: %w", err)
+	}
 	return wallet, nil
 }
 
-func (r *Repository) ArchiveWallet(ctx context.Context, userID string, walletID string) error {
+func (r *Repository) commandArchiveWallet(ctx context.Context, userID string, walletID string, baseVersion int64) error {
+	if baseVersion <= 0 {
+		return fmt.Errorf("%w: base version is required", ErrValidation)
+	}
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE wallets
 		SET archived_at = now(), is_default_ai = false, updated_at = now(), version = version + 1
-		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
-	`, walletID, userID)
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL AND version = $3
+	`, walletID, userID, baseVersion)
 	if err != nil {
 		return fmt.Errorf("archive wallet: %w", err)
 	}
@@ -184,44 +217,54 @@ func (r *Repository) ArchiveWallet(ctx context.Context, userID string, walletID 
 		return fmt.Errorf("archive wallet rows affected: %w", err)
 	}
 	if affected == 0 {
+		var active bool
+		if err := r.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM wallets WHERE id = $1 AND user_id = $2 AND archived_at IS NULL)`, walletID, userID).Scan(&active); err != nil {
+			return fmt.Errorf("check archived wallet version: %w", err)
+		}
+		if active {
+			return ErrConflict
+		}
 		return ErrForbidden
 	}
 	return nil
 }
 
-func (r *Repository) SetDefaultAIWallet(ctx context.Context, userID string, walletID string) error {
+func (r *Repository) commandSetDefaultAIWallet(ctx context.Context, userID string, walletID string, baseVersion int64) error {
+	if baseVersion <= 0 {
+		return fmt.Errorf("%w: base version is required", ErrValidation)
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin set default wallet: %w", err)
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	var exists bool
+	var currentVersion int64
 	if err := tx.QueryRowContext(ctx, `
-		SELECT EXISTS (
-			SELECT 1
-			FROM wallets
-			WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
-		)
-	`, walletID, userID).Scan(&exists); err != nil {
+		SELECT version FROM wallets
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+		FOR UPDATE
+	`, walletID, userID).Scan(&currentVersion); errors.Is(err, sql.ErrNoRows) {
+		return ErrForbidden
+	} else if err != nil {
 		return fmt.Errorf("check wallet owner: %w", err)
 	}
-	if !exists {
-		return ErrForbidden
+	if baseVersion != currentVersion {
+		return ErrConflict
 	}
 
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE wallets
 		SET is_default_ai = false, updated_at = now(), version = version + 1
-		WHERE user_id = $1 AND is_default_ai = true
-	`, userID); err != nil {
-		return fmt.Errorf("clear default wallets: %w", err)
+		WHERE user_id = $1 AND id <> $2 AND archived_at IS NULL AND is_default_ai = true
+	`, userID, walletID); err != nil {
+		return fmt.Errorf("clear default wallet: %w", err)
 	}
 	if _, err := tx.ExecContext(ctx, `
 		UPDATE wallets
 		SET is_default_ai = true, updated_at = now(), version = version + 1
-		WHERE id = $1 AND user_id = $2
-	`, walletID, userID); err != nil {
+		WHERE user_id = $1 AND id = $2 AND archived_at IS NULL AND is_default_ai = false
+	`, userID, walletID); err != nil {
 		return fmt.Errorf("set default wallet: %w", err)
 	}
 	if err := tx.Commit(); err != nil {
@@ -230,18 +273,26 @@ func (r *Repository) SetDefaultAIWallet(ctx context.Context, userID string, wall
 	return nil
 }
 
-func (r *Repository) CreateCategory(ctx context.Context, userID string, input CreateCategoryInput) (Category, error) {
+func (r *Repository) commandCreateCategory(ctx context.Context, userID string, input CreateCategoryInput) (Category, error) {
 	input, err := ValidateCreateCategory(input)
 	if err != nil {
 		return Category{}, err
+	}
+	if input.ID != "" && input.ParentID == input.ID {
+		return Category{}, fmt.Errorf("%w: category cannot be its own parent", ErrValidation)
+	}
+	if input.ParentID != "" {
+		if err := validateCategoryParent(ctx, r.db, userID, "", input.ParentID, input.Kind); err != nil {
+			return Category{}, err
+		}
 	}
 
 	var category Category
 	err = r.db.QueryRowContext(ctx, `
 		INSERT INTO categories (id, user_id, parent_id, kind, name, is_system)
-		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, NULL, $3, $4, false)
+		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, nullif($3, '')::uuid, $4, $5, false)
 		RETURNING id::text, user_id::text, coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system, version
-	`, input.ID, userID, string(input.Kind), input.Name).Scan(
+	`, input.ID, userID, input.ParentID, string(input.Kind), input.Name).Scan(
 		&category.ID,
 		&category.UserID,
 		&category.ParentID,
@@ -292,7 +343,7 @@ func (r *Repository) ListCategories(ctx context.Context, userID string) ([]Categ
 	return categories, nil
 }
 
-func (r *Repository) UpdateCategory(ctx context.Context, userID string, categoryID string, input UpdateCategoryInput) (Category, error) {
+func (r *Repository) commandUpdateCategory(ctx context.Context, userID string, categoryID string, input UpdateCategoryInput) (Category, error) {
 	category, err := r.getCategoryForUser(ctx, userID, categoryID)
 	if err != nil {
 		return Category{}, err
@@ -300,13 +351,31 @@ func (r *Repository) UpdateCategory(ctx context.Context, userID string, category
 	if err := ValidateCategoryUpdate(category, input); err != nil {
 		return Category{}, err
 	}
+	if input.BaseVersion <= 0 {
+		return Category{}, fmt.Errorf("%w: base version is required", ErrValidation)
+	}
+	if input.BaseVersion != category.Version {
+		return Category{}, ErrConflict
+	}
+	parentID := category.ParentID
+	if input.ParentID != nil {
+		parentID = trimmed(*input.ParentID)
+	}
+	if parentID == categoryID {
+		return Category{}, fmt.Errorf("%w: category cannot be its own parent", ErrValidation)
+	}
+	if parentID != "" {
+		if err := validateCategoryParent(ctx, r.db, userID, categoryID, parentID, category.Kind); err != nil {
+			return Category{}, err
+		}
+	}
 
 	err = r.db.QueryRowContext(ctx, `
 		UPDATE categories
-		SET name = $3, updated_at = now(), version = version + 1
-		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
+		SET name = $3, parent_id = nullif($4, '')::uuid, updated_at = now(), version = version + 1
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL AND version = $5
 		RETURNING id::text, user_id::text, coalesce(parent_id::text, ''), kind, name, coalesce(system_key, ''), is_system, version
-	`, categoryID, userID, trimmed(input.Name)).Scan(
+	`, categoryID, userID, trimmed(input.Name), parentID, input.BaseVersion).Scan(
 		&category.ID,
 		&category.UserID,
 		&category.ParentID,
@@ -317,6 +386,9 @@ func (r *Repository) UpdateCategory(ctx context.Context, userID string, category
 		&category.Version,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
+		if input.BaseVersion > 0 {
+			return Category{}, ErrConflict
+		}
 		return Category{}, ErrForbidden
 	}
 	if err != nil {
@@ -325,7 +397,10 @@ func (r *Repository) UpdateCategory(ctx context.Context, userID string, category
 	return category, nil
 }
 
-func (r *Repository) ArchiveCategory(ctx context.Context, userID string, categoryID string) error {
+func (r *Repository) commandArchiveCategory(ctx context.Context, userID string, categoryID string, baseVersion int64) error {
+	if baseVersion <= 0 {
+		return fmt.Errorf("%w: base version is required", ErrValidation)
+	}
 	category, err := r.getCategoryForUser(ctx, userID, categoryID)
 	if err != nil {
 		return err
@@ -333,12 +408,15 @@ func (r *Repository) ArchiveCategory(ctx context.Context, userID string, categor
 	if category.IsSystem {
 		return ErrSystemCategoryLocked
 	}
+	if category.Version != baseVersion {
+		return ErrConflict
+	}
 
 	result, err := r.db.ExecContext(ctx, `
 		UPDATE categories
 		SET archived_at = now(), updated_at = now(), version = version + 1
-		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
-	`, categoryID, userID)
+		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL AND version = $3
+	`, categoryID, userID, baseVersion)
 	if err != nil {
 		if isForeignKeyViolation(err) {
 			return fmt.Errorf("%w: category has history", ErrValidation)
@@ -350,12 +428,12 @@ func (r *Repository) ArchiveCategory(ctx context.Context, userID string, categor
 		return fmt.Errorf("archive category rows affected: %w", err)
 	}
 	if affected == 0 {
-		return ErrForbidden
+		return ErrConflict
 	}
 	return nil
 }
 
-func (r *Repository) SetWalletCategoryActive(ctx context.Context, userID string, walletID string, categoryID string, active bool) error {
+func (r *Repository) commandSetWalletCategoryActive(ctx context.Context, userID string, walletID string, categoryID string, active bool) error {
 	if err := r.requireWalletOwner(ctx, userID, walletID); err != nil {
 		return err
 	}
@@ -375,6 +453,56 @@ func (r *Repository) SetWalletCategoryActive(ctx context.Context, userID string,
 	return nil
 }
 
+func (r *Repository) ListWalletCategorySettings(ctx context.Context, userID string, walletID string) ([]WalletCategorySetting, error) {
+	if err := r.requireWalletOwner(ctx, userID, walletID); err != nil {
+		return nil, err
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT
+			c.id::text,
+			coalesce(c.user_id::text, ''),
+			coalesce(c.parent_id::text, ''),
+			c.kind,
+			c.name,
+			coalesce(c.system_key, ''),
+			c.is_system,
+			c.version,
+			coalesce(s.active, true)
+		FROM categories c
+		LEFT JOIN wallet_category_settings s
+			ON s.wallet_id = $2 AND s.category_id = c.id AND s.user_id = $1
+		WHERE c.archived_at IS NULL AND (c.is_system OR c.user_id = $1)
+		ORDER BY c.is_system DESC, c.kind, c.name, c.id
+	`, userID, walletID)
+	if err != nil {
+		return nil, fmt.Errorf("list wallet category settings: %w", err)
+	}
+	defer rows.Close()
+
+	var settings []WalletCategorySetting
+	for rows.Next() {
+		var setting WalletCategorySetting
+		if err := rows.Scan(
+			&setting.Category.ID,
+			&setting.Category.UserID,
+			&setting.Category.ParentID,
+			&setting.Category.Kind,
+			&setting.Category.Name,
+			&setting.Category.SystemKey,
+			&setting.Category.IsSystem,
+			&setting.Category.Version,
+			&setting.Active,
+		); err != nil {
+			return nil, fmt.Errorf("scan wallet category setting: %w", err)
+		}
+		settings = append(settings, setting)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("wallet category setting rows: %w", err)
+	}
+	return settings, nil
+}
+
 func (r *Repository) CreateTransaction(ctx context.Context, userID string, input CreateTransactionInput) (Transaction, error) {
 	input, err := ValidateCreateTransaction(input)
 	if err != nil {
@@ -391,14 +519,39 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID string, input
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	transaction, err := createTransactionInTx(ctx, tx, userID, input, requestHash)
+	if err != nil {
+		return Transaction{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return Transaction{}, fmt.Errorf("commit create transaction: %w", err)
+	}
+	return transaction, nil
+}
+
+// CreateTransactionInTx posts a transaction inside a caller-owned SQL
+// transaction. The caller is responsible for committing or rolling back tx.
+func CreateTransactionInTx(ctx context.Context, tx *sql.Tx, userID string, input CreateTransactionInput) (Transaction, error) {
+	input, err := ValidateCreateTransaction(input)
+	if err != nil {
+		return Transaction{}, err
+	}
+	requestHash, err := transactionRequestHash(input)
+	if err != nil {
+		return Transaction{}, err
+	}
+	return createTransactionInTx(ctx, tx, userID, input, requestHash)
+}
+
+func createTransactionInTx(ctx context.Context, tx commandtx.Queryer, userID string, input CreateTransactionInput, requestHash string) (Transaction, error) {
+	if err := commandtx.LockUser(ctx, tx, userID); err != nil {
+		return Transaction{}, err
+	}
 	replayed, ok, err := loadIdempotentTransaction(ctx, tx, userID, input.IdempotencyKey, requestHash)
 	if err != nil {
 		return Transaction{}, err
 	}
 	if ok {
-		if err := tx.Commit(); err != nil {
-			return Transaction{}, fmt.Errorf("commit idempotent transaction replay: %w", err)
-		}
 		return replayed, nil
 	}
 	if input.ReceiptObjectID != "" {
@@ -407,16 +560,9 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID string, input
 		}
 	}
 
-	sourceBalance, err := lockWalletBalance(ctx, tx, userID, input.SourceWalletID)
+	balances, err := lockWalletBalances(ctx, tx, userID, []string{input.SourceWalletID, input.DestinationWalletID})
 	if err != nil {
 		return Transaction{}, err
-	}
-	destinationBalance := int64(0)
-	if input.Type == TransactionTransfer {
-		destinationBalance, err = lockWalletBalance(ctx, tx, userID, input.DestinationWalletID)
-		if err != nil {
-			return Transaction{}, err
-		}
 	}
 	if err := requireTransactionCategory(ctx, tx, userID, input.SourceWalletID, input.CategoryID, input.Type); err != nil {
 		return Transaction{}, err
@@ -427,21 +573,20 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID string, input
 		AmountVND:             input.AmountVND,
 		SourceWalletID:        input.SourceWalletID,
 		DestinationWalletID:   input.DestinationWalletID,
-		SourceBalanceVND:      sourceBalance,
-		DestinationBalanceVND: destinationBalance,
+		SourceBalanceVND:      balances[input.SourceWalletID],
+		DestinationBalanceVND: balances[input.DestinationWalletID],
 		TargetBalanceVND:      input.TargetBalanceVND,
 	})
 	if err != nil {
 		return Transaction{}, err
 	}
 
-	if err := updateWalletBalance(ctx, tx, userID, input.SourceWalletID, effect.SourceBalanceVND); err != nil {
-		return Transaction{}, err
-	}
+	balances[input.SourceWalletID] = effect.SourceBalanceVND
 	if input.Type == TransactionTransfer {
-		if err := updateWalletBalance(ctx, tx, userID, input.DestinationWalletID, effect.DestinationBalanceVND); err != nil {
-			return Transaction{}, err
-		}
+		balances[input.DestinationWalletID] = effect.DestinationBalanceVND
+	}
+	if err := updateWalletBalances(ctx, tx, userID, balances); err != nil {
+		return Transaction{}, err
 	}
 
 	transaction, err := insertTransaction(ctx, tx, userID, input, effect)
@@ -458,9 +603,8 @@ func (r *Repository) CreateTransaction(ctx context.Context, userID string, input
 	`, userID, input.IdempotencyKey, requestHash, responseJSON); err != nil {
 		return Transaction{}, fmt.Errorf("store transaction idempotency: %w", err)
 	}
-
-	if err := tx.Commit(); err != nil {
-		return Transaction{}, fmt.Errorf("commit create transaction: %w", err)
+	if err := changefeed.Append(ctx, tx, userID, "transaction", transaction.ID, "create", transaction.Version, transaction); err != nil {
+		return Transaction{}, err
 	}
 	return transaction, nil
 }
@@ -469,6 +613,9 @@ func (r *Repository) UpdateTransaction(ctx context.Context, userID string, trans
 	normalized, err := ValidateUpdateTransaction(input)
 	if err != nil {
 		return Transaction{}, err
+	}
+	if input.BaseVersion <= 0 {
+		return Transaction{}, fmt.Errorf("%w: base version is required", ErrValidation)
 	}
 
 	tx, err := r.db.BeginTx(ctx, nil)
@@ -480,6 +627,9 @@ func (r *Repository) UpdateTransaction(ctx context.Context, userID string, trans
 	current, err := loadActiveTransaction(ctx, tx, userID, transactionID)
 	if err != nil {
 		return Transaction{}, err
+	}
+	if input.BaseVersion != current.Version {
+		return Transaction{}, ErrConflict
 	}
 	balances, err := lockWalletBalances(ctx, tx, userID, transactionWalletIDs(current, normalized))
 	if err != nil {
@@ -494,7 +644,9 @@ func (r *Repository) UpdateTransaction(ctx context.Context, userID string, trans
 		}
 	}
 
-	reverseTransactionEffect(balances, current)
+	if err := reverseTransactionEffect(balances, current); err != nil {
+		return Transaction{}, err
+	}
 	effect, err := ApplyAccountingEffect(AccountingInput{
 		Type:                  normalized.Type,
 		AmountVND:             normalized.AmountVND,
@@ -519,13 +671,19 @@ func (r *Repository) UpdateTransaction(ctx context.Context, userID string, trans
 	if err != nil {
 		return Transaction{}, err
 	}
+	if err := changefeed.Append(ctx, tx, userID, "transaction", updated.ID, "update", updated.Version, updated); err != nil {
+		return Transaction{}, err
+	}
 	if err := tx.Commit(); err != nil {
 		return Transaction{}, fmt.Errorf("commit update transaction: %w", err)
 	}
 	return updated, nil
 }
 
-func (r *Repository) ArchiveTransaction(ctx context.Context, userID string, transactionID string) error {
+func (r *Repository) ArchiveTransaction(ctx context.Context, userID string, transactionID string, baseVersion int64) error {
+	if baseVersion <= 0 {
+		return fmt.Errorf("%w: base version is required", ErrValidation)
+	}
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return fmt.Errorf("begin archive transaction: %w", err)
@@ -536,11 +694,16 @@ func (r *Repository) ArchiveTransaction(ctx context.Context, userID string, tran
 	if err != nil {
 		return err
 	}
+	if baseVersion != current.Version {
+		return ErrConflict
+	}
 	balances, err := lockWalletBalances(ctx, tx, userID, transactionWalletIDs(current, CreateTransactionInput{}))
 	if err != nil {
 		return err
 	}
-	reverseTransactionEffect(balances, current)
+	if err := reverseTransactionEffect(balances, current); err != nil {
+		return err
+	}
 	if err := updateWalletBalances(ctx, tx, userID, balances); err != nil {
 		return err
 	}
@@ -559,6 +722,9 @@ func (r *Repository) ArchiveTransaction(ctx context.Context, userID string, tran
 	}
 	if affected == 0 {
 		return ErrForbidden
+	}
+	if err := changefeed.Append(ctx, tx, userID, "transaction", transactionID, "archive", current.Version+1, map[string]any{"id": transactionID, "version": current.Version + 1}); err != nil {
+		return err
 	}
 	if err := tx.Commit(); err != nil {
 		return fmt.Errorf("commit archive transaction: %w", err)
@@ -629,7 +795,7 @@ func (r *Repository) ListTransactions(ctx context.Context, userID string, filter
 	return transactions, nil
 }
 
-func loadIdempotentTransaction(ctx context.Context, tx *sql.Tx, userID string, key string, requestHash string) (Transaction, bool, error) {
+func loadIdempotentTransaction(ctx context.Context, tx commandtx.Queryer, userID string, key string, requestHash string) (Transaction, bool, error) {
 	var storedHash string
 	var responseJSON []byte
 	err := tx.QueryRowContext(ctx, `
@@ -654,7 +820,10 @@ func loadIdempotentTransaction(ctx context.Context, tx *sql.Tx, userID string, k
 	return transaction, true, nil
 }
 
-func loadActiveTransaction(ctx context.Context, tx *sql.Tx, userID string, transactionID string) (Transaction, error) {
+func loadActiveTransaction(ctx context.Context, tx commandtx.Queryer, userID string, transactionID string) (Transaction, error) {
+	if err := commandtx.LockUser(ctx, tx, userID); err != nil {
+		return Transaction{}, err
+	}
 	transaction, err := queryTransaction(ctx, tx, `
 		SELECT
 			id::text,
@@ -687,7 +856,41 @@ func loadActiveTransaction(ctx context.Context, tx *sql.Tx, userID string, trans
 	return transaction, nil
 }
 
-func lockWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletID string) (int64, error) {
+// GetTransactionInTx loads an owned transaction, including an archived one,
+// inside a caller-owned SQL transaction.
+func GetTransactionInTx(ctx context.Context, tx *sql.Tx, userID string, transactionID string) (Transaction, error) {
+	transaction, err := queryTransaction(ctx, tx, `
+		SELECT
+			id::text,
+			user_id::text,
+			type,
+			source_wallet_id::text,
+			coalesce(destination_wallet_id::text, ''),
+			coalesce(category_id::text, ''),
+			coalesce(receipt_object_id::text, ''),
+			amount_vnd,
+			coalesce(balance_after_vnd, 0),
+			source_delta_vnd,
+			destination_delta_vnd,
+			occurred_at,
+			note,
+			with_person,
+			event_ref,
+			excluded_from_reports,
+			version
+		FROM transactions
+		WHERE id = $1 AND user_id = $2
+	`, transactionID, userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return Transaction{}, ErrForbidden
+	}
+	if err != nil {
+		return Transaction{}, fmt.Errorf("load transaction: %w", err)
+	}
+	return transaction, nil
+}
+
+func lockWalletBalance(ctx context.Context, tx commandtx.Queryer, userID string, walletID string) (int64, error) {
 	var balanceVND int64
 	err := tx.QueryRowContext(ctx, `
 		SELECT balance_vnd
@@ -704,7 +907,7 @@ func lockWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletID 
 	return balanceVND, nil
 }
 
-func lockWalletBalances(ctx context.Context, tx *sql.Tx, userID string, walletIDs []string) (map[string]int64, error) {
+func lockWalletBalances(ctx context.Context, tx commandtx.Queryer, userID string, walletIDs []string) (map[string]int64, error) {
 	unique := make(map[string]struct{}, len(walletIDs))
 	for _, walletID := range walletIDs {
 		walletID = trimmed(walletID)
@@ -729,7 +932,7 @@ func lockWalletBalances(ctx context.Context, tx *sql.Tx, userID string, walletID
 	return balances, nil
 }
 
-func requireTransactionCategory(ctx context.Context, tx *sql.Tx, userID string, walletID string, categoryID string, txType TransactionType) error {
+func requireTransactionCategory(ctx context.Context, tx commandtx.Queryer, userID string, walletID string, categoryID string, txType TransactionType) error {
 	if txType == TransactionTransfer || txType == TransactionAdjustment {
 		return nil
 	}
@@ -759,7 +962,7 @@ func requireTransactionCategory(ctx context.Context, tx *sql.Tx, userID string, 
 	return requireWalletCategoryActive(ctx, tx, userID, walletID, categoryID)
 }
 
-func requireWalletCategoryActive(ctx context.Context, tx *sql.Tx, userID string, walletID string, categoryID string) error {
+func requireWalletCategoryActive(ctx context.Context, tx commandtx.Queryer, userID string, walletID string, categoryID string) error {
 	var active bool
 	err := tx.QueryRowContext(ctx, `
 		SELECT active
@@ -778,7 +981,7 @@ func requireWalletCategoryActive(ctx context.Context, tx *sql.Tx, userID string,
 	return nil
 }
 
-func updateWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletID string, balanceVND int64) error {
+func updateWalletBalance(ctx context.Context, tx commandtx.Queryer, userID string, walletID string, balanceVND int64) error {
 	result, err := tx.ExecContext(ctx, `
 		UPDATE wallets
 		SET balance_vnd = $3, version = version + 1, updated_at = now()
@@ -794,10 +997,14 @@ func updateWalletBalance(ctx context.Context, tx *sql.Tx, userID string, walletI
 	if affected == 0 {
 		return ErrForbidden
 	}
-	return nil
+	var wallet Wallet
+	if err := tx.QueryRowContext(ctx, `SELECT id::text,user_id::text,name,type,balance_vnd,include_in_total,is_default_ai,version FROM wallets WHERE id=$1 AND user_id=$2`, walletID, userID).Scan(&wallet.ID, &wallet.UserID, &wallet.Name, &wallet.Type, &wallet.BalanceVND, &wallet.IncludeInTotal, &wallet.IsDefaultAI, &wallet.Version); err != nil {
+		return err
+	}
+	return changefeed.Append(ctx, tx, userID, "wallet", wallet.ID, "update", wallet.Version, wallet)
 }
 
-func updateWalletBalances(ctx context.Context, tx *sql.Tx, userID string, balances map[string]int64) error {
+func updateWalletBalances(ctx context.Context, tx commandtx.Queryer, userID string, balances map[string]int64) error {
 	walletIDs := make([]string, 0, len(balances))
 	for walletID := range balances {
 		walletIDs = append(walletIDs, walletID)
@@ -811,7 +1018,7 @@ func updateWalletBalances(ctx context.Context, tx *sql.Tx, userID string, balanc
 	return nil
 }
 
-func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input CreateTransactionInput, effect AccountingEffect) (Transaction, error) {
+func insertTransaction(ctx context.Context, tx commandtx.Queryer, userID string, input CreateTransactionInput, effect AccountingEffect) (Transaction, error) {
 	var transaction Transaction
 	returning := `
 		INSERT INTO transactions (
@@ -894,7 +1101,7 @@ func insertTransaction(ctx context.Context, tx *sql.Tx, userID string, input Cre
 	return transaction, nil
 }
 
-func updateTransactionRow(ctx context.Context, tx *sql.Tx, userID string, transactionID string, input CreateTransactionInput, effect AccountingEffect) (Transaction, error) {
+func updateTransactionRow(ctx context.Context, tx commandtx.Queryer, userID string, transactionID string, input CreateTransactionInput, effect AccountingEffect) (Transaction, error) {
 	transaction, err := queryTransaction(ctx, tx, `
 		UPDATE transactions
 		SET
@@ -964,7 +1171,7 @@ type transactionScanner interface {
 	Scan(dest ...any) error
 }
 
-func queryTransaction(ctx context.Context, tx *sql.Tx, query string, args ...any) (Transaction, error) {
+func queryTransaction(ctx context.Context, tx commandtx.Queryer, query string, args ...any) (Transaction, error) {
 	return scanTransaction(tx.QueryRowContext(ctx, query, args...))
 }
 
@@ -995,7 +1202,7 @@ func scanTransaction(scanner transactionScanner) (Transaction, error) {
 	return transaction, nil
 }
 
-func requireReceiptOwnership(ctx context.Context, tx *sql.Tx, userID, receiptID string) error {
+func requireReceiptOwnership(ctx context.Context, tx commandtx.Queryer, userID, receiptID string) error {
 	var exists bool
 	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM receipt_objects WHERE id = $1 AND user_id = $2)`, receiptID, userID).Scan(&exists); err != nil {
 		return fmt.Errorf("check receipt ownership: %w", err)
@@ -1017,11 +1224,20 @@ func transactionWalletIDs(current Transaction, next CreateTransactionInput) []st
 	return walletIDs
 }
 
-func reverseTransactionEffect(balances map[string]int64, transaction Transaction) {
-	balances[transaction.SourceWalletID] -= transaction.SourceDeltaVND
-	if transaction.DestinationWalletID != "" {
-		balances[transaction.DestinationWalletID] -= transaction.DestinationDeltaVND
+func reverseTransactionEffect(balances map[string]int64, transaction Transaction) error {
+	sourceBalance, ok := checkedSub(balances[transaction.SourceWalletID], transaction.SourceDeltaVND)
+	if !ok {
+		return fmt.Errorf("%w: reversing transaction would overflow source balance", ErrValidation)
 	}
+	balances[transaction.SourceWalletID] = sourceBalance
+	if transaction.DestinationWalletID != "" {
+		destinationBalance, ok := checkedSub(balances[transaction.DestinationWalletID], transaction.DestinationDeltaVND)
+		if !ok {
+			return fmt.Errorf("%w: reversing transaction would overflow destination balance", ErrValidation)
+		}
+		balances[transaction.DestinationWalletID] = destinationBalance
+	}
+	return nil
 }
 
 func (r *Repository) getCategoryForUser(ctx context.Context, userID string, categoryID string) (Category, error) {
@@ -1047,6 +1263,67 @@ func (r *Repository) getCategoryForUser(ctx context.Context, userID string, cate
 		return Category{}, fmt.Errorf("load category: %w", err)
 	}
 	return category, nil
+}
+
+type categoryQueryer interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+func validateCategoryParent(ctx context.Context, queryer categoryQueryer, userID, categoryID, parentID string, kind CategoryKind) error {
+	var parent Category
+	var archivedAt sql.NullTime
+	err := queryer.QueryRowContext(ctx, `
+		SELECT id::text, user_id::text, coalesce(parent_id::text, ''), kind, name, is_system, version, archived_at
+		FROM categories
+		WHERE id::text = $1 AND user_id = $2
+	`, parentID, userID).Scan(
+		&parent.ID,
+		&parent.UserID,
+		&parent.ParentID,
+		&parent.Kind,
+		&parent.Name,
+		&parent.IsSystem,
+		&parent.Version,
+		&archivedAt,
+	)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrForbidden
+	}
+	if err != nil {
+		return fmt.Errorf("load category parent: %w", err)
+	}
+	if archivedAt.Valid {
+		return fmt.Errorf("%w: category parent is archived", ErrValidation)
+	}
+	if parent.Kind != kind {
+		return fmt.Errorf("%w: category parent kind must match", ErrValidation)
+	}
+	if categoryID != "" {
+		var cycle bool
+		err := queryer.QueryRowContext(ctx, `
+			WITH RECURSIVE descendants(id) AS (
+				SELECT id
+				FROM categories
+				WHERE parent_id::text = $1 AND user_id = $2
+				UNION
+				SELECT c.id
+				FROM categories c
+				JOIN descendants d ON c.parent_id = d.id
+				WHERE c.user_id = $2
+			)
+			SELECT EXISTS (SELECT 1 FROM descendants WHERE id::text = $3)
+		`, categoryID, userID, parentID).Scan(&cycle)
+		if err != nil {
+			return fmt.Errorf("check category parent cycle: %w", err)
+		}
+		if cycle {
+			return fmt.Errorf("%w: category parent cannot be a descendant", ErrValidation)
+		}
+	}
+	if parent.ParentID != "" {
+		return fmt.Errorf("%w: category depth cannot exceed two levels", ErrValidation)
+	}
+	return nil
 }
 
 func (r *Repository) requireWalletOwner(ctx context.Context, userID string, walletID string) error {

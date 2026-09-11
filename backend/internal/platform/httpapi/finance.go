@@ -3,6 +3,7 @@ package httpapi
 import (
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -44,6 +45,7 @@ type createWalletRequest struct {
 }
 
 type updateWalletRequest struct {
+	BaseVersion    int64  `json:"base_version"`
 	Name           string `json:"name"`
 	IncludeInTotal *bool  `json:"include_in_total"`
 }
@@ -51,6 +53,10 @@ type updateWalletRequest struct {
 type commandResponse struct {
 	Status        string `json:"status"`
 	CorrelationID string `json:"correlation_id"`
+}
+
+type versionCommandRequest struct {
+	BaseVersion int64 `json:"base_version"`
 }
 
 type categoriesResponse struct {
@@ -65,6 +71,12 @@ type categoryResponse struct {
 	CorrelationID string       `json:"correlation_id"`
 }
 
+type walletCategorySettingsResponse struct {
+	Status        string                      `json:"status"`
+	Categories    []walletCategorySettingBody `json:"categories"`
+	CorrelationID string                      `json:"correlation_id"`
+}
+
 type categoryBody struct {
 	ID        string               `json:"id"`
 	ParentID  string               `json:"parent_id,omitempty"`
@@ -75,13 +87,22 @@ type categoryBody struct {
 	Version   int64                `json:"version"`
 }
 
+type walletCategorySettingBody struct {
+	categoryBody
+	Active bool `json:"active"`
+}
+
 type createCategoryRequest struct {
-	Kind finance.CategoryKind `json:"kind"`
-	Name string               `json:"name"`
+	Kind     finance.CategoryKind `json:"kind"`
+	Name     string               `json:"name"`
+	ParentID *string              `json:"parent_id"`
 }
 
 type updateCategoryRequest struct {
-	Name string `json:"name"`
+	Name        string          `json:"name"`
+	ParentID    json.RawMessage `json:"parent_id"`
+	BaseVersion int64           `json:"base_version"`
+	Version     int64           `json:"version"`
 }
 
 type setWalletCategoryRequest struct {
@@ -118,6 +139,7 @@ type transactionBody struct {
 }
 
 type transactionRequest struct {
+	BaseVersion         int64                   `json:"base_version"`
 	Type                finance.TransactionType `json:"type"`
 	SourceWalletID      string                  `json:"source_wallet_id"`
 	DestinationWalletID string                  `json:"destination_wallet_id"`
@@ -188,6 +210,8 @@ func walletByID(cfg config.Config, repo FinanceRepository) http.HandlerFunc {
 			})).ServeHTTP(w, r)
 		case r.Method == http.MethodGet && action == "detail":
 			walletDetail(w, r, repo, userID, walletID)
+		case r.Method == http.MethodGet && action == "category-settings":
+			listWalletCategorySettings(w, r, repo, userID, walletID)
 		case r.Method == http.MethodPut && action == "category":
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				setWalletCategoryActive(w, r, repo, userID, walletID, categoryID)
@@ -276,7 +300,12 @@ func updateWallet(w http.ResponseWriter, r *http.Request, repo FinanceRepository
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
 		return
 	}
+	if req.BaseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+		return
+	}
 	wallet, err := repo.UpdateWallet(r.Context(), userID, walletID, finance.UpdateWalletInput{
+		BaseVersion:    req.BaseVersion,
 		Name:           req.Name,
 		IncludeInTotal: req.IncludeInTotal,
 	})
@@ -292,7 +321,16 @@ func updateWallet(w http.ResponseWriter, r *http.Request, repo FinanceRepository
 }
 
 func archiveWallet(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID string, walletID string) {
-	if err := repo.ArchiveWallet(r.Context(), userID, walletID); err != nil {
+	var req versionCommandRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
+		return
+	}
+	if req.BaseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+		return
+	}
+	if err := repo.ArchiveWallet(r.Context(), userID, walletID, req.BaseVersion); err != nil {
 		writeFinanceError(w, r, err, "Wallet unavailable")
 		return
 	}
@@ -303,7 +341,16 @@ func archiveWallet(w http.ResponseWriter, r *http.Request, repo FinanceRepositor
 }
 
 func setDefaultAIWallet(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID string, walletID string) {
-	if err := repo.SetDefaultAIWallet(r.Context(), userID, walletID); err != nil {
+	var req versionCommandRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
+		return
+	}
+	if req.BaseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+		return
+	}
+	if err := repo.SetDefaultAIWallet(r.Context(), userID, walletID, req.BaseVersion); err != nil {
 		writeFinanceError(w, r, err, "Wallet unavailable")
 		return
 	}
@@ -315,7 +362,7 @@ func setDefaultAIWallet(w http.ResponseWriter, r *http.Request, repo FinanceRepo
 
 func setWalletCategoryActive(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID string, walletID string, categoryID string) {
 	var req setWalletCategoryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeFinanceJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
 		return
 	}
@@ -403,13 +450,18 @@ func listCategories(w http.ResponseWriter, r *http.Request, repo FinanceReposito
 
 func createCategory(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID string) {
 	var req createCategoryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeFinanceJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
 		return
 	}
+	parentID := ""
+	if req.ParentID != nil {
+		parentID = *req.ParentID
+	}
 	category, err := repo.CreateCategory(r.Context(), userID, finance.CreateCategoryInput{
-		Kind: req.Kind,
-		Name: req.Name,
+		Kind:     req.Kind,
+		Name:     req.Name,
+		ParentID: parentID,
 	})
 	if err != nil {
 		writeFinanceError(w, r, err, "Category unavailable")
@@ -424,11 +476,24 @@ func createCategory(w http.ResponseWriter, r *http.Request, repo FinanceReposito
 
 func updateCategory(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID string, categoryID string) {
 	var req updateCategoryRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := decodeFinanceJSON(r, &req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
 		return
 	}
-	category, err := repo.UpdateCategory(r.Context(), userID, categoryID, finance.UpdateCategoryInput{Name: req.Name})
+	baseVersion := req.BaseVersion
+	if baseVersion == 0 {
+		baseVersion = req.Version
+	}
+	if baseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Version is required", correlationID(r.Context())))
+		return
+	}
+	parentID, err := decodeCategoryParentUpdate(req.ParentID)
+	if err != nil {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid parent_id", correlationID(r.Context())))
+		return
+	}
+	category, err := repo.UpdateCategory(r.Context(), userID, categoryID, finance.UpdateCategoryInput{Name: req.Name, ParentID: parentID, BaseVersion: baseVersion})
 	if err != nil {
 		writeFinanceError(w, r, err, "Category unavailable")
 		return
@@ -440,8 +505,61 @@ func updateCategory(w http.ResponseWriter, r *http.Request, repo FinanceReposito
 	})
 }
 
+func listWalletCategorySettings(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID, walletID string) {
+	settings, err := repo.ListWalletCategorySettings(r.Context(), userID, walletID)
+	if err != nil {
+		writeFinanceError(w, r, err, "Category settings unavailable")
+		return
+	}
+	body := make([]walletCategorySettingBody, 0, len(settings))
+	for _, setting := range settings {
+		body = append(body, walletCategorySettingBody{categoryBody: toCategoryBody(setting.Category), Active: setting.Active})
+	}
+	writeJSON(w, http.StatusOK, walletCategorySettingsResponse{
+		Status:        "ok",
+		Categories:    body,
+		CorrelationID: correlationID(r.Context()),
+	})
+}
+
+func decodeFinanceJSON(r *http.Request, target any) error {
+	decoder := json.NewDecoder(r.Body)
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(target); err != nil {
+		return err
+	}
+	var trailing any
+	if err := decoder.Decode(&trailing); !errors.Is(err, io.EOF) {
+		if err == nil {
+			return errors.New("multiple JSON values")
+		}
+		return err
+	}
+	return nil
+}
+
+func decodeCategoryParentUpdate(raw json.RawMessage) (*string, error) {
+	if len(raw) == 0 {
+		return nil, nil
+	}
+	if string(raw) == "null" {
+		value := ""
+		return &value, nil
+	}
+	var value string
+	if err := json.Unmarshal(raw, &value); err != nil {
+		return nil, err
+	}
+	return &value, nil
+}
+
 func archiveCategory(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID string, categoryID string) {
-	if err := repo.ArchiveCategory(r.Context(), userID, categoryID); err != nil {
+	var input versionRequest
+	if err := json.NewDecoder(r.Body).Decode(&input); err != nil || input.BaseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+		return
+	}
+	if err := repo.ArchiveCategory(r.Context(), userID, categoryID, input.BaseVersion); err != nil {
 		writeFinanceError(w, r, err, "Category unavailable")
 		return
 	}
@@ -565,7 +683,12 @@ func updateTransaction(w http.ResponseWriter, r *http.Request, repo FinanceRepos
 	if !ok {
 		return
 	}
+	if req.BaseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+		return
+	}
 	transaction, err := repo.UpdateTransaction(r.Context(), userID, transactionID, finance.UpdateTransactionInput{
+		BaseVersion:         req.BaseVersion,
 		Type:                req.Type,
 		SourceWalletID:      req.SourceWalletID,
 		DestinationWalletID: req.DestinationWalletID,
@@ -591,7 +714,16 @@ func updateTransaction(w http.ResponseWriter, r *http.Request, repo FinanceRepos
 }
 
 func archiveTransaction(w http.ResponseWriter, r *http.Request, repo FinanceRepository, userID string, transactionID string) {
-	if err := repo.ArchiveTransaction(r.Context(), userID, transactionID); err != nil {
+	var req versionCommandRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && !errors.Is(err, io.EOF) {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
+		return
+	}
+	if req.BaseVersion <= 0 {
+		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+		return
+	}
+	if err := repo.ArchiveTransaction(r.Context(), userID, transactionID, req.BaseVersion); err != nil {
 		writeFinanceError(w, r, err, "Transaction unavailable")
 		return
 	}
@@ -708,7 +840,7 @@ func parseWalletPath(path string) (string, string, string, bool) {
 	if len(parts) == 1 && parts[0] != "" {
 		return parts[0], "", "", true
 	}
-	if len(parts) == 2 && parts[0] != "" && (parts[1] == "archive" || parts[1] == "default-ai" || parts[1] == "detail") {
+	if len(parts) == 2 && parts[0] != "" && (parts[1] == "archive" || parts[1] == "default-ai" || parts[1] == "detail" || parts[1] == "category-settings") {
 		return parts[0], "", parts[1], true
 	}
 	if len(parts) == 3 && parts[0] != "" && parts[1] == "categories" && parts[2] != "" {
@@ -756,6 +888,8 @@ func writeFinanceError(w http.ResponseWriter, r *http.Request, err error, fallba
 		writeJSON(w, http.StatusForbidden, ErrorEnvelope("FORBIDDEN", "Forbidden", correlationID(r.Context())))
 	case errors.Is(err, finance.ErrSystemCategoryLocked):
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", err.Error(), correlationID(r.Context())))
+	case errors.Is(err, finance.ErrConflict):
+		writeJSON(w, http.StatusConflict, ErrorEnvelope("VERSION_CONFLICT", "Finance object version conflict", correlationID(r.Context())))
 	default:
 		writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", fallback, correlationID(r.Context())))
 	}

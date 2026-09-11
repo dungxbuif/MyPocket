@@ -4,6 +4,7 @@ import "fmt"
 
 func ValidateCreateCategory(input CreateCategoryInput) (CreateCategoryInput, error) {
 	input.Name = trimmed(input.Name)
+	input.ParentID = trimmed(input.ParentID)
 	if input.Name == "" {
 		return CreateCategoryInput{}, fmt.Errorf("%w: category name is required", ErrValidation)
 	}
@@ -18,7 +19,7 @@ func ValidateCreateCategory(input CreateCategoryInput) (CreateCategoryInput, err
 
 func ValidateCategoryUpdate(category Category, input UpdateCategoryInput) error {
 	name := trimmed(input.Name)
-	if category.IsSystem && name != category.Name {
+	if category.IsSystem {
 		return ErrSystemCategoryLocked
 	}
 	if name == "" {

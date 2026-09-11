@@ -8,14 +8,15 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"mypocket/internal/platform/commandtx"
 )
 
 type Repository struct {
-	db *sql.DB
+	db *commandtx.Handle
 }
 
 func NewRepository(db *sql.DB) *Repository {
-	return &Repository{db: db}
+	return &Repository{db: commandtx.New(db)}
 }
 
 func RequestHash(mutation Mutation) (string, error) {
@@ -226,7 +227,7 @@ func (r *Repository) transactionVersionAndPayload(ctx context.Context, userID st
 	err := r.db.QueryRowContext(ctx, `
 		SELECT version, to_jsonb(row) - 'user_id'
 		FROM (
-			SELECT id::text, user_id::text, type, source_wallet_id::text, coalesce(destination_wallet_id::text, '') AS destination_wallet_id, coalesce(category_id::text, '') AS category_id, amount_vnd, coalesce(balance_after_vnd, 0) AS balance_after_vnd, note, with_person, event_ref, occurred_at, excluded_from_reports, version
+			SELECT id::text, user_id::text, type, source_wallet_id::text, coalesce(destination_wallet_id::text, '') AS destination_wallet_id, coalesce(category_id::text, '') AS category_id, coalesce(receipt_object_id::text, '') AS receipt_object_id, amount_vnd, coalesce(balance_after_vnd, 0) AS balance_after_vnd, note, with_person, event_ref, occurred_at, excluded_from_reports, version
 			FROM transactions
 			WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
 		) row

@@ -39,6 +39,7 @@ type Wallet struct {
 }
 
 type UpdateWalletInput struct {
+	BaseVersion    int64
 	Name           string
 	IncludeInTotal *bool
 }
@@ -66,11 +67,19 @@ type CreateCategoryInput struct {
 	ID          string
 	Kind        CategoryKind
 	Name        string
+	ParentID    string
 	ParentDepth *int
 }
 
 type UpdateCategoryInput struct {
-	Name string
+	Name        string
+	ParentID    *string
+	BaseVersion int64
+}
+
+type WalletCategorySetting struct {
+	Category Category `json:"category"`
+	Active   bool     `json:"active"`
 }
 
 type TransactionType string
@@ -117,6 +126,7 @@ type CreateTransactionInput struct {
 }
 
 type UpdateTransactionInput struct {
+	BaseVersion         int64
 	Type                TransactionType
 	SourceWalletID      string
 	DestinationWalletID string

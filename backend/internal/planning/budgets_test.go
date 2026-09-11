@@ -75,20 +75,26 @@ func TestBudgetUpdateArchiveAndCategoryOwnership(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create budget: %v", err)
 	}
-	if _, err := planningRepo.UpdateBudget(context.Background(), owner, budget.ID, planning.UpdateBudgetInput{Name: "Invalid", PeriodType: planning.BudgetWeekly, AmountVND: 300000, CategoryIDs: []string{otherCategory.ID}}); !errors.Is(err, planning.ErrForbidden) {
+	if _, err := planningRepo.UpdateBudget(context.Background(), owner, budget.ID, planning.UpdateBudgetInput{BaseVersion: budget.Version, Name: "Invalid", PeriodType: planning.BudgetWeekly, AmountVND: 300000, CategoryIDs: []string{otherCategory.ID}}); !errors.Is(err, planning.ErrForbidden) {
 		t.Fatalf("expected category ownership rejection, got %v", err)
 	}
-	updated, err := planningRepo.UpdateBudget(context.Background(), owner, budget.ID, planning.UpdateBudgetInput{Name: "Cafe tháng", PeriodType: planning.BudgetMonthly, AmountVND: 600000})
+	updated, err := planningRepo.UpdateBudget(context.Background(), owner, budget.ID, planning.UpdateBudgetInput{BaseVersion: budget.Version, Name: "Cafe tháng", PeriodType: planning.BudgetMonthly, AmountVND: 600000})
 	if err != nil {
 		t.Fatalf("update budget: %v", err)
 	}
 	if updated.Name != "Cafe tháng" || !updated.AllCategories || updated.Version != 2 {
 		t.Fatalf("unexpected updated budget: %#v", updated)
 	}
-	if err := planningRepo.ArchiveBudget(context.Background(), other, budget.ID); !errors.Is(err, planning.ErrForbidden) {
+	if _, err := planningRepo.UpdateBudget(context.Background(), owner, budget.ID, planning.UpdateBudgetInput{BaseVersion: budget.Version, Name: "Stale", PeriodType: planning.BudgetMonthly, AmountVND: 700000}); !errors.Is(err, planning.ErrVersionConflict) {
+		t.Fatalf("expected stale budget update conflict, got %v", err)
+	}
+	if err := planningRepo.ArchiveBudget(context.Background(), owner, budget.ID, budget.Version); !errors.Is(err, planning.ErrVersionConflict) {
+		t.Fatalf("expected stale budget archive conflict, got %v", err)
+	}
+	if err := planningRepo.ArchiveBudget(context.Background(), other, budget.ID, updated.Version); !errors.Is(err, planning.ErrForbidden) {
 		t.Fatalf("expected other user archive rejection, got %v", err)
 	}
-	if err := planningRepo.ArchiveBudget(context.Background(), owner, budget.ID); err != nil {
+	if err := planningRepo.ArchiveBudget(context.Background(), owner, budget.ID, updated.Version); err != nil {
 		t.Fatalf("archive budget: %v", err)
 	}
 	progress, err := planningRepo.ListBudgetProgress(context.Background(), owner, time.Now())

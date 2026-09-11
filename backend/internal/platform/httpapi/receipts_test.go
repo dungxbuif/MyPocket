@@ -38,6 +38,23 @@ func TestReceiptUploadAndDownloadAreUserScoped(t *testing.T) {
 	}
 }
 
+func TestReceiptPresignUsesAPIKeyOwner(t *testing.T) {
+	cfg := authTestConfig()
+	cfg.APIKeyHashSecret = "change-this-development-api-key-hash-secret-32-bytes"
+	identityRepo := &authRepoStub{user: identity.User{ID: "user_123", Email: "agent@example.com", EmailVerified: true}}
+	repo := &receiptRepoStub{}
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: identityRepo, APIKeyRepository: identityRepo, ReceiptRepository: repo, ObjectStore: &receiptStoreStub{}, AuthCache: &authCacheStub{}})
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/files/presign", strings.NewReader(`{"filename":"bill.jpg","content_type":"image/jpeg","size_bytes":123,"checksum_sha256":"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"}`))
+	req.Header.Set("Authorization", "Bearer mpk_test")
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusCreated || repo.created.UserID != "user_123" {
+		t.Fatalf("expected receipt scoped to API key owner, code=%d user=%q body=%s", res.Code, repo.created.UserID, res.Body.String())
+	}
+}
+
 type receiptRepoStub struct{ created finance.ReceiptObject }
 
 func (r *receiptRepoStub) CreateReceiptObject(_ context.Context, userID string, input finance.CreateReceiptObjectInput) (finance.ReceiptObject, error) {

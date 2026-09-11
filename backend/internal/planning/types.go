@@ -27,6 +27,7 @@ type CreateBudgetInput struct {
 }
 
 type UpdateBudgetInput struct {
+	BaseVersion int64
 	Name        string
 	PeriodType  BudgetPeriodType
 	AmountVND   int64
@@ -67,10 +68,11 @@ type CreateEventInput struct {
 }
 
 type UpdateEventInput struct {
-	Name     string
-	StartsOn string
-	EndsOn   string
-	Note     string
+	BaseVersion int64
+	Name        string
+	StartsOn    string
+	EndsOn      string
+	Note        string
 }
 
 type EventSummary struct {
@@ -101,6 +103,7 @@ type CreateObligationInput struct {
 }
 
 type UpdateObligationInput struct {
+	BaseVersion  int64
 	Direction    ObligationDirection
 	PrincipalVND int64
 	Counterparty string
@@ -162,19 +165,36 @@ type RecurringSchedule struct {
 }
 
 type TransactionDraft struct {
-	ID                  string                  `json:"id"`
-	UserID              string                  `json:"user_id"`
-	ScheduleID          string                  `json:"schedule_id,omitempty"`
-	OccurrenceKey       string                  `json:"occurrence_key"`
-	Type                finance.TransactionType `json:"type"`
-	SourceWalletID      string                  `json:"source_wallet_id"`
-	DestinationWalletID string                  `json:"destination_wallet_id,omitempty"`
-	CategoryID          string                  `json:"category_id,omitempty"`
-	AmountVND           int64                   `json:"amount_vnd"`
-	OccurredAt          time.Time               `json:"occurred_at"`
-	Note                string                  `json:"note"`
-	Status              string                  `json:"status"`
-	Version             int64                   `json:"version"`
+	ID                     string                  `json:"id"`
+	UserID                 string                  `json:"user_id"`
+	ScheduleID             string                  `json:"schedule_id,omitempty"`
+	OccurrenceKey          string                  `json:"occurrence_key"`
+	Type                   finance.TransactionType `json:"type"`
+	SourceWalletID         string                  `json:"source_wallet_id"`
+	DestinationWalletID    string                  `json:"destination_wallet_id,omitempty"`
+	CategoryID             string                  `json:"category_id,omitempty"`
+	AmountVND              int64                   `json:"amount_vnd"`
+	OccurredAt             time.Time               `json:"occurred_at"`
+	Note                   string                  `json:"note"`
+	Status                 string                  `json:"status"`
+	ConfirmedTransactionID string                  `json:"confirmed_transaction_id,omitempty"`
+	Version                int64                   `json:"version"`
+}
+
+type ConfirmTransactionDraftInput struct {
+	Version        int64
+	AmountVND      int64
+	Note           string
+	IdempotencyKey string
+}
+
+type RejectTransactionDraftInput struct {
+	Version int64
+}
+
+type TransactionDraftDecision struct {
+	Draft       TransactionDraft
+	Transaction *finance.Transaction
 }
 
 func trimmed(value string) string {

@@ -32,8 +32,14 @@ func ValidateCreateEvent(input CreateEventInput) (CreateEventInput, error) {
 }
 
 func ValidateUpdateEvent(input UpdateEventInput) (UpdateEventInput, error) {
-	created, err := ValidateCreateEvent(CreateEventInput(input))
-	return UpdateEventInput(created), err
+	if input.BaseVersion <= 0 {
+		return UpdateEventInput{}, fmt.Errorf("%w: base version is required", ErrValidation)
+	}
+	created, err := ValidateCreateEvent(CreateEventInput{Name: input.Name, StartsOn: input.StartsOn, EndsOn: input.EndsOn, Note: input.Note})
+	if err != nil {
+		return UpdateEventInput{}, err
+	}
+	return UpdateEventInput{BaseVersion: input.BaseVersion, Name: created.Name, StartsOn: created.StartsOn, EndsOn: created.EndsOn, Note: created.Note}, nil
 }
 
 func ValidateCreateObligation(input CreateObligationInput) (CreateObligationInput, error) {
@@ -57,8 +63,14 @@ func ValidateCreateObligation(input CreateObligationInput) (CreateObligationInpu
 }
 
 func ValidateUpdateObligation(input UpdateObligationInput) (UpdateObligationInput, error) {
-	created, err := ValidateCreateObligation(CreateObligationInput(input))
-	return UpdateObligationInput(created), err
+	if input.BaseVersion <= 0 {
+		return UpdateObligationInput{}, fmt.Errorf("%w: base version is required", ErrValidation)
+	}
+	created, err := ValidateCreateObligation(CreateObligationInput{Direction: input.Direction, PrincipalVND: input.PrincipalVND, Counterparty: input.Counterparty, DueOn: input.DueOn, Note: input.Note})
+	if err != nil {
+		return UpdateObligationInput{}, err
+	}
+	return UpdateObligationInput{BaseVersion: input.BaseVersion, Direction: created.Direction, PrincipalVND: created.PrincipalVND, Counterparty: created.Counterparty, DueOn: created.DueOn, Note: created.Note}, nil
 }
 
 func validObligationDirection(value ObligationDirection) bool {

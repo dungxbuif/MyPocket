@@ -54,7 +54,6 @@ func dashboard(cfg config.Config, financeRepo FinanceRepository, analyticsRepo A
 			writeJSON(w, http.StatusServiceUnavailable, ErrorEnvelope("INTERNAL_RETRYABLE", "Dashboard unavailable", correlationID(r.Context())))
 			return
 		}
-		d.Summary.DataVersion = d.Summary.DataVersion
 		writeJSON(w, http.StatusOK, analyticsEnvelope{Status: "ok", Report: d, GeneratedAt: d.Summary.GeneratedAt, Timezone: d.Summary.Timezone, From: d.Summary.From, To: d.Summary.To, DataVersion: d.Summary.DataVersion, CorrelationID: correlationID(r.Context())})
 	}
 }
@@ -137,6 +136,9 @@ func parseAnalyticsFilter(r *http.Request) (analytics.Filter, error) {
 		return analytics.Filter{}, err
 	}
 	filter := analytics.NormalizeFilter(from, to)
+	if filter.From.After(filter.To) {
+		return analytics.Filter{}, fmt.Errorf("report from date must not be after to date")
+	}
 	filter.WalletID = strings.TrimSpace(r.URL.Query().Get("wallet_id"))
 	return filter, nil
 }

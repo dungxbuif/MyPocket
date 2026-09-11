@@ -62,6 +62,7 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/recurring-schedules", recurringSchedules(cfg, deps.PlanningRepository))
 	mux.HandleFunc("/api/v1/recurring-schedules/", recurringScheduleByID(cfg, deps.PlanningRepository))
 	mux.HandleFunc("/api/v1/transaction-drafts", transactionDrafts(cfg, deps.PlanningRepository))
+	mux.HandleFunc("/api/v1/transaction-drafts/", transactionDraftByID(cfg, deps.PlanningRepository))
 	mux.HandleFunc("/api/v1/notifications", notifications(cfg, deps.NotificationRepository))
 	mux.HandleFunc("/api/v1/notifications/", notificationByID(cfg, deps.NotificationRepository))
 	mux.HandleFunc("/api/v1/push-subscriptions", pushSubscriptions(cfg, deps.NotificationRepository))
@@ -142,17 +143,18 @@ type FinanceRepository interface {
 	ListWallets(ctx context.Context, userID string) ([]finance.Wallet, error)
 	CreateWallet(ctx context.Context, userID string, input finance.CreateWalletInput) (finance.Wallet, error)
 	UpdateWallet(ctx context.Context, userID string, walletID string, input finance.UpdateWalletInput) (finance.Wallet, error)
-	ArchiveWallet(ctx context.Context, userID string, walletID string) error
-	SetDefaultAIWallet(ctx context.Context, userID string, walletID string) error
+	ArchiveWallet(ctx context.Context, userID string, walletID string, baseVersion int64) error
+	SetDefaultAIWallet(ctx context.Context, userID string, walletID string, baseVersion int64) error
 	ListCategories(ctx context.Context, userID string) ([]finance.Category, error)
 	CreateCategory(ctx context.Context, userID string, input finance.CreateCategoryInput) (finance.Category, error)
 	UpdateCategory(ctx context.Context, userID string, categoryID string, input finance.UpdateCategoryInput) (finance.Category, error)
-	ArchiveCategory(ctx context.Context, userID string, categoryID string) error
+	ArchiveCategory(ctx context.Context, userID string, categoryID string, baseVersion int64) error
 	SetWalletCategoryActive(ctx context.Context, userID string, walletID string, categoryID string, active bool) error
+	ListWalletCategorySettings(ctx context.Context, userID string, walletID string) ([]finance.WalletCategorySetting, error)
 	ListTransactions(ctx context.Context, userID string, filters finance.TransactionFilters) ([]finance.Transaction, error)
 	CreateTransaction(ctx context.Context, userID string, input finance.CreateTransactionInput) (finance.Transaction, error)
 	UpdateTransaction(ctx context.Context, userID string, transactionID string, input finance.UpdateTransactionInput) (finance.Transaction, error)
-	ArchiveTransaction(ctx context.Context, userID string, transactionID string) error
+	ArchiveTransaction(ctx context.Context, userID string, transactionID string, baseVersion int64) error
 }
 
 type SyncService interface {
@@ -165,21 +167,23 @@ type PlanningRepository interface {
 	ListBudgetProgress(ctx context.Context, userID string, now time.Time) ([]planning.BudgetProgress, error)
 	CreateBudget(ctx context.Context, userID string, input planning.CreateBudgetInput) (planning.Budget, error)
 	UpdateBudget(ctx context.Context, userID string, budgetID string, input planning.UpdateBudgetInput) (planning.Budget, error)
-	ArchiveBudget(ctx context.Context, userID string, budgetID string) error
+	ArchiveBudget(ctx context.Context, userID string, budgetID string, baseVersion int64) error
 	ListEvents(ctx context.Context, userID string) ([]planning.EventSummary, error)
 	CreateEvent(ctx context.Context, userID string, input planning.CreateEventInput) (planning.EventSummary, error)
 	UpdateEvent(ctx context.Context, userID string, eventID string, input planning.UpdateEventInput) (planning.EventSummary, error)
-	ArchiveEvent(ctx context.Context, userID string, eventID string) error
+	ArchiveEvent(ctx context.Context, userID string, eventID string, baseVersion int64) error
 	LinkEventTransaction(ctx context.Context, userID string, eventID string, transactionID string) error
 	ListObligations(ctx context.Context, userID string) ([]planning.ObligationSummary, error)
 	CreateObligation(ctx context.Context, userID string, input planning.CreateObligationInput) (planning.ObligationSummary, error)
 	UpdateObligation(ctx context.Context, userID string, obligationID string, input planning.UpdateObligationInput) (planning.ObligationSummary, error)
-	ArchiveObligation(ctx context.Context, userID string, obligationID string) error
+	ArchiveObligation(ctx context.Context, userID string, obligationID string, baseVersion int64) error
 	LinkObligationRepayment(ctx context.Context, userID string, obligationID string, transactionID string) error
 	ListRecurringSchedules(ctx context.Context, userID string) ([]planning.RecurringSchedule, error)
 	CreateRecurringSchedule(ctx context.Context, userID string, input planning.CreateRecurringScheduleInput) (planning.RecurringSchedule, error)
-	ArchiveRecurringSchedule(ctx context.Context, userID string, scheduleID string) error
+	ArchiveRecurringSchedule(ctx context.Context, userID string, scheduleID string, baseVersion int64) error
 	ListTransactionDrafts(ctx context.Context, userID string) ([]planning.TransactionDraft, error)
+	ConfirmTransactionDraft(ctx context.Context, userID string, draftID string, input planning.ConfirmTransactionDraftInput) (planning.TransactionDraftDecision, error)
+	RejectTransactionDraft(ctx context.Context, userID string, draftID string, input planning.RejectTransactionDraftInput) (planning.TransactionDraftDecision, error)
 }
 
 type NotificationRepository interface {

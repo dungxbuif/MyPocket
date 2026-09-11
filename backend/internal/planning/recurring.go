@@ -30,14 +30,29 @@ func ValidateCreateRecurringSchedule(input CreateRecurringScheduleInput) (Create
 	if !validRecurringTransactionType(input.Type) {
 		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: schedule transaction type is invalid", ErrValidation)
 	}
-	if trimmed(input.SourceWalletID) == "" {
+	input.SourceWalletID = trimmed(input.SourceWalletID)
+	input.DestinationWalletID = trimmed(input.DestinationWalletID)
+	input.CategoryID = trimmed(input.CategoryID)
+	if input.SourceWalletID == "" {
 		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: source wallet is required", ErrValidation)
 	}
-	if input.Type == finance.TransactionTransfer && trimmed(input.DestinationWalletID) == "" {
-		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: destination wallet is required", ErrValidation)
-	}
-	if input.Type != finance.TransactionTransfer && trimmed(input.CategoryID) == "" {
-		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: category is required", ErrValidation)
+	if input.Type == finance.TransactionTransfer {
+		if input.DestinationWalletID == "" {
+			return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: destination wallet is required", ErrValidation)
+		}
+		if input.DestinationWalletID == input.SourceWalletID {
+			return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: transfer wallets must differ", ErrValidation)
+		}
+		if input.CategoryID != "" {
+			return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: transfer cannot have category", ErrValidation)
+		}
+	} else {
+		if input.DestinationWalletID != "" {
+			return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: income and expense cannot have destination wallet", ErrValidation)
+		}
+		if input.CategoryID == "" {
+			return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: category is required", ErrValidation)
+		}
 	}
 	if input.AmountVND <= 0 {
 		return CreateRecurringScheduleInput{}, time.Time{}, fmt.Errorf("%w: schedule amount must be positive", ErrValidation)

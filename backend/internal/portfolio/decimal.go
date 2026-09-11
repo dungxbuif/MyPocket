@@ -99,12 +99,27 @@ func roundRat(value *big.Rat) *big.Int {
 	return q
 }
 
-func roundQuantityMoney(quantity *big.Rat, unitPriceVND int64) int64 {
+func roundQuantityMoney(quantity *big.Rat, unitPriceVND int64) (int64, error) {
 	if quantity == nil || quantity.Sign() == 0 || unitPriceVND == 0 {
-		return 0
+		return 0, nil
 	}
 	value := new(big.Rat).Mul(quantity, big.NewRat(unitPriceVND, 1))
-	return roundRat(value).Int64()
+	return checkedMoney(roundRat(value))
+}
+
+func checkedMoney(value *big.Int) (int64, error) {
+	if !value.IsInt64() {
+		return 0, ErrValidation
+	}
+	return value.Int64(), nil
+}
+
+func addMoney(a, b int64) (int64, error) {
+	return checkedMoney(new(big.Int).Add(big.NewInt(a), big.NewInt(b)))
+}
+
+func subtractMoney(a, b int64) (int64, error) {
+	return checkedMoney(new(big.Int).Sub(big.NewInt(a), big.NewInt(b)))
 }
 
 func percentString(numerator int64, denominator int64) *string {

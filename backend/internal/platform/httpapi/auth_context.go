@@ -18,9 +18,14 @@ func authContextMiddleware(cfg config.Config, identityRepo IdentityRepository, a
 		cache = authcache.Noop{}
 	}
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if userID, ok := resolveBearerUserID(r.Context(), cfg, apiKeyRepo, cache, bearerToken(r)); ok {
-			appendAudit(r.Context(), auditRepo, audit.Event{CorrelationID: correlationID(r.Context()), ActorUserID: userID, Action: "api_key.authenticate", EntityType: "api_key", Outcome: audit.OutcomeSuccess, Severity: audit.SeveritySecurity, Source: audit.SourceAPI, RequestMethod: r.Method, RequestPath: safeRequestPath(r)})
-			next.ServeHTTP(w, r.WithContext(withAuthenticatedUser(r.Context(), userID, "api_key")))
+		if strings.TrimSpace(r.Header.Get("Authorization")) != "" {
+			if userID, ok := resolveBearerUserID(r.Context(), cfg, apiKeyRepo, cache, bearerToken(r)); ok {
+				appendAudit(r.Context(), auditRepo, audit.Event{CorrelationID: correlationID(r.Context()), ActorUserID: userID, Action: "api_key.authenticate", EntityType: "api_key", Outcome: audit.OutcomeSuccess, Severity: audit.SeveritySecurity, Source: audit.SourceAPI, RequestMethod: r.Method, RequestPath: safeRequestPath(r)})
+				next.ServeHTTP(w, r.WithContext(withAuthenticatedUser(r.Context(), userID, "api_key")))
+				return
+			}
+			appendAudit(r.Context(), auditRepo, audit.Event{CorrelationID: correlationID(r.Context()), Action: "api_key.authenticate", EntityType: "api_key", Outcome: audit.OutcomeDenied, Severity: audit.SeveritySecurity, Source: audit.SourceAPI, ErrorCode: "AUTH_REQUIRED", RequestMethod: r.Method, RequestPath: safeRequestPath(r)})
+			writeJSON(w, http.StatusUnauthorized, ErrorEnvelope("AUTH_REQUIRED", "Authentication required", correlationID(r.Context())))
 			return
 		}
 		if userID, ok := resolveCookieUserID(r.Context(), cfg, identityRepo, cache, r); ok {
@@ -40,12 +45,13 @@ func resolveBearerUserID(ctx context.Context, cfg config.Config, repo APIKeyRepo
 		return "", false
 	}
 	cacheKey := apiKeyCacheKey(keyHash)
-	if userID, ok, err := cache.Get(ctx, cacheKey); err == nil && ok && userID != "" {
-		return userID, true
-	}
+	cachedUserID, cached, _ := cache.Get(ctx, cacheKey)
 	user, _, err := repo.AuthenticateAPIKey(ctx, token, cfg.APIKeyHashSecret)
 	if err != nil {
 		return "", false
+	}
+	if cached && cachedUserID != "" && cachedUserID != user.ID {
+		_ = cache.Delete(ctx, cacheKey)
 	}
 	_ = cache.Set(ctx, cacheKey, user.ID, 5*time.Minute)
 	return user.ID, true

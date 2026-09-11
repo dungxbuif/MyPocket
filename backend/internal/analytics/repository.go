@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"time"
 )
@@ -65,7 +66,10 @@ func (r *Repository) Categories(ctx context.Context, userID string, filter Filte
 		if err := rows.Scan(&c.CategoryID, &c.CategoryName, &c.AmountVND); err != nil {
 			return nil, err
 		}
-		total += c.AmountVND
+		total, err = addMoneyChecked(total, c.AmountVND)
+		if err != nil {
+			return nil, fmt.Errorf("category report total: %w", err)
+		}
 		result = append(result, c)
 	}
 	if err := rows.Err(); err != nil {
@@ -161,7 +165,10 @@ func (r *Repository) Daily(ctx context.Context, userID string, filter Filter) ([
 		}
 		d.Date = date.Format("2006-01-02")
 		d.NetIncomeVND = d.IncomeVND - d.ExpenseVND
-		cumulative += d.NetIncomeVND
+		cumulative, err = addMoneyChecked(cumulative, d.NetIncomeVND)
+		if err != nil {
+			return nil, fmt.Errorf("daily cumulative total: %w", err)
+		}
 		d.CumulativeNetVND = cumulative
 		result = append(result, d)
 	}
@@ -186,7 +193,11 @@ func (r *Repository) Dashboard(ctx context.Context, userID string, filter Filter
 		}
 		d.Wallets = append(d.Wallets, w)
 		if w.IncludeInTotal {
-			d.NetWorthVND += w.BalanceVND
+			d.NetWorthVND, err = addMoneyChecked(d.NetWorthVND, w.BalanceVND)
+			if err != nil {
+				rows.Close()
+				return Dashboard{}, fmt.Errorf("wallet net worth total: %w", err)
+			}
 		}
 	}
 	rows.Close()
@@ -243,19 +254,29 @@ func (r *Repository) attachPortfolioTotals(ctx context.Context, userID string, d
 			d.MissingAssetPriceCount++
 			continue
 		}
-		d.InvestmentMarketValueVND += roundDecimalMoney(quantityText, price.Int64)
+		marketValue, err := roundDecimalMoneyChecked(quantityText, price.Int64)
+		if err != nil {
+			return fmt.Errorf("portfolio market value: %w", err)
+		}
+		d.InvestmentMarketValueVND, err = addMoneyChecked(d.InvestmentMarketValueVND, marketValue)
+		if err != nil {
+			return fmt.Errorf("portfolio market value total: %w", err)
+		}
 	}
 	if err := rows.Err(); err != nil {
 		return err
 	}
-	d.CombinedNetWorthVND += d.InvestmentMarketValueVND
+	d.CombinedNetWorthVND, err = addMoneyChecked(d.CombinedNetWorthVND, d.InvestmentMarketValueVND)
+	if err != nil {
+		return fmt.Errorf("combined net worth total: %w", err)
+	}
 	return nil
 }
 
-func roundDecimalMoney(quantity string, unitPriceVND int64) int64 {
+func roundDecimalMoneyChecked(quantity string, unitPriceVND int64) (int64, error) {
 	rat := new(big.Rat)
 	if _, ok := rat.SetString(quantity); !ok {
-		return 0
+		return 0, fmt.Errorf("invalid decimal quantity")
 	}
 	value := new(big.Rat).Mul(rat, big.NewRat(unitPriceVND, 1))
 	num := new(big.Int).Set(value.Num())
@@ -269,5 +290,15 @@ func roundDecimalMoney(quantity string, unitPriceVND int64) int64 {
 	if value.Sign() < 0 {
 		q.Neg(q)
 	}
-	return q.Int64()
+	if !q.IsInt64() {
+		return 0, fmt.Errorf("money value overflows int64")
+	}
+	return q.Int64(), nil
+}
+
+func addMoneyChecked(left int64, right int64) (int64, error) {
+	if (right > 0 && left > math.MaxInt64-right) || (right < 0 && left < math.MinInt64-right) {
+		return 0, fmt.Errorf("money total overflows int64")
+	}
+	return left + right, nil
 }

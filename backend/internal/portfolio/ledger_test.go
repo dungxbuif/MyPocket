@@ -48,12 +48,18 @@ func TestNormalizeDecimalRejectsFloatyOrOverPreciseInput(t *testing.T) {
 }
 
 func TestSummarizeMissingPriceAndZeroCostBasisStates(t *testing.T) {
-	missing := summarize("10", 1_000_000, 0, nil)
+	missing, err := summarize("10", 1_000_000, 0, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if missing.MarketValueVND != nil || missing.ValuationStatus != "missing_price" {
 		t.Fatalf("missing summary should not invent market value: %#v", missing)
 	}
 	price := PricePoint{UnitPriceVND: 12_345, Source: "manual"}
-	zeroCost := summarize("2", 0, 0, &price)
+	zeroCost, err := summarize("2", 0, 0, &price)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if zeroCost.MarketValueVND == nil || *zeroCost.MarketValueVND != 24_690 {
 		t.Fatalf("market value = %#v, want 24690", zeroCost.MarketValueVND)
 	}

@@ -2,12 +2,15 @@ package httpapi_test
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"mypocket/internal/finance"
 	"mypocket/internal/identity"
 	"mypocket/internal/planning"
 	"mypocket/internal/platform/httpapi"
@@ -28,6 +31,23 @@ func TestBudgetsAPIRequiresAuth(t *testing.T) {
 	}
 	if !strings.Contains(res.Body.String(), "AUTH_REQUIRED") {
 		t.Fatalf("expected auth error, got %s", res.Body.String())
+	}
+}
+
+func TestBudgetsAPIUsesAPIKeyOwner(t *testing.T) {
+	cfg := authTestConfig()
+	cfg.APIKeyHashSecret = "change-this-development-api-key-hash-secret-32-bytes"
+	identityRepo := &authRepoStub{user: identity.User{ID: "user_123", Email: "agent@example.com", EmailVerified: true}}
+	repo := &planningRepoStub{}
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: identityRepo, APIKeyRepository: identityRepo, PlanningRepository: repo, AuthCache: &authCacheStub{}})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/budgets", nil)
+	req.Header.Set("Authorization", "Bearer mpk_test")
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK || repo.listUserID != "user_123" {
+		t.Fatalf("expected budgets scoped to API key owner, code=%d user=%q body=%s", res.Code, repo.listUserID, res.Body.String())
 	}
 }
 
@@ -85,7 +105,7 @@ func TestBudgetsAPIUsesAuthenticatedUser(t *testing.T) {
 		t.Fatalf("budget create failed/scoped wrong: code=%d user=%q input=%#v body=%s", createRes.Code, repo.createUserID, repo.createInput, createRes.Body.String())
 	}
 
-	updateReq := authenticatedRequest(t, http.MethodPatch, "/api/v1/budgets/budget-2", `{"name":"Mua sắm mới","period_type":"monthly","amount_vnd":600000}`)
+	updateReq := authenticatedRequest(t, http.MethodPatch, "/api/v1/budgets/budget-2", `{"base_version":1,"name":"Mua sắm mới","period_type":"monthly","amount_vnd":600000}`)
 	addCSRF(updateReq)
 	updateRes := httptest.NewRecorder()
 	handler.ServeHTTP(updateRes, updateReq)
@@ -93,12 +113,36 @@ func TestBudgetsAPIUsesAuthenticatedUser(t *testing.T) {
 		t.Fatalf("budget update failed/scoped wrong: code=%d user=%q id=%q input=%#v body=%s", updateRes.Code, repo.updateUserID, repo.updateID, repo.updateInput, updateRes.Body.String())
 	}
 
-	archiveReq := authenticatedRequest(t, http.MethodPost, "/api/v1/budgets/budget-2/archive", "")
+	archiveReq := authenticatedRequest(t, http.MethodPost, "/api/v1/budgets/budget-2/archive", `{"base_version":2}`)
 	addCSRF(archiveReq)
 	archiveRes := httptest.NewRecorder()
 	handler.ServeHTTP(archiveRes, archiveReq)
 	if archiveRes.Code != http.StatusOK || repo.archiveUserID != "user_123" || repo.archiveID != "budget-2" {
 		t.Fatalf("budget archive failed/scoped wrong: code=%d user=%q id=%q body=%s", archiveRes.Code, repo.archiveUserID, repo.archiveID, archiveRes.Body.String())
+	}
+}
+
+func TestPlanningWritesRequireBaseVersionAndMapConflicts(t *testing.T) {
+	repo := &planningRepoStub{updateErr: planning.ErrVersionConflict}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		PlanningRepository: repo,
+	})
+
+	missing := authenticatedRequest(t, http.MethodPatch, "/api/v1/budgets/budget-1", `{"name":"Mới","period_type":"monthly","amount_vnd":100000}`)
+	addCSRF(missing)
+	missingRes := httptest.NewRecorder()
+	handler.ServeHTTP(missingRes, missing)
+	if missingRes.Code != http.StatusBadRequest || repo.updateID != "" {
+		t.Fatalf("missing base_version must fail before repository: code=%d body=%s", missingRes.Code, missingRes.Body.String())
+	}
+
+	stale := authenticatedRequest(t, http.MethodPatch, "/api/v1/budgets/budget-1", `{"base_version":1,"name":"Mới","period_type":"monthly","amount_vnd":100000}`)
+	addCSRF(stale)
+	staleRes := httptest.NewRecorder()
+	handler.ServeHTTP(staleRes, stale)
+	if staleRes.Code != http.StatusConflict || !strings.Contains(staleRes.Body.String(), `"code":"VERSION_CONFLICT"`) || repo.updateInput.BaseVersion != 1 {
+		t.Fatalf("stale planning write must return stable conflict: code=%d input=%#v body=%s", staleRes.Code, repo.updateInput, staleRes.Body.String())
 	}
 }
 
@@ -206,10 +250,235 @@ func TestRecurringSchedulesAPIUsesAuthenticatedUser(t *testing.T) {
 	}
 }
 
+func TestTransactionDraftConfirmAndRejectUseCookieCSRFContract(t *testing.T) {
+	now := time.Date(2026, 9, 10, 2, 0, 0, 0, time.UTC)
+	repo := &planningRepoStub{
+		confirmDecision: planning.TransactionDraftDecision{
+			Draft:       planning.TransactionDraft{ID: "draft-1", UserID: "user_123", AmountVND: 125000, Note: "Accepted", Status: "confirmed", ConfirmedTransactionID: "tx-1", Version: 2},
+			Transaction: &finance.Transaction{ID: "tx-1", UserID: "user_123", Type: finance.TransactionExpense, AmountVND: 125000, OccurredAt: now, Note: "Accepted", Version: 1},
+		},
+		rejectDecision: planning.TransactionDraftDecision{Draft: planning.TransactionDraft{ID: "draft-2", UserID: "user_123", Status: "rejected", Version: 2}},
+	}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		PlanningRepository: repo,
+	})
+
+	missingCSRF := authenticatedRequest(t, http.MethodPost, "/api/v1/transaction-drafts/draft-1/confirm", `{"version":1,"amount_vnd":125000,"note":"Accepted"}`)
+	missingCSRF.Header.Set("Idempotency-Key", "draft-confirm-key")
+	missingCSRFRes := httptest.NewRecorder()
+	handler.ServeHTTP(missingCSRFRes, missingCSRF)
+	if missingCSRFRes.Code != http.StatusForbidden || !strings.Contains(missingCSRFRes.Body.String(), `"code":"CSRF_REQUIRED"`) {
+		t.Fatalf("expected cookie CSRF envelope, code=%d body=%s", missingCSRFRes.Code, missingCSRFRes.Body.String())
+	}
+
+	confirmReq := authenticatedRequest(t, http.MethodPost, "/api/v1/transaction-drafts/draft-1/confirm", `{"version":1,"amount_vnd":125000,"note":"Accepted"}`)
+	addCSRF(confirmReq)
+	confirmReq.Header.Set("Idempotency-Key", "draft-confirm-key")
+	confirmReq.Header.Set("X-Correlation-ID", "corr-draft-confirm")
+	confirmRes := httptest.NewRecorder()
+	handler.ServeHTTP(confirmRes, confirmReq)
+	if confirmRes.Code != http.StatusOK || repo.confirmUserID != "user_123" || repo.confirmID != "draft-1" || repo.confirmInput.IdempotencyKey != "draft-confirm-key" || repo.confirmInput.AmountVND != 125000 {
+		t.Fatalf("confirm routing mismatch: code=%d user=%q id=%q input=%#v body=%s", confirmRes.Code, repo.confirmUserID, repo.confirmID, repo.confirmInput, confirmRes.Body.String())
+	}
+	if !strings.Contains(confirmRes.Body.String(), `"confirmed_transaction_id":"tx-1"`) || !strings.Contains(confirmRes.Body.String(), `"transaction":{"id":"tx-1"`) || !strings.Contains(confirmRes.Body.String(), `"correlation_id":"corr-draft-confirm"`) {
+		t.Fatalf("confirm response missing stable envelope fields: %s", confirmRes.Body.String())
+	}
+
+	rejectReq := authenticatedRequest(t, http.MethodPost, "/api/v1/transaction-drafts/draft-2/reject", `{"version":1}`)
+	addCSRF(rejectReq)
+	rejectRes := httptest.NewRecorder()
+	handler.ServeHTTP(rejectRes, rejectReq)
+	if rejectRes.Code != http.StatusOK || repo.rejectUserID != "user_123" || repo.rejectID != "draft-2" || repo.rejectInput.Version != 1 || strings.Contains(rejectRes.Body.String(), `"transaction"`) {
+		t.Fatalf("reject routing/envelope mismatch: code=%d user=%q id=%q input=%#v body=%s", rejectRes.Code, repo.rejectUserID, repo.rejectID, repo.rejectInput, rejectRes.Body.String())
+	}
+}
+
+func TestTransactionDraftConfirmAllowsAPIKeyAndRequiresIdempotencyKey(t *testing.T) {
+	cfg := authTestConfig()
+	cfg.APIKeyHashSecret = "change-this-development-api-key-hash-secret-32-bytes"
+	identityRepo := &authRepoStub{user: identity.User{ID: "api-owner", Email: "agent@example.com", EmailVerified: true}}
+	repo := &planningRepoStub{confirmDecision: planning.TransactionDraftDecision{Draft: planning.TransactionDraft{ID: "draft-api", UserID: "api-owner", Status: "confirmed", ConfirmedTransactionID: "tx-api", Version: 2}, Transaction: &finance.Transaction{ID: "tx-api", UserID: "api-owner"}}}
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: identityRepo, APIKeyRepository: identityRepo, PlanningRepository: repo, AuthCache: &authCacheStub{}})
+
+	missingKeyReq := httptest.NewRequest(http.MethodPost, "/api/v1/transaction-drafts/draft-api/confirm", strings.NewReader(`{"version":1,"amount_vnd":50000,"note":"API"}`))
+	missingKeyReq.Header.Set("Authorization", "Bearer mpk_test")
+	missingKeyRes := httptest.NewRecorder()
+	handler.ServeHTTP(missingKeyRes, missingKeyReq)
+	if missingKeyRes.Code != http.StatusBadRequest || !strings.Contains(missingKeyRes.Body.String(), `"code":"VALIDATION_FAILED"`) || repo.confirmID != "" {
+		t.Fatalf("missing key must fail before repository: code=%d id=%q body=%s", missingKeyRes.Code, repo.confirmID, missingKeyRes.Body.String())
+	}
+
+	confirmReq := httptest.NewRequest(http.MethodPost, "/api/v1/transaction-drafts/draft-api/confirm", strings.NewReader(`{"version":1,"amount_vnd":50000,"note":"API"}`))
+	confirmReq.Header.Set("Authorization", "Bearer mpk_test")
+	confirmReq.Header.Set("Idempotency-Key", "api-key-confirm")
+	confirmRes := httptest.NewRecorder()
+	handler.ServeHTTP(confirmRes, confirmReq)
+	if confirmRes.Code != http.StatusOK || repo.confirmUserID != "api-owner" || repo.confirmInput.IdempotencyKey != "api-key-confirm" {
+		t.Fatalf("API-key confirm should be CSRF-exempt and owner-scoped: code=%d user=%q input=%#v body=%s", confirmRes.Code, repo.confirmUserID, repo.confirmInput, confirmRes.Body.String())
+	}
+}
+
+func TestTransactionDraftDecisionUsesStableConflictEnvelopes(t *testing.T) {
+	cases := []struct {
+		name string
+		err  error
+		code string
+	}{
+		{name: "terminal", err: planning.ErrDraftAlreadyResolved, code: "DRAFT_ALREADY_RESOLVED"},
+		{name: "version", err: planning.ErrDraftVersionConflict, code: "DRAFT_VERSION_CONFLICT"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &planningRepoStub{confirmErr: tc.err}
+			handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}}, PlanningRepository: repo})
+			req := authenticatedRequest(t, http.MethodPost, "/api/v1/transaction-drafts/draft-1/confirm", `{"version":1,"amount_vnd":125000,"note":"Accepted"}`)
+			addCSRF(req)
+			req.Header.Set("Idempotency-Key", "conflict-key")
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
+			if res.Code != http.StatusConflict || !strings.Contains(res.Body.String(), `"code":"`+tc.code+`"`) || !strings.Contains(res.Body.String(), `"correlation_id":`) {
+				t.Fatalf("unexpected conflict envelope: code=%d body=%s", res.Code, res.Body.String())
+			}
+		})
+	}
+
+	repo := &planningRepoStub{confirmErr: errors.New("database offline")}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}}, PlanningRepository: repo})
+	req := authenticatedRequest(t, http.MethodPost, "/api/v1/transaction-drafts/draft-1/confirm", `{"version":1,"amount_vnd":125000,"note":"Accepted"}`)
+	addCSRF(req)
+	req.Header.Set("Idempotency-Key", "failure-key")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusServiceUnavailable || !strings.Contains(res.Body.String(), `"code":"INTERNAL_RETRYABLE"`) || strings.Contains(res.Body.String(), "database offline") {
+		t.Fatalf("database error must be safe and retryable: code=%d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestTransactionDraftInvalidStoredReferencesUseValidationEnvelope(t *testing.T) {
+	repo := &planningRepoStub{confirmErr: fmt.Errorf("%w: draft transaction references are unavailable", planning.ErrValidation)}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}}, PlanningRepository: repo})
+	req := authenticatedRequest(t, http.MethodPost, "/api/v1/transaction-drafts/draft-1/confirm", `{"version":1,"amount_vnd":125000,"note":"Accepted"}`)
+	addCSRF(req)
+	req.Header.Set("Idempotency-Key", "invalid-reference-key")
+	res := httptest.NewRecorder()
+	handler.ServeHTTP(res, req)
+	if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), `"code":"VALIDATION_FAILED"`) || strings.Contains(res.Body.String(), "finance object forbidden") {
+		t.Fatalf("invalid stored references must be safe validation error: code=%d body=%s", res.Code, res.Body.String())
+	}
+}
+
+func TestTransactionDraftDecisionsRequireAuthentication(t *testing.T) {
+	cases := []struct {
+		action string
+		body   string
+	}{
+		{action: "confirm", body: `{"version":1,"amount_vnd":125000,"note":"Accepted"}`},
+		{action: "reject", body: `{"version":1}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.action, func(t *testing.T) {
+			repo := &planningRepoStub{}
+			handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: &authRepoStub{}, PlanningRepository: repo})
+			req := httptest.NewRequest(http.MethodPost, "/api/v1/transaction-drafts/draft-1/"+tc.action, strings.NewReader(tc.body))
+			req.Header.Set("Idempotency-Key", "unauth-key")
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
+			if res.Code != http.StatusUnauthorized || !strings.Contains(res.Body.String(), `"code":"AUTH_REQUIRED"`) || repo.confirmID != "" || repo.rejectID != "" {
+				t.Fatalf("unauthenticated %s must be rejected before repository: code=%d body=%s", tc.action, res.Code, res.Body.String())
+			}
+		})
+	}
+}
+
+func TestTransactionDraftMissingOrForeignDraftUsesOwnershipHidingEnvelope(t *testing.T) {
+	cases := []struct {
+		name   string
+		action string
+		body   string
+	}{
+		{name: "missing confirm", action: "confirm", body: `{"version":1,"amount_vnd":125000,"note":"Accepted"}`},
+		{name: "foreign reject", action: "reject", body: `{"version":1}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &planningRepoStub{confirmErr: planning.ErrForbidden, rejectErr: planning.ErrForbidden}
+			handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}}, PlanningRepository: repo})
+			req := authenticatedRequest(t, http.MethodPost, "/api/v1/transaction-drafts/draft-1/"+tc.action, tc.body)
+			addCSRF(req)
+			req.Header.Set("Idempotency-Key", "forbidden-key")
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
+			if res.Code != http.StatusForbidden || !strings.Contains(res.Body.String(), `"code":"FORBIDDEN"`) || strings.Contains(res.Body.String(), "planning object forbidden") {
+				t.Fatalf("%s must use safe ownership-hiding envelope: code=%d body=%s", tc.name, res.Code, res.Body.String())
+			}
+		})
+	}
+}
+
+func TestTransactionDraftDecisionRejectsInvalidBodiesBeforeRepository(t *testing.T) {
+	cases := []struct {
+		name   string
+		action string
+		body   string
+	}{
+		{name: "confirm nonpositive amount", action: "confirm", body: `{"version":1,"amount_vnd":0,"note":"Accepted"}`},
+		{name: "confirm nonpositive version", action: "confirm", body: `{"version":0,"amount_vnd":125000,"note":"Accepted"}`},
+		{name: "reject nonpositive version", action: "reject", body: `{"version":0}`},
+		{name: "confirm malformed JSON", action: "confirm", body: `{"version":`},
+		{name: "confirm unknown field", action: "confirm", body: `{"version":1,"amount_vnd":125000,"note":"Accepted","source_wallet_id":"override"}`},
+		{name: "reject unknown field", action: "reject", body: `{"version":1,"note":"override"}`},
+		{name: "confirm trailing JSON", action: "confirm", body: `{"version":1,"amount_vnd":125000,"note":"Accepted"} {}`},
+		{name: "reject trailing JSON", action: "reject", body: `{"version":1} {}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &planningRepoStub{}
+			handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}}, PlanningRepository: repo})
+			req := authenticatedRequest(t, http.MethodPost, "/api/v1/transaction-drafts/draft-1/"+tc.action, tc.body)
+			addCSRF(req)
+			req.Header.Set("Idempotency-Key", "invalid-body-key")
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
+			if res.Code != http.StatusBadRequest || !strings.Contains(res.Body.String(), `"code":"VALIDATION_FAILED"`) || repo.confirmID != "" || repo.rejectID != "" {
+				t.Fatalf("%s must fail before repository: code=%d confirm=%q reject=%q body=%s", tc.name, res.Code, repo.confirmID, repo.rejectID, res.Body.String())
+			}
+		})
+	}
+}
+
+func TestTransactionDraftDecisionRejectsMalformedRouteAndMethod(t *testing.T) {
+	cases := []struct {
+		name       string
+		method     string
+		path       string
+		wantStatus int
+		wantCode   string
+	}{
+		{name: "unknown action", method: http.MethodPost, path: "/api/v1/transaction-drafts/draft-1/approve", wantStatus: http.StatusNotFound, wantCode: "NOT_FOUND"},
+		{name: "extra segment", method: http.MethodPost, path: "/api/v1/transaction-drafts/draft-1/confirm/again", wantStatus: http.StatusNotFound, wantCode: "NOT_FOUND"},
+		{name: "wrong method", method: http.MethodGet, path: "/api/v1/transaction-drafts/draft-1/confirm", wantStatus: http.StatusMethodNotAllowed, wantCode: "VALIDATION_FAILED"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &planningRepoStub{}
+			handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}}, PlanningRepository: repo})
+			req := authenticatedRequest(t, tc.method, tc.path, "")
+			addCSRF(req)
+			res := httptest.NewRecorder()
+			handler.ServeHTTP(res, req)
+			if res.Code != tc.wantStatus || !strings.Contains(res.Body.String(), `"code":"`+tc.wantCode+`"`) || repo.confirmID != "" || repo.rejectID != "" {
+				t.Fatalf("unexpected route rejection: code=%d body=%s", res.Code, res.Body.String())
+			}
+		})
+	}
+}
+
 type planningRepoStub struct {
 	progress                []planning.BudgetProgress
 	created                 planning.Budget
 	updated                 planning.Budget
+	updateErr               error
 	events                  []planning.EventSummary
 	createdEvent            planning.EventSummary
 	updatedEvent            planning.EventSummary
@@ -255,6 +524,16 @@ type planningRepoStub struct {
 	scheduleArchiveID       string
 	drafts                  []planning.TransactionDraft
 	draftListUserID         string
+	confirmDecision         planning.TransactionDraftDecision
+	confirmErr              error
+	confirmUserID           string
+	confirmID               string
+	confirmInput            planning.ConfirmTransactionDraftInput
+	rejectDecision          planning.TransactionDraftDecision
+	rejectErr               error
+	rejectUserID            string
+	rejectID                string
+	rejectInput             planning.RejectTransactionDraftInput
 }
 
 func (s *planningRepoStub) ListBudgetProgress(_ context.Context, userID string, _ time.Time) ([]planning.BudgetProgress, error) {
@@ -272,10 +551,10 @@ func (s *planningRepoStub) UpdateBudget(_ context.Context, userID string, budget
 	s.updateUserID = userID
 	s.updateID = budgetID
 	s.updateInput = input
-	return s.updated, nil
+	return s.updated, s.updateErr
 }
 
-func (s *planningRepoStub) ArchiveBudget(_ context.Context, userID string, budgetID string) error {
+func (s *planningRepoStub) ArchiveBudget(_ context.Context, userID string, budgetID string, _ int64) error {
 	s.archiveUserID = userID
 	s.archiveID = budgetID
 	return nil
@@ -299,7 +578,7 @@ func (s *planningRepoStub) UpdateEvent(_ context.Context, userID string, eventID
 	return s.updatedEvent, nil
 }
 
-func (s *planningRepoStub) ArchiveEvent(_ context.Context, userID string, eventID string) error {
+func (s *planningRepoStub) ArchiveEvent(_ context.Context, userID string, eventID string, _ int64) error {
 	s.eventArchiveUserID = userID
 	s.eventArchiveID = eventID
 	return nil
@@ -330,7 +609,7 @@ func (s *planningRepoStub) UpdateObligation(_ context.Context, userID string, ob
 	return s.updatedObligation, nil
 }
 
-func (s *planningRepoStub) ArchiveObligation(_ context.Context, userID string, obligationID string) error {
+func (s *planningRepoStub) ArchiveObligation(_ context.Context, userID string, obligationID string, _ int64) error {
 	s.obligationArchiveUserID = userID
 	s.obligationArchiveID = obligationID
 	return nil
@@ -354,7 +633,7 @@ func (s *planningRepoStub) CreateRecurringSchedule(_ context.Context, userID str
 	return s.createdSchedule, nil
 }
 
-func (s *planningRepoStub) ArchiveRecurringSchedule(_ context.Context, userID string, scheduleID string) error {
+func (s *planningRepoStub) ArchiveRecurringSchedule(_ context.Context, userID string, scheduleID string, _ int64) error {
 	s.scheduleArchiveUserID = userID
 	s.scheduleArchiveID = scheduleID
 	return nil
@@ -363,4 +642,18 @@ func (s *planningRepoStub) ArchiveRecurringSchedule(_ context.Context, userID st
 func (s *planningRepoStub) ListTransactionDrafts(_ context.Context, userID string) ([]planning.TransactionDraft, error) {
 	s.draftListUserID = userID
 	return s.drafts, nil
+}
+
+func (s *planningRepoStub) ConfirmTransactionDraft(_ context.Context, userID string, draftID string, input planning.ConfirmTransactionDraftInput) (planning.TransactionDraftDecision, error) {
+	s.confirmUserID = userID
+	s.confirmID = draftID
+	s.confirmInput = input
+	return s.confirmDecision, s.confirmErr
+}
+
+func (s *planningRepoStub) RejectTransactionDraft(_ context.Context, userID string, draftID string, input planning.RejectTransactionDraftInput) (planning.TransactionDraftDecision, error) {
+	s.rejectUserID = userID
+	s.rejectID = draftID
+	s.rejectInput = input
+	return s.rejectDecision, s.rejectErr
 }

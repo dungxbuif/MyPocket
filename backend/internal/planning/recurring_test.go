@@ -3,6 +3,7 @@ package planning_test
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"testing"
 	"time"
 
@@ -86,6 +87,81 @@ func TestWorkerLeaseAllowsSingleActiveOwner(t *testing.T) {
 	if !acquired {
 		t.Fatal("second worker should acquire expired lease")
 	}
+}
+
+func TestRecurringScheduleRejectsFinanceFieldsThatWouldCreateUnconfirmableDrafts(t *testing.T) {
+	conn := migratedPlanningPostgres(t)
+	owner := createPlanningUser(t, conn, "recurring-validation@example.com")
+	financeRepo := finance.NewRepository(conn)
+	planningRepo := planning.NewRepository(conn)
+	source := createPlanningWallet(t, financeRepo, owner)
+	destination, err := financeRepo.CreateWallet(context.Background(), owner, finance.CreateWalletInput{Name: "Ngân hàng", Type: finance.WalletBank})
+	if err != nil {
+		t.Fatalf("create destination wallet: %v", err)
+	}
+	expenseCategoryID := findPlanningSystemCategory(t, conn, "expense_food")
+	incomeCategoryID := findPlanningSystemCategory(t, conn, "income_salary")
+	base := planning.CreateRecurringScheduleInput{
+		Name: "Lịch kiểm chứng", Frequency: planning.RecurrenceMonthly, Timezone: "Asia/Ho_Chi_Minh",
+		StartsAt: "2026-09-01T09:00:00+07:00", SourceWalletID: source.ID, AmountVND: 100_000,
+	}
+	tests := []struct {
+		name  string
+		input planning.CreateRecurringScheduleInput
+	}{
+		{name: "transfer with category", input: mergeRecurringInput(base, finance.TransactionTransfer, destination.ID, expenseCategoryID)},
+		{name: "transfer to the same wallet", input: mergeRecurringInput(base, finance.TransactionTransfer, source.ID, "")},
+		{name: "expense with destination wallet", input: mergeRecurringInput(base, finance.TransactionExpense, destination.ID, expenseCategoryID)},
+		{name: "income with expense category", input: mergeRecurringInput(base, finance.TransactionIncome, "", expenseCategoryID)},
+		{name: "expense with income category", input: mergeRecurringInput(base, finance.TransactionExpense, "", incomeCategoryID)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := planningRepo.CreateRecurringSchedule(context.Background(), owner, tt.input); !errors.Is(err, planning.ErrValidation) {
+				t.Fatalf("create schedule error = %v, want validation", err)
+			}
+		})
+	}
+}
+
+func TestRecurringCatchUpIsBoundedByWorkerLimit(t *testing.T) {
+	conn := migratedPlanningPostgres(t)
+	owner := createPlanningUser(t, conn, "recurring-bounded@example.com")
+	financeRepo := finance.NewRepository(conn)
+	planningRepo := planning.NewRepository(conn)
+	wallet := createPlanningWallet(t, financeRepo, owner)
+	categoryID := findPlanningSystemCategory(t, conn, "expense_food")
+
+	_, err := planningRepo.CreateRecurringSchedule(context.Background(), owner, planning.CreateRecurringScheduleInput{
+		Name: "Daily", Frequency: planning.RecurrenceDaily, Timezone: "Asia/Ho_Chi_Minh",
+		StartsAt: "2026-01-01T09:00:00+07:00", Type: finance.TransactionExpense,
+		SourceWalletID: wallet.ID, CategoryID: categoryID, AmountVND: 10000,
+	})
+	if err != nil {
+		t.Fatalf("create recurring schedule: %v", err)
+	}
+
+	processed, err := planningRepo.ProcessDueRecurringSchedules(context.Background(), "worker-a", time.Date(2026, 9, 10, 2, 0, 0, 0, time.UTC), 2)
+	if err != nil {
+		t.Fatalf("bounded catch-up: %v", err)
+	}
+	if processed != 2 {
+		t.Fatalf("expected exactly two occurrence attempts, got %d", processed)
+	}
+	var drafts int
+	if err := conn.QueryRowContext(context.Background(), `SELECT count(*) FROM transaction_drafts WHERE user_id = $1`, owner).Scan(&drafts); err != nil {
+		t.Fatalf("count drafts: %v", err)
+	}
+	if drafts != 2 {
+		t.Fatalf("worker limit must bound inserted drafts, got %d", drafts)
+	}
+}
+
+func mergeRecurringInput(base planning.CreateRecurringScheduleInput, txType finance.TransactionType, destinationWalletID string, categoryID string) planning.CreateRecurringScheduleInput {
+	base.Type = txType
+	base.DestinationWalletID = destinationWalletID
+	base.CategoryID = categoryID
+	return base
 }
 
 func walletBalance(t *testing.T, conn *sql.DB, walletID string) int64 {

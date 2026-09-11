@@ -51,3 +51,20 @@ func TestNotificationsAPIScopesAndMarksRead(t *testing.T) {
 		t.Fatalf("mark read failed: %d %s", response.Code, response.Body.String())
 	}
 }
+
+func TestNotificationsAPIUsesAPIKeyOwner(t *testing.T) {
+	cfg := authTestConfig()
+	cfg.APIKeyHashSecret = "change-this-development-api-key-hash-secret-32-bytes"
+	identityRepo := &authRepoStub{user: identity.User{ID: "user_123", Email: "agent@example.com", EmailVerified: true}}
+	repo := &notificationRepoStub{}
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: identityRepo, APIKeyRepository: identityRepo, NotificationRepository: repo, AuthCache: &authCacheStub{}})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/notifications", nil)
+	req.Header.Set("Authorization", "Bearer mpk_test")
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK || repo.listUser != "user_123" {
+		t.Fatalf("expected notifications scoped to API key owner, code=%d user=%q body=%s", res.Code, repo.listUser, res.Body.String())
+	}
+}

@@ -29,6 +29,11 @@ func DocsHandler(cfg config.Config) http.HandlerFunc {
 	}
 
 	return func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Cache-Control", "private, no-store")
+		if !isAuthenticated(r, cfg) {
+			http.Redirect(w, r, "/", http.StatusSeeOther)
+			return
+		}
 		path := strings.TrimPrefix(r.URL.Path, "/docs")
 		if path == "" || path == "/" {
 			path = "/index.html"

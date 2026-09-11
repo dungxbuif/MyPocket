@@ -53,7 +53,7 @@ func TestRepositoryIntegrationAppliesIdempotentMutationAndListsUserChanges(t *te
 	if first[0].State != mysync.ResultApplied || second[0].State != mysync.ResultReplayed {
 		t.Fatalf("unexpected mutation states first=%s second=%s", first[0].State, second[0].State)
 	}
-	if len(changesA.Changes) != 1 || changesA.Changes[0].EntityID != mutation.EntityID || changesA.NextCursor != 1 {
+	if len(changesA.Changes) != 3 || changesA.Changes[0].EntityID != wallet.ID || changesA.Changes[1].EntityID != wallet.ID || changesA.Changes[1].Version != 2 || changesA.Changes[2].EntityID != mutation.EntityID || changesA.NextCursor != 3 {
 		t.Fatalf("unexpected user A changes: %#v", changesA)
 	}
 	if len(changesB.Changes) != 0 {
@@ -81,6 +81,7 @@ func TestRepositoryIntegrationReturnsConflictForStaleTransactionVersion(t *testi
 		t.Fatalf("create transaction: %v", err)
 	}
 	if _, err := financeRepo.UpdateTransaction(context.Background(), userID, created.ID, finance.UpdateTransactionInput{
+		BaseVersion:    created.Version,
 		Type:           finance.TransactionExpense,
 		SourceWalletID: wallet.ID,
 		CategoryID:     categoryID,

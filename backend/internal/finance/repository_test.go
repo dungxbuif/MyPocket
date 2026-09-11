@@ -4,7 +4,9 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"math"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -80,10 +82,13 @@ func TestRepositoryAllowsOneActiveDefaultAIWalletPerUser(t *testing.T) {
 	first := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
 	second := createFinanceWallet(t, repo, userID, "Ví điện tử", finance.WalletEWallet)
 
-	if err := repo.SetDefaultAIWallet(context.Background(), userID, first.ID); err != nil {
+	if err := repo.SetDefaultAIWallet(context.Background(), userID, first.ID, first.Version); err != nil {
 		t.Fatalf("set first default: %v", err)
 	}
-	if err := repo.SetDefaultAIWallet(context.Background(), userID, second.ID); err != nil {
+	if err := repo.SetDefaultAIWallet(context.Background(), userID, first.ID, first.Version); !errors.Is(err, finance.ErrConflict) {
+		t.Fatalf("stale default selection error = %v, want conflict", err)
+	}
+	if err := repo.SetDefaultAIWallet(context.Background(), userID, second.ID, second.Version); err != nil {
 		t.Fatalf("set second default: %v", err)
 	}
 
@@ -113,6 +118,7 @@ func TestRepositoryUpdatesAndArchivesOnlyOwnedWallet(t *testing.T) {
 	wallet := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletCash)
 
 	updated, err := repo.UpdateWallet(context.Background(), userA, wallet.ID, finance.UpdateWalletInput{
+		BaseVersion:    wallet.Version,
 		Name:           "Tiền ăn",
 		IncludeInTotal: ptrBool(false),
 	})
@@ -123,10 +129,10 @@ func TestRepositoryUpdatesAndArchivesOnlyOwnedWallet(t *testing.T) {
 		t.Fatalf("wallet update did not persist: %#v", updated)
 	}
 
-	if err := repo.ArchiveWallet(context.Background(), userB, wallet.ID); !errors.Is(err, finance.ErrForbidden) {
+	if err := repo.ArchiveWallet(context.Background(), userB, wallet.ID, updated.Version); !errors.Is(err, finance.ErrForbidden) {
 		t.Fatalf("expected other user archive forbidden, got %v", err)
 	}
-	if err := repo.ArchiveWallet(context.Background(), userA, wallet.ID); err != nil {
+	if err := repo.ArchiveWallet(context.Background(), userA, wallet.ID, updated.Version); err != nil {
 		t.Fatalf("archive wallet: %v", err)
 	}
 	wallets, err := repo.ListWallets(context.Background(), userA)
@@ -135,6 +141,39 @@ func TestRepositoryUpdatesAndArchivesOnlyOwnedWallet(t *testing.T) {
 	}
 	if len(wallets) != 0 {
 		t.Fatalf("expected archived wallet hidden from list, got %#v", wallets)
+	}
+}
+
+func TestRepositoryRejectsStaleWalletArchive(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userID := createFinanceUser(t, conn, "wallet-archive-stale@example.com")
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	updated, err := repo.UpdateWallet(context.Background(), userID, wallet.ID, finance.UpdateWalletInput{BaseVersion: wallet.Version, Name: "Ví mới", IncludeInTotal: ptrBool(true)})
+	if err != nil {
+		t.Fatalf("update wallet: %v", err)
+	}
+	if err := repo.ArchiveWallet(context.Background(), userID, wallet.ID, wallet.Version); !errors.Is(err, finance.ErrConflict) {
+		t.Fatalf("stale wallet archive error = %v, want conflict", err)
+	}
+	if err := repo.ArchiveWallet(context.Background(), userID, wallet.ID, updated.Version); err != nil {
+		t.Fatalf("current-version wallet archive: %v", err)
+	}
+}
+
+func TestRepositoryRejectsStaleWalletUpdate(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userID := createFinanceUser(t, conn, "wallet-stale@example.com")
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+
+	updated, err := repo.UpdateWallet(context.Background(), userID, wallet.ID, finance.UpdateWalletInput{BaseVersion: wallet.Version, Name: "Ví mới", IncludeInTotal: ptrBool(true)})
+	if err != nil {
+		t.Fatalf("first wallet update: %v", err)
+	}
+	_, err = repo.UpdateWallet(context.Background(), userID, wallet.ID, finance.UpdateWalletInput{BaseVersion: wallet.Version, Name: "Ghi đè cũ", IncludeInTotal: ptrBool(false)})
+	if !errors.Is(err, finance.ErrConflict) {
+		t.Fatalf("expected stale wallet conflict after version %d became %d, got %v", wallet.Version, updated.Version, err)
 	}
 }
 
@@ -201,7 +240,7 @@ func TestRepositoryUpdatesAndArchivesOnlyUserCategories(t *testing.T) {
 		t.Fatalf("create category: %v", err)
 	}
 
-	updated, err := repo.UpdateCategory(context.Background(), userID, custom.ID, finance.UpdateCategoryInput{Name: "Cafe"})
+	updated, err := repo.UpdateCategory(context.Background(), userID, custom.ID, finance.UpdateCategoryInput{Name: "Cafe", BaseVersion: custom.Version})
 	if err != nil {
 		t.Fatalf("update category: %v", err)
 	}
@@ -211,10 +250,10 @@ func TestRepositoryUpdatesAndArchivesOnlyUserCategories(t *testing.T) {
 	if _, err := repo.UpdateCategory(context.Background(), userID, systemID, finance.UpdateCategoryInput{Name: "Tên mới"}); !errors.Is(err, finance.ErrSystemCategoryLocked) {
 		t.Fatalf("expected system category lock, got %v", err)
 	}
-	if err := repo.ArchiveCategory(context.Background(), userID, systemID); !errors.Is(err, finance.ErrSystemCategoryLocked) {
+	if err := repo.ArchiveCategory(context.Background(), userID, systemID, 1); !errors.Is(err, finance.ErrSystemCategoryLocked) {
 		t.Fatalf("expected system category archive lock, got %v", err)
 	}
-	if err := repo.ArchiveCategory(context.Background(), userID, custom.ID); err != nil {
+	if err := repo.ArchiveCategory(context.Background(), userID, custom.ID, updated.Version); err != nil {
 		t.Fatalf("archive custom category: %v", err)
 	}
 	categories, err := repo.ListCategories(context.Background(), userID)
@@ -403,6 +442,37 @@ func TestRepositoryRejectsReusedTransactionIdempotencyKeyWithDifferentRequest(t 
 	assertWalletBalance(t, conn, wallet.ID, 120_000, 2)
 }
 
+func TestRepositoryIdempotencyHashIncludesReceiptReference(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userID := createFinanceUser(t, conn, "idempotent-receipt@example.com")
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	categoryID := findSystemCategory(t, conn, "expense_food")
+	receipt := func(key string) finance.ReceiptObject {
+		object, err := repo.CreateReceiptObject(context.Background(), userID, finance.CreateReceiptObjectInput{
+			ObjectKey: key, ContentType: "image/jpeg", SizeBytes: 10, ChecksumSHA256: strings.Repeat("a", 64), OriginalFilename: key + ".jpg",
+		})
+		if err != nil {
+			t.Fatalf("create receipt %s: %v", key, err)
+		}
+		return object
+	}
+	firstReceipt := receipt("receipt-first")
+	secondReceipt := receipt("receipt-second")
+	base := finance.CreateTransactionInput{
+		IdempotencyKey: "idem-receipt", Type: finance.TransactionExpense, SourceWalletID: wallet.ID,
+		CategoryID: categoryID, ReceiptObjectID: firstReceipt.ID, AmountVND: 10_000, OccurredAt: fixedFinanceTime(),
+	}
+	if _, err := repo.CreateTransaction(context.Background(), userID, base); err != nil {
+		t.Fatalf("create first transaction: %v", err)
+	}
+	base.ReceiptObjectID = secondReceipt.ID
+	if _, err := repo.CreateTransaction(context.Background(), userID, base); !errors.Is(err, finance.ErrValidation) {
+		t.Fatalf("reused key with a different receipt error = %v, want validation", err)
+	}
+	assertWalletBalance(t, conn, wallet.ID, -10_000, 2)
+}
+
 func TestRepositoryRejectsTransactionForInactiveWalletCategory(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
@@ -471,6 +541,7 @@ func TestRepositoryUpdatesTransactionByReversingAndReapplyingEffect(t *testing.T
 	}
 
 	updated, err := repo.UpdateTransaction(context.Background(), userID, created.ID, finance.UpdateTransactionInput{
+		BaseVersion:         created.Version,
 		Type:                finance.TransactionExpense,
 		SourceWalletID:      wallet.ID,
 		CategoryID:          expenseCategoryID,
@@ -492,6 +563,51 @@ func TestRepositoryUpdatesTransactionByReversingAndReapplyingEffect(t *testing.T
 	}
 }
 
+func TestRepositoryRejectsStaleTransactionUpdateWithoutChangingBalance(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userID := createFinanceUser(t, conn, "tx-stale-update@example.com")
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	incomeCategoryID := findSystemCategory(t, conn, "income_salary")
+	created, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
+		IdempotencyKey: "stale-update-base",
+		Type:           finance.TransactionIncome,
+		SourceWalletID: wallet.ID,
+		CategoryID:     incomeCategoryID,
+		AmountVND:      100_000,
+		OccurredAt:     fixedFinanceTime(),
+	})
+	if err != nil {
+		t.Fatalf("create transaction: %v", err)
+	}
+	first, err := repo.UpdateTransaction(context.Background(), userID, created.ID, finance.UpdateTransactionInput{
+		BaseVersion:    created.Version,
+		Type:           finance.TransactionIncome,
+		SourceWalletID: wallet.ID,
+		CategoryID:     incomeCategoryID,
+		AmountVND:      200_000,
+		OccurredAt:     fixedFinanceTime(),
+	})
+	if err != nil {
+		t.Fatalf("first update: %v", err)
+	}
+	_, err = repo.UpdateTransaction(context.Background(), userID, created.ID, finance.UpdateTransactionInput{
+		BaseVersion:    created.Version,
+		Type:           finance.TransactionIncome,
+		SourceWalletID: wallet.ID,
+		CategoryID:     incomeCategoryID,
+		AmountVND:      300_000,
+		OccurredAt:     fixedFinanceTime(),
+	})
+	if !errors.Is(err, finance.ErrConflict) {
+		t.Fatalf("stale update error = %v, want conflict", err)
+	}
+	assertWalletBalance(t, conn, wallet.ID, 200_000, 3)
+	if first.Version != created.Version+1 {
+		t.Fatalf("first update version = %d, want %d", first.Version, created.Version+1)
+	}
+}
+
 func TestRepositoryArchivesTransactionByReversingEffectOnce(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
@@ -510,14 +626,82 @@ func TestRepositoryArchivesTransactionByReversingEffectOnce(t *testing.T) {
 		t.Fatalf("create transaction: %v", err)
 	}
 
-	if err := repo.ArchiveTransaction(context.Background(), userID, created.ID); err != nil {
+	if err := repo.ArchiveTransaction(context.Background(), userID, created.ID, created.Version); err != nil {
 		t.Fatalf("archive transaction: %v", err)
 	}
 	assertWalletBalance(t, conn, wallet.ID, 0, 3)
-	if err := repo.ArchiveTransaction(context.Background(), userID, created.ID); !errors.Is(err, finance.ErrForbidden) {
+	if err := repo.ArchiveTransaction(context.Background(), userID, created.ID, created.Version); !errors.Is(err, finance.ErrForbidden) {
 		t.Fatalf("expected second archive to be forbidden, got %v", err)
 	}
 	assertWalletBalance(t, conn, wallet.ID, 0, 3)
+}
+
+func TestRepositoryRejectsArchiveWhenReversalWouldOverflowBalance(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userID := createFinanceUser(t, conn, "tx-archive-overflow@example.com")
+	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{
+		Name:       "Ví sát biên",
+		Type:       finance.WalletCash,
+		BalanceVND: math.MaxInt64 - 1,
+	})
+	if err != nil {
+		t.Fatalf("create wallet: %v", err)
+	}
+	expenseCategoryID := findSystemCategory(t, conn, "expense_food")
+	incomeCategoryID := findSystemCategory(t, conn, "income_salary")
+	expense, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
+		IdempotencyKey: "archive-overflow-expense",
+		Type:           finance.TransactionExpense,
+		SourceWalletID: wallet.ID,
+		CategoryID:     expenseCategoryID,
+		AmountVND:      1,
+		OccurredAt:     fixedFinanceTime(),
+	})
+	if err != nil {
+		t.Fatalf("create expense: %v", err)
+	}
+	if _, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
+		IdempotencyKey: "archive-overflow-income",
+		Type:           finance.TransactionIncome,
+		SourceWalletID: wallet.ID,
+		CategoryID:     incomeCategoryID,
+		AmountVND:      2,
+		OccurredAt:     fixedFinanceTime(),
+	}); err != nil {
+		t.Fatalf("create income: %v", err)
+	}
+
+	err = repo.ArchiveTransaction(context.Background(), userID, expense.ID, expense.Version)
+	if !errors.Is(err, finance.ErrValidation) {
+		t.Fatalf("archive overflow error = %v, want validation", err)
+	}
+	assertWalletBalance(t, conn, wallet.ID, math.MaxInt64, 3)
+	assertFinanceRowCount(t, conn, `SELECT count(*) FROM transactions WHERE id = $1 AND archived_at IS NULL`, expense.ID, 1)
+}
+
+func TestRepositoryRejectsStaleTransactionArchive(t *testing.T) {
+	conn := migratedFinancePostgres(t)
+	repo := finance.NewRepository(conn)
+	userID := createFinanceUser(t, conn, "tx-archive-stale@example.com")
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	categoryID := findSystemCategory(t, conn, "income_salary")
+	created, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{IdempotencyKey: "archive-stale", Type: finance.TransactionIncome, SourceWalletID: wallet.ID, CategoryID: categoryID, AmountVND: 200_000, OccurredAt: fixedFinanceTime()})
+	if err != nil {
+		t.Fatalf("create transaction: %v", err)
+	}
+	updated, err := repo.UpdateTransaction(context.Background(), userID, created.ID, finance.UpdateTransactionInput{BaseVersion: created.Version, Type: finance.TransactionIncome, SourceWalletID: wallet.ID, CategoryID: categoryID, AmountVND: 300_000, OccurredAt: fixedFinanceTime()})
+	if err != nil {
+		t.Fatalf("update transaction: %v", err)
+	}
+	if err := repo.ArchiveTransaction(context.Background(), userID, created.ID, created.Version); !errors.Is(err, finance.ErrConflict) {
+		t.Fatalf("stale archive error = %v, want conflict", err)
+	}
+	assertWalletBalance(t, conn, wallet.ID, 300_000, 3)
+	if err := repo.ArchiveTransaction(context.Background(), userID, created.ID, updated.Version); err != nil {
+		t.Fatalf("current-version archive: %v", err)
+	}
+	assertWalletBalance(t, conn, wallet.ID, 0, 4)
 }
 
 func TestRepositoryListsTransactionsWithFilters(t *testing.T) {

@@ -2,6 +2,7 @@ package sync
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,6 +11,7 @@ import (
 
 	"mypocket/internal/audit"
 	"mypocket/internal/finance"
+	"mypocket/internal/platform/commandtx"
 	"mypocket/internal/portfolio"
 )
 
@@ -17,17 +19,17 @@ type FinanceCommands interface {
 	ListWallets(ctx context.Context, userID string) ([]finance.Wallet, error)
 	CreateWallet(ctx context.Context, userID string, input finance.CreateWalletInput) (finance.Wallet, error)
 	UpdateWallet(ctx context.Context, userID string, walletID string, input finance.UpdateWalletInput) (finance.Wallet, error)
-	ArchiveWallet(ctx context.Context, userID string, walletID string) error
-	SetDefaultAIWallet(ctx context.Context, userID string, walletID string) error
+	ArchiveWallet(ctx context.Context, userID string, walletID string, baseVersion int64) error
+	SetDefaultAIWallet(ctx context.Context, userID string, walletID string, baseVersion int64) error
 	ListCategories(ctx context.Context, userID string) ([]finance.Category, error)
 	CreateCategory(ctx context.Context, userID string, input finance.CreateCategoryInput) (finance.Category, error)
 	UpdateCategory(ctx context.Context, userID string, categoryID string, input finance.UpdateCategoryInput) (finance.Category, error)
-	ArchiveCategory(ctx context.Context, userID string, categoryID string) error
+	ArchiveCategory(ctx context.Context, userID string, categoryID string, baseVersion int64) error
 	SetWalletCategoryActive(ctx context.Context, userID string, walletID string, categoryID string, active bool) error
 	ListTransactions(ctx context.Context, userID string, filters finance.TransactionFilters) ([]finance.Transaction, error)
 	CreateTransaction(ctx context.Context, userID string, input finance.CreateTransactionInput) (finance.Transaction, error)
 	UpdateTransaction(ctx context.Context, userID string, transactionID string, input finance.UpdateTransactionInput) (finance.Transaction, error)
-	ArchiveTransaction(ctx context.Context, userID string, transactionID string) error
+	ArchiveTransaction(ctx context.Context, userID string, transactionID string, baseVersion int64) error
 }
 
 type PortfolioCommands interface {
@@ -59,6 +61,7 @@ type Service struct {
 	finance   FinanceCommands
 	portfolio PortfolioCommands
 	audit     AuditSink
+	atomic    bool
 }
 
 func NewService(store Store, financeCommands FinanceCommands, portfolioCommands ...PortfolioCommands) *Service {
@@ -102,6 +105,21 @@ func (s *Service) Resync(ctx context.Context, userID string) (Snapshot, error) {
 	if strings.TrimSpace(userID) == "" {
 		return Snapshot{}, fmt.Errorf("%w: user is required", ErrValidation)
 	}
+	if store, ok := s.store.(*Repository); ok && !s.atomic {
+		tx, err := store.db.BeginTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true})
+		if err != nil {
+			return Snapshot{}, err
+		}
+		defer tx.Rollback()
+		snapshot, err := s.bind(tx.Tx).Resync(ctx, userID)
+		if err != nil {
+			return Snapshot{}, err
+		}
+		if err = tx.Commit(); err != nil {
+			return Snapshot{}, err
+		}
+		return snapshot, nil
+	}
 	wallets, err := s.finance.ListWallets(ctx, userID)
 	if err != nil {
 		return Snapshot{}, fmt.Errorf("list resync wallets: %w", err)
@@ -129,6 +147,26 @@ func (s *Service) Resync(ctx context.Context, userID string) (Snapshot, error) {
 }
 
 func (s *Service) applyOne(ctx context.Context, userID string, mutation Mutation) (MutationResult, error) {
+	if store, ok := s.store.(*Repository); ok && !s.atomic {
+		tx, err := store.db.BeginTx(ctx, nil)
+		if err != nil {
+			return MutationResult{}, err
+		}
+		defer tx.Rollback()
+		if err = commandtx.LockUser(ctx, tx, userID); err != nil {
+			return MutationResult{}, err
+		}
+		bound := s.bind(tx.Tx)
+		result, err := bound.applyOne(ctx, userID, mutation)
+		if err != nil {
+			return MutationResult{}, err
+		}
+		if err = tx.Commit(); err != nil {
+			return MutationResult{}, err
+		}
+		s.appendMutationAudit(ctx, userID, result)
+		return result, nil
+	}
 	hash, err := RequestHash(mutation)
 	if err != nil {
 		return MutationResult{}, err
@@ -150,7 +188,16 @@ func (s *Service) applyOne(ctx context.Context, userID string, mutation Mutation
 
 	result, err := s.executeMutation(ctx, userID, mutation)
 	if err != nil {
-		if errors.Is(err, finance.ErrValidation) || errors.Is(err, finance.ErrForbidden) || errors.Is(err, portfolio.ErrValidation) || errors.Is(err, portfolio.ErrForbidden) || errors.Is(err, portfolio.ErrOversell) || errors.Is(err, portfolio.ErrConflict) || errors.Is(err, ErrValidation) {
+		if errors.Is(err, finance.ErrConflict) || errors.Is(err, portfolio.ErrConflict) {
+			conflict, ok, conflictErr := s.conflictForStaleBase(ctx, userID, mutation)
+			if conflictErr != nil {
+				return MutationResult{}, conflictErr
+			}
+			if !ok {
+				return MutationResult{}, err
+			}
+			result = MutationResult{MutationID: mutation.MutationID, EntityType: mutation.EntityType, EntityID: mutation.EntityID, Operation: mutation.Operation, State: ResultConflict, Conflict: &conflict}
+		} else if errors.Is(err, finance.ErrValidation) || errors.Is(err, finance.ErrForbidden) || errors.Is(err, portfolio.ErrValidation) || errors.Is(err, portfolio.ErrForbidden) || errors.Is(err, portfolio.ErrOversell) || errors.Is(err, ErrValidation) {
 			result = rejectedResult(mutation, safeReason(err))
 		} else {
 			return MutationResult{}, err
@@ -194,7 +241,9 @@ func (s *Service) appendMutationAudit(ctx context.Context, userID string, result
 }
 
 func (s *Service) executeMutation(ctx context.Context, userID string, mutation Mutation) (MutationResult, error) {
-	if mutation.Operation != OperationCreate {
+	// Wallet/category activation is an idempotent absolute-state PUT. The setting
+	// currently has no version of its own, and the category's version is unrelated.
+	if mutation.Operation != OperationCreate && mutation.Operation != OperationSetCategoryActive {
 		conflict, ok, err := s.conflictForStaleBase(ctx, userID, mutation)
 		if err != nil {
 			return MutationResult{}, err
@@ -256,21 +305,28 @@ func (s *Service) executeWalletMutation(ctx context.Context, userID string, muta
 		if err := decodePayload(mutation.Payload, &input); err != nil {
 			return MutationResult{}, err
 		}
-		wallet, err := s.finance.UpdateWallet(ctx, userID, mutation.EntityID, finance.UpdateWalletInput{Name: input.Name, IncludeInTotal: &input.IncludeInTotal})
+		wallet, err := s.finance.UpdateWallet(ctx, userID, mutation.EntityID, finance.UpdateWalletInput{BaseVersion: mutation.BaseVersion, Name: input.Name, IncludeInTotal: &input.IncludeInTotal})
 		if err != nil {
 			return MutationResult{}, err
 		}
 		return s.appliedWithChange(ctx, userID, mutation, wallet.Version, mustJSON(wallet))
 	case OperationArchive:
-		if err := s.finance.ArchiveWallet(ctx, userID, mutation.EntityID); err != nil {
+		if err := s.finance.ArchiveWallet(ctx, userID, mutation.EntityID, mutation.BaseVersion); err != nil {
 			return MutationResult{}, err
 		}
 		return s.appliedWithChange(ctx, userID, mutation, mutation.BaseVersion+1, json.RawMessage(`{}`))
 	case OperationSetDefaultAI:
-		if err := s.finance.SetDefaultAIWallet(ctx, userID, mutation.EntityID); err != nil {
+		if err := s.finance.SetDefaultAIWallet(ctx, userID, mutation.EntityID, mutation.BaseVersion); err != nil {
 			return MutationResult{}, err
 		}
-		return s.appliedWithChange(ctx, userID, mutation, mutation.BaseVersion+1, json.RawMessage(`{}`))
+		version, payload, found, err := s.store.EntityVersionAndPayload(ctx, userID, EntityWallet, mutation.EntityID)
+		if err != nil {
+			return MutationResult{}, err
+		}
+		if !found {
+			return MutationResult{}, finance.ErrForbidden
+		}
+		return s.appliedWithChange(ctx, userID, mutation, version, payload)
 	default:
 		return MutationResult{}, fmt.Errorf("%w: unsupported wallet operation", ErrValidation)
 	}
@@ -280,31 +336,43 @@ func (s *Service) executeCategoryMutation(ctx context.Context, userID string, mu
 	switch mutation.Operation {
 	case OperationCreate:
 		var input struct {
-			Kind finance.CategoryKind `json:"kind"`
-			Name string               `json:"name"`
+			Kind     finance.CategoryKind `json:"kind"`
+			Name     string               `json:"name"`
+			ParentID string               `json:"parent_id"`
 		}
 		if err := decodePayload(mutation.Payload, &input); err != nil {
 			return MutationResult{}, err
 		}
-		category, err := s.finance.CreateCategory(ctx, userID, finance.CreateCategoryInput{ID: mutation.EntityID, Kind: input.Kind, Name: input.Name})
+		category, err := s.finance.CreateCategory(ctx, userID, finance.CreateCategoryInput{ID: mutation.EntityID, Kind: input.Kind, Name: input.Name, ParentID: input.ParentID})
 		if err != nil {
 			return MutationResult{}, err
 		}
 		return s.appliedWithChange(ctx, userID, mutation, category.Version, mustJSON(category))
 	case OperationUpdate:
 		var input struct {
-			Name string `json:"name"`
+			Name     string          `json:"name"`
+			ParentID json.RawMessage `json:"parent_id"`
 		}
 		if err := decodePayload(mutation.Payload, &input); err != nil {
 			return MutationResult{}, err
 		}
-		category, err := s.finance.UpdateCategory(ctx, userID, mutation.EntityID, finance.UpdateCategoryInput{Name: input.Name})
+		var parentID *string
+		if len(input.ParentID) > 0 {
+			value := ""
+			if string(input.ParentID) != "null" {
+				if err := json.Unmarshal(input.ParentID, &value); err != nil {
+					return MutationResult{}, fmt.Errorf("%w: invalid parent_id", ErrValidation)
+				}
+			}
+			parentID = &value
+		}
+		category, err := s.finance.UpdateCategory(ctx, userID, mutation.EntityID, finance.UpdateCategoryInput{Name: input.Name, BaseVersion: mutation.BaseVersion, ParentID: parentID})
 		if err != nil {
 			return MutationResult{}, err
 		}
 		return s.appliedWithChange(ctx, userID, mutation, category.Version, mustJSON(category))
 	case OperationArchive:
-		if err := s.finance.ArchiveCategory(ctx, userID, mutation.EntityID); err != nil {
+		if err := s.finance.ArchiveCategory(ctx, userID, mutation.EntityID, mutation.BaseVersion); err != nil {
 			return MutationResult{}, err
 		}
 		return s.appliedWithChange(ctx, userID, mutation, mutation.BaseVersion+1, json.RawMessage(`{}`))
@@ -319,7 +387,7 @@ func (s *Service) executeCategoryMutation(ctx context.Context, userID string, mu
 		if err := s.finance.SetWalletCategoryActive(ctx, userID, input.WalletID, mutation.EntityID, input.Active); err != nil {
 			return MutationResult{}, err
 		}
-		return s.appliedWithChange(ctx, userID, mutation, mutation.BaseVersion+1, mutation.Payload)
+		return s.appliedWithChange(ctx, userID, mutation, 0, mutation.Payload)
 	default:
 		return MutationResult{}, fmt.Errorf("%w: unsupported category operation", ErrValidation)
 	}
@@ -345,6 +413,7 @@ func (s *Service) executeTransactionMutation(ctx context.Context, userID string,
 			return MutationResult{}, err
 		}
 		transaction, err := s.finance.UpdateTransaction(ctx, userID, mutation.EntityID, finance.UpdateTransactionInput{
+			BaseVersion:         mutation.BaseVersion,
 			Type:                input.Type,
 			SourceWalletID:      input.SourceWalletID,
 			DestinationWalletID: input.DestinationWalletID,
@@ -363,7 +432,7 @@ func (s *Service) executeTransactionMutation(ctx context.Context, userID string,
 		}
 		return s.appliedWithChange(ctx, userID, mutation, transaction.Version, mustJSON(transaction))
 	case OperationArchive:
-		if err := s.finance.ArchiveTransaction(ctx, userID, mutation.EntityID); err != nil {
+		if err := s.finance.ArchiveTransaction(ctx, userID, mutation.EntityID, mutation.BaseVersion); err != nil {
 			return MutationResult{}, err
 		}
 		return s.appliedWithChange(ctx, userID, mutation, mutation.BaseVersion+1, json.RawMessage(`{}`))
@@ -496,6 +565,9 @@ func (s *Service) conflictForStaleBase(ctx context.Context, userID string, mutat
 
 func (s *Service) appliedWithChange(ctx context.Context, userID string, mutation Mutation, version int64, payload json.RawMessage) (MutationResult, error) {
 	payload = normalizedPayload(payload)
+	if s.atomic {
+		return MutationResult{MutationID: mutation.MutationID, EntityType: mutation.EntityType, EntityID: mutation.EntityID, Operation: mutation.Operation, State: ResultApplied, Version: version, Payload: payload}, nil
+	}
 	change, err := s.store.AppendChange(ctx, userID, mutation.EntityType, mutation.EntityID, mutation.Operation, version, payload)
 	if err != nil {
 		return MutationResult{}, err
@@ -509,6 +581,16 @@ func (s *Service) appliedWithChange(ctx context.Context, userID string, mutation
 		Version:    version,
 		Payload:    change.Payload,
 	}, nil
+}
+
+// bind shares one connection for domain changes, change feed and replay receipt.
+// Audit is intentionally emitted by the caller only after commit.
+func (s *Service) bind(tx *sql.Tx) *Service {
+	bound := &Service{store: &Repository{db: commandtx.Bound(tx)}, finance: finance.NewRepositoryInTx(tx), atomic: true}
+	if s.portfolio != nil {
+		bound.portfolio = portfolio.NewRepositoryInTx(tx)
+	}
+	return bound
 }
 
 func validateBatch(userID string, mutations []Mutation) error {

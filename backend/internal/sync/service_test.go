@@ -75,6 +75,49 @@ func TestServiceReturnsConflictForStaleBaseVersion(t *testing.T) {
 	}
 }
 
+func TestServiceReturnsConflictWhenVersionChangesAfterPrecheck(t *testing.T) {
+	store := newStoreStub()
+	key := string(mysync.EntityTransaction) + ":" + fixedTransactionID
+	store.entityVersions[key] = versionPayload{version: 1, payload: rawJSON(`{"id":"` + fixedTransactionID + `","version":1}`)}
+	financeRepo := &financeStub{updateTransaction: func() (finance.Transaction, error) {
+		store.entityVersions[key] = versionPayload{version: 2, payload: rawJSON(`{"id":"` + fixedTransactionID + `","version":2,"note":"other device"}`)}
+		return finance.Transaction{}, finance.ErrConflict
+	}}
+	service := mysync.NewService(store, financeRepo)
+
+	result, err := service.ApplyMutations(context.Background(), fixedUserID, []mysync.Mutation{transactionUpdateMutation("mut_race", 1, 1)})
+	if err != nil {
+		t.Fatalf("post-precheck version race should be a conflict result, got %v", err)
+	}
+	if result[0].State != mysync.ResultConflict || result[0].Conflict == nil || result[0].Conflict.ServerVersion != 2 {
+		t.Fatalf("unexpected race conflict result: %#v", result[0])
+	}
+}
+
+func TestServiceAppliesIdempotentCategoryActivationWithoutCategoryVersionConflict(t *testing.T) {
+	store := newStoreStub()
+	store.entityVersions[string(mysync.EntityCategory)+":"+fixedCategoryID] = versionPayload{version: 7, payload: rawJSON(`{"id":"` + fixedCategoryID + `","version":7}`)}
+	financeRepo := &financeStub{}
+	service := mysync.NewService(store, financeRepo)
+
+	result, err := service.ApplyMutations(context.Background(), fixedUserID, []mysync.Mutation{{
+		MutationID:  "mut_category_active",
+		DeviceID:    "device_1",
+		Sequence:    1,
+		EntityType:  mysync.EntityCategory,
+		EntityID:    fixedCategoryID,
+		Operation:   mysync.OperationSetCategoryActive,
+		BaseVersion: 0,
+		Payload:     rawJSON(`{"wallet_id":"` + fixedWalletID + `","active":false}`),
+	}})
+	if err != nil {
+		t.Fatalf("apply category activation: %v", err)
+	}
+	if result[0].State != mysync.ResultApplied || financeRepo.setCategoryActiveCalls != 1 {
+		t.Fatalf("category activation should apply once without comparing category version: result=%#v calls=%d", result[0], financeRepo.setCategoryActiveCalls)
+	}
+}
+
 func TestServiceAppliesAssetMutations(t *testing.T) {
 	store := newStoreStub()
 	portfolioRepo := &portfolioStub{
@@ -185,7 +228,9 @@ func (s *storeStub) EntityVersionAndPayload(_ context.Context, _ string, entityT
 
 type financeStub struct {
 	createTransactionCalls int
+	setCategoryActiveCalls int
 	createdTransaction     finance.Transaction
+	updateTransaction      func() (finance.Transaction, error)
 }
 
 func (f *financeStub) ListWallets(context.Context, string) ([]finance.Wallet, error) { return nil, nil }
@@ -195,8 +240,8 @@ func (f *financeStub) CreateWallet(context.Context, string, finance.CreateWallet
 func (f *financeStub) UpdateWallet(context.Context, string, string, finance.UpdateWalletInput) (finance.Wallet, error) {
 	return finance.Wallet{ID: fixedWalletID, Version: 2}, nil
 }
-func (f *financeStub) ArchiveWallet(context.Context, string, string) error      { return nil }
-func (f *financeStub) SetDefaultAIWallet(context.Context, string, string) error { return nil }
+func (f *financeStub) ArchiveWallet(context.Context, string, string, int64) error      { return nil }
+func (f *financeStub) SetDefaultAIWallet(context.Context, string, string, int64) error { return nil }
 func (f *financeStub) ListCategories(context.Context, string) ([]finance.Category, error) {
 	return nil, nil
 }
@@ -206,8 +251,9 @@ func (f *financeStub) CreateCategory(context.Context, string, finance.CreateCate
 func (f *financeStub) UpdateCategory(context.Context, string, string, finance.UpdateCategoryInput) (finance.Category, error) {
 	return finance.Category{ID: fixedCategoryID, Version: 2}, nil
 }
-func (f *financeStub) ArchiveCategory(context.Context, string, string) error { return nil }
+func (f *financeStub) ArchiveCategory(context.Context, string, string, int64) error { return nil }
 func (f *financeStub) SetWalletCategoryActive(context.Context, string, string, string, bool) error {
+	f.setCategoryActiveCalls++
 	return nil
 }
 func (f *financeStub) ListTransactions(context.Context, string, finance.TransactionFilters) ([]finance.Transaction, error) {
@@ -219,9 +265,12 @@ func (f *financeStub) CreateTransaction(_ context.Context, _ string, input finan
 	return f.createdTransaction, nil
 }
 func (f *financeStub) UpdateTransaction(context.Context, string, string, finance.UpdateTransactionInput) (finance.Transaction, error) {
+	if f.updateTransaction != nil {
+		return f.updateTransaction()
+	}
 	return finance.Transaction{ID: fixedTransactionID, Version: 2}, nil
 }
-func (f *financeStub) ArchiveTransaction(context.Context, string, string) error { return nil }
+func (f *financeStub) ArchiveTransaction(context.Context, string, string, int64) error { return nil }
 
 type portfolioStub struct {
 	createCalls int

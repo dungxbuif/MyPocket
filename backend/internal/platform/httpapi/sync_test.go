@@ -30,6 +30,23 @@ func TestSyncMutationsRequiresCSRF(t *testing.T) {
 	}
 }
 
+func TestSyncChangesUsesAPIKeyOwner(t *testing.T) {
+	cfg := authTestConfig()
+	cfg.APIKeyHashSecret = "change-this-development-api-key-hash-secret-32-bytes"
+	identityRepo := &authRepoStub{user: identity.User{ID: "user_123", Email: "agent@example.com", EmailVerified: true}}
+	service := &syncServiceStub{}
+	handler := httpapi.NewRouter(cfg, httpapi.Dependencies{IdentityRepository: identityRepo, APIKeyRepository: identityRepo, SyncService: service, AuthCache: &authCacheStub{}})
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/sync/changes?after=0", nil)
+	req.Header.Set("Authorization", "Bearer mpk_test")
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusOK || service.changesUserID != "user_123" {
+		t.Fatalf("expected sync scoped to API key owner, code=%d user=%q body=%s", res.Code, service.changesUserID, res.Body.String())
+	}
+}
+
 func TestSyncMutationsUsesAuthenticatedUser(t *testing.T) {
 	service := &syncServiceStub{results: []mysync.MutationResult{{MutationID: "mut_1", EntityType: mysync.EntityWallet, EntityID: "wallet_1", Operation: mysync.OperationCreate, State: mysync.ResultApplied, Version: 1}}}
 	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
