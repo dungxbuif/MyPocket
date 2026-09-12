@@ -19,7 +19,17 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
-*(No unreleased changes)*
+### Business Tickets — 2026-09-13
+
+- Added [11 parent and 31 child tickets](../work/tickets/README.md) covering the product contract, with concise business scope, acceptance criteria and unresolved questions attached to affected children.
+- Linked the draft tickets to the current queue and validation matrix. This supersedes the earlier no-ticket direction; no implementation or product UAT was performed.
+
+### Documentation — 2026-09-13
+
+- Consolidated product specification, business rules, report/Insider design, requirements and review stories into [canonical product docs](../requirements/README.md); removed the two superseded V2 drafts. This is design under review, not a shipped runtime change.
+- Recorded editable month-end reporting, independent monthly user notes, automatic context/AI summaries, flexible monthly/cumulative jars and UTC/account-timezone semantics.
+- Moved existing standards unchanged to `docs/standards/`; removed the unused Harness CLI phase example and its scheduled milestones. No new implementation tasks were created.
+- Runtime tests/UAT were not run for this docs-only update. Documentation evidence is recorded in [VALIDATION_MATRIX.md](../work/VALIDATION_MATRIX.md).
 
 ## [1.1.1] - 2026-06-07
 

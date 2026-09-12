@@ -19,7 +19,7 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-09-12
+updated: 2026-09-13
 ---
 
 # Project Context
@@ -34,17 +34,21 @@ updated: 2026-09-12
 
 - Status: A new root `app/` Vite React Tailwind app now renders a mock-only MyPocket FE preview following the new Financial Clarity design and Atomic Design structure.
 - Active backlog: `docs/work/BACKLOG.md`
-- Current queue focus: Review the standalone `app/` FE preview, then iterate UI before moving reference logic/API contracts into it.
+- Current queue focus: Review 11 parent and 31 child business tickets in `docs/work/tickets/README.md`, together with unresolved business decisions. The existing `app/` FE preview remains mock-only.
 - Active phase: None.
 - Active ticket: None.
 - Active bug: None.
 
 ## Current Focus
 
-Prepare MyPocket / Financial Clarity for app implementation. The current product direction is a personal finance app inspired by Money Lover, with a reusable design system and fast transaction logging as the first implementation target.
+Review the MyPocket product/business specification and its BA ticket breakdown. The owner now requests large tickets with smaller child tickets, written briefly in business language. This supersedes the earlier request to avoid creating tickets. No implementation phase or technical plan is scheduled by this breakdown.
 
 ## Recently Touched Areas
 
+- `docs/work/tickets/`: 11 parent tickets, 31 children and a business-oriented index; all tickets are `draft` pending review.
+- `docs/requirements/SPEC.md`, `BUSINESS_RULES.md`, `REPORTS.md`, `REQUIREMENTS.md`, `USER_STORIES.md`
+- `docs/work/VALIDATION_MATRIX.md`, `docs/work/ROADMAP.md`, `docs/releases/CHANGELOG.md`
+- Standards relocated unchanged from `docs/templates/standards/` to the mandatory `docs/standards/` path; unused Harness CLI phase example removed.
 - `AGENTS.md`
 - `docs/`
 - `docs/templates/`
@@ -57,6 +61,13 @@ Prepare MyPocket / Financial Clarity for app implementation. The current product
 
 ## Recent Decisions
 
+- Divide the full business contract into parent/child tickets with concise scope and acceptance criteria. Keep unresolved decisions in the affected child; do not silently resolve them during breakdown.
+- Current product contract is `docs/requirements/SPEC.md`, with `BUSINESS_RULES.md` and `REPORTS.md`; older design inputs do not override these decisions.
+- Budget and Jar are separate. Jars are optional expense-group tracking with monthly copied configuration, advisory allocation/warnings, no balance carryover, and a cumulative reporting view.
+- Monthly reports remain recalculable after month-end. User notes are independent; related context and AI summaries are generated separately and cannot overwrite manual notes.
+- Timestamps use UTC; account timezone drives query boundaries; calendar-only dates/months keep their explicit labels. Only VND is seeded; multi-currency has no designed contract.
+- Travel Mode automatically links eligible new transactions; recurring-generated transactions do not inherit it. Recurring creates ordinary editable transactions with a default note.
+- The following older bullets describe the existing preview/history, not authority over the current product specification.
 - Keep `AGENTS.md` at the repository root for agent discovery.
 - Keep shared state in `docs/CONTEXT.md`.
 - Use markdown-only enforcement for v1.
@@ -69,14 +80,16 @@ Prepare MyPocket / Financial Clarity for app implementation. The current product
 - Frontend preview uses the old app as logic/data-shape reference only; UI is new and follows `docs/design/DESIGN.md`.
 - New app source lives in root `app/`; `refereces/disappointed_app/` should remain the reference app for moving logic/API contracts later.
 - The standalone FE preview now includes Overview, Transactions, Budgets, Reports, Account, Quick Add sheet, goals/funds, quick personal actions, and a nested category report mock.
+- OCR Platform docs have been captured in `docs/architecture/OCR_API.md` for future receipt OCR implementation against `https://ocr.dungxbuif.com/`.
 
 ## Next Steps
 
-- Collect FE feedback on the standalone mock prototype at `app/`.
-- After UI direction is approved, move selected reference logic/API calls from `refereces/disappointed_app/` into the Atomic Design component tree.
-- Reconcile product requirements and architecture docs once the FE direction is approved.
+- Review the parent/child ticket list and resolve business questions in the affected children; prioritize implementation only when requested.
+- Reconcile the existing mock preview and reference architecture against the accepted contract when implementation is requested; no runtime changes have been made in this documentation update.
+- When implementing receipt OCR, use `docs/architecture/OCR_API.md` as the provider contract and keep `OCR_API_KEY` server-side only.
+- Product UAT and runtime proof remain pending; documentation review must not be presented as implemented behavior.
 
 ## Open Questions
 
-- Should `refereces/disappointed_app/` become the active app source, or should implementation start in a new clean app directory?
-- Should the first app slice prioritize UI foundation/component library or the fast transaction logging flow?
+- Deletion of linked objects and paired-wallet effects; Travel Mode for backdated/offline/delayed confirmation; recurring month-end/catch-up/timezone changes.
+- Exact income/refund classification for jar allocation; credit overpayment/refund/statement allocation; portfolio funding and historical deletion behavior.

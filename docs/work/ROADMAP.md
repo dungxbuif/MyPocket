@@ -1,7 +1,7 @@
 ---
 artifact_type: roadmap
 id: ROADMAP
-status: active
+status: draft
 owner: human
 human_fields:
   - milestones
@@ -12,7 +12,7 @@ ai_fields:
   - status_summaries
 shared_fields:
   - milestone_status
-updated: TBD
+updated: 2026-09-13
 ---
 
 # Roadmap
@@ -22,7 +22,7 @@ updated: TBD
 - Human owns milestones, priority, and phase order.
 - AI maintains phase links and status summaries.
 
-Use this file to group work into milestones or major phases.
+No implementation roadmap has been scheduled for the current product specification. The owner is reviewing the complete function design in [SPEC.md](../requirements/SPEC.md) and its [parent/child business tickets](tickets/README.md). The draft tickets describe business scope; their numbering does not assign implementation phases or priority.
 
 ## Roadmap Rules
 
@@ -34,5 +34,5 @@ Use this file to group work into milestones or major phases.
 
 | Milestone | Goal | Status | Phase Files |
 | --- | --- | --- | --- |
-| M0 | Establish SDLC agent framework | active | TBD |
-| M1 | Phase 2: Develop Harness CLI (Hard Enforcement) | ready | [PHASE-2.md](phases/PHASE-2.md) |
+
+No project milestones have been assigned. The inherited Harness CLI example is not MyPocket product work and has been removed from this scheduler.

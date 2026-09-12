@@ -21,18 +21,22 @@ Document HTTP endpoints, RPC methods, events, CLI commands, or any other public 
 
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
-| TBD | TBD | TBD | draft | TBD |
+| OCR Platform document recognition | HTTP REST | `Authorization: Bearer sk_ocr_...` for protected requests | ready | See `docs/architecture/OCR_API.md`. |
 
 ## Errors
 
 | Error | Meaning | Consumer Impact |
 | --- | --- | --- |
-| TBD | TBD | TBD |
+| `400 INVALID_INPUT` | OCR request/options invalid. | Show OCR failure and keep manual receipt entry available. |
+| `404 NOT_FOUND` | OCR document ID unknown, expired metadata, or wrong owner. | Mark OCR job unavailable; retain attachment/manual entry. |
+| `410 RESULT_EXPIRED` | OCR result TTL expired. | Use persisted MyPocket result if available or request re-scan. |
+| `413 URL_CONTENT_TOO_LARGE` | File exceeds OCR deployment limit. | Show max upload size and ask user to reduce/split file. |
+| `415 UNSUPPORTED_MEDIA_TYPE` | Unsupported input type. | Block unsupported upload in UI where possible. |
 
 ## Versioning
 
-TBD
+External public contracts use provider versioning where available. OCR Platform uses `/v1` REST paths. MyPocket should wrap provider calls behind an internal adapter so provider changes do not leak into frontend components.
 
 ## Linked Decisions
 
-- TBD
+- `docs/architecture/OCR_API.md`

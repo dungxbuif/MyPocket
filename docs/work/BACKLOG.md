@@ -15,7 +15,7 @@ ai_fields:
 shared_fields:
   - queue_items
   - status
-updated: 2026-09-12
+updated: 2026-09-13
 ---
 
 # Backlog
@@ -27,6 +27,30 @@ updated: 2026-09-12
 - Shared fields include queue rows and item status.
 
 Use this file as the runtime work queue.
+
+## Current Owner Direction
+
+Review the complete contract and its [11 parent / 31 child BA tickets](tickets/README.md). The owner requested concise business-language tickets; all are `draft`, without an implementation phase or technical plan. The ticket list covers REQ-01 through REQ-18; common quality rules apply across the groups. Existing queue rows below remain historical context and do not override this review focus.
+
+Documentation checks and remaining product proof are recorded in [VALIDATION_MATRIX.md](VALIDATION_MATRIX.md). Standards now live at the required `docs/standards/` location, with their existing content preserved.
+
+## Current Business Ticket Queue
+
+| Group | Review item | Status |
+| --- | --- | --- |
+| TICKET-01 | [Tài khoản, ví và danh mục](tickets/TICKET-01-tai-khoan-va-vi.md) | draft |
+| TICKET-02 | [Giao dịch](tickets/TICKET-02-giao-dich.md) | draft |
+| TICKET-03 | [Budget](tickets/TICKET-03-budget.md) | draft |
+| TICKET-04 | [Hũ chi tiêu](tickets/TICKET-04-hu-chi-tieu.md) | draft |
+| TICKET-05 | [Định kỳ và du lịch](tickets/TICKET-05-dinh-ky-du-lich.md) | draft |
+| TICKET-06 | [Tiết kiệm, tín dụng và nợ](tickets/TICKET-06-tiet-kiem-tin-dung-no.md) | draft |
+| TICKET-07 | [Báo cáo và tổng kết](tickets/TICKET-07-bao-cao-tong-ket.md) | draft |
+| TICKET-08 | [Danh mục tài sản](tickets/TICKET-08-danh-muc-tai-san.md) | draft |
+| TICKET-09 | [Trợ lý AI](tickets/TICKET-09-tro-ly-ai.md) | draft |
+| TICKET-10 | [Kết nối công cụ](tickets/TICKET-10-ket-noi-cong-cu.md) | draft |
+| TICKET-11 | [Sử dụng và dữ liệu](tickets/TICKET-11-su-dung-du-lieu.md) | draft |
+
+Group numbering is for navigation, not an assigned implementation priority. Each parent links to its children and the relevant product requirements.
 
 The backlog decides what should be worked on next. It does not replace tickets, bugs, requirements, phases, detail designs, or verification artifacts.
 
@@ -81,4 +105,5 @@ Mark risk flags in the `Risk Flags` column when relevant:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | BL-001 | product | normal | Edit Financial Clarity design into implementation-ready source of truth | High | done | `design/DESIGN.md`, `design/INDEX.md` | Existing behavior | Docs review | Refactored design now keeps Money Lover-style parity, personal extensions, component inventory, data domains, launch phases, and acceptance checklist. |
 | 2 | BL-002 | phase | normal | Start first app implementation slice | High | open | `refereces/disappointed_app/`, `design/` | Existing behavior, Multi-domain | Phase or ticket | Decide whether to build from the reference app or start a clean app shell. |
-| 3 | BL-003 | framework | normal | Finalize first project-specific standards | Medium | open | `docs/standards/` | Standards change | TBD | Add human-maintained rules in `docs/standards/`. |
+| 3 | BL-003 | integration | normal | Implement receipt OCR adapter | Medium | open | `docs/architecture/OCR_API.md`, `docs/architecture/INTEGRATIONS.md` | External system/provider, Public contract/API, Data model | Ticket plus detail design | Use OCR Platform for receipt image/PDF recognition; keep API key server-side. |
+| 4 | BL-004 | framework | normal | Finalize first project-specific standards | Medium | open | `docs/standards/` | Standards change | TBD | Add human-maintained rules in `docs/standards/`. |

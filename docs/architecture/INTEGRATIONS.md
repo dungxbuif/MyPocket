@@ -19,14 +19,19 @@ shared_fields: [status, trace]
 
 | System | Purpose | Contract | Owner | Status |
 | --- | --- | --- | --- | --- |
-| TBD | TBD | TBD | TBD | draft |
+| OCR Platform (`https://ocr.dungxbuif.com`) | Receipt OCR for images/PDFs, optional future scan enhancement | `docs/architecture/OCR_API.md` | human-approved provider pending final credential setup | ready for implementation planning |
 
 ## Credentials And Secrets
 
 Document required secret names only. Do not store secret values.
 
-- TBD
+- `OCR_API_URL`
+- `OCR_API_KEY`
 
 ## Failure Modes
 
-- TBD
+- OCR provider unavailable: keep receipt attachment and manual transaction entry available.
+- OCR result expired before MyPocket persisted it: ask user to re-run OCR or continue manually.
+- Upload too large or unsupported file type: block or explain before submission where possible.
+- Presigned upload failure: request a fresh presign URL and do not submit stale `sourceUrl`.
+- OCR recognition low quality: show extracted fields as suggestions, never as final transaction data without user confirmation.

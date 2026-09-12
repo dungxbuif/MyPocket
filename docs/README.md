@@ -1,5 +1,5 @@
 ---
-artifact_type: framework_docs_guide
+artifact_type: project_docs_guide
 id: DOCS_README
 status: active
 owner: shared
@@ -8,9 +8,11 @@ ai_fields: [usage_guidance, artifact_explanations, maintenance_notes]
 shared_fields: [status, links]
 ---
 
-# Harness Docs Guide
+# MyPocket Docs Guide
 
-This document explains the documentation system used by Harness. The root `README.md` explains the idea and philosophy; this file explains how to use the actual docs framework.
+This is the documentation entry point for MyPocket. Start with [requirements/SPEC.md](requirements/SPEC.md), [requirements/BUSINESS_RULES.md](requirements/BUSINESS_RULES.md), and [requirements/REPORTS.md](requirements/REPORTS.md) for the product under review.
+
+Product design is currently being reviewed as a whole, with [business tickets grouped into parents and children](work/tickets/README.md). These are draft business scopes and acceptance criteria; no implementation phase has been scheduled. Existing reference designs and framework examples are not the current product contract. Reusable artifact templates remain available for actual implementation work when requested.
 
 ## Document Format
 
