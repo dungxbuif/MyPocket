@@ -12,11 +12,12 @@ updated: 2026-09-01
 
 | Environment | Target | URL |
 | --- | --- | --- |
-| Production | Mac mini Docker Compose (`10.10.0.10`) | `https://money.dungxbuif.com` |
+| Production | VM100 Docker Swarm worker (`10.10.0.31`) behind Orange Pi Traefik | `https://money.dungxbuif.com` |
 
 ## Secrets
 
-Secrets are stored in `homelab/local_vars.json` under `MYPOCKET_SECRETS` and copied to `~/production/mypocket/.env` (mode 600). Do not commit `.env`.
+Secrets are copied to VM100 `/opt/apps/mypocket/run/.env` (mode 600) and used
+as the Swarm service env source. Do not commit `.env`.
 
 ## Pi5 Dependencies Setup
 
@@ -65,57 +66,49 @@ Policy JSON (scoped to `mypocket` bucket only):
 }
 ```
 
-## Build & Push
+## Build
 
 ```bash
-cd ~/workspace/mypocket
+cd ~/workspace/MyPocket
 
-# Tag and push API image (builds api + worker + migrate from one Dockerfile)
+# Build API image (builds api + worker + migrate from one Dockerfile)
 # Build context is the repo root (backend/ + migrations/ are inside)
-docker build -f backend/Dockerfile -t registry.dungxbuif.com/mypocket-api:prod-YYYY.MM.DD .
-docker push registry.dungxbuif.com/mypocket-api:prod-YYYY.MM.DD
+docker build -f backend/Dockerfile -t homelab/mypocket-api:vm100-YYYYMMDD-<git-sha> .
 
-# Tag and push Web image (frontend only, includes Docusaurus docs)
-docker build -f frontend/Dockerfile -t registry.dungxbuif.com/mypocket-web:prod-YYYY.MM.DD ~/workspace/mypocket/frontend
-docker push registry.dungxbuif.com/mypocket-web:prod-YYYY.MM.DD
+# Build Web image (frontend only)
+docker build -f frontend/Dockerfile -t homelab/mypocket-web:vm100-YYYYMMDD-<git-sha> frontend
 ```
 
 ## Deploy
 
 ```bash
-cd ~/production/mypocket
+# Run migrations (one-shot) on VM100
+docker run --rm --env-file /opt/apps/mypocket/run/.env \
+  --entrypoint /app/migrate \
+  homelab/mypocket-api:vm100-YYYYMMDD-<git-sha>
 
-# Pull latest images
-docker compose pull
-
-# Run migrations (one-shot)
-docker compose run --rm migrate
-
-# Start services
-docker compose up -d
+# Start/update services from the Pi5 Swarm manager
+docker service create/update mypocket-api
+docker service create/update mypocket-worker
+docker service create/update mypocket-web
 
 # Verify
-curl http://localhost:18082/api/v1/health/live    # → 200
-curl http://localhost:18082/api/v1/health/ready   # → 200
-curl http://localhost:18083/api/v1/health/live    # → 200 (web proxy)
+curl https://money.dungxbuif.com/api/v1/health/live   # -> 200
+curl https://money.dungxbuif.com/api/v1/health/ready  # -> 200
+curl https://money.dungxbuif.com/                     # -> 200
 ```
 
-## Caddy Route (Orange Pi `10.10.0.2`)
+## Traefik Route (Orange Pi `10.10.0.2`)
 
-Add to `/opt/edge/caddy/Caddyfile` (NOT `/ssd-data/infra/Caddyfile` on Pi5 — the running Caddy is on orange-pi via Swarm):
+Orange Pi Traefik uses the file provider at `/opt/edge/traefik/dynamic.yml`.
+Route MyPocket to the Swarm DNS service:
 
-```
-@money host money.dungxbuif.com
-handle @money {
-    reverse_proxy 10.10.0.10:18083
-}
-```
-
-Then reload:
-
-```bash
-CADDY_ID=$(docker ps --format '{{.ID}}' -f name=edge_caddy)
-docker exec $CADDY_ID caddy reload --config /etc/caddy/Caddyfile
+```yaml
+money:
+  loadBalancer:
+    passHostHeader: true
+    servers:
+      - url: http://mypocket-web:80
 ```
 
 ## VPS Traefik Whitelist
