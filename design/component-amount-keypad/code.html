@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>Component #1: Amount Display Input &amp; Custom Numeric Keypad</title>
+<!-- Google Fonts: Manrope & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Manrope:wght@500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+            mono: ['Manrope', 'monospace'],
+          },
+          colors: {
+            brand: {
+              DEFAULT: '#4CAF50',
+              50: '#F0F9F1',
+              100: '#DCF2DF',
+              500: '#4CAF50',
+              600: '#43A047',
+              700: '#388E3C',
+            },
+            surface: {
+              canvas: '#F2F4F7',
+              card: '#FFFFFF',
+              key: '#F8F9FA',
+              keyHover: '#EAECEF',
+            }
+          },
+          boxShadow: {
+            'soft': '0 2px 10px rgba(0, 0, 0, 0.04)',
+            'keypad': '0 -4px 20px rgba(0, 0, 0, 0.06)',
+            'card': '0 4px 24px -2px rgba(16, 24, 40, 0.08)',
+          }
+        }
+      }
+    }
+  </script>
+<!-- BEGIN: Custom Styles -->
+<style data-purpose="base-styling">
+    body {
+      background-color: #EEF2F6;
+      font-family: 'Inter', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .font-numeric {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    /* Touch state for mobile buttons */
+    .key-btn:active {
+      transform: scale(0.96);
+      transition: transform 0.08s ease-in-out;
+    }
+  </style>
+<style data-purpose="scrollbar-hidden">
+    /* Hide horizontal scrollbar for suggestion pills */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+<!-- END: Custom Styles -->
+</head>
+<body class="min-h-screen py-6 px-3 sm:px-6 md:px-8 text-slate-800 flex flex-col items-center">
+<!-- BEGIN: MainContainer -->
+<main class="w-full max-w-md mx-auto space-y-6">
+<!-- BEGIN: ComponentHeader -->
+<header class="text-center space-y-2" data-purpose="component-header">
+<div class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-100/70 border border-emerald-200 text-emerald-800 text-xs font-semibold uppercase tracking-wider">
+<span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+        Base Component #1 / Form Controls &amp; Keypad
+      </div>
+<h1 class="text-2xl font-bold text-slate-900 tracking-tight">Bộ điều khiển nhập số tiền &amp; Bàn phím số</h1>
+<p class="text-xs text-slate-500 max-w-xs mx-auto">
+        Tái hiện chuẩn xác giao diện nhập liệu tài chính iOS, hỗ trợ tính toán tức thời và phím gợi ý nhanh.
+      </p>
+</header>
+<!-- END: ComponentHeader -->
+<!-- BEGIN: MobileDeviceFrame -->
+<div class="bg-white rounded-[2.5rem] shadow-card border border-slate-200/80 overflow-hidden flex flex-col relative" data-purpose="mobile-mockup-frame">
+<!-- iOS Dynamic Island & Status Bar Mockup -->
+<div class="pt-3 px-6 pb-2 flex justify-between items-center text-xs font-semibold text-slate-900 select-none">
+<span class="tracking-tight font-numeric font-bold" id="live-clock">22:24</span>
+<div class="w-24 h-4 bg-slate-900 rounded-full mx-auto -mt-1 hidden sm:block"></div>
+<div class="flex items-center gap-1.5">
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 16 12">
+<rect height="4" rx="0.5" width="2.5" x="0" y="8"></rect>
+<rect height="7" rx="0.5" width="2.5" x="4" y="5"></rect>
+<rect height="10" rx="0.5" width="2.5" x="8" y="2"></rect>
+<rect height="12" rx="0.5" width="2.5" x="12" y="0"></rect>
+</svg>
+<svg class="w-4 h-3 fill-current" viewbox="0 0 16 12">
+<path d="M8 2.5C5.1 2.5 2.5 3.8 0.7 5.8L8 14.5L15.3 5.8C13.5 3.8 10.9 2.5 8 2.5Z"></path>
+</svg>
+<div class="w-5 h-2.5 border border-current rounded-sm p-0.5 flex items-center">
+<div class="h-full bg-current rounded-2xs w-3/4"></div>
+</div>
+</div>
+</div>
+<!-- Navigation & Action Top Bar -->
+<div class="px-4 py-3 flex items-center justify-between border-b border-slate-100" data-purpose="screen-header">
+<button class="px-4 py-1.5 rounded-full bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 text-sm font-medium transition" onclick="resetAll()" type="button">
+          Huỷ
+        </button>
+<span class="text-base font-bold text-slate-800">Thêm Giao Dịch</span>
+<div class="w-12"></div> <!-- Balance spacer -->
+</div>
+<!-- Context: Transaction Tabs Mock -->
+<div class="p-4 bg-slate-50/50">
+<div class="grid grid-cols-3 bg-slate-200/70 p-1 rounded-xl text-center text-xs font-semibold text-slate-600 select-none">
+<div class="py-1.5 bg-white text-slate-900 rounded-lg shadow-sm">Khoản chi</div>
+<div class="py-1.5">Khoản thu</div>
+<div class="py-1.5">Vay/Nợ</div>
+</div>
+</div>
+<!-- BEGIN: AmountDisplaySection -->
+<section class="p-5 space-y-2 bg-white" data-purpose="amount-display-field">
+<div class="flex items-center justify-between">
+<span class="text-xs font-medium text-slate-400">Số tiền</span>
+<!-- Dynamic State Badge -->
+<span class="text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full" id="keypad-mode-indicator">
+            Chờ nhập
+          </span>
+</div>
+<div class="flex items-center gap-3 min-h-[56px]">
+<!-- Currency Unit Badge -->
+<div class="shrink-0 px-3 py-1.5 rounded-lg bg-slate-100 border border-slate-200/70 text-slate-600 font-bold text-sm tracking-wide select-none">
+            VND
+          </div>
+<!-- Interactive Amount Display Output -->
+<div class="flex-1 overflow-hidden flex items-baseline justify-start gap-1">
+<span class="text-4xl font-extrabold text-slate-900 font-numeric tracking-tight truncate select-all" id="amount-display">0</span>
+<span class="text-lg font-bold text-emerald-600 font-numeric hidden" id="active-operator-badge"></span>
+<span class="text-2xl font-semibold text-slate-400 font-numeric hidden truncate" id="sub-operand-display"></span>
+</div>
+<!-- Quick Clear Button -->
+<button aria-label="Xoá toàn bộ số tiền" class="shrink-0 w-8 h-8 rounded-full bg-slate-200/70 hover:bg-slate-300 active:scale-90 text-slate-500 flex items-center justify-center transition-all opacity-0 pointer-events-none" id="btn-quick-clear" onclick="clearAllAmount()" type="button">
+<svg class="w-4 h-4 stroke-2 stroke-current" fill="none" viewbox="0 0 24 24">
+<path d="M6 18L18 6M6 6l12 12" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<p class="text-xs text-slate-400 italic truncate h-4 select-none" id="amount-in-words">Không đồng</p>
+</section>
+<!-- END: AmountDisplaySection -->
+<!-- Action Button Mockup (Save / Luu) -->
+<div class="px-4 pt-1 pb-2 flex gap-2.5 items-center">
+<button class="flex-1 py-3 bg-slate-300 text-white font-bold rounded-xl text-center text-sm shadow-sm transition" id="btn-mock-save" type="button">
+          Lưu
+        </button>
+<button class="w-11 h-11 bg-emerald-600 rounded-xl flex items-center justify-center text-white shadow-sm active:scale-95 transition" type="button">
+<svg class="w-5 h-5 fill-current" viewbox="0 0 24 24">
+<path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V5h14v14zm-5.04-6.71l-2.75 3.54-1.96-2.36L6.5 17h11l-3.54-4.71z"></path>
+<path d="M18 7h2v2h-2zm0-4h2v2h-2z" opacity="0.3"></path>
+</svg>
+</button>
+</div>
+<!-- BEGIN: QuickAmountSuggestions -->
+<section class="px-4 py-2 bg-slate-50 border-t border-slate-100" data-purpose="quick-amount-presets">
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+<button class="key-btn px-4 py-2 bg-white border border-slate-200/80 rounded-full text-xs font-bold text-slate-700 font-numeric whitespace-nowrap shadow-soft hover:bg-slate-50" onclick="setPresetAmount(150000)" type="button">
+            150.000
+          </button>
+<button class="key-btn px-4 py-2 bg-white border border-slate-200/80 rounded-full text-xs font-bold text-slate-700 font-numeric whitespace-nowrap shadow-soft hover:bg-slate-50" onclick="setPresetAmount(50000)" type="button">
+            50.000
+          </button>
+<button class="key-btn px-4 py-2 bg-white border border-slate-200/80 rounded-full text-xs font-bold text-slate-700 font-numeric whitespace-nowrap shadow-soft hover:bg-slate-50" onclick="setPresetAmount(500000)" type="button">
+            500.000
+          </button>
+<button class="key-btn px-4 py-2 bg-white border border-slate-200/80 rounded-full text-xs font-bold text-slate-700 font-numeric whitespace-nowrap shadow-soft hover:bg-slate-50" onclick="setPresetAmount(40000)" type="button">
+            40.000
+          </button>
+<button class="key-btn px-4 py-2 bg-white border border-slate-200/80 rounded-full text-xs font-bold text-slate-700 font-numeric whitespace-nowrap shadow-soft hover:bg-slate-50" onclick="setPresetAmount(1000000)" type="button">
+            1.000.000
+          </button>
+</div>
+</section>
+<!-- END: QuickAmountSuggestions -->
+<!-- BEGIN: FinancialNumericKeypadGrid -->
+<section class="p-3 bg-slate-100/90 border-t border-slate-200/80 shadow-keypad" data-purpose="keypad-layout">
+<!-- 4-Column Responsive Grid matching Image Spec -->
+<div class="grid grid-cols-4 gap-2 text-slate-800 select-none">
+<!-- Keypad Row 0: Clear, Divide, Multiply, Backspace -->
+<button class="key-btn h-14 bg-white/90 hover:bg-white text-emerald-600 font-extrabold text-xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="clearAllAmount()" type="button">
+            C
+          </button>
+<button class="key-btn h-14 bg-white/90 hover:bg-white text-emerald-600 font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="setOperator('÷')" type="button">
+            ÷
+          </button>
+<button class="key-btn h-14 bg-white/90 hover:bg-white text-emerald-600 font-semibold text-xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="setOperator('×')" type="button">
+            ×
+          </button>
+<button aria-label="Xoá lùi" class="key-btn h-14 bg-white/90 hover:bg-white text-emerald-600 font-medium text-lg rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressBackspace()" type="button">
+<svg class="w-6 h-6 fill-current" viewbox="0 0 24 24">
+<path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3.7 13.7a.996.996 0 0 1-1.41 0L14 13.82l-2.89 2.89a.996.996 0 1 1-1.41-1.41L12.59 12.4 9.7 9.51a.996.996 0 1 1 1.41-1.41L14 10.99l2.89-2.89a.996.996 0 0 1 1.41 1.41L15.41 12.4l2.89 2.89c.38.39.38 1.02 0 1.41z"></path>
+</svg>
+</button>
+<!-- Keypad Row 1: 7, 8, 9, Minus (-) -->
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('7')" type="button">
+            7
+          </button>
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('8')" type="button">
+            8
+          </button>
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('9')" type="button">
+            9
+          </button>
+<button class="key-btn h-14 bg-white/90 hover:bg-white text-emerald-600 font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="setOperator('−')" type="button">
+            −
+          </button>
+<!-- Keypad Row 2: 4, 5, 6, Plus (+) -->
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('4')" type="button">
+            4
+          </button>
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('5')" type="button">
+            5
+          </button>
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('6')" type="button">
+            6
+          </button>
+<button class="key-btn h-14 bg-white/90 hover:bg-white text-emerald-600 font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="setOperator('+')" type="button">
+            +
+          </button>
+<!-- Keypad Row 3 & 4 combined with Action Button "XONG" spanning 2 rows -->
+<!-- Row 3: 1, 2, 3 -->
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('1')" type="button">
+            1
+          </button>
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('2')" type="button">
+            2
+          </button>
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('3')" type="button">
+            3
+          </button>
+<!-- Action Button: XONG (2-row height) -->
+<button class="key-btn row-span-2 bg-[#4caf50] hover:bg-[#43a047] active:bg-[#388e3c] text-white font-bold text-base tracking-wide rounded-2xl shadow-md flex flex-col items-center justify-center gap-1 transition" id="btn-done" onclick="confirmAmount()" type="button">
+<span>XONG</span>
+</button>
+<!-- Row 4: 0, 000, Decimal Separator (,) -->
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-semibold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressNumber('0')" type="button">
+            0
+          </button>
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-bold text-lg rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressTripleZero()" type="button">
+            000
+          </button>
+<button class="key-btn h-14 bg-white hover:bg-slate-50 text-slate-900 font-numeric font-bold text-2xl rounded-2xl shadow-soft flex items-center justify-center transition" onclick="pressComma()" type="button">
+            ,
+          </button>
+</div>
+<!-- iOS Home Indicator Bar -->
+<div class="mt-3 flex justify-center">
+<div class="w-32 h-1 bg-slate-300 rounded-full"></div>
+</div>
+</section>
+<!-- END: FinancialNumericKeypadGrid -->
+</div>
+<!-- END: MobileDeviceFrame -->
+<!-- BEGIN: ComponentSpecsDocumentation -->
+<section class="bg-white rounded-2xl p-5 border border-slate-200/80 shadow-sm space-y-4 text-xs text-slate-600" data-purpose="design-specifications">
+<div class="flex items-center justify-between border-b border-slate-100 pb-2">
+<h2 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+<svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+          Đặc tả kỹ thuật (Component Spec)
+        </h2>
+<span class="text-[10px] bg-slate-100 px-2 py-0.5 rounded font-mono">v1.2.0-stable</span>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="p-3 bg-slate-50 rounded-xl space-y-1">
+<div class="text-[10px] uppercase font-bold text-slate-400">Primary Color</div>
+<div class="flex items-center gap-2 font-mono font-semibold text-slate-800">
+<span class="w-3 h-3 rounded-full bg-[#4caf50]"></span> #4CAF50
+          </div>
+</div>
+<div class="p-3 bg-slate-50 rounded-xl space-y-1">
+<div class="text-[10px] uppercase font-bold text-slate-400">Typography</div>
+<div class="font-semibold text-slate-800 truncate">Manrope (SemiBold/Bold)</div>
+</div>
+</div>
+<div class="space-y-1.5">
+<div class="font-semibold text-slate-800">Quy tắc tương tác &amp; Xử lý toán tử:</div>
+<ul class="list-disc pl-4 space-y-1 text-slate-500">
+<li><strong>Phím 000:</strong> Tăng tốc gõ hàng nghìn chuẩn tài chính Việt Nam.</li>
+<li><strong>Toán tử (+, −, ×, ÷):</strong> Cho phép tính nhẩm trực tiếp số tiền hóa đơn mà không cần thoát ứng dụng.</li>
+<li><strong>Trạng thái "XONG":</strong> Tự động hoàn tất phép tính, định dạng dấu chấm phân cách hàng nghìn.</li>
+</ul>
+</div>
+</section>
+<!-- END: ComponentSpecsDocumentation -->
+<!-- Toast Notification for Confirm Action -->
+<aside class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-full shadow-lg text-xs font-medium flex items-center gap-2 transition-all opacity-0 pointer-events-none duration-300 z-50" id="toast-message">
+<svg class="w-4 h-4 text-emerald-400 shrink-0" fill="currentColor" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" fill-rule="evenodd"></path>
+</svg>
+<span id="toast-text">Đã ghi nhận số tiền giao dịch!</span>
+</aside>
+</main>
+<!-- END: MainContainer -->
+<!-- BEGIN: InteractiveScript -->
+<script data-purpose="amount-keypad-engine">
+    // State Variables
+    let primaryOperand = "0";
+    let secondaryOperand = "";
+    let activeOperator = null;
+    let isCalculated = false;
+
+    // DOM Elements
+    const amountDisplay = document.getElementById('amount-display');
+    const operatorBadge = document.getElementById('active-operator-badge');
+    const subDisplay = document.getElementById('sub-operand-display');
+    const btnQuickClear = document.getElementById('btn-quick-clear');
+    const modeIndicator = document.getElementById('keypad-mode-indicator');
+    const textInWords = document.getElementById('amount-in-words');
+    const saveButton = document.getElementById('btn-mock-save');
+
+    // Utility to format number with thousands separator (e.g. 150000 -> "150.000")
+    function formatVietnameseCurrency(valueStr) {
+      if (!valueStr || valueStr === "0") return "0";
+      // Split decimal if present
+      const parts = valueStr.split(',');
+      let intPart = parts[0].replace(/\D/g, '');
+      if (!intPart) intPart = "0";
+      
+      const formattedInt = new Intl.NumberFormat('vi-VN').format(Number(intPart));
+      return parts.length > 1 ? `${formattedInt},${parts[1]}` : formattedInt;
+    }
+
+    // Convert number to approximate Vietnamese text for confirmation
+    function convertNumberToWordsApprox(numStr) {
+      const cleanNum = parseInt(numStr.replace(/\./g, '').replace(/,/g, ''), 10);
+      if (isNaN(cleanNum) || cleanNum === 0) return "Không đồng";
+      if (cleanNum >= 1000000000) return `${(cleanNum / 1000000000).toFixed(1)} tỷ đồng`;
+      if (cleanNum >= 1000000) return `${(cleanNum / 1000000).toFixed(1)} triệu đồng`;
+      if (cleanNum >= 1000) return `${(cleanNum / 1000).toFixed(0)} nghìn đồng`;
+      return `${cleanNum} đồng`;
+    }
+
+    // Render function to update UI according to state
+    function updateUI() {
+      if (activeOperator && secondaryOperand !== "") {
+        amountDisplay.textContent = formatVietnameseCurrency(primaryOperand);
+        operatorBadge.textContent = activeOperator;
+        operatorBadge.classList.remove('hidden');
+        subDisplay.textContent = formatVietnameseCurrency(secondaryOperand);
+        subDisplay.classList.remove('hidden');
+        modeIndicator.textContent = 'Đang tính nhẩm';
+        modeIndicator.className = 'text-[10px] font-semibold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full';
+      } else if (activeOperator) {
+        amountDisplay.textContent = formatVietnameseCurrency(primaryOperand);
+        operatorBadge.textContent = activeOperator;
+        operatorBadge.classList.remove('hidden');
+        subDisplay.classList.add('hidden');
+        modeIndicator.textContent = 'Chọn số kế tiếp';
+      } else {
+        amountDisplay.textContent = formatVietnameseCurrency(primaryOperand);
+        operatorBadge.classList.add('hidden');
+        subDisplay.classList.add('hidden');
+        if (primaryOperand !== "0") {
+          modeIndicator.textContent = 'Đã nhập';
+          modeIndicator.className = 'text-[10px] font-semibold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full';
+        } else {
+          modeIndicator.textContent = 'Chờ nhập';
+          modeIndicator.className = 'text-[10px] font-semibold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-full';
+        }
+      }
+
+      // Toggle Clear Button & Save Button Active state
+      const hasValue = primaryOperand !== "0" || secondaryOperand !== "";
+      if (hasValue) {
+        btnQuickClear.classList.remove('opacity-0', 'pointer-events-none');
+        saveButton.classList.remove('bg-slate-300');
+        saveButton.classList.add('bg-slate-900', 'hover:bg-slate-800', 'cursor-pointer');
+      } else {
+        btnQuickClear.classList.add('opacity-0', 'pointer-events-none');
+        saveButton.classList.add('bg-slate-300');
+        saveButton.classList.remove('bg-slate-900', 'hover:bg-slate-800', 'cursor-pointer');
+      }
+
+      textInWords.textContent = convertNumberToWordsApprox(primaryOperand);
+    }
+
+    // Number key handlers
+    function pressNumber(digit) {
+      if (isCalculated && !activeOperator) {
+        primaryOperand = digit;
+        isCalculated = false;
+      } else if (!activeOperator) {
+        if (primaryOperand === "0") {
+          primaryOperand = digit;
+        } else if (primaryOperand.length < 12) {
+          primaryOperand += digit;
+        }
+      } else {
+        if (secondaryOperand === "0" || secondaryOperand === "") {
+          secondaryOperand = digit;
+        } else if (secondaryOperand.length < 12) {
+          secondaryOperand += digit;
+        }
+      }
+      updateUI();
+    }
+
+    function pressTripleZero() {
+      if (!activeOperator) {
+        if (primaryOperand !== "0" && primaryOperand.length <= 9) {
+          primaryOperand += "000";
+        }
+      } else {
+        if (secondaryOperand !== "" && secondaryOperand !== "0" && secondaryOperand.length <= 9) {
+          secondaryOperand += "000";
+        }
+      }
+      updateUI();
+    }
+
+    function pressComma() {
+      if (!activeOperator) {
+        if (!primaryOperand.includes(',')) {
+          primaryOperand += ',';
+        }
+      } else {
+        if (!secondaryOperand.includes(',')) {
+          secondaryOperand += secondaryOperand === "" ? '0,' : ',';
+        }
+      }
+      updateUI();
+    }
+
+    function setOperator(op) {
+      if (activeOperator && secondaryOperand !== "") {
+        computeResult();
+      }
+      activeOperator = op;
+      updateUI();
+    }
+
+    function computeResult() {
+      if (!activeOperator || secondaryOperand === "") return;
+
+      const p1 = parseFloat(primaryOperand.replace(/\./g, '').replace(',', '.'));
+      const p2 = parseFloat(secondaryOperand.replace(/\./g, '').replace(',', '.'));
+      let res = 0;
+
+      switch (activeOperator) {
+        case '+': res = p1 + p2; break;
+        case '−': res = Math.max(0, p1 - p2); break;
+        case '×': res = p1 * p2; break;
+        case '÷': res = p2 === 0 ? p1 : p1 / p2; break;
+      }
+
+      primaryOperand = Math.round(res).toString();
+      secondaryOperand = "";
+      activeOperator = null;
+      isCalculated = true;
+    }
+
+    function pressBackspace() {
+      if (activeOperator && secondaryOperand !== "") {
+        secondaryOperand = secondaryOperand.slice(0, -1);
+      } else if (activeOperator) {
+        activeOperator = null;
+      } else {
+        if (primaryOperand.length > 1) {
+          primaryOperand = primaryOperand.slice(0, -1);
+        } else {
+          primaryOperand = "0";
+        }
+      }
+      updateUI();
+    }
+
+    function clearAllAmount() {
+      primaryOperand = "0";
+      secondaryOperand = "";
+      activeOperator = null;
+      isCalculated = false;
+      updateUI();
+    }
+
+    function setPresetAmount(val) {
+      primaryOperand = val.toString();
+      secondaryOperand = "";
+      activeOperator = null;
+      isCalculated = false;
+      updateUI();
+    }
+
+    function resetAll() {
+      clearAllAmount();
+      showToast('Đã huỷ & làm mới trạng thái');
+    }
+
+    function confirmAmount() {
+      if (activeOperator && secondaryOperand !== "") {
+        computeResult();
+        updateUI();
+      }
+      const formatted = formatVietnameseCurrency(primaryOperand);
+      showToast(`Đã áp dụng số tiền: ${formatted} VND`);
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast-message');
+      const toastText = document.getElementById('toast-text');
+      toastText.textContent = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      toast.classList.add('opacity-100');
+
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+        toast.classList.remove('opacity-100');
+      }, 2400);
+    }
+
+    // Update real clock on header
+    setInterval(() => {
+      const now = new Date();
+      const h = String(now.getHours()).padStart(2, '0');
+      const m = String(now.getMinutes()).padStart(2, '0');
+      const clockEl = document.getElementById('live-clock');
+      if (clockEl) clockEl.textContent = `${h}:${m}`;
+    }, 1000);
+
+    // Initial setup
+    updateUI();
+  </script>
+<!-- END: InteractiveScript -->
+</body></html>

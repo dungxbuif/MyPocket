@@ -1,0 +1,383 @@
+<!DOCTYPE html><html lang="vi"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Component Showcase: Thẻ Thêm Giao Dịch &amp; Row Items</title>
+<!-- Google Fonts: Manrope (Financial Clarity System) -->
+<link href="https://fonts.googleapis.com" rel="preconnect">
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet">
+<!-- Tailwind CSS v3 with Forms & Container Queries -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'system-ui', '-apple-system', 'sans-serif'],
+          },
+          colors: {
+            primary: {
+              DEFAULT: '#22c55e',
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+            },
+            surface: {
+              DEFAULT: '#fbf9f9',
+              dim: '#dbdad9',
+              bright: '#ffffff',
+              card: '#ffffff',
+              canvas: '#f3f4f6',
+            }
+          },
+          boxShadow: {
+            'subtle': '0 4px 20px -2px rgba(0, 0, 0, 0.04), 0 2px 6px -1px rgba(0, 0, 0, 0.02)',
+            'phone': '0 25px 60px -15px rgba(0, 0, 0, 0.2), 0 0 0 10px #1f2937',
+          },
+          borderRadius: {
+            '3xl': '24px',
+            '4xl': '32px',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-scrollbars">
+    /* Ẩn scrollbar thô kệch cho mobile preview */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-[#f0f2f5] text-slate-800 font-sans antialiased min-h-screen p-4 sm:p-8 lg:p-12">
+<!-- BEGIN: MainContainer -->
+<main class="max-w-6xl mx-auto space-y-12">
+<!-- BEGIN: HeaderShowcase -->
+<header class="space-y-3" data-purpose="showcase-header">
+<div class="inline-flex items-center gap-2 px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-bold tracking-wider uppercase">
+<span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+        BASE COMPONENT #4 / FORM &amp; ROW ITEMS
+      </div>
+<h1 class="text-3xl sm:text-4xl font-extrabold text-slate-900 tracking-tight">
+        Thẻ Thêm Giao Dịch (Transaction Form Card)
+      </h1>
+<p class="text-base sm:text-lg text-slate-600 max-w-3xl leading-relaxed">
+        Cấu trúc thẻ form chuẩn cho tác vụ thêm mới chi tiêu / thu nhập, gồm các hàng item linh hoạt với icon/logo đại diện bên trái và ô nhập dữ liệu / trường chọn tương tác bên phải. Bám sát thiết kế chuẩn từ iOS Mobile mockup.
+      </p>
+</header>
+<!-- END: HeaderShowcase -->
+<!-- BEGIN: ShowcaseGrid -->
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+<!-- BEGIN: PhoneMockupColumn -->
+<div class="lg:col-span-6 flex justify-center w-full">
+<!-- iOS Device Shell -->
+<div class="w-full max-w-[390px] h-[844px] bg-[#f2f3f7] rounded-[48px] shadow-phone flex flex-col overflow-hidden relative border border-slate-700/60 ring-1 ring-white/20 select-none">
+<!-- BEGIN: iOSStatusBar -->
+<div class="pt-3.5 px-7 flex justify-between items-center z-30 shrink-0 select-none">
+<span class="text-sm font-semibold tracking-tight text-slate-900">22:45</span>
+<!-- Dynamic Island / Speaker notch simulation -->
+<div class="w-24 h-4 bg-black rounded-full absolute left-1/2 -translate-x-1/2 top-2.5 flex items-center justify-end px-2">
+<div class="w-2.5 h-2.5 bg-[#0f172a] rounded-full border border-slate-700"></div>
+</div>
+<div class="flex items-center gap-1.5 text-slate-900 text-xs">
+<!-- Cellular Signal -->
+<svg class="w-4 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 3c-4.97 0-9 4.03-9 9 0 2.12.74 4.07 1.97 5.61L4.35 19H19.65l-.62-1.39C20.26 16.07 21 14.12 21 12c0-4.97-4.03-9-9-9zm0 2c3.87 0 7 3.13 7 7 0 1.5-.47 2.89-1.28 4.04l-1.26-2.83A4.982 4.982 0 0 0 17 12c0-2.76-2.24-5-5-5s-5 2.24-5 5c0 .41.05.8.14 1.18l-1.26 2.82C5.47 14.89 5 13.5 5 12c0-3.87 3.13-7 7-7z"></path></svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0 0 12 4zm0 3c3.74 0 7.15 1.45 9.7 3.84L12 19.54 2.3 10.84A13.9 13.9 0 0 1 12 7z"></path></svg>
+<!-- Battery Icon -->
+<div class="flex items-center gap-0.5 font-bold text-[11px] bg-slate-900 text-white px-1 py-0.5 rounded">
+                48
+              </div>
+</div>
+</div>
+<!-- END: iOSStatusBar -->
+<!-- BEGIN: SheetHeader -->
+<div class="relative pt-2 pb-2 px-4 flex items-center justify-between z-20 shrink-0">
+<!-- Nút Huỷ dạng Pill -->
+<button class="px-3.5 py-1.5 text-sm font-semibold text-slate-800 bg-white/90 hover:bg-white rounded-full shadow-sm active:scale-95 transition" type="button">
+              Huỷ
+            </button>
+<h2 class="text-base font-bold text-slate-900 tracking-tight absolute left-1/2 -translate-x-1/2">
+              Thêm Giao Dịch
+            </h2>
+<div class="w-9 h-9"></div> <!-- Spacer cân xứng -->
+</div>
+<!-- END: SheetHeader -->
+<!-- BEGIN: ScrollableContent -->
+<div class="flex-1 overflow-y-auto px-4 pb-24 space-y-3 no-scrollbar" data-purpose="sheet-content">
+<!-- Transaction Type Segmented Bar (IMG_7707) -->
+<nav aria-label="Loại giao dịch" class="bg-slate-200/70 p-1 rounded-full flex items-center text-xs font-medium">
+<button class="flex-1 py-1.5 text-center bg-white text-slate-900 font-bold rounded-full shadow-sm" type="button">
+                Khoản chi
+              </button>
+<button class="flex-1 py-1.5 text-center text-slate-500 hover:text-slate-900 transition" type="button">
+                Khoản thu
+              </button>
+<button class="flex-1 py-1.5 text-center text-slate-500 hover:text-slate-900 transition" type="button">
+                Vay/Nợ
+              </button>
+</nav>
+<!-- Card 1: Khối thông tin cốt lõi -->
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden" data-purpose="primary-form-card">
+<!-- Row: Chọn Tài khoản / Ví -->
+<div class="flex items-center px-4 hover:bg-slate-50 transition cursor-pointer border-b border-slate-100 py-2.5">
+<div class="w-9 h-9 flex items-center justify-center shrink-0">
+<!-- Techcombank Logo Diamond Representation -->
+<div class="w-5 h-5 flex items-center justify-center rotate-45 gap-0.5">
+<div class="w-2.5 h-2.5 bg-red-600 rounded-sm"></div>
+<div class="w-2.5 h-2.5 bg-red-600 rounded-sm"></div>
+</div>
+</div>
+<div class="flex-1 ml-3 flex items-center justify-between">
+<span class="text-sm font-semibold text-slate-800">Techcombank</span>
+<svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+<!-- Row: Số tiền (Amount Input) -->
+<div class="flex items-center px-4 border-b border-slate-100 py-2">
+<div class="w-9 shrink-0 flex items-center justify-center">
+<span class="px-2 py-0.5 text-xs font-bold text-slate-600 bg-slate-100 border border-slate-200/70 rounded-md">VND</span>
+</div>
+<div class="flex-1 ml-3 flex flex-col justify-center">
+<span class="text-[11px] font-medium text-slate-400">Số tiền</span>
+<div class="flex items-center justify-between">
+<input class="w-full p-0 text-3xl font-extrabold text-slate-900 border-none focus:ring-0 placeholder:text-slate-300" placeholder="0" type="text" value="0">
+</div>
+</div>
+</div>
+<!-- Row: Chọn nhóm (Category) -->
+<div class="flex items-center px-4 hover:bg-slate-50 transition cursor-pointer border-b border-slate-100 py-2.5">
+<div class="w-9 h-9 rounded-full bg-slate-200/80 shrink-0 flex items-center justify-center">
+<!-- Category Icon Placeholder -->
+</div>
+<div class="flex-1 ml-3 flex items-center justify-between">
+<span class="text-base font-normal text-slate-400">Chọn nhóm</span>
+<svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+<!-- Row: Ghi chú (Note) -->
+<div class="flex items-center px-4 hover:bg-slate-50 transition cursor-pointer border-b border-slate-100 py-2.5">
+<div class="w-9 h-9 shrink-0 flex items-center justify-center text-slate-700">
+<!-- Note / Edit lines icon -->
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h9" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+<div class="flex-1 ml-3 flex items-center justify-between">
+<span class="text-base text-slate-800 font-normal">Ghi chú</span>
+<svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+<!-- Row: Ngày tháng (Date selector) -->
+<div class="flex items-center px-4 py-2">
+<div class="w-9 h-9 shrink-0 flex items-center justify-center text-slate-700">
+<!-- Calendar icon -->
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect height="18" rx="2" stroke-linecap="round" width="18" x="3" y="4"></rect><path d="M16 2v4M8 2v4M3 10h18" stroke-linecap="round"></path><circle cx="8" cy="14" fill="currentColor" r="1"></circle><circle cx="12" cy="14" fill="currentColor" r="1"></circle><circle cx="16" cy="14" fill="currentColor" r="1"></circle></svg>
+</div>
+<div class="flex-1 ml-3 flex items-center gap-1.5 justify-end">
+<button aria-label="Lùi 1 ngày" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+<div class="px-3 py-1 bg-emerald-50 text-emerald-800 text-xs font-semibold rounded-lg">
+                    Chủ Nhật, 23/08/2026
+                  </div>
+<button aria-label="Tiến 1 ngày" class="w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-600 hover:bg-slate-200" type="button">
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+</div>
+</div>
+</div>
+<!-- Card 2: Row độc lập - Người liên quan (With) -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 flex items-center justify-between cursor-pointer hover:bg-slate-50 transition py-2.5">
+<div class="flex items-center gap-3">
+<div class="w-8 flex items-center justify-center text-slate-700">
+<!-- Users group icon -->
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+<span class="text-sm font-normal text-slate-400">Với</span>
+</div>
+<svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+<!-- Card 3: Nhóm thiết lập nâng cao (Location, Event, Reminder) -->
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden divide-y divide-slate-100">
+<!-- Row: Đặt vị trí -->
+<div class="flex items-center px-4 hover:bg-slate-50 transition cursor-pointer py-2.5">
+<div class="w-8 flex items-center justify-center text-slate-700">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+<div class="flex-1 ml-3 flex items-center justify-between">
+<span class="text-sm font-normal text-slate-400">Đặt vị trí</span>
+<svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+<!-- Row: Chọn sự kiện -->
+<div class="flex items-center px-4 hover:bg-slate-50 transition cursor-pointer py-2.5">
+<div class="w-8 flex items-center justify-center text-slate-700">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+<div class="flex-1 ml-3 flex items-center justify-between">
+<span class="text-sm font-normal text-slate-400">Chọn sự kiện</span>
+<svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+<!-- Row: Đặt nhắc nhở -->
+<div class="flex items-center px-4 hover:bg-slate-50 transition cursor-pointer py-2.5">
+<div class="w-8 flex items-center justify-center text-slate-700">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+<div class="flex-1 ml-3 flex items-center justify-between">
+<span class="text-sm font-normal text-slate-400">Đặt nhắc nhở</span>
+<svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+</div>
+</div>
+<!-- Card 4: Thêm hình ảnh -->
+<div class="bg-white rounded-2xl shadow-sm border border-slate-100 px-4 flex items-center gap-3 cursor-pointer hover:bg-emerald-50/40 transition py-2.5">
+<div class="w-8 flex items-center justify-center text-emerald-600">
+<!-- Image + icon -->
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</div>
+<span class="text-sm font-semibold text-emerald-600">Thêm Hình Ảnh</span>
+</div>
+<!-- Card 5: Không tính vào báo cáo (Exclude from report) -->
+<div class="bg-white rounded-3xl shadow-sm border border-slate-100 space-y-1 p-3">
+<div class="flex items-center justify-between">
+<span class="text-sm font-semibold text-slate-800">Không tính vào báo cáo</span>
+<!-- iOS Switch Button -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value="">
+<div class="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-500"></div>
+</label>
+</div>
+<p class="text-xs text-slate-400 leading-relaxed pr-6">
+                Không tính giao dịch này trong các báo cáo, ví dụ như Tổng quan.
+              </p>
+</div>
+</div>
+<!-- END: ScrollableContent -->
+<!-- BEGIN: FixedActionFooter -->
+<div class="absolute bottom-0 inset-x-0 bg-white/95 backdrop-blur-md border-t border-slate-100 px-4 py-3 flex items-center gap-3 z-30">
+<!-- Nút Lưu (Save) -->
+<button class="flex-1 py-3 bg-slate-200 text-slate-500 hover:bg-emerald-500 hover:text-white font-bold text-sm rounded-full transition duration-150 shadow-sm active:scale-[0.99] text-center" type="button">
+              Lưu
+            </button>
+<!-- Nút Camera/Image Quick Capture -->
+<button aria-label="Chụp hóa đơn" class="w-11 h-11 bg-emerald-500 hover:bg-emerald-600 text-white rounded-full flex items-center justify-center shrink-0 shadow-md shadow-emerald-500/20 active:scale-95 transition" type="button">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" stroke-linecap="round" stroke-linejoin="round"></path><path d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+</button>
+</div>
+<!-- END: FixedActionFooter -->
+<!-- Home Indicator Bar -->
+<div class="absolute bottom-1.5 left-1/2 -translate-x-1/2 w-32 h-1 bg-slate-900/40 rounded-full z-40 pointer-events-none"></div>
+</div>
+</div>
+<!-- END: PhoneMockupColumn -->
+<!-- BEGIN: SpecsAndTokensColumn -->
+<div class="lg:col-span-6 space-y-6">
+<!-- Anatomy Specification Card -->
+<article class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-subtle space-y-5" data-purpose="component-anatomy">
+<div class="border-b border-slate-100 pb-4">
+<h3 class="text-lg font-bold text-slate-900 flex items-center gap-2">
+<svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+              Cấu Trúc Hàng Dữ Liệu (Row Item Anatomy)
+            </h3>
+<p class="text-xs sm:text-sm text-slate-500 mt-1">
+              Được thiết kế dạng slot-based layout nhằm đảm bảo tính đồng bộ trên tất cả màn hình nhập liệu.
+            </p>
+</div>
+<!-- Slot List Breakdown -->
+<div class="space-y-3">
+<div class="flex items-start gap-3.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+<span class="px-2 py-0.5 text-[11px] font-bold bg-emerald-100 text-emerald-800 rounded">Left Slot</span>
+<div class="text-xs sm:text-sm text-slate-700">
+<span class="font-bold text-slate-900 block">Kích thước cố định (36px - 40px):</span>
+                Chứa Brand Logo (Techcombank/ACB), Currency Unit Tag (<code class="text-emerald-700 font-mono">VND</code>), Category Glyph hoặc System Icon (Vị trí, Nhắc nhở, Ghi chú).
+              </div>
+</div>
+<div class="flex items-start gap-3.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+<span class="px-2 py-0.5 text-[11px] font-bold bg-blue-100 text-blue-800 rounded">Center Slot</span>
+<div class="text-xs sm:text-sm text-slate-700">
+<span class="font-bold text-slate-900 block">Nội dung động (Flex 1):</span>
+                Gồm Label định danh, Input text tự do, hoặc Large Amount Typography hiển thị số tiền tương phản cao.
+              </div>
+</div>
+<div class="flex items-start gap-3.5 p-3 rounded-xl bg-slate-50 border border-slate-100">
+<span class="px-2 py-0.5 text-[11px] font-bold bg-amber-100 text-amber-800 rounded">Right Slot</span>
+<div class="text-xs sm:text-sm text-slate-700">
+<span class="font-bold text-slate-900 block">Tương tác phụ &amp; Chỉ báo:</span>
+                Chevron phải (<code class="text-slate-500">&gt;</code>) để mở Sub-sheet/Modal, Date Stepper (<code class="text-slate-500">&lt; Date &gt;</code>), hoặc Switch Toggle on/off.
+              </div>
+</div>
+</div>
+</article>
+<!-- Design System Tokens Card -->
+<article class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-subtle space-y-4" data-purpose="design-tokens">
+<h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+<svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+            Design Tokens &amp; Quy Tắc Áp Dụng
+          </h3>
+<div class="grid grid-cols-2 gap-3 text-xs">
+<div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+<span class="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Typography</span>
+<p class="font-bold text-slate-800">Manrope</p>
+<p class="text-slate-500">Regular 400, Medium 500, Extrabold 800 (Amount)</p>
+</div>
+<div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+<span class="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Border Radius</span>
+<p class="font-bold text-slate-800">rounded-3xl (24px)</p>
+<p class="text-slate-500">Cho Form Card; Pill (9999px) cho Button &amp; Switch</p>
+</div>
+<div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+<span class="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Primary Color</span>
+<div class="flex items-center gap-2 mt-0.5">
+<div class="w-3.5 h-3.5 rounded-full bg-[#22c55e]"></div>
+<span class="font-bold text-slate-800">#22C55E</span>
+</div>
+<p class="text-slate-500">Màu nhấn hành động &amp; hình ảnh</p>
+</div>
+<div class="p-3 bg-slate-50 rounded-2xl border border-slate-100 space-y-1">
+<span class="text-slate-400 uppercase tracking-wider text-[10px] font-bold">Surface Color</span>
+<div class="flex items-center gap-2 mt-0.5">
+<div class="w-3.5 h-3.5 rounded-full bg-[#f2f3f7] border border-slate-300"></div>
+<span class="font-bold text-slate-800">#F2F3F7</span>
+</div>
+<p class="text-slate-500">Nền canvas mobile &amp; thẻ #FFFFFF</p>
+</div>
+</div>
+</article>
+<!-- States Matrix -->
+<article class="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/80 shadow-subtle space-y-4" data-purpose="interaction-states">
+<h3 class="text-base font-bold text-slate-900">
+            Các Trạng Thái Hàng Dữ Liệu (States Matrix)
+          </h3>
+<div class="space-y-2.5 text-xs">
+<!-- State 1: Placeholder / Unfilled -->
+<div class="p-2.5 rounded-xl border border-dashed border-slate-300 flex items-center justify-between">
+<span class="font-semibold text-slate-500">Default (Trống / Placeholder)</span>
+<span class="text-slate-400">Placeholder xám #94A3B8 kèm chevron mở sub-menu</span>
+</div>
+<!-- State 2: Filled Value -->
+<div class="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200 flex items-center justify-between">
+<span class="font-semibold text-emerald-800">Filled (Đã nhập giá trị)</span>
+<span class="text-emerald-700 font-medium">Text đậm #0F172A, hiển thị tag ngày/ví cụ thể</span>
+</div>
+<!-- State 3: Active / Press -->
+<div class="p-2.5 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-between">
+<span class="font-semibold text-slate-800">Active / Pressed</span>
+<span class="text-slate-600">Feedback đổi màu nền hover:bg-slate-50, scale-[0.99]</span>
+</div>
+</div>
+</article>
+</div>
+<!-- END: SpecsAndTokensColumn -->
+</section>
+<!-- END: ShowcaseGrid -->
+</main>
+<!-- END: MainContainer -->
+
+
+</body></html>
