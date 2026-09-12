@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: Manrope, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+}
+
+@layer base {
+  :root {
+    color: #1b1c1c;
+    background: #fbf9f9;
+    font-family: var(--font-sans);
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  * {
+    box-sizing: border-box;
+    letter-spacing: 0;
+  }
+
+  body {
+    margin: 0;
+    min-width: 320px;
+    min-height: 100vh;
+    background: #fbf9f9;
+  }
+
+  button {
+    font: inherit;
+  }
+}
+
+.money {
+  font-variant-numeric: tabular-nums;
+}
+
+::selection {
+  background: #006e1c;
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: 2px solid #006e1c;
+  outline-offset: 2px;
+}

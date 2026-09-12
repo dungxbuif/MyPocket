@@ -32,9 +32,9 @@ updated: 2026-09-12
 
 ## Current Status
 
-- Status: Financial Clarity design has been refactored into an app initialization spec that keeps Money Lover-style parity plus personal extensions.
+- Status: A new root `app/` Vite React Tailwind app now renders a mock-only MyPocket FE preview following the new Financial Clarity design and Atomic Design structure.
 - Active backlog: `docs/work/BACKLOG.md`
-- Current queue focus: Start the first app implementation slice from `design/DESIGN.md` and the reference app.
+- Current queue focus: Review the standalone `app/` FE preview, then iterate UI before moving reference logic/API contracts into it.
 - Active phase: None.
 - Active ticket: None.
 - Active bug: None.
@@ -51,6 +51,8 @@ Prepare MyPocket / Financial Clarity for app implementation. The current product
 - `docs/standards/`
 - `design/`
 - `design/DESIGN.md`
+- `app/`
+- `app/src/atomic/`
 - `refereces/disappointed_app/`
 
 ## Recent Decisions
@@ -64,12 +66,15 @@ Prepare MyPocket / Financial Clarity for app implementation. The current product
 - Treat `refereces/disappointed_app/` as the existing reference implementation unless the human decides to move or rename it.
 - `design/DESIGN.md` now defines Money Lover-style app parity, personal extension backlog, component inventory, data domains, launch phases, and acceptance checklist.
 - Design artifact folders under `design/` now use normalized ASCII names such as `component-amount-keypad`, `component-category-tree-line`, and `system-base-cards`.
+- Frontend preview uses the old app as logic/data-shape reference only; UI is new and follows `docs/design/DESIGN.md`.
+- New app source lives in root `app/`; `refereces/disappointed_app/` should remain the reference app for moving logic/API contracts later.
+- The standalone FE preview now includes Overview, Transactions, Budgets, Reports, Account, Quick Add sheet, goals/funds, quick personal actions, and a nested category report mock.
 
 ## Next Steps
 
-- Create the first app-start phase or ticket from the design system and reference app.
-- Decide whether the active app source should live at the repository root, under `refereces/disappointed_app/`, or under a renamed app directory.
-- Reconcile product requirements and architecture docs once the app-start direction is chosen.
+- Collect FE feedback on the standalone mock prototype at `app/`.
+- After UI direction is approved, move selected reference logic/API calls from `refereces/disappointed_app/` into the Atomic Design component tree.
+- Reconcile product requirements and architecture docs once the FE direction is approved.
 
 ## Open Questions
 
