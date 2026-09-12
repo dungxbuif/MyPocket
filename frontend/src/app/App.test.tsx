@@ -11,7 +11,7 @@ describe("App shell", () => {
   async function openReceiptForm() {
     const fetcher = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
@@ -120,7 +120,7 @@ describe("App shell", () => {
   it("does not recreate a saved offline transaction when its receipt queue fails", async () => {
     mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
@@ -147,7 +147,7 @@ describe("App shell", () => {
     const transaction = { id: "tx_error", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 988000, occurred_at: "2026-09-09T00:00:00Z", note: "Giữ ghi chú", with_person: "", event_ref: "", excluded_from_reports: false, version: 1 };
     const fetcher = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 988000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [transaction] },
     });
@@ -175,7 +175,7 @@ describe("App shell", () => {
 
   it("does not submit the previous owner's queued wallet after account switching", async () => {
     await saveFinanceMirror({ userID: "previous-owner", wallets: [] });
-    await enqueueMutation({ entity_type: "wallet", entity_id: "private-wallet", operation: "create", base_version: 0, payload: { name: "Private previous owner", type: "cash" } });
+    await enqueueMutation({ entity_type: "wallet", entity_id: "private-wallet", operation: "create", base_version: 0, payload: { name: "Private previous owner", type: "basic" } });
     const fetchMock = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com" } },
       "/api/v1/wallets": { wallets: [] }, "/api/v1/categories": { categories: [] }, "/api/v1/transactions": { transactions: [] },
@@ -308,7 +308,7 @@ describe("App shell", () => {
   it("opens the transaction add sheet from the raised add action", async () => {
     mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
@@ -345,8 +345,8 @@ describe("App shell", () => {
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
       "/api/v1/wallets": {
         wallets: [
-          { id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 },
-          { id: "wallet_savings", name: "Tiết kiệm API", type: "savings", balance_vnd: 234567, include_in_total: true, is_default_ai: false, version: 1 },
+          { id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 },
+          { id: "wallet_savings", name: "Tiết kiệm API", type: "goal", balance_vnd: 234567, include_in_total: true, is_default_ai: false, version: 1 },
         ],
       },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true, version: 1 }] },
@@ -364,10 +364,37 @@ describe("App shell", () => {
     expect(screen.queryByText("Techcombank")).not.toBeInTheDocument();
   });
 
+  it("creates goal wallets with behavior type and goal metadata", async () => {
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [] },
+      "/api/v1/categories": { categories: [] },
+      "/api/v1/transactions": { transactions: [] },
+    });
+    render(<App />);
+
+    await screen.findByText("Tổng quan");
+    await userEvent.click(await screen.findByRole("button", { name: "Xem tất cả" }));
+    await userEvent.click(screen.getByRole("button", { name: "Thêm ví" }));
+    await userEvent.type(screen.getByLabelText("Tên ví mới"), "Quỹ du lịch");
+    const typeSelect = screen.getByLabelText("Loại ví") as HTMLSelectElement;
+    expect([...typeSelect.options].map((option) => option.value)).toEqual(["basic", "goal", "credit"]);
+    await userEvent.selectOptions(typeSelect, "goal");
+    await userEvent.type(screen.getByLabelText("Mục tiêu số tiền"), "25000000");
+    fireEvent.change(screen.getByLabelText("Ngày hoàn thành mục tiêu"), { target: { value: "2027-12-31" } });
+    await userEvent.click(screen.getByRole("button", { name: "Tạo ví" }));
+
+    await waitFor(() => {
+      const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/wallets" && options?.method === "POST");
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ name: "Quỹ du lịch", type: "goal", goal_target_vnd: 25_000_000, goal_deadline_on: "2027-12-31" });
+    });
+  });
+
   it("shows loaded categories in the add transaction sheet", async () => {
     const fetchMock = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống API", system_key: "expense_food", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
@@ -384,7 +411,7 @@ describe("App shell", () => {
   it("renders API transactions and can search them", async () => {
     mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [] },
       "/api/v1/transactions": { transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_live", amount_vnd: 125000, balance_after_vnd: 875000, occurred_at: "2026-08-30T00:00:00Z", note: "Cà phê sáng", with_person: "", event_ref: "", excluded_from_reports: false, version: 1 }] },
     });
@@ -400,7 +427,7 @@ describe("App shell", () => {
     mockNavigatorOnline(false);
     await saveFinanceMirror({
       userID: "user_123",
-      wallets: [{ id: "wallet_cached", name: "Ví cached", type: "cash", balance_vnd: 880000, include_in_total: true, is_default_ai: true, version: 3 }],
+      wallets: [{ id: "wallet_cached", name: "Ví cached", type: "basic", balance_vnd: 880000, include_in_total: true, is_default_ai: true, version: 3 }],
       categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống cached", is_system: false, version: 1 }],
       transactions: [{ id: "tx_cached", type: "expense", source_wallet_id: "wallet_cached", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 868000, occurred_at: "2026-08-31T00:00:00Z", note: "Cached lunch", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }],
     });
@@ -427,7 +454,7 @@ describe("App shell", () => {
   it("reloads offline with cached auth, cached finance data, and pending mutation visibility", async () => {
     const onlineFetch = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví reload", type: "cash", balance_vnd: 990000, include_in_total: true, is_default_ai: true, version: 5 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví reload", type: "basic", balance_vnd: 990000, include_in_total: true, is_default_ai: true, version: 5 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn reload", is_system: false, version: 1 }] },
       "/api/v1/transactions": { transactions: [{ id: "tx_reload", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 11000, balance_after_vnd: 979000, occurred_at: "2026-08-31T00:00:00Z", note: "Online cached", with_person: "", event_ref: "", excluded_from_reports: false, version: 1 }] },
     });
@@ -473,7 +500,7 @@ describe("App shell", () => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       const path = new URL(url, "http://localhost").pathname;
       if (path === "/api/v1/me") return new Response(JSON.stringify({ user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } }), { status: 200 });
-      if (path === "/api/v1/wallets") return new Response(JSON.stringify({ wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] }), { status: 200 });
+      if (path === "/api/v1/wallets") return new Response(JSON.stringify({ wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] }), { status: 200 });
       if (path === "/api/v1/categories") return new Response(JSON.stringify({ categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] }), { status: 200 });
       if (path === "/api/v1/transactions" && options?.method === "POST") {
         expect(new Headers(options.headers).get("Idempotency-Key")).toBeTruthy();
@@ -497,7 +524,7 @@ describe("App shell", () => {
   it("updates wallet/category settings from the manager sheet", async () => {
     const fetchMock = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [{ id: "cat_custom", kind: "expense", name: "Cafe", is_system: false, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
     });
@@ -520,7 +547,7 @@ describe("App shell", () => {
       const url = typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
       const path = new URL(url, "http://localhost").pathname;
       if (path === "/api/v1/me") return jsonResponse({ user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } });
-      if (path === "/api/v1/wallets") return jsonResponse({ wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] });
+      if (path === "/api/v1/wallets") return jsonResponse({ wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] });
       if (path === "/api/v1/categories") return jsonResponse({ categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] });
       if (path === "/api/v1/transactions/tx_1" && options?.method === "PATCH") {
         const body = JSON.parse(String(options.body));
@@ -549,7 +576,7 @@ describe("App shell", () => {
   it("shows conflict inbox and lets the user keep the server version", async () => {
     await saveFinanceMirror({
       userID: "user_123",
-      wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 }],
+      wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 }],
       categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }],
       transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 988000, occurred_at: "2026-08-31T00:00:00Z", note: "Server note", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }],
     });
@@ -569,7 +596,7 @@ describe("App shell", () => {
     });
     mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_live", name: "Ví API", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 2 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [{ id: "tx_1", type: "expense", source_wallet_id: "wallet_live", category_id: "cat_food", amount_vnd: 12000, balance_after_vnd: 988000, occurred_at: "2026-08-31T00:00:00Z", note: "Server note", with_person: "", event_ref: "", excluded_from_reports: false, version: 2 }] },
     });
@@ -621,6 +648,44 @@ describe("App shell", () => {
     });
   });
 
+  it("assigns a selected budget when creating an expense transaction", async () => {
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_1", name: "Ví chính", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [] },
+      "/api/v1/budgets": {
+        budgets: [{
+          budget: { id: "budget_food", name: "Hũ ăn uống", period_type: "monthly", amount_vnd: 500000, category_ids: ["cat_food"], all_categories: false, version: 1 },
+          period_start: "2026-09-01",
+          period_end: "2026-09-30",
+          spent_vnd: 0,
+          remaining_vnd: 500000,
+          percent: 0,
+          alert_80: false,
+          alert_100: false,
+        }],
+      },
+      "/api/v1/events": { events: [] },
+      "/api/v1/obligations": { obligations: [] },
+      "/api/v1/recurring-schedules": { schedules: [] },
+      "/api/v1/transaction-drafts": { drafts: [] },
+    });
+
+    render(<App />);
+    await screen.findByText("Ví chính");
+    await userEvent.click(screen.getByRole("button", { name: "Thêm giao dịch" }));
+    await userEvent.type(await screen.findByLabelText("Số tiền"), "75000");
+    await userEvent.selectOptions(screen.getByLabelText("Ngân sách giao dịch"), "budget_food");
+    await userEvent.click(screen.getByRole("button", { name: "Lưu" }));
+
+    await waitFor(() => {
+      const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/transactions" && options?.method === "POST");
+      expect(createCall).toBeTruthy();
+      expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({ budget_id: "budget_food", type: "expense", amount_vnd: 75000 });
+    });
+  });
+
   it("shows event and debt planning flows", async () => {
     const fetchMock = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
@@ -655,7 +720,7 @@ describe("App shell", () => {
   it("creates a recurring schedule from the planning tab", async () => {
     const fetchMock = mockFetchRoutes({
       "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
-      "/api/v1/wallets": { wallets: [{ id: "wallet_1", name: "Ví chính", type: "cash", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_1", name: "Ví chính", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
       "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
       "/api/v1/transactions": { transactions: [] },
       "/api/v1/budgets": { budgets: [] },
@@ -675,6 +740,55 @@ describe("App shell", () => {
     await waitFor(() => {
       const createCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/recurring-schedules" && options?.method === "POST");
       expect(createCall).toBeTruthy();
+    });
+  });
+
+  it("edits and pauses an existing recurring schedule from the planning tab", async () => {
+    const fetchMock = mockFetchRoutes({
+      "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
+      "/api/v1/wallets": { wallets: [{ id: "wallet_1", name: "Ví chính", type: "basic", balance_vnd: 1000000, include_in_total: true, is_default_ai: true, version: 1 }] },
+      "/api/v1/categories": { categories: [{ id: "cat_food", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }] },
+      "/api/v1/transactions": { transactions: [] },
+      "/api/v1/budgets": {
+        budgets: [{
+          budget: { id: "budget_food", name: "Hũ ăn uống", period_type: "monthly", amount_vnd: 500000, category_ids: ["cat_food"], all_categories: false, version: 1 },
+          period_start: "2026-09-01",
+          period_end: "2026-09-30",
+          spent_vnd: 0,
+          remaining_vnd: 500000,
+          percent: 0,
+          alert_80: false,
+          alert_100: false,
+        }],
+      },
+      "/api/v1/events": { events: [] },
+      "/api/v1/obligations": { obligations: [] },
+      "/api/v1/recurring-schedules": { schedules: [{ id: "schedule_1", name: "Tiền nhà", frequency: "monthly", timezone: "Asia/Ho_Chi_Minh", starts_at: "2026-09-01T02:00:00Z", next_occurs_at: "2026-10-01T02:00:00Z", type: "expense", source_wallet_id: "wallet_1", category_id: "cat_food", amount_vnd: 3500000, note: "Thuê nhà", posting_mode: "draft", budget_id: "budget_food", version: 2 }] },
+      "/api/v1/transaction-drafts": { drafts: [] },
+    });
+
+    render(<App />);
+    await userEvent.click(await screen.findByLabelText("Ngân sách"));
+    await userEvent.click(await screen.findByRole("button", { name: /Tiền nhà/ }));
+    await userEvent.clear(await screen.findByLabelText("Số tiền lịch lặp"));
+    await userEvent.type(screen.getByLabelText("Số tiền lịch lặp"), "3600000");
+    await userEvent.selectOptions(screen.getByLabelText("Cách ghi lịch lặp"), "auto_post");
+    await userEvent.type(screen.getByLabelText("Ngày kết thúc lịch lặp"), "2026-12-31");
+    await userEvent.click(screen.getByRole("button", { name: "Lưu thay đổi" }));
+
+    await waitFor(() => {
+      const updateCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/recurring-schedules/schedule_1" && options?.method === "PATCH");
+      expect(updateCall).toBeTruthy();
+      expect(JSON.parse(String(updateCall?.[1]?.body))).toMatchObject({ base_version: 2, amount_vnd: 3600000, posting_mode: "auto_post", budget_id: "budget_food", ends_at: "2026-12-31T23:59:59+07:00" });
+    });
+
+    await userEvent.click(await screen.findByRole("button", { name: /Tiền nhà/ }));
+    await userEvent.click(await screen.findByRole("button", { name: "Tạm dừng" }));
+
+    await waitFor(() => {
+      const pauseCall = fetchMock.mock.calls.find(([input, options]) => new URL(String(input), "http://localhost").pathname === "/api/v1/recurring-schedules/schedule_1/pause" && options?.method === "POST");
+      expect(pauseCall).toBeTruthy();
+      expect(JSON.parse(String(pauseCall?.[1]?.body))).toMatchObject({ base_version: 2 });
     });
   });
 

@@ -27,6 +27,8 @@ export async function queueWalletCreate(input: WalletCreateInput): Promise<Walle
     balance_vnd: input.balance_vnd ?? 0,
     include_in_total: input.include_in_total ?? true,
     is_default_ai: false,
+    goal_target_vnd: input.goal_target_vnd,
+    goal_deadline_on: input.goal_deadline_on,
     version: NOW_VERSION,
   };
   await enqueueMutation({
@@ -39,6 +41,8 @@ export async function queueWalletCreate(input: WalletCreateInput): Promise<Walle
       type: input.type,
       balance_vnd: input.balance_vnd ?? 0,
       include_in_total: input.include_in_total ?? true,
+      ...(input.goal_target_vnd ? { goal_target_vnd: input.goal_target_vnd } : {}),
+      ...(input.goal_deadline_on ? { goal_deadline_on: input.goal_deadline_on } : {}),
     },
   });
   await upsertOfflineWallet(wallet);

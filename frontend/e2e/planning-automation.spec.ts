@@ -21,14 +21,6 @@ test("mobile budget CRUD shows threshold progress through the live API", async (
   await expect(page.getByLabel(`Tên nhóm ${categoryName}`)).toBeVisible();
   await page.getByRole("button", { name: "Đóng" }).click();
 
-  await page.getByRole("button", { name: "Thêm giao dịch" }).click();
-  await page.getByLabel("Số tiền").fill("410000");
-  await page.getByLabel("Ví nguồn").selectOption({ label: walletName });
-  await page.getByLabel("Nhóm").selectOption({ label: categoryName });
-  await page.getByLabel("Ghi chú").fill(note);
-  await page.getByRole("button", { name: "Lưu", exact: true }).click();
-  await expect(page.getByRole("dialog", { name: "Thêm Giao Dịch" })).toHaveCount(0);
-
   await page.getByRole("button", { name: "Ngân sách" }).click();
   await page.getByRole("button", { name: "Tạo", exact: true }).click();
   await page.getByLabel("Tên ngân sách").fill(budgetName);
@@ -37,6 +29,17 @@ test("mobile budget CRUD shows threshold progress through the live API", async (
   await page.getByRole("button", { name: categoryName }).click();
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
 
+  await page.getByRole("button", { name: "Thêm giao dịch" }).click();
+  await page.getByLabel("Số tiền").fill("410000");
+  await page.getByLabel("Ví nguồn").selectOption({ label: walletName });
+  await page.getByLabel("Nhóm").selectOption({ label: categoryName });
+  await page.getByLabel("Ngân sách giao dịch").selectOption({ label: budgetName });
+  await page.getByLabel("Ghi chú").fill(note);
+  await page.getByRole("button", { name: "Lưu", exact: true }).click();
+  await expect(page.getByRole("dialog", { name: "Thêm Giao Dịch" })).toHaveCount(0);
+
+  await page.reload();
+  await page.getByRole("button", { name: "Ngân sách" }).click();
   const budgetRow = page.getByRole("button", { name: new RegExp(budgetName) });
   await expect(budgetRow).toBeVisible();
   await expect(budgetRow.getByText("Đã chạm 80%")).toBeVisible();
@@ -99,6 +102,15 @@ test("mobile event and debt planning links existing transactions", async ({ page
   await page.getByLabel("Số tiền lịch lặp").fill("99000");
   await page.getByLabel("Ví lịch lặp").selectOption({ label: walletName });
   await page.getByLabel("Nhóm lịch lặp").selectOption({ label: categoryName });
+  await page.getByLabel("Cách ghi lịch lặp").selectOption("auto_post");
+  await page.getByLabel("Ngày kết thúc lịch lặp").fill("2026-12-31");
   await page.getByRole("button", { name: "Lưu", exact: true }).click();
   await expect(page.getByRole("button", { name: new RegExp(`${scheduleName}[\\s\\S]*99\\.000`) })).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(scheduleName) }).click();
+  await page.getByLabel("Số tiền lịch lặp").fill("100000");
+  await page.getByRole("button", { name: "Lưu thay đổi" }).click();
+  await expect(page.getByRole("button", { name: new RegExp(`${scheduleName}[\\s\\S]*100\\.000`) })).toBeVisible();
+  await page.getByRole("button", { name: new RegExp(scheduleName) }).click();
+  await page.getByRole("button", { name: "Tạm dừng" }).click();
+  await expect(page.getByRole("button", { name: new RegExp(scheduleName) })).toBeVisible();
 });

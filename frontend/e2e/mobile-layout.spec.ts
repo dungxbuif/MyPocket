@@ -9,7 +9,7 @@ for (const count of [0, 100]) {
     await page.route('**/api/v1/wallets', async route => {
       if (route.request().method() !== 'GET') return route.continue();
       await route.fulfill({ json: { wallets: Array.from({ length: count }, (_, i) => ({
-        id: `fixture-${i}`, name: `Wallet ${i} with a deliberately long name for mobile layout`, type: 'cash', balance_vnd: 0,
+        id: `fixture-${i}`, name: `Wallet ${i} with a deliberately long name for mobile layout`, type: 'basic', balance_vnd: 0,
         include_in_total: true, is_default_ai: false, version: 1,
       })) } });
     });

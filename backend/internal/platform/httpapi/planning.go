@@ -89,16 +89,20 @@ type recurringScheduleResponse struct {
 }
 
 type recurringScheduleRequest struct {
-	Name                string                       `json:"name"`
-	Frequency           planning.RecurrenceFrequency `json:"frequency"`
-	Timezone            string                       `json:"timezone"`
-	StartsAt            string                       `json:"starts_at"`
-	Type                finance.TransactionType      `json:"type"`
-	SourceWalletID      string                       `json:"source_wallet_id"`
-	DestinationWalletID string                       `json:"destination_wallet_id"`
-	CategoryID          string                       `json:"category_id"`
-	AmountVND           int64                        `json:"amount_vnd"`
-	Note                string                       `json:"note"`
+	BaseVersion         int64                         `json:"base_version"`
+	Name                string                        `json:"name"`
+	Frequency           planning.RecurrenceFrequency  `json:"frequency"`
+	Timezone            string                        `json:"timezone"`
+	StartsAt            string                        `json:"starts_at"`
+	EndsAt              string                        `json:"ends_at"`
+	PostingMode         planning.RecurringPostingMode `json:"posting_mode"`
+	Type                finance.TransactionType       `json:"type"`
+	SourceWalletID      string                        `json:"source_wallet_id"`
+	DestinationWalletID string                        `json:"destination_wallet_id"`
+	CategoryID          string                        `json:"category_id"`
+	BudgetID            string                        `json:"budget_id"`
+	AmountVND           int64                         `json:"amount_vnd"`
+	Note                string                        `json:"note"`
 }
 
 type planningVersionRequest struct {
@@ -394,7 +398,7 @@ func recurringSchedules(cfg config.Config, repo PlanningRepository) http.Handler
 			writeJSON(w, http.StatusOK, recurringSchedulesResponse{Status: "ok", Schedules: schedules, CorrelationID: correlationID(r.Context())})
 		case http.MethodPost:
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-				input, ok := decodeRecurringScheduleRequest(w, r)
+				input, _, ok := decodeRecurringScheduleRequest(w, r)
 				if !ok {
 					return
 				}
@@ -426,7 +430,59 @@ func recurringScheduleByID(cfg config.Config, repo PlanningRepository) http.Hand
 			writeJSON(w, http.StatusNotFound, ErrorEnvelope("NOT_FOUND", "Recurring schedule not found", correlationID(r.Context())))
 			return
 		}
-		if r.Method == http.MethodPost && action == "archive" {
+		switch {
+		case r.Method == http.MethodPatch && action == "":
+			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				input, baseVersion, ok := decodeRecurringScheduleRequest(w, r)
+				if !ok {
+					return
+				}
+				if baseVersion <= 0 {
+					writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "base_version is required", correlationID(r.Context())))
+					return
+				}
+				schedule, err := repo.UpdateRecurringSchedule(r.Context(), userID, scheduleID, planning.UpdateRecurringScheduleInput{
+					BaseVersion: baseVersion, Name: input.Name, Frequency: input.Frequency, Timezone: input.Timezone,
+					StartsAt: input.StartsAt, EndsAt: input.EndsAt, PostingMode: input.PostingMode, Type: input.Type,
+					SourceWalletID: input.SourceWalletID, DestinationWalletID: input.DestinationWalletID, CategoryID: input.CategoryID,
+					BudgetID: input.BudgetID, AmountVND: input.AmountVND, Note: input.Note,
+				})
+				if err != nil {
+					writePlanningError(w, r, err, "Recurring schedule unavailable")
+					return
+				}
+				writeJSON(w, http.StatusOK, recurringScheduleResponse{Status: "ok", Schedule: schedule, CorrelationID: correlationID(r.Context())})
+			})).ServeHTTP(w, r)
+			return
+		case r.Method == http.MethodPost && action == "pause":
+			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				baseVersion, ok := decodePlanningBaseVersion(w, r)
+				if !ok {
+					return
+				}
+				schedule, err := repo.PauseRecurringSchedule(r.Context(), userID, scheduleID, baseVersion)
+				if err != nil {
+					writePlanningError(w, r, err, "Recurring schedule unavailable")
+					return
+				}
+				writeJSON(w, http.StatusOK, recurringScheduleResponse{Status: "ok", Schedule: schedule, CorrelationID: correlationID(r.Context())})
+			})).ServeHTTP(w, r)
+			return
+		case r.Method == http.MethodPost && action == "resume":
+			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				baseVersion, ok := decodePlanningBaseVersion(w, r)
+				if !ok {
+					return
+				}
+				schedule, err := repo.ResumeRecurringSchedule(r.Context(), userID, scheduleID, baseVersion, time.Now())
+				if err != nil {
+					writePlanningError(w, r, err, "Recurring schedule unavailable")
+					return
+				}
+				writeJSON(w, http.StatusOK, recurringScheduleResponse{Status: "ok", Schedule: schedule, CorrelationID: correlationID(r.Context())})
+			})).ServeHTTP(w, r)
+			return
+		case r.Method == http.MethodPost && action == "archive":
 			requireCSRF(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				baseVersion, ok := decodePlanningBaseVersion(w, r)
 				if !ok {
@@ -661,24 +717,27 @@ func decodeObligationRequest(w http.ResponseWriter, r *http.Request) (planning.C
 	return planning.CreateObligationInput{Direction: req.Direction, PrincipalVND: req.PrincipalVND, Counterparty: req.Counterparty, DueOn: req.DueOn, Note: req.Note}, req.BaseVersion, true
 }
 
-func decodeRecurringScheduleRequest(w http.ResponseWriter, r *http.Request) (planning.CreateRecurringScheduleInput, bool) {
+func decodeRecurringScheduleRequest(w http.ResponseWriter, r *http.Request) (planning.CreateRecurringScheduleInput, int64, bool) {
 	var req recurringScheduleRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", "Invalid JSON body", correlationID(r.Context())))
-		return planning.CreateRecurringScheduleInput{}, false
+		return planning.CreateRecurringScheduleInput{}, 0, false
 	}
 	return planning.CreateRecurringScheduleInput{
 		Name:                req.Name,
 		Frequency:           req.Frequency,
 		Timezone:            req.Timezone,
 		StartsAt:            req.StartsAt,
+		EndsAt:              req.EndsAt,
+		PostingMode:         req.PostingMode,
 		Type:                req.Type,
 		SourceWalletID:      req.SourceWalletID,
 		DestinationWalletID: req.DestinationWalletID,
 		CategoryID:          req.CategoryID,
+		BudgetID:            req.BudgetID,
 		AmountVND:           req.AmountVND,
 		Note:                req.Note,
-	}, true
+	}, req.BaseVersion, true
 }
 
 func parseOptionalDate(w http.ResponseWriter, r *http.Request, value string) (*time.Time, bool) {
@@ -725,8 +784,8 @@ func parseBudgetPathWithPrefix(path string, prefix string) (budgetID string, act
 	if len(parts) == 1 {
 		return parts[0], "", true
 	}
-	if len(parts) == 2 && parts[1] == "archive" {
-		return parts[0], "archive", true
+	if len(parts) == 2 && (parts[1] == "archive" || parts[1] == "pause" || parts[1] == "resume") {
+		return parts[0], parts[1], true
 	}
 	return "", "", false
 }

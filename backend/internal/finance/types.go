@@ -8,12 +8,9 @@ import (
 type WalletType string
 
 const (
-	WalletCash    WalletType = "cash"
-	WalletBank    WalletType = "bank"
-	WalletCredit  WalletType = "credit"
-	WalletEWallet WalletType = "e_wallet"
-	WalletSavings WalletType = "savings"
-	WalletDebt    WalletType = "debt"
+	WalletBasic  WalletType = "basic"
+	WalletGoal   WalletType = "goal"
+	WalletCredit WalletType = "credit"
 )
 
 type CreateWalletInput struct {
@@ -25,6 +22,8 @@ type CreateWalletInput struct {
 	CreditLimitVND *int64
 	StatementDay   *int
 	PaymentDueDay  *int
+	GoalTargetVND  *int64
+	GoalDeadlineOn *string
 }
 
 type Wallet struct {
@@ -35,6 +34,11 @@ type Wallet struct {
 	BalanceVND     int64      `json:"balance_vnd"`
 	IncludeInTotal bool       `json:"include_in_total"`
 	IsDefaultAI    bool       `json:"is_default_ai"`
+	CreditLimitVND *int64     `json:"credit_limit_vnd,omitempty"`
+	StatementDay   *int       `json:"statement_day,omitempty"`
+	PaymentDueDay  *int       `json:"payment_due_day,omitempty"`
+	GoalTargetVND  *int64     `json:"goal_target_vnd,omitempty"`
+	GoalDeadlineOn string     `json:"goal_deadline_on,omitempty"`
 	Version        int64      `json:"version"`
 }
 
@@ -115,6 +119,7 @@ type CreateTransactionInput struct {
 	SourceWalletID      string
 	DestinationWalletID string
 	CategoryID          string
+	BudgetID            string
 	ReceiptObjectID     string
 	AmountVND           int64
 	TargetBalanceVND    *int64
@@ -131,6 +136,7 @@ type UpdateTransactionInput struct {
 	SourceWalletID      string
 	DestinationWalletID string
 	CategoryID          string
+	BudgetID            string
 	ReceiptObjectID     string
 	AmountVND           int64
 	TargetBalanceVND    *int64
@@ -159,6 +165,7 @@ type Transaction struct {
 	SourceWalletID      string          `json:"source_wallet_id"`
 	DestinationWalletID string          `json:"destination_wallet_id,omitempty"`
 	CategoryID          string          `json:"category_id,omitempty"`
+	BudgetID            string          `json:"budget_id,omitempty"`
 	ReceiptObjectID     string          `json:"receipt_object_id,omitempty"`
 	AmountVND           int64           `json:"amount_vnd"`
 	BalanceAfterVND     int64           `json:"balance_after_vnd"`

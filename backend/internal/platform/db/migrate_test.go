@@ -74,7 +74,7 @@ func TestMigration0012UpgradesProductionShapeAndIsIdempotent(t *testing.T) {
 	if err := conn.QueryRowContext(ctx, `INSERT INTO users (google_subject, email, email_verified) VALUES ('migration-0012', 'migration-0012@example.com', true) RETURNING id::text`).Scan(&userID); err != nil {
 		t.Fatalf("seed user: %v", err)
 	}
-	if err := conn.QueryRowContext(ctx, `INSERT INTO wallets (user_id, name, type, balance_vnd) VALUES ($1, 'Cash', 'cash', 90000) RETURNING id::text`, userID).Scan(&walletID); err != nil {
+	if err := conn.QueryRowContext(ctx, `INSERT INTO wallets (user_id, name, type, balance_vnd) VALUES ($1, 'Cash', 'basic', 90000) RETURNING id::text`, userID).Scan(&walletID); err != nil {
 		t.Fatalf("seed wallet: %v", err)
 	}
 	if err := conn.QueryRowContext(ctx, `INSERT INTO transactions (user_id, type, source_wallet_id, category_id, amount_vnd, source_delta_vnd, balance_after_vnd, occurred_at) VALUES ($1, 'expense', $2, '00000000-0000-4000-8000-000000000201', 10000, -10000, 90000, '2026-09-11T00:00:00Z') RETURNING id::text`, userID, walletID).Scan(&transactionID); err != nil {
@@ -107,6 +107,71 @@ func TestMigration0012UpgradesProductionShapeAndIsIdempotent(t *testing.T) {
 	}
 	if migrationRows != 1 {
 		t.Fatalf("expected one checksummed 0012 record, got %d", migrationRows)
+	}
+}
+
+func TestMigration0020ConvertsWalletPseudoTypesToBehaviorModel(t *testing.T) {
+	ctx := context.Background()
+	conn := openTestPostgres(t)
+	resetSchema(t, conn)
+
+	all := loadMigrationMap(t)
+	through0019 := fstest.MapFS{}
+	for name, file := range all {
+		if strings.HasPrefix(name, "0020_") {
+			continue
+		}
+		through0019[name] = file
+	}
+	if err := db.Migrate(ctx, conn, through0019); err != nil {
+		t.Fatalf("migrate through 0019: %v", err)
+	}
+
+	var userID string
+	if err := conn.QueryRowContext(ctx, `INSERT INTO users (google_subject, email, email_verified) VALUES ('migration-0020', 'migration-0020@example.com', true) RETURNING id::text`).Scan(&userID); err != nil {
+		t.Fatalf("seed user: %v", err)
+	}
+	for _, walletType := range []string{"cash", "bank", "e_wallet", "debt", "savings", "credit"} {
+		if _, err := conn.ExecContext(ctx, `INSERT INTO wallets (user_id, name, type, balance_vnd) VALUES ($1, $2, $3, 1000)`, userID, "wallet-"+walletType, walletType); err != nil {
+			t.Fatalf("seed wallet type %s: %v", walletType, err)
+		}
+	}
+
+	if err := db.Migrate(ctx, conn, all); err != nil {
+		t.Fatalf("apply migration 0020: %v", err)
+	}
+	if err := db.Migrate(ctx, conn, all); err != nil {
+		t.Fatalf("repeat migration 0020: %v", err)
+	}
+
+	counts := map[string]int{}
+	rows, err := conn.QueryContext(ctx, `SELECT type, count(*) FROM wallets GROUP BY type`)
+	if err != nil {
+		t.Fatalf("count behavior types: %v", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var walletType string
+		var count int
+		if err := rows.Scan(&walletType, &count); err != nil {
+			t.Fatalf("scan type count: %v", err)
+		}
+		counts[walletType] = count
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("type count rows: %v", err)
+	}
+	if counts["basic"] != 4 || counts["goal"] != 1 || counts["credit"] != 1 || len(counts) != 3 {
+		t.Fatalf("unexpected wallet behavior mapping: %#v", counts)
+	}
+	if _, err := conn.ExecContext(ctx, `INSERT INTO wallets (user_id, name, type) VALUES ($1, 'legacy cash', 'cash')`, userID); err == nil {
+		t.Fatalf("expected legacy wallet type insert to be rejected")
+	}
+	if _, err := conn.ExecContext(ctx, `INSERT INTO wallets (user_id, name, type, goal_target_vnd) VALUES ($1, 'basic with target', 'basic', 1000)`, userID); err == nil {
+		t.Fatalf("expected goal metadata on basic wallet to be rejected")
+	}
+	if _, err := conn.ExecContext(ctx, `INSERT INTO wallets (user_id, name, type, goal_target_vnd, goal_deadline_on) VALUES ($1, 'goal ok', 'goal', 1000, '2027-12-31')`, userID); err != nil {
+		t.Fatalf("expected goal metadata on goal wallet to be accepted: %v", err)
 	}
 }
 

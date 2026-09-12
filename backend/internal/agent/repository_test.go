@@ -21,11 +21,11 @@ func TestAgentCompletionCreatesReviewDraftWithoutAccounting(t *testing.T) {
 	user := agentUser(t, db, "agent-owner@example.com")
 	other := agentUser(t, db, "agent-other@example.com")
 	financeRepo := finance.NewRepository(db)
-	wallet, err := financeRepo.CreateWallet(ctx, user, finance.CreateWalletInput{Name: "Cash", Type: finance.WalletCash})
+	wallet, err := financeRepo.CreateWallet(ctx, user, finance.CreateWalletInput{Name: "Cash", Type: finance.WalletBasic})
 	if err != nil {
 		t.Fatal(err)
 	}
-	foreign, err := financeRepo.CreateWallet(ctx, other, finance.CreateWalletInput{Name: "Foreign", Type: finance.WalletCash})
+	foreign, err := financeRepo.CreateWallet(ctx, other, finance.CreateWalletInput{Name: "Foreign", Type: finance.WalletBasic})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -70,6 +70,151 @@ func TestAgentCompletionCreatesReviewDraftWithoutAccounting(t *testing.T) {
 	bad, _ := agent.ParseModelResult(`{"transaction":{"type":"expense","amount_vnd":1,"source_wallet_id":"`+foreign.ID+`","category_id":"`+category+`","occurred_at":"2026-09-11T00:00:00Z","note":""}}`, agent.KindTransactionDraft)
 	if err := repo.Complete(ctx, second, bad, nil); !errors.Is(err, agent.ErrValidation) {
 		t.Fatalf("expected foreign reference rejection, got %v", err)
+	}
+}
+
+func TestAgentIntakeRejectsTransfersAndNeverWritesAccounting(t *testing.T) {
+	db := agentDB(t)
+	ctx := context.Background()
+	user := agentUser(t, db, "intake-transfer@example.com")
+	financeRepo := finance.NewRepository(db)
+	source, err := financeRepo.CreateWallet(ctx, user, finance.CreateWalletInput{Name: "Cash", Type: finance.WalletBasic})
+	if err != nil {
+		t.Fatal(err)
+	}
+	destination, err := financeRepo.CreateWallet(ctx, user, finance.CreateWalletInput{Name: "Bank", Type: finance.WalletBasic})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = agent.ParseModelResult(`{"transaction":{"type":"transfer","amount_vnd":100000,"source_wallet_id":"`+source.ID+`","destination_wallet_id":"`+destination.ID+`","occurred_at":"2026-09-11T00:00:00Z","note":"move"}}`, agent.KindIntake)
+	if !errors.Is(err, agent.ErrValidation) {
+		t.Fatalf("expected intake transfer rejection, got %v", err)
+	}
+	var txCount, draftCount int
+	if err := db.QueryRow(`SELECT count(*) FROM transactions WHERE user_id=$1`, user).Scan(&txCount); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.QueryRow(`SELECT count(*) FROM transaction_drafts WHERE user_id=$1`, user).Scan(&draftCount); err != nil {
+		t.Fatal(err)
+	}
+	if txCount != 0 || draftCount != 0 {
+		t.Fatalf("intake transfer wrote state transactions=%d drafts=%d", txCount, draftCount)
+	}
+}
+
+func TestAgentIntakeCreatesMultipleReviewDrafts(t *testing.T) {
+	db := agentDB(t)
+	ctx := context.Background()
+	user := agentUser(t, db, "intake-multiple@example.com")
+	financeRepo := finance.NewRepository(db)
+	wallet, err := financeRepo.CreateWallet(ctx, user, finance.CreateWalletInput{Name: "Cash", Type: finance.WalletBasic})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var category string
+	if err := db.QueryRow(`SELECT id::text FROM categories WHERE system_key='expense_food'`).Scan(&category); err != nil {
+		t.Fatal(err)
+	}
+	repo := agent.NewRepository(db)
+	run, err := repo.CreateRun(ctx, user, "multi-intake", agent.KindIntake, "Ăn trưa 80k, taxi 120k")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _, _ = repo.ClaimDue(ctx, "test", time.Now().UTC(), time.Minute)
+	result, err := agent.ParseModelResult(`{"drafts":[{"type":"expense","amount_vnd":80000,"source_wallet_id":"`+wallet.ID+`","category_id":"`+category+`","occurred_at":"2026-09-11T00:00:00Z","note":"Ăn trưa"},{"type":"expense","amount_vnd":120000,"source_wallet_id":"`+wallet.ID+`","category_id":"`+category+`","occurred_at":"2026-09-11T01:00:00Z","note":"Taxi"}]}`, agent.KindIntake)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Complete(ctx, run, result, map[string]any{"provider": "test"}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := repo.GetRun(ctx, user, run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Status != agent.StatusCompleted || len(loaded.DraftIDs) != 2 {
+		t.Fatalf("loaded=%#v", loaded)
+	}
+	var txCount int
+	if err := db.QueryRow(`SELECT count(*) FROM transactions WHERE user_id=$1`, user).Scan(&txCount); err != nil {
+		t.Fatal(err)
+	}
+	if txCount != 0 {
+		t.Fatalf("intake bypassed review boundary transactions=%d", txCount)
+	}
+}
+
+func TestAgentIntakePersistsSessionMessagesAndDraftActionCard(t *testing.T) {
+	db := agentDB(t)
+	ctx := context.Background()
+	user := agentUser(t, db, "intake-history@example.com")
+	financeRepo := finance.NewRepository(db)
+	wallet, err := financeRepo.CreateWallet(ctx, user, finance.CreateWalletInput{Name: "Cash", Type: finance.WalletBasic})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var category string
+	if err := db.QueryRow(`SELECT id::text FROM categories WHERE system_key='expense_food'`).Scan(&category); err != nil {
+		t.Fatal(err)
+	}
+	repo := agent.NewRepository(db)
+	run, session, userMessage, err := repo.CreateSessionRun(ctx, user, "", "intake-once", agent.KindIntake, "Ăn trưa 80k", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if session.Kind != agent.KindIntake || userMessage.Role != agent.MessageRoleUser || userMessage.Text != "Ăn trưa 80k" || userMessage.RunID != run.ID {
+		t.Fatalf("session=%#v userMessage=%#v run=%#v", session, userMessage, run)
+	}
+	run, _, _ = repo.ClaimDue(ctx, "test", time.Now().UTC(), time.Minute)
+	result, err := agent.ParseModelResult(`{"drafts":[{"type":"expense","amount_vnd":80000,"source_wallet_id":"`+wallet.ID+`","category_id":"`+category+`","occurred_at":"2026-09-11T00:00:00Z","note":"Ăn trưa"}]}`, agent.KindIntake)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Complete(ctx, run, result, map[string]any{"provider": "test"}); err != nil {
+		t.Fatal(err)
+	}
+	history, err := repo.GetSession(ctx, user, session.ID, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if history.Session.ID != session.ID || len(history.Messages) != 2 {
+		t.Fatalf("history=%#v", history)
+	}
+	if history.Messages[0].Role != agent.MessageRoleUser || history.Messages[0].Text != "Ăn trưa 80k" {
+		t.Fatalf("user message not persisted: %#v", history.Messages[0])
+	}
+	assistantMessage := history.Messages[1]
+	if assistantMessage.Role != agent.MessageRoleAssistant || assistantMessage.RunID != run.ID {
+		t.Fatalf("assistant message not linked to run: %#v", assistantMessage)
+	}
+	if assistantMessage.Action == nil || assistantMessage.Action.Type != agent.ActionDraftsCreated || len(assistantMessage.Action.DraftIDs) != 1 {
+		t.Fatalf("assistant action card missing draft_ids: %#v", assistantMessage.Action)
+	}
+}
+
+func TestAgentAdvisorCompletionNeverCreatesDrafts(t *testing.T) {
+	db := agentDB(t)
+	ctx := context.Background()
+	user := agentUser(t, db, "advisor-readonly@example.com")
+	repo := agent.NewRepository(db)
+	run, err := repo.CreateRun(ctx, user, "advisor", agent.KindAdvisor, "Tháng này thế nào?")
+	if err != nil {
+		t.Fatal(err)
+	}
+	run, _, _ = repo.ClaimDue(ctx, "test", time.Now().UTC(), time.Minute)
+	result, err := agent.ParseModelResult(`{"answer":"Tháng này chi 0 VND."}`, agent.KindAdvisor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.Complete(ctx, run, result, map[string]any{"provider": "test"}); err != nil {
+		t.Fatal(err)
+	}
+	loaded, err := repo.GetRun(ctx, user, run.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded.Status != agent.StatusCompleted || len(loaded.DraftIDs) != 0 {
+		t.Fatalf("advisor wrote drafts or failed: %#v", loaded)
 	}
 }
 

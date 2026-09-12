@@ -159,6 +159,18 @@ paths:
     post:
       summary: Lưu trữ lịch lặp; JSON bắt buộc base_version hiện tại
       security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+  /api/v1/recurring-schedules/{id}:
+    patch:
+      summary: Sửa lịch lặp; JSON bắt buộc base_version hiện tại
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+  /api/v1/recurring-schedules/{id}/pause:
+    post:
+      summary: Tạm dừng lịch lặp; JSON bắt buộc base_version hiện tại
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
+  /api/v1/recurring-schedules/{id}/resume:
+    post:
+      summary: Tiếp tục lịch lặp; JSON bắt buộc base_version hiện tại
+      security: [{ cookieAuth: [], csrf: [] }, { bearerAuth: [] }]
 components:
   schemas:
     RecurringSchedule:
@@ -169,11 +181,15 @@ components:
         frequency: { type: string, enum: ["daily", "weekly", "monthly"] }
         timezone: { type: string }
         starts_at: { type: string, format: date-time }
+        ends_at: { type: string, format: date-time, nullable: true }
         next_occurs_at: { type: string, format: date-time }
+        paused_at: { type: string, format: date-time, nullable: true }
+        posting_mode: { type: string, enum: ["draft", "auto_post"] }
         type: { type: string, enum: ["income", "expense", "transfer"] }
         source_wallet_id: { type: string, format: uuid }
         destination_wallet_id: { type: string, format: uuid }
         category_id: { type: string, format: uuid }
+        budget_id: { type: string, format: uuid }
         amount_vnd: { type: integer }
         note: { type: string }
         version: { type: integer }

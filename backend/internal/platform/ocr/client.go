@@ -35,31 +35,40 @@ func New(baseURL, apiKey string, timeout time.Duration) (*Client, error) {
 func (c *Client) Capabilities(ctx context.Context) error {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/v1/ocr/capabilities", nil)
 	var response struct {
-		API   string   `json:"api"`
-		Input []string `json:"input"`
+		Engine             string   `json:"engine"`
+		CapabilityVersion  string   `json:"capabilityVersion"`
+		SupportedLanguages []string `json:"supportedLanguages"`
+		Limits             struct {
+			MaxBase64Bytes     int64 `json:"maxBase64Bytes"`
+			MaxLanguagesPerDoc int   `json:"maxLanguagesPerDoc"`
+		} `json:"limits"`
 	}
 	if _, err := c.do(req, &response); err != nil {
 		return err
 	}
-	if response.API != "v1" || !contains(response.Input, "base64") {
+	if response.Engine != "OCR" || !strings.HasPrefix(response.CapabilityVersion, "ocr-v1.") || response.Limits.MaxBase64Bytes <= 0 || response.Limits.MaxLanguagesPerDoc <= 0 || !contains(response.SupportedLanguages, "vi-VN") {
 		return errors.New("OCR provider capabilities are incompatible")
 	}
 	return nil
 }
 
 func (c *Client) Submit(ctx context.Context, input agent.ImageInput) (agent.ToolSubmission, error) {
-	body, _ := json.Marshal(map[string]any{"content_type": input.ContentType, "content_base64": base64.StdEncoding.EncodeToString(input.Bytes), "languages": input.Languages})
+	request := map[string]any{"input": map[string]string{"base64": base64.StdEncoding.EncodeToString(input.Bytes)}}
+	if languages := normalizeLanguages(input.Languages); len(languages) > 0 {
+		request["options"] = map[string]any{"languages": languages}
+	}
+	body, _ := json.Marshal(request)
 	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, c.baseURL+"/v1/documents", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	var response struct {
-		ID     string              `json:"document_id"`
+		ID     string              `json:"documentId"`
 		Status agent.ToolRunStatus `json:"status"`
 	}
 	retry, err := c.do(req, &response)
 	if err != nil {
 		return agent.ToolSubmission{}, err
 	}
-	if response.ID == "" || (response.Status != agent.ToolProcessing && response.Status != agent.ToolCompleted) {
+	if response.ID == "" || !validOCRStatus(response.Status, true) {
 		return agent.ToolSubmission{}, errors.New("invalid OCR submission response")
 	}
 	return agent.ToolSubmission{ProviderID: response.ID, Status: response.Status, RetryAfter: retry}, nil
@@ -68,22 +77,39 @@ func (c *Client) Submit(ctx context.Context, input agent.ImageInput) (agent.Tool
 func (c *Client) Read(ctx context.Context, id string) (agent.ToolResult, error) {
 	req, _ := http.NewRequestWithContext(ctx, http.MethodGet, c.baseURL+"/v1/documents/"+url.PathEscape(id), nil)
 	var response struct {
-		Status    agent.ToolRunStatus `json:"status"`
-		Text      string              `json:"text"`
-		Fields    map[string]any      `json:"fields"`
-		ExpiresAt time.Time           `json:"expires_at"`
-		ErrorCode string              `json:"error_code"`
+		DocumentID    string              `json:"documentId"`
+		Status        agent.ToolRunStatus `json:"status"`
+		Result        *ocrResult          `json:"result"`
+		ExpiresAt     time.Time           `json:"resultExpiresAt"`
+		ResultExpired bool                `json:"resultExpired"`
+		ErrorDetail   string              `json:"errorDetail"`
 	}
 	retry, err := c.do(req, &response)
 	if err != nil {
 		return agent.ToolResult{}, err
 	}
-	switch response.Status {
-	case agent.ToolProcessing, agent.ToolCompleted, agent.ToolFailed, agent.ToolCancelled, agent.ToolExpired:
-	default:
+	if !validOCRStatus(response.Status, false) {
 		return agent.ToolResult{}, errors.New("invalid OCR status")
 	}
-	return agent.ToolResult{Status: response.Status, Text: response.Text, Fields: response.Fields, ExpiresAt: response.ExpiresAt, RetryAfter: retry, ErrorCode: response.ErrorCode}, nil
+	if response.ResultExpired {
+		response.Status = agent.ToolExpired
+	}
+	text := ""
+	fields := map[string]any{"document_id": response.DocumentID}
+	if response.Result != nil {
+		text = response.Result.Text
+		fields["page_count"] = response.Result.PageCount
+		if len(response.Result.Pages) > 0 {
+			fields["pages"] = response.Result.Pages
+		}
+	}
+	return agent.ToolResult{Status: response.Status, Text: text, Fields: fields, ExpiresAt: response.ExpiresAt, RetryAfter: retry, ErrorCode: response.ErrorDetail}, nil
+}
+
+type ocrResult struct {
+	Text      string           `json:"text"`
+	PageCount int              `json:"pageCount"`
+	Pages     []map[string]any `json:"pages"`
 }
 
 func (c *Client) do(req *http.Request, target any) (time.Duration, error) {
@@ -129,4 +155,35 @@ func contains(values []string, want string) bool {
 		}
 	}
 	return false
+}
+
+func normalizeLanguages(values []string) []string {
+	if len(values) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(values))
+	for _, v := range values {
+		switch strings.TrimSpace(v) {
+		case "vi":
+			out = append(out, "vi-VN")
+		case "en":
+			out = append(out, "en-US")
+		case "":
+			continue
+		default:
+			out = append(out, strings.TrimSpace(v))
+		}
+	}
+	return out
+}
+
+func validOCRStatus(status agent.ToolRunStatus, submission bool) bool {
+	switch status {
+	case agent.ToolQueued, agent.ToolProcessing, agent.ToolCompleted:
+		return true
+	case agent.ToolFailed, agent.ToolCancelled, agent.ToolExpired:
+		return !submission
+	default:
+		return false
+	}
 }

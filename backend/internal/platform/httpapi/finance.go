@@ -33,6 +33,11 @@ type walletBody struct {
 	BalanceVND     int64              `json:"balance_vnd"`
 	IncludeInTotal bool               `json:"include_in_total"`
 	IsDefaultAI    bool               `json:"is_default_ai"`
+	CreditLimitVND *int64             `json:"credit_limit_vnd,omitempty"`
+	StatementDay   *int               `json:"statement_day,omitempty"`
+	PaymentDueDay  *int               `json:"payment_due_day,omitempty"`
+	GoalTargetVND  *int64             `json:"goal_target_vnd,omitempty"`
+	GoalDeadlineOn string             `json:"goal_deadline_on,omitempty"`
 	Version        int64              `json:"version"`
 }
 
@@ -42,6 +47,8 @@ type createWalletRequest struct {
 	CreditLimitVND *int64             `json:"credit_limit_vnd"`
 	StatementDay   *int               `json:"statement_day"`
 	PaymentDueDay  *int               `json:"payment_due_day"`
+	GoalTargetVND  *int64             `json:"goal_target_vnd"`
+	GoalDeadlineOn *string            `json:"goal_deadline_on"`
 }
 
 type updateWalletRequest struct {
@@ -127,6 +134,7 @@ type transactionBody struct {
 	SourceWalletID      string                  `json:"source_wallet_id"`
 	DestinationWalletID string                  `json:"destination_wallet_id,omitempty"`
 	CategoryID          string                  `json:"category_id,omitempty"`
+	BudgetID            string                  `json:"budget_id,omitempty"`
 	ReceiptObjectID     string                  `json:"receipt_object_id,omitempty"`
 	AmountVND           int64                   `json:"amount_vnd"`
 	BalanceAfterVND     int64                   `json:"balance_after_vnd"`
@@ -144,6 +152,7 @@ type transactionRequest struct {
 	SourceWalletID      string                  `json:"source_wallet_id"`
 	DestinationWalletID string                  `json:"destination_wallet_id"`
 	CategoryID          string                  `json:"category_id"`
+	BudgetID            string                  `json:"budget_id"`
 	ReceiptObjectID     string                  `json:"receipt_object_id"`
 	AmountVND           int64                   `json:"amount_vnd"`
 	TargetBalanceVND    *int64                  `json:"target_balance_vnd"`
@@ -278,6 +287,8 @@ func createWallet(w http.ResponseWriter, r *http.Request, repo FinanceRepository
 		CreditLimitVND: req.CreditLimitVND,
 		StatementDay:   req.StatementDay,
 		PaymentDueDay:  req.PaymentDueDay,
+		GoalTargetVND:  req.GoalTargetVND,
+		GoalDeadlineOn: req.GoalDeadlineOn,
 	})
 	if errors.Is(err, finance.ErrValidation) {
 		writeJSON(w, http.StatusBadRequest, ErrorEnvelope("VALIDATION_FAILED", err.Error(), correlationID(r.Context())))
@@ -658,6 +669,7 @@ func createTransaction(w http.ResponseWriter, r *http.Request, repo FinanceRepos
 		SourceWalletID:      req.SourceWalletID,
 		DestinationWalletID: req.DestinationWalletID,
 		CategoryID:          req.CategoryID,
+		BudgetID:            req.BudgetID,
 		ReceiptObjectID:     req.ReceiptObjectID,
 		AmountVND:           req.AmountVND,
 		TargetBalanceVND:    req.TargetBalanceVND,
@@ -693,6 +705,7 @@ func updateTransaction(w http.ResponseWriter, r *http.Request, repo FinanceRepos
 		SourceWalletID:      req.SourceWalletID,
 		DestinationWalletID: req.DestinationWalletID,
 		CategoryID:          req.CategoryID,
+		BudgetID:            req.BudgetID,
 		ReceiptObjectID:     req.ReceiptObjectID,
 		AmountVND:           req.AmountVND,
 		TargetBalanceVND:    req.TargetBalanceVND,
@@ -758,6 +771,11 @@ func toWalletBody(wallet finance.Wallet) walletBody {
 		BalanceVND:     wallet.BalanceVND,
 		IncludeInTotal: wallet.IncludeInTotal,
 		IsDefaultAI:    wallet.IsDefaultAI,
+		CreditLimitVND: wallet.CreditLimitVND,
+		StatementDay:   wallet.StatementDay,
+		PaymentDueDay:  wallet.PaymentDueDay,
+		GoalTargetVND:  wallet.GoalTargetVND,
+		GoalDeadlineOn: wallet.GoalDeadlineOn,
 		Version:        wallet.Version,
 	}
 }
@@ -868,6 +886,7 @@ func toTransactionBody(transaction finance.Transaction) transactionBody {
 		SourceWalletID:      transaction.SourceWalletID,
 		DestinationWalletID: transaction.DestinationWalletID,
 		CategoryID:          transaction.CategoryID,
+		BudgetID:            transaction.BudgetID,
 		ReceiptObjectID:     transaction.ReceiptObjectID,
 		AmountVND:           transaction.AmountVND,
 		BalanceAfterVND:     transaction.BalanceAfterVND,

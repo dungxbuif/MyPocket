@@ -17,7 +17,7 @@ const owner = {
 const verificationWallet = {
   id: 'wallet-verification',
   name: 'Ví kiểm chứng',
-  type: 'cash',
+  type: 'basic',
   balance_vnd: 880000,
   include_in_total: true,
   is_default_ai: true,
@@ -27,7 +27,7 @@ const verificationWallet = {
 const reserveWallet = {
   id: 'wallet-reserve',
   name: 'Ví dự phòng',
-  type: 'bank',
+  type: 'basic',
   balance_vnd: 240000,
   include_in_total: true,
   is_default_ai: false,
@@ -37,7 +37,7 @@ const reserveWallet = {
 const offlineWallet = {
   id: 'wallet-offline',
   name: 'Ví ngoại tuyến đã lưu',
-  type: 'cash',
+  type: 'basic',
   balance_vnd: 510000,
   include_in_total: true,
   is_default_ai: true,
@@ -47,7 +47,7 @@ const offlineWallet = {
 const lateOnlineWallet = {
   id: 'wallet-online-late',
   name: 'Ví online đến muộn',
-  type: 'bank',
+  type: 'basic',
   balance_vnd: 920000,
   include_in_total: true,
   is_default_ai: false,

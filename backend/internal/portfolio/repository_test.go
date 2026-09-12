@@ -237,7 +237,7 @@ func createPortfolioWallet(t *testing.T, repo *finance.Repository, userID string
 	t.Helper()
 	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{
 		Name: "Tiền mặt",
-		Type: finance.WalletCash,
+		Type: finance.WalletBasic,
 	})
 	if err != nil {
 		t.Fatalf("create portfolio wallet: %v", err)

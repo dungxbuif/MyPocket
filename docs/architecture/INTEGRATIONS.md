@@ -26,7 +26,7 @@ updated: 2026-08-24
 | S3-compatible storage | Private receipts and generated exports | S3 API and presigned URLs | Homelab operator | approved |
 | OpenAI-compatible text API | Parse chat text into structured drafts | Chat/responses-compatible JSON schema output | Homelab operator | approved |
 | OpenAI-compatible API | Structured Agent analysis and transaction proposals | Chat completions-compatible JSON schema contract | Homelab operator | implemented locally |
-| OCR Platform | Extract text/fields from an owned receipt attached to Agent | `GET /v1/ocr/capabilities`, `POST /v1/documents`, `GET /v1/documents/{id}` | Homelab operator | implemented locally |
+| OCR Platform | Extract text/fields from an owned receipt attached to Agent | `GET /v1/ocr/capabilities`, `POST /v1/documents` with `input.base64` and optional `options.languages`, `GET /v1/documents/{documentId}` with `result.text`/`resultExpiresAt` | Homelab operator | implemented locally |
 | Web Push service | Deliver best-effort browser notifications | Web Push protocol with VAPID | Browser endpoint/provider | approved |
 | Bank notification sender | Not integrated in the current release | None | N/A | deferred |
 | Manual export consumer | Open CSV/Sheets-compatible snapshots | Downloaded file | User | approved |
@@ -64,6 +64,14 @@ Store names only; never commit values:
 - `LOG_LEVEL`
 
 Agent providers use `AI_*` and `OCR_*` server-side environment variables. Provider API keys are never sent to the browser, public API responses, audit metadata, or docs. Bank webhook credentials are not configured because that integration is outside the current release.
+
+The OCR Platform is the separate `mac-ocr` service, consumed as a backend tool by the MyPocket worker. MyPocket validates capabilities before use (`engine=OCR`, `capabilityVersion=ocr-v1.*`, positive Base64/language limits, Vietnamese support), submits owned receipt bytes as:
+
+```json
+{"input":{"base64":"..."},"options":{"languages":["vi-VN","en-US"]}}
+```
+
+Submission responses are read from `documentId` and status values such as `queued`, `processing` or `completed`. Poll responses are read from `result.text`, `result.pageCount`, `result.pages`, `resultExpiresAt` and `errorDetail`. MyPocket never exposes the OCR provider API key or provider document ID to the browser.
 
 ## Failure Modes
 

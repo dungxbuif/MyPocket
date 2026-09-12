@@ -5,7 +5,7 @@ async function login(page:Page){const owner=`reset-${crypto.randomUUID()}`;await
 
 test('destructive preview and cancel are mounted and non-mutating',async({page})=>{
   const csrf=await login(page);
-  const created=await page.request.post(`${api}/wallets`,{headers:{'X-CSRF-Token':csrf,'Idempotency-Key':crypto.randomUUID()},data:{name:'Keep me',type:'cash'}});expect(created.status()).toBe(201);
+  const created=await page.request.post(`${api}/wallets`,{headers:{'X-CSRF-Token':csrf,'Idempotency-Key':crypto.randomUUID()},data:{name:'Keep me',type:'basic'}});expect(created.status()).toBe(201);
   await page.goto('/');await page.getByRole('button',{name:'Tài khoản',exact:true}).click();
   await page.getByRole('button',{name:'Xem trước đặt lại dữ liệu'}).click();
   await expect(page.getByRole('dialog',{name:'Xác nhận đặt lại'})).toBeVisible();

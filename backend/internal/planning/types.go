@@ -132,20 +132,45 @@ const (
 	RecurrenceMonthly RecurrenceFrequency = "monthly"
 )
 
+type RecurringPostingMode string
+
+const (
+	RecurringPostingDraft    RecurringPostingMode = "draft"
+	RecurringPostingAutoPost RecurringPostingMode = "auto_post"
+)
+
 type CreateRecurringScheduleInput struct {
 	Name                string
 	Frequency           RecurrenceFrequency
 	Timezone            string
 	StartsAt            string
+	EndsAt              string
+	PostingMode         RecurringPostingMode
 	Type                finance.TransactionType
 	SourceWalletID      string
 	DestinationWalletID string
 	CategoryID          string
+	BudgetID            string
 	AmountVND           int64
 	Note                string
 }
 
-type UpdateRecurringScheduleInput = CreateRecurringScheduleInput
+type UpdateRecurringScheduleInput struct {
+	BaseVersion         int64
+	Name                string
+	Frequency           RecurrenceFrequency
+	Timezone            string
+	StartsAt            string
+	EndsAt              string
+	PostingMode         RecurringPostingMode
+	Type                finance.TransactionType
+	SourceWalletID      string
+	DestinationWalletID string
+	CategoryID          string
+	BudgetID            string
+	AmountVND           int64
+	Note                string
+}
 
 type RecurringSchedule struct {
 	ID                  string                  `json:"id"`
@@ -155,10 +180,14 @@ type RecurringSchedule struct {
 	Timezone            string                  `json:"timezone"`
 	StartsAt            time.Time               `json:"starts_at"`
 	NextOccursAt        time.Time               `json:"next_occurs_at"`
+	EndsAt              *time.Time              `json:"ends_at,omitempty"`
+	PausedAt            *time.Time              `json:"paused_at,omitempty"`
+	PostingMode         RecurringPostingMode    `json:"posting_mode"`
 	Type                finance.TransactionType `json:"type"`
 	SourceWalletID      string                  `json:"source_wallet_id"`
 	DestinationWalletID string                  `json:"destination_wallet_id,omitempty"`
 	CategoryID          string                  `json:"category_id,omitempty"`
+	BudgetID            string                  `json:"budget_id,omitempty"`
 	AmountVND           int64                   `json:"amount_vnd"`
 	Note                string                  `json:"note"`
 	Version             int64                   `json:"version"`
@@ -173,6 +202,7 @@ type TransactionDraft struct {
 	SourceWalletID         string                  `json:"source_wallet_id"`
 	DestinationWalletID    string                  `json:"destination_wallet_id,omitempty"`
 	CategoryID             string                  `json:"category_id,omitempty"`
+	BudgetID               string                  `json:"budget_id,omitempty"`
 	AmountVND              int64                   `json:"amount_vnd"`
 	OccurredAt             time.Time               `json:"occurred_at"`
 	Note                   string                  `json:"note"`

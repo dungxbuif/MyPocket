@@ -62,7 +62,7 @@ describe("offline conflict recovery", () => {
       status: "ok",
       correlation_id: "req_test",
       snapshot: {
-        wallets: [{ id: "wallet_1", name: "Ví server", type: "cash", balance_vnd: 1000, include_in_total: true, is_default_ai: true, version: 1 }],
+        wallets: [{ id: "wallet_1", name: "Ví server", type: "basic", balance_vnd: 1000, include_in_total: true, is_default_ai: true, version: 1 }],
         categories: [{ id: "cat_1", kind: "expense", name: "Ăn uống", is_system: true, version: 1 }],
         transactions: [transaction("tx_server", "Server only", 3)],
         server_epoch: "atomic-sync-v1",
@@ -87,7 +87,7 @@ describe("offline conflict recovery", () => {
       status: "ok",
       correlation_id: "req_epoch",
       snapshot: {
-        wallets: [{ id: "wallet_epoch", name: "Ví server", type: "cash", balance_vnd: 1000, include_in_total: true, is_default_ai: true, version: 1 }],
+        wallets: [{ id: "wallet_epoch", name: "Ví server", type: "basic", balance_vnd: 1000, include_in_total: true, is_default_ai: true, version: 1 }],
         categories: [],
         transactions: [],
         assets: [],

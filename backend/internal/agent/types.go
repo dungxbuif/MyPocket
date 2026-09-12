@@ -11,6 +11,8 @@ type Kind string
 const (
 	KindTransactionDraft Kind = "transaction_draft"
 	KindAnalysis         Kind = "analysis"
+	KindIntake           Kind = "intake"
+	KindAdvisor          Kind = "advisor"
 )
 
 type Status string
@@ -25,6 +27,7 @@ const (
 type Run struct {
 	ID             string    `json:"id"`
 	UserID         string    `json:"-"`
+	SessionID      string    `json:"session_id,omitempty"`
 	Kind           Kind      `json:"kind"`
 	Status         Status    `json:"status"`
 	RequestText    string    `json:"request_text"`
@@ -38,6 +41,48 @@ type Run struct {
 	NextAttemptAt  time.Time `json:"-"`
 	LeaseOwner     string    `json:"-"`
 	LeaseExpiresAt time.Time `json:"-"`
+}
+
+type MessageRole string
+
+const (
+	MessageRoleUser      MessageRole = "user"
+	MessageRoleAssistant MessageRole = "assistant"
+	MessageRoleSystem    MessageRole = "system"
+)
+
+const ActionDraftsCreated = "drafts_created"
+
+type ActionCard struct {
+	Type     string   `json:"type"`
+	DraftIDs []string `json:"draft_ids,omitempty"`
+}
+
+type Session struct {
+	ID             string    `json:"id"`
+	UserID         string    `json:"-"`
+	Kind           Kind      `json:"kind"`
+	Title          string    `json:"title"`
+	ContextSummary string    `json:"context_summary,omitempty"`
+	Status         string    `json:"status"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type Message struct {
+	ID        string      `json:"id"`
+	UserID    string      `json:"-"`
+	SessionID string      `json:"session_id"`
+	RunID     string      `json:"run_id,omitempty"`
+	Role      MessageRole `json:"role"`
+	Text      string      `json:"text"`
+	Action    *ActionCard `json:"action,omitempty"`
+	CreatedAt time.Time   `json:"created_at"`
+}
+
+type SessionHistory struct {
+	Session  Session   `json:"session"`
+	Messages []Message `json:"messages"`
 }
 
 type ModelRequest struct {
@@ -66,6 +111,7 @@ type ProposedTransaction struct {
 }
 
 type ModelResult struct {
-	Answer      string               `json:"answer,omitempty"`
-	Transaction *ProposedTransaction `json:"transaction,omitempty"`
+	Answer      string                `json:"answer,omitempty"`
+	Transaction *ProposedTransaction  `json:"transaction,omitempty"`
+	Drafts      []ProposedTransaction `json:"drafts,omitempty"`
 }

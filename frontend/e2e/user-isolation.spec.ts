@@ -14,7 +14,7 @@ test("two real users cannot read or mutate each other's wallet using cookie or A
   try {
     const headersA = await login(a, "owner-a");
     const headersB = await login(b, "owner-b");
-    const created = await a.post("/api/v1/wallets", { headers: headersA, data: { name: "Private A", type: "cash" } });
+    const created = await a.post("/api/v1/wallets", { headers: headersA, data: { name: "Private A", type: "basic" } });
     expect(created.status()).toBe(201);
     const { wallet } = await created.json();
     expect((await (await b.get("/api/v1/wallets")).json()).wallets ?? []).toEqual([]);

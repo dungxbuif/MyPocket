@@ -14,7 +14,7 @@ func TestCreateTransactionInTxRollsBackAllAccountingEffects(t *testing.T) {
 	ctx := context.Background()
 	owner := createFinanceUser(t, conn, "tx-boundary@example.com")
 	repo := finance.NewRepository(conn)
-	wallet := createFinanceWallet(t, repo, owner, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, owner, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "expense_food")
 
 	tx, err := conn.BeginTx(ctx, nil)

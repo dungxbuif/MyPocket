@@ -4,7 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "./App";
 
-const wallet = { id: "wallet-main", name: "Ví chính", type: "cash", balance_vnd: 500000, include_in_total: true, is_default_ai: true, version: 2 };
+const wallet = { id: "wallet-main", name: "Ví chính", type: "basic", balance_vnd: 500000, include_in_total: true, is_default_ai: true, version: 2 };
 const parent = { id: "cat-food", kind: "expense", name: "Ăn uống", is_system: false, version: 3 };
 const child = { id: "cat-cafe", parent_id: "cat-food", kind: "expense", name: "Cà phê", is_system: false, version: 4 };
 const income = { id: "cat-salary", kind: "income", name: "Lương", is_system: false, version: 1 };
@@ -142,7 +142,7 @@ describe("mounted category hierarchy and wallet settings", { timeout: 15_000 }, 
   });
 
   it("loads settings for the wallet selected in the manager", async () => {
-    const savings = { ...wallet, id: "wallet-savings", name: "Ví tiết kiệm", type: "savings", is_default_ai: false };
+    const savings = { ...wallet, id: "wallet-savings", name: "Ví tiết kiệm", type: "goal", is_default_ai: false };
     const fetcher = financeFetch({
       wallets: [wallet, savings],
       mutate: async (path, method) => path === "/api/v1/wallets/wallet-savings/category-settings" && method === "GET"

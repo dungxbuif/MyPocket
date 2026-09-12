@@ -44,6 +44,8 @@ Beta reliability evidence: [2026-09-07 verification](test-verification/BETA-RELI
 
 ## Matrix
 
+2026-09-12 two-chat Agent refinement: [verification](test-verification/AGENT-TWO-CHAT-2026-09-12.md) records RED/GREEN proof for `/api/v1/agent/intakes`, `/api/v1/agent/advisor/messages`, legacy compatibility route, intake multiple income/expense drafts, transfer rejection, advisor read-only completion, OpenAPI route inventory and frontend client split. Focused backend packages pass with PostgreSQL test DB and `frontend/src/app/agent.test.ts` passes. Production provider/OCR smoke, full E2E, deploy and physical-device UAT remain open.
+
 2026-09-10: [Sổ tiền F1 local proof](test-verification/SO-TIEN-F1-2026-09-10.md) records 138 frontend tests, build and 3 desktop browser regressions passing for selected budgets, HCM report/remaining-day dates and asynchronous read failures. F2/F3, full browser/Go rerun, retained WebKit/device gates and visual UI acceptance remain open; no release is implied.
 
 2026-09-09 local functional/accounting: [proof](test-verification/R0-FUNCTIONAL-E2E-2026-09-09.md) adds literal ledger assertions for transfer create/edit/archive and five date/wallet-filtered reports including timezone boundaries, exclusion, adjustment and archive. New 9/9 browser passes are included in full 61/63; two WebKit offline failures retained. Frontend 120 pass, Go/PostgreSQL suite pass, build/typecheck pass. No full-function, public-docs, visual fidelity, physical-device or deployment acceptance.

@@ -143,6 +143,7 @@ func ValidateUpdateTransaction(input UpdateTransactionInput) (CreateTransactionI
 		SourceWalletID:      input.SourceWalletID,
 		DestinationWalletID: input.DestinationWalletID,
 		CategoryID:          input.CategoryID,
+		BudgetID:            input.BudgetID,
 		ReceiptObjectID:     input.ReceiptObjectID,
 		AmountVND:           input.AmountVND,
 		TargetBalanceVND:    input.TargetBalanceVND,
@@ -158,6 +159,7 @@ func validateTransactionFields(input CreateTransactionInput) (CreateTransactionI
 	input.SourceWalletID = trimmed(input.SourceWalletID)
 	input.DestinationWalletID = trimmed(input.DestinationWalletID)
 	input.CategoryID = trimmed(input.CategoryID)
+	input.BudgetID = trimmed(input.BudgetID)
 	input.ReceiptObjectID = trimmed(input.ReceiptObjectID)
 	input.Note = trimmed(input.Note)
 	input.WithPerson = trimmed(input.WithPerson)
@@ -169,6 +171,9 @@ func validateTransactionFields(input CreateTransactionInput) (CreateTransactionI
 
 	switch input.Type {
 	case TransactionIncome:
+		if input.BudgetID != "" {
+			return CreateTransactionInput{}, fmt.Errorf("%w: income cannot have budget", ErrValidation)
+		}
 		if input.CategoryID == "" {
 			return CreateTransactionInput{}, fmt.Errorf("%w: income category is required", ErrValidation)
 		}
@@ -183,6 +188,9 @@ func validateTransactionFields(input CreateTransactionInput) (CreateTransactionI
 			return CreateTransactionInput{}, fmt.Errorf("%w: expense cannot target balance", ErrValidation)
 		}
 	case TransactionTransfer:
+		if input.BudgetID != "" {
+			return CreateTransactionInput{}, fmt.Errorf("%w: transfer cannot have budget", ErrValidation)
+		}
 		if input.CategoryID != "" {
 			return CreateTransactionInput{}, fmt.Errorf("%w: transfer cannot have category", ErrValidation)
 		}
@@ -190,6 +198,9 @@ func validateTransactionFields(input CreateTransactionInput) (CreateTransactionI
 			return CreateTransactionInput{}, fmt.Errorf("%w: transfer cannot target balance", ErrValidation)
 		}
 	case TransactionAdjustment:
+		if input.BudgetID != "" {
+			return CreateTransactionInput{}, fmt.Errorf("%w: adjustment cannot have budget", ErrValidation)
+		}
 		if input.CategoryID != "" {
 			return CreateTransactionInput{}, fmt.Errorf("%w: adjustment cannot have category", ErrValidation)
 		}
@@ -227,6 +238,7 @@ func transactionRequestHash(input CreateTransactionInput) (string, error) {
 		SourceWalletID      string          `json:"source_wallet_id"`
 		DestinationWalletID string          `json:"destination_wallet_id"`
 		CategoryID          string          `json:"category_id"`
+		BudgetID            string          `json:"budget_id"`
 		ReceiptObjectID     string          `json:"receipt_object_id"`
 		AmountVND           int64           `json:"amount_vnd"`
 		TargetBalanceVND    *int64          `json:"target_balance_vnd"`
@@ -240,6 +252,7 @@ func transactionRequestHash(input CreateTransactionInput) (string, error) {
 		SourceWalletID:      input.SourceWalletID,
 		DestinationWalletID: input.DestinationWalletID,
 		CategoryID:          input.CategoryID,
+		BudgetID:            input.BudgetID,
 		ReceiptObjectID:     input.ReceiptObjectID,
 		AmountVND:           input.AmountVND,
 		TargetBalanceVND:    input.TargetBalanceVND,

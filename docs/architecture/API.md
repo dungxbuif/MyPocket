@@ -15,7 +15,7 @@ updated: 2026-08-31
 
 The authoritative machine inventory is `GET /api/v1/openapi.json`; router coverage tests fail when any `/api/v1` operation is absent. User-owned routes accept cookie auth or `Authorization: Bearer <user-api-key>` unless the OpenAPI security entry narrows them. Cookie mutations require CSRF. Bearer identity is owner-scoped, Redis-rate-limited and fail-closed if the limit cannot be enforced.
 
-Agent is implemented at `POST /agent/messages` and `GET /agent/runs/{id}`. An optional owned `receipt_id` invokes OCR Platform as an internal third-party image tool, then supplies minimized OCR context to the OpenAI-compatible model. Only reviewable `transaction_drafts` may be created; confirmation remains a separate user/API action. No generic OCR proxy or bank endpoint exists.
+Agent has two implemented chat surfaces. Transaction intake uses `POST /agent/intakes` and `POST /agent/intakes/{id}/messages`; it may accept text plus an optional owned `receipt_id`, invoke OCR Platform as an internal third-party image tool, and create only reviewable income/expense `transaction_drafts`. Advisor chat uses `POST /agent/advisor/messages`; it is read-only analysis and cannot create drafts or other write actions. `POST /agent/messages` remains as a compatibility endpoint for explicit legacy `kind` values, and `GET /agent/runs/{id}` polls run status. Draft confirmation remains a separate deterministic user/API action. No generic OCR proxy or bank endpoint exists.
 
 Import/export and account lifecycle jobs are implemented. Reset/delete remain browser-only with recent auth, signed preview and exact confirmation. See the Docusaurus domain pages and `skills/mypocket-api` for current payload examples and integration rules. Historical planned endpoint names below are retained only as design history and must not be treated as live routes.
 
@@ -26,7 +26,7 @@ Import/export and account lifecycle jobs are implemented. Reset/delete remain br
 
 ## Contract Rules
 
-- Audit qualification 2026-09-10: [parity/contract review](../research/moneylover/PARITY-AUDIT-2026-09-08.md) found portal drift and incomplete journeys. API route presence is not full Money Lover parity. Export, AI/OCR extraction and account reset/delete remain unimplemented; recurring draft confirm/reject and category hierarchy are implemented in the current workspace. Analytics accepts `from/to` (not `date_from/date_to`) and Insider only returns its Home summary. Full machine-validated OpenAPI and route-by-route integration acceptance remain follow-up work.
+- Audit qualification 2026-09-12: [parity/contract review](../research/moneylover/PARITY-AUDIT-2026-09-08.md) found incomplete journeys. API route presence is not full Money Lover parity. Export and browser-only account reset/delete jobs are implemented locally; there is still no generic public OCR proxy or bank endpoint. Recurring draft confirm/reject, recurring edit/pause/resume/end/auto-post, category hierarchy, transaction-level budget assignment and two-chat Agent sessions are implemented in the current workspace. Analytics accepts `from/to` (not `date_from/date_to`) and Insider only returns its Home summary. Full route-by-route external acceptance and deployment remain follow-up work.
 
 - Base prefix: `/api/v1`.
 - Browser contracts use JSON except presigned object upload and generated export download.
@@ -50,16 +50,16 @@ Import/export and account lifecycle jobs are implemented. Reset/delete remain br
 | `GET /budgets`, `POST /budgets`, `PATCH /budgets/{id}`, `POST /budgets/{id}/archive` | REST/command | User | implemented | Budget CRUD, selected/all expense category scopes, Ho Chi Minh period progress, and 80%/100% alert dedupe |
 | `GET /events`, `POST /events`, `PATCH /events/{id}`, `POST /events/{id}/archive`, `POST /events/{id}/transactions/{transaction_id}` | REST/command | User | implemented | Event CRUD and links to owned confirmed transactions; totals preserve report exclusion |
 | `GET /obligations`, `POST /obligations`, `PATCH /obligations/{id}`, `POST /obligations/{id}/archive`, `POST /obligations/{id}/repayments/{transaction_id}` | REST/command | User | implemented | Borrow/lend obligation CRUD and repayment links with overpayment protection |
-| `GET /recurring-schedules`, `POST /recurring-schedules`, `POST /recurring-schedules/{id}/archive` | REST/command | User | implemented | Recurring schedule setup for deterministic draft generation |
+| `GET /recurring-schedules`, `POST /recurring-schedules`, `PATCH /recurring-schedules/{id}`, `POST /recurring-schedules/{id}/pause`, `POST /recurring-schedules/{id}/resume`, `POST /recurring-schedules/{id}/archive` | REST/command | User | implemented | Recurring schedule setup, edit, pause/resume, optional end date, review-draft mode and explicit auto-post mode |
 | `GET /dashboard`, `GET /reports/{cash-flow,categories,daily,comparison,cumulative,insider}`, `GET /search` | Query REST | User | implemented | Authenticated server aggregates, normalized Ho Chi Minh date filters, bounded grouped search, generated metadata and data version; Insider Home summary selects the most frequent expense category and compares daily averages |
 | `GET /assets`, `POST /assets`, `GET /assets/{id}`, `POST /assets/{id}/archive`, `POST /assets/{id}/trades`, `PATCH /assets/{id}/trades/{trade_id}`, `POST /assets/{id}/trades/{trade_id}/archive`, `POST /assets/{id}/prices`, `GET /portfolio/summary` | REST/command | User | implemented | User-owned market-valued assets, moving-average buy/sell trades, append-only manual/provider VND price snapshots, archive retention, optimistic versions, and separate investment totals |
-| `/ai/conversations`, `/ai/conversations/{id}/messages` | REST collection | User | planned | Text and multimodal chat |
+| `POST /agent/intakes`, `POST /agent/intakes/{id}/messages`, `GET /agent/intakes/{id}`, `POST /agent/advisor/messages`, `POST /agent/messages`, `GET /agent/runs/{id}` | REST/job | User | implemented | Two Agent chat surfaces with durable session messages. Intake creates reviewable income/expense drafts only and returns draft action cards; advisor is read-only. Legacy `/agent/messages` remains for compatible explicit `kind` submissions. |
 | `POST /receipts/{id}/extract` | Command | User | planned | External OCR path from add transaction |
 | `GET /transaction-drafts`, `POST /transaction-drafts/{id}/confirm`, `POST /transaction-drafts/{id}/reject` | REST/command | User | implemented | Versioned draft decisions; confirmation creates one idempotent transaction, rejection has no accounting effect |
 | `POST /webhooks/bank/{source_id}` | Webhook | HMAC | planned | Timestamp, nonce, signature, deduplication |
 | `GET /notifications`, `PATCH /notifications/{id}/read`, `POST /push-subscriptions`, `DELETE /push-subscriptions/{id}` | REST collection | User | implemented | Cursor-bounded inbox, ownership checks, private subscription keys, best-effort worker delivery |
-| `POST /exports`, `GET /exports/{id}` | Job REST | User | planned | Manual snapshot export |
-| `POST /account/reset`, `DELETE /account` | Command | User | planned | Confirmed background deletion |
+| `POST /exports`, `GET /exports/{id}`, `GET /exports/{id}/download` | Job REST | User | implemented | Manual snapshot export job and short-lived download URL |
+| `POST /account/reset`, `POST /account/delete`, `GET /account/jobs/{id}` | Command/job | User | implemented | Browser recent-auth destructive lifecycle preview/confirm jobs; API-key-only callers cannot manage account destruction |
 | `GET /api/v1/audit/access`, `GET /api/v1/audit/events` | Query REST | Audit viewer | implemented | Access check and read-only filtered audit access; both require signed-cookie auth and exact verified `AUDIT_VIEWER_EMAIL`; the Account UI only renders the log panel after the access check succeeds |
 | `GET /api/v1/health/live`, `GET /api/v1/health/ready` | Operations | None/internal | implemented | Liveness is process-only; readiness returns `503 INTERNAL_RETRYABLE` when the required database dependency is unavailable and never exposes sensitive dependency details |
 
@@ -95,8 +95,8 @@ Response:
   "wallets": [
     {
       "id": "uuid",
-      "name": "Tiền mặt",
-      "type": "cash",
+      "name": "Ví chính",
+      "type": "basic",
       "balance_vnd": 120000,
       "include_in_total": true,
       "is_default_ai": false,
@@ -117,15 +117,19 @@ Request:
 
 ```json
 {
-  "name": "Ngân hàng",
-  "type": "bank",
+  "name": "Quỹ du lịch",
+  "type": "goal",
   "credit_limit_vnd": null,
   "statement_day": null,
-  "payment_due_day": null
+  "payment_due_day": null,
+  "goal_target_vnd": 25000000,
+  "goal_deadline_on": "2027-12-31"
 }
 ```
 
 Response status: `201 Created`.
+
+Wallet `type` is a behavior enum, not a payment-channel label: `basic`, `goal`, or `credit`. Previous `cash`, `bank`, `e_wallet`, and wallet-level `debt` values migrate to `basic`; `savings` migrates to `goal`; `credit` remains `credit`. Goal metadata is allowed only for `goal`, credit metadata only for `credit`. Debt/loan remains a category/obligation concept, not a wallet type.
 
 ### `PATCH /api/v1/wallets/{id}`
 
@@ -533,7 +537,7 @@ Links an owned confirmed transaction as a repayment. Borrowed obligations requir
 
 ### `GET /api/v1/recurring-schedules`
 
-Returns authenticated-user active recurring schedules with normalized `frequency`, `timezone`, `starts_at`, `next_occurs_at`, wallet/category references, integer `amount_vnd`, and draft payload fields.
+Returns authenticated-user active recurring schedules with normalized `frequency`, `timezone`, `starts_at`, `next_occurs_at`, optional `ends_at`, optional `paused_at`, `posting_mode` (`draft` or `auto_post`), wallet/category/budget references, integer `amount_vnd`, and draft payload fields.
 
 ### `POST /api/v1/recurring-schedules`
 
@@ -541,7 +545,23 @@ Headers:
 
 - `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
 
-Request fields: `name`, `frequency` (`daily`, `weekly`, or `monthly`), `timezone`, `starts_at` as RFC3339, `type`, `source_wallet_id`, optional `destination_wallet_id`, optional `category_id`, `amount_vnd`, and optional `note`. Response status: `201 Created`.
+Request fields: `name`, `frequency` (`daily`, `weekly`, or `monthly`), `timezone`, `starts_at` as RFC3339, optional `ends_at`, optional `posting_mode` (`draft` default or `auto_post`), `type`, `source_wallet_id`, optional `destination_wallet_id`, optional `category_id`, optional `budget_id` for expense schedules, `amount_vnd`, and optional `note`. Response status: `201 Created`.
+
+### `PATCH /api/v1/recurring-schedules/{id}`
+
+Headers:
+
+- `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
+
+Request uses the create fields plus `base_version`. The backend validates owned active wallet/category/budget references, rejects `budget_id` outside expense schedules, bumps `version`, and recomputes the next due occurrence from `starts_at`.
+
+### `POST /api/v1/recurring-schedules/{id}/pause`
+
+Requires JSON `{ "base_version": n }`. Sets `paused_at`; the worker skips paused schedules and does not create draft or auto-post occurrences.
+
+### `POST /api/v1/recurring-schedules/{id}/resume`
+
+Requires JSON `{ "base_version": n }`. Clears `paused_at` and keeps optimistic versioning.
 
 ### `POST /api/v1/recurring-schedules/{id}/archive`
 
@@ -584,6 +604,7 @@ Response:
       "type": "expense",
       "source_wallet_id": "uuid",
       "category_id": "uuid",
+      "budget_id": "uuid",
       "amount_vnd": 45000,
       "balance_after_vnd": 955000,
       "occurred_at": "2026-08-30T10:00:00Z",
@@ -613,6 +634,7 @@ Request:
   "source_wallet_id": "uuid",
   "destination_wallet_id": "",
   "category_id": "uuid",
+  "budget_id": "uuid-or-empty-for-no-budget",
   "amount_vnd": 500000,
   "target_balance_vnd": null,
   "occurred_at": "2026-08-30T10:00:00Z",
@@ -631,7 +653,7 @@ Headers:
 
 - `X-CSRF-Token`: must match the `mypocket_csrf` cookie.
 
-Request uses the same body shape as `POST /api/v1/transactions`; the backend reverses the old stored deltas and reapplies the new effect in one database transaction.
+Request uses the same body shape as `POST /api/v1/transactions`; the backend reverses the old stored deltas and reapplies the new effect in one database transaction. `budget_id` is accepted only for expense transactions and must reference an active budget owned by the authenticated user; income, transfer and adjustment requests reject `budget_id`.
 
 ### `POST /api/v1/transactions/{id}/archive`
 

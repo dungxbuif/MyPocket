@@ -91,6 +91,9 @@ func NewRouter(cfg config.Config, deps Dependencies) http.Handler {
 	mux.HandleFunc("/api/v1/account/reset", destructiveAccount(cfg, deps.LifecycleRepository, lifecycle.KindReset))
 	mux.HandleFunc("/api/v1/account/delete", destructiveAccount(cfg, deps.LifecycleRepository, lifecycle.KindDelete))
 	mux.HandleFunc("/api/v1/account/jobs/", accountJob(cfg, deps.LifecycleRepository))
+	mux.HandleFunc("/api/v1/agent/intakes", agentIntakes(cfg, deps.AgentService))
+	mux.HandleFunc("/api/v1/agent/intakes/", agentIntakeByID(cfg, deps.AgentService))
+	mux.HandleFunc("/api/v1/agent/advisor/messages", agentAdvisorMessages(cfg, deps.AgentService))
 	mux.HandleFunc("/api/v1/agent/messages", agentMessages(cfg, deps.AgentService))
 	mux.HandleFunc("/api/v1/agent/runs/", agentRunByID(cfg, deps.AgentService))
 	mux.HandleFunc("/api/v1/health/live", liveHealth)
@@ -214,6 +217,9 @@ type PlanningRepository interface {
 	LinkObligationRepayment(ctx context.Context, userID string, obligationID string, transactionID string) error
 	ListRecurringSchedules(ctx context.Context, userID string) ([]planning.RecurringSchedule, error)
 	CreateRecurringSchedule(ctx context.Context, userID string, input planning.CreateRecurringScheduleInput) (planning.RecurringSchedule, error)
+	UpdateRecurringSchedule(ctx context.Context, userID string, scheduleID string, input planning.UpdateRecurringScheduleInput) (planning.RecurringSchedule, error)
+	PauseRecurringSchedule(ctx context.Context, userID string, scheduleID string, baseVersion int64) (planning.RecurringSchedule, error)
+	ResumeRecurringSchedule(ctx context.Context, userID string, scheduleID string, baseVersion int64, now time.Time) (planning.RecurringSchedule, error)
 	ArchiveRecurringSchedule(ctx context.Context, userID string, scheduleID string, baseVersion int64) error
 	ListTransactionDrafts(ctx context.Context, userID string) ([]planning.TransactionDraft, error)
 	ConfirmTransactionDraft(ctx context.Context, userID string, draftID string, input planning.ConfirmTransactionDraftInput) (planning.TransactionDraftDecision, error)

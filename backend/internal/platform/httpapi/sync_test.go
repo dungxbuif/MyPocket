@@ -53,7 +53,7 @@ func TestSyncMutationsUsesAuthenticatedUser(t *testing.T) {
 		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
 		SyncService:        service,
 	})
-	req := authenticatedRequest(t, http.MethodPost, "/api/v1/sync/mutations", `{"mutations":[{"mutation_id":"mut_1","device_id":"device_1","sequence":1,"entity_type":"wallet","entity_id":"wallet_1","operation":"create","base_version":0,"payload":{"name":"Cash","type":"cash"}}]}`)
+	req := authenticatedRequest(t, http.MethodPost, "/api/v1/sync/mutations", `{"mutations":[{"mutation_id":"mut_1","device_id":"device_1","sequence":1,"entity_type":"wallet","entity_id":"wallet_1","operation":"create","base_version":0,"payload":{"name":"Cash","type":"basic"}}]}`)
 	addCSRF(req)
 	res := httptest.NewRecorder()
 

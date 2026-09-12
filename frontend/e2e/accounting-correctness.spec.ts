@@ -15,8 +15,8 @@ async function setup(page: Page) {
     expect(response.status(), await response.text()).toBe(201);
     return response.json();
   };
-  const a = (await post('wallets', { name: 'Ví nguồn kiểm chứng', type: 'cash' })).wallet;
-  const b = (await post('wallets', { name: 'Ví nhận kiểm chứng', type: 'bank' })).wallet;
+  const a = (await post('wallets', { name: 'Ví nguồn kiểm chứng', type: 'basic' })).wallet;
+  const b = (await post('wallets', { name: 'Ví nhận kiểm chứng', type: 'basic' })).wallet;
   const get = async (path: string) => {
     const response = await page.request.get(`http://127.0.0.1:18173/api/v1/${path}`);
     expect(response.status()).toBe(200);

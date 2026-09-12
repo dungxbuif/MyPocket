@@ -39,6 +39,15 @@ Before changing code or docs, read:
 
 For bug, failure, or unexpected behavior work, also read `docs/standards/DEBUGGING.md` before proposing fixes.
 
+For finance, planning, analytics, sync, or third-party API correctness audits, also read and follow:
+
+```text
+.agents/skills/auditing-mypocket-business-logic/SKILL.md
+```
+
+This repository-owned skill is the reusable audit contract. Its public companion is
+`frontend/docs/docs/skills/business-logic-audit.mdx`.
+
 ## Rule 2: Do Not Over-Scan
 
 Do not scan the whole repository by default.

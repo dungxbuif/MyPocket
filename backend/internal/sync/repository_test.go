@@ -176,7 +176,7 @@ func createSyncUser(t *testing.T, conn *sql.DB, email string) string {
 func createSyncWallet(t *testing.T, repo *finance.Repository, userID string) finance.Wallet {
 	t.Helper()
 
-	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{Name: "Tiền mặt", Type: finance.WalletCash})
+	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{Name: "Tiền mặt", Type: finance.WalletBasic})
 	if err != nil {
 		t.Fatalf("create sync wallet: %v", err)
 	}

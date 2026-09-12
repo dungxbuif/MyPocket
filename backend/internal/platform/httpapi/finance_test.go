@@ -34,7 +34,7 @@ func TestWalletsAPIRequiresAuth(t *testing.T) {
 
 func TestWalletsAPIListsAuthenticatedUsersWallets(t *testing.T) {
 	repo := &financeRepoStub{
-		wallets: []finance.Wallet{{ID: "wallet-1", UserID: "user_123", Name: "Tiền mặt", Type: finance.WalletCash, BalanceVND: 120000, IncludeInTotal: true, Version: 1}},
+		wallets: []finance.Wallet{{ID: "wallet-1", UserID: "user_123", Name: "Tiền mặt", Type: finance.WalletBasic, BalanceVND: 120000, IncludeInTotal: true, Version: 1}},
 	}
 	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
 		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
@@ -59,7 +59,7 @@ func TestWalletsAPIListsAuthenticatedUsersWallets(t *testing.T) {
 
 func TestWalletsAPIListsAPIKeyOwnersWallets(t *testing.T) {
 	repo := &financeRepoStub{
-		wallets: []finance.Wallet{{ID: "wallet-1", UserID: "user_123", Name: "Tiền mặt", Type: finance.WalletCash, BalanceVND: 120000, IncludeInTotal: true, Version: 1}},
+		wallets: []finance.Wallet{{ID: "wallet-1", UserID: "user_123", Name: "Tiền mặt", Type: finance.WalletBasic, BalanceVND: 120000, IncludeInTotal: true, Version: 1}},
 	}
 	identityRepo := &authRepoStub{user: identity.User{ID: "user_123", Email: "agent@example.com", EmailVerified: true}}
 	cfg := authTestConfig()
@@ -89,7 +89,7 @@ func TestCreateWalletRequiresCSRF(t *testing.T) {
 		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
 		FinanceRepository:  &financeRepoStub{},
 	})
-	req := authenticatedRequest(t, http.MethodPost, "/api/v1/wallets", `{"name":"Tiền mặt","type":"cash"}`)
+	req := authenticatedRequest(t, http.MethodPost, "/api/v1/wallets", `{"name":"Tiền mặt","type":"basic"}`)
 	res := httptest.NewRecorder()
 
 	handler.ServeHTTP(res, req)
@@ -104,13 +104,13 @@ func TestCreateWalletRequiresCSRF(t *testing.T) {
 
 func TestCreateWalletUsesAuthenticatedUser(t *testing.T) {
 	repo := &financeRepoStub{
-		createdWallet: finance.Wallet{ID: "wallet-2", UserID: "user_123", Name: "Ngân hàng", Type: finance.WalletBank, IncludeInTotal: true, Version: 1},
+		createdWallet: finance.Wallet{ID: "wallet-2", UserID: "user_123", Name: "Ngân hàng", Type: finance.WalletBasic, IncludeInTotal: true, Version: 1},
 	}
 	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
 		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
 		FinanceRepository:  repo,
 	})
-	req := authenticatedRequest(t, http.MethodPost, "/api/v1/wallets", `{"name":"Ngân hàng","type":"bank"}`)
+	req := authenticatedRequest(t, http.MethodPost, "/api/v1/wallets", `{"name":"Ngân hàng","type":"basic"}`)
 	addCSRF(req)
 	res := httptest.NewRecorder()
 
@@ -122,15 +122,51 @@ func TestCreateWalletUsesAuthenticatedUser(t *testing.T) {
 	if repo.createWalletUserID != "user_123" {
 		t.Fatalf("expected create scoped to auth user, got %q", repo.createWalletUserID)
 	}
-	if repo.createWalletInput.Name != "Ngân hàng" || repo.createWalletInput.Type != finance.WalletBank {
+	if repo.createWalletInput.Name != "Ngân hàng" || repo.createWalletInput.Type != finance.WalletBasic {
 		t.Fatalf("unexpected wallet input: %#v", repo.createWalletInput)
+	}
+}
+
+func TestCreateGoalWalletCarriesGoalMetadata(t *testing.T) {
+	goalTarget := int64(25_000_000)
+	repo := &financeRepoStub{
+		createdWallet: finance.Wallet{ID: "wallet-goal", UserID: "user_123", Name: "Quỹ du lịch", Type: finance.WalletGoal, GoalTargetVND: &goalTarget, GoalDeadlineOn: "2027-12-31", IncludeInTotal: true, Version: 1},
+	}
+	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
+		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},
+		FinanceRepository:  repo,
+	})
+	req := authenticatedRequest(t, http.MethodPost, "/api/v1/wallets", `{"name":"Quỹ du lịch","type":"goal","goal_target_vnd":25000000,"goal_deadline_on":"2027-12-31"}`)
+	addCSRF(req)
+	res := httptest.NewRecorder()
+
+	handler.ServeHTTP(res, req)
+
+	if res.Code != http.StatusCreated {
+		t.Fatalf("expected 201, got %d: %s", res.Code, res.Body.String())
+	}
+	if repo.createWalletInput.Type != finance.WalletGoal || repo.createWalletInput.GoalTargetVND == nil || *repo.createWalletInput.GoalTargetVND != 25_000_000 || repo.createWalletInput.GoalDeadlineOn == nil || *repo.createWalletInput.GoalDeadlineOn != "2027-12-31" {
+		t.Fatalf("goal metadata not passed to repository: %#v", repo.createWalletInput)
+	}
+	var body struct {
+		Wallet struct {
+			Type           string `json:"type"`
+			GoalTargetVND  int64  `json:"goal_target_vnd"`
+			GoalDeadlineOn string `json:"goal_deadline_on"`
+		} `json:"wallet"`
+	}
+	if err := json.Unmarshal(res.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Wallet.Type != "goal" || body.Wallet.GoalTargetVND != 25_000_000 || body.Wallet.GoalDeadlineOn != "2027-12-31" {
+		t.Fatalf("goal metadata missing from response: %s", res.Body.String())
 	}
 }
 
 func TestUpdateWalletUsesAuthenticatedUser(t *testing.T) {
 	includeInTotal := false
 	repo := &financeRepoStub{
-		updatedWallet: finance.Wallet{ID: "wallet-2", UserID: "user_123", Name: "Ngân hàng phụ", Type: finance.WalletBank, IncludeInTotal: includeInTotal, Version: 2},
+		updatedWallet: finance.Wallet{ID: "wallet-2", UserID: "user_123", Name: "Ngân hàng phụ", Type: finance.WalletBasic, IncludeInTotal: includeInTotal, Version: 2},
 	}
 	handler := httpapi.NewRouter(authTestConfig(), httpapi.Dependencies{
 		IdentityRepository: &authRepoStub{user: identity.User{ID: "user_123", Email: "a@example.com", EmailVerified: true}},

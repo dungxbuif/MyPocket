@@ -48,7 +48,7 @@ func TestLifecycleRunnerPreviewsThenAppliesImportExactlyOnce(t *testing.T) {
 	repo := lifecycle.NewRepository(db)
 	financeRepo := finance.NewRepository(db)
 	user := workerLifecycleUser(t, db)
-	wallet, err := financeRepo.CreateWallet(ctx, user, finance.CreateWalletInput{Name: "Cash", Type: finance.WalletCash})
+	wallet, err := financeRepo.CreateWallet(ctx, user, finance.CreateWalletInput{Name: "Cash", Type: finance.WalletBasic})
 	if err != nil {
 		t.Fatal(err)
 	}

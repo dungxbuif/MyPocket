@@ -13,8 +13,14 @@ func ValidateCreateWallet(input CreateWalletInput) (CreateWalletInput, error) {
 	if input.Type != WalletCredit && hasCreditMetadata(input) {
 		return CreateWalletInput{}, fmt.Errorf("%w: credit metadata requires credit wallet type", ErrValidation)
 	}
+	if input.Type != WalletGoal && hasGoalMetadata(input) {
+		return CreateWalletInput{}, fmt.Errorf("%w: goal metadata requires goal wallet type", ErrValidation)
+	}
 	if input.CreditLimitVND != nil && *input.CreditLimitVND < 0 {
 		return CreateWalletInput{}, fmt.Errorf("%w: credit limit cannot be negative", ErrValidation)
+	}
+	if input.GoalTargetVND != nil && *input.GoalTargetVND <= 0 {
+		return CreateWalletInput{}, fmt.Errorf("%w: goal target must be positive", ErrValidation)
 	}
 	if !validDay(input.StatementDay) || !validDay(input.PaymentDueDay) {
 		return CreateWalletInput{}, fmt.Errorf("%w: credit day must be between 1 and 31", ErrValidation)
@@ -32,7 +38,7 @@ func ValidateUpdateWallet(input UpdateWalletInput) (UpdateWalletInput, error) {
 
 func validWalletType(value WalletType) bool {
 	switch value {
-	case WalletCash, WalletBank, WalletCredit, WalletEWallet, WalletSavings, WalletDebt:
+	case WalletBasic, WalletGoal, WalletCredit:
 		return true
 	default:
 		return false
@@ -41,6 +47,10 @@ func validWalletType(value WalletType) bool {
 
 func hasCreditMetadata(input CreateWalletInput) bool {
 	return input.CreditLimitVND != nil || input.StatementDay != nil || input.PaymentDueDay != nil
+}
+
+func hasGoalMetadata(input CreateWalletInput) bool {
+	return input.GoalTargetVND != nil || input.GoalDeadlineOn != nil
 }
 
 func validDay(value *int) bool {

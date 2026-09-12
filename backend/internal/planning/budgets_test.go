@@ -36,14 +36,13 @@ func TestBudgetProgressExcludesNonExpenseAndReportExcludedTransactions(t *testin
 	incomeCategoryID := findPlanningSystemCategory(t, conn, "income_salary")
 	occurred := time.Date(2026, 8, 15, 10, 0, 0, 0, time.UTC)
 
-	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "expense-1", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, AmountVND: 450000, OccurredAt: occurred, Note: "Counted"})
-	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "income-1", Type: finance.TransactionIncome, SourceWalletID: wallet.ID, CategoryID: incomeCategoryID, AmountVND: 2000000, OccurredAt: occurred, Note: "Excluded income"})
-	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "excluded-1", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, AmountVND: 250000, OccurredAt: occurred, Note: "Excluded report", ExcludedFromReports: true})
-
 	budget, err := planningRepo.CreateBudget(context.Background(), owner, planning.CreateBudgetInput{Name: "Ăn uống", PeriodType: planning.BudgetMonthly, AmountVND: 500000, CategoryIDs: []string{expenseCategoryID}})
 	if err != nil {
 		t.Fatalf("create budget: %v", err)
 	}
+	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "expense-1", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, BudgetID: budget.ID, AmountVND: 450000, OccurredAt: occurred, Note: "Counted"})
+	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "income-1", Type: finance.TransactionIncome, SourceWalletID: wallet.ID, CategoryID: incomeCategoryID, AmountVND: 2000000, OccurredAt: occurred, Note: "Excluded income"})
+	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "excluded-1", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, BudgetID: budget.ID, AmountVND: 250000, OccurredAt: occurred, Note: "Excluded report", ExcludedFromReports: true})
 	progress, err := planningRepo.ListBudgetProgress(context.Background(), owner, occurred)
 	if err != nil {
 		t.Fatalf("list progress: %v", err)
@@ -60,6 +59,61 @@ func TestBudgetProgressExcludesNonExpenseAndReportExcludedTransactions(t *testin
 		t.Fatalf("list progress again: %v", err)
 	}
 	assertBudgetAlertCount(t, conn, budget.ID, 1)
+}
+
+func TestBudgetProgressCountsOnlyExplicitlyAssignedExpenseTransactions(t *testing.T) {
+	conn := migratedPlanningPostgres(t)
+	owner := createPlanningUser(t, conn, "budget-assignment@example.com")
+	other := createPlanningUser(t, conn, "budget-assignment-other@example.com")
+	financeRepo := finance.NewRepository(conn)
+	planningRepo := planning.NewRepository(conn)
+	wallet := createPlanningWallet(t, financeRepo, owner)
+	destination, err := financeRepo.CreateWallet(context.Background(), owner, finance.CreateWalletInput{Name: "Ví nhận", Type: finance.WalletBasic})
+	if err != nil {
+		t.Fatalf("create destination wallet: %v", err)
+	}
+	otherWallet := createPlanningWallet(t, financeRepo, other)
+	expenseCategoryID := findPlanningSystemCategory(t, conn, "expense_food")
+	incomeCategoryID := findPlanningSystemCategory(t, conn, "income_salary")
+	occurred := time.Date(2026, 8, 15, 10, 0, 0, 0, time.UTC)
+
+	budget, err := planningRepo.CreateBudget(context.Background(), owner, planning.CreateBudgetInput{Name: "Hũ ăn uống", PeriodType: planning.BudgetMonthly, AmountVND: 500000, CategoryIDs: []string{expenseCategoryID}})
+	if err != nil {
+		t.Fatalf("create budget: %v", err)
+	}
+	otherBudget, err := planningRepo.CreateBudget(context.Background(), other, planning.CreateBudgetInput{Name: "Other budget", PeriodType: planning.BudgetMonthly, AmountVND: 500000, CategoryIDs: []string{expenseCategoryID}})
+	if err != nil {
+		t.Fatalf("create other budget: %v", err)
+	}
+
+	assigned := createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "assigned-expense", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, BudgetID: budget.ID, AmountVND: 125000, OccurredAt: occurred, Note: "Assigned"})
+	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "same-category-unassigned", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, AmountVND: 300000, OccurredAt: occurred, Note: "Same category, not assigned"})
+	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "assigned-excluded", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, BudgetID: budget.ID, AmountVND: 50000, OccurredAt: occurred, Note: "Excluded", ExcludedFromReports: true})
+	createPlanningTransaction(t, financeRepo, owner, finance.CreateTransactionInput{IdempotencyKey: "assigned-outside-period", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, BudgetID: budget.ID, AmountVND: 90000, OccurredAt: occurred.AddDate(0, -1, 0), Note: "Outside"})
+
+	if _, err := financeRepo.CreateTransaction(context.Background(), owner, finance.CreateTransactionInput{IdempotencyKey: "budget-income", Type: finance.TransactionIncome, SourceWalletID: wallet.ID, CategoryID: incomeCategoryID, BudgetID: budget.ID, AmountVND: 100000, OccurredAt: occurred}); !errors.Is(err, finance.ErrValidation) {
+		t.Fatalf("income with budget must be validation error, got %v", err)
+	}
+	if _, err := financeRepo.CreateTransaction(context.Background(), owner, finance.CreateTransactionInput{IdempotencyKey: "budget-transfer", Type: finance.TransactionTransfer, SourceWalletID: wallet.ID, DestinationWalletID: destination.ID, BudgetID: budget.ID, AmountVND: 100000, OccurredAt: occurred}); !errors.Is(err, finance.ErrValidation) {
+		t.Fatalf("transfer with budget must be validation error, got %v", err)
+	}
+	if _, err := financeRepo.CreateTransaction(context.Background(), owner, finance.CreateTransactionInput{IdempotencyKey: "foreign-budget", Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: expenseCategoryID, BudgetID: otherBudget.ID, AmountVND: 100000, OccurredAt: occurred}); !errors.Is(err, finance.ErrForbidden) {
+		t.Fatalf("foreign budget must be forbidden, got %v", err)
+	}
+	if _, err := financeRepo.CreateTransaction(context.Background(), other, finance.CreateTransactionInput{IdempotencyKey: "other-owner-own-budget", Type: finance.TransactionExpense, SourceWalletID: otherWallet.ID, CategoryID: expenseCategoryID, BudgetID: otherBudget.ID, AmountVND: 100000, OccurredAt: occurred}); err != nil {
+		t.Fatalf("other owner own budget should be accepted: %v", err)
+	}
+
+	progress, err := planningRepo.ListBudgetProgress(context.Background(), owner, occurred)
+	if err != nil {
+		t.Fatalf("list progress: %v", err)
+	}
+	if len(progress) != 1 || progress[0].Budget.ID != budget.ID {
+		t.Fatalf("unexpected progress rows: %#v", progress)
+	}
+	if progress[0].SpentVND != assigned.AmountVND || progress[0].RemainingVND != 375000 || progress[0].Percent != 25 {
+		t.Fatalf("budget progress must count only assigned report-included current-period expenses: %#v", progress[0])
+	}
 }
 
 func TestBudgetUpdateArchiveAndCategoryOwnership(t *testing.T) {
@@ -141,7 +195,7 @@ func createPlanningUser(t *testing.T, conn *sql.DB, email string) string {
 
 func createPlanningWallet(t *testing.T, repo *finance.Repository, userID string) finance.Wallet {
 	t.Helper()
-	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{Name: "Tiền mặt", Type: finance.WalletCash})
+	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{Name: "Tiền mặt", Type: finance.WalletBasic})
 	if err != nil {
 		t.Fatalf("create wallet: %v", err)
 	}

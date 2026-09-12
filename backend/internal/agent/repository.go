@@ -26,8 +26,83 @@ func (r *Repository) CreateRun(ctx context.Context, userID, key string, kind Kin
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (user_id, idempotency_key) DO UPDATE SET idempotency_key = EXCLUDED.idempotency_key
 		WHERE agent_runs.kind = EXCLUDED.kind AND agent_runs.request_text = EXCLUDED.request_text
-		RETURNING id::text, user_id::text, kind, status, request_text, coalesce(response_text,''), coalesce(error_code,''), attempts, created_at, updated_at, next_attempt_at, coalesce(lease_owner,''), coalesce(lease_expires_at, 'epoch'::timestamptz)
+		RETURNING id::text, user_id::text, coalesce(session_id::text, ''), kind, status, request_text, coalesce(response_text,''), coalesce(error_code,''), attempts, created_at, updated_at, next_attempt_at, coalesce(lease_owner,''), coalesce(lease_expires_at, 'epoch'::timestamptz)
 	`, userID, strings.TrimSpace(key), kind, strings.TrimSpace(text)))
+}
+
+func (r *Repository) CreateSessionRun(ctx context.Context, userID, sessionID, key string, kind Kind, text, receiptID string) (Run, Session, Message, error) {
+	if kind != KindIntake && kind != KindAdvisor {
+		return Run{}, Session{}, Message{}, fmt.Errorf("%w: session kind required", ErrValidation)
+	}
+	if err := ValidateCreate(kind, text, key); err != nil {
+		return Run{}, Session{}, Message{}, err
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return Run{}, Session{}, Message{}, err
+	}
+	defer tx.Rollback()
+	var session Session
+	if strings.TrimSpace(sessionID) == "" {
+		session, err = scanSession(tx.QueryRowContext(ctx, `
+			INSERT INTO agent_sessions (user_id, kind, title)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (user_id, kind) DO UPDATE SET updated_at = agent_sessions.updated_at
+			RETURNING id::text, user_id::text, kind, title, context_summary, status, created_at, updated_at
+		`, userID, kind, defaultSessionTitle(kind)))
+	} else {
+		session, err = scanSession(tx.QueryRowContext(ctx, `
+			SELECT id::text, user_id::text, kind, title, context_summary, status, created_at, updated_at
+			FROM agent_sessions
+			WHERE id=$1 AND user_id=$2 AND kind=$3 AND status='active'
+		`, strings.TrimSpace(sessionID), userID, kind))
+	}
+	if errors.Is(err, sql.ErrNoRows) {
+		return Run{}, Session{}, Message{}, ErrNotFound
+	}
+	if err != nil {
+		return Run{}, Session{}, Message{}, err
+	}
+	run, err := scanRun(tx.QueryRowContext(ctx, `
+		INSERT INTO agent_runs (user_id, session_id, idempotency_key, kind, request_text)
+		VALUES ($1, $2, $3, $4, $5)
+		ON CONFLICT (user_id, idempotency_key) DO UPDATE SET idempotency_key=EXCLUDED.idempotency_key
+		WHERE agent_runs.kind=EXCLUDED.kind AND agent_runs.request_text=EXCLUDED.request_text AND agent_runs.session_id=EXCLUDED.session_id
+		RETURNING id::text, user_id::text, coalesce(session_id::text, ''), kind, status, request_text, coalesce(response_text,''), coalesce(error_code,''), attempts, created_at, updated_at, next_attempt_at, coalesce(lease_owner,''), coalesce(lease_expires_at,'epoch'::timestamptz)
+	`, userID, session.ID, strings.TrimSpace(key), kind, strings.TrimSpace(text)))
+	if err != nil {
+		return Run{}, Session{}, Message{}, err
+	}
+	if receiptID != "" {
+		var toolID string
+		err = tx.QueryRowContext(ctx, `
+			INSERT INTO agent_tool_runs (user_id,agent_run_id,receipt_object_id,provider)
+			SELECT $1,$2,o.id,'ocr' FROM receipt_objects o WHERE o.id=$3 AND o.user_id=$1
+			ON CONFLICT (agent_run_id,receipt_object_id) DO UPDATE SET provider=EXCLUDED.provider RETURNING id::text
+		`, userID, run.ID, strings.TrimSpace(receiptID)).Scan(&toolID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return Run{}, Session{}, Message{}, ErrNotFound
+		}
+		if err != nil {
+			return Run{}, Session{}, Message{}, err
+		}
+	}
+	message, err := scanMessage(tx.QueryRowContext(ctx, `
+		INSERT INTO agent_messages (user_id, session_id, run_id, role, text)
+		VALUES ($1, $2, $3, 'user', $4)
+		ON CONFLICT (user_id, run_id, role) WHERE run_id IS NOT NULL DO UPDATE SET text=EXCLUDED.text
+		RETURNING id::text, user_id::text, session_id::text, coalesce(run_id::text, ''), role, text, coalesce(action, 'null'::jsonb), created_at
+	`, userID, session.ID, run.ID, strings.TrimSpace(text)))
+	if err != nil {
+		return Run{}, Session{}, Message{}, err
+	}
+	if _, err = tx.ExecContext(ctx, `UPDATE agent_sessions SET updated_at=now() WHERE id=$1 AND user_id=$2`, session.ID, userID); err != nil {
+		return Run{}, Session{}, Message{}, err
+	}
+	if err = tx.Commit(); err != nil {
+		return Run{}, Session{}, Message{}, err
+	}
+	return run, session, message, nil
 }
 
 func (r *Repository) CreateRunWithTool(ctx context.Context, userID, key string, kind Kind, text, receiptID string) (Run, error) {
@@ -43,7 +118,7 @@ func (r *Repository) CreateRunWithTool(ctx context.Context, userID, key string, 
 		INSERT INTO agent_runs (user_id,idempotency_key,kind,request_text) VALUES ($1,$2,$3,$4)
 		ON CONFLICT (user_id,idempotency_key) DO UPDATE SET idempotency_key=EXCLUDED.idempotency_key
 		WHERE agent_runs.kind=EXCLUDED.kind AND agent_runs.request_text=EXCLUDED.request_text
-		RETURNING id::text,user_id::text,kind,status,request_text,coalesce(response_text,''),coalesce(error_code,''),attempts,created_at,updated_at,next_attempt_at,coalesce(lease_owner,''),coalesce(lease_expires_at,'epoch'::timestamptz)
+		RETURNING id::text,user_id::text,coalesce(session_id::text, ''),kind,status,request_text,coalesce(response_text,''),coalesce(error_code,''),attempts,created_at,updated_at,next_attempt_at,coalesce(lease_owner,''),coalesce(lease_expires_at,'epoch'::timestamptz)
 	`, userID, strings.TrimSpace(key), kind, strings.TrimSpace(text)))
 	if err != nil {
 		return Run{}, err
@@ -68,7 +143,7 @@ func (r *Repository) CreateRunWithTool(ctx context.Context, userID, key string, 
 
 func (r *Repository) GetRun(ctx context.Context, userID, id string) (Run, error) {
 	run, err := scanRun(r.db.QueryRowContext(ctx, `
-		SELECT id::text, user_id::text, kind, status, request_text, coalesce(response_text,''), coalesce(error_code,''), attempts, created_at, updated_at, next_attempt_at, coalesce(lease_owner,''), coalesce(lease_expires_at, 'epoch'::timestamptz)
+		SELECT id::text, user_id::text, coalesce(session_id::text, ''), kind, status, request_text, coalesce(response_text,''), coalesce(error_code,''), attempts, created_at, updated_at, next_attempt_at, coalesce(lease_owner,''), coalesce(lease_expires_at, 'epoch'::timestamptz)
 		FROM agent_runs WHERE id=$1 AND user_id=$2
 	`, id, userID))
 	if errors.Is(err, sql.ErrNoRows) {
@@ -82,6 +157,46 @@ func (r *Repository) GetRun(ctx context.Context, userID, id string) (Run, error)
 		run.ToolRuns, err = r.toolRuns(ctx, run.ID, run.UserID)
 	}
 	return run, err
+}
+
+func (r *Repository) GetSession(ctx context.Context, userID, sessionID string, limit int) (SessionHistory, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 50
+	}
+	session, err := scanSession(r.db.QueryRowContext(ctx, `
+		SELECT id::text, user_id::text, kind, title, context_summary, status, created_at, updated_at
+		FROM agent_sessions
+		WHERE id=$1 AND user_id=$2
+	`, sessionID, userID))
+	if errors.Is(err, sql.ErrNoRows) {
+		return SessionHistory{}, ErrNotFound
+	}
+	if err != nil {
+		return SessionHistory{}, fmt.Errorf("get agent session: %w", err)
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT id::text, user_id::text, session_id::text, coalesce(run_id::text, ''), role, text, coalesce(action, 'null'::jsonb), created_at
+		FROM agent_messages
+		WHERE session_id=$1 AND user_id=$2
+		ORDER BY created_at, id
+		LIMIT $3
+	`, session.ID, userID, limit)
+	if err != nil {
+		return SessionHistory{}, fmt.Errorf("list agent messages: %w", err)
+	}
+	defer rows.Close()
+	messages := []Message{}
+	for rows.Next() {
+		message, err := scanMessage(rows)
+		if err != nil {
+			return SessionHistory{}, err
+		}
+		messages = append(messages, message)
+	}
+	if err := rows.Err(); err != nil {
+		return SessionHistory{}, err
+	}
+	return SessionHistory{Session: session, Messages: messages}, nil
 }
 
 func (r *Repository) CreateToolRun(ctx context.Context, userID, runID, receiptID string) (ToolRun, error) {
@@ -107,7 +222,7 @@ func (r *Repository) ClaimDue(ctx context.Context, owner string, now time.Time, 
 		)
 		UPDATE agent_runs r SET status='processing', attempts=r.attempts+1, lease_owner=$2, lease_expires_at=$3, updated_at=$1
 		FROM candidate WHERE r.id=candidate.id
-		RETURNING r.id::text, r.user_id::text, r.kind, r.status, r.request_text, coalesce(r.response_text,''), coalesce(r.error_code,''), r.attempts, r.created_at, r.updated_at, r.next_attempt_at, coalesce(r.lease_owner,''), coalesce(r.lease_expires_at, 'epoch'::timestamptz)
+		RETURNING r.id::text, r.user_id::text, coalesce(r.session_id::text, ''), r.kind, r.status, r.request_text, coalesce(r.response_text,''), coalesce(r.error_code,''), r.attempts, r.created_at, r.updated_at, r.next_attempt_at, coalesce(r.lease_owner,''), coalesce(r.lease_expires_at, 'epoch'::timestamptz)
 	`, now, owner, now.Add(lease)))
 	if errors.Is(err, sql.ErrNoRows) {
 		return Run{}, false, nil
@@ -167,34 +282,64 @@ func (r *Repository) Complete(ctx context.Context, run Run, result ModelResult, 
 		return fmt.Errorf("begin agent completion: %w", err)
 	}
 	defer tx.Rollback()
-	if run.Kind == KindTransactionDraft {
-		if result.Transaction == nil {
+	if run.Kind == KindTransactionDraft || run.Kind == KindIntake {
+		if len(result.Drafts) == 0 {
 			return fmt.Errorf("%w: missing transaction", ErrValidation)
 		}
-		proposal := result.Transaction
-		if err := validateOwnedReferences(ctx, tx, run.UserID, proposal); err != nil {
-			return err
+		for i := range result.Drafts {
+			proposal := &result.Drafts[i]
+			if err := validateOwnedReferences(ctx, tx, run.UserID, proposal); err != nil {
+				return err
+			}
+			occurred, _ := time.Parse(time.RFC3339, proposal.OccurredAt)
+			var destination, category any
+			if proposal.DestinationWalletID != nil {
+				destination = *proposal.DestinationWalletID
+			}
+			if proposal.CategoryID != nil {
+				category = *proposal.CategoryID
+			}
+			proof, _ := json.Marshal(provenance)
+			occurrenceKey := fmt.Sprintf("agent:%s:%d", run.ID, i+1)
+			if run.Kind == KindTransactionDraft {
+				occurrenceKey = "agent:" + run.ID
+			}
+			if _, err := tx.ExecContext(ctx, `
+				INSERT INTO transaction_drafts (user_id, occurrence_key, transaction_type, source_wallet_id, destination_wallet_id, category_id, amount_vnd, occurred_at, note, agent_run_id, provenance)
+				VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+				ON CONFLICT (user_id, occurrence_key) DO NOTHING
+			`, run.UserID, occurrenceKey, proposal.Type, proposal.SourceWalletID, destination, category, proposal.AmountVND, occurred, proposal.Note, run.ID, proof); err != nil {
+				return fmt.Errorf("insert agent draft: %w", err)
+			}
 		}
-		occurred, _ := time.Parse(time.RFC3339, proposal.OccurredAt)
-		var destination, category any
-		if proposal.DestinationWalletID != nil {
-			destination = *proposal.DestinationWalletID
-		}
-		if proposal.CategoryID != nil {
-			category = *proposal.CategoryID
-		}
-		proof, _ := json.Marshal(provenance)
-		if _, err := tx.ExecContext(ctx, `
-			INSERT INTO transaction_drafts (user_id, occurrence_key, transaction_type, source_wallet_id, destination_wallet_id, category_id, amount_vnd, occurred_at, note, agent_run_id, provenance)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-			ON CONFLICT (user_id, occurrence_key) DO NOTHING
-		`, run.UserID, "agent:"+run.ID, proposal.Type, proposal.SourceWalletID, destination, category, proposal.AmountVND, occurred, proposal.Note, run.ID, proof); err != nil {
-			return fmt.Errorf("insert agent draft: %w", err)
-		}
+	}
+	draftIDs, err := draftIDsInTx(ctx, tx, run.ID, run.UserID)
+	if err != nil {
+		return err
 	}
 	response := strings.TrimSpace(result.Answer)
 	if _, err := tx.ExecContext(ctx, `UPDATE agent_runs SET status='completed', response_text=$1, error_code=NULL, lease_owner=NULL, lease_expires_at=NULL, updated_at=now() WHERE id=$2 AND user_id=$3 AND status='processing'`, response, run.ID, run.UserID); err != nil {
 		return fmt.Errorf("complete agent run: %w", err)
+	}
+	if run.SessionID != "" {
+		if response == "" && len(draftIDs) > 0 {
+			response = fmt.Sprintf("Đã tạo %d nháp giao dịch để bạn duyệt.", len(draftIDs))
+		}
+		var action any
+		if len(draftIDs) > 0 {
+			raw, _ := json.Marshal(ActionCard{Type: ActionDraftsCreated, DraftIDs: draftIDs})
+			action = raw
+		}
+		if _, err := tx.ExecContext(ctx, `
+			INSERT INTO agent_messages (user_id, session_id, run_id, role, text, action)
+			VALUES ($1, $2, $3, 'assistant', $4, $5)
+			ON CONFLICT (user_id, run_id, role) WHERE run_id IS NOT NULL DO UPDATE SET text=EXCLUDED.text, action=EXCLUDED.action
+		`, run.UserID, run.SessionID, run.ID, response, action); err != nil {
+			return fmt.Errorf("insert agent assistant message: %w", err)
+		}
+		if _, err := tx.ExecContext(ctx, `UPDATE agent_sessions SET updated_at=now() WHERE id=$1 AND user_id=$2`, run.SessionID, run.UserID); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
 }
@@ -228,6 +373,23 @@ func validateOwnedReferences(ctx context.Context, tx *sql.Tx, userID string, pro
 
 func (r *Repository) draftIDs(ctx context.Context, runID, userID string) ([]string, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT id::text FROM transaction_drafts WHERE agent_run_id=$1 AND user_id=$2 ORDER BY id`, runID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	ids := []string{}
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func draftIDsInTx(ctx context.Context, tx *sql.Tx, runID, userID string) ([]string, error) {
+	rows, err := tx.QueryContext(ctx, `SELECT id::text FROM transaction_drafts WHERE agent_run_id=$1 AND user_id=$2 ORDER BY id`, runID, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -324,6 +486,35 @@ func scanToolRun(row scanner) (ToolRun, error) {
 
 func scanRun(row scanner) (Run, error) {
 	var run Run
-	err := row.Scan(&run.ID, &run.UserID, &run.Kind, &run.Status, &run.RequestText, &run.ResponseText, &run.ErrorCode, &run.Attempts, &run.CreatedAt, &run.UpdatedAt, &run.NextAttemptAt, &run.LeaseOwner, &run.LeaseExpiresAt)
+	err := row.Scan(&run.ID, &run.UserID, &run.SessionID, &run.Kind, &run.Status, &run.RequestText, &run.ResponseText, &run.ErrorCode, &run.Attempts, &run.CreatedAt, &run.UpdatedAt, &run.NextAttemptAt, &run.LeaseOwner, &run.LeaseExpiresAt)
 	return run, err
+}
+
+func defaultSessionTitle(kind Kind) string {
+	if kind == KindAdvisor {
+		return "Tư vấn tài chính"
+	}
+	return "Nhập giao dịch"
+}
+
+func scanSession(row scanner) (Session, error) {
+	var session Session
+	err := row.Scan(&session.ID, &session.UserID, &session.Kind, &session.Title, &session.ContextSummary, &session.Status, &session.CreatedAt, &session.UpdatedAt)
+	return session, err
+}
+
+func scanMessage(row scanner) (Message, error) {
+	var message Message
+	var raw []byte
+	if err := row.Scan(&message.ID, &message.UserID, &message.SessionID, &message.RunID, &message.Role, &message.Text, &raw, &message.CreatedAt); err != nil {
+		return Message{}, err
+	}
+	if len(raw) > 0 && string(raw) != "null" {
+		var action ActionCard
+		if err := json.Unmarshal(raw, &action); err != nil {
+			return Message{}, err
+		}
+		message.Action = &action
+	}
+	return message, nil
 }

@@ -14,6 +14,7 @@ export function calendarDateInHoChiMinh(value: Date = new Date()): string {
 export function buildTransactionInput(input: {
   type: "expense" | "income" | "transfer"; amount: string; sourceWalletID: string;
   destinationWalletID?: string;
+  budgetID?: string;
   categoryID?: string; note: string; excludedFromReports: boolean;
   occurredOn: string; receiptObjectID?: string;
 }): TransactionInput {
@@ -21,6 +22,7 @@ export function buildTransactionInput(input: {
     type: input.type, source_wallet_id: input.sourceWalletID,
     destination_wallet_id: input.type === "transfer" ? input.destinationWalletID : undefined,
     category_id: input.type === "transfer" ? undefined : input.categoryID,
+    budget_id: input.type === "expense" && input.budgetID ? input.budgetID : undefined,
     receipt_object_id: input.receiptObjectID, amount_vnd: Number(input.amount),
     target_balance_vnd: null, occurred_at: new Date(`${input.occurredOn}T12:00:00+07:00`).toISOString(),
     note: input.note, excluded_from_reports: input.excludedFromReports,

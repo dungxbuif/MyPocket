@@ -95,7 +95,7 @@ func TestRecurringScheduleRejectsFinanceFieldsThatWouldCreateUnconfirmableDrafts
 	financeRepo := finance.NewRepository(conn)
 	planningRepo := planning.NewRepository(conn)
 	source := createPlanningWallet(t, financeRepo, owner)
-	destination, err := financeRepo.CreateWallet(context.Background(), owner, finance.CreateWalletInput{Name: "Ngân hàng", Type: finance.WalletBank})
+	destination, err := financeRepo.CreateWallet(context.Background(), owner, finance.CreateWalletInput{Name: "Ngân hàng", Type: finance.WalletBasic})
 	if err != nil {
 		t.Fatalf("create destination wallet: %v", err)
 	}
@@ -121,6 +121,113 @@ func TestRecurringScheduleRejectsFinanceFieldsThatWouldCreateUnconfirmableDrafts
 				t.Fatalf("create schedule error = %v, want validation", err)
 			}
 		})
+	}
+}
+
+func TestRecurringScheduleCanBeUpdatedPausedResumedAndEnded(t *testing.T) {
+	conn := migratedPlanningPostgres(t)
+	owner := createPlanningUser(t, conn, "recurring-controls@example.com")
+	financeRepo := finance.NewRepository(conn)
+	planningRepo := planning.NewRepository(conn)
+	wallet := createPlanningWallet(t, financeRepo, owner)
+	categoryID := findPlanningSystemCategory(t, conn, "expense_food")
+
+	schedule, err := planningRepo.CreateRecurringSchedule(context.Background(), owner, planning.CreateRecurringScheduleInput{
+		Name: "Ăn sáng", Frequency: planning.RecurrenceDaily, Timezone: "Asia/Ho_Chi_Minh",
+		StartsAt: "2026-09-01T07:00:00+07:00", Type: finance.TransactionExpense,
+		SourceWalletID: wallet.ID, CategoryID: categoryID, AmountVND: 50000, Note: "Cũ",
+	})
+	if err != nil {
+		t.Fatalf("create recurring schedule: %v", err)
+	}
+	updated, err := planningRepo.UpdateRecurringSchedule(context.Background(), owner, schedule.ID, planning.UpdateRecurringScheduleInput{
+		BaseVersion: schedule.Version,
+		Name:        "Ăn sáng updated", Frequency: planning.RecurrenceDaily, Timezone: "Asia/Ho_Chi_Minh",
+		StartsAt: "2026-09-01T07:00:00+07:00", EndsAt: "2026-09-01T07:00:00+07:00",
+		Type: finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: categoryID, AmountVND: 75000, Note: "Mới",
+	})
+	if err != nil {
+		t.Fatalf("update recurring schedule: %v", err)
+	}
+	if updated.AmountVND != 75000 || updated.Note != "Mới" || updated.EndsAt == nil || updated.Version != 2 {
+		t.Fatalf("unexpected updated schedule: %#v", updated)
+	}
+	paused, err := planningRepo.PauseRecurringSchedule(context.Background(), owner, schedule.ID, updated.Version)
+	if err != nil {
+		t.Fatalf("pause recurring schedule: %v", err)
+	}
+	if paused.PausedAt == nil || paused.Version != 3 {
+		t.Fatalf("paused schedule should expose paused_at/version: %#v", paused)
+	}
+	processed, err := planningRepo.ProcessDueRecurringSchedules(context.Background(), "worker-paused", time.Date(2026, 9, 2, 2, 0, 0, 0, time.UTC), 10)
+	if err != nil {
+		t.Fatalf("process paused schedule: %v", err)
+	}
+	if processed != 0 {
+		t.Fatalf("paused schedule must not create occurrences, got %d", processed)
+	}
+	resumed, err := planningRepo.ResumeRecurringSchedule(context.Background(), owner, schedule.ID, paused.Version, time.Date(2026, 8, 31, 2, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("resume recurring schedule: %v", err)
+	}
+	if resumed.PausedAt != nil || resumed.Version != 4 {
+		t.Fatalf("resumed schedule should clear paused_at/version: %#v", resumed)
+	}
+	processed, err = planningRepo.ProcessDueRecurringSchedules(context.Background(), "worker-ended", time.Date(2026, 9, 3, 2, 0, 0, 0, time.UTC), 10)
+	if err != nil {
+		t.Fatalf("process ended schedule: %v", err)
+	}
+	if processed != 1 {
+		t.Fatalf("ends_at should allow first occurrence only, got %d", processed)
+	}
+	drafts, err := planningRepo.ListTransactionDrafts(context.Background(), owner)
+	if err != nil {
+		t.Fatalf("list drafts: %v", err)
+	}
+	if len(drafts) != 1 || drafts[0].AmountVND != 75000 || drafts[0].Note != "Mới" {
+		t.Fatalf("updated resumed schedule should create one updated draft: %#v", drafts)
+	}
+}
+
+func TestRecurringScheduleAutoPostCreatesConfirmedTransactionOnce(t *testing.T) {
+	conn := migratedPlanningPostgres(t)
+	owner := createPlanningUser(t, conn, "recurring-autopost@example.com")
+	financeRepo := finance.NewRepository(conn)
+	planningRepo := planning.NewRepository(conn)
+	wallet := createPlanningWallet(t, financeRepo, owner)
+	setPlanningWalletBalance(t, conn, wallet.ID, 500000)
+	categoryID := findPlanningSystemCategory(t, conn, "expense_food")
+
+	schedule, err := planningRepo.CreateRecurringSchedule(context.Background(), owner, planning.CreateRecurringScheduleInput{
+		Name: "Auto", Frequency: planning.RecurrenceDaily, Timezone: "Asia/Ho_Chi_Minh",
+		StartsAt: "2026-09-01T07:00:00+07:00", EndsAt: "2026-09-01T07:00:00+07:00",
+		PostingMode: planning.RecurringPostingAutoPost,
+		Type:        finance.TransactionExpense, SourceWalletID: wallet.ID, CategoryID: categoryID, AmountVND: 100000, Note: "Auto-post",
+	})
+	if err != nil {
+		t.Fatalf("create auto-post schedule: %v", err)
+	}
+	if schedule.PostingMode != planning.RecurringPostingAutoPost {
+		t.Fatalf("unexpected posting mode: %#v", schedule)
+	}
+	processed, err := planningRepo.ProcessDueRecurringSchedules(context.Background(), "worker-auto", time.Date(2026, 9, 3, 2, 0, 0, 0, time.UTC), 10)
+	if err != nil {
+		t.Fatalf("process auto-post schedule: %v", err)
+	}
+	if processed != 1 {
+		t.Fatalf("auto-post ended schedule should process once, got %d", processed)
+	}
+	again, err := planningRepo.ProcessDueRecurringSchedules(context.Background(), "worker-auto-again", time.Date(2026, 9, 3, 2, 0, 0, 0, time.UTC), 10)
+	if err != nil {
+		t.Fatalf("process auto-post schedule again: %v", err)
+	}
+	if again != 0 {
+		t.Fatalf("auto-post occurrence should be idempotent and ended, got %d", again)
+	}
+	assertPlanningCount(t, conn, `SELECT count(*) FROM transaction_drafts WHERE user_id = $1`, 0, owner)
+	assertPlanningCount(t, conn, `SELECT count(*) FROM transactions WHERE user_id = $1 AND note = 'Auto-post'`, 1, owner)
+	if got := walletBalance(t, conn, wallet.ID); got != 400000 {
+		t.Fatalf("auto-post should apply accounting once, got balance %d", got)
 	}
 }
 

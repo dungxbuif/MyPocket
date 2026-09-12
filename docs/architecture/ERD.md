@@ -22,18 +22,18 @@ updated: 2026-08-31
 | Entity/Table | Purpose | Owner | Notes |
 | --- | --- | --- | --- |
 | `users` | Google-backed application identity | Identity | Unique provider subject and verified email; no provider tokens |
-| `wallets` | Cash, bank, credit, e-wallet, savings, or debt account | User | VND-first; optional credit metadata; versioned/archiveable |
+| `wallets` | Basic, goal, or credit wallet behavior | User | VND-first; behavior-specific goal/credit metadata; versioned/archiveable |
 | `categories` | Two-level expense, income, or debt/loan taxonomy | User/system seed | System rows locked; user rows archiveable |
 | `wallet_category_settings` | Category activation per wallet | User | Composite wallet/category uniqueness |
-| `transactions` | Confirmed accounting event | User | Positive integer amount; type determines balance effect |
-| `transaction_drafts` | Reviewable proposal from manual automation/provider flow | User | Source and confirmation link; no accounting effect |
+| `transactions` | Confirmed accounting event | User | Positive integer amount; type determines balance effect; optional explicit expense budget assignment |
+| `transaction_drafts` | Reviewable proposal from manual automation/provider flow | User | Source, optional budget carry-through and confirmation link; no accounting effect |
 | `receipt_objects` | Private object metadata | User | S3 key, checksum, size, content type |
-| `budgets` | Period category/all-category limits | User | Weekly/monthly/quarterly/yearly/custom periods; versioned/archiveable |
-| `budget_categories` | Selected expense category scope for a budget | User | Composite budget/category uniqueness |
+| `budgets` | Period spending limits / “hũ chi tiêu” | User | Weekly/monthly/quarterly/yearly/custom periods; versioned/archiveable; progress is explicit transaction assignment |
+| `budget_categories` | Selected expense category hint/scope metadata for a budget | User | Composite budget/category uniqueness; no longer defines progress by itself |
 | `budget_alerts` | Durable 80%/100% budget threshold event | User | Unique budget/threshold/period dedupe |
 | `events` | Trip or event grouping | User | Versioned/archiveable date range |
 | `event_transactions` | Event-to-transaction link | User | Composite event/transaction uniqueness |
-| `recurring_schedules` | Template and next occurrence | User | Worker emits deterministic drafts; versioned/archiveable |
+| `recurring_schedules` | Template and next occurrence | User | Worker emits deterministic drafts or explicit auto-posted transactions; editable, pausable, endable, versioned/archiveable |
 | `recurring_occurrences` | Processed schedule occurrence ledger | User | Unique schedule/occurrence key |
 | `obligations` | Borrowed/lent obligation | User | Principal, counterparty, due date; versioned/archiveable |
 | `obligation_repayments` | Obligation-to-transaction repayment link | User | Composite obligation/transaction uniqueness |
@@ -45,7 +45,9 @@ updated: 2026-08-31
 | `sync_mutations` | Idempotency ledger | User | Unique client mutation ID |
 | `sync_changes` | Incremental authoritative change feed | User | Monotonic per-user cursor |
 | `sync_conflicts` | Rejected client mutation and server snapshot | User | Explicit resolution lifecycle |
-| `agent_runs` | Text/image Agent request and review-first result | User | Idempotent, leased, provider-independent state |
+| `agent_sessions` | Durable Agent chat thread | User | One active singleton per `intake` or `advisor`; stores title/context summary |
+| `agent_messages` | Durable Agent chat message/action card | User/session | User/assistant/system messages; optional run link and action payload |
+| `agent_runs` | Text/image Agent request and result | User | Idempotent, leased, provider-independent state; optional session link; `intake` creates review-first income/expense drafts only, `advisor` is read-only analysis |
 | `agent_tool_runs` | OCR image-tool execution | User/agent run | Owned receipt reference; provider identifier remains private |
 | `api_keys` | Third-party/API-agent credentials | User | Stores HMAC hash and display prefix only; revocable; Redis-cached lookup |
 | `audit_events` | Append-only state/security event | System | Redacted; restricted read; retention-managed |
@@ -62,14 +64,19 @@ updated: 2026-08-31
 | `wallets` | `transactions` | one-to-many | Source wallet required |
 | `transactions` | `wallets` | optional destination | Required only for transfer |
 | `transactions` | `categories` | many-to-one | Type and activation must match |
+| `transactions` | `budgets` | optional many-to-one | Only expense transactions can carry `budget_id`; budget progress sums explicit assignment |
 | `events` | `event_transactions` | one-to-many | Event totals do not alter base accounting |
 | `event_transactions` | `transactions` | many-to-one | Report-excluded transactions are linkable but excluded from event totals |
 | `transactions` | `receipt_objects` | optional many-to-one | Private attachment |
 | `transaction_drafts` | `transactions` | optional one-to-one confirmation | Idempotent confirmation |
+| `transaction_drafts` | `budgets` | optional many-to-one | Expense drafts can carry `budget_id` into confirmed transactions |
 | `recurring_schedules` | `recurring_occurrences` | one-to-many | Worker locks due schedules and advances next occurrence |
 | `recurring_occurrences` | `transaction_drafts` | one-to-one by occurrence key | Deterministic draft generation without wallet accounting |
+| `recurring_schedules` | `budgets` | optional many-to-one | Expense schedules can carry budget assignment into drafts or auto-posted transactions |
+| `agent_sessions` | `agent_messages` | one-to-many | Chat history is user-scoped and durable |
+| `agent_sessions` | `agent_runs` | one-to-many | Runs correlate async work back to a thread |
 | `agent_runs` | `agent_tool_runs` | one-to-many | Optional image tools are scoped to one owned run |
-| `agent_runs` | `transaction_drafts` | optional one-to-one | Structured proposal remains review-only until explicit confirmation |
+| `agent_runs` | `transaction_drafts` | optional one-to-many | Structured proposals remain review-only until explicit confirmation |
 | `obligations` | `obligation_repayments` | one-to-many | Repayment links cannot exceed principal |
 | `obligation_repayments` | `transactions` | many-to-one | Confirmed owned transaction remains the accounting source of truth |
 | `users` | `sync_changes` | one-to-many ordered cursor | Pull scope is per user |
@@ -82,9 +89,10 @@ updated: 2026-08-31
 - Every user-owned foreign-key relationship must reference objects with the same `user_id`; enforce in service logic and database constraints where practical.
 - Money is a positive integer; transaction type and wallet role determine signs.
 - Transfer source and destination wallets differ and belong to one user.
+- `budget_id` is valid only on expense transactions, expense drafts and expense recurring schedules; progress never counts income, transfers, adjustments, archived rows or report-excluded rows.
 - At most one active default AI wallet exists per user.
 - Category depth is at most two; system categories cannot be renamed or deleted.
-- Mutation IDs, confirmation commands, recurring occurrences, Agent idempotency keys and provider document IDs are unique in their intended scope.
+- Mutation IDs, confirmation commands, recurring occurrences, Agent idempotency keys, Agent user/assistant messages per run and provider document IDs are unique in their intended scope.
 - API keys store only HMAC hashes plus a short display prefix; plaintext key material is returned only once at creation.
 - Version increments occur only with accepted authoritative mutations.
 - Audit rows have no application update/delete endpoint; retention deletion is worker-only.
@@ -135,11 +143,12 @@ The implemented identity schema intentionally has no `google_access_token`, `goo
 | `id` | `uuid` | Primary key; defaults through `gen_random_uuid()` |
 | `user_id` | `uuid` | Required owner; references `users(id)` |
 | `name` | `text` | Required non-empty wallet name |
-| `type` | `text` | `cash`, `bank`, `credit`, `e_wallet`, `savings`, or `debt` |
+| `type` | `text` | `basic`, `goal`, or `credit` behavior |
 | `balance_vnd` | `bigint` | Required integer VND balance; defaults `0` |
 | `include_in_total` | `boolean` | Controls total balance inclusion |
 | `is_default_ai` | `boolean` | Partial unique index allows one active default AI wallet per user |
 | `credit_limit_vnd`, `statement_day`, `payment_due_day` | nullable numeric fields | Allowed only for `credit` wallets |
+| `goal_target_vnd`, `goal_deadline_on` | nullable goal fields | Allowed only for `goal` wallets |
 | `archived_at` | `timestamptz` | Archive marker |
 | `version` | `bigint` | Optimistic version seed; starts at `1` |
 | `created_at`, `updated_at` | `timestamptz` | Audit timestamps |
@@ -194,6 +203,7 @@ The full Vietnamese parent/child catalog is seeded by migration `0011_phase002_c
 | `source_wallet_id` | `uuid` | Required source wallet |
 | `destination_wallet_id` | `uuid` | Required only for transfer; must differ from source |
 | `category_id` | `uuid` | Optional category reference |
+| `budget_id` | `uuid` | Optional active owned budget reference; expense only |
 | `receipt_object_id` | `uuid` | Optional private receipt metadata reference |
 | `amount_vnd` | `bigint` | Required positive VND integer |
 | `balance_after_vnd` | `bigint` | Snapshot for source wallet after posting |

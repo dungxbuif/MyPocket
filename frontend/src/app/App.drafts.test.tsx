@@ -327,8 +327,8 @@ function defaultResponse(path: string, drafts: Draft[]) {
   const routes: Record<string, unknown> = {
     "/api/v1/me": { user: { id: "user_123", email: "a@example.com", email_verified: true, display_name: "A", avatar_url: "" } },
     "/api/v1/wallets": { wallets: [
-      { id: "wallet_main", name: "Ví chính", type: "cash", balance_vnd: 10_000_000, include_in_total: true, is_default_ai: true, version: 1 },
-      { id: "wallet_savings", name: "Ví tiết kiệm", type: "savings", balance_vnd: 20_000_000, include_in_total: true, is_default_ai: false, version: 1 },
+      { id: "wallet_main", name: "Ví chính", type: "basic", balance_vnd: 10_000_000, include_in_total: true, is_default_ai: true, version: 1 },
+      { id: "wallet_savings", name: "Ví tiết kiệm", type: "goal", balance_vnd: 20_000_000, include_in_total: true, is_default_ai: false, version: 1 },
     ] },
     "/api/v1/categories": { categories: [{ id: "cat_home", kind: "expense", name: "Nhà cửa", is_system: true, version: 1 }] },
     "/api/v1/transactions": { transactions: [] },

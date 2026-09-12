@@ -39,6 +39,16 @@ transactions ──┐??:1── wallets (destination_wallet_id, cho transfer)
 budgets ──┐1:N── budget_categories ──┐N:1── categories
 ```
 
+## Budget → Transaction/Draft/Schedule
+
+```
+budgets ──┐1:N── transactions (budget_id, expense only)
+budgets ──┐1:N── transaction_drafts (budget_id, expense only)
+budgets ──┐1:N── recurring_schedules (budget_id, expense only)
+```
+
+Budget progress reads explicit `transactions.budget_id`; category links are UI/filter metadata.
+
 ## Event → Transaction
 
 ```

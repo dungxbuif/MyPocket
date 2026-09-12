@@ -13,7 +13,7 @@ import {
   queueWalletUpdate,
 } from "../offline/outbox";
 
-export type WalletType = "cash" | "bank" | "credit" | "e_wallet" | "savings" | "debt";
+export type WalletType = "basic" | "goal" | "credit";
 
 export type WalletSummary = {
   id: string;
@@ -22,6 +22,11 @@ export type WalletSummary = {
   balance_vnd: number;
   include_in_total: boolean;
   is_default_ai: boolean;
+  credit_limit_vnd?: number;
+  statement_day?: number;
+  payment_due_day?: number;
+  goal_target_vnd?: number;
+  goal_deadline_on?: string;
   version: number;
 };
 
@@ -45,6 +50,7 @@ export type Transaction = {
   source_wallet_id: string;
   destination_wallet_id?: string;
   category_id?: string;
+  budget_id?: string;
   receipt_object_id?: string;
   amount_vnd: number;
   balance_after_vnd: number;
@@ -63,6 +69,7 @@ export type TransactionInput = {
   source_wallet_id: string;
   destination_wallet_id?: string;
   category_id?: string;
+  budget_id?: string;
   receipt_object_id?: string;
   amount_vnd: number;
   target_balance_vnd?: number | null;
@@ -74,7 +81,7 @@ export type TransactionInput = {
   base_version?: number;
 };
 
-export type WalletCreateInput = { name: string; type: WalletType };
+export type WalletCreateInput = { name: string; type: WalletType; goal_target_vnd?: number; goal_deadline_on?: string };
 export type WalletUpdateInput = { name: string; include_in_total: boolean; base_version?: number; current_wallet?: WalletSummary };
 export type CategoryCreateInput = { kind: CategorySummary["kind"]; name: string; parent_id?: string };
 export type CategoryUpdateInput = { name: string; parent_id: string | null; base_version?: number; current_category?: CategorySummary };

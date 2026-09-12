@@ -157,7 +157,7 @@ func ledgerCategoryID(t *testing.T, conn *sql.DB, systemKey string) string {
 
 func mustWallet(t *testing.T, repo *finance.Repository, userID, name string) finance.Wallet {
 	t.Helper()
-	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{Name: name, Type: finance.WalletCash})
+	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{Name: name, Type: finance.WalletBasic})
 	if err != nil {
 		t.Fatalf("create wallet %s: %v", name, err)
 	}

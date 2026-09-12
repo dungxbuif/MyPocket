@@ -96,6 +96,38 @@ func TestConfirmTransactionDraftReplayPrecedesVersionCheckAndHasNoNewEffects(t *
 	assertPlanningCount(t, fixture.conn, `SELECT count(*) FROM finance_idempotency_keys WHERE user_id = $1`, 1, fixture.owner)
 }
 
+func TestConfirmTransactionDraftCarriesBudgetAssignmentToConfirmedExpense(t *testing.T) {
+	fixture := newDraftDecisionFixture(t)
+	categoryID := findPlanningSystemCategory(t, fixture.conn, "expense_food")
+	budget, err := fixture.repo.CreateBudget(context.Background(), fixture.owner, planning.CreateBudgetInput{
+		Name: "Hũ ăn uống", PeriodType: planning.BudgetMonthly, AmountVND: 500000, CategoryIDs: []string{categoryID},
+	})
+	if err != nil {
+		t.Fatalf("create budget: %v", err)
+	}
+	draftID := insertBudgetedTransactionDraft(t, fixture.conn, fixture.owner, "budgeted-draft", finance.TransactionExpense, fixture.source.ID, "", categoryID, budget.ID, 100000, "Scheduled")
+
+	decision, err := fixture.repo.ConfirmTransactionDraft(context.Background(), fixture.owner, draftID, planning.ConfirmTransactionDraftInput{
+		Version:        1,
+		AmountVND:      125000,
+		Note:           "Accepted",
+		IdempotencyKey: "budgeted-draft-confirm",
+	})
+	if err != nil {
+		t.Fatalf("confirm budgeted draft: %v", err)
+	}
+	if decision.Transaction == nil || decision.Transaction.BudgetID != budget.ID {
+		t.Fatalf("confirmed transaction must carry draft budget assignment: %#v", decision.Transaction)
+	}
+	progress, err := fixture.repo.ListBudgetProgress(context.Background(), fixture.owner, time.Date(2026, 9, 10, 2, 0, 0, 0, time.UTC))
+	if err != nil {
+		t.Fatalf("list progress: %v", err)
+	}
+	if len(progress) != 1 || progress[0].SpentVND != 125000 {
+		t.Fatalf("budget progress must include confirmed draft transaction: %#v", progress)
+	}
+}
+
 func TestConcurrentTransactionDraftConfirmationsReturnOneAccountingResult(t *testing.T) {
 	fixture := newDraftDecisionFixture(t)
 	setPlanningWalletBalance(t, fixture.conn, fixture.source.ID, 500000)
@@ -344,12 +376,17 @@ func newDraftDecisionFixture(t *testing.T) draftDecisionFixture {
 
 func insertTransactionDraft(t *testing.T, conn *sql.DB, userID, occurrenceKey string, txType finance.TransactionType, sourceWalletID, destinationWalletID, categoryID string, amountVND int64, note string) string {
 	t.Helper()
+	return insertBudgetedTransactionDraft(t, conn, userID, occurrenceKey, txType, sourceWalletID, destinationWalletID, categoryID, "", amountVND, note)
+}
+
+func insertBudgetedTransactionDraft(t *testing.T, conn *sql.DB, userID, occurrenceKey string, txType finance.TransactionType, sourceWalletID, destinationWalletID, categoryID, budgetID string, amountVND int64, note string) string {
+	t.Helper()
 	var id string
 	if err := conn.QueryRowContext(context.Background(), `
-		INSERT INTO transaction_drafts (user_id, occurrence_key, transaction_type, source_wallet_id, destination_wallet_id, category_id, amount_vnd, occurred_at, note)
-		VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, $7, $8, $9)
+		INSERT INTO transaction_drafts (user_id, occurrence_key, transaction_type, source_wallet_id, destination_wallet_id, category_id, budget_id, amount_vnd, occurred_at, note)
+		VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, NULLIF($7, '')::uuid, $8, $9, $10)
 		RETURNING id::text
-	`, userID, occurrenceKey, string(txType), sourceWalletID, destinationWalletID, categoryID, amountVND, time.Date(2026, 9, 10, 2, 0, 0, 0, time.UTC), note).Scan(&id); err != nil {
+	`, userID, occurrenceKey, string(txType), sourceWalletID, destinationWalletID, categoryID, budgetID, amountVND, time.Date(2026, 9, 10, 2, 0, 0, 0, time.UTC), note).Scan(&id); err != nil {
 		t.Fatalf("insert transaction draft: %v", err)
 	}
 	return id

@@ -34,7 +34,7 @@ async function closeWalletManager(page: Page) {
 async function createWallet(page: Page, name: string) {
   await page.getByRole("button", { name: "Thêm ví", exact: true }).click();
   await page.getByLabel("Tên ví mới").fill(name);
-  await page.getByLabel("Loại ví").selectOption("cash");
+  await page.getByLabel("Loại ví").selectOption("basic");
   await page.getByRole("button", { name: "Tạo ví" }).click();
   await expect(page.getByRole("dialog").locator("strong").filter({ hasText: name })).toBeVisible();
 }

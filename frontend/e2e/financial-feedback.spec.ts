@@ -14,16 +14,18 @@ async function ledger(page: Page) {
     expect(response.status(), await response.text()).toBe(201);
     return response.json();
   };
-  const wallet = (await post('wallets', { name: 'Ví kiểm chứng F1', type: 'cash' })).wallet;
+  const wallet = (await post('wallets', { name: 'Ví kiểm chứng F1', type: 'basic' })).wallet;
   const category = (await post('categories', { name: 'Chi F1', kind: 'expense' })).category;
   await post('transactions', { type: 'expense', source_wallet_id: wallet.id, category_id: category.id, amount_vnd: 410000, occurred_at: new Date().toISOString(), note: 'Chi thực 410 nghìn' });
   return { wallet, category, post };
 }
 
 test('overlapping budgets retain independent exact totals when choosing and reloading', async ({ page }, info) => {
-  const { post, category } = await ledger(page);
+  const { post, wallet, category } = await ledger(page);
   const a = (await post('budgets', { name: 'Hạn mức A', period_type: 'monthly', amount_vnd: 500000, category_ids: [category.id] })).budget;
   const b = (await post('budgets', { name: 'Hạn mức B', period_type: 'monthly', amount_vnd: 200000, category_ids: [category.id] })).budget;
+  await post('transactions', { type: 'expense', source_wallet_id: wallet.id, category_id: category.id, budget_id: a.id, amount_vnd: 410000, occurred_at: new Date().toISOString(), note: 'Chi ngân sách A' });
+  await post('transactions', { type: 'expense', source_wallet_id: wallet.id, category_id: category.id, budget_id: b.id, amount_vnd: 410000, occurred_at: new Date().toISOString(), note: 'Chi ngân sách B' });
   await page.reload();
   await page.getByRole('button', { name: 'Ngân sách', exact: true }).click();
   const summary = page.getByRole('region', { name: 'Ngân sách đã chọn' });

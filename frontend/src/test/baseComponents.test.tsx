@@ -207,7 +207,7 @@ describe("Base UI Components & Charts", () => {
       <WalletPickerSheet
         isOpen={true}
         onClose={handleClose}
-        wallets={[{ id: "w_1", name: "Ví Tiền Mặt", balance_vnd: 500000, type: "cash", include_in_total: true, is_default_ai: false, version: 1 }]}
+        wallets={[{ id: "w_1", name: "Ví Tiền Mặt", balance_vnd: 500000, type: "basic", include_in_total: true, is_default_ai: false, version: 1 }]}
         onSelectWallet={handleSelect}
       />
     );

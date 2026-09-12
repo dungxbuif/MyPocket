@@ -76,6 +76,7 @@ export type ObligationInput = {
 };
 
 export type RecurrenceFrequency = "daily" | "weekly" | "monthly";
+export type RecurringPostingMode = "draft" | "auto_post";
 
 export type RecurringSchedule = {
   id: string;
@@ -84,10 +85,14 @@ export type RecurringSchedule = {
   timezone: string;
   starts_at: string;
   next_occurs_at: string;
+  ends_at?: string;
+  paused_at?: string;
+  posting_mode: RecurringPostingMode;
   type: "income" | "expense" | "transfer";
   source_wallet_id: string;
   destination_wallet_id?: string;
   category_id?: string;
+  budget_id?: string;
   amount_vnd: number;
   note: string;
   version: number;
@@ -98,10 +103,13 @@ export type RecurringScheduleInput = {
   frequency: RecurrenceFrequency;
   timezone: string;
   starts_at: string;
+  ends_at?: string;
+  posting_mode?: RecurringPostingMode;
   type: "income" | "expense" | "transfer";
   source_wallet_id: string;
   destination_wallet_id?: string;
   category_id?: string;
+  budget_id?: string;
   amount_vnd: number;
   note?: string;
 };
@@ -114,6 +122,7 @@ export type TransactionDraft = {
   source_wallet_id: string;
   destination_wallet_id?: string;
   category_id?: string;
+  budget_id?: string;
   amount_vnd: number;
   occurred_at: string;
   note: string;
@@ -238,6 +247,33 @@ export async function createRecurringSchedule(input: RecurringScheduleInput) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
+  });
+  return response.schedule;
+}
+
+export async function updateRecurringSchedule(id: string, input: RecurringScheduleInput, baseVersion: number) {
+  const response = await apiFetch<{ schedule: RecurringSchedule }>(`/api/v1/recurring-schedules/${encodeURIComponent(id)}`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ...input, base_version: baseVersion }),
+  });
+  return response.schedule;
+}
+
+export async function pauseRecurringSchedule(id: string, baseVersion: number) {
+  const response = await apiFetch<{ schedule: RecurringSchedule }>(`/api/v1/recurring-schedules/${encodeURIComponent(id)}/pause`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base_version: baseVersion }),
+  });
+  return response.schedule;
+}
+
+export async function resumeRecurringSchedule(id: string, baseVersion: number) {
+  const response = await apiFetch<{ schedule: RecurringSchedule }>(`/api/v1/recurring-schedules/${encodeURIComponent(id)}/resume`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ base_version: baseVersion }),
   });
   return response.schedule;
 }

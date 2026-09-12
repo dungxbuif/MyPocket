@@ -10,7 +10,28 @@ shared_fields: [status]
 
 # Changelog
 
-## Unreleased — 2026-09-11 completion contract
+## [v1.0.0] — 2026-09-12 — First release
+
+First MyPocket release candidate covering the finance core, offline sync, planning, reports, Agent/OCR integration, public API docs, and the final A/B/C/D cleanup requested for this milestone.
+
+### Wallet, budget, recurring, and Agent completion
+
+- Replaced pseudo wallet channel types with behavior types: `basic`, `goal`, and `credit`. Existing `cash`, `bank`, `e_wallet`, and wallet-level `debt` rows migrate to `basic`; `savings` migrates to `goal`; `credit` remains `credit`. Goal wallets now support optional `goal_target_vnd` and `goal_deadline_on`.
+- Changed budgets to transaction-level assignment: expense transactions, drafts and recurring schedules can carry `budget_id`; budget progress now counts confirmed active report-included expenses explicitly assigned to that budget instead of category-derived spending.
+- Completed recurring schedule controls: update, pause/resume, optional `ends_at`, explicit `posting_mode=draft|auto_post`, budget carry-through, and UI controls for edit/end/auto-post/pause.
+- Added durable Agent chat sessions/messages and `drafts_created` action cards. Intake/advisor submissions now return `session`, persisted user `message`, and queued `run`; `GET /agent/intakes/{session_id}` returns bounded durable history. Legacy run polling remains.
+- Reconciled OpenAPI descriptors, architecture API/ERD docs, Docusaurus Agent/Budget/Planning/ERD pages, and the AI-agent `skills/mypocket-api` docs.
+- Release verification before production rollout: backend `go test -p 1 ./...`; frontend 184 tests; frontend production build; Docusaurus build; selected business Playwright E2E 24/24 and full Playwright E2E 105/105 across mobile, desktop and webkit-mobile. UAT remains outside this automated gate.
+
+### Two-chat Agent refinement
+
+- Split Agent API into `/api/v1/agent/intakes` for text/image transaction intake and `/api/v1/agent/advisor/messages` for read-only financial Q&A. The legacy `/api/v1/agent/messages` route remains compatible for explicit `kind` submissions.
+- Intake now accepts multiple income/expense proposals per run and rejects transfers; advisor completions are answer-only and create no `transaction_drafts`.
+- Fixed the OCR Platform adapter to match the real `mac-ocr` REST contract: capabilities use `engine`/`capabilityVersion`, submissions send `input.base64` plus normalized `options.languages`, and polling reads `documentId`, `result.text`, `result.pageCount`, `result.pages`, `resultExpiresAt`, and `errorDetail`.
+- Updated OpenAPI route inventory, public Agent docs, image guide and AI-agent skill docs for the two-chat contract.
+- Local verification: focused backend `platform/ocr`, `agent`, `worker`, `httpapi` packages pass with PostgreSQL test DB; `frontend/src/app/agent.test.ts` passes. No production provider/OCR smoke, full E2E, deploy or physical-device UAT in this slice.
+
+### Completion contract
 
 - Added review-first OpenAI-compatible Agent text/analysis endpoints and worker; provider output can create transaction drafts but never confirmed ledger entries.
 - Added optional owned-receipt attachment with OCR Platform as a server-side third-party image tool, including leases, checksum/size checks and user/run scoping. No bank integration is included.
@@ -18,7 +39,7 @@ shared_fields: [status]
 - Mounted Agent text/image UI and consolidated the product into a monochrome shared-component interface with five-tab navigation and non-blocking blurred PWA install prompt.
 - Local verification: 177 frontend tests, production build and 105 Playwright E2E pass; physical iPhone/Safari UAT and production provider smoke remain release blockers.
 
-## Unreleased — 2026-09-11 correctness follow-up
+### Correctness follow-up
 
 - Constrain shared comparison-chart columns and labels to available width. Large seven-day report values no longer expand the mobile viewport and displace fixed navigation/PWA hit targets; complete values remain in label text/title.
 - Reject portfolio overflow in rounded quantities × prices, fees, cost basis, realized/unrealized profit and aggregate valuation; rejected commands preserve state/version/change feed.
@@ -31,7 +52,7 @@ shared_fields: [status]
 - Human owns release approval.
 - AI maintains planned and released change entries with trace links.
 
-## [Unreleased — business-logic and integration audit]
+### Business-logic and integration audit
 
 - Added a repository-owned AI audit skill plus public Docusaurus guidance so future agents can reproduce the finance/planning/analytics/sync/auth review contract.
 - Fixed checked balance and reporting arithmetic, exact edit/archive reversals, receipt-preserving idempotency, recurring transaction validation, obligation repayment direction/reuse/locking and HCM calendar-date defaults.

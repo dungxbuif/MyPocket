@@ -36,7 +36,7 @@ describe("transaction outbox", () => {
   });
 
   it("queues wallet and category mutations with durable ordering", async () => {
-    const wallet = await queueWalletCreate({ name: "Ví offline", type: "cash" });
+    const wallet = await queueWalletCreate({ name: "Ví offline", type: "basic" });
     const category = await queueCategoryCreate({ name: "Ăn offline", kind: "expense" });
     const outbox = await readOutbox();
 
@@ -46,7 +46,7 @@ describe("transaction outbox", () => {
   });
 
   it("drains queued mutations through the sync API and updates the mirror", async () => {
-    await queueWalletCreate({ name: "Ví offline", type: "cash" });
+    await queueWalletCreate({ name: "Ví offline", type: "basic" });
     const outbox = await readOutbox();
     vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL) => {
       expect(new URL(String(input), "http://localhost").pathname).toBe("/api/v1/sync/mutations");
@@ -60,7 +60,7 @@ describe("transaction outbox", () => {
           operation: "create",
           state: "applied",
           version: 1,
-          payload: { id: "wallet_server", name: "Ví server", type: "cash", balance_vnd: 0, include_in_total: true, is_default_ai: false, version: 1 },
+          payload: { id: "wallet_server", name: "Ví server", type: "basic", balance_vnd: 0, include_in_total: true, is_default_ai: false, version: 1 },
         }],
       }), { status: 200, headers: { "Content-Type": "application/json" } });
     }));

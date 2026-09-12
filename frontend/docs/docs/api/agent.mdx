@@ -6,7 +6,102 @@ title: Agent và OCR image tool
 
 Agent là luồng bất đồng bộ, review-first. Provider OpenAI-compatible chỉ phân tích/phân loại/đề xuất; không được ghi trực tiếp vào giao dịch hoặc số dư. OCR Platform là API bên thứ ba xử lý ảnh cho agent, không phải kết nối ngân hàng và không có public proxy riêng trong MyPocket.
 
-## Gửi yêu cầu
+## Chat nhập giao dịch
+
+```http
+POST /api/v1/agent/intakes
+Authorization: Bearer <user-api-key>
+Idempotency-Key: <stable-logical-request-id>
+Content-Type: application/json
+```
+
+```json
+{
+  "message": "Bữa trưa 120000 đồng từ ví tiền mặt",
+  "receipt_id": "optional-owned-receipt-uuid"
+}
+```
+
+Luồng intake chỉ được tạo nháp thu/chi. Không dùng endpoint này cho chuyển ví, ngân sách, khoản nợ, sửa giao dịch đã ghi sổ, ngân hàng hoặc voice. Nếu model/provider đề xuất transfer hoặc ID không thuộc user, backend từ chối hoặc fail run; số dư không đổi.
+
+Response `202`:
+
+```json
+{
+  "status": "ok",
+  "session": {
+    "id": "session-id",
+    "kind": "intake",
+    "title": "Nhập giao dịch",
+    "status": "active"
+  },
+  "message": {
+    "id": "message-id",
+    "session_id": "session-id",
+    "run_id": "run-id",
+    "role": "user",
+    "text": "Bữa trưa 120000 đồng từ ví tiền mặt"
+  },
+  "run": {
+    "id": "run-id",
+    "session_id": "session-id",
+    "kind": "intake",
+    "status": "queued",
+    "request_text": "Bữa trưa 120000 đồng từ ví tiền mặt",
+    "attempts": 0,
+    "draft_ids": [],
+    "created_at": "2026-09-11T02:00:00Z",
+    "updated_at": "2026-09-11T02:00:00Z"
+  },
+  "correlation_id": "request-id"
+}
+```
+
+Có thể tiếp tục một run/session intake bằng:
+
+```http
+POST /api/v1/agent/intakes/{id}/messages
+```
+
+Body giống `POST /agent/intakes`. `{id}` là `session.id`, không phải `run.id`. Client đọc lịch sử chat bằng:
+
+```http
+GET /api/v1/agent/intakes/{session_id}
+```
+
+Response gồm `session` và `messages`. Khi worker tạo nháp, assistant message có action card:
+
+```json
+{
+  "role": "assistant",
+  "text": "Đã tạo 2 nháp giao dịch để bạn duyệt.",
+  "action": {
+    "type": "drafts_created",
+    "draft_ids": ["draft-1", "draft-2"]
+  }
+}
+```
+
+Client vẫn poll tiến độ bất đồng bộ bằng endpoint run chung bên dưới.
+
+## Chat tư vấn tài chính
+
+```http
+POST /api/v1/agent/advisor/messages
+Authorization: Bearer <user-api-key>
+Idempotency-Key: <stable-logical-request-id>
+Content-Type: application/json
+```
+
+```json
+{
+  "message": "Tháng này tôi tiêu gì nhiều nhất?"
+}
+```
+
+Advisor là read-only. Nó trả cùng envelope `session` + `message` + `run`, được trả lời bằng số liệu/diễn giải dựa trên dữ liệu user được phép đọc, nhưng không có tool ghi dữ liệu và không tạo `transaction_drafts`.
+
+## Endpoint tương thích
 
 ```http
 POST /api/v1/agent/messages
@@ -23,26 +118,7 @@ Content-Type: application/json
 }
 ```
 
-`kind` nhận `transaction_draft` hoặc `analysis`. `message` là text bắt buộc. `receipt_id`, nếu có, phải thuộc đúng user và trỏ tới object receipt đã upload. Unknown field và body lớn hơn 16 KiB bị từ chối.
-
-Response `202`:
-
-```json
-{
-  "status": "ok",
-  "run": {
-    "id": "run-id",
-    "kind": "transaction_draft",
-    "status": "queued",
-    "request_text": "Bữa trưa 120000 đồng từ ví tiền mặt",
-    "attempts": 0,
-    "draft_ids": [],
-    "created_at": "2026-09-11T02:00:00Z",
-    "updated_at": "2026-09-11T02:00:00Z"
-  },
-  "correlation_id": "request-id"
-}
-```
+`kind` nhận legacy `transaction_draft` hoặc `analysis`. Client mới nên dùng `/agent/intakes` và `/agent/advisor/messages` để tránh nhập nhằng scope. `message` là text bắt buộc. `receipt_id`, nếu có, phải thuộc đúng user và trỏ tới object receipt đã upload. Unknown field và body lớn hơn 16 KiB bị từ chối.
 
 ## Poll run
 
@@ -55,6 +131,8 @@ Trạng thái run: `queued`, `processing`, `completed`, `failed`. Khi có ảnh,
 
 Khi hoàn tất loại `transaction_draft`, `draft_ids` chỉ trỏ tới `transaction_drafts`. Client phải đọc bản nháp rồi gọi endpoint confirm/reject riêng. Nếu chưa confirm, báo cáo, số dư và danh sách giao dịch không thay đổi.
 
+Khi hoàn tất loại `intake`, `draft_ids` có thể chứa nhiều nháp thu/chi. Khi hoàn tất loại `advisor`, `response_text` chứa câu trả lời và `draft_ids` rỗng.
+
 ## OCR image tool
 
 1. Tạo receipt qua `POST /files/presign` và PUT đúng bytes vào presigned URL.
@@ -63,7 +141,20 @@ Khi hoàn tất loại `transaction_draft`, `draft_ids` chỉ trỏ tới `trans
 4. OCR text/fields chỉ được đưa vào context của đúng agent run/user.
 5. Kết quả có thể hỗ trợ luồng hóa đơn, nhưng mọi giá trị vẫn phải qua validation và review draft.
 
-MyPocket gọi OCR Platform bằng `GET /v1/ocr/capabilities`, `POST /v1/documents`, `GET /v1/documents/{id}` ở server-side. API key OCR không được đưa cho browser hay public qua MyPocket.
+MyPocket gọi OCR Platform bằng `GET /v1/ocr/capabilities`, `POST /v1/documents`, `GET /v1/documents/{documentId}` ở server-side. Đây là contract của dịch vụ `mac-ocr`, không phải skill cục bộ:
+
+```json
+{
+  "input": {
+    "base64": "<image-or-pdf-bytes-base64>"
+  },
+  "options": {
+    "languages": ["vi-VN", "en-US"]
+  }
+}
+```
+
+MyPocket đọc response submit từ `documentId` và poll kết quả từ `result.text`, `result.pageCount`, `result.pages`, `resultExpiresAt`, `errorDetail`. API key OCR không được đưa cho browser hay public qua MyPocket.
 
 ## Lỗi
 

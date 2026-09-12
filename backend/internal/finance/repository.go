@@ -63,6 +63,7 @@ func (r *Repository) commandCreateWallet(ctx context.Context, userID string, inp
 		return Wallet{}, err
 	}
 	var wallet Wallet
+	var goalTarget sql.NullInt64
 	err = r.db.QueryRowContext(ctx, `
 		INSERT INTO wallets (
 			id,
@@ -73,10 +74,12 @@ func (r *Repository) commandCreateWallet(ctx context.Context, userID string, inp
 			include_in_total,
 			credit_limit_vnd,
 			statement_day,
-			payment_due_day
+			payment_due_day,
+			goal_target_vnd,
+			goal_deadline_on
 		)
-		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, $3, $4, $5, coalesce($6, true), $7, $8, $9)
-		RETURNING id::text, user_id::text, name, type, balance_vnd, include_in_total, is_default_ai, version
+		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, $3, $4, $5, coalesce($6, true), $7, $8, $9, $10, NULLIF($11, '')::date)
+		RETURNING id::text, user_id::text, name, type, balance_vnd, include_in_total, is_default_ai, credit_limit_vnd, statement_day, payment_due_day, goal_target_vnd, coalesce(goal_deadline_on::text, ''), version
 	`,
 		input.ID,
 		userID,
@@ -87,6 +90,8 @@ func (r *Repository) commandCreateWallet(ctx context.Context, userID string, inp
 		input.CreditLimitVND,
 		input.StatementDay,
 		input.PaymentDueDay,
+		input.GoalTargetVND,
+		input.GoalDeadlineOn,
 	).Scan(
 		&wallet.ID,
 		&wallet.UserID,
@@ -95,17 +100,25 @@ func (r *Repository) commandCreateWallet(ctx context.Context, userID string, inp
 		&wallet.BalanceVND,
 		&wallet.IncludeInTotal,
 		&wallet.IsDefaultAI,
+		&wallet.CreditLimitVND,
+		&wallet.StatementDay,
+		&wallet.PaymentDueDay,
+		&goalTarget,
+		&wallet.GoalDeadlineOn,
 		&wallet.Version,
 	)
 	if err != nil {
 		return Wallet{}, fmt.Errorf("create wallet: %w", err)
+	}
+	if goalTarget.Valid {
+		wallet.GoalTargetVND = &goalTarget.Int64
 	}
 	return wallet, nil
 }
 
 func (r *Repository) ListWallets(ctx context.Context, userID string) ([]Wallet, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT id::text, user_id::text, name, type, balance_vnd, include_in_total, is_default_ai, version
+		SELECT id::text, user_id::text, name, type, balance_vnd, include_in_total, is_default_ai, credit_limit_vnd, statement_day, payment_due_day, goal_target_vnd, coalesce(goal_deadline_on::text, ''), version
 		FROM wallets
 		WHERE user_id = $1 AND archived_at IS NULL
 		ORDER BY created_at, id
@@ -118,6 +131,7 @@ func (r *Repository) ListWallets(ctx context.Context, userID string) ([]Wallet, 
 	var wallets []Wallet
 	for rows.Next() {
 		var wallet Wallet
+		var goalTarget sql.NullInt64
 		if err := rows.Scan(
 			&wallet.ID,
 			&wallet.UserID,
@@ -126,9 +140,17 @@ func (r *Repository) ListWallets(ctx context.Context, userID string) ([]Wallet, 
 			&wallet.BalanceVND,
 			&wallet.IncludeInTotal,
 			&wallet.IsDefaultAI,
+			&wallet.CreditLimitVND,
+			&wallet.StatementDay,
+			&wallet.PaymentDueDay,
+			&goalTarget,
+			&wallet.GoalDeadlineOn,
 			&wallet.Version,
 		); err != nil {
 			return nil, fmt.Errorf("scan wallet: %w", err)
+		}
+		if goalTarget.Valid {
+			wallet.GoalTargetVND = &goalTarget.Int64
 		}
 		wallets = append(wallets, wallet)
 	}
@@ -173,11 +195,12 @@ func (r *Repository) commandUpdateWallet(ctx context.Context, userID string, wal
 	}
 
 	var wallet Wallet
+	var goalTarget sql.NullInt64
 	err = tx.QueryRowContext(ctx, `
 		UPDATE wallets
 		SET name = $3, include_in_total = $4, updated_at = now(), version = version + 1
 		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
-		RETURNING id::text, user_id::text, name, type, balance_vnd, include_in_total, is_default_ai, version
+		RETURNING id::text, user_id::text, name, type, balance_vnd, include_in_total, is_default_ai, credit_limit_vnd, statement_day, payment_due_day, goal_target_vnd, coalesce(goal_deadline_on::text, ''), version
 	`, walletID, userID, input.Name, includeInTotal).Scan(
 		&wallet.ID,
 		&wallet.UserID,
@@ -186,6 +209,11 @@ func (r *Repository) commandUpdateWallet(ctx context.Context, userID string, wal
 		&wallet.BalanceVND,
 		&wallet.IncludeInTotal,
 		&wallet.IsDefaultAI,
+		&wallet.CreditLimitVND,
+		&wallet.StatementDay,
+		&wallet.PaymentDueDay,
+		&goalTarget,
+		&wallet.GoalDeadlineOn,
 		&wallet.Version,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -193,6 +221,9 @@ func (r *Repository) commandUpdateWallet(ctx context.Context, userID string, wal
 	}
 	if err != nil {
 		return Wallet{}, fmt.Errorf("update wallet: %w", err)
+	}
+	if goalTarget.Valid {
+		wallet.GoalTargetVND = &goalTarget.Int64
 	}
 	if err := tx.Commit(); err != nil {
 		return Wallet{}, fmt.Errorf("commit update wallet: %w", err)
@@ -567,6 +598,9 @@ func createTransactionInTx(ctx context.Context, tx commandtx.Queryer, userID str
 	if err := requireTransactionCategory(ctx, tx, userID, input.SourceWalletID, input.CategoryID, input.Type); err != nil {
 		return Transaction{}, err
 	}
+	if err := requireTransactionBudget(ctx, tx, userID, input.BudgetID, input.Type); err != nil {
+		return Transaction{}, err
+	}
 
 	effect, err := ApplyAccountingEffect(AccountingInput{
 		Type:                  input.Type,
@@ -636,6 +670,9 @@ func (r *Repository) UpdateTransaction(ctx context.Context, userID string, trans
 		return Transaction{}, err
 	}
 	if err := requireTransactionCategory(ctx, tx, userID, normalized.SourceWalletID, normalized.CategoryID, normalized.Type); err != nil {
+		return Transaction{}, err
+	}
+	if err := requireTransactionBudget(ctx, tx, userID, normalized.BudgetID, normalized.Type); err != nil {
 		return Transaction{}, err
 	}
 	if normalized.ReceiptObjectID != "" {
@@ -753,6 +790,7 @@ func (r *Repository) ListTransactions(ctx context.Context, userID string, filter
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(budget_id::text, ''),
 			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
@@ -832,6 +870,7 @@ func loadActiveTransaction(ctx context.Context, tx commandtx.Queryer, userID str
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(budget_id::text, ''),
 			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
@@ -867,6 +906,7 @@ func GetTransactionInTx(ctx context.Context, tx *sql.Tx, userID string, transact
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(budget_id::text, ''),
 			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
@@ -981,6 +1021,24 @@ func requireWalletCategoryActive(ctx context.Context, tx commandtx.Queryer, user
 	return nil
 }
 
+func requireTransactionBudget(ctx context.Context, tx commandtx.Queryer, userID string, budgetID string, txType TransactionType) error {
+	budgetID = trimmed(budgetID)
+	if budgetID == "" {
+		return nil
+	}
+	if txType != TransactionExpense {
+		return fmt.Errorf("%w: only expense transactions can be assigned to a budget", ErrValidation)
+	}
+	var exists bool
+	if err := tx.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM budgets WHERE id = $1 AND user_id = $2 AND archived_at IS NULL)`, budgetID, userID).Scan(&exists); err != nil {
+		return fmt.Errorf("check transaction budget: %w", err)
+	}
+	if !exists {
+		return ErrForbidden
+	}
+	return nil
+}
+
 func updateWalletBalance(ctx context.Context, tx commandtx.Queryer, userID string, walletID string, balanceVND int64) error {
 	result, err := tx.ExecContext(ctx, `
 		UPDATE wallets
@@ -1028,6 +1086,7 @@ func insertTransaction(ctx context.Context, tx commandtx.Queryer, userID string,
 			source_wallet_id,
 			 destination_wallet_id,
 			 category_id,
+			budget_id,
 			receipt_object_id,
 			amount_vnd,
 			balance_after_vnd,
@@ -1039,7 +1098,7 @@ func insertTransaction(ctx context.Context, tx commandtx.Queryer, userID string,
 			occurred_at,
 			excluded_from_reports
 		)
-		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, $3, $4, NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, NULLIF($7, '')::uuid, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+		VALUES (coalesce(nullif($1, '')::uuid, gen_random_uuid()), $2, $3, $4, NULLIF($5, '')::uuid, NULLIF($6, '')::uuid, NULLIF($7, '')::uuid, NULLIF($8, '')::uuid, $9, $10, $11, $12, $13, $14, $15, $16, $17)
 		RETURNING
 			id::text,
 			user_id::text,
@@ -1047,6 +1106,7 @@ func insertTransaction(ctx context.Context, tx commandtx.Queryer, userID string,
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(budget_id::text, ''),
 			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
@@ -1066,6 +1126,7 @@ func insertTransaction(ctx context.Context, tx commandtx.Queryer, userID string,
 		input.SourceWalletID,
 		input.DestinationWalletID,
 		input.CategoryID,
+		input.BudgetID,
 		input.ReceiptObjectID,
 		input.AmountVND,
 		effect.SourceBalanceVND,
@@ -1083,6 +1144,7 @@ func insertTransaction(ctx context.Context, tx commandtx.Queryer, userID string,
 		&transaction.SourceWalletID,
 		&transaction.DestinationWalletID,
 		&transaction.CategoryID,
+		&transaction.BudgetID,
 		&transaction.ReceiptObjectID,
 		&transaction.AmountVND,
 		&transaction.BalanceAfterVND,
@@ -1109,16 +1171,17 @@ func updateTransactionRow(ctx context.Context, tx commandtx.Queryer, userID stri
 			source_wallet_id = $4,
 			destination_wallet_id = NULLIF($5, '')::uuid,
 			category_id = NULLIF($6, '')::uuid,
-			receipt_object_id = NULLIF($7, '')::uuid,
-			amount_vnd = $8,
-			balance_after_vnd = $9,
-			source_delta_vnd = $10,
-			destination_delta_vnd = $11,
-			note = $12,
-			with_person = $13,
-			event_ref = $14,
-			occurred_at = $15,
-			excluded_from_reports = $16,
+			budget_id = NULLIF($7, '')::uuid,
+			receipt_object_id = NULLIF($8, '')::uuid,
+			amount_vnd = $9,
+			balance_after_vnd = $10,
+			source_delta_vnd = $11,
+			destination_delta_vnd = $12,
+			note = $13,
+			with_person = $14,
+			event_ref = $15,
+			occurred_at = $16,
+			excluded_from_reports = $17,
 			updated_at = now(),
 			version = version + 1
 		WHERE id = $1 AND user_id = $2 AND archived_at IS NULL
@@ -1129,6 +1192,7 @@ func updateTransactionRow(ctx context.Context, tx commandtx.Queryer, userID stri
 			source_wallet_id::text,
 			coalesce(destination_wallet_id::text, ''),
 			coalesce(category_id::text, ''),
+			coalesce(budget_id::text, ''),
 			coalesce(receipt_object_id::text, ''),
 			amount_vnd,
 			coalesce(balance_after_vnd, 0),
@@ -1147,6 +1211,7 @@ func updateTransactionRow(ctx context.Context, tx commandtx.Queryer, userID stri
 		input.SourceWalletID,
 		input.DestinationWalletID,
 		input.CategoryID,
+		input.BudgetID,
 		input.ReceiptObjectID,
 		input.AmountVND,
 		effect.SourceBalanceVND,
@@ -1184,6 +1249,7 @@ func scanTransaction(scanner transactionScanner) (Transaction, error) {
 		&transaction.SourceWalletID,
 		&transaction.DestinationWalletID,
 		&transaction.CategoryID,
+		&transaction.BudgetID,
 		&transaction.ReceiptObjectID,
 		&transaction.AmountVND,
 		&transaction.BalanceAfterVND,

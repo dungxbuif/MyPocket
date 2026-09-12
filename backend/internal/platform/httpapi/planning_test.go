@@ -242,6 +242,30 @@ func TestRecurringSchedulesAPIUsesAuthenticatedUser(t *testing.T) {
 		t.Fatalf("schedule create failed/scoped wrong: code=%d user=%q input=%#v body=%s", createRes.Code, repo.scheduleCreateUserID, repo.scheduleCreateInput, createRes.Body.String())
 	}
 
+	updateReq := authenticatedRequest(t, http.MethodPatch, "/api/v1/recurring-schedules/schedule-1", `{"base_version":1,"name":"Internet updated","frequency":"monthly","timezone":"Asia/Ho_Chi_Minh","starts_at":"2026-08-31T09:00:00+07:00","ends_at":"2026-12-31T09:00:00+07:00","posting_mode":"auto_post","type":"expense","source_wallet_id":"wallet-1","category_id":"cat-1","budget_id":"budget-1","amount_vnd":300000,"note":"Wifi mới"}`)
+	addCSRF(updateReq)
+	updateRes := httptest.NewRecorder()
+	handler.ServeHTTP(updateRes, updateReq)
+	if updateRes.Code != http.StatusOK || repo.scheduleUpdateUserID != "user_123" || repo.scheduleUpdateID != "schedule-1" || repo.scheduleUpdateInput.BaseVersion != 1 || repo.scheduleUpdateInput.PostingMode != planning.RecurringPostingAutoPost || repo.scheduleUpdateInput.BudgetID != "budget-1" {
+		t.Fatalf("schedule update failed/scoped wrong: code=%d user=%q id=%q input=%#v body=%s", updateRes.Code, repo.scheduleUpdateUserID, repo.scheduleUpdateID, repo.scheduleUpdateInput, updateRes.Body.String())
+	}
+
+	pauseReq := authenticatedRequest(t, http.MethodPost, "/api/v1/recurring-schedules/schedule-1/pause", `{"base_version":2}`)
+	addCSRF(pauseReq)
+	pauseRes := httptest.NewRecorder()
+	handler.ServeHTTP(pauseRes, pauseReq)
+	if pauseRes.Code != http.StatusOK || repo.schedulePauseUserID != "user_123" || repo.schedulePauseID != "schedule-1" || repo.schedulePauseVersion != 2 {
+		t.Fatalf("schedule pause failed/scoped wrong: code=%d user=%q id=%q version=%d body=%s", pauseRes.Code, repo.schedulePauseUserID, repo.schedulePauseID, repo.schedulePauseVersion, pauseRes.Body.String())
+	}
+
+	resumeReq := authenticatedRequest(t, http.MethodPost, "/api/v1/recurring-schedules/schedule-1/resume", `{"base_version":3}`)
+	addCSRF(resumeReq)
+	resumeRes := httptest.NewRecorder()
+	handler.ServeHTTP(resumeRes, resumeReq)
+	if resumeRes.Code != http.StatusOK || repo.scheduleResumeUserID != "user_123" || repo.scheduleResumeID != "schedule-1" || repo.scheduleResumeVersion != 3 {
+		t.Fatalf("schedule resume failed/scoped wrong: code=%d user=%q id=%q version=%d body=%s", resumeRes.Code, repo.scheduleResumeUserID, repo.scheduleResumeID, repo.scheduleResumeVersion, resumeRes.Body.String())
+	}
+
 	draftReq := authenticatedRequest(t, http.MethodGet, "/api/v1/transaction-drafts", "")
 	draftRes := httptest.NewRecorder()
 	handler.ServeHTTP(draftRes, draftReq)
@@ -520,6 +544,15 @@ type planningRepoStub struct {
 	scheduleListUserID      string
 	scheduleCreateUserID    string
 	scheduleCreateInput     planning.CreateRecurringScheduleInput
+	scheduleUpdateUserID    string
+	scheduleUpdateID        string
+	scheduleUpdateInput     planning.UpdateRecurringScheduleInput
+	schedulePauseUserID     string
+	schedulePauseID         string
+	schedulePauseVersion    int64
+	scheduleResumeUserID    string
+	scheduleResumeID        string
+	scheduleResumeVersion   int64
 	scheduleArchiveUserID   string
 	scheduleArchiveID       string
 	drafts                  []planning.TransactionDraft
@@ -631,6 +664,28 @@ func (s *planningRepoStub) CreateRecurringSchedule(_ context.Context, userID str
 	s.scheduleCreateUserID = userID
 	s.scheduleCreateInput = input
 	return s.createdSchedule, nil
+}
+
+func (s *planningRepoStub) UpdateRecurringSchedule(_ context.Context, userID string, scheduleID string, input planning.UpdateRecurringScheduleInput) (planning.RecurringSchedule, error) {
+	s.scheduleUpdateUserID = userID
+	s.scheduleUpdateID = scheduleID
+	s.scheduleUpdateInput = input
+	return planning.RecurringSchedule{ID: scheduleID, UserID: userID, Name: input.Name, Frequency: input.Frequency, Timezone: input.Timezone, Type: input.Type, SourceWalletID: input.SourceWalletID, DestinationWalletID: input.DestinationWalletID, CategoryID: input.CategoryID, BudgetID: input.BudgetID, AmountVND: input.AmountVND, Note: input.Note, PostingMode: input.PostingMode, Version: input.BaseVersion + 1}, nil
+}
+
+func (s *planningRepoStub) PauseRecurringSchedule(_ context.Context, userID string, scheduleID string, baseVersion int64) (planning.RecurringSchedule, error) {
+	s.schedulePauseUserID = userID
+	s.schedulePauseID = scheduleID
+	s.schedulePauseVersion = baseVersion
+	now := time.Date(2026, 9, 12, 0, 0, 0, 0, time.UTC)
+	return planning.RecurringSchedule{ID: scheduleID, UserID: userID, PausedAt: &now, PostingMode: planning.RecurringPostingDraft, Version: baseVersion + 1}, nil
+}
+
+func (s *planningRepoStub) ResumeRecurringSchedule(_ context.Context, userID string, scheduleID string, baseVersion int64, _ time.Time) (planning.RecurringSchedule, error) {
+	s.scheduleResumeUserID = userID
+	s.scheduleResumeID = scheduleID
+	s.scheduleResumeVersion = baseVersion
+	return planning.RecurringSchedule{ID: scheduleID, UserID: userID, PostingMode: planning.RecurringPostingDraft, Version: baseVersion + 1}, nil
 }
 
 func (s *planningRepoStub) ArchiveRecurringSchedule(_ context.Context, userID string, scheduleID string, _ int64) error {

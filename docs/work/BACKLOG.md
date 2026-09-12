@@ -35,6 +35,8 @@ updated: 2026-08-31
 
 ## Items
 
+2026-09-12 two-chat Agent refinement: owner approved implementation of the reviewed two-chat design. [Verification](test-verification/AGENT-TWO-CHAT-2026-09-12.md) is in_review: intake and advisor API/client split, multiple income/expense draft proposals, transfer rejection, advisor read-only boundary and OpenAPI/docs reconciliation have focused local proof. Full provider/OCR smoke, E2E, physical-device UAT and deployment remain open gates.
+
 Latest 2026-09-11 completion run: public API/authorization, lifecycle, Agent/OCR image tool and monochrome base-component UI have local evidence. Frontend has 177/177 tests, production build and 105/105 E2E passes across desktop Chromium, mobile Chromium and mobile WebKit. Production provider smoke and physical iPhone/Safari UAT remain fail-closed release gates; no deploy claim.
 
 2026-09-11 continuation: [portfolio arithmetic](phases/PORTFOLIO-MONEY-DETAIL_DESIGN.md) and [offline presentation reconciliation](phases/OFFLINE-RECONCILIATION-DETAIL_DESIGN.md) address reproduced defects. Track fresh test results and remaining immediate-offline category issue in the [audit record](test-verification/BUSINESS-LOGIC-AUDIT-2026-09-10.md). No release readiness inferred from focused passes.

@@ -52,7 +52,7 @@ func TestRepositoryConfirmationIsVersionedAndResetPreservesIdentity(t *testing.T
 	db := lifecycleDB(t)
 	user := lifecycleUser(t, db, "life-reset@example.com")
 	repo := NewRepository(db)
-	if _, err := db.Exec(`INSERT INTO wallets(user_id,name,type) VALUES($1,'Cash','cash')`, user); err != nil {
+	if _, err := db.Exec(`INSERT INTO wallets(user_id,name,type) VALUES($1,'Cash','basic')`, user); err != nil {
 		t.Fatal(err)
 	}
 	job, err := repo.CreateJob(context.Background(), user, KindImport, "import", ImportRequest{ObjectKey: "users/" + user + "/imports/a.csv"})

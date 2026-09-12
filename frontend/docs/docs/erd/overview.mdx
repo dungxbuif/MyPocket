@@ -88,13 +88,15 @@ erDiagram
 | `id` | `uuid` | PK, `gen_random_uuid()` | ID ví |
 | `user_id` | `uuid` | NOT NULL, FK → users(id) | Chủ sở hữu |
 | `name` | `text` | NOT NULL, CHECK `length(trim(name)) > 0` | Tên ví |
-| `type` | `text` | NOT NULL, CHECK IN (`cash`, `bank`, `credit`, `e_wallet`, `savings`, `debt`) | Loại ví |
+| `type` | `text` | NOT NULL, CHECK IN (`basic`, `goal`, `credit`) | Hành vi ví |
 | `balance_vnd` | `bigint` | NOT NULL, DEFAULT 0 | Số dư (VND) |
 | `include_in_total` | `boolean` | NOT NULL, DEFAULT true | Tính vào tổng tài sản |
 | `is_default_ai` | `boolean` | NOT NULL, DEFAULT false | Ví mặc định cho AI |
 | `credit_limit_vnd` | `bigint` | CHECK (`>= 0`) | Hạn mức tín dụng |
 | `statement_day` | `integer` | CHECK (1-31) | Ngày sao kê |
 | `payment_due_day` | `integer` | CHECK (1-31) | Ngày đến hạn thanh toán |
+| `goal_target_vnd` | `bigint` | CHECK (`> 0`) | Mục tiêu ví `goal` |
+| `goal_deadline_on` | `date` | | Ngày mục tiêu ví `goal` |
 | `archived_at` | `timestamptz` | | Ngày lưu trữ |
 | `version` | `bigint` | NOT NULL, DEFAULT 1, CHECK (> 0) | Phiên bản optimistic lock |
 | `created_at` | `timestamptz` | NOT NULL, DEFAULT now() | |
@@ -174,6 +176,7 @@ erDiagram
 | `source_wallet_id` | `uuid` | NOT NULL, FK → wallets(id) | Ví nguồn |
 | `destination_wallet_id` | `uuid` | FK → wallets(id), NULLABLE | Ví đích (transfer) |
 | `category_id` | `uuid` | FK → categories(id), NULLABLE | Danh mục |
+| `budget_id` | `uuid` | FK → budgets(id), NULLABLE | Expense only; explicit budget progress assignment |
 | `receipt_object_id` | `uuid` | FK → receipt_objects(id), NULLABLE | Hoá đơn |
 | `amount_vnd` | `bigint` | NOT NULL, CHECK (> 0) | Số tiền |
 | `balance_after_vnd` | `bigint` | | Số dư sau giao dịch |
@@ -347,10 +350,14 @@ erDiagram
 | `timezone` | `text` | NOT NULL | |
 | `starts_at` | `timestamptz` | NOT NULL | |
 | `next_occurs_at` | `timestamptz` | NOT NULL | |
+| `ends_at` | `timestamptz` | | Optional stop timestamp |
+| `paused_at` | `timestamptz` | | Non-null means worker skips schedule |
+| `posting_mode` | `text` | NOT NULL, CHECK IN (`draft`, `auto_post`) | Default `draft` |
 | `transaction_type` | `text` | NOT NULL, CHECK IN (`income`, `expense`, `transfer`) | |
 | `source_wallet_id` | `uuid` | NOT NULL, FK → wallets(id) | |
 | `destination_wallet_id` | `uuid` | FK → wallets(id) | Cho transfer |
 | `category_id` | `uuid` | FK → categories(id) | |
+| `budget_id` | `uuid` | FK → budgets(id) | Expense only |
 | `amount_vnd` | `bigint` | NOT NULL, CHECK (> 0) | |
 | `note` | `text` | NOT NULL, DEFAULT '' | |
 | `archived_at` | `timestamptz` | | |
@@ -380,6 +387,7 @@ erDiagram
 | `source_wallet_id` | `uuid` | NOT NULL, FK → wallets(id) | |
 | `destination_wallet_id` | `uuid` | FK → wallets(id) | |
 | `category_id` | `uuid` | FK → categories(id) | |
+| `budget_id` | `uuid` | FK → budgets(id) | Expense only; carried into confirmed transaction |
 | `amount_vnd` | `bigint` | NOT NULL, CHECK (> 0) | |
 | `occurred_at` | `timestamptz` | NOT NULL | |
 | `note` | `text` | NOT NULL, DEFAULT '' | |
@@ -492,6 +500,49 @@ erDiagram
 | `source` | `text` | NOT NULL | `manual` hoặc provider name |
 | `provider_quote_id` | `text` | UNIQUE | |
 | `created_at` | `timestamptz` | | |
+
+---
+
+### Ingestion
+
+#### `agent_sessions`
+
+| Column | Type | Constraints | Mô tả |
+|--------|------|-----------|-------|
+| `id` | `uuid` | PK | |
+| `user_id` | `uuid` | NOT NULL, FK → users(id), UNIQUE WITH kind | |
+| `kind` | `text` | NOT NULL, CHECK IN (`intake`, `advisor`) | |
+| `title` | `text` | NOT NULL, DEFAULT '' | |
+| `context_summary` | `text` | NOT NULL, DEFAULT '' | Reserved for compaction |
+| `status` | `text` | NOT NULL, CHECK IN (`active`, `archived`) | |
+| `created_at`, `updated_at` | `timestamptz` | | |
+
+#### `agent_messages`
+
+| Column | Type | Constraints | Mô tả |
+|--------|------|-----------|-------|
+| `id` | `uuid` | PK | |
+| `user_id` | `uuid` | NOT NULL, FK → users(id) | |
+| `session_id` | `uuid` | NOT NULL, FK → agent_sessions(id) | |
+| `run_id` | `uuid` | FK → agent_runs(id) | Optional async run link |
+| `role` | `text` | NOT NULL, CHECK IN (`user`, `assistant`, `system`) | |
+| `text` | `text` | NOT NULL, DEFAULT '' | |
+| `action` | `jsonb` | | e.g. `{ "type": "drafts_created", "draft_ids": [...] }` |
+| `created_at` | `timestamptz` | | |
+
+#### `agent_runs`
+
+| Column | Type | Constraints | Mô tả |
+|--------|------|-----------|-------|
+| `id` | `uuid` | PK | |
+| `user_id` | `uuid` | NOT NULL, FK → users(id), UNIQUE WITH idempotency_key | |
+| `session_id` | `uuid` | FK → agent_sessions(id) | |
+| `idempotency_key` | `text` | NOT NULL | |
+| `kind` | `text` | NOT NULL, CHECK IN (`transaction_draft`, `analysis`, `intake`, `advisor`) | |
+| `status` | `text` | NOT NULL | queued/processing/completed/failed |
+| `request_text`, `response_text`, `error_code` | `text` | | |
+| `attempts` | `integer` | NOT NULL | |
+| `next_attempt_at`, `lease_expires_at`, `created_at`, `updated_at` | `timestamptz` | | |
 
 ---
 

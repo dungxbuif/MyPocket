@@ -17,20 +17,20 @@ title: Danh sách entities
 | `wallets` | Ví tiền | VND-first; credit metadata; versioned; archived |
 | `categories` | Danh mục 2 cấp | System rows locked; user rows archived |
 | `wallet_category_settings` | Kích hoạt category theo wallet | Composite unique |
-| `transactions` | Giao dịch đã xác nhận | Positive integer; type quyết định balance effect |
-| `transaction_drafts` | Bản nháp | Không ảnh hưởng balance |
+| `transactions` | Giao dịch đã xác nhận | Positive integer; type quyết định balance effect; expense có thể gắn `budget_id` |
+| `transaction_drafts` | Bản nháp | Không ảnh hưởng balance; có thể carry `budget_id` tới confirm |
 | `receipt_objects` | Metadata ảnh hoá đơn | S3 key, checksum, size, content type |
 
 ## Planning
 
 | Bảng | Mục đích | Ghi chú |
 |------|----------|---------|
-| `budgets` | Ngân sách | Weekly/monthly/quarterly/yearly/custom |
-| `budget_categories` | Category scope cho budget | Composite unique |
+| `budgets` | Ngân sách / hũ chi tiêu | Weekly/monthly/quarterly/yearly/custom; progress theo transaction `budget_id` |
+| `budget_categories` | Category hint cho budget | Composite unique; không tự tính progress |
 | `budget_alerts` | Alert 80%/100% | Dedupe theo budget/threshold/period |
 | `events` | Sự kiện | Versioned; archived |
 | `event_transactions` | Link event-transaction | Composite unique |
-| `recurring_schedules` | Lịch lặp | Worker emit drafts |
+| `recurring_schedules` | Lịch lặp | Draft hoặc auto-post, edit/pause/resume/end |
 | `recurring_occurrences` | Ledger occurrences | Unique per schedule/key |
 | `obligations` | Vay/nợ | Principal, counterparty, due date |
 | `obligation_repayments` | Link repayment-transaction | Không vượt quá principal |
@@ -62,7 +62,9 @@ title: Danh sách entities
 
 | Bảng | Mục đích | Ghi chú |
 |------|----------|---------|
-| `agent_runs` | Text/image Agent run | Idempotent, leased, review-first |
+| `agent_sessions` | Durable Agent chat thread | One active `intake` and one active `advisor` per user |
+| `agent_messages` | Agent chat message/action card | User/assistant/system role; optional `drafts_created` card |
+| `agent_runs` | Text/image Agent run | Idempotent, leased, review-first; optional session link |
 | `agent_tool_runs` | Third-party OCR execution | Owned receipt + agent-run scope |
 
 ## Operations

@@ -83,21 +83,28 @@ components:
       type: object
       properties:
         id: { type: string, format: uuid }
-        name: { type: string, example: "Tiền mặt" }
-        type: { type: string, enum: ["cash", "bank", "credit", "e_wallet", "savings", "debt"] }
+        name: { type: string, example: "Ví chính" }
+        type: { type: string, enum: ["basic", "goal", "credit"] }
         balance_vnd: { type: integer, example: 120000 }
         include_in_total: { type: boolean }
         is_default_ai: { type: boolean }
+        credit_limit_vnd: { type: integer, nullable: true }
+        statement_day: { type: integer, nullable: true, minimum: 1, maximum: 31 }
+        payment_due_day: { type: integer, nullable: true, minimum: 1, maximum: 31 }
+        goal_target_vnd: { type: integer, nullable: true }
+        goal_deadline_on: { type: string, format: date, nullable: true }
         version: { type: integer }
     CreateWalletInput:
       type: object
       required: [name, type]
       properties:
         name: { type: string, minLength: 1 }
-        type: { type: string, enum: ["cash", "bank", "credit", "e_wallet", "savings", "debt"] }
+        type: { type: string, enum: ["basic", "goal", "credit"] }
         credit_limit_vnd: { type: integer, nullable: true }
         statement_day: { type: integer, nullable: true, minimum: 1, maximum: 31 }
         payment_due_day: { type: integer, nullable: true, minimum: 1, maximum: 31 }
+        goal_target_vnd: { type: integer, nullable: true, minimum: 1 }
+        goal_deadline_on: { type: string, format: date, nullable: true }
     UpdateWalletInput:
       type: object
       required: [name, include_in_total, base_version]
@@ -122,12 +129,11 @@ Lệnh bật/tắt category theo ví là `PUT` đặt trạng thái tuyệt đ�
 
 | type | Mô tả | Metadata |
 |------|-------|----------|
-| `cash` | Tiền mặt | — |
-| `bank` | Tài khoản ngân hàng | — |
-| `credit` | Thẻ tín dụng | credit_limit_vnd, statement_day, payment_due_day |
-| `e_wallet` | Ví điện tử | — |
-| `savings` | Tiết kiệm | — |
-| `debt` | Nợ phải trả | — |
+| `basic` | Ví thường, chỉ quản lý số dư | — |
+| `goal` | Ví mục tiêu / hũ tiết kiệm | `goal_target_vnd`, `goal_deadline_on` |
+| `credit` | Thẻ tín dụng | `credit_limit_vnd`, `statement_day`, `payment_due_day` |
+
+`type` là hành vi của ví, không phải nhãn kênh thanh toán. Dữ liệu cũ được migrate: `cash`, `bank`, `e_wallet`, `debt` → `basic`; `savings` → `goal`; `credit` giữ nguyên. Khoản vay/nợ là obligation/category, không còn là wallet type.
 
 ### Balance calculation
 

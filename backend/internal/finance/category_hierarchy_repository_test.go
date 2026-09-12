@@ -128,7 +128,7 @@ func TestRepositoryListsWalletCategorySettingsWithActiveDefaultAndOwnerIsolation
 	repo := finance.NewRepository(conn)
 	owner := createFinanceUser(t, conn, "settings-owner@example.com")
 	other := createFinanceUser(t, conn, "settings-other@example.com")
-	wallet := createFinanceWallet(t, repo, owner, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, owner, "Tiền mặt", finance.WalletBasic)
 	category, err := repo.CreateCategory(context.Background(), owner, finance.CreateCategoryInput{Kind: finance.CategoryExpense, Name: "Cafe"})
 	if err != nil {
 		t.Fatalf("create category: %v", err)
@@ -160,7 +160,7 @@ func TestRepositoryArchiveRetainsReferencedCategoryHistory(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	owner := createFinanceUser(t, conn, "category-history-owner@example.com")
-	wallet := createFinanceWallet(t, repo, owner, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, owner, "Tiền mặt", finance.WalletBasic)
 	category, err := repo.CreateCategory(context.Background(), owner, finance.CreateCategoryInput{Kind: finance.CategoryExpense, Name: "Cafe"})
 	if err != nil {
 		t.Fatalf("create category: %v", err)

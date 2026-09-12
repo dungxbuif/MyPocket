@@ -91,10 +91,13 @@ import {
   loadRecurringSchedules,
   loadObligations,
   loadTransactionDrafts,
+  pauseRecurringSchedule,
   rejectTransactionDraft,
+  resumeRecurringSchedule,
   updateBudget,
   updateEvent,
   updateObligation,
+  updateRecurringSchedule,
   type BudgetInput,
   type BudgetPeriodType,
   type BudgetProgress,
@@ -104,6 +107,7 @@ import {
   type ObligationInput,
   type ObligationSummary,
   type RecurrenceFrequency,
+  type RecurringPostingMode,
   type RecurringSchedule,
   type RecurringScheduleInput,
   type TransactionDraft,
@@ -688,17 +692,17 @@ export function App() {
       </ActionButton>
       <PWAInstallPrompt prompt={installPrompt} onConsumed={() => setInstallPrompt(null)} />
 
-      {sheetOpen ? <AddTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} onCreated={upsertTransaction} onDebtCreated={() => void refreshFinanceData()} onClose={() => setSheetOpen(false)} /> : null}
+      {sheetOpen ? <AddTransactionSheet categories={categories ?? []} wallets={wallets ?? []} budgets={budgets ?? []} readOnly={offlineReadOnly} onCreated={upsertTransaction} onDebtCreated={() => void refreshFinanceData()} onClose={() => setSheetOpen(false)} /> : null}
       {walletSheetOpen ? <WalletManagerSheet wallets={wallets ?? []} categories={categories ?? []} online={online} readOnly={offlineReadOnly} onWalletChanged={(wallet) => setWallets((current) => [wallet, ...(current ?? []).filter((item) => item.id !== wallet.id)])} onWalletArchived={(walletID) => setWallets((current) => (current ?? []).filter((item) => item.id !== walletID))} onCategoryChanged={(category) => setCategories((current) => [category, ...(current ?? []).filter((item) => item.id !== category.id)])} onChanged={() => reconcileAfterLocalChange()} onClose={() => setWalletSheetOpen(false)} /> : null}
-      {editingTransaction ? <EditTransactionSheet categories={categories ?? []} wallets={wallets ?? []} readOnly={offlineReadOnly} transaction={editingTransaction} onChanged={upsertTransaction} onArchived={() => { setTransactions((current) => (current ?? []).filter((item) => item.id !== editingTransaction.id)); setEditingTransaction(null); void reconcileAfterLocalChange().catch(() => undefined); }} onClose={() => setEditingTransaction(null)} /> : null}
+      {editingTransaction ? <EditTransactionSheet categories={categories ?? []} wallets={wallets ?? []} budgets={budgets ?? []} readOnly={offlineReadOnly} transaction={editingTransaction} onChanged={upsertTransaction} onArchived={() => { setTransactions((current) => (current ?? []).filter((item) => item.id !== editingTransaction.id)); setEditingTransaction(null); void reconcileAfterLocalChange().catch(() => undefined); }} onClose={() => setEditingTransaction(null)} /> : null}
       {budgetSheetOpen ? <BudgetSheet categories={categories ?? []} onSaved={() => { setBudgetSheetOpen(false); void refreshFinanceData(); }} onClose={() => setBudgetSheetOpen(false)} /> : null}
       {editingBudget ? <BudgetSheet budget={editingBudget} categories={categories ?? []} onSaved={() => { setEditingBudget(null); void refreshFinanceData(); }} onArchived={() => { setEditingBudget(null); void refreshFinanceData(); }} onClose={() => setEditingBudget(null)} /> : null}
       {eventSheetOpen ? <EventSheet transactions={transactions ?? []} onSaved={() => { setEventSheetOpen(false); void refreshFinanceData(); }} onClose={() => setEventSheetOpen(false)} /> : null}
       {editingEvent ? <EventSheet event={editingEvent} transactions={transactions ?? []} onSaved={() => { setEditingEvent(null); void refreshFinanceData(); }} onArchived={() => { setEditingEvent(null); void refreshFinanceData(); }} onClose={() => setEditingEvent(null)} /> : null}
       {obligationSheetOpen ? <ObligationSheet transactions={transactions ?? []} onSaved={() => { setObligationSheetOpen(false); void refreshFinanceData(); }} onClose={() => setObligationSheetOpen(false)} /> : null}
       {editingObligation ? <ObligationSheet obligation={editingObligation} transactions={transactions ?? []} onSaved={() => { setEditingObligation(null); void refreshFinanceData(); }} onArchived={() => { setEditingObligation(null); void refreshFinanceData(); }} onClose={() => setEditingObligation(null)} /> : null}
-      {scheduleSheetOpen ? <ScheduleSheet wallets={wallets ?? []} categories={categories ?? []} onSaved={() => { setScheduleSheetOpen(false); void refreshFinanceData(); }} onClose={() => setScheduleSheetOpen(false)} /> : null}
-      {editingSchedule ? <ScheduleSheet schedule={editingSchedule} wallets={wallets ?? []} categories={categories ?? []} onSaved={() => { setEditingSchedule(null); void refreshFinanceData(); }} onArchived={() => { setEditingSchedule(null); void refreshFinanceData(); }} onClose={() => setEditingSchedule(null)} /> : null}
+      {scheduleSheetOpen ? <ScheduleSheet wallets={wallets ?? []} categories={categories ?? []} budgets={budgets ?? []} onSaved={() => { setScheduleSheetOpen(false); void refreshFinanceData(); }} onClose={() => setScheduleSheetOpen(false)} /> : null}
+      {editingSchedule ? <ScheduleSheet schedule={editingSchedule} wallets={wallets ?? []} categories={categories ?? []} budgets={budgets ?? []} onSaved={() => { setEditingSchedule(null); void refreshFinanceData(); }} onArchived={() => { setEditingSchedule(null); void refreshFinanceData(); }} onClose={() => setEditingSchedule(null)} /> : null}
       {assetSheetOpen ? <AssetSheet onSaved={(asset) => { setAssetSheetOpen(false); setAssets((current) => [asset, ...(current ?? [])]); void refreshFinanceData(); }} onClose={() => setAssetSheetOpen(false)} /> : null}
     </div>
   );
@@ -1088,7 +1092,7 @@ function ObligationSheet({ obligation, transactions, onSaved, onArchived, onClos
   );
 }
 
-function ScheduleSheet({ schedule, wallets, categories, onSaved, onArchived, onClose }: { schedule?: RecurringSchedule; wallets: WalletSummary[]; categories: CategorySummary[]; onSaved: () => void; onArchived?: () => void; onClose: () => void }) {
+function ScheduleSheet({ schedule, wallets, categories, budgets, onSaved, onArchived, onClose }: { schedule?: RecurringSchedule; wallets: WalletSummary[]; categories: CategorySummary[]; budgets: BudgetProgress[]; onSaved: () => void; onArchived?: () => void; onClose: () => void }) {
   const [name, setName] = useState(schedule?.name ?? "");
   const [frequency, setFrequency] = useState<RecurrenceFrequency>(schedule?.frequency ?? "monthly");
   const [amount, setAmount] = useState(String(schedule?.amount_vnd ?? ""));
@@ -1096,10 +1100,14 @@ function ScheduleSheet({ schedule, wallets, categories, onSaved, onArchived, onC
   const [sourceWalletID, setSourceWalletID] = useState(schedule?.source_wallet_id ?? wallets[0]?.id ?? "");
   const [destinationWalletID, setDestinationWalletID] = useState(schedule?.destination_wallet_id ?? wallets.find((wallet) => wallet.id !== sourceWalletID)?.id ?? "");
   const [categoryID, setCategoryID] = useState(schedule?.category_id ?? "");
+  const [budgetID, setBudgetID] = useState(schedule?.budget_id ?? "");
   const [startsOn, setStartsOn] = useState(schedule ? calendarDateInHoChiMinh(new Date(schedule.starts_at)) : calendarDateInHoChiMinh());
+  const [endsOn, setEndsOn] = useState(schedule?.ends_at ? calendarDateInHoChiMinh(new Date(schedule.ends_at)) : "");
+  const [postingMode, setPostingMode] = useState<RecurringPostingMode>(schedule?.posting_mode ?? "draft");
   const [note, setNote] = useState(schedule?.note ?? "");
   const [saving, setSaving] = useState(false);
   const selectableCategories = categories.filter((category) => category.kind === type);
+  const activeBudgets = budgets.map((row) => row.budget);
   const chosenCategoryID = type === "transfer" ? "" : categoryID || selectableCategories[0]?.id || "";
   const canSave = name.trim() !== "" && Number(amount) > 0 && sourceWalletID !== "" && startsOn !== "" && (type === "transfer" ? destinationWalletID !== "" && destinationWalletID !== sourceWalletID : chosenCategoryID !== "");
   useEffect(() => {
@@ -1109,7 +1117,7 @@ function ScheduleSheet({ schedule, wallets, categories, onSaved, onArchived, onC
     }
   }, [destinationWalletID, sourceWalletID, type, wallets]);
   async function save() {
-    if (!canSave || saving || schedule) return;
+    if (!canSave || saving) return;
     setSaving(true);
     try {
       const input: RecurringScheduleInput = {
@@ -1117,14 +1125,35 @@ function ScheduleSheet({ schedule, wallets, categories, onSaved, onArchived, onC
         frequency,
         timezone: "Asia/Ho_Chi_Minh",
         starts_at: `${startsOn}T09:00:00+07:00`,
+        ends_at: endsOn ? `${endsOn}T23:59:59+07:00` : undefined,
+        posting_mode: postingMode,
         type,
         source_wallet_id: sourceWalletID,
         destination_wallet_id: type === "transfer" ? destinationWalletID : undefined,
         category_id: type === "transfer" ? undefined : chosenCategoryID,
+        budget_id: type === "expense" && budgetID ? budgetID : undefined,
         amount_vnd: Number(amount),
         note,
       };
-      await createRecurringSchedule(input);
+      if (schedule) {
+        await updateRecurringSchedule(schedule.id, input, schedule.version);
+      } else {
+        await createRecurringSchedule(input);
+      }
+      onSaved();
+    } finally {
+      setSaving(false);
+    }
+  }
+  async function togglePaused() {
+    if (!schedule || saving) return;
+    setSaving(true);
+    try {
+      if (schedule.paused_at) {
+        await resumeRecurringSchedule(schedule.id, schedule.version);
+      } else {
+        await pauseRecurringSchedule(schedule.id, schedule.version);
+      }
       onSaved();
     } finally {
       setSaving(false);
@@ -1148,21 +1177,25 @@ function ScheduleSheet({ schedule, wallets, categories, onSaved, onArchived, onC
           <h2>{schedule ? "Sửa Lịch Lặp" : "Tạo Lịch Lặp"}</h2>
           <span />
         </header>
-        {schedule ? <p className="sheet-meta">Lịch đang chỉ hỗ trợ lưu trữ; tạo lịch mới để đổi mẫu.</p> : null}
-        <label className="sheet-row"><CalendarDays /><InputControl aria-label="Tên lịch lặp" value={name} onChange={(change) => setName(change.target.value)} placeholder="Tên lịch lặp" disabled={Boolean(schedule)} /></label>
-        <label className="amount-row"><span>VND</span><InputControl aria-label="Số tiền lịch lặp" inputMode="numeric" value={amount} onChange={(change) => setAmount(change.target.value.replace(/\D/g, ""))} placeholder="0" disabled={Boolean(schedule)} /></label>
-        <label className="sheet-row"><CalendarDays /><Select aria-label="Chu kỳ lặp" value={frequency} onChange={(change) => setFrequency(change.target.value as RecurrenceFrequency)} disabled={Boolean(schedule)}><option value="daily">Hàng ngày</option><option value="weekly">Hàng tuần</option><option value="monthly">Hàng tháng</option></Select></label>
-        <label className="sheet-row"><CalendarDays /><InputControl aria-label="Ngày bắt đầu lịch lặp" type="date" value={startsOn} onChange={(change) => setStartsOn(change.target.value)} disabled={Boolean(schedule)} /></label>
+        {schedule ? <p className="sheet-meta">{schedule.paused_at ? "Đang tạm dừng" : "Đang hoạt động"} · phiên bản {schedule.version}</p> : null}
+        <label className="sheet-row"><CalendarDays /><InputControl aria-label="Tên lịch lặp" value={name} onChange={(change) => setName(change.target.value)} placeholder="Tên lịch lặp" /></label>
+        <label className="amount-row"><span>VND</span><InputControl aria-label="Số tiền lịch lặp" inputMode="numeric" value={amount} onChange={(change) => setAmount(change.target.value.replace(/\D/g, ""))} placeholder="0" /></label>
+        <label className="sheet-row"><CalendarDays /><Select aria-label="Chu kỳ lặp" value={frequency} onChange={(change) => setFrequency(change.target.value as RecurrenceFrequency)}><option value="daily">Hàng ngày</option><option value="weekly">Hàng tuần</option><option value="monthly">Hàng tháng</option></Select></label>
+        <label className="sheet-row"><CalendarDays /><InputControl aria-label="Ngày bắt đầu lịch lặp" type="date" value={startsOn} onChange={(change) => setStartsOn(change.target.value)} /></label>
+        <label className="sheet-row"><CalendarDays /><InputControl aria-label="Ngày kết thúc lịch lặp" type="date" value={endsOn} onChange={(change) => setEndsOn(change.target.value)} /></label>
+        <label className="sheet-row"><CalendarDays /><Select aria-label="Cách ghi lịch lặp" value={postingMode} onChange={(change) => setPostingMode(change.target.value as RecurringPostingMode)}><option value="draft">Tạo nháp để duyệt</option><option value="auto_post">Tự ghi giao dịch</option></Select></label>
         <div className="segmented sheet-segmented">
-          {(["expense", "income", "transfer"] as const).map((option) => <ActionButton className={type === option ? "active" : ""} type="button" key={option} disabled={Boolean(schedule)} onClick={() => setType(option)}>{transactionTypeLabel(option)}</ActionButton>)}
+          {(["expense", "income", "transfer"] as const).map((option) => <ActionButton className={type === option ? "active" : ""} type="button" key={option} onClick={() => setType(option)}>{transactionTypeLabel(option)}</ActionButton>)}
         </div>
-        <label className="sheet-row"><Wallet /><Select aria-label="Ví lịch lặp" value={sourceWalletID} onChange={(change) => setSourceWalletID(change.target.value)} disabled={Boolean(schedule)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label>
-        {type === "transfer" ? <label className="sheet-row"><Wallet /><Select aria-label="Ví nhận lịch lặp" value={destinationWalletID} onChange={(change) => setDestinationWalletID(change.target.value)} disabled={Boolean(schedule)}>{wallets.filter((wallet) => wallet.id !== sourceWalletID).map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label> : null}
-        {type !== "transfer" ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Nhóm lịch lặp" value={chosenCategoryID} onChange={(change) => setCategoryID(change.target.value)} disabled={Boolean(schedule)}>{selectableCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></label> : null}
-        <label className="sheet-row"><List /><InputControl aria-label="Ghi chú lịch lặp" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" disabled={Boolean(schedule)} /></label>
+        <label className="sheet-row"><Wallet /><Select aria-label="Ví lịch lặp" value={sourceWalletID} onChange={(change) => setSourceWalletID(change.target.value)}>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label>
+        {type === "transfer" ? <label className="sheet-row"><Wallet /><Select aria-label="Ví nhận lịch lặp" value={destinationWalletID} onChange={(change) => setDestinationWalletID(change.target.value)}>{wallets.filter((wallet) => wallet.id !== sourceWalletID).map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label> : null}
+        {type !== "transfer" ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Nhóm lịch lặp" value={chosenCategoryID} onChange={(change) => setCategoryID(change.target.value)}>{selectableCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></label> : null}
+        {type === "expense" && activeBudgets.length > 0 ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Ngân sách lịch lặp" value={budgetID} onChange={(change) => setBudgetID(change.target.value)}><option value="">Không gắn ngân sách</option>{activeBudgets.map((budget) => <option key={budget.id} value={budget.id}>{budget.name}</option>)}</Select></label> : null}
+        <label className="sheet-row"><List /><InputControl aria-label="Ghi chú lịch lặp" value={note} onChange={(change) => setNote(change.target.value)} placeholder="Ghi chú" /></label>
         <div className="sheet-actions">
+          {schedule ? <ActionButton className="wide-pill" type="button" disabled={saving} onClick={() => void togglePaused()}>{schedule.paused_at ? "Tiếp tục" : "Tạm dừng"}</ActionButton> : null}
           {schedule ? <ActionButton className="wide-pill destructive" type="button" disabled={saving} onClick={() => void archive()}>Lưu trữ</ActionButton> : null}
-          {!schedule ? <ActionButton className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : "Lưu"}</ActionButton> : null}
+          <ActionButton className="primary-cta" type="button" disabled={!canSave || saving} onClick={() => void save()}>{saving ? "Đang lưu" : schedule ? "Lưu thay đổi" : "Lưu"}</ActionButton>
         </div>
       </section>
     </div>
@@ -1361,13 +1394,14 @@ function AssetSheet({ onSaved, onClose }: { onSaved: (asset: AssetPosition) => v
   );
 }
 
-function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtCreated, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; readOnly: boolean; onCreated: (transaction: Transaction) => void; onDebtCreated: () => void; onClose: () => void }) {
+function AddTransactionSheet({ categories, wallets, budgets, readOnly, onCreated, onDebtCreated, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; budgets: BudgetProgress[]; readOnly: boolean; onCreated: (transaction: Transaction) => void; onDebtCreated: () => void; onClose: () => void }) {
   const [type, setType] = useState<"expense" | "income" | "debt" | "transfer">("expense");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
   const [sourceWalletID, setSourceWalletID] = useState(wallets[0]?.id ?? "");
   const [destinationWalletID, setDestinationWalletID] = useState(wallets[1]?.id ?? "");
   const [categoryID, setCategoryID] = useState("");
+  const [budgetID, setBudgetID] = useState("");
   const [excludedFromReports, setExcludedFromReports] = useState(false);
   const [debtDirection, setDebtDirection] = useState<ObligationDirection>("borrowed");
   const [counterparty, setCounterparty] = useState("");
@@ -1380,6 +1414,7 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
   const [completed, setCompleted] = useState(false);
   const [showDetails, setShowDetails] = useState(false);
   const filteredCategories = categories.filter((category) => category.kind === (type === "income" ? "income" : "expense"));
+  const activeBudgets = budgets.map((row) => row.budget);
   const chosenCategoryID = type === "income" || type === "expense" ? categoryID || filteredCategories[0]?.id : "";
   const receiptLocked = readOnly || saving || completed;
   const canSave = !completed && !readOnly && wallets.length > 0 && Number.isSafeInteger(Number(amount)) && Number(amount) > 0 && (type === "debt" ? !receiptFile && counterparty.trim() !== "" && dueOn !== "" : Boolean(sourceWalletID)) && (type !== "transfer" || Boolean(destinationWalletID && destinationWalletID !== sourceWalletID));
@@ -1399,7 +1434,7 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
         return;
       }
       const receipt = receiptFile && navigator.onLine ? await uploadFile(receiptFile) : undefined;
-      const transaction = await createTransaction(buildTransactionInput({ type, amount, sourceWalletID, destinationWalletID, categoryID: chosenCategoryID, note, excludedFromReports, occurredOn, receiptObjectID: receipt?.id }));
+      const transaction = await createTransaction(buildTransactionInput({ type, amount, sourceWalletID, destinationWalletID, budgetID, categoryID: chosenCategoryID, note, excludedFromReports, occurredOn, receiptObjectID: receipt?.id }));
       transactionSaved = true;
       setCompleted(true);
       onCreated(transaction);
@@ -1435,6 +1470,7 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
             <label className="sheet-row"><Wallet /><Select aria-label="Ví đích" value={destinationWalletID} disabled={receiptLocked} onChange={(event) => setDestinationWalletID(event.target.value)}><option value="">Chọn ví nhận</option>{wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</Select></label>
             <p className="px-4 py-2 text-sm">Chuyển giữa hai ví khác nhau, không tính vào thu/chi báo cáo.</p>
           </> : type !== "debt" ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Nhóm" value={chosenCategoryID} onChange={(event) => setCategoryID(event.target.value)}><option value="">Chọn nhóm</option>{filteredCategories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</Select></label> : <label className="sheet-row"><CalendarDays /><InputControl aria-label="Ngày đến hạn" type="date" value={dueOn} onChange={(event) => setDueOn(event.target.value)} /></label>}
+          {type === "expense" && activeBudgets.length > 0 ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Ngân sách giao dịch" value={budgetID} disabled={receiptLocked} onChange={(event) => setBudgetID(event.target.value)}><option value="">Không gắn ngân sách</option>{activeBudgets.map((budget) => <option key={budget.id} value={budget.id}>{budget.name}</option>)}</Select></label> : null}
           {type !== "debt" ? <label className="sheet-row"><List /><InputControl aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" /></label> : null}
           {type !== "debt" ? <label className="date-row"><CalendarDays /><InputControl aria-label="Ngày giao dịch" type="date" value={occurredOn} onChange={(event) => setOccurredOn(event.target.value)} /></label> : null}
           {type !== "debt" ? <label className="exclude-row"><InputControl type="checkbox" checked={excludedFromReports} onChange={(event) => setExcludedFromReports(event.target.checked)} /><span>Không tính vào báo cáo</span></label> : null}
@@ -1458,14 +1494,16 @@ function AddTransactionSheet({ categories, wallets, readOnly, onCreated, onDebtC
   );
 }
 
-function EditTransactionSheet({ categories, wallets, readOnly, transaction, onChanged, onArchived, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; readOnly: boolean; transaction: Transaction; onChanged: (transaction: Transaction) => void; onArchived: () => void; onClose: () => void }) {
+function EditTransactionSheet({ categories, wallets, budgets, readOnly, transaction, onChanged, onArchived, onClose }: { categories: CategorySummary[]; wallets: WalletSummary[]; budgets: BudgetProgress[]; readOnly: boolean; transaction: Transaction; onChanged: (transaction: Transaction) => void; onArchived: () => void; onClose: () => void }) {
   const [amount, setAmount] = useState(String(transaction.amount_vnd));
   const [note, setNote] = useState(transaction.note);
+  const [budgetID, setBudgetID] = useState(transaction.budget_id ?? "");
   const [excludedFromReports, setExcludedFromReports] = useState(transaction.excluded_from_reports);
   const [saving, setSaving] = useState(false);
   const [operationError, setOperationError] = useState<OperationFailure | null>(null);
   const category = categories.find((item) => item.id === transaction.category_id);
   const sourceWallet = wallets.find((item) => item.id === transaction.source_wallet_id);
+  const activeBudgets = budgets.map((row) => row.budget);
   async function save() {
     if (readOnly || Number(amount) <= 0 || saving) return;
     setSaving(true);
@@ -1476,6 +1514,7 @@ function EditTransactionSheet({ categories, wallets, readOnly, transaction, onCh
         source_wallet_id: transaction.source_wallet_id,
         destination_wallet_id: transaction.destination_wallet_id,
         category_id: transaction.category_id,
+        budget_id: transaction.type === "expense" && budgetID ? budgetID : undefined,
         amount_vnd: Number(amount),
         occurred_at: transaction.occurred_at,
         note,
@@ -1517,6 +1556,7 @@ function EditTransactionSheet({ categories, wallets, readOnly, transaction, onCh
         <OperationError failure={operationError} />
         <p className="sheet-meta">{transactionTypeLabel(transaction.type)} · {sourceWallet?.name ?? "Ví"} · {category?.name ?? "Không nhóm"}</p>
         <label className="amount-row"><span>VND</span><InputControl aria-label="Số tiền" inputMode="numeric" value={amount} onChange={(event) => setAmount(event.target.value.replace(/\D/g, ""))} placeholder="0" disabled={readOnly} /></label>
+        {transaction.type === "expense" && activeBudgets.length > 0 ? <label className="sheet-row"><span className="dot-icon" /><Select aria-label="Ngân sách giao dịch" value={budgetID} disabled={readOnly} onChange={(event) => setBudgetID(event.target.value)}><option value="">Không gắn ngân sách</option>{activeBudgets.map((budget) => <option key={budget.id} value={budget.id}>{budget.name}</option>)}</Select></label> : null}
         <label className="sheet-row"><List /><InputControl aria-label="Ghi chú" value={note} onChange={(event) => setNote(event.target.value)} placeholder="Ghi chú" disabled={readOnly} /></label>
         <ActionButton className={excludedFromReports ? "toggle-row active" : "toggle-row"} type="button" disabled={readOnly} onClick={() => setExcludedFromReports((current) => !current)}>Không tính vào báo cáo<span /></ActionButton>
         <div className="sheet-actions">
@@ -1550,7 +1590,9 @@ function WalletManagerSheet({
   onClose: () => void;
 }) {
   const [walletName, setWalletName] = useState("");
-  const [walletType, setWalletType] = useState<WalletType>("cash");
+  const [walletType, setWalletType] = useState<WalletType>("basic");
+  const [goalTarget, setGoalTarget] = useState("");
+  const [goalDeadline, setGoalDeadline] = useState("");
   const [creatingWallet, setCreatingWallet] = useState(false);
   const [categoryName, setCategoryName] = useState("");
   const [categoryKind, setCategoryKind] = useState<"income" | "expense">("expense");
@@ -1632,7 +1674,25 @@ function WalletManagerSheet({
             <div className="manager-form">
               <InputControl aria-label="Tên ví mới" value={walletName} onChange={(event) => setWalletName(event.target.value)} placeholder="Tên ví mới" disabled={readOnly} />
               <Select aria-label="Loại ví" value={walletType} onChange={(event) => setWalletType(event.target.value as WalletType)} disabled={readOnly}>{walletTypes.map((type) => <option key={type} value={type}>{walletTypeLabel(type)}</option>)}</Select>
-              <ActionButton type="button" disabled={readOnly || !walletName.trim() || busy} onClick={() => void run(async () => { const wallet = await createWallet({ name: walletName, type: walletType }); if (wallet) onWalletChanged(wallet); setWalletName(""); setCreatingWallet(false); })}>Tạo ví</ActionButton>
+              {walletType === "goal" ? (
+                <>
+                  <InputControl aria-label="Mục tiêu số tiền" inputMode="numeric" value={goalTarget} onChange={(event) => setGoalTarget(event.target.value)} placeholder="Mục tiêu VND" disabled={readOnly} />
+                  <InputControl aria-label="Ngày hoàn thành mục tiêu" type="date" value={goalDeadline} onChange={(event) => setGoalDeadline(event.target.value)} disabled={readOnly} />
+                </>
+              ) : null}
+              <ActionButton type="button" disabled={readOnly || !walletName.trim() || busy} onClick={() => void run(async () => {
+                const wallet = await createWallet({
+                  name: walletName,
+                  type: walletType,
+                  ...(walletType === "goal" && Number(goalTarget) > 0 ? { goal_target_vnd: Number(goalTarget) } : {}),
+                  ...(walletType === "goal" && goalDeadline ? { goal_deadline_on: goalDeadline } : {}),
+                });
+                if (wallet) onWalletChanged(wallet);
+                setWalletName("");
+                setGoalTarget("");
+                setGoalDeadline("");
+                setCreatingWallet(false);
+              })}>Tạo ví</ActionButton>
             </div>
           </section>
         ) : null}
@@ -1848,21 +1908,15 @@ function walletIcon(type: WalletSummary["type"]) {
   switch (type) {
     case "credit":
       return "💳";
-    case "bank":
-      return "◆";
-    case "e_wallet":
-      return "◎";
-    case "savings":
+    case "goal":
       return "◇";
-    case "debt":
-      return "!";
-    case "cash":
+    case "basic":
     default:
       return "₫";
   }
 }
 
-const walletTypes: WalletType[] = ["cash", "bank", "credit", "e_wallet", "savings", "debt"];
+const walletTypes: WalletType[] = ["basic", "goal", "credit"];
 const assetTypes: AssetType[] = ["gold", "stock", "crypto", "foreign_currency", "other"];
 const budgetPeriods: BudgetPeriodType[] = ["weekly", "monthly", "quarterly", "yearly", "custom"];
 
@@ -1989,19 +2043,13 @@ function conflictLabel(conflict: OfflineConflict) {
 
 function walletTypeLabel(type: WalletType) {
   switch (type) {
-    case "bank":
-      return "Ngân hàng";
     case "credit":
       return "Tín dụng";
-    case "e_wallet":
-      return "Ví điện tử";
-    case "savings":
-      return "Tiết kiệm";
-    case "debt":
-      return "Nợ";
-    case "cash":
+    case "goal":
+      return "Mục tiêu";
+    case "basic":
     default:
-      return "Tiền mặt";
+      return "Cơ bản";
   }
 }
 

@@ -6,7 +6,7 @@ import { App } from './App';
 afterEach(() => vi.unstubAllGlobals());
 
 it('opens a real wallet card with a null transaction list as empty without unmounting the app', async () => {
-  const wallet = { id: 'empty-wallet', name: 'Ví chưa giao dịch', type: 'cash', balance_vnd: 0, include_in_total: true, is_default_ai: false, version: 1 };
+  const wallet = { id: 'empty-wallet', name: 'Ví chưa giao dịch', type: 'basic', balance_vnd: 0, include_in_total: true, is_default_ai: false, version: 1 };
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const path = new URL(String(input), 'http://localhost').pathname;
     const payloads: Record<string, unknown> = {

@@ -24,14 +24,14 @@ func TestRepositoryListsOnlyUserWallets(t *testing.T) {
 
 	walletA, err := repo.CreateWallet(context.Background(), userA, finance.CreateWalletInput{
 		Name: "Tiền mặt",
-		Type: finance.WalletCash,
+		Type: finance.WalletBasic,
 	})
 	if err != nil {
 		t.Fatalf("create wallet A: %v", err)
 	}
 	if _, err := repo.CreateWallet(context.Background(), userB, finance.CreateWalletInput{
 		Name: "Ngân hàng",
-		Type: finance.WalletBank,
+		Type: finance.WalletBasic,
 	}); err != nil {
 		t.Fatalf("create wallet B: %v", err)
 	}
@@ -79,8 +79,8 @@ func TestRepositoryAllowsOneActiveDefaultAIWalletPerUser(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "default-ai@example.com")
-	first := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
-	second := createFinanceWallet(t, repo, userID, "Ví điện tử", finance.WalletEWallet)
+	first := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
+	second := createFinanceWallet(t, repo, userID, "Ví điện tử", finance.WalletBasic)
 
 	if err := repo.SetDefaultAIWallet(context.Background(), userID, first.ID, first.Version); err != nil {
 		t.Fatalf("set first default: %v", err)
@@ -115,7 +115,7 @@ func TestRepositoryUpdatesAndArchivesOnlyOwnedWallet(t *testing.T) {
 	repo := finance.NewRepository(conn)
 	userA := createFinanceUser(t, conn, "wallet-update-a@example.com")
 	userB := createFinanceUser(t, conn, "wallet-update-b@example.com")
-	wallet := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletBasic)
 
 	updated, err := repo.UpdateWallet(context.Background(), userA, wallet.ID, finance.UpdateWalletInput{
 		BaseVersion:    wallet.Version,
@@ -148,7 +148,7 @@ func TestRepositoryRejectsStaleWalletArchive(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "wallet-archive-stale@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	updated, err := repo.UpdateWallet(context.Background(), userID, wallet.ID, finance.UpdateWalletInput{BaseVersion: wallet.Version, Name: "Ví mới", IncludeInTotal: ptrBool(true)})
 	if err != nil {
 		t.Fatalf("update wallet: %v", err)
@@ -165,7 +165,7 @@ func TestRepositoryRejectsStaleWalletUpdate(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "wallet-stale@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 
 	updated, err := repo.UpdateWallet(context.Background(), userID, wallet.ID, finance.UpdateWalletInput{BaseVersion: wallet.Version, Name: "Ví mới", IncludeInTotal: ptrBool(true)})
 	if err != nil {
@@ -182,7 +182,7 @@ func TestRepositoryRejectsActivationForAnotherUsersWallet(t *testing.T) {
 	repo := finance.NewRepository(conn)
 	userA := createFinanceUser(t, conn, "activation-a@example.com")
 	userB := createFinanceUser(t, conn, "activation-b@example.com")
-	wallet := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "expense_food")
 
 	err := repo.SetWalletCategoryActive(context.Background(), userB, wallet.ID, categoryID, false)
@@ -269,7 +269,7 @@ func TestRepositoryUpsertsWalletCategoryActivation(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "activation-upsert@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "expense_food")
 
 	if err := repo.SetWalletCategoryActive(context.Background(), userID, wallet.ID, categoryID, false); err != nil {
@@ -298,7 +298,7 @@ func TestRepositoryCreatesIncomeExpenseAndAdjustmentTransactions(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "transactions@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	expenseCategoryID := findSystemCategory(t, conn, "expense_food")
 	incomeCategoryID := findSystemCategory(t, conn, "income_salary")
 
@@ -357,8 +357,8 @@ func TestRepositoryCreatesTransferTransactionAtomically(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "transfer@example.com")
-	source := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
-	destination := createFinanceWallet(t, repo, userID, "Ngân hàng", finance.WalletBank)
+	source := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
+	destination := createFinanceWallet(t, repo, userID, "Ngân hàng", finance.WalletBasic)
 	creditWallet(t, conn, source.ID, 1_000_000)
 
 	tx, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
@@ -384,7 +384,7 @@ func TestRepositoryReplaysDuplicateTransactionIdempotencyKey(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "idempotent@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "income_salary")
 	input := finance.CreateTransactionInput{
 		IdempotencyKey: "idem-1",
@@ -414,7 +414,7 @@ func TestRepositoryRejectsReusedTransactionIdempotencyKeyWithDifferentRequest(t 
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "idempotent-conflict@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "income_salary")
 
 	if _, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
@@ -446,7 +446,7 @@ func TestRepositoryIdempotencyHashIncludesReceiptReference(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "idempotent-receipt@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "expense_food")
 	receipt := func(key string) finance.ReceiptObject {
 		object, err := repo.CreateReceiptObject(context.Background(), userID, finance.CreateReceiptObjectInput{
@@ -477,7 +477,7 @@ func TestRepositoryRejectsTransactionForInactiveWalletCategory(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "inactive-category@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "expense_food")
 	if err := repo.SetWalletCategoryActive(context.Background(), userID, wallet.ID, categoryID, false); err != nil {
 		t.Fatalf("disable category: %v", err)
@@ -503,7 +503,7 @@ func TestRepositoryRejectsTransactionForAnotherUsersWallet(t *testing.T) {
 	repo := finance.NewRepository(conn)
 	userA := createFinanceUser(t, conn, "tx-owner@example.com")
 	userB := createFinanceUser(t, conn, "tx-other@example.com")
-	wallet := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "income_salary")
 
 	_, err := repo.CreateTransaction(context.Background(), userB, finance.CreateTransactionInput{
@@ -525,7 +525,7 @@ func TestRepositoryUpdatesTransactionByReversingAndReapplyingEffect(t *testing.T
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "tx-edit@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	incomeCategoryID := findSystemCategory(t, conn, "income_salary")
 	expenseCategoryID := findSystemCategory(t, conn, "expense_food")
 	created, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
@@ -567,7 +567,7 @@ func TestRepositoryRejectsStaleTransactionUpdateWithoutChangingBalance(t *testin
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "tx-stale-update@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	incomeCategoryID := findSystemCategory(t, conn, "income_salary")
 	created, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
 		IdempotencyKey: "stale-update-base",
@@ -612,7 +612,7 @@ func TestRepositoryArchivesTransactionByReversingEffectOnce(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "tx-archive@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "income_salary")
 	created, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{
 		IdempotencyKey: "archive-base-1",
@@ -642,7 +642,7 @@ func TestRepositoryRejectsArchiveWhenReversalWouldOverflowBalance(t *testing.T) 
 	userID := createFinanceUser(t, conn, "tx-archive-overflow@example.com")
 	wallet, err := repo.CreateWallet(context.Background(), userID, finance.CreateWalletInput{
 		Name:       "Ví sát biên",
-		Type:       finance.WalletCash,
+		Type:       finance.WalletBasic,
 		BalanceVND: math.MaxInt64 - 1,
 	})
 	if err != nil {
@@ -684,7 +684,7 @@ func TestRepositoryRejectsStaleTransactionArchive(t *testing.T) {
 	conn := migratedFinancePostgres(t)
 	repo := finance.NewRepository(conn)
 	userID := createFinanceUser(t, conn, "tx-archive-stale@example.com")
-	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletCash)
+	wallet := createFinanceWallet(t, repo, userID, "Tiền mặt", finance.WalletBasic)
 	categoryID := findSystemCategory(t, conn, "income_salary")
 	created, err := repo.CreateTransaction(context.Background(), userID, finance.CreateTransactionInput{IdempotencyKey: "archive-stale", Type: finance.TransactionIncome, SourceWalletID: wallet.ID, CategoryID: categoryID, AmountVND: 200_000, OccurredAt: fixedFinanceTime()})
 	if err != nil {
@@ -709,9 +709,9 @@ func TestRepositoryListsTransactionsWithFilters(t *testing.T) {
 	repo := finance.NewRepository(conn)
 	userA := createFinanceUser(t, conn, "tx-list-a@example.com")
 	userB := createFinanceUser(t, conn, "tx-list-b@example.com")
-	walletA := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletCash)
-	walletB := createFinanceWallet(t, repo, userA, "Ngân hàng", finance.WalletBank)
-	otherWallet := createFinanceWallet(t, repo, userB, "Other", finance.WalletCash)
+	walletA := createFinanceWallet(t, repo, userA, "Tiền mặt", finance.WalletBasic)
+	walletB := createFinanceWallet(t, repo, userA, "Ngân hàng", finance.WalletBasic)
+	otherWallet := createFinanceWallet(t, repo, userB, "Other", finance.WalletBasic)
 	incomeCategoryID := findSystemCategory(t, conn, "income_salary")
 	expenseCategoryID := findSystemCategory(t, conn, "expense_food")
 	base := fixedFinanceTime()

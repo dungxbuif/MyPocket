@@ -53,7 +53,7 @@ func TestChangeFailureRollsBackDirectAndSyncCommands(t *testing.T) {
 	if _, err := conn.Exec(`CREATE FUNCTION fail_change() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected change failure'; END $$; CREATE TRIGGER fail_change BEFORE INSERT ON sync_changes FOR EACH ROW EXECUTE FUNCTION fail_change();`); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := repo.CreateWallet(ctx, owner, finance.CreateWalletInput{Name: "Fail", Type: finance.WalletCash}); err == nil {
+	if _, err := repo.CreateWallet(ctx, owner, finance.CreateWalletInput{Name: "Fail", Type: finance.WalletBasic}); err == nil {
 		t.Fatal("expected change failure")
 	}
 	var n int
@@ -64,7 +64,7 @@ func TestChangeFailureRollsBackDirectAndSyncCommands(t *testing.T) {
 		t.Fatalf("direct command escaped rollback: %d", n)
 	}
 	service := mysync.NewService(mysync.NewRepository(conn), repo)
-	mutation := mysync.Mutation{MutationID: "fail-change", DeviceID: "d", Sequence: 1, EntityType: mysync.EntityWallet, EntityID: fixedWalletID, Operation: mysync.OperationCreate, Payload: rawJSON(`{"name":"Fail","type":"cash"}`)}
+	mutation := mysync.Mutation{MutationID: "fail-change", DeviceID: "d", Sequence: 1, EntityType: mysync.EntityWallet, EntityID: fixedWalletID, Operation: mysync.OperationCreate, Payload: rawJSON(`{"name":"Fail","type":"basic"}`)}
 	if _, err := service.ApplyMutations(ctx, owner, []mysync.Mutation{mutation}); err == nil {
 		t.Fatal("expected sync change failure")
 	}
@@ -179,7 +179,7 @@ func TestConcurrentMutationReplaysExactlyOnce(t *testing.T) {
 	ctx := context.Background()
 	owner := createSyncUser(t, conn, "concurrent-sync@example.com")
 	service := mysync.NewService(mysync.NewRepository(conn), finance.NewRepository(conn))
-	mutation := mysync.Mutation{MutationID: "same", DeviceID: "device", Sequence: 1, EntityType: mysync.EntityWallet, EntityID: fixedWalletID, Operation: mysync.OperationCreate, Payload: rawJSON(`{"name":"Cash","type":"cash"}`)}
+	mutation := mysync.Mutation{MutationID: "same", DeviceID: "device", Sequence: 1, EntityType: mysync.EntityWallet, EntityID: fixedWalletID, Operation: mysync.OperationCreate, Payload: rawJSON(`{"name":"Cash","type":"basic"}`)}
 	var wg sync.WaitGroup
 	results := make(chan mysync.ResultState, 2)
 	errs := make(chan error, 2)
@@ -278,11 +278,11 @@ func TestSyncRejectionThenValidMutationAndHashReuse(t *testing.T) {
 	ctx := context.Background()
 	owner := createSyncUser(t, conn, "sync-reject@example.com")
 	service := mysync.NewService(mysync.NewRepository(conn), finance.NewRepository(conn))
-	bad := mysync.Mutation{MutationID: "bad", DeviceID: "d", Sequence: 1, EntityType: mysync.EntityWallet, EntityID: fixedWalletID, Operation: mysync.OperationCreate, Payload: rawJSON(`{"name":"","type":"cash"}`)}
+	bad := mysync.Mutation{MutationID: "bad", DeviceID: "d", Sequence: 1, EntityType: mysync.EntityWallet, EntityID: fixedWalletID, Operation: mysync.OperationCreate, Payload: rawJSON(`{"name":"","type":"basic"}`)}
 	good := bad
 	good.MutationID = "good"
 	good.Sequence = 2
-	good.Payload = rawJSON(`{"name":"Cash","type":"cash"}`)
+	good.Payload = rawJSON(`{"name":"Cash","type":"basic"}`)
 	result, err := service.ApplyMutations(ctx, owner, []mysync.Mutation{bad, good})
 	if err != nil {
 		t.Fatal(err)
@@ -290,7 +290,7 @@ func TestSyncRejectionThenValidMutationAndHashReuse(t *testing.T) {
 	if result[0].State != mysync.ResultRejected || result[1].State != mysync.ResultApplied {
 		t.Fatalf("results: %v", result)
 	}
-	good.Payload = rawJSON(`{"name":"Changed","type":"cash"}`)
+	good.Payload = rawJSON(`{"name":"Changed","type":"basic"}`)
 	result, err = service.ApplyMutations(ctx, owner, []mysync.Mutation{good})
 	if err != nil {
 		t.Fatal(err)
