@@ -7,6 +7,7 @@ import { QuickAddSheet } from "../organisms/QuickAddSheet";
 import { ReportsPanel } from "../organisms/ReportsPanel";
 import { TransactionsPanel } from "../organisms/TransactionsPanel";
 import { GroupManagementPanel } from "../organisms/GroupManagementPanel";
+import { WalletManagementPanel } from "../organisms/WalletManagementPanel";
 import { MobileAppShell } from "../templates/MobileAppShell";
 import { APP_CONFIG, APP_ROUTES, API_ROUTES } from "../../config/app";
 import {
@@ -162,12 +163,13 @@ export function FinancePrototypePage() {
         onTabChange={(nextTab) => void navigate({ to: pathFromTab(nextTab) })}
         onToggleMask={() => setMasked((value) => !value)}
         onAdd={() => setQuickAddOpen(true)}
+        showHeader={!location.pathname.startsWith("/account/groups")}
       >
         {tab === "overview" ? <OverviewPanel masked={masked} /> : null}
         {tab === "transactions" ? <TransactionsPanel /> : null}
         {tab === "budgets" ? <BudgetsPanel masked={masked} /> : null}
         {tab === "reports" ? <ReportsPanel masked={masked} /> : null}
-        {tab === "account" ? (location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
+        {tab === "account" ? (location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
       </MobileAppShell>
       {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} /> : null}
     </>

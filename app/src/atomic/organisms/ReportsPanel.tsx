@@ -1,6 +1,11 @@
 import { SectionTitle } from "../atoms/SectionTitle";
-import { CategoryTreeCard } from "../molecules/CategoryTreeCard";
-import { categoryShares, categoryTree, reportBars } from "../data/mockFinance";
+import { BaseCategoryTree, type BaseCategoryTreeItem } from "../molecules/BaseCategoryTree";
+import { categoryShares, categoryTree, reportBars, type MockCategoryNode } from "../data/mockFinance";
+import { formatVND } from "../utils/format";
+
+const REPORT_TREE_TEXT = {
+  activity: (count: number) => `Hoạt động trong ${count} nhóm`,
+} as const;
 
 export function ReportsPanel({ masked }: { masked: boolean }) {
   return (
@@ -69,8 +74,19 @@ export function ReportsPanel({ masked }: { masked: boolean }) {
 
       <section className="rounded-3xl bg-white p-4">
         <SectionTitle title="Danh mục đa tầng" />
-        <div className="mt-3 space-y-3">{categoryTree.map((node) => <CategoryTreeCard key={node.id} node={node} masked={masked} />)}</div>
+        <div className="mt-3 space-y-3">{categoryTree.map((node) => <BaseCategoryTree key={node.id} root={reportTreeItem(node, masked, true)} children={(node.children ?? []).map((child) => reportTreeItem(child, masked, false))} />)}</div>
       </section>
     </>
   );
+}
+
+function reportTreeItem(node: MockCategoryNode, masked: boolean, root: boolean): BaseCategoryTreeItem {
+  return {
+    id: node.id,
+    name: node.name,
+    subtitle: root ? REPORT_TREE_TEXT.activity(node.children?.length ?? 0) : "",
+    isSystem: true,
+    icon: node.icon,
+    trailing: <span className={`money font-bold text-slate-800 ${root ? "text-sm" : "text-xs"}`}>{masked ? "••••••" : formatVND(node.amount)}</span>,
+  };
 }

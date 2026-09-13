@@ -29,7 +29,10 @@ This file maps accepted behavior and work items to proof.
 
 | Area | Proof | Result | Evidence |
 | --- | --- | --- | --- |
-| Base component styling | TypeScript + production build | pass | `npm run typecheck && npm run build` in `app/` |
+| Base component styling | TypeScript + production build and authenticated browser inspection | pass | `npm run typecheck && npm run build` in `app/`; canonical `BaseCategoryTree` now powers both Group management and the Reports adapter. Browser proof at `/account/groups`: global colorful category icon catalog, 32px parent / 28px child icons, visibly indented children, connector from the parent-icon centre, and dividers beginning at the indented content column. |
+| Database migrations | Dev PostgreSQL migration CLI | pass | `go run ./cmd/migrate up && go run ./cmd/migrate version` in `backend/`; version `3`, `dirty=false`; catalog count 28, `user`/`transactions` tables and wallet FK cascade confirmed. |
+| API routing and Swagger generation | Go test + code generation | pass | `go test ./... && go generate ./cmd/api` in `backend/`; domain route groups compile and generated Swagger includes implemented wallet/transaction handlers. |
+| Group management CRUD | API smoke, use-case test, FE typecheck/build and browser inspection | pass; owner UAT pending | Temporary personal group create → update → delete passed; system group PATCH returned `404`; `go test ./...`, `go generate ./cmd/api`, `npm run typecheck && npm run build`. Category use case rejects a wallet outside owner scope; `/account/groups` authenticated browser load confirmed Expense/Income/Debt tabs, system count, vertical connector and horizontal dividers. The edit-form delete action is covered by typecheck/build; owner UAT remains pending. |
 
 | Area | Proof | Result | Evidence |
 | --- | --- | --- | --- |

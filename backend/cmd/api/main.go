@@ -18,6 +18,8 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/controller/http,../../internal/usecase,../../internal/entity -o ../../docs --parseInternal
+
 // @title MyPocket API
 // @version 0.1.0
 // @description Current implemented API surface for local development.
@@ -40,10 +42,6 @@ func main() {
 	defer func() {
 		_ = sqlDB.Close()
 	}()
-
-	if err := db.EnsureSchema(database); err != nil {
-		log.Fatalf("migrate schema failed: %v", err)
-	}
 
 	cacheRepo, err := cache.NewRedis(cfg.RedisURL)
 	if err != nil {
@@ -85,12 +83,16 @@ func main() {
 	)
 	profileHandler := httpapi.NewProfileHandler(authUc)
 	homeHandler := httpapi.NewHomeHandler(authUc)
-	categoryHandler := httpapi.NewCategoryHandler(repo.NewCategoryPostgresRepository(database))
+	categoryRepository := repo.NewCategoryPostgresRepository(database)
+	categoryHandler := httpapi.NewCategoryHandler(usecase.NewCategoryInteractor(categoryRepository))
+	walletRepository := repo.NewWalletPostgresRepository(database)
+	walletHandler := httpapi.NewWalletHandler(walletRepository)
+	transactionHandler := httpapi.NewTransactionHandler(repo.NewTransactionPostgresRepository(database), walletRepository, categoryRepository)
 	verifySession := func(sessionID string) (string, error) {
 		return authUc.VerifySession(context.Background(), sessionID)
 	}
 	middleware := httpapi.NewAuthMiddleware(jwtSvc, verifySession)
-	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, middleware, cfg.CORSAllowedOrigins)
+	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, walletHandler, transactionHandler, middleware, cfg.CORSAllowedOrigins)
 	router.Engine.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	if err := router.Engine.Run(cfg.HTTPAddr); err != nil {

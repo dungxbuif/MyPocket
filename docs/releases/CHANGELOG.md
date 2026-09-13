@@ -19,6 +19,14 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+- Refined the shared category-tree base: all seeded groups use a global colorful icon catalog; parent/child hierarchy uses a connector at the outer icon edge, smaller child icons, and indented row dividers. Personal-category deletion is available from the shared edit form after confirmation.
+
+- Added real Account → Nhóm management: owner-scoped category list/create/update/delete, system category read-only protection, two-level parent validation, child-delete protection, owner-validated applicable-wallet selection and loading/error/form states in the React screen.
+
+- Replaced API-startup GORM auto-sync and category seeding with versioned PostgreSQL migrations. The same migration CLI is used in development and production; the local dev database is at clean version 2.
+- Split Gin route registration into public auth, account, category, wallet and transaction route groups. Swagger remains code-first: handler annotations plus `go generate ./cmd/api`; no standalone Swagger config exists.
+- Added the base-component technical contract from current `docs/design` image/HTML artifacts, including card, keypad, form-row, budget-meter and category-tree constraints.
+
 - Added TanStack Router route tree for finance sections and account management paths.
 - Added GORM schema migration for `user`, wallets, categories, and category-wallet assignments, plus idempotent system category seeding.
 

@@ -174,6 +174,12 @@ The shape language is consistently rounded to evoke a "friendly tech" feel.
 *   **Pattern:** Inset fields within a card. Labels are small and floated above the value. Use a 1px border or subtle underline to define the input area.
 *   **Selection:** "Choose Category" or "Select Wallet" inputs include a trailing chevron-right icon.
 
+### Tài khoản → Quản lý nhóm
+* **Composition:** the sub-route hides the balance header and uses a compact centered `Heading` app bar with a pill back `BaseButton`; global `SegmentedControl` switches Expense/Income/Debt; a full-width outlined `BaseButton` is the “Nhóm mới” action; `BaseCategoryTree` owns root/child geometry, category marker, wallet-activity text and expand state; `SurfaceCard` wraps only status cards and the edit form; `FormField` with `BaseTextInput`/`BaseSelect` owns field treatment. Do not create a second card, tree, form field, tab or button treatment in this screen.
+* **States:** loading, list, empty, load error/retry, local validation, saving, API error, and destructive-delete confirmation are explicit states.
+* **Permissions:** a system group exposes its name, kind and system label only. Personal groups expose edit/delete. The backend remains authoritative for owner scope and rules.
+* **Tree:** `nested` is the Account variant (31px icon-axis / `pl-10`); `line` is reserved for dense selector contexts (66px anchor / `pl-16`). Root markers use the dark category treatment; named system keys map to their category marker/tone, and unrecognized personal groups use the global fallback marker. The list shows root and one child level; category kind, valid root parent and many applicable wallets are selected in the form. No selected wallet means “Áp dụng tất cả ví”; new wallets are not auto-selected. The screen never presents a child as a valid parent.
+
 ### Charts
 *   **Bar Charts:** Use rounded tops for bars. Current period uses Primary Green; previous periods use a muted or desaturated version.
 *   **Donut/Arc Charts:** Use a medium stroke width (approx 8-10px) with rounded caps for the progress indicator.

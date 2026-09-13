@@ -20,12 +20,140 @@ definitions:
         type: string
       updated_at:
         type: string
+      wallet_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  entity.Transaction:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      included_in_reports:
+        type: boolean
+      note:
+        type: string
+      occurred_at:
+        type: string
+      owner_id:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.Wallet:
+    properties:
+      created_at:
+        type: string
+      credit_limit:
+        type: integer
+      currency:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      is_in_total:
+        type: boolean
+      last_statement_balance:
+        type: integer
+      name:
+        type: string
+      opening_balance:
+        type: integer
+      owner_id:
+        type: string
+      payment_due_day:
+        type: integer
+      statement_day:
+        type: integer
+      target_amount:
+        type: integer
+      target_date:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  httpapi.Problem:
+    properties:
+      code:
+        type: string
+      detail:
+        type: string
+      instance:
+        type: string
+      request_id:
+        type: string
+      status:
+        type: integer
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  httpapi.categoryInput:
+    properties:
+      kind:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: string
+      wallet_ids:
+        items:
+          type: string
+        type: array
     type: object
   httpapi.loginRequest:
     properties:
       email:
         type: string
       password:
+        type: string
+    type: object
+  httpapi.transactionInput:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      included_in_reports:
+        type: boolean
+      note:
+        type: string
+      occurred_at:
+        type: string
+      type:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  httpapi.walletInput:
+    properties:
+      credit_limit:
+        type: integer
+      description:
+        type: string
+      is_in_total:
+        type: boolean
+      name:
+        type: string
+      opening_balance:
+        type: integer
+      target_amount:
+        type: integer
+      type:
         type: string
     type: object
   usecase.HomeOutput:
@@ -181,18 +309,95 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            additionalProperties:
-              type: string
-            type: object
-        "500":
-          description: Internal Server Error
-          schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/httpapi.Problem'
       security:
       - BearerAuth: []
       summary: List visible categories
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category input
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.categoryInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a personal category
+      tags:
+      - Categories
+  /api/v1/categories/{id}:
+    delete:
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete a personal category without children
+      tags:
+      - Categories
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category input
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.categoryInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update a personal category
       tags:
       - Categories
   /api/v1/home:
@@ -254,6 +459,236 @@ paths:
       summary: Login with email and password
       tags:
       - Authentication
+  /api/v1/transactions:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Transaction'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List transactions
+      tags:
+      - Transactions
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction input
+        in: body
+        name: transaction
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.transactionInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create an income or expense transaction
+      tags:
+      - Transactions
+  /api/v1/transactions/{id}:
+    delete:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete a transaction
+      tags:
+      - Transactions
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Transaction input
+        in: body
+        name: transaction
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.transactionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update an income or expense transaction
+      tags:
+      - Transactions
+  /api/v1/wallets:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Wallet'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List wallets
+      tags:
+      - Wallets
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wallet input
+        in: body
+        name: wallet
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.walletInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Wallet'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a wallet
+      tags:
+      - Wallets
+  /api/v1/wallets/{id}:
+    delete:
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Permanently delete a wallet
+      tags:
+      - Wallets
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Wallet input
+        in: body
+        name: wallet
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.walletInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Wallet'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update a wallet
+      tags:
+      - Wallets
 securityDefinitions:
   BearerAuth:
     in: header
