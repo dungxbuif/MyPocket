@@ -1,6 +1,8 @@
+import { BASE_COMPONENT_RADIUS } from "./tokens";
+
 export function MetricBox({ label, value, danger = false, className = "" }: { label: string; value: string; danger?: boolean; className?: string }) {
   return (
-    <div className={`rounded-2xl bg-[#f5f3f3] p-3 ${className}`}>
+    <div className={`${BASE_COMPONENT_RADIUS} bg-[#f5f3f3] p-3 ${className}`}>
       <p className="text-xs text-[#3f4a3c]">{label}</p>
       <p className={`money mt-1 text-sm font-bold ${danger ? "text-[#bb1614]" : "text-[#1b1c1c]"}`}>{value}</p>
     </div>

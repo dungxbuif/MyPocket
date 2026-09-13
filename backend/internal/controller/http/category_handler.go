@@ -1,32 +1,31 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
-	"strings"
-	"github.com/google/uuid"
-	"github.com/mypocket/backend/internal/entity"
 
 	"github.com/gin-gonic/gin"
-	categoryrepo "github.com/mypocket/backend/internal/repository"
+	"github.com/mypocket/backend/internal/usecase"
+	"gorm.io/gorm"
 )
 
 const (
-	categoryUnauthorizedMessage = "chưa đăng nhập"
-	categoryLoadErrorMessage    = "không đọc được danh sách nhóm"
+	categoryUnauthorizedMessage   = "chưa đăng nhập"
+	categoryLoadErrorMessage      = "không đọc được danh sách nhóm"
+	categoryNotFoundMessage       = "không tìm thấy nhóm hoặc nhóm hệ thống không thể sửa"
+	categoryDeleteNotFoundMessage = "không tìm thấy nhóm hoặc nhóm hệ thống không thể xóa"
 )
 
-type CategoryHandler struct {
-	Categories categoryrepo.CategoryRepository
+type CategoryHandler struct{ Categories *usecase.CategoryInteractor }
+type categoryInput struct {
+	Name      string   `json:"name"`
+	Kind      string   `json:"kind"`
+	ParentID  *string  `json:"parent_id"`
+	WalletIDs []string `json:"wallet_ids"`
+	IconKey   string   `json:"icon_key"`
 }
 
-type categoryInput struct { Name string `json:"name"`; Kind string `json:"kind"`; ParentID *string `json:"parent_id"` }
-func categoryOwner(c *gin.Context) (string, bool) { value, ok := c.Get(contextUserIDKey); id, valid := value.(string); return id, ok && valid && strings.TrimSpace(id) != "" }
-
-func (h *CategoryHandler) CreateCategory(c *gin.Context) { owner, ok := categoryOwner(c); if !ok { Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: categoryUnauthorizedMessage}); return }; var input categoryInput; if c.ShouldBindJSON(&input) != nil || strings.TrimSpace(input.Name) == "" { Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: "Bad Request", Detail: "tên nhóm không được để trống"}); return }; item := &entity.Category{ID: uuid.NewString(), Name: strings.TrimSpace(input.Name), Kind: input.Kind, ParentID: input.ParentID}; if item.Kind == "" { item.Kind = "expense" }; if err := h.Categories.Create(owner, item); err != nil { FailError(c, http.StatusInternalServerError, problemCodeCategoryLoadFailed, problemTitleInternalServer, err); return }; Created(c, item) }
-func (h *CategoryHandler) UpdateCategory(c *gin.Context) { owner, ok := categoryOwner(c); if !ok { Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: categoryUnauthorizedMessage}); return }; var input categoryInput; if c.ShouldBindJSON(&input) != nil || strings.TrimSpace(input.Name) == "" { Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: "Bad Request", Detail: "tên nhóm không được để trống"}); return }; item, err := h.Categories.Update(owner, c.Param("id"), map[string]any{"name": strings.TrimSpace(input.Name), "parent_id": input.ParentID}); if err != nil { Fail(c, http.StatusNotFound, Problem{Code: "CATEGORY_NOT_FOUND", Title: "Not Found", Detail: "không tìm thấy nhóm hoặc nhóm hệ thống không thể sửa"}); return }; OK(c, item) }
-func (h *CategoryHandler) DeleteCategory(c *gin.Context) { owner, ok := categoryOwner(c); if !ok { Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: categoryUnauthorizedMessage}); return }; if err := h.Categories.Delete(owner, c.Param("id")); err != nil { Fail(c, http.StatusNotFound, Problem{Code: "CATEGORY_NOT_FOUND", Title: "Not Found", Detail: "không tìm thấy nhóm hoặc nhóm hệ thống không thể xóa"}); return }; NoContent(c) }
-
-func NewCategoryHandler(categories categoryrepo.CategoryRepository) *CategoryHandler {
+func NewCategoryHandler(categories *usecase.CategoryInteractor) *CategoryHandler {
 	return &CategoryHandler{Categories: categories}
 }
 
@@ -36,24 +35,123 @@ func NewCategoryHandler(categories categoryrepo.CategoryRepository) *CategoryHan
 // @Produce json
 // @Security BearerAuth
 // @Success 200 {array} entity.Category
-// @Failure 401 {object} map[string]string
-// @Failure 500 {object} map[string]string
+// @Failure 401 {object} Problem
 // @Router /api/v1/categories [get]
 func (h *CategoryHandler) ListCategories(c *gin.Context) {
-	value, ok := c.Get(contextUserIDKey)
+	owner, ok := categoryOwner(c)
 	if !ok {
-		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: categoryUnauthorizedMessage})
+		categoryUnauthorized(c)
 		return
 	}
-	userID, ok := value.(string)
-	if !ok || userID == "" {
-		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: categoryUnauthorizedMessage})
-		return
-	}
-	categories, err := h.Categories.ListVisible(userID)
+	items, err := h.Categories.List(owner)
 	if err != nil {
 		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeCategoryLoadFailed, Title: problemTitleInternalServer, Detail: categoryLoadErrorMessage})
 		return
 	}
-	OK(c, categories)
+	OK(c, items)
+}
+
+// CreateCategory godoc
+// @Summary Create a personal category
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param category body categoryInput true "Category input"
+// @Success 201 {object} entity.Category
+// @Failure 400 {object} Problem
+// @Router /api/v1/categories [post]
+func (h *CategoryHandler) CreateCategory(c *gin.Context) {
+	owner, ok := categoryOwner(c)
+	if !ok {
+		categoryUnauthorized(c)
+		return
+	}
+	input, ok := bindCategoryInput(c)
+	if !ok {
+		return
+	}
+	item, err := h.Categories.Create(owner, input)
+	if err != nil {
+		categoryError(c, err, categoryNotFoundMessage)
+		return
+	}
+	Created(c, item)
+}
+
+// UpdateCategory godoc
+// @Summary Update a personal category
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Category ID"
+// @Param category body categoryInput true "Category input"
+// @Success 200 {object} entity.Category
+// @Failure 400 {object} Problem
+// @Failure 404 {object} Problem
+// @Router /api/v1/categories/{id} [patch]
+func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
+	owner, ok := categoryOwner(c)
+	if !ok {
+		categoryUnauthorized(c)
+		return
+	}
+	input, ok := bindCategoryInput(c)
+	if !ok {
+		return
+	}
+	item, err := h.Categories.Update(owner, c.Param("id"), input)
+	if err != nil {
+		categoryError(c, err, categoryNotFoundMessage)
+		return
+	}
+	OK(c, item)
+}
+
+// DeleteCategory godoc
+// @Summary Delete a personal category without children
+// @Tags Categories
+// @Security BearerAuth
+// @Param id path string true "Category ID"
+// @Success 204
+// @Failure 400 {object} Problem
+// @Failure 404 {object} Problem
+// @Router /api/v1/categories/{id} [delete]
+func (h *CategoryHandler) DeleteCategory(c *gin.Context) {
+	owner, ok := categoryOwner(c)
+	if !ok {
+		categoryUnauthorized(c)
+		return
+	}
+	err := h.Categories.Delete(owner, c.Param("id"))
+	if err != nil {
+		categoryError(c, err, categoryDeleteNotFoundMessage)
+		return
+	}
+	NoContent(c)
+}
+
+func categoryOwner(c *gin.Context) (string, bool) { return walletOwner(c) }
+func categoryUnauthorized(c *gin.Context) {
+	Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: categoryUnauthorizedMessage})
+}
+func bindCategoryInput(c *gin.Context) (usecase.CategoryInput, bool) {
+	var input categoryInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return usecase.CategoryInput{}, false
+	}
+	return usecase.CategoryInput{Name: input.Name, Kind: input.Kind, ParentID: input.ParentID, WalletIDs: input.WalletIDs, IconKey: input.IconKey}, true
+}
+func categoryError(c *gin.Context, err error, notFoundDetail string) {
+	if errors.Is(err, gorm.ErrRecordNotFound) {
+		Fail(c, http.StatusNotFound, Problem{Code: problemCodeCategoryNotFound, Title: problemTitleNotFound, Detail: notFoundDetail})
+		return
+	}
+	if errors.Is(err, usecase.ErrCategoryNameRequired) || errors.Is(err, usecase.ErrCategoryKindInvalid) || errors.Is(err, usecase.ErrCategoryParentInvalid) || errors.Is(err, usecase.ErrCategoryHasChildren) || errors.Is(err, usecase.ErrCategoryWalletInvalid) {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: err.Error()})
+		return
+	}
+	Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeCategorySaveFailed, Title: problemTitleInternalServer, Detail: categoryLoadErrorMessage})
 }

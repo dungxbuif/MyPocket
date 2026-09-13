@@ -9,6 +9,11 @@ const (
 	WalletCurrencyVND = "VND"
 )
 
+const (
+	TransactionTypeIncome  = "income"
+	TransactionTypeExpense = "expense"
+)
+
 type Wallet struct {
 	ID                   string     `json:"id" gorm:"primaryKey"`
 	OwnerID              string     `json:"owner_id" gorm:"index;not null"`
@@ -35,13 +40,29 @@ type Category struct {
 	Kind      string    `json:"kind" gorm:"not null"`
 	Name      string    `json:"name" gorm:"not null"`
 	SystemKey *string   `json:"system_key,omitempty" gorm:"uniqueIndex"`
+	IconKey   string    `json:"icon_key" gorm:"not null;default:tag"`
 	IsSystem  bool      `json:"is_system" gorm:"not null;default:false"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
+	WalletIDs []string  `json:"wallet_ids" gorm:"-"`
 }
 
 type CategoryWallet struct {
 	CategoryID string    `json:"category_id" gorm:"primaryKey"`
 	WalletID   string    `json:"wallet_id" gorm:"primaryKey"`
 	CreatedAt  time.Time `json:"created_at"`
+}
+
+type Transaction struct {
+	ID                string    `json:"id" gorm:"primaryKey"`
+	OwnerID           string    `json:"owner_id" gorm:"index;not null"`
+	WalletID          string    `json:"wallet_id" gorm:"index;not null"`
+	CategoryID        *string   `json:"category_id,omitempty" gorm:"index"`
+	Type              string    `json:"type" gorm:"not null"`
+	Amount            int64     `json:"amount" gorm:"not null"`
+	OccurredAt        time.Time `json:"occurred_at" gorm:"index;not null"`
+	Note              *string   `json:"note,omitempty"`
+	IncludedInReports bool      `json:"included_in_reports" gorm:"not null;default:true"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
