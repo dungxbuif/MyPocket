@@ -1,7 +1,7 @@
 ---
 artifact_type: detail_design
 id: DESIGN-02-01
-status: in_progress
+status: in_review
 owner: shared
 approval: authorized_by_user_full_spec
 trace:
@@ -11,6 +11,7 @@ trace:
   tests: ../../work/VALIDATION_MATRIX.md
   database_operations: ../../architecture/DATABASE.md
   adr: ../../decisions/ADR-001-versioned-database-migrations.md
+  ui_spec: ../../design/screens/transactions/README.md
 ---
 
 # Thu/chi cơ bản trên ledger
@@ -26,6 +27,14 @@ Chuyển ví, điều chỉnh số dư, nợ/tín dụng, recurring, Travel Mode
 ## Contract
 
 `GET/POST /api/v1/transactions`, `PATCH/DELETE /api/v1/transactions/{id}`. Tất cả route protected, owner-scoped, dùng response envelope chung. Chỉ nhận `income` hoặc `expense`; amount phải lớn hơn 0; wallet phải thuộc owner; category nếu có phải visible và đúng kind.
+
+Slice thu/chi chỉ chọn ví `basic` hoặc `goal`. Ví `credit` bị chặn ở cả API và UI vì CRD-01…04 định nghĩa chiều dư nợ, mua, hoàn tiền và thanh toán riêng; dùng công thức thu/chi thường sẽ làm sai nghĩa tín dụng.
+
+Nhóm không có `wallet_ids` áp dụng cho mọi ví. Nhóm có `wallet_ids` chỉ được chọn và lưu với một ví nằm trong danh sách đó. API là lớp bảo vệ cuối, UI lọc cùng quy tắc và xóa lựa chọn nhóm không còn hợp lệ khi đổi ví hoặc loại giao dịch.
+
+Số dư hiện tại của ví là giá trị suy ra theo WAL-02: `opening_balance + income - expense`. CRUD giao dịch không ghi đè `opening_balance`; list ví trả thêm `current_balance` để các màn dùng cùng một nguồn dữ liệu.
+
+UI compose từ các base đã có: `BaseBottomSheet`, `SegmentedControl`, `FormField`/`BaseTextInput`/`BaseSelect`, `BaseCheckbox`, `StatusMessage`, `SurfaceCard`, `BaseButton` và `TransactionItem`. Behavior màn được khóa tại [screen spec](../../design/screens/transactions/README.md); không dựng control/card/màu riêng trong organism.
 
 ## Proof và reconciliation
 

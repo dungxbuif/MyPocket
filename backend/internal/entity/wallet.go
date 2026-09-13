@@ -21,6 +21,7 @@ type Wallet struct {
 	Type                 string     `json:"type" gorm:"not null"`
 	Currency             string     `json:"currency" gorm:"not null;default:VND"`
 	OpeningBalance       int64      `json:"opening_balance"`
+	CurrentBalance       int64      `json:"current_balance" gorm:"-"`
 	IsInTotal            bool       `json:"is_in_total" gorm:"not null;default:true"`
 	Description          *string    `json:"description,omitempty"`
 	TargetAmount         *int64     `json:"target_amount,omitempty"`

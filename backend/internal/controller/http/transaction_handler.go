@@ -18,6 +18,7 @@ const (
 	transactionAmountMessage       = "số tiền phải lớn hơn 0"
 	transactionTypeMessage         = "loại giao dịch không hợp lệ"
 	transactionWalletMessage       = "ví không tồn tại hoặc không thuộc tài khoản"
+	transactionCreditWalletMessage = "ví tín dụng cần luồng giao dịch tín dụng riêng"
 	transactionCategoryMessage     = "nhóm không phù hợp với loại giao dịch"
 	transactionDateMessage         = "thời điểm giao dịch không hợp lệ"
 	transactionNotFoundMessage     = "không tìm thấy giao dịch"
@@ -173,11 +174,17 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string) (tran
 		transactionBadRequest(c, transactionTypeMessage)
 		return transactionInput{}, time.Time{}, false
 	}
-	if _, err := h.Wallets.Find(owner, input.WalletID); err != nil {
+	wallet, err := h.Wallets.Find(owner, input.WalletID)
+	if err != nil {
 		Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionWalletNotFound, Title: problemTitleNotFound, Detail: transactionWalletMessage})
 		return transactionInput{}, time.Time{}, false
 	}
-	if input.CategoryID != nil && !h.categoryValid(owner, *input.CategoryID, input.Type) {
+	if wallet.Type == entity.WalletTypeCredit {
+		transactionBadRequest(c, transactionCreditWalletMessage)
+		return transactionInput{}, time.Time{}, false
+	}
+	input.CategoryID = normalizeOptional(input.CategoryID)
+	if input.CategoryID != nil && !h.categoryValid(owner, *input.CategoryID, input.Type, input.WalletID) {
 		transactionBadRequest(c, transactionCategoryMessage)
 		return transactionInput{}, time.Time{}, false
 	}
@@ -193,15 +200,24 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string) (tran
 	return input, occurredAt, true
 }
 
-func (h *TransactionHandler) categoryValid(owner, categoryID, kind string) bool {
+func (h *TransactionHandler) categoryValid(owner, categoryID, kind, walletID string) bool {
 	categories, err := h.Categories.ListVisible(owner)
 	if err != nil {
 		return false
 	}
 	for _, category := range categories {
-		if category.ID == categoryID && category.Kind == kind {
+		if category.ID != categoryID || category.Kind != kind {
+			continue
+		}
+		if len(category.WalletIDs) == 0 {
 			return true
 		}
+		for _, applicableWalletID := range category.WalletIDs {
+			if applicableWalletID == walletID {
+				return true
+			}
+		}
+		return false
 	}
 	return false
 }

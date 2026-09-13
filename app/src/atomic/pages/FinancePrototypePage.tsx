@@ -6,9 +6,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { AccountPanel } from "../organisms/AccountPanel";
 import { BudgetsPanel } from "../organisms/BudgetsPanel";
 import { OverviewPanel } from "../organisms/OverviewPanel";
-// QuickAddSheet and ReportsPanel stay in the codebase for their future API slices.
-// They are intentionally not mounted until those backend contracts exist.
-// import { QuickAddSheet } from "../organisms/QuickAddSheet";
+import { QuickAddSheet } from "../organisms/QuickAddSheet";
 // import { ReportsPanel } from "../organisms/ReportsPanel";
 import { TransactionsPanel } from "../organisms/TransactionsPanel";
 import { GroupManagementPanel } from "../organisms/GroupManagementPanel";
@@ -53,7 +51,8 @@ export function FinancePrototypePage() {
   const navigate = useNavigate();
   const tab = tabFromPath(location.pathname);
   const [masked, setMasked] = useState(false);
-  // const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [transactionRefresh, setTransactionRefresh] = useState(0);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
@@ -168,16 +167,17 @@ export function FinancePrototypePage() {
         masked={masked}
         onTabChange={(nextTab) => void navigate({ to: pathFromTab(nextTab) })}
         onToggleMask={() => setMasked((value) => !value)}
-        onAdd={() => undefined}
+        onAdd={() => setQuickAddOpen(true)}
+        refreshKey={transactionRefresh}
         showHeader={!location.pathname.startsWith("/account/groups")}
       >
-        {tab === "overview" ? <OverviewPanel masked={masked} /> : null}
-        {tab === "transactions" ? <TransactionsPanel /> : null}
+        {tab === "overview" ? <OverviewPanel masked={masked} refreshKey={transactionRefresh} /> : null}
+        {tab === "transactions" ? <TransactionsPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : null}
         {tab === "budgets" ? <BudgetsPanel masked={masked} /> : null}
         {/* ReportsPanel awaits its real reporting API. */}
-        {tab === "account" ? (location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
+        {tab === "account" ? (location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
       </MobileAppShell>
-      {/* QuickAddSheet awaits the transaction create API. */}
+      {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} onSaved={() => setTransactionRefresh((value) => value + 1)} /> : null}
     </>
   );
 }

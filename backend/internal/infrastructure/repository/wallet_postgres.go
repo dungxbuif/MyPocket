@@ -16,8 +16,35 @@ func NewWalletPostgresRepository(db *gorm.DB) walletrepo.WalletRepository {
 
 func (r *WalletPostgresRepository) List(ownerID string) ([]entity.Wallet, error) {
 	var wallets []entity.Wallet
-	err := r.db.Where("owner_id = ?", ownerID).Order("created_at ASC").Find(&wallets).Error
-	return wallets, err
+	if err := r.db.Where("owner_id = ?", ownerID).Order("created_at ASC").Find(&wallets).Error; err != nil {
+		return nil, err
+	}
+	var transactions []entity.Transaction
+	if err := r.db.Where("owner_id = ?", ownerID).Find(&transactions).Error; err != nil {
+		return nil, err
+	}
+	calculateCurrentBalances(wallets, transactions)
+	return wallets, nil
+}
+
+func calculateCurrentBalances(wallets []entity.Wallet, transactions []entity.Transaction) {
+	indexByID := make(map[string]int, len(wallets))
+	for index := range wallets {
+		wallets[index].CurrentBalance = wallets[index].OpeningBalance
+		indexByID[wallets[index].ID] = index
+	}
+	for _, transaction := range transactions {
+		index, ok := indexByID[transaction.WalletID]
+		if !ok {
+			continue
+		}
+		switch transaction.Type {
+		case entity.TransactionTypeIncome:
+			wallets[index].CurrentBalance += transaction.Amount
+		case entity.TransactionTypeExpense:
+			wallets[index].CurrentBalance -= transaction.Amount
+		}
+	}
 }
 
 func (r *WalletPostgresRepository) Find(ownerID, id string) (*entity.Wallet, error) {

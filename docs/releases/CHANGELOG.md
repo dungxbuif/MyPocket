@@ -19,6 +19,12 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+- Connected the basic income/expense ledger end to end: global add, real transaction list, edit/delete sheet, wallet/category validation, signed VND groups and synchronized Header/Overview/Wallet balances. Added the durable [transaction screen contract](../design/screens/transactions/README.md).
+- Wallet list responses now expose ledger-derived `current_balance`; totals honor `is_in_total`. Goal wallets require a positive target and credit wallets require a positive limit. Permanent-delete warnings show dependent transaction count and report impact.
+- Wallet metadata edits no longer overwrite opening balance; the edit form makes that field read-only until the dedicated adjustment transaction is implemented.
+- Wallet type is immutable after creation to prevent existing basic/goal ledger rows from being reinterpreted with credit semantics.
+- Enforced category applicable-wallet scope in transaction validation and excluded credit wallets from the basic ledger until credit purchase/payment semantics are implemented. Added Go and frontend rule tests plus real PostgreSQL/Chrome UAT evidence.
+
 - Normalized `docs/design` to Markdown component/token/behavior specifications from seven screenshots. Removed 7 PNG and 8 HTML exports after extraction (originals recoverable in Git); screen behavior is documented as each screen is implemented.
 - Wired the canonical theme and refactored shared controls, text, cards, statuses, navigation, progress/gauge and chart compositions. Added build guardrails against literal colors, native controls outside atoms, local card/text recreation and base visual overrides. Added keyboard tab selection and bottom-sheet focus trapping/Escape/return-focus. [UI-BASE-01 proof](../work/tickets/UI-BASE-01-VERIFICATION.md).
 
@@ -26,7 +32,7 @@ All notable changes should be recorded here.
 
 - Closed Account → Nhóm management: shared base-composed create/edit cards now support icon, name, type, parent and applicable-wallet selection. System categories lock metadata but allow wallet selection; deleting a personal parent returns its personal children to root. The system icon catalog is applied by migration `000008` for every deployment.
 
-- Reduced active bottom navigation to Tổng quan, Sổ GD, Ngân sách and Tài khoản. Reports and quick-add source remain commented out until their backend contracts exist; the center add button has no label and occupies the vacant middle position.
+- Reduced active bottom navigation to Tổng quan, Sổ GD, Ngân sách and Tài khoản. Reports remain unmounted; the center add button now opens the verified basic income/expense editor.
 
 - Refined the shared category-tree base: all seeded groups use a global colorful icon catalog while the nested reference geometry is retained—40px parent / 32px child icons, `pl-10` child list, 2px central trunk and curved child branches. Personal-category deletion is available from the shared edit form after confirmation.
 

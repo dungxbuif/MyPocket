@@ -1,27 +1,29 @@
-import { Text } from "../atoms/Text";
-import { BaseButton } from "../atoms/BaseButton";
-import type { MockTransaction } from "../data/mockFinance";
-import { formatVND } from "../utils/format";
-import { IconBadge } from "../atoms/IconBadge";
-import { TRANSACTION_BADGE_TONES } from "../../ui/domainVariants";
+import type { LucideIcon } from "lucide-react";
 
-export function TransactionItem({ transaction }: { transaction: MockTransaction }) {
-  const Icon = transaction.icon;
-  const positive = transaction.amount > 0;
-  const neutral = transaction.kind === "transfer";
+import { BaseButton } from "../atoms/BaseButton";
+import { IconBadge } from "../atoms/IconBadge";
+import { Text } from "../atoms/Text";
+import { formatVND } from "../utils/format";
+import type { BadgeTone } from "../../ui/variants";
+
+export type TransactionItemModel = {
+  title: string;
+  metadata: string;
+  amount: number;
+  kind: "income" | "expense" | "transfer" | "debt";
+  icon: LucideIcon;
+  tone: BadgeTone;
+};
+
+export function TransactionItem({ item, onActivate }: { item: TransactionItemModel; onActivate?: () => void }) {
   return (
-    <BaseButton variant="row" size="row" className="flex w-full items-center gap-3">
-      <IconBadge icon={Icon} tone={TRANSACTION_BADGE_TONES[transaction.kind]} />
+    <BaseButton variant="row" size="row" className="flex w-full items-center gap-3" onClick={onActivate}>
+      <IconBadge icon={item.icon} tone={item.tone} />
       <div className="min-w-0 flex-1">
-        <Text weight="semibold" className="truncate">{transaction.title}</Text>
-        <Text size="xs" tone="secondary" className="truncate">
-          {transaction.category} · {transaction.wallet}
-          {transaction.note ? ` · ${transaction.note}` : ""}
-        </Text>
+        <Text weight="semibold" className="truncate">{item.title}</Text>
+        <Text size="xs" tone="secondary" className="truncate">{item.metadata}</Text>
       </div>
-      <Text numeric weight="bold" tone={positive ? "action" : neutral ? "secondary" : "danger"} className="tracking-tight">
-        {formatVND(transaction.amount)}
-      </Text>
+      <Text numeric weight="bold" tone={item.kind === "income" ? "action" : item.kind === "transfer" ? "secondary" : "danger"} className="tracking-tight">{formatVND(item.amount)}</Text>
     </BaseButton>
   );
 }

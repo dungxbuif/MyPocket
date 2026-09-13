@@ -948,6 +948,9 @@ const docTemplate = `{
                 "currency": {
                     "type": "string"
                 },
+                "current_balance": {
+                    "type": "integer"
+                },
                 "description": {
                     "type": "string"
                 },

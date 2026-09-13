@@ -21,7 +21,7 @@ The current local Gin API will use a code-first Swagger contract: each Gin handl
 
 Swagger UI is available at `/api/v1/docs/index.html`; generated artifacts live under `backend/docs/`. Run `go generate ./cmd/api` from `backend/`: the generator declaration stays beside the Go API entry point, and endpoint annotations stay beside their handlers. There is no separate Swagger configuration file.
 
-Frontend navigation is client-side and does not change the API base path. TanStack Router currently exposes `/`, `/transactions`, `/budgets`, `/account`, `/account/groups`, and `/account/wallets`; Reports and quick-add remain retained source code but are not mounted until their APIs exist.
+Frontend navigation is client-side and does not change the API base path. TanStack Router currently exposes `/`, `/transactions`, `/budgets`, `/account`, `/account/groups`, and `/account/wallets`; the global quick-add sheet now persists the implemented basic income/expense contract. Reports remain unmounted until their APIs exist.
 
 Google login starts from the frontend origin using the relative `/api/v1/auth/google` path. Vite proxies that request during development, and the backend redirects the completed OAuth flow back to the same frontend origin at `/auth/callback`.
 
@@ -33,8 +33,8 @@ Document HTTP endpoints, RPC methods, events, CLI commands, or any other public 
 | MyPocket local API | HTTP REST | JWT bearer for `/auth/profile` and `/home`; OAuth cookies for Google callback | implemented for current auth/profile/home slice | Code-first Swagger annotations in Go handlers; generated UI is added incrementally. |
 | `/api/v1/categories` | HTTP REST | JWT bearer | implemented | `GET` returns the owner-approved system catalog and owner-visible groups with `wallet_ids`; `POST`/`PATCH` accept name, kind, parent and owner-scoped applicable wallet IDs; `DELETE` removes a personal group and returns its personal children to root. |
 | `/api/v1/categories/:id/wallets` | HTTP REST | JWT bearer | implemented | Replaces applicable-wallet selections for a visible personal or system category. System metadata remains immutable. |
-| `/api/v1/wallets` | HTTP REST | JWT bearer | implemented; UAT pending | Create/list/update/delete owner-scoped VND wallets. |
-| `/api/v1/transactions` | HTTP REST | JWT bearer | implemented; UI/UAT pending | Create/list/update/delete owner-scoped income and expense ledger entries. |
+| `/api/v1/wallets` | HTTP REST | JWT bearer | implemented; core UAT verified | Create/list/update/delete owner-scoped VND wallets. List returns `opening_balance` and ledger-derived `current_balance`; goal requires positive target and credit requires positive limit. |
+| `/api/v1/transactions` | HTTP REST | JWT bearer | implemented; basic ledger UAT verified | Create/list/update/delete owner-scoped income and expense entries for basic/goal wallets. Optional category must match kind and applicable-wallet scope; credit uses a later dedicated ledger. |
 
 ## Errors
 

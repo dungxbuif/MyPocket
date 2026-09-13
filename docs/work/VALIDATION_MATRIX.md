@@ -59,6 +59,16 @@ This file maps accepted behavior and work items to proof.
 
 Policy lives in `docs/standards/VALIDATION.md`. This matrix is runtime project state and should change as work is planned, implemented, changed, or retired.
 
+### Wallet and basic ledger runtime verification
+
+- Status: core wallet management and the approved basic income/expense ledger are implemented and verified for review. [Wallet evidence](tickets/TICKET-01-02-VERIFICATION.md) · [Ledger evidence](tickets/TICKET-02-01-VERIFICATION.md).
+- `rtk go test ./...` in `backend/`: pass, including owner-scoped handler rules, wallet type validation, category-wallet applicability, credit-ledger exclusion and derived balances.
+- `rtk go run ./cmd/migrate up` and real HTTP UAT against dev PostgreSQL: pass. Restricted category returned `400`; create/update/delete balance sequence was 115,000 → 113,000 → 93,000; deleting the wallet cascaded its final transaction.
+- `rtk go generate ./cmd/api`: pass; Swagger includes wallet `current_balance` and current transaction endpoints.
+- `npm run test:transactions`, `npm run test:design`, and `npm run build` in `app/`: pass.
+- Chrome UAT through the Vite proxy: create wallet, create expense, list, edit, synchronized Header/Wallet balance, and cleanup all passed. Two stale cross-panel refresh gaps were found during UAT, fixed, and rechecked.
+- UAT boundary: receipt/OCR, jar assignment, transfer/adjustment and credit ledger are not required for the approved basic slice and remain open BA/follow-up scope. Human acceptance sign-off remains human-owned.
+
 ## Status Values
 
 | Status | Meaning |
@@ -73,6 +83,8 @@ Policy lives in `docs/standards/VALIDATION.md`. This matrix is runtime project s
 
 | Requirement | Phase | Ticket/Bug | Contract/Behavior | Unit | Integration | E2E | UAT | Platform/Manual | Docs Review | Status | Evidence |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| REQ-02 | not_applicable | [TICKET-01-02](tickets/TICKET-01-02-quan-ly-vi.md) | Core wallet CRUD, type fields, permanent-delete impact, derived/current total balance | yes | yes | yes | yes | not_required | yes | implemented | [Wallet verification](tickets/TICKET-01-02-VERIFICATION.md); human review remains open for later statement/adjustment scope |
+| REQ-04 | not_applicable | [TICKET-02-01](tickets/TICKET-02-01-ghi-thu-chi.md) | Basic income/expense CRUD with wallet/category compatibility and synchronized balances | yes | yes | yes | yes | not_required | yes | implemented | [Ledger verification](tickets/TICKET-02-01-VERIFICATION.md); receipt/jar acceptance remains outside verified slice |
 | REQ-01, NFR-04 | not_applicable | [BA tickets](tickets/README.md) | UTC/date-only/account timezone and fixed VND | yes | yes | yes | yes | not_required | yes | planned | Design review only; TIME rules and US-01/05 timezone case; runtime proof pending |
 | REQ-02–05, REQ-09–11 | not_applicable | [BA tickets](tickets/README.md) | Wallet, transaction, budget, savings/credit/debt accounting | yes | yes | yes | yes | not_required | yes | planned | Business rules documented; open linked-deletion/credit scenarios remain |
 | REQ-06 | not_applicable | [BA tickets](tickets/README.md) | Optional jar grouping, soft warnings, monthly configuration and cumulative view | yes | yes | yes | yes | not_required | yes | planned | JAR rules, numeric example, REPORTS and US-05/06; runtime proof pending |

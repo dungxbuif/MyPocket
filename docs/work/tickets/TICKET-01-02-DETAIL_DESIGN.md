@@ -1,9 +1,9 @@
 ---
 artifact_type: detail_design
 id: DESIGN-01-02
-status: ready
+status: in_review
 owner: ai
-approval: pending
+approval: authorized_by_user_goal_2026-09-13
 human_fields:
   - approval
   - constraints
@@ -30,6 +30,7 @@ trace:
   phase: null
   ticket_or_bug: TICKET-01-02
   test_verification: ../VALIDATION_MATRIX.md
+  implementation_verification: TICKET-01-02-VERIFICATION.md
   validation_matrix: ../VALIDATION_MATRIX.md
   docs_review: ../VALIDATION_MATRIX.md
   adrs: []
@@ -44,9 +45,9 @@ trace:
 ## Status
 
 - ID: DESIGN-01-02
-- Status: ready for human review
+- Status: in review after core implementation verification
 - Ticket: [TICKET-01-02](TICKET-01-02-quan-ly-vi.md)
-- Approval: pending
+- Approval: authorized by the owner's wallet/transaction completion goal on 2026-09-13
 - Updated: 2026-09-13
 
 ## 1. Context & Scope
@@ -96,6 +97,7 @@ Người dùng cần tạo, xem, sửa và xoá các ví thuộc tài khoản đ
 - `goal`: `target_amount` > 0, `target_date` tuỳ chọn theo SPEC hiện có; hiển thị số hiện có, còn thiếu và tiến độ từ giao dịch. Không triển khai công thức lãi ngân hàng từ nghiên cứu này.
 - `credit`: `credit_limit` > 0, `last_statement_balance`, `statement_day`, `payment_due_day`. Phải phân biệt số dư sao kê gần nhất với dư nợ hiện tại; không mặc định hai số này luôn bằng nhau. Quy tắc kỳ và phân bổ trả nợ vẫn thuộc thiết kế tín dụng cần hoàn thiện.
 - Sửa metadata ví không ghi đè số dư hiện tại. “Điều chỉnh số dư” tạo một giao dịch mới có nguồn adjustment: `delta = target_balance - current_balance`. Ví dụ 1.000.000 → 800.000 tạo khoản giảm 200.000; chênh lệch 0 không cần tạo giao dịch. Không tự chọn giao dịch cũ để sửa.
+- Loại ví không đổi sau khi tạo. Không diễn giải lại ledger thu/chi thường thành dư nợ tín dụng (hoặc ngược lại) bằng một thao tác sửa metadata.
 - Sửa một giao dịch sai là luồng riêng; số dư tính lại theo WAL-02/TX-04. Cách biểu diễn số dư khởi tạo trong sổ giao dịch cần được thiết kế cùng ledger để không đếm hai lần.
 - MyPocket hiện quy định adjustment không tự thành thu/chi thường (TX-03). Mặc định loại khỏi báo cáo phù hợp quy tắc này; khả năng bật lại cờ như Money Lover chưa được coi là quyết định đã duyệt.
 - Điều chỉnh cần ledger và thao tác DB nguyên tử, kiểm soát gửi lại/đồng thời. Vì vậy không thể gọi nó đã hoàn thiện chỉ bằng CRUD `opening_balance`; thiết kế hiện tại chưa đủ để triển khai đầy đủ chức năng số dư.

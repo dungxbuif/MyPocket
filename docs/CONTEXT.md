@@ -32,13 +32,13 @@ updated: 2026-09-13
 
 ## Current Status
 
-- Latest owner request (2026-09-13): normalize design specifications, add build guardrails and refactor frontend bases. UI-BASE-01 execution and proof: [detail design](work/tickets/UI-BASE-01-DETAIL_DESIGN.md), [verification](work/tickets/UI-BASE-01-VERIFICATION.md). This takes precedence over older UI source/export guidance below.
+- Latest owner request (2026-09-13): finish wallet management and adding transactions, then verify wallet–transaction–category logic and UI. Core wallet and basic income/expense slices are in review with [wallet proof](work/tickets/TICKET-01-02-VERIFICATION.md), [ledger proof](work/tickets/TICKET-02-01-VERIFICATION.md), and a durable [screen contract](design/screens/transactions/README.md).
 
 - Status: The root `app/` Vite React Tailwind app renders the Financial Clarity preview and is connected to the dev Gin API; Google OAuth and development CORS are enabled for local testing. PostgreSQL uses explicit versioned migrations; API startup does not mutate schema.
 - Active backlog: `docs/work/BACKLOG.md`
-- Current queue focus: wallet/category persistence is implemented for runtime review. Account → Nhóm is closed; the next product slice is the basic income/expense ledger UI.
+- Current queue focus: wallet CRUD and basic income/expense ledger are implemented and verified for review. Account → Nhóm remains closed; receipt/jar and credit/adjustment ledgers remain separate follow-ups.
 - Active phase: None.
-- Active ticket: No active group ticket. TICKET-02-01 (basic income/expense ledger API) is next.
+- Active ticket: TICKET-01-02 and the approved basic slice of TICKET-02-01 are `in_review`.
 - Active bug: None.
 
 ## Current Focus
@@ -48,6 +48,10 @@ Yêu cầu hiện tại: cập nhật docs cho Tài khoản → Quản lý nhóm
 Review the MyPocket product/business specification and its BA ticket breakdown. The owner now requests large tickets with smaller child tickets, written briefly in business language. This supersedes the earlier request to avoid creating tickets. No implementation phase or technical plan is scheduled by this breakdown.
 
 ## Recently Touched Areas
+
+- `backend/internal/controller/http/transaction_handler.go`, wallet ledger balance repository/model, handler tests and generated Swagger.
+- `app/src/services/transactions.ts`, transaction/wallet rule tests, real Overview/Header/Transactions/Quick Add/Wallet consumers.
+- `docs/design/screens/transactions/`, wallet/transaction verification, API/backlog/validation/changelog reconciliation.
 
 - `docs/work/tickets/`: 11 parent tickets, 31 children and a business-oriented index; all tickets are `draft` pending review.
 - `docs/requirements/SPEC.md`, `BUSINESS_RULES.md`, `REPORTS.md`, `REQUIREMENTS.md`, `USER_STORIES.md`
@@ -64,6 +68,11 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 - `refereces/disappointed_app/`
 
 ## Recent Decisions
+
+- Basic income/expense entries may use `basic` and `goal` wallets. `credit` is intentionally rejected until CRD-01…04 purchase/refund/payment semantics have an approved ledger; applying ordinary expense direction would corrupt debt meaning.
+- Category selection obeys both transaction kind and applicable-wallet scope at UI and API. Empty `wallet_ids` means all owner wallets.
+- Wallet API list exposes ledger-derived `current_balance`; `opening_balance` remains unchanged by transaction CRUD. Header total uses current balances only for `is_in_total` wallets.
+- Global add and transaction edit/delete now use real APIs. Header, Overview, Transactions and Wallet management share refresh propagation; browser UAT found and fixed two stale-balance branches.
 
 - `docs/design` now retains Markdown specifications only; 7 PNG/8 HTML exports were extracted and removed by owner request, recoverable at Git commit `1bc013d`. Shared behavior and per-component constraints are in `docs/design/system/` and component READMEs. Write screen-specific behavior as each screen is implemented.
 - UI primitives use the imported `app/src/ui/theme.css`; component variants use `ui/variants.ts`, with atom tokens only re-exporting. Build checks base ownership, literal colors and common visual overrides. See ADR-002. CTA uses brand, action uses emerald; current default card/control radius remains 12px.
@@ -112,9 +121,9 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 
 ## Next Steps
 
-- For every next UI slice, read `docs/design/README.md`, list reused bases, create missing base contracts/components first, and record the screen's behavior/proof. Run `npm run check:design`, `npm run test:design` and `npm run build` in `app/`.
+- Review the verified core wallet and basic ledger slices. The next independent product choices are receipt/OCR and jar assignment for TICKET-02-01, or transfer/adjustment and credit statement/payment semantics; none are represented by mocks in the implemented ledger.
 
-- Build the real transaction screen from the protected ledger API. Retain the base-component contract, keep unimplemented Reports/quick-add source commented, and update screen artifacts after each verified UI slice.
+- For every next UI slice, read `docs/design/README.md`, list reused bases, create missing base contracts/components first, and record the screen's behavior/proof. Run `npm run check:design`, `npm run test:design` and `npm run build` in `app/`.
 
 - Review the parent/child ticket list and resolve business questions in the affected children; prioritize implementation only when requested.
 - Continue implementation from the Financial Clarity design and reference-app behavior; local runtime proof for auth/profile/home is now available, while product feature validation remains pending.

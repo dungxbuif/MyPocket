@@ -60,6 +60,8 @@ definitions:
         type: integer
       currency:
         type: string
+      current_balance:
+        type: integer
       description:
         type: string
       id:

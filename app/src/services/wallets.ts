@@ -15,6 +15,7 @@ export type Wallet = {
   type: WalletType;
   currency: "VND";
   opening_balance: number;
+  current_balance: number;
   is_in_total: boolean;
   description?: string | null;
   target_amount?: number | null;

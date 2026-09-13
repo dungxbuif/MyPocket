@@ -35,3 +35,5 @@
 
 Additional foundation atoms: SurfaceCard, Text, Heading, FormField, BaseTextInput, BaseSelect, BaseCheckbox, BaseLink, Divider, IconButton, Progress, Chip.
 No inventory entry claims all 28 are complete. Existing retained preview components must meet the same automated checks as mounted code.
+
+Screen contracts: [Account groups](screens/account-groups/README.md) · [Transactions](screens/transactions/README.md).

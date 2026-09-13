@@ -14,6 +14,8 @@ const (
 	walletUnauthorizedMessage = "chưa đăng nhập"
 	walletNameRequiredMessage = "tên ví không được để trống"
 	walletInvalidTypeMessage  = "loại ví không hợp lệ"
+	walletTargetAmountMessage = "mục tiêu tiết kiệm phải lớn hơn 0"
+	walletCreditLimitMessage  = "hạn mức tín dụng phải lớn hơn 0"
 	walletNotFoundMessage     = "không tìm thấy ví"
 	walletLoadErrorMessage    = "không đọc được danh sách ví"
 	walletSaveErrorMessage    = "không lưu được ví"
@@ -109,11 +111,16 @@ func (h *WalletHandler) UpdateWallet(c *gin.Context) {
 		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: walletUnauthorizedMessage})
 		return
 	}
-	input, valid := bindWalletInput(c)
+	existing, err := h.Wallets.Find(owner, c.Param("id"))
+	if err != nil {
+		Fail(c, http.StatusNotFound, Problem{Code: problemCodeWalletNotFound, Title: problemTitleNotFound, Detail: walletNotFoundMessage})
+		return
+	}
+	input, valid := bindWalletInput(c, existing.Type)
 	if !valid {
 		return
 	}
-	updates := map[string]any{"name": input.Name, "opening_balance": input.OpeningBalance, "description": input.Description, "target_amount": input.TargetAmount, "credit_limit": input.CreditLimit}
+	updates := map[string]any{"name": input.Name, "description": input.Description, "target_amount": input.TargetAmount, "credit_limit": input.CreditLimit}
 	if input.IsInTotal != nil {
 		updates["is_in_total"] = *input.IsInTotal
 	}
@@ -153,7 +160,7 @@ func walletOwner(c *gin.Context) (string, bool) {
 	return ownerID, ok && valid && strings.TrimSpace(ownerID) != ""
 }
 
-func bindWalletInput(c *gin.Context) (walletInput, bool) {
+func bindWalletInput(c *gin.Context, existingType ...string) (walletInput, bool) {
 	var input walletInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
@@ -164,12 +171,30 @@ func bindWalletInput(c *gin.Context) (walletInput, bool) {
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: walletNameRequiredMessage})
 		return walletInput{}, false
 	}
-	if input.Type == "" {
+	if len(existingType) > 0 {
+		input.Type = existingType[0]
+	} else if input.Type == "" {
 		input.Type = entity.WalletTypeBasic
 	}
 	if input.Type != entity.WalletTypeBasic && input.Type != entity.WalletTypeGoal && input.Type != entity.WalletTypeCredit {
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: walletInvalidTypeMessage})
 		return walletInput{}, false
+	}
+	switch input.Type {
+	case entity.WalletTypeBasic:
+		input.TargetAmount, input.CreditLimit = nil, nil
+	case entity.WalletTypeGoal:
+		input.CreditLimit = nil
+		if input.TargetAmount == nil || *input.TargetAmount <= 0 {
+			Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: walletTargetAmountMessage})
+			return walletInput{}, false
+		}
+	case entity.WalletTypeCredit:
+		input.TargetAmount = nil
+		if input.CreditLimit == nil || *input.CreditLimit <= 0 {
+			Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: walletCreditLimitMessage})
+			return walletInput{}, false
+		}
 	}
 	return input, true
 }
