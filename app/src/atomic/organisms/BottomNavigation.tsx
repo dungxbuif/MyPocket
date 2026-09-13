@@ -22,7 +22,7 @@ export function BottomNavigation({
       <button
         type="button"
         onClick={onAdd}
-        className="absolute left-1/2 top-1 grid h-14 w-14 -translate-x-1/2 -translate-y-1/3 place-items-center rounded-full bg-[#006e1c] text-white shadow-[0_12px_24px_rgb(0_110_28/0.25)]"
+        className="absolute left-1/2 top-1/2 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[#006e1c] text-white shadow-[0_12px_24px_rgb(0_110_28/0.25)]"
         aria-label="Thêm giao dịch"
       >
         <Plus size={26} />

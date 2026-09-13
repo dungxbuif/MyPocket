@@ -19,6 +19,8 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+- Aligned the center create button vertically inside the bottom navigation frame with the four tab actions.
+
 - Closed Account → Nhóm management: shared base-composed create/edit cards now support icon, name, type, parent and applicable-wallet selection. System categories lock metadata but allow wallet selection; deleting a personal parent returns its personal children to root. The system icon catalog is applied by migration `000008` for every deployment.
 
 - Reduced active bottom navigation to Tổng quan, Sổ GD, Ngân sách and Tài khoản. Reports and quick-add source remain commented out until their backend contracts exist; the center add button has no label and occupies the vacant middle position.
