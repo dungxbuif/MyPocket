@@ -1,13 +1,10 @@
 @import "tailwindcss";
-
-@theme {
-  --font-sans: Manrope, -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
-}
+@import "./ui/theme.css";
 
 @layer base {
   :root {
-    color: #1b1c1c;
-    background: #fbf9f9;
+    color: var(--color-ink);
+    background: var(--color-canvas);
     font-family: var(--font-sans);
     font-synthesis: none;
     text-rendering: optimizeLegibility;
@@ -22,7 +19,7 @@
     margin: 0;
     min-width: 320px;
     min-height: 100vh;
-    background: #fbf9f9;
+    background: var(--color-canvas);
   }
 
   button {
@@ -40,11 +37,11 @@
 }
 
 ::selection {
-  background: #006e1c;
-  color: #ffffff;
+  background: var(--color-action);
+  color: var(--color-card);
 }
 
 :focus-visible {
-  outline: 2px solid #006e1c;
+  outline: 2px solid var(--color-action);
   outline-offset: 2px;
 }

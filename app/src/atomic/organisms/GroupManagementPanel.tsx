@@ -1,6 +1,8 @@
+import { Text } from "../atoms/Text";
 import { useEffect, useMemo, useState } from "react";
-import { ArrowLeft } from "lucide-react";
-import { Link, useNavigate } from "@tanstack/react-router";
+import { PlusCircle } from "lucide-react";
+import { useNavigate } from "@tanstack/react-router";
+import { PageBackHeader } from "../molecules/PageBackHeader";
 import { SurfaceCard } from "../atoms/SurfaceCard";
 import { BaseButton } from "../atoms/BaseButton";
 import { Heading } from "../atoms/Heading";
@@ -40,13 +42,13 @@ export function GroupManagementPanel() {
   useEffect(() => { void load(); }, []);
   const roots = useMemo(() => categories.filter((item) => !item.parent_id && item.kind === kind).sort((left, right) => Number(categories.some((item) => item.parent_id === right.id)) - Number(categories.some((item) => item.parent_id === left.id))), [categories, kind]);
   return <section className="space-y-3">
-    <header className="grid grid-cols-[1fr_auto_1fr] items-center px-1 pb-1"><Link to="/account" aria-label={GROUP_TEXT.back}><BaseButton variant="outline" size="sm" className="gap-1 px-3 text-slate-700"><ArrowLeft size={14} />{GROUP_TEXT.backLabel}</BaseButton></Link><Heading as="h1" size="section" className="text-center">{GROUP_TEXT.title}</Heading><span /></header>
+    <PageBackHeader title={GROUP_TEXT.title} backTo="/account" backLabel={GROUP_TEXT.back} />
     <SegmentedControl value={kind} options={KIND_OPTIONS} onChange={setKind} />
-    <BaseButton variant="outline" className="w-full gap-2" onClick={() => void navigate({ to: "/account/groups/new", search: { kind } })}><span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-500 text-white">+</span>{GROUP_TEXT.add}</BaseButton>
-    {state === "loading" ? <SurfaceCard padding="md" className="text-sm text-slate-500">{GROUP_TEXT.loading}</SurfaceCard> : null}
-    {state === "error" ? <SurfaceCard padding="md" className="space-y-3 text-sm text-rose-600"><p>{GROUP_TEXT.loadError}</p><BaseButton variant="secondary" size="sm" onClick={() => void load()}>{GROUP_TEXT.retry}</BaseButton></SurfaceCard> : null}
+    <BaseButton variant="outline" className="w-full" onClick={() => void navigate({ to: "/account/groups/new", search: { kind } })}><PlusCircle size={20} />{GROUP_TEXT.add}</BaseButton>
+    {state === "loading" ? <SurfaceCard padding="md" className="text-sm text-secondary">{GROUP_TEXT.loading}</SurfaceCard> : null}
+    {state === "error" ? <SurfaceCard padding="md" className="space-y-3 text-sm text-danger"><Text>{GROUP_TEXT.loadError}</Text><BaseButton variant="secondary" size="sm" onClick={() => void load()}>{GROUP_TEXT.retry}</BaseButton></SurfaceCard> : null}
     {state === "ready" && roots.map((root) => <BaseCategoryTree key={root.id} root={treeItem(root)} children={categories.filter((item) => item.parent_id === root.id).map(treeItem)} onSelect={(id) => void navigate({ to: "/account/groups/$categoryId/edit", params: { categoryId: id } })} />)}
-    {state === "ready" && roots.length === 0 ? <SurfaceCard padding="md" className="text-sm text-slate-500">{GROUP_TEXT.empty}</SurfaceCard> : null}
+    {state === "ready" && roots.length === 0 ? <SurfaceCard padding="md" className="text-sm text-secondary">{GROUP_TEXT.empty}</SurfaceCard> : null}
   </section>;
 }
 

@@ -30,6 +30,8 @@ Use this file as the runtime work queue.
 
 ## Current Owner Direction
 
+Latest request 2026-09-13: normalize design to Markdown contracts, add automated base-first checks and refactor the existing frontend. [UI-BASE-01](tickets/UI-BASE-01-DETAIL_DESIGN.md), from [FB-002](FEEDBACK_LOG.md), supersedes the earlier screen-removal proposal. Ledger remains the next product slice after this UI foundation work.
+
 Naming đã chốt: bảng tài khoản là `user`. Khi triển khai migration, rename bảo toàn dữ liệu và đổi GORM mapping đồng bộ theo [ERD](../architecture/ERD.md); hiện chỉ cập nhật thiết kế.
 
 Quản lý nhóm [TICKET-01-03](tickets/TICKET-01-03-tong-vi-danh-muc.md) đã hoàn tất: catalog system và nhóm cá nhân, cây cha–con, create/edit/delete cá nhân, và chọn ví áp dụng. Tiếp theo là giao diện ledger cơ bản; không đưa Reports/quick-add vào runtime trước khi có API.
@@ -109,6 +111,7 @@ Mark risk flags in the `Risk Flags` column when relevant:
 
 | Rank | ID | Type | Lane | Title | Priority | Status | Links | Risk Flags | Next Artifact | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 | UI-BASE-01 | framework | high-risk | Normalize design specs, enforce base-first and refactor UI | High | done | [Design](tickets/UI-BASE-01-DETAIL_DESIGN.md), [Proof](tickets/UI-BASE-01-VERIFICATION.md), [ADR](../decisions/ADR-002-design-contract-enforcement.md) | Standards change, Existing behavior | Next UI slice follows base contract | Build, regression checks and shared browser acceptance passed; product contracts preserved |
 | 1 | BL-001 | product | normal | Edit Financial Clarity design into implementation-ready source of truth | High | done | `design/system/DESIGN.md`, `design/INDEX.md` | Existing behavior | Docs review | Refactored design now keeps Money Lover-style parity, personal extensions, component inventory, data domains, launch phases, and acceptance checklist. |
 | 2 | BL-006 | maintenance | tiny | Align center create button within bottom navigation | Low | done | `app/src/atomic/organisms/BottomNavigation.tsx` | Existing behavior | Not required | Small task exemption: yes. Reason: one shared CSS positioning change; impact checked: API=no, DB=no, Security=no, Runtime=no, Standards=no. TypeScript and browser visual check passed. |
 | 3 | BL-005 | product | high-risk | Implement wallet management | High | in_progress | [Ticket](tickets/TICKET-01-02-quan-ly-vi.md), [Design](tickets/TICKET-01-02-DETAIL_DESIGN.md), [DB operations](../architecture/DATABASE.md) | Data model, Migration/data loss, Public contract/API, Authorization | Wallet UI UAT | Versioned migrations and system-group seed are applied in dev; group CRUD and wallet applicability are complete under TICKET-01-03. |

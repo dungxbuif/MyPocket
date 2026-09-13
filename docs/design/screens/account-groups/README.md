@@ -1,33 +1,27 @@
 ---
 artifact_type: screen_design_contract
 id: ACCOUNT-GROUPS
-status: implemented_owner_uat_pending
+status: implemented
 owner: shared
-trace:
-  ticket: ../../../work/tickets/TICKET-01-03-tong-vi-danh-muc.md
-  system_design: ../../system/DESIGN.md
-  tree: ../../molecules/category-tree/README.md
 ---
 
 # Account — Quản lý nhóm
 
-## Composition
+[Ticket](../../../work/tickets/TICKET-01-03-tong-vi-danh-muc.md) · [Normalization](../../../work/tickets/UI-BASE-01-DETAIL_DESIGN.md) · [Tree](../../molecules/category-tree/README.md) · [Edit group](../../molecules/edit-group/README.md).
 
-- Header: balance header hidden; centered `Heading`, pill back `BaseButton`, then `SegmentedControl` for Expense/Income/Debt and a full-width “Nhóm mới” base button.
-- Group list: one `BaseCategoryTree` per root using the `nested` layout, with system-key marker mapping and owner-wallet activity text. It follows the nested artifact: `p-3` card, 40px parent icon, `pl-10` child list, 32px child icons, 2px connector at the parent-icon centre and curved branches. The colorful icon catalog remains; the source export's dark parent-badge styling is not restored.
-- Form: `BaseBottomSheet` contains two `SurfaceCard` bases: one for group fields and one for Ví áp dụng. Inside are `FormField`, `BaseTextInput`, `BaseSelect`, and `BaseCheckbox`. The same form composes create and edit; edit provides a danger `BaseButton` for deletion.
-- Feedback: `SurfaceCard` plus `BaseButton`; no screen-local card, field or icon-button styling.
+## Routes and composition
 
-## States and copy
+/account/groups: PageBackHeader back to account, SegmentedControl expense/income/debt, outline BaseButton “Nhóm mới”, BaseCategoryTree per root.
+New/edit routes: PageBackHeader, CategoryEditForm and ApplicableWalletsCard. Personal group exposes delete IconButton in header; system metadata is read-only. Icon picker uses BaseBottomSheet. The whole edit form is not inside a sheet.
 
-The screen handles loading, loaded tree, empty list, load failure/retry, local
-required-name validation, saving, API failure, and native destructive-delete
-confirmation. System items are visually read-only. A personal group may select
-multiple wallets; an empty selection means it is not limited by wallet.
+## Event → effect
 
-## Runtime proof
+List load fetches categories, groups roots by kind and displays direct children. Segment click/keyboard changes filter. Nhóm mới routes to create with current kind. Select row routes to edit by ID.
+Edit name/icon/kind/parent in base controls; kind change resets parent. Only same-kind roots excluding self are parent options. Wallet checkboxes toggle selected IDs. Save validates nonempty trimmed name for personal group, then screen invokes API. System save updates wallet applicability only.
+Delete requires native confirmation before API; API determines scope and integrity. Cancel/back return to group list. Icon sheet choose updates icon and closes; Escape/backdrop close without changing selection.
 
-- `/account/groups` loaded in the authenticated Vite session on 2026-09-13;
-  system roots/children, header and expand controls were present.
-- Automated build proof and category API proof are recorded in the linked
-  ticket and validation matrix. Owner UAT for create/edit/delete remains open.
+## States, copy and proof
+
+Loading “Đang tải nhóm...”; empty “Chưa có nhóm nào.”; failure “Không tải được danh sách nhóm.” with “Thử lại”. Save loading disables CTA; errors surfaced. System hint explains only wallets can change.
+No wallet restriction displays “Áp dụng tất cả ví”; selected count displays activity count. Tree is fixed expanded; collapse and inactive filter are not implemented.
+Base fixture checks keyboard, shared tokens and sheet focus behavior. Existing product ticket is done after owner UI review and owns CRUD/API proof; this normalization preserves that acceptance and does not claim a new CRUD run.

@@ -1,3 +1,4 @@
+import { Text } from "../atoms/Text";
 import { useMemo, useState } from "react";
 import { BaseButton } from "../atoms/BaseButton";
 import { BaseSelect, BaseTextInput } from "../atoms/FormField";
@@ -45,23 +46,23 @@ export function CategoryEditForm({ category, categories, wallets, saving, onSave
   const submit = async () => { if (!readOnly && !name.trim()) { setError(FORM_TEXT.required); return; } setError(""); await onSave({ name: name.trim(), kind, parent_id: parentID || null, wallet_ids: walletIDs, icon_key: iconKey }); };
   const presentation = categoryPresentationFor(iconKey);
   return <div className="space-y-5">
-    {readOnly ? <CategoryReadonlyMetadata icon={presentation.icon} tone={presentation.tone} name={name} kind={kind} /> : <SurfaceCard padding="none" className="divide-y divide-slate-100 p-2">
-      <InlineControlRow leading={<CategoryIconPicker compact value={iconKey} onChange={setIconKey} />}><BaseTextInput aria-label={FORM_TEXT.name} placeholder={FORM_TEXT.name} value={name} className="mt-0 border-transparent px-0 text-xl font-bold shadow-none focus:border-transparent focus:ring-0" onChange={(event) => setName(event.target.value)} /></InlineControlRow>
-      <InlineControlRow leading={<span className="grid h-11 w-11 place-items-center text-2xl font-semibold leading-none text-slate-700">{FORM_TEXT.typeSymbol}</span>}><BaseSelect aria-label={FORM_TEXT.kind} value={kind} className="mt-0 border-transparent px-0 text-base font-medium shadow-none focus:border-transparent focus:ring-0" onChange={(event) => { setKind(event.target.value); setParentID(""); }}>{CATEGORY_KINDS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</BaseSelect></InlineControlRow>
-      <InlineControlRow leading={<span className="grid h-11 w-11 place-items-center text-lg font-semibold leading-none text-slate-700">↳</span>}><BaseSelect aria-label={FORM_TEXT.parent} value={parentID} className="mt-0 border-transparent px-0 text-base font-medium shadow-none focus:border-transparent focus:ring-0" onChange={(event) => setParentID(event.target.value)}><option value="">{FORM_TEXT.parentPlaceholder}</option>{parents.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</BaseSelect></InlineControlRow>
+    {readOnly ? <CategoryReadonlyMetadata icon={presentation.icon} tone={presentation.tone} name={name} kind={kind} /> : <SurfaceCard padding="none" className="divide-y divide-line p-2">
+      <InlineControlRow leading={<CategoryIconPicker compact value={iconKey} onChange={setIconKey} />}><BaseTextInput aria-label={FORM_TEXT.name} placeholder={FORM_TEXT.name} value={name} variant="title" onChange={(event) => setName(event.target.value)} /></InlineControlRow>
+      <InlineControlRow leading={<span className="grid h-11 w-11 place-items-center text-2xl font-semibold leading-none text-ink">{FORM_TEXT.typeSymbol}</span>}><BaseSelect aria-label={FORM_TEXT.kind} value={kind} variant="inline" onChange={(event) => { setKind(event.target.value); setParentID(""); }}>{CATEGORY_KINDS.map((item) => <option key={item.value} value={item.value}>{item.label}</option>)}</BaseSelect></InlineControlRow>
+      <InlineControlRow leading={<span className="grid h-11 w-11 place-items-center text-lg font-semibold leading-none text-ink">↳</span>}><BaseSelect aria-label={FORM_TEXT.parent} value={parentID} variant="inline" onChange={(event) => setParentID(event.target.value)}><option value="">{FORM_TEXT.parentPlaceholder}</option>{parents.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</BaseSelect></InlineControlRow>
     </SurfaceCard>}
-    {readOnly ? <p className="px-1 text-xs text-slate-500">{FORM_TEXT.systemHint}</p> : null}
+    {readOnly ? <Text size="xs" tone="secondary" className="px-1">{FORM_TEXT.systemHint}</Text> : null}
     <ApplicableWalletsCard wallets={wallets} selectedWalletIDs={walletIDs} onToggle={toggleWallet} />
-    {error ? <p role="alert" className="text-sm text-rose-600">{error}</p> : null}
+    {error ? <Text size="sm" tone="danger" role="alert" className="">{error}</Text> : null}
     <div className="flex gap-2"><BaseButton className="flex-1" loading={saving} onClick={submit}>{readOnly ? FORM_TEXT.saveWallets : FORM_TEXT.save}</BaseButton><BaseButton variant="secondary" disabled={saving} onClick={onCancel}>{FORM_TEXT.cancel}</BaseButton></div>
   </div>;
 }
 
 function CategoryReadonlyMetadata({ icon, tone, name, kind }: { icon: ReturnType<typeof categoryPresentationFor>["icon"]; tone: ReturnType<typeof categoryPresentationFor>["tone"]; name: string; kind: string }) {
   const kindLabel = CATEGORY_KINDS.find((item) => item.value === kind)?.label ?? kind;
-  return <SurfaceCard padding="none" className="divide-y divide-slate-100 p-2"><div className="flex items-center gap-4 px-3 py-3.5"><IconBadge icon={icon} tone={tone} size="md" shape="circle" /><span className="text-xl font-bold tracking-tight text-slate-800">{name}</span></div><ReadonlyRow icon={FORM_TEXT.typeSymbol} label={kindLabel} /></SurfaceCard>;
+  return <SurfaceCard padding="none" className="divide-y divide-line p-2"><div className="flex items-center gap-4 px-3 py-3.5"><IconBadge icon={icon} tone={tone} size="md" shape="circle" /><span className="text-xl font-bold tracking-tight text-ink">{name}</span></div><ReadonlyRow icon={FORM_TEXT.typeSymbol} label={kindLabel} /></SurfaceCard>;
 }
 
 function ReadonlyRow({ icon, label }: { icon: string; label: string }) {
-  return <div className="flex items-center gap-4 px-3 py-3.5"><span className="grid h-11 w-11 place-items-center text-2xl font-semibold leading-none text-slate-700">{icon}</span><span className="text-base font-medium tracking-tight text-slate-700">{label}</span></div>;
+  return <div className="flex items-center gap-4 px-3 py-3.5"><span className="grid h-11 w-11 place-items-center text-2xl font-semibold leading-none text-ink">{icon}</span><span className="text-base font-medium tracking-tight text-ink">{label}</span></div>;
 }

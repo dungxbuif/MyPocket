@@ -1,3 +1,5 @@
+import { Text } from "../atoms/Text";
+import { BaseButton } from "../atoms/BaseButton";
 import { ChevronRight, FolderTree, LockKeyhole, type LucideIcon } from "lucide-react";
 import type { ReactNode } from "react";
 import { IconBadge } from "../atoms/IconBadge";
@@ -30,11 +32,11 @@ function TreeRow({ item, root = false, onSelect, branchClass }: {
 }) {
   const Icon = item.icon ?? FolderTree;
   const selectable = item.isEditable && onSelect;
-  const className = `z-10 flex w-full items-center justify-between rounded-xl text-left transition ${root ? "relative gap-3 p-1.5" : `${branchClass} gap-2.5 pl-2 pr-1.5 py-1.5`} ${selectable ? "cursor-pointer hover:bg-slate-50" : ""}`;
+  const className = `z-10 flex w-full items-center justify-between ${root ? "relative gap-3" : `${branchClass} gap-2.5`}`;
   const content = <><span className="grid shrink-0 place-items-center"><IconBadge icon={Icon} size={root ? "md" : "sm"} shape="circle" tone={item.tone ?? (root ? "neutral" : "brand")} /></span>
-    <div className="min-w-0 flex-1"><p className={`${root ? "text-sm" : "text-xs"} font-bold text-slate-900`}>{item.name}</p><p className={`${root ? "text-[11px]" : "text-[10px]"} font-medium text-slate-400`}>{item.subtitle}</p></div>
+    <div className="min-w-0 flex-1"><Text size={root ? "sm" : "xs"} weight="bold" tone="heading">{item.name}</Text><Text size={root ? "tiny" : "micro"} weight="medium" tone="muted">{item.subtitle}</Text></div>
     {item.trailing ? <div className="shrink-0">{item.trailing}</div> : null}
-    {item.isSystem ? <span className="flex shrink-0 items-center gap-1.5"><LockKeyhole size={13} className="text-slate-400" /><ChevronRight size={16} className="text-slate-300" /></span> : null}
+    {item.isSystem ? <span className="flex shrink-0 items-center gap-1.5"><LockKeyhole size={13} className="text-muted" /><ChevronRight size={16} className="text-muted" /></span> : null}
   </>;
-  return selectable ? <button type="button" onClick={() => onSelect(item.id)} className={className}>{content}</button> : <div className={className}>{content}</div>;
+  return selectable ? <BaseButton variant="row" size="row" type="button" onClick={() => onSelect(item.id)} className={className}>{content}</BaseButton> : <div className={className}>{content}</div>;
 }

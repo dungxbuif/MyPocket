@@ -38,3 +38,4 @@ Feedback must be triaged here before it can be entered into the `BACKLOG.md`.
 | ID | Date | Raw Feedback | Source | Type (Bug/Feat/Enhance/Noise) | Status | Converted Artifact | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | FB-001 | TBD | TBD | TBD | TBD | raw | TBD | TBD |
+| FB-002 | 2026-09-13 | “chuẩn hoa dvaf thêm guardrail và rèacgor luôn nhé”, “luôn”; extract image behavior into specs and remove redundant exports | Owner conversation | Enhancement | converted | [UI-BASE-01](tickets/UI-BASE-01-DETAIL_DESIGN.md) | Approved documentation normalization, guardrails and frontend refactor |

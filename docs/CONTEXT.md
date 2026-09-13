@@ -32,6 +32,8 @@ updated: 2026-09-13
 
 ## Current Status
 
+- Latest owner request (2026-09-13): normalize design specifications, add build guardrails and refactor frontend bases. UI-BASE-01 execution and proof: [detail design](work/tickets/UI-BASE-01-DETAIL_DESIGN.md), [verification](work/tickets/UI-BASE-01-VERIFICATION.md). This takes precedence over older UI source/export guidance below.
+
 - Status: The root `app/` Vite React Tailwind app renders the Financial Clarity preview and is connected to the dev Gin API; Google OAuth and development CORS are enabled for local testing. PostgreSQL uses explicit versioned migrations; API startup does not mutate schema.
 - Active backlog: `docs/work/BACKLOG.md`
 - Current queue focus: wallet/category persistence is implemented for runtime review. Account → Nhóm is closed; the next product slice is the basic income/expense ledger UI.
@@ -62,6 +64,10 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 - `refereces/disappointed_app/`
 
 ## Recent Decisions
+
+- `docs/design` now retains Markdown specifications only; 7 PNG/8 HTML exports were extracted and removed by owner request, recoverable at Git commit `1bc013d`. Shared behavior and per-component constraints are in `docs/design/system/` and component READMEs. Write screen-specific behavior as each screen is implemented.
+- UI primitives use the imported `app/src/ui/theme.css`; component variants use `ui/variants.ts`, with atom tokens only re-exporting. Build checks base ownership, literal colors and common visual overrides. See ADR-002. CTA uses brand, action uses emerald; current default card/control radius remains 12px.
+- Shared text, controls, cards, progress/gauge, feedback, navigation and chart compositions were normalized. Keyboard segmented selection and bottom-sheet focus/close/scroll behavior are shared. Prototype data and unmounted incomplete keypad/report flows remain explicitly partial.
 
 - Owner chốt tên bảng tài khoản là `user`. ERD dùng tên đích này; GORM mapping và rename migration chưa triển khai, phải giữ dữ liệu/ID tài khoản hiện có.
 
@@ -105,6 +111,8 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 - OCR Platform docs have been captured in `docs/architecture/OCR_API.md` for future receipt OCR implementation against `https://ocr.dungxbuif.com/`.
 
 ## Next Steps
+
+- For every next UI slice, read `docs/design/README.md`, list reused bases, create missing base contracts/components first, and record the screen's behavior/proof. Run `npm run check:design`, `npm run test:design` and `npm run build` in `app/`.
 
 - Build the real transaction screen from the protected ledger API. Retain the base-component contract, keep unimplemented Reports/quick-add source commented, and update screen artifacts after each verified UI slice.
 

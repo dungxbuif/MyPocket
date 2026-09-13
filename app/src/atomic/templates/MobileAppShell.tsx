@@ -21,8 +21,8 @@ export function MobileAppShell({
   showHeader?: boolean;
 }) {
   return (
-    <main className="min-h-screen bg-[#fbf9f9] text-[#1b1c1c]">
-      <div className="mx-auto min-h-screen max-w-[430px] bg-[#fbf9f9] pb-28 shadow-[0_0_40px_rgb(0_0_0/0.08)]">
+    <main className="min-h-screen bg-canvas text-ink">
+      <div className="mx-auto min-h-screen max-w-[430px] bg-canvas pb-28 shadow-shell">
         {showHeader ? <AppHeader masked={masked} onToggleMask={onToggleMask} /> : null}
         <section className="space-y-3 px-4">{children}</section>
         <BottomNavigation tab={tab} onTabChange={onTabChange} onAdd={onAdd} />

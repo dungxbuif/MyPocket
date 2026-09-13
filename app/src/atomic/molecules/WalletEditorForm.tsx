@@ -1,4 +1,6 @@
 import { BaseButton } from "../atoms/BaseButton";
+import { BaseSelect, BaseTextInput, FormField } from "../atoms/FormField";
+import { BaseCheckbox } from "../atoms/BaseCheckbox";
 import { WALLET_TYPES, type WalletInput, type WalletType } from "../../services/wallets";
 
 const COPY = {
@@ -48,11 +50,11 @@ export function walletFormToInput(state: WalletFormState): WalletInput {
 
 export function WalletEditorForm({ state, onChange, onSubmit, onCancel, saving }: { state: WalletFormState; onChange: (next: WalletFormState) => void; onSubmit: () => void; onCancel: () => void; saving: boolean }) {
   return <form className="space-y-3" onSubmit={(event) => { event.preventDefault(); onSubmit(); }}>
-    <label className="block text-sm font-semibold text-[#1b1c1c]">{COPY.name}<input required value={state.name} onChange={(event) => onChange({ ...state, name: event.target.value })} className="mt-1 w-full rounded-xl border border-[#e3e2e2] bg-white px-3 py-3 font-normal" /></label>
-    <label className="block text-sm font-semibold text-[#1b1c1c]">{COPY.type}<select value={state.type} onChange={(event) => onChange({ ...state, type: event.target.value as WalletType })} className="mt-1 w-full rounded-xl border border-[#e3e2e2] bg-white px-3 py-3 font-normal">{Object.values(WALLET_TYPES).map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}</select></label>
-    <label className="block text-sm font-semibold text-[#1b1c1c]">{COPY.openingBalance}<input inputMode="numeric" value={state.openingBalance} onChange={(event) => onChange({ ...state, openingBalance: event.target.value.replace(/[^0-9-]/g, "") })} className="mt-1 w-full rounded-xl border border-[#e3e2e2] bg-white px-3 py-3 font-normal" /></label>
-    <label className="flex cursor-pointer items-center gap-3 text-sm font-semibold text-[#1b1c1c]"><input type="checkbox" checked={state.isInTotal} onChange={(event) => onChange({ ...state, isInTotal: event.target.checked })} />{COPY.includeTotal}</label>
-    <label className="block text-sm font-semibold text-[#1b1c1c]">{COPY.description}<input value={state.description} onChange={(event) => onChange({ ...state, description: event.target.value })} className="mt-1 w-full rounded-xl border border-[#e3e2e2] bg-white px-3 py-3 font-normal" /></label>
-    <div className="flex gap-2"><BaseButton type="submit" loading={saving} className="flex-1">{COPY.save}</BaseButton><BaseButton type="button" variant="ghost" onClick={onCancel}>{COPY.cancel}</BaseButton></div>
+    <FormField label={COPY.name}><BaseTextInput required disabled={saving} value={state.name} onChange={(event) => onChange({ ...state, name: event.target.value })} /></FormField>
+    <FormField label={COPY.type}><BaseSelect disabled={saving} value={state.type} onChange={(event) => onChange({ ...state, type: event.target.value as WalletType })}>{Object.values(WALLET_TYPES).map((type) => <option key={type} value={type}>{TYPE_LABELS[type]}</option>)}</BaseSelect></FormField>
+    <FormField label={COPY.openingBalance}><BaseTextInput disabled={saving} inputMode="numeric" value={state.openingBalance} onChange={(event) => onChange({ ...state, openingBalance: event.target.value.replace(/[^0-9-]/g, "") })} /></FormField>
+    <BaseCheckbox label={COPY.includeTotal} disabled={saving} checked={state.isInTotal} onChange={(event) => onChange({ ...state, isInTotal: event.target.checked })}>{COPY.includeTotal}</BaseCheckbox>
+    <FormField label={COPY.description}><BaseTextInput disabled={saving} value={state.description} onChange={(event) => onChange({ ...state, description: event.target.value })} /></FormField>
+    <div className="flex gap-2"><BaseButton type="submit" loading={saving} className="flex-1">{COPY.save}</BaseButton><BaseButton type="button" variant="ghost" disabled={saving} onClick={onCancel}>{COPY.cancel}</BaseButton></div>
   </form>;
 }

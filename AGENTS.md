@@ -41,6 +41,8 @@ For bug, failure, or unexpected behavior work, also read `docs/standards/DEBUGGI
 
 ## Rule 2: Do Not Over-Scan
 
+For frontend work, read `docs/design/README.md`, shared tokens/base contracts and the relevant component/screen specification before implementation. List reused bases in the work item. If a base is missing, specify and create it first. Never recreate controls/cards/typography in screens or override base colors/shapes via `className`. Run `npm run check:design`, `npm run test:design` and `npm run build` in `app/`. Update the screen's Markdown behavior spec as it is implemented; PNG/HTML exports are not required. See `docs/decisions/ADR-002-design-contract-enforcement.md`.
+
 Do not scan the whole repository by default.
 
 For brownfield work:

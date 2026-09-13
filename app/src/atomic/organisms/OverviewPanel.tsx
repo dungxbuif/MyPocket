@@ -13,7 +13,7 @@ export function OverviewPanel({ masked }: OverviewPanelProps) {
     <>
       <SurfaceCard className="p-5">
         <SectionTitle title="Ví của tôi" action="Quản lý" />
-        <div className="mt-3 divide-y divide-slate-50">{wallets.slice(0, 3).map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} />)}</div>
+        <div className="mt-3 divide-y divide-row">{wallets.slice(0, 3).map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} />)}</div>
       </SurfaceCard>
 
       {/* Insight, shortcuts and quick reports remain source-only until their APIs exist. */}

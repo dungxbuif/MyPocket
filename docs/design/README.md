@@ -1,24 +1,24 @@
-# MyPocket Design Source
+# MyPocket Design Contract
 
-`docs/design` là nguồn tham chiếu UI/UX duy nhất cho frontend. Tổ chức thư mục theo Atomic Design:
+Đây là gateway UI bắt buộc. Đọc theo thứ tự: [system](system/DESIGN.md) → [tokens](system/TOKENS.md) → [base contracts](system/BASE_COMPONENTS.md) → [inventory](INDEX.md) → đặc tả component/màn đang làm.
 
-- `system/`: design tokens, typography, layout rules và product-level screen flows.
-- `atoms/`: component nền tảng độc lập (base cards, amount/keypad).
-- `molecules/`: nhóm component có composition (wallet rows, transaction rows, category tree, budget cards).
-- `screens/`: đặc tả composition/state/copy của từng màn hình đã implement; cập nhật ngược sau khi verify.
-- `INDEX.md`: inventory, trạng thái implementation và liên kết tới từng artifact.
+## Base-first bắt buộc
 
-Mỗi artifact UI giữ hai file:
+1. Trước khi viết JSX, ghi component cần dùng và đường dẫn implementation vào ticket/detail design.
+2. Có base phù hợp: compose bằng props/variant/tone/size. Thiếu: định nghĩa contract và bổ sung base trước, rồi mới dùng trong màn.
+3. Native button/input/select/textarea chỉ nằm trong atoms. Text/heading, card, badge, progress và feedback phải dùng base tương ứng.
+4. Không override màu, font, shape, border, shadow của base qua className. className chỉ dành cho layout của consumer (width, margin, alignment, placement). Không tạo wrapper base rỗng để chuyển nguyên CSS tự custom xuống một tầng.
+5. Primitive màu/font/radius/shadow thuộc app/src/ui/theme.css; variants thuộc app/src/ui/variants.ts; mapping nghiệp vụ thuộc domainVariants.ts/categoryPresentation.ts.
+6. Organism sở hữu fetching, state, điều hướng và composition. Molecule sở hữu bố cục tái sử dụng. Atom sở hữu hình thức và hành vi control.
+7. Build bắt buộc qua npm run check:design. Thêm base phải thêm test cho behavior; không sửa guardrail để miễn trừ màn riêng.
 
-- `code.html`: bản thiết kế/render reference.
-- `screen.png`: ảnh review trực quan.
+## Chỉ giữ đặc tả
 
-## Quy tắc đồng bộ hai chiều
+Ảnh PNG và HTML export đã được đọc trực quan/OCR, đối chiếu và cô đọng tại [SOURCE_EXTRACTION](system/SOURCE_EXTRACTION.md). Theo yêu cầu owner ngày 2026-09-13, docs/design giữ Markdown specification; không yêu cầu duy trì code.html/screen.png nữa. Bản gốc tra được trong Git ở commit 1bc013d. Browser fixture kiểm thử nằm trong app/tests, không phải một design source khác.
 
-1. Trước khi implement screen, đọc artifact tương ứng và ưu tiên atom/molecule đã có trong `app/src/atomic`.
-2. Nếu code cần biến thể mới, cập nhật base component trước rồi mới lắp vào screen.
-3. Sau khi screen được duyệt, cập nhật ngược `system/DESIGN.md` hoặc artifact component: layout thực tế, trạng thái, text, variant và ghi chú khác biệt.
-4. Không tạo thư mục tên theo export tạm thời; dùng tên kebab-case theo nhóm Atomic.
-5. `INDEX.md` phải phản ánh trạng thái `implemented`, `partial` hoặc `planned`; không mô tả component chưa tồn tại như đã hoàn thiện.
-6. [`system/BASE_COMPONENTS.md`](./system/BASE_COMPONENTS.md) là contract kỹ thuật trích từ ảnh/export; thay đổi base phải cập nhật nó trước khi screen dùng biến thể mới.
-7. Mọi UI production bắt buộc compose từ base component. JSX của screen/organism không được tự tạo card, row, input, button, icon badge, tree hoặc typography styling trùng trách nhiệm; thiếu khả năng thì bổ sung prop/variant ở base trước.
+Khi implement đến màn nào, thêm/cập nhật screens/<screen>/README.md của màn đó: route, composition, states, event → effect, validation, quyền thao tác, copy, API dependency, proof và known gaps. Không suy đoán behavior chưa thấy trong ảnh thành quyết định sản phẩm. Xem [screen template](screens/README.md).
+
+## Authority và verification
+
+Quyết định owner hiện tại → product requirements cho nghiệp vụ → design contract chuẩn hóa cho UI → component implementation. Code hiện tại không tự ghi đè thiết kế; lệch contract phải sửa hoặc ghi quyết định được duyệt.
+[ADR](../decisions/ADR-002-design-contract-enforcement.md) · [Work item](../work/tickets/UI-BASE-01-DETAIL_DESIGN.md) · [Validation](../work/VALIDATION_MATRIX.md).

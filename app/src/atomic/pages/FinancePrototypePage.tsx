@@ -1,3 +1,6 @@
+import { StatusMessage } from "../atoms/StatusMessage";
+import { Text } from "../atoms/Text";
+import { BaseButton } from "../atoms/BaseButton";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { AccountPanel } from "../organisms/AccountPanel";
@@ -198,9 +201,9 @@ function pathFromTab(tab: PrototypeTab): "/" | "/transactions" | "/budgets" | "/
 
 function AuthLoadingScreen() {
   return (
-    <main className="min-h-screen bg-[#fbf9f9] text-[#1b1c1c]">
-      <div className="mx-auto flex min-h-screen max-w-[430px] items-center justify-center bg-[#fbf9f9] px-4">
-        <p>Đang kiểm tra phiên đăng nhập...</p>
+    <main className="min-h-screen bg-canvas text-ink">
+      <div className="mx-auto flex min-h-screen max-w-[430px] items-center justify-center bg-canvas px-4">
+        <Text>Đang kiểm tra phiên đăng nhập...</Text>
       </div>
     </main>
   );
@@ -216,20 +219,20 @@ function AuthGateScreen({
   onGoogleLogin: () => void;
 }) {
   return (
-    <main className="min-h-screen bg-[#fbf9f9] text-[#1b1c1c]">
+    <main className="min-h-screen bg-canvas text-ink">
       <div className="mx-auto flex min-h-screen max-w-[430px] flex-col items-center justify-center gap-4 px-6">
-        <div className="grid h-16 w-16 place-items-center rounded-full bg-[#006e1c] text-2xl font-bold text-white">M</div>
-        <h1 className="text-center text-2xl font-bold">MyPocket</h1>
-        <p className="text-center text-sm text-[#3f4a3c]">Đăng nhập bằng Google để dùng đầy đủ tính năng.</p>
-        {errorMessage ? <p className="rounded-2xl bg-[#ffe6e6] p-3 text-sm text-[#8d1717]">{errorMessage}</p> : null}
-        <button
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-action text-2xl font-bold text-card">M</div>
+        <Text as="h1" size="2xl" weight="bold" className="text-center">MyPocket</Text>
+        <Text size="sm" tone="secondary" className="text-center">Đăng nhập bằng Google để dùng đầy đủ tính năng.</Text>
+        {errorMessage ? <StatusMessage tone="danger">{errorMessage}</StatusMessage> : null}
+        <BaseButton variant="primary" size="md"
           type="button"
           onClick={() => void onGoogleLogin()}
-          className="mt-2 rounded-full bg-[#006e1c] px-5 py-3 font-semibold text-white disabled:opacity-50"
+          className="mt-2"
           disabled={isLoading}
         >
           {isLoading ? "Đang đăng nhập..." : "Đăng nhập bằng Google"}
-        </button>
+        </BaseButton>
       </div>
     </main>
   );

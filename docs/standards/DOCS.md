@@ -12,6 +12,8 @@ After implementation, agents must compare actual changes with master docs.
 
 After implementing or changing a user-facing screen, agents MUST update the matching artifact under `docs/design/` in the same work item. The update must record the implemented layout, component composition, variants, visible states, user-facing text, and any intentional deviation from the source design. A screen is not reconciled while its code and design artifact disagree.
 
+Owner direction 2026-09-13: these artifacts are Markdown specifications. PNG/HTML exports are no longer required; source observations are preserved in `docs/design/system/SOURCE_EXTRACTION.md`. Create/update the behavior spec as each screen is implemented, using `docs/design/screens/README.md`. This supersedes older mandatory code.html/screen.png synchronization language.
+
 Update:
 
 - `docs/requirements/` when product behavior, requirements, or acceptance criteria change.

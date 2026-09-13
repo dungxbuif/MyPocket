@@ -31,6 +31,8 @@ MyPocket is currently a modular monolith: a Vite/React mobile-first client calls
 
 ## Modules
 
+Frontend UI ownership: one primitive source `app/src/ui/theme.css` is imported by `styles.css`; named component variants live in `ui/variants.ts`. Atoms own native controls, typography, surface and progress visuals; molecules compose reusable patterns; organisms own screen state/API composition. Build enforces the base contract through `scripts/check-design.mjs`. See [ADR-002](../decisions/ADR-002-design-contract-enforcement.md) and [design gateway](../design/README.md).
+
 | Module | Responsibility | Key Files | Notes |
 | --- | --- | --- | --- |
 | HTTP controller | Request/response mapping, auth middleware, CORS | `backend/internal/controller/http` | No business rules in handlers. |

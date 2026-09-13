@@ -19,6 +19,9 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+- Normalized `docs/design` to Markdown component/token/behavior specifications from seven screenshots. Removed 7 PNG and 8 HTML exports after extraction (originals recoverable in Git); screen behavior is documented as each screen is implemented.
+- Wired the canonical theme and refactored shared controls, text, cards, statuses, navigation, progress/gauge and chart compositions. Added build guardrails against literal colors, native controls outside atoms, local card/text recreation and base visual overrides. Added keyboard tab selection and bottom-sheet focus trapping/Escape/return-focus. [UI-BASE-01 proof](../work/tickets/UI-BASE-01-VERIFICATION.md).
+
 - Aligned the center create button vertically inside the bottom navigation frame with the four tab actions.
 
 - Closed Account → Nhóm management: shared base-composed create/edit cards now support icon, name, type, parent and applicable-wallet selection. System categories lock metadata but allow wallet selection; deleting a personal parent returns its personal children to root. The system icon catalog is applied by migration `000008` for every deployment.

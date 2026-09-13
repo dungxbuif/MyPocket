@@ -1,58 +1,42 @@
----
-artifact_type: design_system_contract
-id: DESIGN-BASE-COMPONENTS
-status: active
-owner: shared
-trace:
-  source_artifacts:
-    - ../atoms/base-cards/code.html
-    - ../atoms/amount-keypad/code.html
-    - ../molecules/budget-meter/code.html
-    - ../molecules/transaction-form-rows/code.html
----
+# Base component contracts
 
-# Base component technical contract
+[Gateway](../README.md) · [Tokens](TOKENS.md) · [Inventory](../INDEX.md) · [Work item](../../work/tickets/UI-BASE-01-DETAIL_DESIGN.md)
 
-This is the implementation contract extracted from the current design export
-images and HTML. A screen composes these bases; it must not recreate their
-visual CSS or one-off variants.
+## Atoms đang dùng
 
-| Base | Required geometry and tokens | Variants / behavior |
+| Base | Props/variants | Behavior và ownership |
 | --- | --- | --- |
-| `SurfaceCard` | white card, maximum `rounded-2xl` / 16px, `0 4px 20px rgba(0,0,0,.03)`, subtle slate divider | list, form, metric and settings use the same container; padding/elevation are named variants. |
-| `IconBadge` | 28–40px icon hit area; soft tinted background plus matching border | semantic `wallet`, `income`, `expense`, `warning`, `neutral` and global category palette; no screen supplies arbitrary color classes. |
-| `BaseButton` | Manrope 600/700; primary green; touch target at least 44px; inline flex centres icon-plus-label content | primary, secondary, ghost, danger; size and loading are named props. |
-| `Heading` | semantic `h1`/`h2`/`h3`; slate hierarchy and Manrope weight are global | `screen`, `section`, `field`; caller can supply semantic tag and additive `className`, never local base typography. |
-| `FormField`, `BaseTextInput`, `BaseSelect` | label plus 1px slate border, 12px inset control, emerald focus state and `rounded-lg` control | `FormField` owns label association/layout; input/select forward native props and allow additive classes. |
-| `IconButton` | 40px circular interaction target, subtle border/shadow, visible focus state | accessible label is required; additive `className` is allowed for named composition contexts. |
-| `FormSelectorRow` | fixed 36–40px leading slot, flexible content, trailing value/chevron/switch | row target is 44–48px; selector, date and toggle are props rather than bespoke markup. |
-| `Toggle` | iOS style 48×24px | active uses emerald; keyboard and label support are mandatory. |
-| `SegmentedControl` | pill tabs, selected state visible | arrow, Home and End keys move the active tab. |
-| `BaseCategoryTree` | white `rounded-3xl` tree card; 40px root icon and 32px child icon; 2px vertical connector plus curved branches | `nested` and `line` are the only layout variants. The `nested` geometry follows its source export: card `p-3`, root `p-1.5`, children `pt-1.5 pl-10 pr-1`, 0.5 gap, and no horizontal dividers. A root without children keeps horizontal inset but drops card vertical padding. Icon color/presentation stays sourced from the global category catalog. Optional icon and trailing-content slots support reporting without recreating a tree. |
+| SurfaceCard | padding none/sm/md/lg; radius sm/md/lg hiện cùng 12px; elevation flat/subtle/raised; tone default/muted/danger | Một background/border/radius/elevation; forward section role/aria; screen không override shape |
+| BaseButton | primary/secondary/ghost/danger/outline/row/key/chip; size sm/md/lg/row; loadingLabel | min 44px; type mặc định button; loading → disabled + aria-busy; inline icon/label; CTA pill, row control radius |
+| IconButton | surface/bare; shape circle/control; selected | accessible label bắt buộc; disabled; selected ring tại base; min 44px |
+| BaseLink | to/label/content | Một link tương tác duy nhất; không bọc button trong anchor |
+| BaseNavigationItem / BaseFab | active / children, action | aria-current, named selected color; FAB 56px; consumer chỉ quyết định vị trí |
+| Text / Heading | semantic tag, size, weight, tone; numeric | Manrope, type scale và màu chung; className chỉ layout |
+| FormField / BaseTextInput / BaseSelect | native props; default/inline/title | label association; focus còn thấy; disabled forwarding; select chevron không ăn click |
+| BaseCheckbox | checked/disabled/label/onChange | controlled boolean, native keyboard, hàng min 44px |
+| IconBadge | size xs/sm/md/lg; rounded/circle; tone | Một tone map, không chồng class màu. Icon visual size không đồng nghĩa hit target |
+| Progress | value/label/danger | clamp thanh 0–100, aria-valuenow, rounded cap; nhãn/số tiền bên ngoài giữ giá trị nghiệp vụ thật |
+| BudgetGauge | value/label | SVG arc 180°, clamp arc, label truy cập được; value >100 dùng danger |
+| StatusMessage | muted/danger | compose SurfaceCard + Text, role status/alert |
+| Divider | layout className | line token chung |
+| Chip | children/layout className | passive pill label; use BaseButton chip for interactive actions |
 
-## Direct artifact rules
+## Molecules
 
-- Typography is Manrope 400/500/800; financial values use a stable numeric
-  presentation.
-- Canvas is the light neutral surface; cards are white; text hierarchy uses
-  slate 900/800 then slate 500/400.
-- The base-card export names green `#10b981`/`#059669`; amount keypad names
-  `#4caf50`; budget/form exports use `#22c55e`. They are semantic variants of
-  the global brand palette, not per-screen ad-hoc values.
-- Amount keypad supports `000`, arithmetic `+ − × ÷`, and `XONG` to commit a
-  formatted VND result.
-- Budget semi-circle is 180° SVG. Its time marker is
-  `(currentDay / totalDays) × 100`; warning starts above that marker and danger
-  above 100%.
-- Category tree has two approved layout variants. The `nested` variant follows
-  its source geometry: a 2px vertical connector at `left: 37px` beginning at
-  the first child row, curved child branches offset right of that trunk, and no horizontal dividers. A
-  consuming component selects the named variant; it does not hand-roll a third
-  layout.
+| Base | Composition và behavior | Chi tiết |
+| --- | --- | --- |
+| BaseBottomSheet | Heading + IconButton, modal shell; focus trap, Escape, backdrop, return focus, scroll lock | [Behavior](BEHAVIOR.md) |
+| BaseCategoryTree | SurfaceCard + BaseButton row + IconBadge + Text; root/children/trailing content | [Tree](../molecules/category-tree/README.md) |
+| WalletCard / TransactionItem | shared row/button, badge và numeric Text; domain tone maps | [Cards](../atoms/base-cards/README.md) |
+| FormSelectorRow / InlineControlRow | leading/content/trailing slots; native input chỉ qua base | [Rows](../molecules/transaction-form-rows/README.md) |
+| CategoryEditForm / ApplicableWalletsCard | base fields, icon picker, checkbox, status/save | [Edit group](../molecules/edit-group/README.md) |
+| BudgetProgressItem / GoalCard | SurfaceCard + IconBadge + Text + Progress | [Budget](../molecules/budget-progress-cards/README.md) |
+| PageBackHeader | BaseLink + Heading + trailing slot | một tầng interactive |
+| AccountMenuRow / ProfileHeroCard | shared identity/navigation presentation | screen-specific actions thuộc consumer |
+| BaseBarChart / BaseDonutChart | values/shares/label; shared visual geometry and theme-based data colors | source preview only; tooltip/drilldown not implemented |
 
-Every completed screen must update its matching `docs/design/screens/<screen>`
-artifact with composition, states and copy, as required by [README](../README.md).
+## Contract gate
 
-`SurfaceCard` additionally forwards semantic section HTML attributes such as
-`role` and `aria-*`; this is the permitted customization path for accessible
-status cards. Visual shape, elevation and spacing still use its named variants.
+Trước một biến thể mới, ghi: intent, anatomy, props, event/effect, states, keyboard, tokens, consumers, proof. Sau đó implement base và kiểm thử consumer. API lớp UI có thể mở rộng theo task đã duyệt; không tự tạo palette/interaction model riêng.
+
+Ảnh chỉ chứng minh trạng thái nhìn thấy; trạng thái chưa có trong code được đánh planned/partial. Không copy tiêu đề “Production” trên export thành trạng thái implementation.

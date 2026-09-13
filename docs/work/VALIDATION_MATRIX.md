@@ -27,6 +27,15 @@ This file maps accepted behavior and work items to proof.
 
 ## Runtime Verification — 2026-09-13
 
+### UI-BASE-01 normalization
+
+- Status: implemented / verified for shared UI foundation and standards. [Exact evidence and docs review](tickets/UI-BASE-01-VERIFICATION.md).
+- `rtk proxy npm run test:design` in `app/`: pass (6 guardrail regression fixtures and shared SSR contracts).
+- `rtk proxy npm run build` in `app/`: pass (source guard, docs guard, typecheck, Vite). Docs guard: 17 Markdown specs, 57 valid links, no PNG/HTML exports.
+- Chrome fixture: theme primary color/min touch height, selected keyboard tab, disabled/loading CTA, dialog open/focus trap/Escape/return-focus and visual card/tree/gauge checks passed.
+- Root cause reproduced before migration: unimported theme, duplicate literal token values, native controls outside atoms. Owner authorized specs + guardrail + refactor; this supersedes prior UI-BASE-01 removal proposal.
+- Product-level CRUD/OAuth/ledger acceptance is unchanged; fixture is shared UI proof, not a new business UAT sign-off.
+
 | Area | Proof | Result | Evidence |
 | --- | --- | --- | --- |
 | Base component styling | TypeScript + production build and authenticated browser inspection | pass | `npm run typecheck && npm run build` in `app/`; canonical `BaseCategoryTree` now powers both Group management and the Reports adapter. Browser proof at `/account/groups`: `nested` source geometry with global colorful icon catalog, 40px parent / 32px child icons, `pl-10` children, a 2px trunk starting at the first child row and curved branches. Regression proof: `BaseButton` now owns inline flex alignment; Quay lại and Nhóm mới both render icon plus label in one centered row. Base card/form/row radii were reduced one token step; semantic circles and pills remain intact. Browser check at `/`: the center create button is vertically contained in the bottom-navigation frame. |

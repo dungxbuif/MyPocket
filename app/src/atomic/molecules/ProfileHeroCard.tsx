@@ -1,3 +1,5 @@
+import { Text } from "../atoms/Text";
+import { BaseButton } from "../atoms/BaseButton";
 import { UserRound } from 'lucide-react';
 import type { UserProfile } from '../../services/auth';
 import { PROFILE_CARD_CLASSES } from '../atoms/tokens';
@@ -18,34 +20,34 @@ export function ProfileHeroCard({
             <div className={PROFILE_CARD_CLASSES.avatar}>
                {name.slice(0, 1).toUpperCase()}
             </div>
-            <h2 className="mt-3 text-base font-bold tracking-tight text-[#1b1c1c]">
+            <Text as="h2" size="base" weight="bold" tone="ink" className="mt-3 tracking-tight">
                {name}
-            </h2>
-            <p className="text-xs font-medium text-[#6f7a6b]">{email}</p>
+            </Text>
+            <Text size="xs" weight="medium" tone="secondary" className="">{email}</Text>
          </div>
          {onManage ? (
-            <button
+            <BaseButton variant="row" size="row"
                type="button"
                className={PROFILE_CARD_CLASSES.row}
                onClick={onManage}
             >
                <span className="flex items-center gap-3">
-                  <span className="grid h-8 w-8 place-items-center rounded-full bg-[#f5f3f3] text-[#3f4a3c]">
+                  <span className="grid h-8 w-8 place-items-center rounded-full bg-row text-secondary">
                      <UserRound size={17} />
                   </span>
                   <span>
-                     <strong className="block text-sm text-[#1b1c1c]">
+                     <Text as="strong" size="sm" tone="ink" className="block">
                         Quản lý tài khoản
-                     </strong>
-                     <small className="text-[11px] text-[#6f7a6b]">
+                     </Text>
+                     <Text as="small" size="tiny" tone="secondary" className="">
                         Hồ sơ Google
-                     </small>
+                     </Text>
                   </span>
                </span>
-               <span aria-hidden="true" className="text-lg text-[#6f7a6b]">
+               <span aria-hidden="true" className="text-lg text-secondary">
                   ›
                </span>
-            </button>
+            </BaseButton>
          ) : null}
       </SurfaceCard>
    );

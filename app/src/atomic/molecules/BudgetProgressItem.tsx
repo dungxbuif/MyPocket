@@ -1,31 +1,29 @@
+import { Text } from "../atoms/Text";
 import type { MockBudget } from "../data/mockFinance";
 import { formatVND, ratioPercent } from "../utils/format";
-import { BUDGET_PROGRESS_CLASSES } from "../atoms/tokens";
+import { SurfaceCard } from "../atoms/SurfaceCard";
+import { IconBadge } from "../atoms/IconBadge";
+import { Progress } from "../atoms/Progress";
 
 export function BudgetProgressItem({ budget }: { budget: MockBudget }) {
   const Icon = budget.icon;
   const progress = ratioPercent(budget.spent, budget.limit);
   const over = budget.spent > budget.limit;
-  const colors = over ? BUDGET_PROGRESS_CLASSES.over : BUDGET_PROGRESS_CLASSES.normal;
   return (
-    <div className={`${BUDGET_PROGRESS_CLASSES.container} p-3`}>
+    <SurfaceCard padding="sm" tone="muted" elevation="flat">
       <div className="flex items-center gap-3">
-        <div className={`grid h-10 w-10 place-items-center rounded-full ${colors.badge}`}>
-          <Icon size={18} />
-        </div>
+        <IconBadge icon={Icon} shape="circle" tone={over ? "danger" : "success"} />
         <div className="min-w-0 flex-1">
           <div className="flex items-center justify-between gap-2">
-            <p className="font-semibold">{budget.name}</p>
-            <p className={`text-sm font-bold ${colors.text}`}>{progress}%</p>
+            <Text weight="semibold" className="">{budget.name}</Text>
+            <Text weight="bold" tone={over ? "danger" : "ink"}>{progress}%</Text>
           </div>
-          <p className={`money text-xs ${BUDGET_PROGRESS_CLASSES.detail}`}>
+          <Text numeric size="xs" tone="secondary">
             {formatVND(budget.spent)} / {formatVND(budget.limit)}
-          </p>
+          </Text>
         </div>
       </div>
-      <div className={`mt-3 h-2 overflow-hidden rounded-full ${BUDGET_PROGRESS_CLASSES.track}`}>
-        <div className={`h-full rounded-full ${colors.fill}`} style={{ width: `${progress}%` }} />
-      </div>
-    </div>
+      <Progress value={progress} label={budget.name} danger={over} className="mt-3" />
+    </SurfaceCard>
   );
 }

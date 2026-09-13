@@ -132,10 +132,10 @@ export const insights = [
 export const reportBars = [38, 54, 42, 76, 61, 88, 49, 66, 72, 45, 58, 91];
 
 export const categoryShares = [
-  { name: "Ăn uống", value: 42, color: "#006e1c" },
-  { name: "Mua sắm", value: 26, color: "#bb1614" },
-  { name: "Đi lại", value: 17, color: "#556158" },
-  { name: "Khác", value: 15, color: "#78dc77" },
+  { name: "Ăn uống", value: 42, color: "var(--color-action)" },
+  { name: "Mua sắm", value: 26, color: "var(--color-danger)" },
+  { name: "Đi lại", value: 17, color: "var(--color-secondary)" },
+  { name: "Khác", value: 15, color: "var(--color-accent)" },
 ];
 
 export const quickActions = [

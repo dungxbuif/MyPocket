@@ -15,9 +15,7 @@ Every artifact MUST be:
 - Scoped: states what is in scope and what is out of scope.
 - Current: reflects the implementation after reconciliation, not only the original intention.
 
-For user-facing screen artifacts, current means the specification and its `code.html`/`screen.png` reference agree with the verified component composition, variants, states, and copy.
-
-For user-facing screen artifacts, “current” means the screen specification and its `code.html`/`screen.png` reference agree with the implemented component composition, variants, states, and copy after the work is verified.
+For user-facing screen artifacts, current means the Markdown specification agrees with the verified component composition, variants, states, and copy. PNG/HTML exports are not required; source extraction and optional test screenshots are evidence, not additional authorities.
 
 Every artifact MUST avoid:
 

@@ -1,34 +1,12 @@
----
-artifact_type: molecule_design_contract
-id: CATEGORY-TREE
-status: active
-owner: shared
----
+# Category tree
 
-# Category Tree
+[Source IMG-07](../../system/SOURCE_EXTRACTION.md) · [Base contract](../../system/BASE_COMPONENTS.md) · [Screen](../../screens/account-groups/README.md).
 
-Canonical base molecule for parent/child category presentation. It merges the
-two former design exports into one implementation contract and owns both
-reference variants.
+BaseCategoryTree composes SurfaceCard, BaseButton row, IconBadge and Text. Root and direct children are one card. Children do not get their own cards. Root icon 40px, child 32px, connector 2px with curved branches. Geometry is in ui/variants.ts, never copied into screen.
+Current nested variant uses pl-12; line variant changes vertical row spacing. These are existing named implementation variants; a materially different dense tree requires its own reviewed contract, not a local class override.
+Current card radius is 12px; source 24px superseded. Global colorful icon catalog replaces legacy dark parent background.
 
-| Variant | Source geometry | Use |
-| --- | --- | --- |
-| `nested` | Reference geometry: card `p-3`; root `p-1.5` with 40px icon; child list `pt-1.5 pl-10 pr-1 space-y-0.5`; 32px child icon; 2px vertical and curved branch connectors | Account views. |
-| `line` | aligned rows, dense 1 spacing | Dense category selector views. |
-
-The component is implemented as `BaseCategoryTree`; consumers pass root,
-children, localized labels and optional edit/delete callbacks. A row may supply
-an icon and trailing-content slot (for example, a report amount), while
-`IconButton`, `IconBadge` and `SurfaceCard` remain atom-owned. Root and child
-are not separate cards: the child list is indented by `pl-10`; a 2px vertical
-line at `left: 37px`, beginning at the first child row, and a curved branch offset right of the trunk into each child icon
-communicate hierarchy. The global colorful icon catalog is retained even though
-the legacy export used dark parent badges. A third layout may not be introduced
-locally.
-
-A root with no children uses the same horizontal `p-3` card inset but drops the
-card's vertical padding; its row keeps only the root row's own `p-1.5` spacing.
-
-Reference exports live under `nested/` and `line/`, each with its own
-`code.html` and `screen.png`. New work must reference this folder and
-[`BASE_COMPONENTS.md`](../../system/BASE_COMPONENTS.md).
+Props: root, children, layout, onSelect; each item has ID, name, subtitle, system/editable flags, optional icon/tone and trailing React content. onSelect receives the item ID when selectable. System item may still open its read-only metadata + editable wallet applicability.
+No collapse state exists in current code. Export describes chevron rotation for collapse: planned, not implemented. A root without children keeps horizontal inset and drops card vertical padding.
+No inactive-filter behavior exists just because the source has “Hiển thị nhóm không hoạt động”.
+Text slots truncate/wrap within available width; connector changes require browser check with long labels, childless root and multiple children.
