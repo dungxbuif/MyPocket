@@ -32,7 +32,7 @@ Use this file as the runtime work queue.
 
 Naming đã chốt: bảng tài khoản là `user`. Khi triển khai migration, rename bảo toàn dữ liệu và đổi GORM mapping đồng bộ theo [ERD](../architecture/ERD.md); hiện chỉ cập nhật thiết kế.
 
-Tiếp nối review ví: thiết kế phần Quản lý nhóm của [TICKET-01-03](tickets/TICKET-01-03-tong-vi-danh-muc.md) trước khi chốt quan hệ nhóm/ví. [UI design](../design/system/DESIGN.md#account--quản-lý-nhóm) đã ghi điểm vào Tài khoản, chọn nhóm và form sửa; đang review, chưa tạo API/migration.
+Quản lý nhóm [TICKET-01-03](tickets/TICKET-01-03-tong-vi-danh-muc.md) đã hoàn tất: catalog system và nhóm cá nhân, cây cha–con, create/edit/delete cá nhân, và chọn ví áp dụng. Tiếp theo là giao diện ledger cơ bản; không đưa Reports/quick-add vào runtime trước khi có API.
 
 Ưu tiên hiện tại: review [DESIGN-01-02](tickets/TICKET-01-02-DETAIL_DESIGN.md) cho quản lý ví trên branch `feature/wallet-management`. Đã chốt xoá thực và trùng tên; nghiên cứu Money Lover xác nhận adjustment tạo giao dịch mới. Bộ nhóm mặc định dùng lại catalog app cũ. Các quyết định này thay ghi chú chờ chọn hành vi xoá ở bản trước; chưa duyệt migration/implementation ví.
 
@@ -110,6 +110,6 @@ Mark risk flags in the `Risk Flags` column when relevant:
 | Rank | ID | Type | Lane | Title | Priority | Status | Links | Risk Flags | Next Artifact | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 1 | BL-001 | product | normal | Edit Financial Clarity design into implementation-ready source of truth | High | done | `design/system/DESIGN.md`, `design/INDEX.md` | Existing behavior | Docs review | Refactored design now keeps Money Lover-style parity, personal extensions, component inventory, data domains, launch phases, and acceptance checklist. |
-| 3 | BL-005 | product | high-risk | Implement wallet management | High | in_progress | [Ticket](tickets/TICKET-01-02-quan-ly-vi.md), [Design](tickets/TICKET-01-02-DETAIL_DESIGN.md), [DB operations](../architecture/DATABASE.md) | Data model, Migration/data loss, Public contract/API, Authorization | Wallet/group UI UAT | Versioned migrations and system-group seed are applied in dev; group CRUD and wallet applicability are in owner review. |
+| 3 | BL-005 | product | high-risk | Implement wallet management | High | in_progress | [Ticket](tickets/TICKET-01-02-quan-ly-vi.md), [Design](tickets/TICKET-01-02-DETAIL_DESIGN.md), [DB operations](../architecture/DATABASE.md) | Data model, Migration/data loss, Public contract/API, Authorization | Wallet UI UAT | Versioned migrations and system-group seed are applied in dev; group CRUD and wallet applicability are complete under TICKET-01-03. |
 | 4 | BL-003 | integration | normal | Implement receipt OCR adapter | Medium | open | `docs/architecture/OCR_API.md`, `docs/architecture/INTEGRATIONS.md` | External system/provider, Public contract/API, Data model | Ticket plus detail design | Use OCR Platform for receipt image/PDF recognition; keep API key server-side. |
 | 5 | BL-004 | framework | normal | Finalize first project-specific standards | Medium | open | `docs/standards/` | Standards change | TBD | Add human-maintained rules in `docs/standards/`. |

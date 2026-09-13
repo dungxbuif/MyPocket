@@ -19,7 +19,6 @@ var (
 	ErrCategoryNameRequired  = errors.New("tên nhóm không được để trống")
 	ErrCategoryKindInvalid   = errors.New("loại nhóm không hợp lệ")
 	ErrCategoryParentInvalid = errors.New("nhóm cha không hợp lệ")
-	ErrCategoryHasChildren   = errors.New("không thể xóa nhóm đang có nhóm con")
 	ErrCategoryWalletInvalid = errors.New("ví áp dụng không hợp lệ")
 	ErrCategoryIconInvalid   = errors.New("icon nhóm không hợp lệ")
 )
@@ -39,7 +38,9 @@ func NewCategoryInteractor(repository categoryrepo.CategoryRepository) *Category
 	return &CategoryInteractor{repository: repository}
 }
 func (u *CategoryInteractor) List(ownerID string) ([]entity.Category, error) {
-	if err := u.repository.EnsurePersonalDefaults(ownerID); err != nil { return nil, err }
+	if err := u.repository.EnsurePersonalDefaults(ownerID); err != nil {
+		return nil, err
+	}
 	return u.repository.ListVisible(ownerID)
 }
 
@@ -83,16 +84,24 @@ func (u *CategoryInteractor) Update(ownerID, id string, input CategoryInput) (*e
 	return item, nil
 }
 
+func (u *CategoryInteractor) UpdateWallets(ownerID, id string, walletIDs []string) (*entity.Category, error) {
+	item, err := u.repository.FindVisible(ownerID, id)
+	if err != nil {
+		return nil, err
+	}
+	walletIDs = uniqueWalletIDs(walletIDs)
+	if err := u.repository.ValidateWallets(ownerID, walletIDs); err != nil {
+		return nil, err
+	}
+	if err := u.repository.ReplaceWallets(ownerID, item, walletIDs); err != nil {
+		return nil, err
+	}
+	return item, nil
+}
+
 func (u *CategoryInteractor) Delete(ownerID, id string) error {
 	if _, err := u.repository.FindPersonal(ownerID, id); err != nil {
 		return err
-	}
-	hasChildren, err := u.repository.HasChildren(ownerID, id)
-	if err != nil {
-		return err
-	}
-	if hasChildren {
-		return ErrCategoryHasChildren
 	}
 	return u.repository.Delete(ownerID, id)
 }

@@ -5,7 +5,7 @@ export function GoalCard({ goal, masked }: { goal: MockGoal; masked: boolean }) 
   const Icon = goal.icon;
   const progress = ratioPercent(goal.saved, goal.target);
   return (
-    <div className="rounded-2xl bg-[#f5f3f3] p-3">
+    <div className="rounded-xl bg-[#f5f3f3] p-3">
       <div className="flex items-center gap-3">
         <div className="grid h-10 w-10 place-items-center rounded-full bg-[#d9e6da] text-[#006e1c]">
           <Icon size={18} />
@@ -26,4 +26,3 @@ export function GoalCard({ goal, masked }: { goal: MockGoal; masked: boolean }) 
     </div>
   );
 }
-

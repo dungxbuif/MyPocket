@@ -34,9 +34,9 @@ updated: 2026-09-13
 
 - Status: The root `app/` Vite React Tailwind app renders the Financial Clarity preview and is connected to the dev Gin API; Google OAuth and development CORS are enabled for local testing. PostgreSQL uses explicit versioned migrations; API startup does not mutate schema.
 - Active backlog: `docs/work/BACKLOG.md`
-- Current queue focus: wallet/category persistence and basic transaction API are implemented for runtime review. Account → Nhóm now has real CRUD plus owner-validated applicable-wallet selection and awaits owner browser UAT.
+- Current queue focus: wallet/category persistence is implemented for runtime review. Account → Nhóm is closed; the next product slice is the basic income/expense ledger UI.
 - Active phase: None.
-- Active ticket: TICKET-01-03 (group management) is in review; TICKET-02-01 (basic income/expense ledger API) follows after owner UAT.
+- Active ticket: No active group ticket. TICKET-02-01 (basic income/expense ledger API) is next.
 - Active bug: None.
 
 ## Current Focus
@@ -66,19 +66,21 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 - Owner chốt tên bảng tài khoản là `user`. ERD dùng tên đích này; GORM mapping và rename migration chưa triển khai, phải giữ dữ liệu/ID tài khoản hiện có.
 
 - Wallet review: xoá thực sau xác nhận đã chốt, cho phép trùng tên. Money Lover adjustment tạo giao dịch mới bằng chênh lệch, mặc định loại khỏi báo cáo; thiết kế ledger MyPocket cần review theo kết quả này.
-- Nhóm mặc định lấy từ `refereces/disappointed_app/backend/migrations/0011_phase002_category_catalog.sql` và seed tiền nhiệm; giữ tên/system key/cha-con. Không thay bằng nhóm tự nghĩ hoặc mock FE.
+- Nhóm mặc định theo catalog owner chốt ngày 2026-09-13; migration `000004` là nguồn runtime cho tên, system key và quan hệ cha–con.
 - Schema startup now renames legacy `app_users` to `user`, migrates wallets/categories/category-wallet assignments, and idempotently seeds stable system groups.
 - The two category-tree exports are consolidated under `docs/design/molecules/category-tree/`; `BaseCategoryTree` is the canonical atom-composed molecule, with `nested` and `line` named variants.
 - Category APIs return `wallet_ids`; create/update validates every selected wallet belongs to the authenticated owner. Swagger is regenerated from handler annotations.
 - Unified Gin responses with `{data, meta}`, RFC 9457-style errors, request IDs, and shared constants/helpers; profile route is `/api/v1/auth/profile`.
-- Database schema and system category data are now owned by ordered SQL migrations in `backend/migrations/`, executed with `go run ./cmd/migrate up` in dev and prod. `AutoMigrate`/startup system seed were removed; dev DB reached migration version 3, clean, with 28 system groups. Wallet deletion cascades its transaction rows by the approved permanent-delete policy.
+- Database schema and system category data are now owned by ordered SQL migrations in `backend/migrations/`, executed with `go run ./cmd/migrate up` in dev and prod. `AutoMigrate`/startup system seed were removed; dev DB reached migration version 8, clean. Migration `000008` assigns the system icon catalog for deployment. Wallet deletion cascades its transaction rows by the approved permanent-delete policy.
 - Gin route registration is split by public-auth, account, category, wallet and transaction domain. Swagger is code-first: annotations are beside Go handlers and `go generate ./cmd/api` regenerates only implemented endpoints.
-- Group management now uses a category use case for owner scoping, system read-only rules, valid kind/parent rules, max two levels, child deletion protection and owner-wallet validation. `/account/groups` has real list/create/edit/delete states, not mock data.
-- Added `/account/groups` UI using the real categories/wallets APIs, with loading/error/empty states and reusable `BaseCategoryTree`, `Heading`, `FormField`, `BaseCheckbox`, `SurfaceCard` and `IconBadge` bases. The canonical tree uses the global category icon catalog and palette, a connector from the parent-icon centre, visibly indented smaller child icons, and dividers beginning at the indented child-content column; personal-group edit exposes confirmed deletion. Account links to wallets/groups are visible; unsupported sections remain commented.
-- TICKET-01-03 is now ready with an implementation plan at `docs/superpowers/plans/2026-09-13-group-management.md`; CRUD group is scoped separately from wallet management.
+- Group management uses owner scoping, valid kind/parent rules, max two levels, child re-parenting on personal-parent deletion and owner-wallet validation. System metadata is read-only, but an owner may choose its applicable wallets through a dedicated endpoint. `/account/groups` has real list/create/edit/delete states, not mock data.
+- Added `/account/groups` UI using the real categories/wallets APIs and reusable bases (`BaseCategoryTree`, `Heading`, `FormField`, `BaseCheckbox`, `SurfaceCard`, `IconBadge`, `BaseBottomSheet`). The canonical tree follows `docs/design/molecules/category-tree/nested`; personal-category edit exposes confirmed deletion. Account links to wallets/groups are visible. Reports and quick-add are retained source but deliberately not mounted until their APIs exist.
+- TICKET-01-03 (group management) is complete; CRUD group remains separately scoped from wallet management.
 - Vite dev proxy now forwards `/api` to Gin, allowing FE and BE to be tested through one browser origin.
 - Base-cards export tại `docs/design/atoms/base-cards/` là nguồn tham chiếu mới; Overview đã dùng `SurfaceCard`, `IconBadge`, `WalletCard` và `TransactionItem` để khớp các biến thể card/list, không lặp markup card tại màn hình.
 - Variant maps của surface, badge, button, wallet và transaction được tập trung trong `app/src/atomic/atoms/tokens.ts`; consumer chỉ tham chiếu token global.
+- `BaseButton` owns inline-flex icon-plus-label alignment; screen callers may use `gap` but must not recreate this layout locally.
+- Base card/form/row corners are reduced one token step; circular icon, progress and pill CTA geometry remain semantic exceptions. In `BaseCategoryTree`, the trunk begins at the first child row rather than crossing the parent row.
 
 - Divide the full business contract into parent/child tickets with concise scope and acceptance criteria. Keep unresolved decisions in the affected child; do not silently resolve them during breakdown.
 - Current product contract is `docs/requirements/SPEC.md`, with `BUSINESS_RULES.md` and `REPORTS.md`; older design inputs do not override these decisions.
@@ -103,7 +105,7 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 
 ## Next Steps
 
-- Run owner browser UAT for group create/edit/delete, parent choice and wallet applicability at `/account/groups`; then build the real transaction screen from the newly wired protected API. Retain the base-component contract and update screen artifacts after each verified UI slice.
+- Build the real transaction screen from the protected ledger API. Retain the base-component contract, keep unimplemented Reports/quick-add source commented, and update screen artifacts after each verified UI slice.
 
 - Review the parent/child ticket list and resolve business questions in the affected children; prioritize implementation only when requested.
 - Continue implementation from the Financial Clarity design and reference-app behavior; local runtime proof for auth/profile/home is now available, while product feature validation remains pending.

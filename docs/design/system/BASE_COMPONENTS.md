@@ -19,16 +19,16 @@ visual CSS or one-off variants.
 
 | Base | Required geometry and tokens | Variants / behavior |
 | --- | --- | --- |
-| `SurfaceCard` | white card, `rounded-3xl` / 24px, `0 4px 20px rgba(0,0,0,.03)`, subtle slate divider | list, form, metric and settings use the same container; padding/elevation are named variants. |
+| `SurfaceCard` | white card, maximum `rounded-2xl` / 16px, `0 4px 20px rgba(0,0,0,.03)`, subtle slate divider | list, form, metric and settings use the same container; padding/elevation are named variants. |
 | `IconBadge` | 28–40px icon hit area; soft tinted background plus matching border | semantic `wallet`, `income`, `expense`, `warning`, `neutral` and global category palette; no screen supplies arbitrary color classes. |
-| `BaseButton` | Manrope 600/700; primary green; touch target at least 44px | primary, secondary, ghost, danger; size and loading are named props. |
+| `BaseButton` | Manrope 600/700; primary green; touch target at least 44px; inline flex centres icon-plus-label content | primary, secondary, ghost, danger; size and loading are named props. |
 | `Heading` | semantic `h1`/`h2`/`h3`; slate hierarchy and Manrope weight are global | `screen`, `section`, `field`; caller can supply semantic tag and additive `className`, never local base typography. |
-| `FormField`, `BaseTextInput`, `BaseSelect` | label plus 1px slate border, 12px inset control, emerald focus state | `FormField` owns label association/layout; input/select forward native props and allow additive classes. |
+| `FormField`, `BaseTextInput`, `BaseSelect` | label plus 1px slate border, 12px inset control, emerald focus state and `rounded-lg` control | `FormField` owns label association/layout; input/select forward native props and allow additive classes. |
 | `IconButton` | 40px circular interaction target, subtle border/shadow, visible focus state | accessible label is required; additive `className` is allowed for named composition contexts. |
 | `FormSelectorRow` | fixed 36–40px leading slot, flexible content, trailing value/chevron/switch | row target is 44–48px; selector, date and toggle are props rather than bespoke markup. |
 | `Toggle` | iOS style 48×24px | active uses emerald; keyboard and label support are mandatory. |
 | `SegmentedControl` | pill tabs, selected state visible | arrow, Home and End keys move the active tab. |
-| `BaseCategoryTree` | white `rounded-3xl` tree card; 32px root icon and 28px child icon; soft vertical hierarchy connector and subtle horizontal row dividers | `nested` and `line` are the only layout variants. Both retain compact equal 48px rows and small text; child rows are clearly indented, the connector starts at the centre of the parent icon, and dividers start at the indented child-content column. Optional icon and trailing-content slots support reporting without recreating a tree. |
+| `BaseCategoryTree` | white `rounded-3xl` tree card; 40px root icon and 32px child icon; 2px vertical connector plus curved branches | `nested` and `line` are the only layout variants. The `nested` geometry follows its source export: card `p-3`, root `p-1.5`, children `pt-1.5 pl-10 pr-1`, 0.5 gap, and no horizontal dividers. A root without children keeps horizontal inset but drops card vertical padding. Icon color/presentation stays sourced from the global category catalog. Optional icon and trailing-content slots support reporting without recreating a tree. |
 
 ## Direct artifact rules
 
@@ -44,10 +44,9 @@ visual CSS or one-off variants.
 - Budget semi-circle is 180° SVG. Its time marker is
   `(currentDay / totalDays) × 100`; warning starts above that marker and danger
   above 100%.
-- Category tree has two approved layout variants. Both visibly indent child
-  rows, shrink the child icon, retain a vertical connector starting at the
-  centre of the parent icon, and separate rows with subtle horizontal dividers
-  beginning at the indented content column. A
+- Category tree has two approved layout variants. The `nested` variant follows
+  its source geometry: a 2px vertical connector at `left: 37px` beginning at
+  the first child row, curved child branches offset right of that trunk, and no horizontal dividers. A
   consuming component selects the named variant; it does not hand-roll a third
   layout.
 

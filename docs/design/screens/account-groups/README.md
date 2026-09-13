@@ -14,8 +14,8 @@ trace:
 ## Composition
 
 - Header: balance header hidden; centered `Heading`, pill back `BaseButton`, then `SegmentedControl` for Expense/Income/Debt and a full-width “Nhóm mới” base button.
-- Group list: one `BaseCategoryTree` per root using the `nested` layout, with system-key marker mapping and owner-wallet activity text. Root and child rows use compact shared 48px height with reduced text; child rows are visibly indented and use smaller icons. The vertical connector starts at the centre of the parent icon and each horizontal divider begins at the indented child-content column.
-- Form: `BaseBottomSheet`, `FormField`, `BaseTextInput`, `BaseSelect`, and `BaseCheckbox` for wallet applicability. The same form composes create and edit; edit provides a danger `BaseButton` for deletion.
+- Group list: one `BaseCategoryTree` per root using the `nested` layout, with system-key marker mapping and owner-wallet activity text. It follows the nested artifact: `p-3` card, 40px parent icon, `pl-10` child list, 32px child icons, 2px connector at the parent-icon centre and curved branches. The colorful icon catalog remains; the source export's dark parent-badge styling is not restored.
+- Form: `BaseBottomSheet` contains two `SurfaceCard` bases: one for group fields and one for Ví áp dụng. Inside are `FormField`, `BaseTextInput`, `BaseSelect`, and `BaseCheckbox`. The same form composes create and edit; edit provides a danger `BaseButton` for deletion.
 - Feedback: `SurfaceCard` plus `BaseButton`; no screen-local card, field or icon-button styling.
 
 ## States and copy

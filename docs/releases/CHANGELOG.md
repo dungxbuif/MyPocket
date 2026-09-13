@@ -19,7 +19,17 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
-- Refined the shared category-tree base: all seeded groups use a global colorful icon catalog; parent/child hierarchy uses a connector at the outer icon edge, smaller child icons, and indented row dividers. Personal-category deletion is available from the shared edit form after confirmation.
+- Closed Account → Nhóm management: shared base-composed create/edit cards now support icon, name, type, parent and applicable-wallet selection. System categories lock metadata but allow wallet selection; deleting a personal parent returns its personal children to root. The system icon catalog is applied by migration `000008` for every deployment.
+
+- Reduced active bottom navigation to Tổng quan, Sổ GD, Ngân sách and Tài khoản. Reports and quick-add source remain commented out until their backend contracts exist; the center add button has no label and occupies the vacant middle position.
+
+- Refined the shared category-tree base: all seeded groups use a global colorful icon catalog while the nested reference geometry is retained—40px parent / 32px child icons, `pl-10` child list, 2px central trunk and curved child branches. Personal-category deletion is available from the shared edit form after confirmation.
+
+- Fixed shared button alignment: icon-plus-label content is now centered by `BaseButton`, repairing the Account → Nhóm back and create actions without screen-local styles.
+
+- Reduced shared card, form and row corner radii by one token step while preserving semantic circular badges and pill controls.
+
+- Re-seeded the default expense, income and debt category catalog from the owner-approved hierarchy. PostgreSQL migration `000004` is applied in dev.
 
 - Added real Account → Nhóm management: owner-scoped category list/create/update/delete, system category read-only protection, two-level parent validation, child-delete protection, owner-validated applicable-wallet selection and loading/error/form states in the React screen.
 

@@ -3,7 +3,7 @@ import { ChevronRight } from "lucide-react";
 
 export function FormSelectorRow({ label, value, icon: Icon }: { label: string; value: string; icon: LucideIcon }) {
   return (
-    <button type="button" className="flex w-full cursor-pointer items-center gap-3 rounded-2xl p-3 text-left transition hover:bg-[#f5f3f3]">
+    <button type="button" className="flex w-full cursor-pointer items-center gap-3 rounded-xl p-3 text-left transition hover:bg-[#f5f3f3]">
       <div className="grid h-9 w-9 place-items-center rounded-full bg-[#d9e6da] text-[#006e1c]">
         <Icon size={17} />
       </div>

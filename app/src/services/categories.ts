@@ -7,6 +7,7 @@ export type CategoryInput = { name: string; kind: string; parent_id?: string | n
 
 const CATEGORY_API_PATH = "/api/v1/categories";
 const categoryPath = (id: string) => `${CATEGORY_API_PATH}/${id}`;
+const categoryWalletsPath = (id: string) => `${categoryPath(id)}/wallets`;
 
 export async function fetchCategories(): Promise<Category[]> {
   return apiRequest<Category[]>(CATEGORY_API_PATH, {}, getStoredToken());
@@ -18,6 +19,10 @@ export async function createCategory(input: CategoryInput): Promise<Category> {
 
 export async function updateCategory(id: string, input: CategoryInput): Promise<Category> {
   return apiRequest<Category>(categoryPath(id), { method: "PATCH", body: JSON.stringify(input) }, getStoredToken());
+}
+
+export async function updateCategoryWallets(id: string, walletIDs: string[]): Promise<Category> {
+	return apiRequest<Category>(categoryWalletsPath(id), { method: "PATCH", body: JSON.stringify({ wallet_ids: walletIDs }) }, getStoredToken());
 }
 
 export async function deleteCategory(id: string): Promise<void> {

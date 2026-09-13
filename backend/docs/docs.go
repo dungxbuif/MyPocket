@@ -337,6 +337,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/categories/{id}/wallets": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Update wallets applicable to a visible category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Applicable wallets",
+                        "name": "wallets",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.categoryWalletInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Category"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/home": {
             "get": {
                 "security": [
@@ -806,6 +863,9 @@ const docTemplate = `{
                 "created_at": {
                     "type": "string"
                 },
+                "icon_key": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -958,6 +1018,9 @@ const docTemplate = `{
         "httpapi.categoryInput": {
             "type": "object",
             "properties": {
+                "icon_key": {
+                    "type": "string"
+                },
                 "kind": {
                     "type": "string"
                 },
@@ -967,6 +1030,17 @@ const docTemplate = `{
                 "parent_id": {
                     "type": "string"
                 },
+                "wallet_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "httpapi.categoryWalletInput": {
+            "type": "object",
+            "properties": {
                 "wallet_ids": {
                     "type": "array",
                     "items": {

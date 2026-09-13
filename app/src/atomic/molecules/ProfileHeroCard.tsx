@@ -1,6 +1,7 @@
 import { UserRound } from 'lucide-react';
 import type { UserProfile } from '../../services/auth';
 import { PROFILE_CARD_CLASSES } from '../atoms/tokens';
+import { SurfaceCard } from '../atoms/SurfaceCard';
 
 export function ProfileHeroCard({
    user,
@@ -12,7 +13,7 @@ export function ProfileHeroCard({
    const name = user?.name?.trim() || 'Người dùng';
    const email = user?.email?.trim() || 'Chưa có email';
    return (
-      <section className={PROFILE_CARD_CLASSES.card}>
+      <SurfaceCard className={PROFILE_CARD_CLASSES.card}>
          <div className="flex flex-col items-center">
             <div className={PROFILE_CARD_CLASSES.avatar}>
                {name.slice(0, 1).toUpperCase()}
@@ -46,6 +47,6 @@ export function ProfileHeroCard({
                </span>
             </button>
          ) : null}
-      </section>
+      </SurfaceCard>
    );
 }

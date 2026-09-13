@@ -3,10 +3,13 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { AccountPanel } from "../organisms/AccountPanel";
 import { BudgetsPanel } from "../organisms/BudgetsPanel";
 import { OverviewPanel } from "../organisms/OverviewPanel";
-import { QuickAddSheet } from "../organisms/QuickAddSheet";
-import { ReportsPanel } from "../organisms/ReportsPanel";
+// QuickAddSheet and ReportsPanel stay in the codebase for their future API slices.
+// They are intentionally not mounted until those backend contracts exist.
+// import { QuickAddSheet } from "../organisms/QuickAddSheet";
+// import { ReportsPanel } from "../organisms/ReportsPanel";
 import { TransactionsPanel } from "../organisms/TransactionsPanel";
 import { GroupManagementPanel } from "../organisms/GroupManagementPanel";
+import { GroupEditorPage } from "../organisms/GroupEditorPage";
 import { WalletManagementPanel } from "../organisms/WalletManagementPanel";
 import { MobileAppShell } from "../templates/MobileAppShell";
 import { APP_CONFIG, APP_ROUTES, API_ROUTES } from "../../config/app";
@@ -25,7 +28,7 @@ import {
   type UserProfile,
 } from "../../services/auth";
 
-export type PrototypeTab = "overview" | "transactions" | "budgets" | "reports" | "account";
+export type PrototypeTab = "overview" | "transactions" | "budgets" | "account";
 
 type AuthPhase = "checking" | "authenticated" | "unauthenticated";
 
@@ -47,7 +50,7 @@ export function FinancePrototypePage() {
   const navigate = useNavigate();
   const tab = tabFromPath(location.pathname);
   const [masked, setMasked] = useState(false);
-  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  // const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   useEffect(() => {
@@ -162,16 +165,16 @@ export function FinancePrototypePage() {
         masked={masked}
         onTabChange={(nextTab) => void navigate({ to: pathFromTab(nextTab) })}
         onToggleMask={() => setMasked((value) => !value)}
-        onAdd={() => setQuickAddOpen(true)}
+        onAdd={() => undefined}
         showHeader={!location.pathname.startsWith("/account/groups")}
       >
         {tab === "overview" ? <OverviewPanel masked={masked} /> : null}
         {tab === "transactions" ? <TransactionsPanel /> : null}
         {tab === "budgets" ? <BudgetsPanel masked={masked} /> : null}
-        {tab === "reports" ? <ReportsPanel masked={masked} /> : null}
-        {tab === "account" ? (location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
+        {/* ReportsPanel awaits its real reporting API. */}
+        {tab === "account" ? (location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
       </MobileAppShell>
-      {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} /> : null}
+      {/* QuickAddSheet awaits the transaction create API. */}
     </>
   );
 }
@@ -179,17 +182,15 @@ export function FinancePrototypePage() {
 function tabFromPath(pathname: string): PrototypeTab {
   if (pathname.startsWith("/transactions")) return "transactions";
   if (pathname.startsWith("/budgets")) return "budgets";
-  if (pathname.startsWith("/reports")) return "reports";
   if (pathname.startsWith("/account")) return "account";
   return "overview";
 }
 
-function pathFromTab(tab: PrototypeTab): "/" | "/transactions" | "/budgets" | "/reports" | "/account" {
-  const paths: Record<PrototypeTab, "/" | "/transactions" | "/budgets" | "/reports" | "/account"> = {
+function pathFromTab(tab: PrototypeTab): "/" | "/transactions" | "/budgets" | "/account" {
+  const paths: Record<PrototypeTab, "/" | "/transactions" | "/budgets" | "/account"> = {
     overview: "/",
     transactions: "/transactions",
     budgets: "/budgets",
-    reports: "/reports",
     account: "/account",
   };
   return paths[tab];

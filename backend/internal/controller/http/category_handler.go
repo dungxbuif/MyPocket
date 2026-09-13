@@ -24,6 +24,9 @@ type categoryInput struct {
 	WalletIDs []string `json:"wallet_ids"`
 	IconKey   string   `json:"icon_key"`
 }
+type categoryWalletInput struct {
+	WalletIDs []string `json:"wallet_ids"`
+}
 
 func NewCategoryHandler(categories *usecase.CategoryInteractor) *CategoryHandler {
 	return &CategoryHandler{Categories: categories}
@@ -109,6 +112,37 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 	OK(c, item)
 }
 
+// UpdateCategoryWallets godoc
+// @Summary Update wallets applicable to a visible category
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Category ID"
+// @Param wallets body categoryWalletInput true "Applicable wallets"
+// @Success 200 {object} entity.Category
+// @Failure 400 {object} Problem
+// @Failure 404 {object} Problem
+// @Router /api/v1/categories/{id}/wallets [patch]
+func (h *CategoryHandler) UpdateCategoryWallets(c *gin.Context) {
+	owner, ok := categoryOwner(c)
+	if !ok {
+		categoryUnauthorized(c)
+		return
+	}
+	var input categoryWalletInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	item, err := h.Categories.UpdateWallets(owner, c.Param("id"), input.WalletIDs)
+	if err != nil {
+		categoryError(c, err, categoryNotFoundMessage)
+		return
+	}
+	OK(c, item)
+}
+
 // DeleteCategory godoc
 // @Summary Delete a personal category without children
 // @Tags Categories
@@ -149,7 +183,7 @@ func categoryError(c *gin.Context, err error, notFoundDetail string) {
 		Fail(c, http.StatusNotFound, Problem{Code: problemCodeCategoryNotFound, Title: problemTitleNotFound, Detail: notFoundDetail})
 		return
 	}
-	if errors.Is(err, usecase.ErrCategoryNameRequired) || errors.Is(err, usecase.ErrCategoryKindInvalid) || errors.Is(err, usecase.ErrCategoryParentInvalid) || errors.Is(err, usecase.ErrCategoryHasChildren) || errors.Is(err, usecase.ErrCategoryWalletInvalid) {
+	if errors.Is(err, usecase.ErrCategoryNameRequired) || errors.Is(err, usecase.ErrCategoryKindInvalid) || errors.Is(err, usecase.ErrCategoryParentInvalid) || errors.Is(err, usecase.ErrCategoryWalletInvalid) {
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: err.Error()})
 		return
 	}

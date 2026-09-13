@@ -1,6 +1,7 @@
 import { MetricBox } from "../atoms/MetricBox";
 import { SectionTitle } from "../atoms/SectionTitle";
 import { BudgetProgressItem } from "../molecules/BudgetProgressItem";
+import { SurfaceCard } from "../atoms/SurfaceCard";
 import { budgets } from "../data/mockFinance";
 import { formatVND, ratioPercent } from "../utils/format";
 
@@ -12,7 +13,7 @@ export function BudgetsPanel({ masked }: { masked: boolean }) {
 
   return (
     <>
-      <section className="rounded-3xl bg-white p-5 text-center">
+      <SurfaceCard padding="lg" className="text-center">
         <p className="text-sm font-semibold text-[#3f4a3c]">Số tiền bạn có thể chi mỗi ngày</p>
         <p className="money mt-1 text-3xl font-bold text-[#006e1c]">{masked ? "••••••" : formatVND(safeToSpend)}</p>
         <div className="relative mx-auto mt-5 h-28 w-56 overflow-hidden">
@@ -31,12 +32,11 @@ export function BudgetsPanel({ masked }: { masked: boolean }) {
           <MetricBox label="Đã chi" value={masked ? "••••••" : formatVND(totalSpent)} danger />
           <MetricBox label="Còn lại" value={masked ? "••••••" : formatVND(totalBudget - totalSpent)} />
         </div>
-      </section>
-      <section className="rounded-3xl bg-white p-4">
+      </SurfaceCard>
+      <SurfaceCard padding="md">
         <SectionTitle title="Theo danh mục" action="Thêm" />
         <div className="mt-3 space-y-3">{budgets.map((budget) => <BudgetProgressItem key={budget.id} budget={budget} />)}</div>
-      </section>
+      </SurfaceCard>
     </>
   );
 }
-

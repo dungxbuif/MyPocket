@@ -77,7 +77,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | --- | --- | --- | --- |
 | `user` | Authenticated account/user | User | Migration `000001` preserves legacy `app_users` IDs when renaming. |
 | `wallets` | User-owned basic/goal/credit wallet | User | Migrated; VND enforced for this stage. |
-| `categories` | System or user-owned group | System/User | Migrated; reviewed system catalog is seeded in `000002`. |
+| `categories` | System or user-owned group | System/User | Migrated; owner-approved system catalog is seeded through `000004`. |
 | `category_wallets` | Quan hệ nhóm–ví áp dụng | Cùng user với nhóm/ví | Migrated; owner consistency remains use-case enforced. |
 | `transactions` | Owner-scoped income/expense ledger entry | User | Migrated; belongs to one wallet and optional visible category. |
 

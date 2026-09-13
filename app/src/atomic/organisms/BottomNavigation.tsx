@@ -1,11 +1,10 @@
-import { BarChart3, Home, PieChart, Plus, ReceiptText, Settings } from "lucide-react";
+import { Home, PieChart, Plus, ReceiptText, Settings } from "lucide-react";
 import type { PrototypeTab } from "../pages/FinancePrototypePage";
 
 const items = [
   { key: "overview", label: "Tổng quan", icon: Home },
-  { key: "transactions", label: "Sổ GD", icon: ReceiptText },
+  { key: "transactions", label: "Giao dịch", icon: ReceiptText },
   { key: "budgets", label: "Ngân sách", icon: PieChart },
-  { key: "reports", label: "Báo cáo", icon: BarChart3 },
   { key: "account", label: "Tài khoản", icon: Settings },
 ] as const;
 
@@ -23,7 +22,7 @@ export function BottomNavigation({
       <button
         type="button"
         onClick={onAdd}
-        className="absolute left-1/2 top-0 grid h-14 w-14 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-full bg-[#006e1c] text-white shadow-[0_12px_24px_rgb(0_110_28/0.25)]"
+        className="absolute left-1/2 top-1 grid h-14 w-14 -translate-x-1/2 -translate-y-1/3 place-items-center rounded-full bg-[#006e1c] text-white shadow-[0_12px_24px_rgb(0_110_28/0.25)]"
         aria-label="Thêm giao dịch"
       >
         <Plus size={26} />
@@ -38,7 +37,7 @@ export function BottomNavigation({
               type="button"
               onClick={() => onTabChange(item.key)}
               className={`flex min-h-[52px] flex-col items-center justify-center gap-1 text-xs font-bold ${
-                index === 1 ? "pr-5" : index === 2 ? "px-7" : index === 3 ? "pl-5" : ""
+                index === 1 ? "pr-5" : index === 2 ? "col-start-4 pl-5" : index === 3 ? "col-start-5" : ""
               } ${active ? "text-[#006e1c]" : "text-[#6f7a6b]"}`}
             >
               <Icon size={20} />

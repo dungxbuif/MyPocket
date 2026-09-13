@@ -8,9 +8,12 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/" });
 const transactionsRoute = createRoute({ getParentRoute: () => rootRoute, path: "transactions" });
 const budgetsRoute = createRoute({ getParentRoute: () => rootRoute, path: "budgets" });
-const reportsRoute = createRoute({ getParentRoute: () => rootRoute, path: "reports" });
+// Reports stay deliberately out of the active route tree until the reporting API is implemented.
+// const reportsRoute = createRoute({ getParentRoute: () => rootRoute, path: "reports" });
 const accountRoute = createRoute({ getParentRoute: () => rootRoute, path: "account" });
 const groupsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups" });
+const groupNewRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups/new" });
+const groupEditRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups/$categoryId/edit" });
 const walletsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/wallets" });
 const authRoute = createRoute({ getParentRoute: () => rootRoute, path: "auth/google" });
 const authCallbackRoute = createRoute({ getParentRoute: () => rootRoute, path: "auth/callback" });
@@ -19,9 +22,11 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   transactionsRoute,
   budgetsRoute,
-  reportsRoute,
+  // reportsRoute,
   accountRoute,
   groupsRoute,
+  groupNewRoute,
+  groupEditRoute,
   walletsRoute,
   authRoute,
   authCallbackRoute,

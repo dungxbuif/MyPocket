@@ -1,5 +1,6 @@
 import { ListFilter, Search } from "lucide-react";
 import { IconButton } from "../atoms/IconButton";
+import { SurfaceCard } from "../atoms/SurfaceCard";
 import { TransactionItem } from "../molecules/TransactionItem";
 import { transactions } from "../data/mockFinance";
 import { formatVND } from "../utils/format";
@@ -29,7 +30,7 @@ export function TransactionsPanel() {
         if (!rows.length) return null;
         const sum = rows.reduce((value, row) => value + row.amount, 0);
         return (
-          <section key={group} className="rounded-3xl bg-white p-4">
+          <SurfaceCard key={group} padding="md">
             <div className="mb-3 flex items-center justify-between">
               <div>
                 <p className="text-lg font-bold">{group}</p>
@@ -38,10 +39,9 @@ export function TransactionsPanel() {
               <p className={`money text-sm font-bold ${sum < 0 ? "text-[#bb1614]" : "text-[#006e1c]"}`}>{formatVND(sum)}</p>
             </div>
             <div className="space-y-2">{rows.map((transaction) => <TransactionItem key={transaction.id} transaction={transaction} />)}</div>
-          </section>
+          </SurfaceCard>
         );
       })}
     </>
   );
 }
-

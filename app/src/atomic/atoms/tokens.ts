@@ -70,6 +70,14 @@ export const BUTTON_VARIANTS = {
   outline: "border border-slate-100 bg-white text-emerald-600 shadow-[0_4px_20px_rgb(0_0_0/0.03)] hover:bg-emerald-50",
 } as const;
 
+export const BUDGET_PROGRESS_CLASSES = {
+  container: `${BASE_COMPONENT_RADIUS} bg-[#f5f3f3]`,
+  track: "bg-[#e3e2e2]",
+  normal: { badge: "bg-[#d9e6da] text-[#006e1c]", text: "text-[#1b1c1c]", fill: "bg-[#006e1c]" },
+  over: { badge: "bg-[#ffdad6] text-[#93000a]", text: "text-[#bb1614]", fill: "bg-[#bb1614]" },
+  detail: "text-[#3f4a3c]",
+} as const;
+
 export const SURFACE_CARD_ELEVATIONS = {
   flat: "shadow-none",
   subtle: "shadow-[0_4px_20px_rgb(0_0_0/0.03)]",
@@ -130,7 +138,7 @@ export const CATEGORY_TREE_LAYOUTS = {
 } as const;
 
 export const PROFILE_CARD_CLASSES = {
-  card: "relative overflow-hidden rounded-2xl border border-slate-100 bg-white p-5 text-center shadow-[0_2px_10px_rgb(0_0_0/0.03)]",
+  card: "relative overflow-hidden p-5 text-center",
   avatar: "grid h-20 w-20 place-items-center rounded-full border-2 border-white bg-[#48a855] text-4xl font-bold text-white shadow-inner ring-4 ring-[#ecfdf5]",
   row: "mt-4 flex w-full cursor-pointer items-center justify-between border-t border-[#e3e2e2] pt-3 text-left transition hover:bg-[#f5f3f3]",
 } as const;
