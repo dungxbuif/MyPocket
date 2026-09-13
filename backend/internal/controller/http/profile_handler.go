@@ -24,21 +24,21 @@ func NewProfileHandler(auth *usecase.AuthInteractor) *ProfileHandler {
 // @Success 200 {object} usecase.UserProfile
 // @Failure 401 {object} map[string]string
 // @Failure 404 {object} map[string]string
-// @Router /api/v1/profile [get]
+// @Router /api/v1/auth/profile [get]
 func (h *ProfileHandler) GetProfile(c *gin.Context) {
 	userID, ok := c.Get(contextUserIDKey)
 	if !ok {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "chưa đăng nhập"})
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: "chưa đăng nhập"})
 		return
 	}
 	profile, err := h.Auth.Profile(c.Request.Context(), userID.(string))
 	if err != nil {
 		if errors.Is(err, usecase.ErrInvalidCredentials) {
-			c.JSON(http.StatusNotFound, gin.H{"error": "không tìm thấy người dùng"})
+			Fail(c, http.StatusNotFound, Problem{Code: problemCodeUserNotFound, Title: "Not Found", Detail: "không tìm thấy người dùng"})
 			return
 		}
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "không đọc được profile"})
+		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeProfileLoadFailed, Title: problemTitleInternalServer, Detail: "không đọc được profile"})
 		return
 	}
-	c.JSON(http.StatusOK, profile)
+	OK(c, profile)
 }

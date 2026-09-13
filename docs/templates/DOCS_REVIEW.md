@@ -66,6 +66,7 @@ Use this template when a ticket, bug, or detail design needs a standalone docs r
 - [ ] API/contract changed: `docs/architecture/API.md` updated or not needed reason recorded
 - [ ] Data model changed: `docs/architecture/ERD.md` updated or not needed reason recorded
 - [ ] Architecture/runtime changed: `docs/architecture/ARCHITECTURE.md` updated or not needed reason recorded
+- [ ] Changed user-facing screen: matching `docs/design/` specification/artifact updated or not needed reason recorded
 - [ ] Durable decision changed: ADR added or not needed reason recorded
 - [ ] `docs/CONTEXT.md` updated
 - [ ] Trace links updated

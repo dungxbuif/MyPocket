@@ -1,0 +1,36 @@
+import { createRootRoute, createRoute, createRouter } from "@tanstack/react-router";
+import { FinancePrototypePage } from "./atomic/pages/FinancePrototypePage";
+
+const rootRoute = createRootRoute({
+  component: FinancePrototypePage,
+});
+
+const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/" });
+const transactionsRoute = createRoute({ getParentRoute: () => rootRoute, path: "transactions" });
+const budgetsRoute = createRoute({ getParentRoute: () => rootRoute, path: "budgets" });
+const reportsRoute = createRoute({ getParentRoute: () => rootRoute, path: "reports" });
+const accountRoute = createRoute({ getParentRoute: () => rootRoute, path: "account" });
+const groupsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups" });
+const walletsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/wallets" });
+const authRoute = createRoute({ getParentRoute: () => rootRoute, path: "auth/google" });
+const authCallbackRoute = createRoute({ getParentRoute: () => rootRoute, path: "auth/callback" });
+
+const routeTree = rootRoute.addChildren([
+  indexRoute,
+  transactionsRoute,
+  budgetsRoute,
+  reportsRoute,
+  accountRoute,
+  groupsRoute,
+  walletsRoute,
+  authRoute,
+  authCallbackRoute,
+]);
+
+export const router = createRouter({ routeTree });
+
+declare module "@tanstack/react-router" {
+  interface Register {
+    router: typeof router;
+  }
+}

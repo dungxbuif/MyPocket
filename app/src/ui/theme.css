@@ -1,0 +1,41 @@
+/* Primitive values from docs/design/atoms/base-cards and system/DESIGN. */
+@theme {
+  --font-sans: Manrope, system-ui, -apple-system, sans-serif;
+  --color-brand: #4caf50;
+  --color-brand-hover: #006e1c;
+  --color-action: #059669;
+  --color-action-hover: #047857;
+  --color-accent: #10b981;
+  --color-canvas: #f6f8fa;
+  --color-card: #ffffff;
+  --color-ink: #1e293b;
+  --color-heading: #0f172a;
+  --color-muted: #94a3b8;
+  --color-secondary: #64748b;
+  --color-line: #f1f5f9;
+  --color-row: #f8fafc;
+  --color-danger: #f43f5e;
+  --color-danger-hover: #e11d48;
+  --color-success-soft: #ecfdf5;
+  --color-success-line: #d1fae5;
+  --color-danger-soft: #fff1f2;
+  --color-danger-line: #ffe4e6;
+  --color-warning: #d97706;
+  --color-warning-soft: #fffbeb;
+  --color-warning-line: #fef3c7;
+  --color-teal: #0d9488;
+  --color-teal-soft: #f0fdfa;
+  --color-teal-line: #ccfbf1;
+  --color-red: #dc2626;
+  --color-red-soft: #fef2f2;
+  --color-red-line: #fee2e2;
+  --color-orange: #f97316;
+  --color-orange-soft: #fff7ed;
+  --color-orange-line: #ffedd5;
+  --radius-card: 24px;
+  --radius-badge: 16px;
+  --radius-control: 12px;
+  --shadow-card: 0 4px 20px rgb(0 0 0 / 0.03);
+  --shadow-raised: 0 10px 25px rgb(0 0 0 / 0.08);
+  --container-phone: 420px;
+}

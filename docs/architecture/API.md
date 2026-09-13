@@ -19,14 +19,23 @@ shared_fields: [status, trace]
 
 The current local Gin API will use a code-first Swagger contract: each Gin handler owns its Swagger annotations, and generated artifacts are derived from the Go source. Keep the generated surface limited to endpoints that exist in the running implementation; add annotations only when the corresponding handler and verification exist.
 
+Swagger UI is available at `/api/v1/docs/index.html`; generated artifacts live under `backend/docs/` and must be regenerated with `swag init` from the `backend/` module.
+
+Frontend navigation is client-side and does not change the API base path. TanStack Router owns `/`, `/transactions`, `/budgets`, `/reports`, `/account`, `/account/groups`, and `/account/wallets`.
+
+Google login starts from the frontend origin using the relative `/api/v1/auth/google` path. Vite proxies that request during development, and the backend redirects the completed OAuth flow back to the same frontend origin at `/auth/callback`.
+
 Document HTTP endpoints, RPC methods, events, CLI commands, or any other public contract.
 
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
 | OCR Platform document recognition | HTTP REST | `Authorization: Bearer sk_ocr_...` for protected requests | ready | See `docs/architecture/OCR_API.md`. |
-| MyPocket local API | HTTP REST | JWT bearer for `/profile` and `/home`; OAuth cookies for Google callback | implemented for current auth/profile/home slice | Code-first Swagger annotations in Go handlers; generated UI is added incrementally. |
+| MyPocket local API | HTTP REST | JWT bearer for `/auth/profile` and `/home`; OAuth cookies for Google callback | implemented for current auth/profile/home slice | Code-first Swagger annotations in Go handlers; generated UI is added incrementally. |
+| `GET /api/v1/categories` | HTTP REST | JWT bearer | implemented | Returns system categories plus categories owned by the authenticated user. |
 
 ## Errors
+
+All MyPocket success responses use `{data, meta}`. Errors use RFC 9457-style Problem Details with `code` and `request_id`; handlers use shared helpers in `backend/internal/controller/http/response.go`.
 
 | Error | Meaning | Consumer Impact |
 | --- | --- | --- |

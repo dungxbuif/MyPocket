@@ -42,8 +42,10 @@ trace:
 - WAL-02: Số dư đến từ số dư đầu và giao dịch đã ghi sổ; draft, OCR, AI và biến động giá tài sản không làm đổi số dư.
 - WAL-03: User tạo/sửa/xóa ví. Xóa là thao tác loại bỏ dữ liệu được xác nhận; màn hình phải nêu các dữ liệu/giao dịch liên quan sẽ bị xóa và ảnh hưởng báo cáo. Xử lý các liên kết sang ví còn tồn tại phải được chốt trước triển khai.
 - WAL-04: Lựa chọn ví tính vào tổng áp dụng nhất quán ở dashboard, report và thành phần tài sản ròng. Bộ lọc ví cụ thể phải hiển thị rõ phạm vi đang dùng.
+- WAL-05: Cho phép các ví trùng tên trong cùng account; định danh và liên kết dùng ID, không dùng tên.
 - CAT-01: Giữ nhóm danh mục mặc định đã có; danh mục tương thích với loại giao dịch và có tối đa hai cấp, không có vòng lặp.
 - CAT-02: User quản lý danh mục cá nhân và thứ tự/phạm vi sử dụng; cách xóa danh mục đang có giao dịch cần bảo toàn tính giải thích được của lịch sử.
+- CAT-03: Quản lý nhóm nằm trong tab Tài khoản. Chọn nhóm có hành động Sửa, cho chọn nhóm cha và ví áp dụng; yêu cầu trường “category” được ghi trong [design](../design/system/DESIGN.md#account--quản-lý-nhóm) và đang chờ làm rõ ý nghĩa.
 
 ## TX — Giao dịch và số dư
 

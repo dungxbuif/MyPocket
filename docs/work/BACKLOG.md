@@ -30,6 +30,12 @@ Use this file as the runtime work queue.
 
 ## Current Owner Direction
 
+Naming đã chốt: bảng tài khoản là `user`. Khi triển khai migration, rename bảo toàn dữ liệu và đổi GORM mapping đồng bộ theo [ERD](../architecture/ERD.md); hiện chỉ cập nhật thiết kế.
+
+Tiếp nối review ví: thiết kế phần Quản lý nhóm của [TICKET-01-03](tickets/TICKET-01-03-tong-vi-danh-muc.md) trước khi chốt quan hệ nhóm/ví. [UI design](../design/system/DESIGN.md#account--quản-lý-nhóm) đã ghi điểm vào Tài khoản, chọn nhóm và form sửa; đang review, chưa tạo API/migration.
+
+Ưu tiên hiện tại: review [DESIGN-01-02](tickets/TICKET-01-02-DETAIL_DESIGN.md) cho quản lý ví trên branch `feature/wallet-management`. Đã chốt xoá thực và trùng tên; nghiên cứu Money Lover xác nhận adjustment tạo giao dịch mới. Bộ nhóm mặc định dùng lại catalog app cũ. Các quyết định này thay ghi chú chờ chọn hành vi xoá ở bản trước; chưa duyệt migration/implementation ví.
+
 Review the complete contract and its [11 parent / 31 child BA tickets](tickets/README.md). The owner requested concise business-language tickets; all are `draft`, without an implementation phase or technical plan. The ticket list covers REQ-01 through REQ-18; common quality rules apply across the groups. Existing queue rows below remain historical context and do not override this review focus.
 
 Documentation checks and remaining product proof are recorded in [VALIDATION_MATRIX.md](VALIDATION_MATRIX.md). Standards now live at the required `docs/standards/` location, with their existing content preserved.
@@ -103,7 +109,7 @@ Mark risk flags in the `Risk Flags` column when relevant:
 
 | Rank | ID | Type | Lane | Title | Priority | Status | Links | Risk Flags | Next Artifact | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 1 | BL-001 | product | normal | Edit Financial Clarity design into implementation-ready source of truth | High | done | `design/DESIGN.md`, `design/INDEX.md` | Existing behavior | Docs review | Refactored design now keeps Money Lover-style parity, personal extensions, component inventory, data domains, launch phases, and acceptance checklist. |
-| 2 | BL-002 | phase | normal | Start first app implementation slice | High | in_progress | `refereces/disappointed_app/`, `design/` | Existing behavior, Multi-domain | Ticket plus detail design | Clean app shell is running with Gin API integration; next slice should complete authenticated home/profile UAT and then add the first transaction flow. |
-| 3 | BL-003 | integration | normal | Implement receipt OCR adapter | Medium | open | `docs/architecture/OCR_API.md`, `docs/architecture/INTEGRATIONS.md` | External system/provider, Public contract/API, Data model | Ticket plus detail design | Use OCR Platform for receipt image/PDF recognition; keep API key server-side. |
-| 4 | BL-004 | framework | normal | Finalize first project-specific standards | Medium | open | `docs/standards/` | Standards change | TBD | Add human-maintained rules in `docs/standards/`. |
+| 1 | BL-001 | product | normal | Edit Financial Clarity design into implementation-ready source of truth | High | done | `design/system/DESIGN.md`, `design/INDEX.md` | Existing behavior | Docs review | Refactored design now keeps Money Lover-style parity, personal extensions, component inventory, data domains, launch phases, and acceptance checklist. |
+| 3 | BL-005 | product | high-risk | Implement wallet management | High | in_progress | [Ticket](tickets/TICKET-01-02-quan-ly-vi.md), [Design](tickets/TICKET-01-02-DETAIL_DESIGN.md) | Data model, Migration/data loss, Public contract/API, Authorization | Wallet CRUD API | Schema migration and system-group seed are implemented. Group CRUD is tracked in TICKET-01-03. |
+| 4 | BL-003 | integration | normal | Implement receipt OCR adapter | Medium | open | `docs/architecture/OCR_API.md`, `docs/architecture/INTEGRATIONS.md` | External system/provider, Public contract/API, Data model | Ticket plus detail design | Use OCR Platform for receipt image/PDF recognition; keep API key server-side. |
+| 5 | BL-004 | framework | normal | Finalize first project-specific standards | Medium | open | `docs/standards/` | Standards change | TBD | Add human-maintained rules in `docs/standards/`. |

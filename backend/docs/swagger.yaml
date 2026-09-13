@@ -1,5 +1,26 @@
 basePath: /
 definitions:
+  entity.Category:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      is_system:
+        type: boolean
+      kind:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      parent_id:
+        type: string
+      system_key:
+        type: string
+      updated_at:
+        type: string
+    type: object
   httpapi.loginRequest:
     properties:
       email:
@@ -120,6 +141,60 @@ paths:
       summary: Complete Google OAuth login
       tags:
       - Authentication
+  /api/v1/auth/profile:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.UserProfile'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get authenticated user profile
+      tags:
+      - Account
+  /api/v1/categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Category'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: List visible categories
+      tags:
+      - Categories
   /api/v1/home:
     get:
       produces:
@@ -179,32 +254,6 @@ paths:
       summary: Login with email and password
       tags:
       - Authentication
-  /api/v1/profile:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/usecase.UserProfile'
-        "401":
-          description: Unauthorized
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-        "404":
-          description: Not Found
-          schema:
-            additionalProperties:
-              type: string
-            type: object
-      security:
-      - BearerAuth: []
-      summary: Get authenticated user profile
-      tags:
-      - Account
 securityDefinitions:
   BearerAuth:
     in: header

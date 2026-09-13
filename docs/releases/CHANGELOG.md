@@ -19,10 +19,28 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+- Added TanStack Router route tree for finance sections and account management paths.
+- Added GORM schema migration for `user`, wallets, categories, and category-wallet assignments, plus idempotent system category seeding.
+
+- Wallet/category ERD now names the account table `user`, per owner direction. Preserving existing account data during table rename is documented; runtime mapping remains unchanged pending migration.
+
+### Category management design
+
+- Added an [ASCII ERD](../architecture/ERD.md#ascii--mô-hình-ví-và-nhóm-để-review) separating the existing user model from proposed wallet/category relationships. Seed ownership and wallet applicability defaults remain under review.
+
+- Added the Account → Quản lý nhóm → select → Edit flow with parent and applicable-wallet selectors to [design guidelines](../design/system/DESIGN.md#account--quản-lý-nhóm) and TICKET-01-03. The requested “category” field remains explicitly unresolved. Documentation only; no UI, API or migration implemented.
+
+### Wallet design review — 2026-09-13
+
+- Corrected the already-approved hard-delete policy and recorded duplicate wallet names as allowed.
+- Linked official Money Lover research for adjustment transactions and goal/credit wallet fields in [DESIGN-01-02](../work/tickets/TICKET-01-02-DETAIL_DESIGN.md); implementation and migration approval remain pending.
+- Pinned default category reuse to the old app's Vietnamese catalog. No wallet code, seed or migration executed.
+
 ### Runtime — 2026-09-13
 
 - Enabled development CORS for the FE origins `http://localhost:4173` and `http://127.0.0.1:4173`, including credentials required by the Google OAuth callback flow. Origins can be overridden with `CORS_ALLOWED_ORIGINS`.
 - Updated the app header to show the current total balance in place of the MyPocket/“Tài chính hôm nay” branding, following the reviewed design direction.
+- Added implementation-grounded technical documentation for wallet management: clean-architecture boundaries, proposed ERD/migration sequence, and code-first Swagger serving at `/api/v1/docs`.
 
 ### Business Tickets — 2026-09-13
 
@@ -74,3 +92,5 @@ All notable changes should be recorded here.
 
 ### Added
 - Initial SDLC agent framework scaffold.
+- Reconciled Overview cards with the exported base-cards design: shared `SurfaceCard` and `IconBadge` atoms now drive wallet rows, transaction rows, insight and report cards.
+- Centralized reusable component variants in the global UI token module; removed local variant maps from atoms and list molecules.

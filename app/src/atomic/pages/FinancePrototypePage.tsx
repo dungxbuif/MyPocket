@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "@tanstack/react-router";
 import { AccountPanel } from "../organisms/AccountPanel";
 import { BudgetsPanel } from "../organisms/BudgetsPanel";
 import { OverviewPanel } from "../organisms/OverviewPanel";
 import { QuickAddSheet } from "../organisms/QuickAddSheet";
 import { ReportsPanel } from "../organisms/ReportsPanel";
 import { TransactionsPanel } from "../organisms/TransactionsPanel";
+import { GroupManagementPanel } from "../organisms/GroupManagementPanel";
 import { MobileAppShell } from "../templates/MobileAppShell";
 import { APP_CONFIG, APP_ROUTES, API_ROUTES } from "../../config/app";
 import {
@@ -40,7 +42,9 @@ export function FinancePrototypePage() {
     user: null,
     home: null,
   });
-  const [tab, setTab] = useState<PrototypeTab>("overview");
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = tabFromPath(location.pathname);
   const [masked, setMasked] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
@@ -54,7 +58,7 @@ export function FinancePrototypePage() {
 
       try {
         if (statePath === "/auth/google") {
-          window.location.replace(`${APP_CONFIG.API_BASE_URL}${API_ROUTES.START_GOOGLE_AUTH}`);
+          window.location.replace(API_ROUTES.START_GOOGLE_AUTH);
           return;
         }
         if (isAuthCallbackPath(statePath)) {
@@ -72,7 +76,7 @@ export function FinancePrototypePage() {
           } else {
             setAuth((prev) => ({ ...prev, phase: "unauthenticated", errorMessage: "Không nhận được thông tin xác thực từ Google" }));
           }
-          window.history.replaceState({}, "", "/");
+          void navigate({ to: "/", search: {}, replace: true });
           return;
         }
 
@@ -126,7 +130,7 @@ export function FinancePrototypePage() {
     setIsLoggingIn(true);
     setAuth((current) => ({ ...current, errorMessage: "" }));
     const frontendCallback = encodeURIComponent(`${window.location.origin}${APP_ROUTES.AUTH_CALLBACK_PATH}`);
-    window.location.href = `${APP_CONFIG.API_BASE_URL}${API_ROUTES.START_GOOGLE_AUTH}?frontend_callback=${frontendCallback}`;
+    window.location.href = `${API_ROUTES.START_GOOGLE_AUTH}?frontend_callback=${frontendCallback}`;
     setIsLoggingIn(false);
   };
 
@@ -155,7 +159,7 @@ export function FinancePrototypePage() {
       <MobileAppShell
         tab={tab}
         masked={masked}
-        onTabChange={setTab}
+        onTabChange={(nextTab) => void navigate({ to: pathFromTab(nextTab) })}
         onToggleMask={() => setMasked((value) => !value)}
         onAdd={() => setQuickAddOpen(true)}
       >
@@ -163,11 +167,30 @@ export function FinancePrototypePage() {
         {tab === "transactions" ? <TransactionsPanel /> : null}
         {tab === "budgets" ? <BudgetsPanel masked={masked} /> : null}
         {tab === "reports" ? <ReportsPanel masked={masked} /> : null}
-        {tab === "account" ? <AccountPanel user={auth.user} onLogout={handleLogout} /> : null}
+        {tab === "account" ? (location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
       </MobileAppShell>
       {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} /> : null}
     </>
   );
+}
+
+function tabFromPath(pathname: string): PrototypeTab {
+  if (pathname.startsWith("/transactions")) return "transactions";
+  if (pathname.startsWith("/budgets")) return "budgets";
+  if (pathname.startsWith("/reports")) return "reports";
+  if (pathname.startsWith("/account")) return "account";
+  return "overview";
+}
+
+function pathFromTab(tab: PrototypeTab): "/" | "/transactions" | "/budgets" | "/reports" | "/account" {
+  const paths: Record<PrototypeTab, "/" | "/transactions" | "/budgets" | "/reports" | "/account"> = {
+    overview: "/",
+    transactions: "/transactions",
+    budgets: "/budgets",
+    reports: "/reports",
+    account: "/account",
+  };
+  return paths[tab];
 }
 
 function AuthLoadingScreen() {

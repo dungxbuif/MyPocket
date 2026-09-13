@@ -1,5 +1,5 @@
 export const APP_CONFIG = {
-  API_BASE_URL: import.meta.env.VITE_API_BASE_URL?.trim() || "http://localhost:8080",
+  API_BASE_URL: import.meta.env.VITE_API_BASE_URL?.trim() || "",
 } as const;
 
 export const APP_ROUTES = {
@@ -9,7 +9,7 @@ export const APP_ROUTES = {
 export const API_ROUTES = {
   START_GOOGLE_AUTH: "/api/v1/auth/google",
   GOOGLE_CALLBACK: "/api/v1/auth/google/callback",
-  PROFILE: "/api/v1/profile",
+  PROFILE: "/api/v1/auth/profile",
   HOME: "/api/v1/home",
 } as const;
 

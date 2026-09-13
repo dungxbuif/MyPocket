@@ -164,6 +164,8 @@ Human fill observable criteria:
 - [ ] Validation matrix updated or explicitly not affected
 - [ ] UAT completed or explicitly not required
 - [ ] Master docs reconciled
+- [ ] Changed screen specification/artifact under `docs/design/` reconciled, or not-needed reason recorded
+- [ ] Changed screen specification/artifact under `docs/design/` reconciled with implementation, or not needed reason recorded
 - [ ] Docs review completed
 - [ ] ADR created or explicitly not needed
 - [ ] `docs/CONTEXT.md` updated

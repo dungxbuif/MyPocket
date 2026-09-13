@@ -27,9 +27,22 @@ This file maps accepted behavior and work items to proof.
 
 ## Runtime Verification — 2026-09-13
 
+| Area | Proof | Result | Evidence |
+| --- | --- | --- | --- |
+| Base component styling | TypeScript + production build | pass | `npm run typecheck && npm run build` in `app/` |
+
+| Area | Proof | Result | Evidence |
+| --- | --- | --- | --- |
+| Frontend routing | TypeScript compile check | pass | `npm run typecheck` in `app/` |
+| Schema and system catalog | Backend unit test | pass | `go test ./...` in `backend/` |
+| Categories API auth guard | HTTP manual check | pass | `GET /api/v1/categories` without bearer returned `401` |
+| Unified response contract | Go unit tests | pass | `TestOKUsesDataEnvelope`, `TestFailUsesProblemDetails`; `go test ./...` |
+| Group management UI | Frontend production build | pass | `npm run typecheck && npm run build` in `app/`; runtime requires authenticated browser session |
+
 - CORS preflight: `OPTIONS /api/v1/profile` with `Origin: http://localhost:4173` returned `204` with allow-origin, credentials, methods and headers.
 - API health: `GET /api/v1/health` returned `{"status":"ok"}`.
 - Google OAuth start: `GET /api/v1/auth/google` returned `302` to Google with redirect URI `http://localhost:8080/api/v1/auth/google/callback`.
+- Swagger UI: `GET /api/v1/docs/index.html` and `GET /api/v1/docs/doc.json` returned `200`; generated paths cover only the implemented auth/profile/home/health endpoints.
 
 Policy lives in `docs/standards/VALIDATION.md`. This matrix is runtime project state and should change as work is planned, implemented, changed, or retired.
 
@@ -86,6 +99,21 @@ rtk proxy node -e 'const fs=require("fs"),path=require("path");let files=["docs/
 - Reconciliation: ticket index, backlog, context, product docs entry point, roadmap note and changelog updated. No runtime, API/schema or architecture change; no technical ADR needed for the breakdown.
 
 ## Rules
+
+### Category UI and ASCII ERD docs review
+
+- Naming review: owner chọn `user`; sơ đồ và FK dùng tên đích, hiện trạng mapping cũ chỉ ghi trong mục migration. Kiểm tra `rtk git diff --check`; chưa chạy migration hoặc runtime tests cho thay đổi tên trong docs.
+
+- Phạm vi: Tài khoản → Quản lý nhóm → chọn nhóm → Sửa; nhóm cha, category và ví áp dụng. [UI design](../design/system/DESIGN.md#account--quản-lý-nhóm) liên kết [ASCII ERD](../architecture/ERD.md#ascii--mô-hình-ví-và-nhóm-để-review) và [ticket](tickets/TICKET-01-03-tong-vi-danh-muc.md).
+- Docs review: đã phân biệt user model hiện có và quan hệ nhóm/ví đề xuất; giữ catalog cũ; không tự chốt ý nghĩa category, scope rỗng hoặc chiến lược seed. Base component reuse bắt buộc.
+- Kiểm tra: `rtk git diff --check` và kiểm tra file đích của Markdown links bằng Node. Runtime/UAT không chạy vì thay đổi chỉ ở docs; UI/API/migration nhóm chưa implement. Review mô hình dữ liệu còn pending; chưa có quyết định kiến trúc được áp dụng cần ADR implementation.
+
+### Wallet research and docs review — 2026-09-13
+
+- Evidence: official Money Lover support for balance adjustment, wallet management, goal/credit wallets; exact URLs and limits recorded in [DESIGN-01-02](tickets/TICKET-01-02-DETAIL_DESIGN.md).
+- Reviewed old category catalog `0011_phase002_category_catalog.sql` and research sections 17–18; pinned reuse in wallet/category tickets.
+- Corrected deletion/duplicate-name decisions across design, backlog, ERD, architecture and context. Research is not app UAT; no wallet API/schema/seed executed. Full technical design still needs review.
+- Documentation-only verification: diff whitespace and local Markdown link checks; product tests/UAT not run for this research update.
 
 - Add or update a row when a requirement, ticket, bug, public contract, or accepted behavior is created or changed.
 - Mark proof columns `yes`, `no`, or `not_required`.

@@ -21,4 +21,7 @@ Adding or replacing a major dependency requires:
 
 ## Naming And Structure
 
-TBD by humans for the selected stack.
+- Every API response MUST use shared response helpers; handlers MUST NOT construct ad-hoc JSON envelopes.
+- Success responses use `{data, meta}`. Errors use RFC 9457-style Problem Details with stable code constants and `request_id`.
+- Repeated UI patterns MUST be configurable atoms/molecules before screen composition.
+- User-visible strings, route fragments, API paths, error codes, and domain kinds MUST be named constants. No magic strings or numbers in handlers/components.

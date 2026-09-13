@@ -18,22 +18,25 @@ const (
 )
 
 type Router struct {
-	Engine         *gin.Engine
-	AuthHandler    *AuthHandler
-	ProfileHandler *ProfileHandler
-	HomeHandler    *HomeHandler
-	AuthMiddleware *AuthMiddleware
+	Engine          *gin.Engine
+	AuthHandler     *AuthHandler
+	ProfileHandler  *ProfileHandler
+	HomeHandler     *HomeHandler
+	CategoryHandler *CategoryHandler
+	AuthMiddleware  *AuthMiddleware
 }
 
-func NewRouter(authHandler *AuthHandler, profileHandler *ProfileHandler, homeHandler *HomeHandler, middleware *AuthMiddleware, allowedOrigins []string) *Router {
+func NewRouter(authHandler *AuthHandler, profileHandler *ProfileHandler, homeHandler *HomeHandler, categoryHandler *CategoryHandler, middleware *AuthMiddleware, allowedOrigins []string) *Router {
 	engine := gin.Default()
+	engine.Use(requestIDMiddleware())
 	engine.Use(corsMiddleware(allowedOrigins))
 	r := &Router{
-		Engine:         engine,
-		AuthHandler:    authHandler,
-		ProfileHandler: profileHandler,
-		HomeHandler:    homeHandler,
-		AuthMiddleware: middleware,
+		Engine:          engine,
+		AuthHandler:     authHandler,
+		ProfileHandler:  profileHandler,
+		HomeHandler:     homeHandler,
+		CategoryHandler: categoryHandler,
+		AuthMiddleware:  middleware,
 	}
 	api := engine.Group("/api/v1")
 	{
@@ -41,14 +44,18 @@ func NewRouter(authHandler *AuthHandler, profileHandler *ProfileHandler, homeHan
 		api.GET("/auth/google", authHandler.StartGoogleAuth)
 		api.GET("/auth/google/callback", authHandler.GoogleCallback)
 		api.GET("/health", func(c *gin.Context) {
-			c.JSON(200, gin.H{"status": "ok"})
+			OK(c, gin.H{"status": "ok"})
 		})
 
 		protected := api.Group("/")
 		protected.Use(middleware.RequireAuth)
 		{
-			protected.GET("/profile", profileHandler.GetProfile)
+			protected.GET("/auth/profile", profileHandler.GetProfile)
 			protected.GET("/home", homeHandler.GetHome)
+			protected.GET("/categories", categoryHandler.ListCategories)
+			protected.POST("/categories", categoryHandler.CreateCategory)
+			protected.PATCH("/categories/:id", categoryHandler.UpdateCategory)
+			protected.DELETE("/categories/:id", categoryHandler.DeleteCategory)
 		}
 	}
 	return r

@@ -17,7 +17,7 @@ trace:
   docs_review: ../VALIDATION_MATRIX.md#ba-ticket-review
   release_notes: ../../releases/CHANGELOG.md
   phase: null
-  detail_design: null
+  detail_design: TICKET-01-02-DETAIL_DESIGN.md
   test_verification: null
   adrs: []
 ---
@@ -65,5 +65,7 @@ Các ticket dẫn về trang này để dùng chung [backlog](../BACKLOG.md), [b
 Chủ sản phẩm chốt ưu tiên, câu hỏi nghiệp vụ và nghiệm thu. AI duy trì cấu trúc, liên kết và bằng chứng kiểm tra tài liệu. Chia ticket không tự phê duyệt chức năng hoặc thay đổi quy tắc nghiệp vụ.
 
 ## Review tài liệu
+
+Detail design cho quản lý ví đã được tạo tại [TICKET-01-02-DETAIL_DESIGN.md](TICKET-01-02-DETAIL_DESIGN.md) và đang chờ owner review; chưa có schema/API implementation.
 
 Đối chiếu độ bao phủ yêu cầu, quan hệ cha–con và liên kết được ghi tại [BA ticket review](../VALIDATION_MATRIX.md#ba-ticket-review). Không có kiểm thử chức năng hoặc UAT sản phẩm trong lần chia ticket này.

@@ -7,6 +7,7 @@ parent: TICKET-01
 trace:
   parent: TICKET-01-tai-khoan-va-vi.md
   guide: README.md
+  detail_design: TICKET-01-02-DETAIL_DESIGN.md
 ---
 
 # TICKET-01-02 — Quản lý ví
@@ -24,5 +25,7 @@ Thêm, sửa, xóa ví; xem số dư và loại ví thường, tiết kiệm, t�
 - [ ] Trước khi xóa, thấy dữ liệu liên quan và ảnh hưởng đến báo cáo.
 
 ## Cần chốt
+
+Đã chốt: xoá thực ví và dữ liệu liên quan sau cảnh báo/xác nhận; cho phép trùng tên ví. Nghiên cứu điều chỉnh số dư và trường riêng ba loại ví nằm trong [detail design](TICKET-01-02-DETAIL_DESIGN.md#quyết-định-đã-chốt-và-kết-quả-nghiên-cứu).
 
 Xử lý giao dịch chuyển tiền/trả thẻ liên kết với ví khác khi xóa ví. Xem các tình huống còn mở trong [quy tắc nghiệp vụ](../../requirements/BUSINESS_RULES.md#các-tình-huống-cần-thống-nhất-tiếp).

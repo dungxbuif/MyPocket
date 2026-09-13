@@ -129,6 +129,8 @@ Reconciliation MUST include:
 - [ ] SDD docs checked (Detail Design changes synchronized to SDD)
 - [ ] ADR need checked
 - [ ] Docs review completed
+- [ ] Changed screen design artifacts reconciled, or a not-needed reason recorded for non-screen work
+- [ ] Every changed user-facing screen has its matching `docs/design/` specification/artifact updated; record a not-needed reason for non-screen work
 
 Dehydration MUST include:
 
@@ -144,6 +146,7 @@ Dehydration MUST include:
 - Tests were run and recorded.
 - UAT is complete or explicitly not required.
 - Master docs were reconciled.
+- Screen design artifacts were reconciled with the verified implementation, when the work changes a screen.
 - Docs review checklist is complete.
 - ADRs were created when durable decisions changed.
 - `docs/CONTEXT.md` was updated.

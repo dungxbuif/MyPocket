@@ -63,6 +63,9 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, tok
   if (body === null) {
     throw new ApiError("INVALID_RESPONSE", response.status, "Phản hồi JSON không hợp lệ", body);
   }
+  if (typeof body === "object" && body !== null && "data" in body) {
+    return (body as { data: T }).data;
+  }
   return body as T;
 }
 
@@ -84,6 +87,10 @@ function extractErrorMessage(payload: unknown): string {
     if (typeof maybeMessage === "string") {
       return maybeMessage;
     }
+  }
+  if (typeof payload === "object" && payload !== null && "detail" in payload) {
+    const detail = (payload as Record<string, unknown>).detail;
+    if (typeof detail === "string") return detail;
   }
   if (typeof payload === "string") return payload;
   return "Yêu cầu API thất bại";

@@ -17,33 +17,44 @@ shared_fields: [status, linked_decisions]
 
 ## Overview
 
-TBD
+MyPocket is currently a modular monolith: a Vite/React mobile-first client calls a Gin HTTP API. The API follows a clean-architecture split between HTTP controllers, use cases, repository interfaces and PostgreSQL/Redis infrastructure. Google OAuth is handled server-side; the browser receives a JWT-backed session result.
 
 ## System Boundaries
 
-- TBD
+- Browser/PWA: `app/` React + Vite UI, Atomic Design components.
+- Frontend routing: TanStack Router route tree in `app/src/router.tsx`; feature paths are addressable directly and the app shell derives its active section from the URL.
+- Dev same-origin path: Vite proxies `/api/*` to Gin (`VITE_BACKEND_URL`, default `http://localhost:8080`); frontend leaves `VITE_API_BASE_URL` empty so browser API calls use the Vite origin.
+- Gin API: `backend/cmd/api` composition root and `backend/internal/controller/http` routes/middleware.
+- Application: `backend/internal/usecase` authentication and domain orchestration.
+- Persistence: GORM PostgreSQL repositories under `backend/internal/infrastructure`; Redis session/profile/home cache.
+- External identity: Google OAuth provider.
 
 ## Modules
 
 | Module | Responsibility | Key Files | Notes |
 | --- | --- | --- | --- |
-| TBD | TBD | TBD | TBD |
+| HTTP controller | Request/response mapping, auth middleware, CORS | `backend/internal/controller/http` | No business rules in handlers. |
+| Use case | Application rules and orchestration | `backend/internal/usecase` | Depends on repository interfaces. |
+| Repository | Persistence abstraction | `backend/internal/repository`, `backend/internal/infrastructure/repository` | GORM implementation; raw SQL only for genuinely complex queries. |
+| Database | Durable account and wallet data | PostgreSQL + GORM | Schema changes use explicit migrations/AutoMigrate review. |
+| Cache | Session and read-model caching | Redis | Cache is never the source of truth. |
 
 ## Data Flow
 
-TBD
+`React -> Gin route -> auth middleware -> use case -> repository -> PostgreSQL`; read-through profile/home data may use Redis. Google OAuth exchanges code only in the backend.
 
 ## Runtime Flow
 
-TBD
+Local development runs Vite on `:4173`, Gin on `:8080`, PostgreSQL on `:5432` and Redis on `:6379`. Swagger UI is served by Gin at `/api/v1/docs/index.html`.
 
 ## Dependencies
 
-- TBD
+- Gin, GORM, PostgreSQL, Redis, Google OAuth, Swagger (`swaggo/swag` + `gin-swagger`).
 
 ## Risks And Tradeoffs
 
-- TBD
+- Xoá thực ví đã được chốt. Detail design ví còn cần review phần ledger điều chỉnh, trường riêng goal/credit và tác động liên kết sang ví khác; xem [DESIGN-01-02](../work/tickets/TICKET-01-02-DETAIL_DESIGN.md).
+- Generated Swagger files must be regenerated from Go annotations; do not hand-edit generated output.
 
 ## Linked Decisions
 

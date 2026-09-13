@@ -17,7 +17,7 @@ shared_fields:
   - trace
 trace:
   requirements:
-    - docs/design/DESIGN.md
+    - docs/design/system/DESIGN.md
   phases: []
   tickets_or_bugs: []
   detail_designs: []

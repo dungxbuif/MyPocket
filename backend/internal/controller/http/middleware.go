@@ -35,29 +35,29 @@ func NewAuthMiddleware(tokenSvc usecase.TokenService, verifySession func(string)
 func (m *AuthMiddleware) RequireAuth(c *gin.Context) {
 	authHeader := c.GetHeader("Authorization")
 	if authHeader == "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": missingAuthHeaderMsg})
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: missingAuthHeaderMsg})
 		c.Abort()
 		return
 	}
 	content := strings.TrimSpace(authHeader)
 	parts := strings.SplitN(content, " ", 2)
 	if len(parts) != 2 || parts[0] != authScheme {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": invalidAuthFormatMsg})
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthInvalidFormat, Title: problemTitleUnauthorized, Detail: invalidAuthFormatMsg})
 		c.Abort()
 		return
 	}
 	claims, err := m.TokenSvc.Verify(parts[1])
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": invalidTokenMsg})
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeTokenInvalid, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
 		c.Abort()
 		return
 	}
 	userID, err := m.VerifySession(claims.SessionID)
 	if err != nil {
 		if errors.Is(err, usecase.ErrInvalidCredentials) {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": sessionExpiredMsg})
+			Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeSessionExpired, Title: problemTitleUnauthorized, Detail: sessionExpiredMsg})
 		} else {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": verifySessionErrorMsg})
+			Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeSessionVerifyFailed, Title: problemTitleInternalServer, Detail: verifySessionErrorMsg})
 		}
 		c.Abort()
 		return

@@ -1,4 +1,4 @@
-Dựa trên việc phân tích các luồng Money Lover và đối chiếu implementation hiện tại, hệ thống giao diện được tổ chức thành 7 nhóm base component. Danh sách 28 thành phần dưới đây là inventory thiết kế; không được hiểu là tất cả đã hoàn thiện trong code.
+Dựa trên việc phân tích các luồng Money Lover và đối chiếu implementation hiện tại, hệ thống giao diện được tổ chức thành 7 nhóm base component. Danh sách 28 thành phần dưới đây là inventory thiết kế; không được hiểu là tất cả đã hoàn thiện trong code. Cấu trúc thư mục và quy tắc đồng bộ hai chiều được ghi tại [Design Source README](./README.md); product-level rules nằm ở [Financial Clarity System](./system/DESIGN.md).
 
 1. Điều hướng & Cấu trúc khung (Navigation & Layout) — 4 components
    Top Bar / Screen Header:
@@ -42,6 +42,8 @@ Dựa trên việc phân tích các luồng Money Lover và đối chiếu imple
    Tổng kết: 28 base components là phạm vi mục tiêu của design system. Code hiện tại mới có các component trong `app/src/atomic/`; các component chưa có phải được tạo ở layer base trước khi dùng.
 
 ### Quy tắc triển khai bắt buộc
+
+Luồng bổ sung để review: [Tài khoản → Quản lý nhóm → Sửa nhóm](./system/DESIGN.md#account--quản-lý-nhóm), gồm nhóm cha, trường “category” cần làm rõ và ví áp dụng. Liên kết công việc: [TICKET-01-03](../work/tickets/TICKET-01-03-tong-vi-danh-muc.md). Chưa implement màn này.
 
 - Luôn tìm component tương ứng trong `app/src/atomic/atoms/` và `app/src/atomic/molecules/` trước khi viết JSX mới.
 - Nếu chưa có component phù hợp, tạo hoặc cập nhật base component trước; không copy markup/style vào từng screen.
@@ -197,7 +199,7 @@ Các component dưới đây là phạm vi thiết kế; implementation hiện t
 
 1. **Amount Display Input & Numeric Keypad (Component #1):** Đã có bản mock trong `QuickAddSheet`; chưa phải base component độc lập.
 2. **Budget Meter & Progress Cards (Component #2):** Đã có trong `BudgetsPanel` và `BudgetProgressItem`; progress primitive dùng chung chưa tách riêng.
-3. **Multi-purpose Base Cards System (Component #3):** Có các card chuyên biệt; `SurfaceCard` dùng chung chưa có.
+3. **Multi-purpose Base Cards System (Component #3):** Showcase chuẩn nằm tại [`atoms/base-cards`](./atoms/base-cards/). `SurfaceCard` hỗ trợ radius, padding và elevation; `IconBadge` hỗ trợ size, shape và tone; `BaseButton` hỗ trợ variant, size và loading; các molecule wallet/transaction dùng mapping variant global.
 4. **Transaction Form Card & Row Items (Component #4):** `FormSelectorRow` và `QuickAddSheet` đã có; form card vẫn là composition cục bộ.
 5. **Financial Charts Suite (Component #5):** Mock chart hiện nằm trong `OverviewPanel`/`ReportsPanel`; chưa có chart primitives.
 6. **Nested Category Cards (Component #6):** `CategoryTreeCard` đã có và đang dùng trong Reports.

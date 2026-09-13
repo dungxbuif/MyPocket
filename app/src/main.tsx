@@ -1,11 +1,12 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 
-import { FinancePrototypePage } from "./atomic/pages/FinancePrototypePage";
+import { RouterProvider } from "@tanstack/react-router";
+import { router } from "./router";
 import "./styles.css";
 
 createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
-    <FinancePrototypePage />
+    <RouterProvider router={router} />
   </React.StrictMode>,
 );

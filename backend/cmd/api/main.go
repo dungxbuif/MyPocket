@@ -85,11 +85,12 @@ func main() {
 	)
 	profileHandler := httpapi.NewProfileHandler(authUc)
 	homeHandler := httpapi.NewHomeHandler(authUc)
+	categoryHandler := httpapi.NewCategoryHandler(repo.NewCategoryPostgresRepository(database))
 	verifySession := func(sessionID string) (string, error) {
 		return authUc.VerifySession(context.Background(), sessionID)
 	}
 	middleware := httpapi.NewAuthMiddleware(jwtSvc, verifySession)
-	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, middleware, cfg.CORSAllowedOrigins)
+	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, middleware, cfg.CORSAllowedOrigins)
 	router.Engine.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	if err := router.Engine.Run(cfg.HTTPAddr); err != nil {

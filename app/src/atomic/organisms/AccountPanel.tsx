@@ -1,17 +1,8 @@
-import { CalendarDays, Camera, ChevronRight, CreditCard, Settings, Target, Wallet } from "lucide-react";
-import { SectionTitle } from "../atoms/SectionTitle";
-import { goals } from "../data/mockFinance";
-import { GoalCard } from "../molecules/GoalCard";
 import { UserProfile } from "../../services/auth";
-
-const items = [
-  { icon: Wallet, title: "Quản lý ví", detail: "Tiền mặt, ngân hàng, thẻ tín dụng" },
-  { icon: CalendarDays, title: "Giao dịch định kỳ", detail: "Lương, thuê nhà, hóa đơn" },
-  { icon: CreditCard, title: "Nợ và cho vay", detail: "Nhắc hạn, trả một phần, lịch sử" },
-  { icon: Target, title: "Mục tiêu & quỹ", detail: "Du lịch Đà Lạt, laptop mới" },
-  { icon: Camera, title: "OCR hóa đơn", detail: "Mock workflow, chưa nối service" },
-  { icon: Settings, title: "Cài đặt dữ liệu", detail: "Export, privacy, passcode" },
-];
+import { ProfileHeroCard } from "../molecules/ProfileHeroCard";
+import { Wallet, Layers3 } from "lucide-react";
+import { AccountMenuRow } from "../molecules/AccountMenuRow";
+import { SurfaceCard } from "../atoms/SurfaceCard";
 
 export function AccountPanel({
   user,
@@ -20,34 +11,18 @@ export function AccountPanel({
   user: UserProfile | null;
   onLogout: () => void;
 }) {
-  const displayName = user?.name?.trim() || "Người dùng";
-  const displayEmail = user?.email?.trim() || "Chưa có email";
-
   return (
     <>
-      <section className="rounded-3xl bg-white p-4">
-        <div className="flex items-center gap-3">
-          <div className="grid h-14 w-14 place-items-center rounded-full bg-[#006e1c] text-xl font-bold text-white">D</div>
-          <div>
-            <p className="text-lg font-bold">{displayName}</p>
-            <p className="text-sm text-[#3f4a3c]">{displayEmail}</p>
-          </div>
-        </div>
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={onLogout}
-            className="w-full rounded-full bg-[#006e1c] py-2 text-sm font-semibold text-white"
-          >
-            Đăng xuất
-          </button>
-        </div>
-      </section>
-      <section className="rounded-3xl bg-white p-4">
-        <SectionTitle title="Mục tiêu cá nhân" action="Thêm" />
-        <div className="mt-3 space-y-3">{goals.map((goal) => <GoalCard key={goal.id} goal={goal} masked={false} />)}</div>
-      </section>
-      <section className="rounded-3xl bg-white p-2">
+      <ProfileHeroCard user={user} />
+      <button type="button" onClick={onLogout} className="w-full cursor-pointer rounded-full bg-[#006e1c] py-3 text-sm font-semibold text-white transition hover:bg-[#005313]">Đăng xuất</button>
+      {/* Tạm ẩn các màn ví, nhóm, mục tiêu, định kỳ, nợ và OCR cho đến khi backend tương ứng hoàn tất. */}
+      <SurfaceCard radius="md" className="overflow-hidden">
+        <AccountMenuRow to="/account/wallets" icon={Wallet} label="Ví của tôi" />
+        <div className="mx-4 h-px bg-[#e3e2e2]" />
+        <AccountMenuRow to="/account/groups" icon={Layers3} label="Nhóm" />
+      </SurfaceCard>
+      {/* Cài đặt dữ liệu chưa có backend contract nên tạm không render. */}
+      {/* <section className="rounded-3xl bg-white p-2">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -63,7 +38,7 @@ export function AccountPanel({
             </button>
           );
         })}
-      </section>
+      </section> */}
     </>
   );
 }

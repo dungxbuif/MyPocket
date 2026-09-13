@@ -64,7 +64,7 @@ type loginRequest struct {
 func (h *AuthHandler) Login(c *gin.Context) {
 	var req loginRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": httpStatusMessageBadRequest})
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: "Bad Request", Detail: httpStatusMessageBadRequest})
 		return
 	}
 	out, err := h.Auth.Login(c.Request.Context(), usecase.LoginInput{
@@ -72,10 +72,10 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		Password: req.Password,
 	})
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+		FailError(c, http.StatusUnauthorized, problemCodeLoginFailed, problemTitleUnauthorized, err)
 		return
 	}
-	c.JSON(http.StatusOK, out)
+	OK(c, out)
 }
 
 // StartGoogleAuth godoc
@@ -105,26 +105,26 @@ func (h *AuthHandler) StartGoogleAuth(c *gin.Context) {
 		return
 	}
 	if !h.Auth.IsGoogleAuthReady() {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": httpStatusMessageGoogleLoginUnavailable})
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeGoogleUnavailable, Title: "Not Implemented", Detail: httpStatusMessageGoogleLoginUnavailable})
 		return
 	}
 	if callbackURL := strings.TrimSpace(c.Query("frontend_callback")); callbackURL != "" {
 		target, err := buildFixtureRedirectURL(callbackURL)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			FailError(c, http.StatusBadRequest, problemCodeBadRequest, "Bad Request", err)
 			return
 		}
 		c.SetCookie(authCookieFrontendCallbackName, target.String(), oauthCallbackSeconds, "/", "", false, true)
 	}
 	state, err := newOAuthState()
 	if err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": httpStatusMessageLoginFailure})
+		Fail(c, http.StatusServiceUnavailable, Problem{Code: problemCodeLoginFailed, Title: "Service Unavailable", Detail: httpStatusMessageLoginFailure})
 		return
 	}
 	c.SetCookie(authCookieStateName, state, oauthCallbackSeconds, "/", "", false, true)
 	authURL, ok := h.Auth.GoogleAuthURL(state)
 	if !ok {
-		c.JSON(http.StatusNotImplemented, gin.H{"error": httpStatusMessageGoogleLoginUnavailable})
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeGoogleUnavailable, Title: "Not Implemented", Detail: httpStatusMessageGoogleLoginUnavailable})
 		return
 	}
 	c.Redirect(http.StatusFound, authURL)
@@ -162,43 +162,43 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 	if h.FixtureMode {
 		profile, err := h.loadFixtureProfile(c)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			FailError(c, http.StatusBadRequest, problemCodeBadRequest, "Bad Request", err)
 			return
 		}
 		if !h.isEmailAllowed(profile.Email) {
-			c.JSON(http.StatusForbidden, gin.H{"error": httpStatusMessageEmailNotAllowed})
+			Fail(c, http.StatusForbidden, Problem{Code: problemCodeEmailNotAllowed, Title: "Forbidden", Detail: httpStatusMessageEmailNotAllowed})
 			return
 		}
 		out, err := h.Auth.LoginWithGoogle(c.Request.Context(), profile)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{"error": err.Error()})
+			FailError(c, http.StatusUnauthorized, problemCodeLoginFailed, problemTitleUnauthorized, err)
 			return
 		}
-		c.JSON(http.StatusOK, out)
+		OK(c, out)
 		return
 	}
 
 	if c.Query("error") != "" {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": httpStatusMessageGoogleLoginCancelled})
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeGoogleProfileInvalid, Title: problemTitleUnauthorized, Detail: httpStatusMessageGoogleLoginCancelled})
 		return
 	}
 	stateCookie, err := c.Cookie(authCookieStateName)
 	if err != nil || strings.TrimSpace(stateCookie) == "" || stateCookie != c.Query("state") {
-		c.JSON(http.StatusBadRequest, gin.H{"error": httpStatusMessageGoogleLoginStateInvalid})
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeGoogleStateInvalid, Title: "Bad Request", Detail: httpStatusMessageGoogleLoginStateInvalid})
 		return
 	}
 	profile, err := h.Auth.FetchGoogleProfile(strings.TrimSpace(c.Query("code")))
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": httpStatusMessageGoogleProfileInvalid})
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeGoogleProfileInvalid, Title: problemTitleUnauthorized, Detail: httpStatusMessageGoogleProfileInvalid})
 		return
 	}
 	if !h.isEmailAllowed(profile.Email) {
-		c.JSON(http.StatusForbidden, gin.H{"error": httpStatusMessageEmailNotAllowed})
+		Fail(c, http.StatusForbidden, Problem{Code: problemCodeEmailNotAllowed, Title: "Forbidden", Detail: httpStatusMessageEmailNotAllowed})
 		return
 	}
 	out, err := h.Auth.LoginWithGoogle(c.Request.Context(), profile)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": httpStatusMessageGoogleProfileInvalid})
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeGoogleProfileInvalid, Title: problemTitleUnauthorized, Detail: httpStatusMessageGoogleProfileInvalid})
 		return
 	}
 	if callbackURL, callbackErr := c.Cookie(authCookieFrontendCallbackName); callbackErr == nil {
@@ -217,7 +217,7 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 			return
 		}
 	}
-	c.JSON(http.StatusOK, out)
+	OK(c, out)
 }
 
 func (h *AuthHandler) loadFixtureProfile(c *gin.Context) (entity.GoogleProfile, error) {

@@ -1,6 +1,8 @@
 import { Lightbulb } from "lucide-react";
 import { MetricBox } from "../atoms/MetricBox";
 import { SectionTitle } from "../atoms/SectionTitle";
+import { SurfaceCard } from "../atoms/SurfaceCard";
+import { IconBadge } from "../atoms/IconBadge";
 import { BudgetProgressItem } from "../molecules/BudgetProgressItem";
 import { TransactionItem } from "../molecules/TransactionItem";
 import { WalletCard } from "../molecules/WalletCard";
@@ -17,38 +19,34 @@ export function OverviewPanel({ masked }: OverviewPanelProps) {
 
   return (
     <>
-      <section className="rounded-3xl bg-white p-4">
-        <SectionTitle title="Ví của bạn" action="Quản lý" />
-        <div className="mt-3 space-y-2">{wallets.map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} />)}</div>
-      </section>
+      <SurfaceCard className="p-5">
+        <SectionTitle title="Ví của tôi" action="Quản lý" />
+        <div className="mt-3 divide-y divide-slate-50">{wallets.slice(0, 3).map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} />)}</div>
+      </SurfaceCard>
 
-      <section className="rounded-3xl bg-white p-4">
+      <SurfaceCard className="p-5">
         <div className="flex gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#d9e6da] text-[#006e1c]">
-            <Lightbulb size={20} />
-          </div>
+          <IconBadge icon={Lightbulb} shape="circle" className="bg-[#d9e6da] text-[#006e1c]" />
           <div>
             <p className="font-semibold">Money Insight</p>
             <p className="mt-1 text-sm leading-5 text-[#3f4a3c]">{insights[0]}</p>
           </div>
         </div>
-      </section>
+      </SurfaceCard>
 
       <section className="grid grid-cols-4 gap-2">
         {quickActions.map((action) => {
           const Icon = action.icon;
           return (
-            <button key={action.label} className="rounded-3xl bg-white p-3 text-center shadow-sm">
-              <span className="mx-auto grid h-10 w-10 place-items-center rounded-full bg-[#d9e6da] text-[#006e1c]">
-                <Icon size={18} />
-              </span>
+            <button key={action.label} className="cursor-pointer rounded-3xl border border-slate-100 bg-white p-3 text-center shadow-[0_4px_20px_rgb(0_0_0/0.03)] transition hover:bg-[#f5f3f3]">
+              <IconBadge icon={Icon} shape="circle" size="md" className="mx-auto bg-[#d9e6da] text-[#006e1c]" />
               <span className="mt-2 block text-xs font-bold leading-4 text-[#3f4a3c]">{action.label}</span>
             </button>
           );
         })}
       </section>
 
-      <section className="rounded-3xl bg-white p-4">
+      <SurfaceCard className="p-5">
         <SectionTitle title="Báo cáo nhanh" action="Chi tiết" />
         <div className="mt-4 flex h-24 items-end gap-2">
           {reportBars.map((bar, index) => (
@@ -63,17 +61,17 @@ export function OverviewPanel({ masked }: OverviewPanelProps) {
           <MetricBox label="Chi tháng này" value={masked ? "••••••" : formatVND(-7830000)} danger />
           <MetricBox label="So với tháng trước" value="↓ 8.4%" />
         </div>
-      </section>
+      </SurfaceCard>
 
-      <section className="rounded-3xl bg-white p-4">
+      <SurfaceCard className="p-5">
         <SectionTitle title="Giao dịch gần đây" action="Xem tất cả" />
         <div className="mt-3 space-y-2">{transactions.slice(0, 4).map((transaction) => <TransactionItem key={transaction.id} transaction={transaction} />)}</div>
-      </section>
+      </SurfaceCard>
 
-      <section className="rounded-3xl bg-white p-4">
+      <SurfaceCard className="p-5">
         <SectionTitle title="Ngân sách nổi bật" />
         <div className="mt-3 space-y-3">{budgets.slice(0, 2).map((budget) => <BudgetProgressItem key={budget.id} budget={budget} />)}</div>
-      </section>
+      </SurfaceCard>
     </>
   );
 }

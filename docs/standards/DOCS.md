@@ -8,6 +8,10 @@ All project artifacts MUST follow `docs/standards/QUALITY_BAR.md`.
 
 After implementation, agents must compare actual changes with master docs.
 
+### Screen Design Reconciliation
+
+After implementing or changing a user-facing screen, agents MUST update the matching artifact under `docs/design/` in the same work item. The update must record the implemented layout, component composition, variants, visible states, user-facing text, and any intentional deviation from the source design. A screen is not reconciled while its code and design artifact disagree.
+
 Update:
 
 - `docs/requirements/` when product behavior, requirements, or acceptance criteria change.
@@ -28,6 +32,7 @@ Every completed ticket or bug MUST include a docs review result:
 - [ ] Data model changed: `docs/architecture/ERD.md` updated or not needed reason recorded
 - [ ] Architecture/runtime changed: `docs/architecture/ARCHITECTURE.md` updated or not needed reason recorded
 - [ ] Design changes: `DETAIL_DESIGN.md` changes consolidated into `docs/architecture/SDD.md` or not needed reason recorded
+- [ ] Screen specification/artifact under `docs/design/` updated to match the implemented screen, or not needed reason recorded for non-screen work
 - [ ] Durable decision changed: ADR added or not needed reason recorded
 - [ ] `docs/CONTEXT.md` updated
 
