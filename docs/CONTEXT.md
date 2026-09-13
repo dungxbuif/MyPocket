@@ -32,7 +32,7 @@ updated: 2026-09-13
 
 ## Current Status
 
-- Status: A new root `app/` Vite React Tailwind app now renders a mock-only MyPocket FE preview following the new Financial Clarity design and Atomic Design structure.
+- Status: The root `app/` Vite React Tailwind app renders the Financial Clarity preview and is connected to the dev Gin API; Google OAuth and development CORS are enabled for local testing.
 - Active backlog: `docs/work/BACKLOG.md`
 - Current queue focus: Review 11 parent and 31 child business tickets in `docs/work/tickets/README.md`, together with unresolved business decisions. The existing `app/` FE preview remains mock-only.
 - Active phase: None.
@@ -85,7 +85,7 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 ## Next Steps
 
 - Review the parent/child ticket list and resolve business questions in the affected children; prioritize implementation only when requested.
-- Reconcile the existing mock preview and reference architecture against the accepted contract when implementation is requested; no runtime changes have been made in this documentation update.
+- Continue implementation from the Financial Clarity design and reference-app behavior; local runtime proof for auth/profile/home is now available, while product feature validation remains pending.
 - When implementing receipt OCR, use `docs/architecture/OCR_API.md` as the provider contract and keep `OCR_API_KEY` server-side only.
 - Product UAT and runtime proof remain pending; documentation review must not be presented as implemented behavior.
 

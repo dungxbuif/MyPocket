@@ -25,6 +25,12 @@ updated: 2026-09-13
 
 This file maps accepted behavior and work items to proof.
 
+## Runtime Verification — 2026-09-13
+
+- CORS preflight: `OPTIONS /api/v1/profile` with `Origin: http://localhost:4173` returned `204` with allow-origin, credentials, methods and headers.
+- API health: `GET /api/v1/health` returned `{"status":"ok"}`.
+- Google OAuth start: `GET /api/v1/auth/google` returned `302` to Google with redirect URI `http://localhost:8080/api/v1/auth/google/callback`.
+
 Policy lives in `docs/standards/VALIDATION.md`. This matrix is runtime project state and should change as work is planned, implemented, changed, or retired.
 
 ## Status Values

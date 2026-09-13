@@ -1,4 +1,4 @@
-Dựa trên việc phân tích toàn bộ 21 màn hình/luồng giao diện thực tế của ứng dụng quản lý tài chính (Money Lover) đã tải lên, hệ thống Base Components hoàn chỉnh của ứng dụng gồm 7 nhóm chính với tổng cộng 28 thành phần cốt lõi (Base Components):
+Dựa trên việc phân tích các luồng Money Lover và đối chiếu implementation hiện tại, hệ thống giao diện được tổ chức thành 7 nhóm base component. Danh sách 28 thành phần dưới đây là inventory thiết kế; không được hiểu là tất cả đã hoàn thiện trong code.
 
 1. Điều hướng & Cấu trúc khung (Navigation & Layout) — 4 components
    Top Bar / Screen Header:
@@ -39,7 +39,15 @@ Dựa trên việc phân tích toàn bộ 21 màn hình/luồng giao diện th�
 7. Huy hiệu & Phản hồi (Badges & Micro-elements) — 2 components
    Status & Percentage Badge: Huy hiệu bo tròn thể hiện tỷ lệ % (ví dụ: badge tròn viền đỏ 214%, badge pill xanh ↓ 100%).
    Category Icon Badge: Khung icon tròn đường kính cố định (~40px) với màu nền riêng biệt cho từng loại chi tiêu (Ăn uống, Cà phê, Hoá đơn, Mua sắm...).
-   Tổng kết: Cần tổng cộng 28 base components để cover toàn bộ hệ thống giao diện và trải nghiệm của ứng dụng.
+   Tổng kết: 28 base components là phạm vi mục tiêu của design system. Code hiện tại mới có các component trong `app/src/atomic/`; các component chưa có phải được tạo ở layer base trước khi dùng.
+
+### Quy tắc triển khai bắt buộc
+
+- Luôn tìm component tương ứng trong `app/src/atomic/atoms/` và `app/src/atomic/molecules/` trước khi viết JSX mới.
+- Nếu chưa có component phù hợp, tạo hoặc cập nhật base component trước; không copy markup/style vào từng screen.
+- Các organism chỉ được lắp ghép base components và xử lý composition/state của màn hình.
+- Không tạo biến thể chỉ khác màu, padding, icon badge hoặc progress markup nếu có thể mở rộng base component bằng props/variant.
+- Khi cập nhật base component, rà toàn bộ consumer để giữ giao diện hiện tại đồng nhất.
 
 Bạn có muốn bắt đầu bằng việc:
 
@@ -183,16 +191,16 @@ Hệ thống tuân thủ **Financial Clarity System**:
 
 ---
 
-### 7. DANH MỤC CÁC BASE COMPONENTS ĐÃ HOÀN THIỆN
+### 7. DANH MỤC BASE COMPONENTS VÀ MỨC ĐỘ HIỆN THỰC
 
-Hệ thống đã xây dựng và kiểm thử độc lập thành công các linh kiện nền tảng:
+Các component dưới đây là phạm vi thiết kế; implementation hiện tại đã có một phần dưới dạng atoms/molecules và mock organisms:
 
-1. **Amount Display Input & Numeric Keypad (Component #1):** Ô hiển thị số tiền tương phản cao + bàn phím số mini tích hợp máy tính.
-2. **Budget Meter & Progress Cards (Component #2):** Đồng hồ bán nguyệt đo ngân sách tổng + danh sách thanh tiến độ danh mục.
-3. **Multi-purpose Base Cards System (Component #3):** Bộ thẻ card đa năng (Thẻ ví, Thẻ toggle cài đặt, Thẻ tổng hợp số dư, Thẻ insider).
-4. **Transaction Form Card & Row Items (Component #4):** Thẻ cấu trúc form thêm giao dịch với các hàng dữ liệu (Selector rows) tối ưu độ cao ~44-48px.
-5. **Financial Charts Suite (Component #5):** 4 dạng biểu đồ chuẩn hóa (So sánh 2 kỳ, Đường xu hướng lũy kế, Cột theo ngày, Donut tỷ trọng).
-6. **Nested Category Cards (Component #6):** Thẻ phân cấp danh mục đa tầng lồng nhau với đường nhánh dẫn cây (_Tree Branch Line_) căn lề từ nội dung văn bản.
+1. **Amount Display Input & Numeric Keypad (Component #1):** Đã có bản mock trong `QuickAddSheet`; chưa phải base component độc lập.
+2. **Budget Meter & Progress Cards (Component #2):** Đã có trong `BudgetsPanel` và `BudgetProgressItem`; progress primitive dùng chung chưa tách riêng.
+3. **Multi-purpose Base Cards System (Component #3):** Có các card chuyên biệt; `SurfaceCard` dùng chung chưa có.
+4. **Transaction Form Card & Row Items (Component #4):** `FormSelectorRow` và `QuickAddSheet` đã có; form card vẫn là composition cục bộ.
+5. **Financial Charts Suite (Component #5):** Mock chart hiện nằm trong `OverviewPanel`/`ReportsPanel`; chưa có chart primitives.
+6. **Nested Category Cards (Component #6):** `CategoryTreeCard` đã có và đang dùng trong Reports.
 
 ---
 

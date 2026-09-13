@@ -17,11 +17,14 @@ shared_fields: [status, trace]
 
 ## API Surface
 
+The current local Gin API will use a code-first Swagger contract: each Gin handler owns its Swagger annotations, and generated artifacts are derived from the Go source. Keep the generated surface limited to endpoints that exist in the running implementation; add annotations only when the corresponding handler and verification exist.
+
 Document HTTP endpoints, RPC methods, events, CLI commands, or any other public contract.
 
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
 | OCR Platform document recognition | HTTP REST | `Authorization: Bearer sk_ocr_...` for protected requests | ready | See `docs/architecture/OCR_API.md`. |
+| MyPocket local API | HTTP REST | JWT bearer for `/profile` and `/home`; OAuth cookies for Google callback | implemented for current auth/profile/home slice | Code-first Swagger annotations in Go handlers; generated UI is added incrementally. |
 
 ## Errors
 

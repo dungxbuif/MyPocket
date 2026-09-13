@@ -112,6 +112,31 @@ Financial Clarity is a mobile-first personal finance app for everyday spending c
 
 The product borrows interaction patterns from Money Lover, but the UI should feel calmer, clearer, and more systematized. Data is the main visual subject. Decoration should stay quiet and should never compete with balances, transactions, budgets, or warnings.
 
+## Current Implementation Baseline (2026-09-13)
+
+The current source of truth is the React implementation in `app/src/atomic/`. It is a working, mock-data-first preview connected to the local authentication/profile/home API. The implementation preserves the Financial Clarity visual language: Manrope typography, the token colors above, soft neutral surfaces, rounded cards, mobile width capped at 430px, sticky header, bottom navigation and centered quick-add action.
+
+Implemented component map:
+
+| Layer | Components | Responsibility |
+| --- | --- | --- |
+| Atoms | `IconButton`, `MetricBox`, `SectionTitle`, `SegmentedControl` | Reusable controls, metrics and section headings |
+| Molecules | `WalletCard`, `TransactionItem`, `BudgetProgressItem`, `GoalCard`, `CategoryTreeCard`, `FormSelectorRow` | Repeated financial rows/cards and form cells |
+| Organisms | `AppHeader`, `BottomNavigation`, `OverviewPanel`, `TransactionsPanel`, `BudgetsPanel`, `ReportsPanel`, `AccountPanel`, `QuickAddSheet` | Composed screen sections and flows |
+| Template/Page | `MobileAppShell`, `FinancePrototypePage` | App shell, authentication state and tab composition |
+
+The overview currently starts with **Ví của bạn**. The header shows **Tổng số dư** with hide/show controls. The former overview total-balance hero card and the “Trang chủ / Ví / Note” notice card are intentionally removed from the current layout.
+
+### Mandatory component reuse rule
+
+Every new or changed screen must use an existing base component whenever the pattern already exists. If the required pattern does not exist, create or update the base component first, then use it from the screen or organism. Do not copy card, icon-badge, button, metric, row, progress or spacing markup into feature components.
+
+Before adding JSX, check `app/src/atomic/atoms/` and `app/src/atomic/molecules/`. New shared patterns belong there; screen-specific composition belongs in `organisms/`. A refactor must update all consumers of a base component in the same change so visual behavior remains consistent.
+
+### Current base-component gaps
+
+The implementation still needs shared primitives for `SurfaceCard`, `IconBadge`, `ProgressBar`, `BaseButton`, `ScreenSection`, and currency display. Until those are introduced, the repeated styles currently visible in organisms and molecules are known technical debt, not separate design variants. New work must not increase that duplication.
+
 **Primary outcome:** a user can open the app, add an expense, choose a category and wallet, save it, and immediately see the effect on overview, transactions, and budget progress.
 
 ## Design Principles
@@ -304,6 +329,8 @@ This order keeps the first usable slice focused on the highest-frequency workflo
 - Use `design/INDEX.md` as the component inventory and product PRD companion.
 - Use the existing HTML component experiments under `design/` as visual references, not production code.
 - If building from `refereces/disappointed_app/`, map existing components to these contracts before creating new variants.
+- The implementation baseline above takes precedence over stale prototype wording elsewhere in this document. Keep the current layout unless a product/design decision explicitly changes it.
+- Base-component reuse is mandatory: create or update the shared component before consuming a new visual pattern, and keep tokens/styles centralized wherever practical.
 - Any change to core token names, navigation structure, or MVP order should be recorded in Harness docs.
 
 ## Acceptance Checklist

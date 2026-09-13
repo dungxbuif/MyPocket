@@ -5,37 +5,24 @@ import { BudgetProgressItem } from "../molecules/BudgetProgressItem";
 import { TransactionItem } from "../molecules/TransactionItem";
 import { WalletCard } from "../molecules/WalletCard";
 import { budgets, insights, quickActions, reportBars, transactions, wallets } from "../data/mockFinance";
-import { formatVND, ratioPercent } from "../utils/format";
+import { formatVND } from "../utils/format";
 
-export function OverviewPanel({ masked }: { masked: boolean }) {
-  const totalBalance = wallets.reduce((sum, wallet) => sum + wallet.balance, 0);
+type OverviewPanelProps = {
+  masked: boolean;
+};
+
+export function OverviewPanel({ masked }: OverviewPanelProps) {
   const totalBudget = budgets.reduce((sum, budget) => sum + budget.limit, 0);
   const totalSpent = budgets.reduce((sum, budget) => sum + budget.spent, 0);
-  const safeToSpend = Math.max(0, Math.round((totalBudget - totalSpent) / 14));
 
   return (
     <>
-      <section className="rounded-3xl bg-[#006e1c] p-5 text-white shadow-[0_16px_30px_rgb(0_110_28/0.20)]">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-sm text-white/75">Tổng số dư</p>
-            <p className="money mt-1 text-3xl font-bold">{masked ? "••••••••" : formatVND(totalBalance)}</p>
-          </div>
-          <span className="rounded-full bg-white/15 px-3 py-1 text-xs font-semibold">Tháng 09</span>
-        </div>
-        <div className="mt-5 grid grid-cols-2 gap-3">
-          <div className="rounded-2xl bg-white/15 p-3">
-            <p className="text-xs text-white/70">Có thể chi/ngày</p>
-            <p className="money mt-1 text-sm font-bold">{masked ? "••••••" : formatVND(safeToSpend)}</p>
-          </div>
-          <div className="rounded-2xl bg-white/15 p-3">
-            <p className="text-xs text-white/70">Đã dùng ngân sách</p>
-            <p className="mt-1 text-sm font-bold">{ratioPercent(totalSpent, totalBudget)}%</p>
-          </div>
-        </div>
+      <section className="rounded-3xl bg-white p-4">
+        <SectionTitle title="Ví của bạn" action="Quản lý" />
+        <div className="mt-3 space-y-2">{wallets.map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} />)}</div>
       </section>
 
-      <section className="rounded-3xl border border-[#d9e6da] bg-white p-4">
+      <section className="rounded-3xl bg-white p-4">
         <div className="flex gap-3">
           <div className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-[#d9e6da] text-[#006e1c]">
             <Lightbulb size={20} />
@@ -59,11 +46,6 @@ export function OverviewPanel({ masked }: { masked: boolean }) {
             </button>
           );
         })}
-      </section>
-
-      <section className="rounded-3xl bg-white p-4">
-        <SectionTitle title="Ví của bạn" action="Quản lý" />
-        <div className="mt-3 space-y-2">{wallets.map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} />)}</div>
       </section>
 
       <section className="rounded-3xl bg-white p-4">

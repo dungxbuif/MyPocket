@@ -19,6 +19,11 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+### Runtime — 2026-09-13
+
+- Enabled development CORS for the FE origins `http://localhost:4173` and `http://127.0.0.1:4173`, including credentials required by the Google OAuth callback flow. Origins can be overridden with `CORS_ALLOWED_ORIGINS`.
+- Updated the app header to show the current total balance in place of the MyPocket/“Tài chính hôm nay” branding, following the reviewed design direction.
+
 ### Business Tickets — 2026-09-13
 
 - Added [11 parent and 31 child tickets](../work/tickets/README.md) covering the product contract, with concise business scope, acceptance criteria and unresolved questions attached to affected children.
