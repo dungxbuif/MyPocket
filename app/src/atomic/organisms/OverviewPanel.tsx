@@ -46,12 +46,12 @@ export function OverviewPanel({ masked, refreshKey = 0 }: { masked: boolean; ref
     <>
       <SurfaceCard padding="md">
         <SectionTitle title="Ví của tôi" action="Quản lý" onAction={() => void navigate({ to: "/account/wallets" })} />
-        {wallets.length === 0 ? <StatusMessage>Chưa có ví.</StatusMessage> : <div className="mt-3 divide-y divide-row">{wallets.slice(0, 3).map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} onActivate={() => void navigate({ to: "/account/wallets" })} />)}</div>}
+        {wallets.length === 0 ? <StatusMessage variant="plain">Chưa có ví.</StatusMessage> : <div className="mt-3 divide-y divide-row">{wallets.slice(0, 3).map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} onActivate={() => void navigate({ to: "/account/wallets" })} />)}</div>}
       </SurfaceCard>
 
       <SurfaceCard padding="md">
         <SectionTitle title="Giao dịch gần đây" action="Xem tất cả" onAction={() => void navigate({ to: "/transactions" })} />
-        {transactions.length === 0 ? <StatusMessage>Chưa có giao dịch.</StatusMessage> : <div className="mt-3 space-y-2">{transactions.slice(0, 4).map((transaction) => {
+        {transactions.length === 0 ? <StatusMessage variant="plain">Chưa có giao dịch.</StatusMessage> : <div className="mt-3 space-y-2">{transactions.slice(0, 4).map((transaction) => {
           const category = transaction.category_id ? categoryByID.get(transaction.category_id) : undefined;
           const presentation = category ? categoryPresentationFor(category.system_key ?? category.icon_key) : { icon: Tags, tone: "categorySlate" as const };
           return <TransactionItem key={transaction.id} item={{ title: category?.name ?? (transaction.type === "income" ? "Khoản thu" : "Khoản chi"), metadata: [walletNames.get(transaction.wallet_id) ?? "Ví đã xóa", transaction.note].filter(Boolean).join(" · "), amount: signedTransactionAmount(transaction), kind: transaction.type, icon: presentation.icon, tone: presentation.tone }} onActivate={() => void navigate({ to: "/transactions" })} />;

@@ -32,6 +32,8 @@ updated: 2026-09-13
 
 ## Current Status
 
+- 2026-09-20 latest: owner requested API-only screens. All mounted data screens now use real APIs, including new budget explicit-interval CRUD/progress. Savings catalog filtering enforced FE/BE; category names/icons resolved in goal history. API roundtrip through FE proxy passed with PostgreSQL, test fixtures cleaned. Migration 000009 applied. [API-SCREENS-01](work/tickets/API-SCREENS-01-DETAIL_DESIGN.md) and savings remain in review/partial product scope; recurring budgets, internal paired transfers, reports and notifications are not completed. Earlier mock-budget/counterpart-pending notes below are historical.
+
 - Latest owner request (2026-09-13): finish wallet management and adding transactions, then verify wallet–transaction–category logic and UI. Core wallet and basic income/expense slices are in review with [wallet proof](work/tickets/TICKET-01-02-VERIFICATION.md), [ledger proof](work/tickets/TICKET-02-01-VERIFICATION.md), and a durable [screen contract](design/screens/transactions/README.md).
 
 - Status: The root `app/` Vite React Tailwind app renders the Financial Clarity preview and is connected to the dev Gin API; Google OAuth and development CORS are enabled for local testing. PostgreSQL uses explicit versioned migrations; API startup does not mutate schema.
@@ -120,6 +122,23 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 - OCR Platform docs have been captured in `docs/architecture/OCR_API.md` for future receipt OCR implementation against `https://ocr.dungxbuif.com/`.
 
 ## Next Steps
+
+- Owner visual acceptance of API-only budget and savings screens; complete shared paired transfers as separately designed work. Browser inspected budget empty/editor and grouped transaction form without writing to owner's account. Automated API persistence test covers savings and budgets using isolated created fixtures. Do not confuse this with complete browser CRUD UAT or full budget roadmap acceptance.
+
+- Owner resolved savings counterpart question: money may come from outside app; ordinary savings entries affect one wallet. Shared transfer-to-another-wallet is separate. Official Money Lover transfer guide checked and linked in savings design. Continue specialized savings categories without requiring counterpart wallet; internal-transfer ledger remains separate unfinished work.
+
+- Latest execution: wallet list rebuilt as reference-based WalletSelectionList; create uses BaseSelect. Goal date API and SavingsSummary/SavingsWalletPanel implemented; selecting goal opens real progress/history. QuickAdd accepts wallet context and shared searchable category list. [TICKET-06-01 design/proof](work/tickets/TICKET-06-01-DETAIL_DESIGN.md). Automated tests/build pass; browser creation draft inspected/canceled. Pending: answer whether savings transfers require counterpart wallet, specialized categories, exact transaction-form fidelity, full persistence UAT. Notifications/reports remain unsupported. Prior “select/date missing” notes are historical.
+
+- Latest: [wallet screen specification](design/screens/wallets/README.md) normalized using owner decisions and official Money Lover docs. BaseSelect during creation only; type immutable after save. Runtime picker replacement is pending. Per-type goal/credit detail screens and date/statement fields remain explicitly incomplete.
+
+- Latest owner direction: normalize both newly supplied wallet references, tighten base enforcement, reimplement Add Wallet and wallet-type selection. [UI-WALLET-02](work/tickets/UI-WALLET-02-DETAIL_DESIGN.md) implementation and automated checks pass; browser/owner visual review pending. Existing-wallet selector reference is normalized but its runtime scope/filter flow remains unimplemented. This UI work takes priority over transfer/adjustment.
+
+- Owner follow-up: removed the note field from wallet creation only; editing existing notes remains available. UI review pending.
+
+- UI-EMPTY-01 follow-up: owner spotted the remaining “Chưa có ví” border. Both Overview and wallet management now opt into the same plain status variant; pending visual review.
+
+- 2026-09-20: owner reports previously tested bugs are OK and requests continued implementation. Record this as owner-reported acceptance of the tested fixes, not blanket completion of remaining product scope. Transaction empty-state border correction is tracked in [UI-EMPTY-01](work/tickets/UI-EMPTY-01.md). Next product work remains transfer/adjustment detail design before implementation.
+- Local OAuth launch: load Google credentials from the existing reference app environment without printing secrets; use `GOOGLE_REDIRECT_URL=http://localhost:4173/api/v1/auth/google/callback` through the frontend `/api` proxy. This session verified HTTP 302 with that redirect URI; Google Console must register the identical URI. No credentials were copied into tracked files.
 
 - Review the verified core wallet and basic ledger slices. The next independent product choices are receipt/OCR and jar assignment for TICKET-02-01, or transfer/adjustment and credit statement/payment semantics; none are represented by mocks in the implemented ledger.
 

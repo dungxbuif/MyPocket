@@ -27,6 +27,26 @@ This file maps accepted behavior and work items to proof.
 
 ## Runtime Verification — 2026-09-13
 
+### Follow-up 2026-09-20
+
+- Budget review follow-up: real-Postgres disappearing-row update regression red (nil error/resurrection) → green (not found/no insert fallback); metadata-date preservation regression passes with browser timezone UTC. `go test ./...` with TEST_DATABASE_URL executes optional integration test. Production API restarted and full `api-roundtrip.mjs` rerun passes after fixes. `npm run build` passes; `git diff --check` clean. Independent review evidence in [API-SCREENS-01](tickets/API-SCREENS-01-DETAIL_DESIGN.md).
+
+- API-SCREENS-01: `rtk proxy go run ./cmd/migrate up` pass (000009); `rtk proxy node scripts/api-roundtrip.mjs` in app pass through localhost:4173 to PostgreSQL: goal date/deposit/withdrawal/interest/edit/delete/current_balance, invalid goal catalog rejection; budget CRUD/exact overlap409/child category/report exclusion/recalculation and unauthenticated401. Only test-created IDs cleaned, no owner data removed. `go test ./...` pass; design checks/SSR/build pass. New tests fail before implementation for goal filter, category history, budget derivation/validation, masked amounts and problem+json parsing. Browser Google re-login via FE proxy, budget empty/editor data and grouped transaction form inspected; drafts canceled. Owner acceptance and full browser persistence UAT pending. [Evidence and limitations](tickets/API-SCREENS-01-DETAIL_DESIGN.md).
+
+- Savings slice: target-date red/green regression, update omit/clear checks, `go test ./...`, Swagger generation pass. Frontend design, shared SSR (goal progress/selection/form), ledger tests and build pass. Browser confirmed grouped selector, goal form and Save/cancel states without saving test data. Full goal create/reload/transaction UAT pending. Transfer/report/notifications are not verified features. [Work evidence](tickets/TICKET-06-01-DETAIL_DESIGN.md).
+
+- Wallet screen spec normalized with source-backed Money Lover references and owner select/immutable-type decisions. Docs review complete; UAT not required for this docs-only update. Runtime select change and per-type detail UI are pending; earlier tests do not cover them.
+
+- UI-WALLET-02: check:design, test:design (7 guard regressions plus SSR form/switch/type contracts), test:transactions (4), build all pass. Add Wallet uses shared sheet/card/switch/type picker; normalized both supplied references. Browser visual and new-form API UAT pending. [Evidence](tickets/UI-WALLET-02-DETAIL_DESIGN.md).
+
+- Add Wallet note removal: `rtk proxy npm run check:design`, `rtk proxy npm run test:design`, `rtk proxy npm run build` passed in `app/`. SSR confirms creation omits “Ghi chú” and editing retains it. Owner visual UAT pending. Docs review: wallet design, context, backlog and changelog reconciled; API/schema unchanged, no ADR required.
+
+- Wallet empty-state follow-up: Overview and WalletManagementPanel now use the tested `StatusMessage` plain variant as requested; design checks/tests/build rerun, visual UAT pending.
+
+- Owner reports previously tested bugs are OK; this is user-reported acceptance of tested fixes, not exhaustive product verification.
+- [UI-EMPTY-01](tickets/UI-EMPTY-01.md): `npm run check:design`, `npm run test:design`, and `npm run build` pass in `app/`. SSR regression checks cover plain status without card decoration and preserved danger feedback. New empty-state visual UAT pending owner review.
+- Local Google OAuth start endpoint verified HTTP 302 with `redirect_uri=http://localhost:4173/api/v1/auth/google/callback` via FE proxy; session-only launch configuration, no tracked credentials.
+
 ### UI-BASE-01 normalization
 
 - Status: implemented / verified for shared UI foundation and standards. [Exact evidence and docs review](tickets/UI-BASE-01-VERIFICATION.md).

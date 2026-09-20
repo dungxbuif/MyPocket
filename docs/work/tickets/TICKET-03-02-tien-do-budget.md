@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-03-02
-status: draft
+status: in_progress
 owner: human
 parent: TICKET-03
 trace:
@@ -14,6 +14,8 @@ trace:
 Ticket lớn: [Theo dõi budget](TICKET-03-budget.md).
 
 ## Mục tiêu và phạm vi
+
+Real ledger-derived progress, descendant matching, deduplicated active summary, daily allowance and on-screen threshold notices implemented in [API-SCREENS-01](API-SCREENS-01-DETAIL_DESIGN.md). Forecasts, notification delivery and full owner acceptance remain pending.
 
 Xem đã chi/còn lại, cảnh báo, dự báo và giao dịch của budget.
 

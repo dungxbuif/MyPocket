@@ -1,0 +1,19 @@
+# Ví tiết kiệm
+
+2026-09-20 runtime update: picker uses real income_transfer_in/income_interest and expense_transfer_out catalog IDs, filtered by kind and wallet applicability. API enforces the same restriction. History resolves category names/icons from fetched categories. Grouped shared transaction form persists external entries via transaction CRUD; default reports=true with user toggle. API persistence roundtrip passed: opening100000 → deposit900000 → withdrawal200000 → interest10000 → edit deposit500000 → delete withdrawal/interest, ending600000; target date unchanged. No counterpart required. Browser visual UAT pending; historical notes below about missing category specialization are superseded.
+
+Latest owner clarification: nạp/rút có thể từ/ra ngoài app, chỉ tác động ví tiết kiệm và không bắt buộc ví đối ứng. “Chuyển tiền” giữa hai ví được quản lý là luồng chung riêng, không tự phát sinh chỉ vì chọn nhóm có tên chuyển đến/đi. Source: [Money Lover transfer](https://moneylover.zendesk.com/hc/en-us/articles/900000358523-Transfer-money-between-wallets) confirms separate source/destination flow and default report exclusion for internal transfers. Earlier counterpart-pending notes below are superseded for external savings entries; shared transfer implementation remains unfinished.
+
+[Work/design](../../../work/tickets/TICKET-06-01-DETAIL_DESIGN.md). Owner supplied five references under `docs/design/stitch_my_pocket 2/`.
+
+Create reuses WalletCreateForm: name/currency card, goal/opening balance/end-date card, immutable type after save, exclude-total BaseSwitch. VND only. Date is optional YYYY-MM-DD, persisted through existing target_date column; calendar label must not shift timezone. Notifications are not yet supported and are explicitly disabled.
+
+Selecting a goal wallet opens its detail within wallet management: balance, remaining max(target-current_balance,0), reached state, optional days remaining, Progress, real transaction history and add action. Goal attainment reverses if withdrawals take balance below target. No invented interest, transfer or monthly savings advice.
+
+Shared bases: BaseBottomSheet, BaseSelect, BaseTextInput date, FormField, SurfaceCard, Text, IconBadge, Progress, TransactionItem, BaseButton, BaseSwitch, SegmentedControl. Forms retain drafts on error and validate positive target/integer amounts. Categories must obey real API kind/wallet applicability. Do not map a paired transfer to an ordinary income/expense; transfer source/destination behavior awaits clarification. Reports and notification service remain separate.
+
+Proof pending implementation; owner visual UAT required. New reference screenshots do not imply backend support for every depicted control.
+
+Implementation update: target_date create/update is wired; omission preserves and empty string clears. SavingsSummary and SavingsWalletPanel show real balance/remaining/progress and monthly history. QuickAddSheet receives initial wallet context and uses shared CategorySelectionList with kind tabs/search and applicable real categories. UI does not yet match every reference transaction-form region. Transfer categories are not fabricated; counterpart decision pending. Interest can only be recorded manually through existing valid categories, no automatic interest. No report navigation or notification delivery implemented.
+
+Evidence: Go tests, regenerated Swagger, check:design, test:design, test:transactions and build pass. Browser inspected selector and goal-create layout, verified disabled/enabled Save and cancel without persistence. Full save/date reload/transaction roundtrip browser UAT remains pending. The five images are normalized input references, not five completed end-to-end flows.

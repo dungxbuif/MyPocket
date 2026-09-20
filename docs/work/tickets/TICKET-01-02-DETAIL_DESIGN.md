@@ -60,7 +60,7 @@ Người dùng cần tạo, xem, sửa và xoá các ví thuộc tài khoản đ
 
 - Ví thuộc đúng một account/user.
 - Loại ví: `basic` (thường), `goal` (tiết kiệm), `credit` (tín dụng).
-- Tên ví, số dư ban đầu, ghi chú/mô tả và trạng thái được hiển thị theo loại ví.
+- Tên ví, số dư ban đầu và trạng thái được hiển thị theo loại ví. Owner update: form thêm ví không hiển thị ghi chú; form sửa vẫn giữ trường mô tả hiện có.
 - Danh sách ví và tổng số dư của các ví được chọn.
 - Tạo, sửa, xem chi tiết và xoá ví.
 - Chỉ VND ở giai đoạn hiện tại; currency là giá trị hệ thống cố định, chưa mở API đa tiền tệ.

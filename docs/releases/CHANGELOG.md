@@ -19,6 +19,21 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+- Replaced mounted budget mock data with authenticated persisted CRUD and ledger-derived progress via migration 000009. Explicit date intervals, wallet/category scope, child groups, overlap protection, report exclusion, masking, empty/error/retry states. Recurrence/notifications remain unsupported. Added FE-proxy API roundtrip proof and clean-up of test-only fixtures. [Design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md).
+- Savings now restricts the picker/API to actual savings catalog groups; external money requires no counterpart wallet. History shows real group names/icons; shared transaction form uses grouped bases. API client decodes problem+json errors into readable messages instead of raw JSON.
+
+- Rebuilt wallet selection into grouped included/excluded lists with aggregate and edit mode; creation now uses BaseSelect. Added goal-date API validation/persistence, savings progress/history and shared category selection. Savings transfer semantics, report/notification delivery and full UAT remain pending.
+
+- Standardized wallet-management screen specification: list/create/edit, base mapping, select-only creation type and separate basic/goal/credit behaviors, with Money Lover source references and explicit implementation gaps.
+
+- Rebuilt Add Wallet as a shared form sheet with grouped inputs, type picker and exclude-total switch. Normalized owner-supplied Add Wallet/Wallet Selector references. Tightened card/control base checks and documented reference fidelity in [ADR-003](../decisions/ADR-003-wallet-reference-enforcement.md). Existing-wallet selector remains planned; visual acceptance pending.
+
+- Removed the optional note field from Add Wallet per owner request.
+
+- Applied the same borderless empty-state presentation to “Chưa có ví” in Overview and wallet management.
+
+- Removed the card border/background/shadow from empty transaction messages in Overview and Transactions using the shared `StatusMessage` plain variant. [UI-EMPTY-01](../work/tickets/UI-EMPTY-01.md).
+
 - Connected the basic income/expense ledger end to end: global add, real transaction list, edit/delete sheet, wallet/category validation, signed VND groups and synchronized Header/Overview/Wallet balances. Added the durable [transaction screen contract](../design/screens/transactions/README.md).
 - Wallet list responses now expose ledger-derived `current_balance`; totals honor `is_in_total`. Goal wallets require a positive target and credit wallets require a positive limit. Permanent-delete warnings show dependent transaction count and report impact.
 - Wallet metadata edits no longer overwrite opening balance; the edit form makes that field read-only until the dedicated adjustment transaction is implemented.

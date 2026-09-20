@@ -19,6 +19,7 @@ export type Wallet = {
   is_in_total: boolean;
   description?: string | null;
   target_amount?: number | null;
+  target_date?: string | null;
   credit_limit?: number | null;
 };
 
@@ -29,6 +30,7 @@ export type WalletInput = {
   is_in_total: boolean;
   description?: string;
   target_amount?: number;
+  target_date?: string;
   credit_limit?: number;
 };
 

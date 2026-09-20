@@ -4,6 +4,8 @@ Status: implementation contract for [TICKET-02-01](../../../work/tickets/TICKET-
 
 ## Composition
 
+2026-09-20: editor uses grouped SurfaceCards for wallet/large amount/category/note and date, retaining the shared inputs and form-sheet shell. Goal category selection is restricted to real savings catalog keys and backend enforces the same rule; category remains optional. Unsupported old goal categories remain visible in history but must be cleared/reselected before editing. Report flag for external entries defaults true. This is not the paired-wallet transfer flow.
+
 | Region | Base implementation | Contract |
 | --- | --- | --- |
 | Search/filter summary | `Chip`, `IconButton` | Passive until the search/filter ticket is implemented; it must not imply working filtering. |
@@ -34,7 +36,7 @@ No screen-local color, shape, input, button or card styling is allowed. Transfer
 
 - Initial/loading: neutral status; list actions that require loaded data are unavailable.
 - Ready: real API rows grouped newest first.
-- Empty: explain that no transactions exist and direct the user to the global add action.
+- Empty: explain that no transactions exist and direct the user to the global add action. Use `StatusMessage variant="plain"` without a card border, background or shadow; Overview uses the same variant for its empty transaction message (owner request 2026-09-20).
 - Error: danger status with an explicit retry action; stale successful data may remain visible but mock data must not appear.
 - Saving/deleting: submit controls disabled/loading; one request per activation.
 - No wallets: editor explains that a wallet must be created first and cannot submit.

@@ -75,7 +75,7 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
       <div className="flex items-center justify-between"><Text as="h1" size="xl" weight="bold">{COPY.title}</Text><BaseButton variant="ghost" size="sm" onClick={() => setLocalRefresh((value) => value + 1)}><RefreshCw size={16} />{COPY.retry}</BaseButton></div>
       {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
       {error ? <StatusMessage tone="danger">{COPY.error}</StatusMessage> : null}
-      {!loading && !error && transactions.length === 0 ? <StatusMessage>{COPY.empty}</StatusMessage> : null}
+      {!loading && !error && transactions.length === 0 ? <StatusMessage variant="plain">{COPY.empty}</StatusMessage> : null}
       {groups.map((group) => {
         const total = group.rows.reduce((sum, transaction) => sum + signedTransactionAmount(transaction), 0);
         return <SurfaceCard key={group.key} padding="md"><div className="mb-3 flex items-center justify-between"><div><Text size="lg" weight="bold">{group.label}</Text><Text size="xs" tone="secondary">{group.rows.length} giao dịch</Text></div><Text numeric weight="bold" tone={total < 0 ? "danger" : "action"}>{formatVND(total)}</Text></div><div className="space-y-2">{group.rows.map((transaction) => {

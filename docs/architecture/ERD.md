@@ -10,6 +10,10 @@ shared_fields: [status, trace]
 
 # ERD
 
+## Implemented budget schema — migration 000009
+
+`budgets`: text UUID id, owner_id FK user, name, positive safe-integer limit_amount, nullable wallet_id/category_id FKs, start_at/end_at timestamptz with end > start, timestamps. Owner/period index. Delete owner/wallet/category cascades matching budget configuration; deleting budget never removes transactions. Spent/remaining days/ended are derived fields, not stored counters. [ADR-004](../decisions/ADR-004-budget-api-data.md), [API design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md). Dev DB migrated successfully to version 9; no AutoMigrate introduced. Historical rename-pending note below is superseded by explicit migrations already applied.
+
 ## Field Ownership
 
 - Human owns data ownership and migration approval.

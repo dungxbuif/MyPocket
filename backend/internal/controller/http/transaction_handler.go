@@ -184,7 +184,7 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string) (tran
 		return transactionInput{}, time.Time{}, false
 	}
 	input.CategoryID = normalizeOptional(input.CategoryID)
-	if input.CategoryID != nil && !h.categoryValid(owner, *input.CategoryID, input.Type, input.WalletID) {
+	if input.CategoryID != nil && !h.categoryValid(owner, *input.CategoryID, input.Type, input.WalletID, wallet.Type) {
 		transactionBadRequest(c, transactionCategoryMessage)
 		return transactionInput{}, time.Time{}, false
 	}
@@ -200,7 +200,7 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string) (tran
 	return input, occurredAt, true
 }
 
-func (h *TransactionHandler) categoryValid(owner, categoryID, kind, walletID string) bool {
+func (h *TransactionHandler) categoryValid(owner, categoryID, kind, walletID, walletType string) bool {
 	categories, err := h.Categories.ListVisible(owner)
 	if err != nil {
 		return false
@@ -208,6 +208,16 @@ func (h *TransactionHandler) categoryValid(owner, categoryID, kind, walletID str
 	for _, category := range categories {
 		if category.ID != categoryID || category.Kind != kind {
 			continue
+		}
+		if walletType == entity.WalletTypeGoal {
+			if category.SystemKey == nil {
+				return false
+			}
+			key := *category.SystemKey
+			allowed := kind == entity.TransactionTypeIncome && (key == "income_transfer_in" || key == "income_interest") || kind == entity.TransactionTypeExpense && key == "expense_transfer_out"
+			if !allowed {
+				return false
+			}
 		}
 		if len(category.WalletIDs) == 0 {
 			return true

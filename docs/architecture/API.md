@@ -10,6 +10,16 @@ shared_fields: [status, trace]
 
 # API
 
+## Budget and savings integration — 2026-09-20
+
+Authenticated `GET/POST /api/v1/budgets`, `PATCH/DELETE /api/v1/budgets/{id}` implemented. Explicit interval input: name, positive safe-integer limit_amount, nullable owner wallet_id and visible expense category_id, RFC3339 start_at inclusive/end_at exclusive. List returns items with ledger-derived spent/days_remaining/ended and active limit_amount/spent summary (transaction IDs deduplicated). Category scope includes descendants. Only report-included expenses count. Exact same scope and overlapping dates returns 409; ended budgets cannot be edited. Delete configuration leaves transactions unchanged. [Design/proof](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md), [ADR-004](../decisions/ADR-004-budget-api-data.md).
+
+Goal transaction categories, when explicitly selected, must use real catalog keys income_transfer_in/income_interest for income or expense_transfer_out for expense, in addition to kind/wallet applicability. Category omission remains allowed. External savings entries affect one wallet and retain report inclusion default true; internal paired transfers are not implemented by this path.
+
+## Wallet goal date
+
+Wallet create/update accepts optional `target_date` as `YYYY-MM-DD` for goal wallets. Invalid calendar dates return 400. Existing `target_date` timestamp column stores UTC midnight; response uses the existing timestamp representation, with clients retaining its first ten date characters. Omission on update preserves the date; empty string clears it. Other wallet types ignore this input. No migration. See [savings design](../work/tickets/TICKET-06-01-DETAIL_DESIGN.md).
+
 ## Field Ownership
 
 - Human owns public contract intent and approval for contract changes.

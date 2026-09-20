@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { IconButton } from "../atoms/IconButton";
 import { SurfaceCard } from "../atoms/SurfaceCard";
+import { Text } from "../atoms/Text";
 import { CategoryEditForm } from "../molecules/CategoryEditForm";
 import { PageBackHeader } from "../molecules/PageBackHeader";
 import { createCategory, deleteCategory, fetchCategories, updateCategory, updateCategoryWallets, type Category, type CategoryInput } from "../../services/categories";
@@ -29,5 +30,5 @@ export function GroupEditorPage() {
   const save = async (input: CategoryInput) => { setSaving(true); setError(""); try { if (category?.is_system) { await updateCategoryWallets(category.id, input.wallet_ids); } else if (category) { await updateCategory(category.id, input); } else { await createCategory(input); } await navigate({ to: "/account/groups" }); } catch { setError(EDITOR_TEXT.saveError); } finally { setSaving(false); } };
   const remove = async () => { if (!category || !window.confirm(EDITOR_TEXT.deleteConfirm)) return; setSaving(true); setError(""); try { await deleteCategory(category.id); await navigate({ to: "/account/groups" }); } catch { setError(EDITOR_TEXT.deleteError); } finally { setSaving(false); } };
   const trailing = category && !category.is_system ? <IconButton label={EDITOR_TEXT.deleteLabel} variant="bare" disabled={saving} onClick={() => void remove()}><Trash2 size={19} className="text-danger" /></IconButton> : undefined;
-  return <section className="space-y-5 px-1"><PageBackHeader title={category ? EDITOR_TEXT.editTitle : EDITOR_TEXT.createTitle} backTo="/account/groups" backLabel={EDITOR_TEXT.back} trailing={trailing} />{loading ? <SurfaceCard padding="md" className="text-sm text-secondary">{EDITOR_TEXT.loading}</SurfaceCard> : null}{error ? <SurfaceCard padding="md" className="text-sm text-danger" role="alert">{error}</SurfaceCard> : null}{!loading && (!id || category) ? <CategoryEditForm category={category} categories={items} wallets={wallets} saving={saving} readOnly={Boolean(category?.is_system)} onSave={save} onCancel={() => void navigate({ to: "/account/groups" })} /> : null}</section>;
+  return <section className="space-y-5 px-1"><PageBackHeader title={category ? EDITOR_TEXT.editTitle : EDITOR_TEXT.createTitle} backTo="/account/groups" backLabel={EDITOR_TEXT.back} trailing={trailing} />{loading ? <SurfaceCard padding="md"><Text tone="secondary">{EDITOR_TEXT.loading}</Text></SurfaceCard> : null}{error ? <SurfaceCard padding="md" role="alert"><Text tone="danger">{error}</Text></SurfaceCard> : null}{!loading && (!id || category) ? <CategoryEditForm category={category} categories={items} wallets={wallets} saving={saving} readOnly={Boolean(category?.is_system)} onSave={save} onCancel={() => void navigate({ to: "/account/groups" })} /> : null}</section>;
 }

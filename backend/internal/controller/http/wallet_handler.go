@@ -3,6 +3,7 @@ package httpapi
 import (
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
@@ -31,6 +32,7 @@ type walletInput struct {
 	Description    *string `json:"description"`
 	TargetAmount   *int64  `json:"target_amount"`
 	CreditLimit    *int64  `json:"credit_limit"`
+	TargetDate     *string `json:"target_date"`
 }
 
 func NewWalletHandler(wallets walletrepo.WalletRepository) *WalletHandler {
@@ -85,6 +87,10 @@ func (h *WalletHandler) CreateWallet(c *gin.Context) {
 		isInTotal = *input.IsInTotal
 	}
 	wallet := &entity.Wallet{ID: uuid.NewString(), OwnerID: owner, Name: input.Name, Type: input.Type, Currency: entity.WalletCurrencyVND, OpeningBalance: input.OpeningBalance, IsInTotal: isInTotal, Description: input.Description, TargetAmount: input.TargetAmount, CreditLimit: input.CreditLimit}
+	if input.TargetDate != nil && *input.TargetDate != "" {
+		parsed, _ := time.Parse("2006-01-02", *input.TargetDate)
+		wallet.TargetDate = &parsed
+	}
 	if err := h.Wallets.Create(wallet); err != nil {
 		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeWalletSaveFailed, Title: problemTitleInternalServer, Detail: walletSaveErrorMessage})
 		return
@@ -121,6 +127,13 @@ func (h *WalletHandler) UpdateWallet(c *gin.Context) {
 		return
 	}
 	updates := map[string]any{"name": input.Name, "description": input.Description, "target_amount": input.TargetAmount, "credit_limit": input.CreditLimit}
+	if input.TargetDate != nil {
+		updates["target_date"] = nil
+		if *input.TargetDate != "" {
+			parsed, _ := time.Parse("2006-01-02", *input.TargetDate)
+			updates["target_date"] = parsed
+		}
+	}
 	if input.IsInTotal != nil {
 		updates["is_in_total"] = *input.IsInTotal
 	}
@@ -193,6 +206,15 @@ func bindWalletInput(c *gin.Context, existingType ...string) (walletInput, bool)
 		input.TargetAmount = nil
 		if input.CreditLimit == nil || *input.CreditLimit <= 0 {
 			Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: walletCreditLimitMessage})
+			return walletInput{}, false
+		}
+	}
+	if input.Type != entity.WalletTypeGoal {
+		input.TargetDate = nil
+	}
+	if input.TargetDate != nil && *input.TargetDate != "" {
+		if _, err := time.Parse("2006-01-02", *input.TargetDate); err != nil {
+			Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "ngày mục tiêu phải có định dạng YYYY-MM-DD hợp lệ"})
 			return walletInput{}, false
 		}
 	}

@@ -42,7 +42,7 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, tok
   }
 
   const contentType = response.headers.get("content-type") ?? "";
-  const isJson = contentType.includes("application/json");
+  const isJson = contentType.includes("application/json") || contentType.includes("application/problem+json");
   const rawText = await response.text();
   const body = isJson ? parseJsonResponse(rawText) : rawText;
 

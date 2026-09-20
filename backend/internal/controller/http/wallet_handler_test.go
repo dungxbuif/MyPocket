@@ -136,3 +136,44 @@ func TestDeleteWalletUsesOwnerScopedRepository(t *testing.T) {
 		t.Fatalf("status = %d, deleted = %q", response.Code, stub.deleted)
 	}
 }
+
+func TestGoalTargetDate(t *testing.T) {
+	for _, tc := range []struct {
+		date   string
+		status int
+	}{{"2026-12-31", 201}, {"2026-02-30", 400}, {"bad", 400}} {
+		stub := &walletRepositoryStub{}
+		r := walletTestRouter(NewWalletHandler(stub))
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Goal","type":"goal","target_amount":1000,"target_date":"`+tc.date+`"}`))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+		if w.Code != tc.status {
+			t.Fatalf("%s: status %d", tc.date, w.Code)
+		}
+		if tc.status == 201 && (stub.created.TargetDate == nil || stub.created.TargetDate.Format("2006-01-02") != tc.date) {
+			t.Fatal("target date not persisted")
+		}
+	}
+}
+
+func TestGoalTargetDateUpdateOmitAndClear(t *testing.T) {
+	for _, tc := range []struct {
+		suffix  string
+		changed bool
+	}{{"", false}, {`,"target_date":""`, true}} {
+		stub := &walletRepositoryStub{found: &entity.Wallet{ID: "goal", Type: entity.WalletTypeGoal}}
+		r := walletTestRouter(NewWalletHandler(stub))
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest(http.MethodPatch, "/wallets/goal", bytes.NewBufferString(`{"name":"Goal","target_amount":1000`+tc.suffix+`}`))
+		req.Header.Set("Content-Type", "application/json")
+		r.ServeHTTP(w, req)
+		if w.Code != 200 {
+			t.Fatalf("status %d", w.Code)
+		}
+		value, present := stub.updates["target_date"]
+		if present != tc.changed || value != nil {
+			t.Fatalf("unexpected date update %#v", stub.updates)
+		}
+	}
+}

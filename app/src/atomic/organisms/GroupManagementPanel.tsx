@@ -45,10 +45,10 @@ export function GroupManagementPanel() {
     <PageBackHeader title={GROUP_TEXT.title} backTo="/account" backLabel={GROUP_TEXT.back} />
     <SegmentedControl value={kind} options={KIND_OPTIONS} onChange={setKind} />
     <BaseButton variant="outline" className="w-full" onClick={() => void navigate({ to: "/account/groups/new", search: { kind } })}><PlusCircle size={20} />{GROUP_TEXT.add}</BaseButton>
-    {state === "loading" ? <SurfaceCard padding="md" className="text-sm text-secondary">{GROUP_TEXT.loading}</SurfaceCard> : null}
-    {state === "error" ? <SurfaceCard padding="md" className="space-y-3 text-sm text-danger"><Text>{GROUP_TEXT.loadError}</Text><BaseButton variant="secondary" size="sm" onClick={() => void load()}>{GROUP_TEXT.retry}</BaseButton></SurfaceCard> : null}
+    {state === "loading" ? <SurfaceCard padding="md"><Text tone="secondary">{GROUP_TEXT.loading}</Text></SurfaceCard> : null}
+    {state === "error" ? <SurfaceCard padding="md" className="space-y-3"><Text tone="danger">{GROUP_TEXT.loadError}</Text><BaseButton variant="secondary" size="sm" onClick={() => void load()}>{GROUP_TEXT.retry}</BaseButton></SurfaceCard> : null}
     {state === "ready" && roots.map((root) => <BaseCategoryTree key={root.id} root={treeItem(root)} children={categories.filter((item) => item.parent_id === root.id).map(treeItem)} onSelect={(id) => void navigate({ to: "/account/groups/$categoryId/edit", params: { categoryId: id } })} />)}
-    {state === "ready" && roots.length === 0 ? <SurfaceCard padding="md" className="text-sm text-secondary">{GROUP_TEXT.empty}</SurfaceCard> : null}
+    {state === "ready" && roots.length === 0 ? <SurfaceCard padding="md"><Text tone="secondary">{GROUP_TEXT.empty}</Text></SurfaceCard> : null}
   </section>;
 }
 

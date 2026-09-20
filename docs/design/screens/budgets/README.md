@@ -1,0 +1,9 @@
+# Ngân sách — dữ liệu API
+
+Route `/budgets`; [design](../../../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md). Uses SurfaceCard, MetricBox, BudgetGauge, BudgetProgressItem, Text, BaseButton and StatusMessage. Editor uses BaseBottomSheet, FormField, BaseTextInput and BaseSelect. No screen-local visual variants.
+
+List reads GET budgets with derived spent and deduplicated summary. Loading is not zero; failures show retry, never examples. Empty state is plain “Chưa có ngân sách.” Add opens name/limit/wallet/category/start/end-date form. Explicit intervals only in this slice; end date inclusive in UI, exclusive timestamp in API. Optional wallet/category mean all. Choose expense groups only. Save waits for API; draft survives errors. Row edit/delete via API with destructive confirmation; expired intervals read/delete only. Mask conceals all monetary values. Source transaction save/delete refreshes this screen. Delete budget does not change ledger. Wallet/category delete removes associated tracking configuration.
+
+Known gaps: automatic repeating periods, server notifications and forecasts remain unsupported; no fake controls/data for them. Reports not mounted. Browser/owner visual acceptance pending.
+
+Metadata edits retain the original timestamp boundaries when corresponding visible date fields are unchanged, even after switching browser timezone. Intentional date edits use the current browser-local calendar. Owner account timezone persistence remains separate. API persistence proof and real empty/editor browser inspection recorded in the linked design; full browser CRUD/owner sign-off pending.

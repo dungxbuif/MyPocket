@@ -20,5 +20,7 @@ Khi implement đến màn nào, thêm/cập nhật screens/<screen>/README.md c�
 
 ## Authority và verification
 
+Owner update: đối chiếu từng vùng, action và state của ảnh với base trong screen spec; chỉ dùng input base chưa đủ. Thiếu switch/picker/header phải bổ sung base trước. Không override SurfaceCard, không dựng control bằng div/span onClick. Bundle ảnh/HTML owner cung cấp được giữ làm input evidence khi README có `artifact_source: visual_reference`; không phải code runtime. Xem [ADR-003](../decisions/ADR-003-wallet-reference-enforcement.md).
+
 Quyết định owner hiện tại → product requirements cho nghiệp vụ → design contract chuẩn hóa cho UI → component implementation. Code hiện tại không tự ghi đè thiết kế; lệch contract phải sửa hoặc ghi quyết định được duyệt.
 [ADR](../decisions/ADR-002-design-contract-enforcement.md) · [Work item](../work/tickets/UI-BASE-01-DETAIL_DESIGN.md) · [Validation](../work/VALIDATION_MATRIX.md).

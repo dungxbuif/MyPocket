@@ -30,6 +30,20 @@ Use this file as the runtime work queue.
 
 ## Current Owner Direction
 
+2026-09-20 latest: owner approved savings continuation and requested no mock data in screens. [API-SCREENS-01](tickets/API-SCREENS-01-DETAIL_DESIGN.md) delivers budget explicit-date API/persistence/progress, mounted mock removal, savings catalog/history and error parsing; review pending. [Savings](tickets/TICKET-06-01-DETAIL_DESIGN.md) external-entry clarification resolved, no counterpart required. Next: owner UAT, shared internal transfer design/implementation; recurring budget roadmap remains partial. Historical pending-select and counterpart questions below no longer schedule work.
+
+Active: TICKET-06-01 in_progress, [design/proof](tickets/TICKET-06-01-DETAIL_DESIGN.md). Owner authorized savings UI implementation from five references. Goal create/date/details and common category picker implemented; transfer semantics pending owner answer. UI-WALLET-02 selector layout and create BaseSelect implemented, visual inspection performed, full acceptance pending.
+
+Latest docs normalization: canonical wallet screen now defines list/create/edit, BaseSelect-only type choice during creation and per-type gaps. UI-WALLET-02 remains in_review; next implementation is replace picker with select and browser UAT. Documentation changes do not authorize new API/schema scope.
+
+Current priority: [UI-WALLET-02](tickets/UI-WALLET-02-DETAIL_DESIGN.md), `in_review`: normalize Add Wallet and Wallet Selector references, enforce base composition, implement Add Wallet sheet/type picker. Automated checks pass; browser visual review pending. Existing-wallet selection/filter behavior is still planned.
+
+Wallet UI follow-up: owner requests no note field in Add Wallet. Implemented in shared WalletEditorForm; in_review. Small task exemption: yes. Reason: owner-directed removal of optional create-form field. Impact checked: API=no, DB=no, Security=no, Runtime=no, Standards=no. Reuses FormField/BaseTextInput; existing edit data preserved. Proof: validation matrix; release: changelog; design: TICKET-01-02-DETAIL_DESIGN.md.
+
+UI-EMPTY-01 follow-up includes wallet empty messages in Overview and wallet management; retains `in_review` pending visual acceptance.
+
+2026-09-20: owner reports the bugs they tested are OK and asks to continue implementation. [UI-EMPTY-01](tickets/UI-EMPTY-01.md) is `in_review`: transaction empty messages now use a borderless shared base variant; automated design/build checks passed, owner visual review pending. This does not close unimplemented receipt/jar/transfer/credit scope. Next product slice: prepare transfer/adjustment detail design for review.
+
 Latest request 2026-09-13: normalize design to Markdown contracts, add automated base-first checks and refactor the existing frontend. [UI-BASE-01](tickets/UI-BASE-01-DETAIL_DESIGN.md), from [FB-002](FEEDBACK_LOG.md), supersedes the earlier screen-removal proposal. Ledger remains the next product slice after this UI foundation work.
 
 Naming đã chốt: bảng tài khoản là `user`. Khi triển khai migration, rename bảo toàn dữ liệu và đổi GORM mapping đồng bộ theo [ERD](../architecture/ERD.md); hiện chỉ cập nhật thiết kế.

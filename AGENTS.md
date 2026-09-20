@@ -53,6 +53,8 @@ For brownfield work:
 
 ## Rule 3: Lifecycle
 
+UI reference fidelity gate: map every supplied reference region/action/state to named bases in the screen spec before implementation. Using base inputs alone does not satisfy reference fidelity. Screen classes are layout-only; SurfaceCard overrides and clickable div/span controls are forbidden. Missing switch/picker/header behavior must be added to shared bases with proof before screen use. Compare the rendered screen to the reference before claiming visual completion. Explicitly declared visual-reference bundles may retain input HTML/PNG alongside their Markdown spec; never copy export CSS into a screen. See docs/decisions/ADR-003-wallet-reference-enforcement.md.
+
 Every task follows this lifecycle:
 
 1. Hydration: load context, backlog queue, standards, and active work.

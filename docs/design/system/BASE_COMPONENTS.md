@@ -17,11 +17,13 @@
 | IconBadge | size xs/sm/md/lg; rounded/circle; tone | Một tone map, không chồng class màu. Icon visual size không đồng nghĩa hit target |
 | Progress | value/label/danger | clamp thanh 0–100, aria-valuenow, rounded cap; nhãn/số tiền bên ngoài giữ giá trị nghiệp vụ thật |
 | BudgetGauge | value/label | SVG arc 180°, clamp arc, label truy cập được; value >100 dùng danger |
-| StatusMessage | muted/danger | compose SurfaceCard + Text, role status/alert |
+| StatusMessage | muted/danger; variant card/plain | card mặc định compose SurfaceCard + Text; plain chỉ Text, không nền/viền/bóng; giữ role status/alert. Transaction empty states ở Tổng quan và Sổ GD dùng plain; không có tương tác/keyboard riêng. |
 | Divider | layout className | line token chung |
 | Chip | children/layout className | passive pill label; use BaseButton chip for interactive actions |
 
 ## Molecules
+
+Wallet empty states in Overview (“Chưa có ví.”) and WalletManagementPanel (“Chưa có ví nào.”) also use `StatusMessage variant="plain"`: semantic status text without a separate card border, background or shadow. Loading/error feedback retains its existing presentation.
 
 | Base | Composition và behavior | Chi tiết |
 | --- | --- | --- |
@@ -36,6 +38,10 @@
 | BaseBarChart / BaseDonutChart | values/shares/label; shared visual geometry and theme-based data colors | source preview only; tooltip/drilldown not implemented |
 
 ## Contract gate
+
+WalletSelectionList: controlled selectedID/editing, aggregate excludes is_in_total=false, grouped shared rows and selection marks; callbacks own navigation. SavingsSummary: clamped Progress with real remaining/reached state, calendar-day countdown. CategorySelectionList: BaseTextInput search and base rows of API-supplied applicable categories; onSelect returns category ID. These molecules reuse controls and tokens, not custom screen styling.
+
+Wallet follow-up: BaseSwitch owns the native checkbox role=switch, 44px target, checked/focus/disabled visuals and controlled onChange. BaseBottomSheet `presentation=form` owns canvas/tall shell, cancel/title/headerAction; same focus trap, Escape and restoration. WalletCreateForm composes shared cards/inline controls/switch; WalletTypePicker composes row buttons with aria-pressed selection. See [wallet contract](../screens/wallets/README.md).
 
 Trước một biến thể mới, ghi: intent, anatomy, props, event/effect, states, keyboard, tokens, consumers, proof. Sau đó implement base và kiểm thử consumer. API lớp UI có thể mở rộng theo task đã duyệt; không tự tạo palette/interaction model riêng.
 

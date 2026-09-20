@@ -7,12 +7,42 @@ const server = await createServer({ server: { middlewareMode: true }, appType: '
 try {
   const { BaseButton } = await server.ssrLoadModule('/src/atomic/atoms/BaseButton.tsx');
   const { SurfaceCard } = await server.ssrLoadModule('/src/atomic/atoms/SurfaceCard.tsx');
+  const { StatusMessage } = await server.ssrLoadModule('/src/atomic/atoms/StatusMessage.tsx');
   const { Progress, BudgetGauge } = await server.ssrLoadModule('/src/atomic/atoms/Progress.tsx');
   const { BaseTextInput } = await server.ssrLoadModule('/src/atomic/atoms/FormField.tsx');
   const { WalletEditorForm, EMPTY_WALLET_FORM } = await server.ssrLoadModule('/src/atomic/molecules/WalletEditorForm.tsx');
   const { BaseDonutChart } = await server.ssrLoadModule('/src/atomic/molecules/BaseCharts.tsx');
+  const { WalletCreateForm, WalletTypePicker, canCreateWallet } = await server.ssrLoadModule('/src/atomic/molecules/WalletCreateForm.tsx');
+  const { savingsProgress, SavingsSummary } = await server.ssrLoadModule('/src/atomic/molecules/SavingsSummary.tsx');
+  const { WalletSelectionList } = await server.ssrLoadModule('/src/atomic/molecules/WalletSelectionList.tsx');
   const html = (component, props) => renderToStaticMarkup(React.createElement(component, props));
+  const { BudgetProgressItem } = await server.ssrLoadModule('/src/atomic/molecules/BudgetProgressItem.tsx');
+  const { Wallet } = await server.ssrLoadModule('lucide-react');
+  const maskedBudget=html(BudgetProgressItem,{budget:{name:'Private',spent:123456,limit:200000,icon:Wallet},masked:true});
+  assert.doesNotMatch(maskedBudget,/123[.,]456|200[.,]000/);
+  const { apiRequest } = await server.ssrLoadModule('/src/services/api.ts');
+  const { budgetDateInput } = await server.ssrLoadModule('/src/services/budgetDates.ts');
+  const originalPeriod={start_at:'2026-08-31T17:00:00Z',end_at:'2026-09-30T17:00:00Z'};
+  const priorTZ=process.env.TZ;
+  try {
+    process.env.TZ='UTC';
+    const preserved=budgetDateInput('2026-08-31','2026-09-30',originalPeriod);
+    assert.equal(preserved.start_at,originalPeriod.start_at);
+    assert.equal(preserved.end_at,originalPeriod.end_at);
+  } finally {if(priorTZ===undefined)delete process.env.TZ;else process.env.TZ=priorTZ;}
+  const originalFetch=globalThis.fetch;
+  try {
+    globalThis.fetch=async()=>new Response(JSON.stringify({detail:'Overlapping interval'}),{status:409,headers:{'content-type':'application/problem+json'}});
+    await assert.rejects(()=>apiRequest('/api/v1/budgets'),error=>error.message==='Overlapping interval');
+  } finally {globalThis.fetch=originalFetch;}
   const loading = html(BaseButton, { loading:true, children:'Save' });
+  const empty = html(StatusMessage, { variant:'plain', children:'Chưa có giao dịch.' });
+  assert.match(empty, /role="status"/);
+  assert.match(empty, /Chưa có giao dịch\./);
+  assert.doesNotMatch(empty, /\b(?:border|shadow|bg)-|<section/);
+  const error = html(StatusMessage, { tone:'danger', children:'Error' });
+  assert.match(error, /role="alert"/);
+  assert.match(error, /border-danger-line/);
   assert.match(loading, /disabled=""/); assert.match(loading, /aria-busy="true"/); assert.match(loading, /bg-brand/);
   const flat = html(SurfaceCard, {elevation:'flat',children:'x'}); assert.match(flat,/shadow-none/); assert.doesNotMatch(flat,/shadow-card/);
   assert.match(html(Progress,{value:115,label:'Food'}),/aria-valuenow="100"/);
@@ -20,7 +50,38 @@ try {
   assert.match(html(BudgetGauge,{value:115,label:'Food'}),/stroke-danger/);
   const inline = html(BaseTextInput,{variant:'inline','aria-label':'Name'}); assert.doesNotMatch(inline,/border-line/); assert.match(inline,/focus-visible:outline-action/);
   const wallet = html(WalletEditorForm,{state:EMPTY_WALLET_FORM,saving:true,onChange(){},onSubmit(){},onCancel(){}});
-  assert.equal((wallet.match(/disabled=""/g) ?? []).length,7); // four inputs, select, save and cancel
+  assert.equal((wallet.match(/disabled=""/g) ?? []).length,6); // name, balance, checkbox, select, save and cancel
+  assert.doesNotMatch(wallet, /Ghi chú/);
+  assert.match(html(WalletEditorForm,{state:EMPTY_WALLET_FORM,saving:false,editing:true,onChange(){},onSubmit(){},onCancel(){}}), /Ghi chú/);
   assert.match(html(BaseDonutChart,{shares:[],center:'No data'}),/var\(--color-line\)/);
+  assert.equal(canCreateWallet(EMPTY_WALLET_FORM),false);
+  const valid={...EMPTY_WALLET_FORM,name:'Tiền mặt'};
+  assert.equal(canCreateWallet(valid),true);
+  assert.equal(canCreateWallet({...valid,openingBalance:'1abc'}),false);
+  assert.equal(canCreateWallet({...valid,type:'goal',targetAmount:'0'}),false);
+  assert.equal(canCreateWallet({...valid,type:'credit',creditLimit:'1000000'}),true);
+  const create=html(WalletCreateForm,{state:valid,saving:false,onChange(){},onSubmit(){},onSelectType(){}});
+  assert.doesNotMatch(create,/Ghi chú/);
+  assert.match(create,/<select/);
+  assert.match(create,/role="switch"/);
+  assert.match(create,/VND — Đồng Việt Nam/);
+  const excluded=html(WalletCreateForm,{state:{...valid,isInTotal:false},saving:false,onChange(){},onSubmit(){},onSelectType(){}});
+  assert.match(excluded,/checked=""/);
+  const picker=html(WalletTypePicker,{value:'goal',onSelect(){}});
+  assert.equal((picker.match(/aria-pressed="true"/g)??[]).length,1);
+  for(const label of ['Ví thường','Ví tiết kiệm','Ví tín dụng']) assert.ok(picker.includes(label));
+  assert.deepEqual(savingsProgress(120,100),{remaining:0,percentage:100,reached:true});
+  assert.deepEqual(savingsProgress(20,100),{remaining:80,percentage:20,reached:false});
+  assert.deepEqual(savingsProgress(-10,100),{remaining:110,percentage:0,reached:false});
+  const goalForm=html(WalletCreateForm,{state:{...valid,type:'goal',targetAmount:'1000',targetDate:'2026-12-31'},saving:false,onChange(){},onSubmit(){},onSelectType(){}});
+  assert.match(goalForm,/type="date"/); assert.match(goalForm,/2026-12-31/);
+  const goalWallet={id:'g',name:'Goal',type:'goal',currency:'VND',opening_balance:0,current_balance:20,target_amount:100,is_in_total:true};
+  const { SavingsWalletPanel } = await server.ssrLoadModule('/src/atomic/organisms/SavingsWalletPanel.tsx');
+  const history=html(SavingsWalletPanel,{wallet:goalWallet,categories:[{id:'interest',name:'Thu lãi',kind:'income',system_key:'income_interest',wallet_ids:[]}],transactions:[{id:'t',wallet_id:'g',category_id:'interest',type:'income',amount:20,occurred_at:'2026-09-20T00:00:00Z'}],onBack(){},onChanged(){}});
+  assert.match(history,/Thu lãi/);
+  assert.match(html(SavingsSummary,{wallet:goalWallet}),/aria-valuenow="20"/);
+  const walletList=html(WalletSelectionList,{wallets:[goalWallet,{...goalWallet,id:'excluded',name:'Excluded',is_in_total:false}],selectedID:null,editing:false,onSelect(){},onAdd(){}});
+  assert.match(walletList,/TÍNH VÀO TỔNG/); assert.match(walletList,/KHÔNG TÍNH VÀO TỔNG/);
+  assert.equal((walletList.match(/aria-pressed="true"/g)??[]).length,1);
   console.log('Base contracts passed: loading, single elevation, clamped progress, danger gauge, inline input focus.');
 } finally { await server.close(); }

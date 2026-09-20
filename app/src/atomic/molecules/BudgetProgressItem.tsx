@@ -1,11 +1,11 @@
 import { Text } from "../atoms/Text";
-import type { MockBudget } from "../data/mockFinance";
+import type { LucideIcon } from "lucide-react";
 import { formatVND, ratioPercent } from "../utils/format";
 import { SurfaceCard } from "../atoms/SurfaceCard";
 import { IconBadge } from "../atoms/IconBadge";
 import { Progress } from "../atoms/Progress";
 
-export function BudgetProgressItem({ budget }: { budget: MockBudget }) {
+export function BudgetProgressItem({ budget, masked = false }: { budget: {name:string; spent:number; limit:number; icon:LucideIcon}; masked?:boolean }) {
   const Icon = budget.icon;
   const progress = ratioPercent(budget.spent, budget.limit);
   const over = budget.spent > budget.limit;
@@ -19,7 +19,7 @@ export function BudgetProgressItem({ budget }: { budget: MockBudget }) {
             <Text weight="bold" tone={over ? "danger" : "ink"}>{progress}%</Text>
           </div>
           <Text numeric size="xs" tone="secondary">
-            {formatVND(budget.spent)} / {formatVND(budget.limit)}
+            {masked ? "•••••• / ••••••" : `${formatVND(budget.spent)} / ${formatVND(budget.limit)}`}
           </Text>
         </div>
       </div>

@@ -30,7 +30,8 @@ export function inspect(file, source) {
       const tag = aliases.get(node.tagName.getText(tree)) ?? node.tagName.getText(tree);
       const cls = node.attributes.properties.find(attr => attr.name?.getText(tree) === 'className');
       const classes = expanded(cls?.initializer);
-      if (/^(BaseButton|IconButton|IconBadge|BaseTextInput|BaseSelect|Heading|Text)$/.test(tag) && /\b(bg-|text-(?:ink|heading|secondary|muted|action|danger|card|xs|sm|base|lg|xl|[234]xl|\[)|font-|rounded|shadow|ring-|border-)/.test(classes)) report(node, 'Base visual overrides are forbidden: add a named variant/tone/size to the base.');
+      if (/^(SurfaceCard|StatusMessage|BaseSwitch|BaseButton|IconButton|IconBadge|BaseTextInput|BaseSelect|Heading|Text)$/.test(tag) && /\b(bg-|text-(?:ink|heading|secondary|muted|action|danger|card|xs|sm|base|lg|xl|[234]xl|\[)|font-|rounded|shadow|ring-|border(?:-|\b))/.test(classes)) report(node, 'Base visual overrides are forbidden: add a named variant/tone/size to the base.');
+      if (/^(div|span|section|article)$/.test(tag) && node.attributes.properties.some(attr => attr.name?.getText(tree) === 'onClick')) report(node, 'Clickable wrappers must use a semantic base control.');
       if (/^(div|section|article)$/.test(tag) && /rounded-(?:xl|2xl|3xl|control|card)/.test(classes) && /bg-/.test(classes)) report(node, 'Use SurfaceCard for card surfaces.');
       if (/^(p|h1|h2|h3|h4)$/.test(tag)) report(node, 'Use Text or Heading for the shared type scale.');
       if (/\/(organisms|pages|templates)\//.test(file) && node.attributes.properties.some(attr => attr.name?.getText(tree) === 'style' && /\b(background|color|borderRadius|boxShadow|fontSize|fontFamily)\s*:/.test(expanded(attr.initializer)))) report(node, 'Screen inline visual styles belong to a shared base.');

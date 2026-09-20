@@ -1,5 +1,45 @@
 basePath: /
 definitions:
+  entity.Budget:
+    properties:
+      category_id:
+        type: string
+      created_at:
+        type: string
+      days_remaining:
+        type: integer
+      end_at:
+        type: string
+      ended:
+        type: boolean
+      id:
+        type: string
+      limit_amount:
+        type: integer
+      name:
+        type: string
+      owner_id:
+        type: string
+      spent:
+        type: integer
+      start_at:
+        type: string
+      updated_at:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.BudgetSummary:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/entity.Budget'
+        type: array
+      limit_amount:
+        type: integer
+      spent:
+        type: integer
+    type: object
   entity.Category:
     properties:
       created_at:
@@ -106,6 +146,21 @@ definitions:
       type:
         type: string
     type: object
+  httpapi.budgetInput:
+    properties:
+      category_id:
+        type: string
+      end_at:
+        type: string
+      limit_amount:
+        type: integer
+      name:
+        type: string
+      start_at:
+        type: string
+      wallet_id:
+        type: string
+    type: object
   httpapi.categoryInput:
     properties:
       icon_key:
@@ -166,6 +221,8 @@ definitions:
         type: integer
       target_amount:
         type: integer
+      target_date:
+        type: string
       type:
         type: string
     type: object
@@ -308,6 +365,113 @@ paths:
       summary: Get authenticated user profile
       tags:
       - Account
+  /api/v1/budgets:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetSummary'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List budgets with ledger-derived progress and active deduplicated totals
+      tags:
+      - Budgets
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Budget input
+        in: body
+        name: budget
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Budget'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a budget for an explicit interval
+      tags:
+      - Budgets
+  /api/v1/budgets/{id}:
+    delete:
+      parameters:
+      - description: Budget ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete budget configuration without changing transactions
+      tags:
+      - Budgets
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Budget ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Budget input
+        in: body
+        name: budget
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Budget'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Replace budget configuration before its interval has ended
+      tags:
+      - Budgets
   /api/v1/categories:
     get:
       produces:

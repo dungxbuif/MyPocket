@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Chọn nhóm - Khoản chi</title>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            iosBg: '#F3F4F8',
+            brandGreen: '#16A34A',
+          },
+          fontFamily: {
+            sans: ['-apple-system', 'BlinkMacSystemFont', '"SF Pro Text"', '"SF Pro Display"', 'Helvetica Neue', 'Arial', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-layout">
+    /* Remove tap highlight & standard iOS frame adjustments */
+    * {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    body {
+      background-color: #BAC0CB; /* Outer device mock backdrop if viewed on wide screens */
+    }
+  </style>
+</head>
+<body class="flex justify-center items-center min-h-screen p-0 m-0 font-sans antialiased text-gray-900">
+<!-- BEGIN: PhoneContainer -->
+<!-- Mimics iPhone rounded sheet / view layout as seen in image -->
+<div class="w-full max-w-[425px] h-[100vh] max-h-[920px] bg-[#F4F5F9] relative flex flex-col justify-between overflow-hidden shadow-2xl rounded-t-[44px]">
+<!-- Top Container: Status Bar, Header, Segments, Content List -->
+<div class="w-full flex flex-col">
+<!-- BEGIN: iOSStatusBar -->
+<header class="w-full pt-3 pb-1 px-8 flex justify-between items-center text-sm font-semibold tracking-tight text-gray-900 z-10" data-purpose="status-bar">
+<!-- Time -->
+<span class="text-[17px] font-semibold tracking-normal pl-2">22:21</span>
+<!-- System Status Icons (Signal, Wifi, Battery) -->
+<div class="flex items-center space-x-2 pr-1">
+<!-- Cellular Signal -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 17 12">
+<rect height="4" rx="0.6" width="2.5" x="0.5" y="8"></rect>
+<rect height="6.5" rx="0.6" width="2.5" x="4.5" y="5.5"></rect>
+<rect height="9" rx="0.6" width="2.5" x="8.5" y="3"></rect>
+<rect height="11.5" rx="0.6" width="2.5" x="12.5" y="0.5"></rect>
+</svg>
+<!-- Wifi -->
+<svg class="w-4 h-3 fill-current" viewbox="0 0 16 12">
+<path clip-rule="evenodd" d="M8 3.5C5.1 3.5 2.5 4.8 0.8 6.8L0 6C2 3.6 4.9 2 8 2s6 1.6 8 4l-.8.8C13.5 4.8 10.9 3.5 8 3.5zm0 4c-1.8 0-3.4.9-4.5 2.3L2.7 9C4 7.3 5.9 6.2 8 6.2s4 1.1 5.3 2.8l-.8.8C11.4 8.4 9.8 7.5 8 7.5zm0 4.2a1.8 1.8 0 100-3.6 1.8 1.8 0 000 3.6z" fill-rule="evenodd"></path>
+</svg>
+<!-- Battery Pill with 38% & Bolt -->
+<div class="flex items-center bg-[#4CD964] text-white rounded-full px-1.5 py-0.5 text-[10px] font-bold space-x-0.5 leading-none">
+<span>38</span>
+<svg class="w-2.5 h-2.5 fill-white inline-block" viewbox="0 0 24 24">
+<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+</svg>
+</div>
+</div>
+</header>
+<!-- END: iOSStatusBar -->
+<!-- BEGIN: NavigationBar -->
+<nav class="w-full px-5 pt-3 pb-4 flex items-center justify-between" data-purpose="nav-bar">
+<!-- Back Button (Circle) -->
+<button aria-label="Quay lại" class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.06)] active:scale-95 transition-transform">
+<svg class="w-5 h-5 text-gray-900 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Center Screen Title -->
+<h1 class="text-xl font-bold tracking-tight text-gray-900">Chọn nhóm</h1>
+<!-- Menu Button (Circle with 3 horizontal bars) -->
+<button aria-label="Menu tuỳ chọn" class="w-12 h-12 bg-white rounded-full flex items-center justify-center shadow-[0_1px_3px_rgba(0,0,0,0.06)] active:scale-95 transition-transform">
+<svg class="w-5 h-5 text-gray-900 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4 7h16M4 12h16M4 17h16" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</nav>
+<!-- END: NavigationBar -->
+<!-- BEGIN: SegmentedControl -->
+<div class="px-5 mb-4" data-purpose="segmented-tabs">
+<div class="bg-[#E4E6EB] p-1 rounded-2xl flex items-center h-11">
+<!-- Active Tab: Khoản chi -->
+<button class="flex-1 h-9 bg-white rounded-xl shadow-sm text-[15px] font-semibold text-gray-900 flex items-center justify-center transition-all">
+            Khoản chi
+          </button>
+<!-- Inactive Tab: Khoản thu -->
+<button class="flex-1 h-9 text-[15px] font-medium text-gray-800 flex items-center justify-center active:opacity-70 transition-all">
+            Khoản thu
+          </button>
+</div>
+</div>
+<!-- END: SegmentedControl -->
+<!-- BEGIN: CategoryListArea -->
+<main class="px-5 flex flex-col space-y-3.5" data-purpose="category-list">
+<!-- Category Item: Tiền chuyển đi -->
+<div class="bg-white rounded-[26px] p-4 flex items-center space-x-4 shadow-[0_1px_4px_rgba(0,0,0,0.04)] active:bg-gray-50 cursor-pointer transition-colors" data-purpose="expense-category-item">
+<!-- Custom Savings Transfer Wallet Icon -->
+<div class="w-12 h-12 rounded-full bg-[#1E293B] flex items-center justify-center relative flex-shrink-0">
+<!-- Brown Wallet Body with Card Slot -->
+<div class="relative w-7 h-6 bg-[#C8703E] rounded-md flex items-center justify-center overflow-hidden shadow-sm">
+<!-- Upward Orange Arrow (Money Sending Out) -->
+<svg class="w-4 h-4 text-[#FF8A3D] fill-current drop-shadow-sm" viewbox="0 0 24 24">
+<path d="M12 3l7 8h-4v9h-6v-9H5l7-8z"></path>
+</svg>
+<!-- Wallet decorative snap / clasp -->
+<div class="absolute right-0.5 w-1.5 h-1.5 bg-[#FFE17D] rounded-full border border-amber-800"></div>
+</div>
+</div>
+<!-- Category Name -->
+<span class="text-lg font-medium text-gray-900 tracking-tight">Tiền chuyển đi</span>
+</div>
+<!-- Help / Feedback Card -->
+<button class="w-full bg-white rounded-[26px] py-4 px-4 text-center shadow-[0_1px_4px_rgba(0,0,0,0.04)] flex items-center justify-center active:scale-[0.99] transition-transform" data-purpose="help-feedback-banner">
+<span class="text-[#20B038] text-[15px] font-medium flex items-center">
+            Bạn có thắc mắc? Hãy cho chúng tôi biết!
+            <!-- Help Info Question Icon -->
+<span class="inline-flex items-center justify-center ml-1.5 w-4 h-4 border-[1.5px] border-[#20B038] rounded-full text-[11px] font-bold leading-none">?</span>
+</span>
+</button>
+</main>
+<!-- END: CategoryListArea -->
+</div>
+<!-- BEGIN: BottomSearchBarArea -->
+<div class="w-full px-5 pb-8 pt-2" data-purpose="bottom-search-wrapper">
+<!-- Search Input Pill -->
+<div class="w-full bg-white rounded-full px-5 py-3.5 flex items-center shadow-[0_1px_5px_rgba(0,0,0,0.05)] border border-gray-100/50">
+<!-- Search Glass Icon -->
+<svg class="w-5 h-5 text-gray-900 stroke-[2.2] mr-3" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="11" cy="11" r="7"></circle>
+<line stroke-linecap="round" x1="16.5" x2="21" y1="16.5" y2="21"></line>
+</svg>
+<!-- Search Placeholder / Input -->
+<input class="w-full bg-transparent border-0 p-0 text-base text-gray-900 placeholder-gray-800 font-normal focus:ring-0 focus:outline-none" placeholder="Tìm kiếm" type="text"/>
+</div>
+</div>
+<!-- END: BottomSearchBarArea -->
+</div>
+<!-- END: PhoneContainer -->
+</body></html>

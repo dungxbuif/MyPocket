@@ -18,3 +18,8 @@ test('rejects restyling bases and local cards', () => {
   assert.deepEqual(inspect('/src/Test.tsx', 'const x = <Text tone="danger" size="sm" />'), []);
 });
 test('checks imported aliases and local class constants', () => assert.ok(inspect('/src/Test.tsx', 'import {BaseButton as Button} from "./BaseButton"; const look="bg-danger"; const x=<Button className={look}/>').length));
+test('blocks card overrides and clickable wrapper controls', () => {
+  assert.ok(inspect('/src/atomic/organisms/Example.tsx', 'const x=<SurfaceCard className="rounded-full border-0 bg-row"/>').length);
+  assert.ok(inspect('/src/atomic/molecules/Example.tsx', 'const x=<div role="button" onClick={activate}/>').length);
+  assert.deepEqual(inspect('/src/atomic/organisms/Example.tsx', 'const x=<SurfaceCard padding="md" className="mt-3"/>'), []);
+});

@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Thêm Ví - Quản lý tài chính</title>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          colors: {
+            app: {
+              bg: '#f2f3f7',
+              sheet: '#f8f9fc',
+              brandGreen: '#1eb853',
+              card: '#ffffff',
+            }
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Styles -->
+<style data-purpose="ios-tweaks">
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+    /* Hide scrollbar for standard look */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-300 min-h-screen flex items-center justify-center p-0 sm:p-4">
+<!-- BEGIN: MobileDeviceFrame -->
+<div class="w-full max-w-[420px] h-screen sm:h-[880px] bg-slate-400 sm:rounded-[52px] shadow-2xl overflow-hidden flex flex-col relative sm:border-[8px] sm:border-slate-800" data-purpose="mobile-viewport-container">
+<!-- BEGIN: iOSStatusBar -->
+<header class="w-full h-11 pt-2 px-7 flex justify-between items-center bg-[#b8bcc2]/40 text-slate-900 z-30 shrink-0 select-none" data-purpose="ios-status-bar">
+<!-- Time -->
+<span class="text-[15px] font-bold tracking-tight">22:02</span>
+<!-- Status Icons: Cellular, Wi-Fi, Battery -->
+<div class="flex items-center space-x-2">
+<!-- Cellular Signal -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 17 12">
+<rect height="4" rx="0.5" width="2.5" x="0" y="8"></rect>
+<rect height="6.5" rx="0.5" width="2.5" x="4.5" y="5.5"></rect>
+<rect height="9" rx="0.5" width="2.5" x="9" y="3"></rect>
+<rect height="12" rx="0.5" width="2.5" x="13.5" y="0"></rect>
+</svg>
+<!-- Wi-Fi -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 16 12">
+<path d="M8 3.6c2.5 0 4.8 1 6.5 2.6.3.3.8.3 1.1 0 .3-.3.3-.8 0-1.1C13.4 3 10.8 2 8 2S2.6 3 .4 5.1c-.3.3-.3.8 0 1.1.3.3.8.3 1.1 0C3.2 4.6 5.5 3.6 8 3.6zm0 3.7c1.6 0 3 .6 4.1 1.6.3.3.8.3 1.1 0 .3-.3.3-.8 0-1.1C11.9 6.5 10 5.7 8 5.7s-3.9.8-5.2 2.1c-.3.3-.3.8 0 1.1.3.3.8.3 1.1 0C5 7.9 6.4 7.3 8 7.3zm0 3.7c1 0 1.8.8 1.8 1.8S9 14.6 8 14.6s-1.8-.8-1.8-1.8.8-1.8 1.8-1.8z"></path>
+</svg>
+<!-- Battery Pill (19% with lightning) -->
+<div class="flex items-center gap-1">
+<div class="relative w-[25px] h-[12px] border-[1.2px] border-slate-900 rounded-[4px] p-[1px] flex items-center">
+<div class="h-full bg-slate-900 rounded-[2px] w-[19%]"></div>
+<!-- Battery terminal tip -->
+<div class="absolute -right-[3px] top-[2.5px] w-[1.5px] h-[5px] bg-slate-900 rounded-r-[1px]"></div>
+</div>
+<!-- Percentage text -->
+<span class="text-[11px] font-bold tracking-tighter">19</span>
+</div>
+</div>
+</header>
+<!-- END: iOSStatusBar -->
+<!-- BEGIN: ModalSheetContainer -->
+<!-- The modal sheet overlay that slides up from bottom in iOS -->
+<main class="flex-1 bg-[#f4f5f8] rounded-t-[34px] shadow-2xl flex flex-col overflow-y-auto relative pt-3 px-4 pb-8" data-purpose="sheet-content">
+<!-- Top Pull Bar Indicator (Subtle iOS design) -->
+<div class="w-9 h-1 bg-slate-300 rounded-full mx-auto mb-2 opacity-60"></div>
+<!-- BEGIN: NavigationBar -->
+<nav class="flex items-center justify-between px-1 py-2 mb-5" data-purpose="modal-navbar">
+<!-- Cancel Button -->
+<button aria-label="Huỷ" class="h-10 px-5 rounded-full bg-white text-slate-800 font-semibold text-sm shadow-sm active:scale-95 transition flex items-center justify-center" type="button">
+          Huỷ
+        </button>
+<!-- Modal Title -->
+<h1 class="text-[17px] font-bold text-slate-900 tracking-tight">
+          Thêm Ví
+        </h1>
+<!-- Save Button (Disabled State) -->
+<button aria-label="Lưu" class="h-10 px-5 rounded-full bg-white/70 text-slate-300 font-semibold text-sm cursor-not-allowed flex items-center justify-center" disabled="" type="button">
+          Lưu
+        </button>
+</nav>
+<!-- END: NavigationBar -->
+<!-- BEGIN: MainWalletCard -->
+<section class="bg-white rounded-[26px] p-4 shadow-sm border border-slate-100/80 mb-5" data-purpose="wallet-primary-details">
+<!-- Row 1: Wallet Icon Selector & Name Input -->
+<div class="flex items-center gap-3 pb-3">
+<!-- Icon Picker Container -->
+<button aria-label="Chọn biểu tượng ví" class="flex items-center bg-[#eef1f5] hover:bg-slate-200 transition py-1.5 px-2 rounded-2xl gap-1 shrink-0" type="button">
+<!-- Brown/Orange Wallet Icon -->
+<div class="w-10 h-10 rounded-full bg-[#e37b3b] shadow-inner flex items-center justify-center relative overflow-hidden">
+<!-- Darker Leather Strap -->
+<div class="w-8 h-6 bg-[#cb6323] rounded-sm relative flex items-center justify-end pr-0.5 shadow-sm">
+<!-- Golden snap button -->
+<span class="w-1.5 h-1.5 rounded-full bg-amber-200 block shadow"></span>
+</div>
+</div>
+<!-- Vertical Selector Arrows -->
+<svg class="w-3.5 h-3.5 text-slate-500" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24">
+<polyline points="7 15 12 20 17 15"></polyline>
+<polyline points="7 9 12 4 17 9"></polyline>
+</svg>
+</button>
+<!-- Wallet Name Text Input -->
+<div class="flex-1">
+<input class="w-full border-none p-0 text-[19px] font-medium text-slate-900 placeholder:text-slate-300 focus:ring-0 focus:outline-none bg-transparent" placeholder="Tên" type="text"/>
+</div>
+</div>
+<!-- Inner Separator Line -->
+<div class="h-px bg-slate-100 w-full mb-3 ml-12"></div>
+<!-- Row 2: Currency Selector -->
+<div class="flex items-center justify-between py-1 cursor-pointer group active:opacity-70 transition" data-purpose="currency-selector" role="button" tabindex="0">
+<div class="flex items-center gap-4">
+<!-- Dollar Icon Container -->
+<div class="w-8 h-8 rounded-full border border-slate-300 flex items-center justify-center text-slate-700 font-bold text-sm ml-2">
+              $
+            </div>
+<!-- Currency Label -->
+<span class="text-[15px] text-slate-400 group-hover:text-slate-600 transition">
+              Đơn vị tiền tệ
+            </span>
+</div>
+<!-- Chevron Right -->
+<svg class="w-4 h-4 text-slate-300 mr-1" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</div>
+<!-- Inner Separator Line -->
+<div class="h-px bg-slate-100 w-full my-3 ml-12"></div>
+<!-- Row 3: Current Balance -->
+<div class="flex items-center justify-between cursor-pointer active:opacity-70 transition pl-12 pr-1 pt-0.5" data-purpose="balance-input-row" role="button" tabindex="0">
+<div>
+<p class="text-[12px] font-medium text-slate-400 mb-0.5">Số tiền hiện có</p>
+<span class="text-[22px] font-semibold text-slate-900 tracking-tight leading-tight">0</span>
+</div>
+<!-- Chevron Right -->
+<svg class="w-4 h-4 text-slate-300" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" viewbox="0 0 24 24">
+<polyline points="9 18 15 12 9 6"></polyline>
+</svg>
+</div>
+</section>
+<!-- END: MainWalletCard -->
+<!-- BEGIN: LinkServiceSection -->
+<section class="mb-6" data-purpose="link-service-container">
+<!-- Action Button -->
+<button class="w-full bg-white py-3.5 px-4 rounded-[22px] text-[#22c55e] font-semibold text-[15px] shadow-sm hover:bg-emerald-50/50 active:scale-[0.99] transition text-center flex items-center justify-center border border-slate-100/60" type="button">
+          Liên kết dịch vụ
+        </button>
+<!-- Explanatory Subtext -->
+<p class="text-[12px] text-slate-400 text-center mt-2 font-normal leading-relaxed px-2">
+          Kết nối tới các dịch vụ ngay trong Money Lover.
+        </p>
+</section>
+<!-- END: LinkServiceSection -->
+<!-- BEGIN: ExclusionSettingsSection -->
+<section data-purpose="wallet-settings">
+<!-- Settings Toggle Card -->
+<div class="bg-white rounded-[24px] px-4 py-3.5 shadow-sm border border-slate-100/80 flex items-center justify-between">
+<span class="text-[15px] font-medium text-slate-900">
+            Không tính vào tổng
+          </span>
+<!-- iOS Style Switch (OFF state) -->
+<label class="relative inline-flex items-center cursor-pointer">
+<input class="sr-only peer" type="checkbox" value=""/>
+<div class="w-[50px] h-[30px] bg-[#e3e5ea] peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-200 after:border after:rounded-full after:h-[26px] after:w-[26px] after:transition-all after:shadow-sm peer-checked:bg-[#22c55e]"></div>
+</label>
+</div>
+<!-- Description Note -->
+<p class="text-[12px] text-slate-400 mt-2 px-3 leading-relaxed">
+          Bỏ qua ví này và số dư khỏi "Tổng".
+        </p>
+</section>
+<!-- END: ExclusionSettingsSection -->
+<!-- Bottom iOS Home Indicator -->
+<div class="mt-auto pt-6 flex justify-center shrink-0">
+<div class="w-32 h-1 bg-slate-300 rounded-full opacity-40"></div>
+</div>
+</main>
+<!-- END: ModalSheetContainer -->
+</div>
+<!-- END: MobileDeviceFrame -->
+</body></html>

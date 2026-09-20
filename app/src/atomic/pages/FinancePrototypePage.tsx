@@ -169,11 +169,11 @@ export function FinancePrototypePage() {
         onToggleMask={() => setMasked((value) => !value)}
         onAdd={() => setQuickAddOpen(true)}
         refreshKey={transactionRefresh}
-        showHeader={!location.pathname.startsWith("/account/groups")}
+        showHeader={!location.pathname.startsWith("/account/groups") && !location.pathname.startsWith("/account/wallets")}
       >
         {tab === "overview" ? <OverviewPanel masked={masked} refreshKey={transactionRefresh} /> : null}
         {tab === "transactions" ? <TransactionsPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : null}
-        {tab === "budgets" ? <BudgetsPanel masked={masked} /> : null}
+        {tab === "budgets" ? <BudgetsPanel masked={masked} refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh(value=>value+1)} /> : null}
         {/* ReportsPanel awaits its real reporting API. */}
         {tab === "account" ? (location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
       </MobileAppShell>

@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-03-01
-status: draft
+status: in_progress
 owner: human
 parent: TICKET-03
 trace:
@@ -14,6 +14,8 @@ trace:
 Ticket lớn: [Theo dõi budget](TICKET-03-budget.md).
 
 ## Mục tiêu và phạm vi
+
+Explicit-interval CRUD implemented and API-verified in [API-SCREENS-01](API-SCREENS-01-DETAIL_DESIGN.md), with overlap protection and ended-period read/delete only. Recurring/fixed-period choices and owner acceptance remain pending; full ticket not complete.
 
 Tạo/sửa/xóa budget theo ví, danh mục, kỳ và lựa chọn lặp.
 

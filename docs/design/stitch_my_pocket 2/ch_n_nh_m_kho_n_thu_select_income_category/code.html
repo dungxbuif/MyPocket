@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Chọn nhóm - Khoản thu</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'sans-serif'],
+          },
+          colors: {
+            appBg: '#F3F4F7',
+            cardBg: '#FFFFFF',
+            tabTrack: '#E6E7ED',
+            textPrimary: '#1E232A',
+            emeraldNote: '#279860',
+          },
+          boxShadow: {
+            'soft-btn': '0 2px 8px -1px rgba(0, 0, 0, 0.05)',
+            'pill-tab': '0 2px 6px rgba(0, 0, 0, 0.06)',
+            'card': '0 1px 3px rgba(0, 0, 0, 0.02)',
+          }
+        }
+      }
+    };
+  </script>
+<style data-purpose="base-resets">
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-stone-300 min-h-screen flex justify-center items-center font-sans p-0 sm:p-4 text-textPrimary">
+<!-- BEGIN: MobileContainer -->
+<!-- Main Phone Wrapper replicating iPhone screen layout -->
+<div class="relative w-full max-w-[420px] h-[890px] bg-appBg flex flex-col overflow-hidden sm:rounded-[48px] shadow-2xl">
+<!-- BEGIN: TopBar -->
+<!-- Status Bar & Top Safe Area -->
+<header class="pt-3 px-7 pb-2 flex justify-between items-center text-xs font-semibold select-none text-black">
+<span class="text-sm font-bold tracking-tight">22:21</span>
+<div class="flex items-center space-x-1.5">
+<!-- Cellular Signal Icon -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M2 17h3v4H2v-4zm6-5h3v9H8v-9zm6-5h3v14h-3V7zm6-4h3v18h-3V3z"></path>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-4 fill-current" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A17.9 17.9 0 0 0 12 4zm0 3.5a14.5 14.5 0 0 1 9.4 3.42L12 19.34 2.6 10.92A14.5 14.5 0 0 1 12 7.5z"></path>
+</svg>
+<!-- Battery with Percentage -->
+<div class="flex items-center space-x-0.5 bg-emerald-500/20 text-emerald-700 px-1 py-0.5 rounded text-[10px] font-bold">
+<span>38</span>
+<svg class="w-3.5 h-3.5 fill-current" viewbox="0 0 24 24">
+<path d="M16 4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-1 8H9v-2h6v2z"></path>
+</svg>
+</div>
+</div>
+</header>
+<!-- END: TopBar -->
+<!-- BEGIN: HeaderNav -->
+<!-- Top Action Navigation: Back button, Title, and Hamburger Menu -->
+<nav aria-label="Thanh điều hướng" class="px-5 pt-3 pb-3 flex items-center justify-between">
+<!-- Back Button -->
+<button aria-label="Quay lại" class="w-12 h-12 rounded-full bg-cardBg shadow-soft-btn flex items-center justify-center text-gray-800 hover:bg-gray-50 active:scale-95 transition" data-purpose="nav-back-button" type="button">
+<svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15.75 19.5L8.25 12l7.5-7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Center Title -->
+<h1 class="text-lg font-bold text-gray-900 tracking-tight">Chọn nhóm</h1>
+<!-- Menu Button -->
+<button aria-label="Mở danh mục menu" class="w-12 h-12 rounded-full bg-cardBg shadow-soft-btn flex items-center justify-center text-gray-800 hover:bg-gray-50 active:scale-95 transition" data-purpose="nav-menu-button" type="button">
+<svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</nav>
+<!-- END: HeaderNav -->
+<!-- BEGIN: MainContent -->
+<main class="flex-1 px-5 pt-2 flex flex-col overflow-y-auto">
+<!-- BEGIN: SegmentedControl -->
+<!-- Switcher between Khoản chi and Khoản thu -->
+<div class="bg-tabTrack p-1 rounded-full flex items-center justify-between mb-4 select-none" data-purpose="tab-switcher">
+<!-- Khoản Chi Tab -->
+<button class="flex-1 py-2 text-center text-sm font-semibold text-gray-600 rounded-full transition hover:text-gray-900" type="button">
+          Khoản chi
+        </button>
+<!-- Khoản Thu Tab (Active) -->
+<button class="flex-1 py-2 text-center text-sm font-semibold text-gray-900 bg-cardBg rounded-full shadow-pill-tab transition" type="button">
+          Khoản thu
+        </button>
+</div>
+<!-- END: SegmentedControl -->
+<!-- BEGIN: CategoryList -->
+<!-- Income category cards list -->
+<div class="space-y-3">
+<!-- Category Item 1: Tiền chuyển đến -->
+<div class="w-full bg-cardBg rounded-[22px] px-4 py-3.5 flex items-center space-x-4 shadow-card hover:bg-gray-50/80 cursor-pointer active:scale-[0.99] transition" data-purpose="category-item">
+<!-- Icon: Wallet with arrow down -->
+<div class="w-11 h-11 rounded-full bg-slate-700 flex items-center justify-center relative overflow-hidden flex-shrink-0">
+<!-- Brown bottom flap -->
+<div class="absolute bottom-0 w-full h-5 bg-[#C96B3E] rounded-t-sm flex items-center justify-center">
+<div class="w-1.5 h-1.5 rounded-full bg-white/90"></div>
+</div>
+<!-- Blue arrow down -->
+<svg class="w-4 h-4 text-[#38BDF8] z-10 -mt-2.5 stroke-[2.5]" fill="currentColor" viewbox="0 0 20 20">
+<path clip-rule="evenodd" d="M10 3a1 1 0 011 1v7.586l2.293-2.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 11.586V4a1 1 0 011-1z" fill-rule="evenodd"></path>
+</svg>
+</div>
+<!-- Label -->
+<span class="text-[15px] font-semibold text-gray-900">Tiền chuyển đến</span>
+</div>
+<!-- Category Item 2: Thu lãi -->
+<div class="w-full bg-cardBg rounded-[22px] px-4 py-3.5 flex items-center space-x-4 shadow-card hover:bg-gray-50/80 cursor-pointer active:scale-[0.99] transition" data-purpose="category-item">
+<!-- Icon: Percentage badge -->
+<div class="w-11 h-11 rounded-full bg-[#DE7740] flex items-center justify-center flex-shrink-0 shadow-inner">
+<span class="text-white text-lg font-extrabold tracking-tighter">%</span>
+</div>
+<!-- Label -->
+<span class="text-[15px] font-semibold text-gray-900">Thu lãi</span>
+</div>
+<!-- Feedback & Question Card -->
+<div class="w-full bg-cardBg rounded-[22px] py-3.5 px-4 flex items-center justify-center space-x-1.5 shadow-card hover:bg-gray-50/80 cursor-pointer active:scale-[0.99] transition" data-purpose="support-prompt">
+<span class="text-[13.5px] font-semibold text-emeraldNote">Bạn có thắc mắc? Hãy cho chúng tôi biết!</span>
+<!-- Help Question Mark Icon -->
+<svg class="w-4 h-4 text-emeraldNote" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke-linecap="round"></path>
+<line stroke-linecap="round" stroke-width="2.5" x1="12" x2="12.01" y1="17" y2="17"></line>
+</svg>
+</div>
+</div>
+<!-- END: CategoryList -->
+</main>
+<!-- END: MainContent -->
+<!-- BEGIN: BottomSearchArea -->
+<!-- Bottom Floating Search Input Pill -->
+<footer class="p-5 pt-2 pb-7">
+<div class="relative w-full bg-cardBg rounded-full px-4 py-3 flex items-center shadow-card border border-gray-100/60" data-purpose="search-bar">
+<!-- Search Icon -->
+<svg class="w-5 h-5 text-gray-900 ml-1 mr-2.5 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<input class="w-full bg-transparent border-0 p-0 text-[15px] font-medium text-gray-900 placeholder-gray-500 focus:ring-0" placeholder="Tìm kiếm" type="text"/>
+</div>
+</footer>
+<!-- END: BottomSearchArea -->
+</div>
+<!-- END: MobileContainer -->
+</body></html>
