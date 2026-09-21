@@ -7,6 +7,7 @@ import { AccountPanel } from "../organisms/AccountPanel";
 import { BudgetsPanel } from "../organisms/BudgetsPanel";
 import { OverviewPanel } from "../organisms/OverviewPanel";
 import { QuickAddSheet } from "../organisms/QuickAddSheet";
+import { AiEntrySheet } from "../organisms/AiEntrySheet";
 // import { ReportsPanel } from "../organisms/ReportsPanel";
 import { TransactionsPanel } from "../organisms/TransactionsPanel";
 import { GroupManagementPanel } from "../organisms/GroupManagementPanel";
@@ -52,6 +53,7 @@ export function FinancePrototypePage() {
   const tab = tabFromPath(location.pathname);
   const [masked, setMasked] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [aiEntryOpen, setAiEntryOpen] = useState(false);
   const [transactionRefresh, setTransactionRefresh] = useState(0);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
 
@@ -168,6 +170,7 @@ export function FinancePrototypePage() {
         onTabChange={(nextTab) => void navigate({ to: pathFromTab(nextTab) })}
         onToggleMask={() => setMasked((value) => !value)}
         onAdd={() => setQuickAddOpen(true)}
+        onAiAdd={() => { setQuickAddOpen(false); setAiEntryOpen(true); }}
         refreshKey={transactionRefresh}
         showHeader={!location.pathname.startsWith("/account/groups") && !location.pathname.startsWith("/account/wallets")}
       >
@@ -177,7 +180,8 @@ export function FinancePrototypePage() {
         {/* ReportsPanel awaits its real reporting API. */}
         {tab === "account" ? (location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
       </MobileAppShell>
-      {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} onSaved={() => setTransactionRefresh((value) => value + 1)} /> : null}
+      {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} onAiEntry={() => { setQuickAddOpen(false); setAiEntryOpen(true); }} onSaved={() => setTransactionRefresh((value) => value + 1)} /> : null}
+      {aiEntryOpen ? <AiEntrySheet onClose={() => setAiEntryOpen(false)} onSaved={() => setTransactionRefresh(value => value + 1)} /> : null}
     </>
   );
 }

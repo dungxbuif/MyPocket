@@ -13,6 +13,8 @@ trace:
 
 Ticket lớn: [Trợ lý nhập liệu và tư vấn](TICKET-09-tro-ly-ai.md).
 
+Thiết kế và kế hoạch đề xuất: [DESIGN-09-AI](TICKET-09-DETAIL_DESIGN.md), T6/T7; chờ owner review, chưa triển khai.
+
 ## Mục tiêu và phạm vi
 
 Hỏi trợ lý về giao dịch, reports, budget, hũ, nợ và tài sản.

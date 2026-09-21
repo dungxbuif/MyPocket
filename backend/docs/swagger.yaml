@@ -1,5 +1,86 @@
 basePath: /
 definitions:
+  entity.AIEntryDraft:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      included_in_reports:
+        type: boolean
+      note:
+        type: string
+      occurred_at:
+        type: string
+      type:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.AIEntryMessage:
+    properties:
+      content:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      role:
+        type: string
+    type: object
+  entity.AIEntryProposal:
+    properties:
+      created_at:
+        type: string
+      draft:
+        $ref: '#/definitions/entity.AIEntryDraft'
+      id:
+        type: string
+      questions:
+        items:
+          type: string
+        type: array
+      session_id:
+        type: string
+      status:
+        type: string
+      transaction_id:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+    type: object
+  entity.AIEntrySession:
+    properties:
+      created_at:
+        type: string
+      error:
+        type: string
+      id:
+        type: string
+      messages:
+        items:
+          $ref: '#/definitions/entity.AIEntryMessage'
+        type: array
+      processing:
+        type: boolean
+      proposals:
+        items:
+          $ref: '#/definitions/entity.AIEntryProposal'
+        type: array
+      updated_at:
+        type: string
+    type: object
+  entity.AIImage:
+    properties:
+      base64:
+        type: string
+      mime_type:
+        type: string
+      name:
+        type: string
+    type: object
   entity.Budget:
     properties:
       category_id:
@@ -146,6 +227,23 @@ definitions:
       type:
         type: string
     type: object
+  httpapi.Response:
+    properties:
+      data: {}
+      meta: {}
+    type: object
+  httpapi.aiProposalDecision:
+    properties:
+      version:
+        type: integer
+    type: object
+  httpapi.aiProposalEdit:
+    properties:
+      draft:
+        $ref: '#/definitions/entity.AIEntryDraft'
+      version:
+        type: integer
+    type: object
   httpapi.budgetInput:
     properties:
       category_id:
@@ -226,6 +324,19 @@ definitions:
       type:
         type: string
     type: object
+  usecase.AIEntryMessageInput:
+    properties:
+      images:
+        items:
+          $ref: '#/definitions/entity.AIImage'
+        type: array
+      request_id:
+        type: string
+      text:
+        type: string
+      timezone:
+        type: string
+    type: object
   usecase.HomeOutput:
     properties:
       greeting:
@@ -267,6 +378,192 @@ info:
   title: MyPocket API
   version: 0.1.0
 paths:
+  /api/v1/ai/entry/capabilities:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.Response'
+      security:
+      - BearerAuth: []
+      summary: AI entry configuration availability
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/proposals/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Proposal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Draft and expected version
+        in: body
+        name: proposal
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.aiProposalEdit'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntryProposal'
+      security:
+      - BearerAuth: []
+      summary: Edit a pending AI proposal without changing ledger
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/proposals/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Proposal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Expected version
+        in: body
+        name: decision
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.aiProposalDecision'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntryProposal'
+      security:
+      - BearerAuth: []
+      summary: Approve a proposal and atomically create its ledger transaction once
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/proposals/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Proposal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Expected version
+        in: body
+        name: decision
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.aiProposalDecision'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntryProposal'
+      security:
+      - BearerAuth: []
+      summary: Reject a proposal without changing ledger
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/sessions:
+    post:
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.AIEntrySession'
+      security:
+      - BearerAuth: []
+      summary: Create an owner-scoped AI entry chat
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/sessions/{id}:
+    get:
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntrySession'
+      security:
+      - BearerAuth: []
+      summary: Read AI entry chat and proposals
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/sessions/{id}/messages:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Session ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Message
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/usecase.AIEntryMessageInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntrySession'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Extract reviewable drafts from text and OCR-first images
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/sessions/latest:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntrySession'
+      security:
+      - BearerAuth: []
+      summary: Resume latest AI entry chat
+      tags:
+      - AI Entry
   /api/v1/auth/google:
     get:
       parameters:

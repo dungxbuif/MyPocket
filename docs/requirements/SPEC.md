@@ -121,6 +121,7 @@ API có hợp đồng, lỗi rõ ràng, phân trang, chống tạo trùng khi re
 ## AI nhập liệu, tư vấn và OCR
 
 - AI nhập liệu nhận nội dung/chứng từ, hỏi dữ liệu thiếu, tạo đề xuất sửa/xác nhận được; chỉ xác nhận mới tác động số dư.
+- Điểm mở nhập liệu: bấm nút Thêm giao dịch mở form thủ công; nhấn giữ mở chat nhập liệu AI. Kết quả là danh sách giao dịch điền sẵn, từng dòng được sửa rồi duyệt hoặc từ chối. Chỉ duyệt mới ghi sổ; lưu bản nháp không đổi số dư. Hỏi đáp tài chính có điểm mở riêng, không yêu cầu chọn mode ở nút Thêm.
 - OCR đọc chứng từ thuộc account để review; lỗi không tự tạo giao dịch.
 - AI tư vấn dùng công cụ chỉ đọc lấy dữ liệu mới, nêu phạm vi/nguồn và phân biệt dữ kiện với suy luận.
 - AI tổng kết tháng chỉ cập nhật phần tự sinh, không sửa giao dịch hoặc note thủ công.

@@ -13,16 +13,19 @@ export function BottomNavigation({
   tab,
   onTabChange,
   onAdd,
+  onAiAdd,
 }: {
   tab: PrototypeTab;
   onTabChange: (tab: PrototypeTab) => void;
   onAdd: () => void;
+  onAiAdd?: () => void;
 }) {
   return (
     <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto max-w-[430px] border-t border-line bg-card/95 px-3 pb-[calc(env(safe-area-inset-bottom)+8px)] pt-2 backdrop-blur">
       <BaseFab
         type="button"
         onClick={onAdd}
+        onLongPress={onAiAdd}
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
         aria-label="Thêm giao dịch"
       >

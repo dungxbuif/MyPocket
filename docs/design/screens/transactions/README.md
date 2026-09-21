@@ -23,6 +23,7 @@ No screen-local color, shape, input, button or card styling is allowed. Transfer
 | --- | --- |
 | Enter `/transactions` | Load transactions, wallets and visible groups from their authenticated APIs. Never replace an error with mock rows. |
 | Activate global add | Open a clean editor with `expense`, current local date/time, report inclusion enabled, and the first available wallet. |
+| Hold global add for 500ms | Open [AI entry chat](../assistant/README.md) with persistent prefilled review proposals. Release does not also open the manual editor; moving/cancelling cancels hold. Manual create offers keyboard-accessible “Nhập bằng AI”. |
 | Change wallet | Keep the selected group only if it applies to the new wallet; otherwise clear the group. |
 | Change type | Keep the selected group only if its kind matches; otherwise clear the group. |
 | Submit valid editor | Convert local datetime to RFC3339 UTC, call create/update, close on success, then refresh transactions and wallets. |

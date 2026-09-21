@@ -10,6 +10,7 @@ export function MobileAppShell({
   onTabChange,
   onToggleMask,
   onAdd,
+  onAiAdd,
   refreshKey = 0,
   showHeader = true,
 }: {
@@ -19,6 +20,7 @@ export function MobileAppShell({
   onTabChange: (tab: PrototypeTab) => void;
   onToggleMask: () => void;
   onAdd: () => void;
+  onAiAdd?: () => void;
   refreshKey?: number;
   showHeader?: boolean;
 }) {
@@ -27,7 +29,7 @@ export function MobileAppShell({
       <div className="mx-auto min-h-screen max-w-[430px] bg-canvas pb-28 shadow-shell">
         {showHeader ? <AppHeader masked={masked} onToggleMask={onToggleMask} refreshKey={refreshKey} /> : null}
         <section className="space-y-3 px-4">{children}</section>
-        <BottomNavigation tab={tab} onTabChange={onTabChange} onAdd={onAdd} />
+        <BottomNavigation tab={tab} onTabChange={onTabChange} onAdd={onAdd} onAiAdd={onAiAdd} />
       </div>
     </main>
   );

@@ -32,6 +32,10 @@ updated: 2026-09-13
 
 ## Current Status
 
+- 2026-09-21 implementation follow-up: [AI-ENTRY-01](work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md) implements normal Add/manual vs hold/chat, API-backed persistent proposal list, editing/approve/reject, atomic replay-safe ledger writes and text/OCR adapters. Migration 000010 applied; real DB HTTP/concurrency tests pass. Runtime backend restarted through FE proxy; live Chrome verified manual form and AI configuration state. Actual AI endpoint/model/key are still missing, so extraction UAT remains pending. OCR/S3 secrets are in ignored backend `.env.local`; S3 bucket/region absent, durable receipt storage not implemented.
+
+- 2026-09-21: owner requested feasibility assessment and a reviewable file for the two AI flows. [DESIGN-09-AI](work/tickets/TICKET-09-DETAIL_DESIGN.md) is `in_review`, approval pending: text/OCR proposals, internal-transfer reconciliation, read-only financial Q&A, prompt/eval contracts and T0–T7 delivery plan. No AI/transfer/jar runtime implemented in this documentation task.
+
 - 2026-09-20 latest: owner requested API-only screens. All mounted data screens now use real APIs, including new budget explicit-interval CRUD/progress. Savings catalog filtering enforced FE/BE; category names/icons resolved in goal history. API roundtrip through FE proxy passed with PostgreSQL, test fixtures cleaned. Migration 000009 applied. [API-SCREENS-01](work/tickets/API-SCREENS-01-DETAIL_DESIGN.md) and savings remain in review/partial product scope; recurring budgets, internal paired transfers, reports and notifications are not completed. Earlier mock-budget/counterpart-pending notes below are historical.
 
 - Latest owner request (2026-09-13): finish wallet management and adding transactions, then verify wallet–transaction–category logic and UI. Core wallet and basic income/expense slices are in review with [wallet proof](work/tickets/TICKET-01-02-VERIFICATION.md), [ledger proof](work/tickets/TICKET-02-01-VERIFICATION.md), and a durable [screen contract](design/screens/transactions/README.md).
@@ -122,6 +126,10 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 - OCR Platform docs have been captured in `docs/architecture/OCR_API.md` for future receipt OCR implementation against `https://ocr.dungxbuif.com/`.
 
 ## Next Steps
+
+- Configure AI_BASE_URL/AI_MODEL/AI_API_KEY and run real extraction/owner review for [AI entry](work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md). S3 bucket/region needed before separate retained-receipt storage work. User clarified: hold Add opens entry chat directly, manual click stays unchanged; financial advice has a separate entry point. No two-mode assistant at Add.
+
+- Review [two-flow AI plan](work/tickets/TICKET-09-DETAIL_DESIGN.md), especially transfer-linked wallet deletion, attachment retention and v1 limits. Existing owner decisions recorded: OCR-first/text-only AI, configurable compatible endpoint, session-only bank context, explicit confirmation. Prepare provider credentials/private storage before live integration; jars remain a separate dependency slice.
 
 - Owner visual acceptance of API-only budget and savings screens; complete shared paired transfers as separately designed work. Browser inspected budget empty/editor and grouped transaction form without writing to owner's account. Automated API persistence test covers savings and budgets using isolated created fixtures. Do not confuse this with complete browser CRUD UAT or full budget roadmap acceptance.
 

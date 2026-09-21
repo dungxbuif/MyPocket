@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: TICKET-09-01
-status: draft
+status: in_review
 owner: human
 parent: TICKET-09
 trace:
@@ -12,6 +12,8 @@ trace:
 # TICKET-09-01 — Nhập giao dịch bằng nội dung hoặc chứng từ
 
 Ticket lớn: [Trợ lý nhập liệu và tư vấn](TICKET-09-tro-ly-ai.md).
+
+Thiết kế tổng thể: [DESIGN-09-AI](TICKET-09-DETAIL_DESIGN.md). Owner đã yêu cầu triển khai lát [AI-ENTRY-01](TICKET-09-01-ENTRY-DETAIL_DESIGN.md): giữ nút thêm → chat → danh sách điền sẵn → sửa/duyệt/từ chối. Code và kiểm thử fixture/DB đã có; live model/OCR quality và owner UAT còn chờ. Không đánh dấu toàn bộ multi-bank/transfer/retained receipts hoàn tất.
 
 ## Mục tiêu và phạm vi
 

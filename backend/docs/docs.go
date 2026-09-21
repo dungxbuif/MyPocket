@@ -15,6 +15,309 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/ai/entry/capabilities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "AI entry configuration availability",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Response"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/entry/proposals/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "Edit a pending AI proposal without changing ledger",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Proposal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Draft and expected version",
+                        "name": "proposal",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.aiProposalEdit"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AIEntryProposal"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/entry/proposals/{id}/approve": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "Approve a proposal and atomically create its ledger transaction once",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Proposal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Expected version",
+                        "name": "decision",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.aiProposalDecision"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AIEntryProposal"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/entry/proposals/{id}/reject": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "Reject a proposal without changing ledger",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Proposal ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Expected version",
+                        "name": "decision",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.aiProposalDecision"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AIEntryProposal"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/entry/sessions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "Create an owner-scoped AI entry chat",
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AIEntrySession"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/entry/sessions/latest": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "Resume latest AI entry chat",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AIEntrySession"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/entry/sessions/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "Read AI entry chat and proposals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AIEntrySession"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/entry/sessions/{id}/messages": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "Extract reviewable drafts from text and OCR-first images",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Session ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Message",
+                        "name": "message",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/usecase.AIEntryMessageInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AIEntrySession"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/google": {
             "get": {
                 "produces": [
@@ -1029,6 +1332,130 @@ const docTemplate = `{
         }
     },
     "definitions": {
+        "entity.AIEntryDraft": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "included_in_reports": {
+                    "type": "boolean"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.AIEntryMessage": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.AIEntryProposal": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "draft": {
+                    "$ref": "#/definitions/entity.AIEntryDraft"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "questions": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "session_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "transaction_id": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.AIEntrySession": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "messages": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.AIEntryMessage"
+                    }
+                },
+                "processing": {
+                    "type": "boolean"
+                },
+                "proposals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.AIEntryProposal"
+                    }
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.AIImage": {
+            "type": "object",
+            "properties": {
+                "base64": {
+                    "type": "string"
+                },
+                "mime_type": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.Budget": {
             "type": "object",
             "properties": {
@@ -1251,6 +1678,32 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.Response": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "meta": {}
+            }
+        },
+        "httpapi.aiProposalDecision": {
+            "type": "object",
+            "properties": {
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httpapi.aiProposalEdit": {
+            "type": "object",
+            "properties": {
+                "draft": {
+                    "$ref": "#/definitions/entity.AIEntryDraft"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
         "httpapi.budgetInput": {
             "type": "object",
             "properties": {
@@ -1370,6 +1823,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "usecase.AIEntryMessageInput": {
+            "type": "object",
+            "properties": {
+                "images": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.AIImage"
+                    }
+                },
+                "request_id": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                },
+                "timezone": {
                     "type": "string"
                 }
             }

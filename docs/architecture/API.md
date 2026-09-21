@@ -10,11 +10,21 @@ shared_fields: [status, trace]
 
 # API
 
+## AI entry review — 2026-09-21
+
+Authenticated routes under `/api/v1/ai/entry`: `GET /capabilities`, `POST /sessions`, `GET /sessions/latest`, `GET /sessions/{id}`, `POST /sessions/{id}/messages`, `PATCH /proposals/{id}`, `POST /proposals/{id}/approve`, `POST /proposals/{id}/reject`. Code-first Swagger covers these implemented routes. [Exact request/response contract](../work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [ADR-005](../decisions/ADR-005-ai-entry-review.md).
+
+Messages accept a request UUID, text, IANA timezone and up to three JPEG/PNG base64 images (5 MiB/file, 22 MiB request body). OCR precedes text extraction. Persistent proposals have draft/version/status/questions; editing does not write ledger. Approve validates owner, category visibility/applicability, supported wallet, positive safe-integer VND and RFC3339 date; writes exactly one income/expense transaction and approval receipt atomically. Repeated approval returns the original receipt even if the ledger row was later deleted. Transfer/credit approval is unsupported. Reject has no ledger effect.
+
+Same request ID/payload does not repeat extraction. Different payload with same ID, stale edits and conflicting terminal decisions return 409; invalid input 400, unavailable/unconfigured provider 503, wrong owner 404, missing auth 401. Account cap 20 extraction attempts/24 hours returns 429; session max 20 user messages. Expired processing lease shows interruption; no automatic resubmission. New session is explicit. Env capability booleans indicate configuration, not successful provider authentication or quality.
+
 ## Budget and savings integration — 2026-09-20
 
 Authenticated `GET/POST /api/v1/budgets`, `PATCH/DELETE /api/v1/budgets/{id}` implemented. Explicit interval input: name, positive safe-integer limit_amount, nullable owner wallet_id and visible expense category_id, RFC3339 start_at inclusive/end_at exclusive. List returns items with ledger-derived spent/days_remaining/ended and active limit_amount/spent summary (transaction IDs deduplicated). Category scope includes descendants. Only report-included expenses count. Exact same scope and overlapping dates returns 409; ended budgets cannot be edited. Delete configuration leaves transactions unchanged. [Design/proof](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md), [ADR-004](../decisions/ADR-004-budget-api-data.md).
 
 Goal transaction categories, when explicitly selected, must use real catalog keys income_transfer_in/income_interest for income or expense_transfer_out for expense, in addition to kind/wallet applicability. Category omission remains allowed. External savings entries affect one wallet and retain report inclusion default true; internal paired transfers are not implemented by this path.
+
+2026-09-21 ownership correction: system category wallet applicability is read/replaced within the authenticated owner's wallets. Changing a shared category's selection preserves other owners' assignments. AI catalog and confirmation use the same scope.
 
 ## Wallet goal date
 

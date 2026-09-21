@@ -9,6 +9,7 @@ import (
 	"github.com/mypocket/backend/internal/config"
 	httpapi "github.com/mypocket/backend/internal/controller/http"
 	"github.com/mypocket/backend/internal/entity"
+	"github.com/mypocket/backend/internal/infrastructure/ai"
 	"github.com/mypocket/backend/internal/infrastructure/auth"
 	"github.com/mypocket/backend/internal/infrastructure/cache"
 	"github.com/mypocket/backend/internal/infrastructure/db"
@@ -29,6 +30,9 @@ import (
 // @in header
 // @name Authorization
 func main() {
+	if err := config.LoadLocalEnv(".env.local"); err != nil {
+		log.Fatal(err)
+	}
 	cfg := config.Load()
 
 	database, err := db.NewPostgres(cfg.DatabaseURL)
@@ -94,6 +98,8 @@ func main() {
 	middleware := httpapi.NewAuthMiddleware(jwtSvc, verifySession)
 	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, walletHandler, transactionHandler, middleware, cfg.CORSAllowedOrigins)
 	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: repo.NewBudgetPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Transactions: repo.NewTransactionPostgresRepository(database)})
+	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey})
+	router.RegisterAIEntryRoutes(&httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient}})
 	router.Engine.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	if err := router.Engine.Run(cfg.HTTPAddr); err != nil {

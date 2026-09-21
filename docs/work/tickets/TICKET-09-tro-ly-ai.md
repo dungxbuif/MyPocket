@@ -15,6 +15,10 @@ trace:
 
 Ghi chép nhanh từ nội dung/chứng từ và hỏi về tài chính cá nhân.
 
+## Kế hoạch để review
+
+[Đánh giá tính khả thi và DETAIL_DESIGN hai flow](TICKET-09-DETAIL_DESIGN.md), ngày 2026-09-21: proposal/OCR, đối chiếu chuyển nội bộ, hỏi đáp chỉ đọc, prompt/eval và thứ tự triển khai. Thiết kế đang `in_review`, chưa duyệt implementation; không đổi trạng thái nghiệm thu các ticket con.
+
 ## Ticket con
 
 | Ticket | Phạm vi |

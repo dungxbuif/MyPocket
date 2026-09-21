@@ -7,6 +7,7 @@ import (
 	categoryrepo "github.com/mypocket/backend/internal/repository"
 	"github.com/mypocket/backend/internal/usecase"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type CategoryPostgresRepository struct{ db *gorm.DB }
@@ -109,7 +110,7 @@ func (r *CategoryPostgresRepository) ListVisible(ownerID string) ([]entity.Categ
 		categoryIDs[index] = category.ID
 	}
 	var links []entity.CategoryWallet
-	if err = r.db.Where("category_id IN ?", categoryIDs).Find(&links).Error; err != nil {
+	if err = r.db.Model(&entity.CategoryWallet{}).Select("category_wallets.*").Joins("JOIN wallets ON wallets.id = category_wallets.wallet_id").Where("category_id IN ? AND wallets.owner_id = ?", categoryIDs, ownerID).Find(&links).Error; err != nil {
 		return nil, err
 	}
 	walletsByCategory := make(map[string][]string)
@@ -124,7 +125,20 @@ func (r *CategoryPostgresRepository) ListVisible(ownerID string) ([]entity.Categ
 
 func (r *CategoryPostgresRepository) ReplaceWallets(ownerID string, category *entity.Category, walletIDs []string) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("category_id = ?", category.ID).Delete(&entity.CategoryWallet{}).Error; err != nil {
+		var locked entity.Category
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND (is_system = true OR owner_id = ?)", category.ID, ownerID).First(&locked).Error; err != nil {
+			return err
+		}
+		if len(walletIDs) > 0 {
+			var count int64
+			if err := tx.Model(&entity.Wallet{}).Where("id IN ? AND owner_id = ?", walletIDs, ownerID).Count(&count).Error; err != nil {
+				return err
+			}
+			if count != int64(len(walletIDs)) {
+				return usecase.ErrCategoryWalletInvalid
+			}
+		}
+		if err := tx.Where("category_id = ? AND wallet_id IN (SELECT id FROM wallets WHERE owner_id = ?)", category.ID, ownerID).Delete(&entity.CategoryWallet{}).Error; err != nil {
 			return err
 		}
 		for _, walletID := range walletIDs {

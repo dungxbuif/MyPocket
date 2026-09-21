@@ -36,9 +36,11 @@ trace:
 
 ## Status
 
+- 2026-09-21 runtime update: bounded base64 OCR adapter is implemented for AI-entry JPEG/PNG inputs before text-only extraction. Images are transient; no retained-receipt/S3 upload or durable OCR worker is implemented yet. Adapter protocol tests pass; live OCR document extraction remains unverified. The retained-receipt sequence below is still future design. [Entry slice](../work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md).
 - ID: API-OCR-001
 - Status: ready for future implementation
 - Owner: shared
+- Public contract checked 2026-09-20: OpenAPI and capabilities returned HTTP 200. Scan-only routes are not advertised; do not implement against older scan guidance. This check did not run an authenticated OCR job.
 - Source documentation:
   - `https://ocr.dungxbuif.com/`
   - `https://ocr.dungxbuif.com/guides/onboarding`
@@ -55,7 +57,7 @@ The first implementation should support:
 - OCR job submission.
 - Polling known `documentId`.
 - Persisting normalized text needed by MyPocket before OCR result expiry.
-- Optional future scan-only route for enhanced receipt image previews.
+- Scan enhancement is outside the verified public contract and is not an implementation dependency.
 
 ## External API Summary
 
@@ -66,8 +68,6 @@ The first implementation should support:
 | `GET /v1/documents/{documentId}` | HTTP | Bearer API key | ready | Poll one known document. Completed response includes `result`; no separate result endpoint. |
 | `POST /v1/uploads/presign` | HTTP | Bearer API key | ready | Request signed upload URL for large/private files. |
 | object storage `PUT uploadUrl` | HTTP | signed URL only | ready | Upload bytes directly; do not send OCR API key. |
-| `POST /v1/scans` | HTTP | Bearer API key | optional | Image-only scan enhancement. Does not run OCR. |
-| `GET /v1/scans/{scanId}` | HTTP | Bearer API key | optional | Poll scan result and fetch short-lived enhanced image URL. |
 | `/mcp` | MCP / JSON-RPC / SSE | Bearer API key | future | Agent integration. Use later for MCP clients, not initial FE receipt flow. |
 
 ## Authentication
@@ -219,6 +219,7 @@ Status handling:
 | `processing` | Show processing state. Respect `Retry-After` if present. |
 | `completed` | Persist needed OCR result fields and present a transaction draft. |
 | `failed` | Keep receipt attachment, show retry/manual-entry option, log diagnostic detail. |
+| `cancelled` | Mark processing stopped; allow manual entry or an explicit new attempt. This status does not imply a public cancel endpoint exists. |
 
 Completed document response includes `result` directly:
 
@@ -270,19 +271,9 @@ Consumer rules:
 - Do not reconstruct business text by sorting bounding boxes unless tested against receipt layouts.
 - For MyPocket v1, parse draft fields from `result.text` and let the user confirm.
 
-## Optional Scan-Only Flow
+## Scan-Only Availability
 
-Use `POST /v1/scans` when the app needs an enhanced receipt image rather than recognized text.
-
-Constraints:
-
-- Accepts image inputs only: JPEG, PNG, TIFF, WebP.
-- Does not accept PDFs.
-- Does not accept OCR recognition options.
-- Completed scan returns short-lived `downloadUrl` and `downloadUrlExpiresAt`.
-- Scan consumes the same daily document quota as OCR; failed scan refunds quota.
-
-MyPocket should treat scan-only as a future enhancement for receipt preview quality.
+The [public OpenAPI](https://ocr.dungxbuif.com/api/v1/openapi.json), checked 2026-09-20, does not list `/v1/scans` or `/v1/scans/{scanId}`. Earlier scan-only guidance is superseded. Reverify provider support before designing this enhancement; the AI entry plan requires OCR text only.
 
 ## Errors
 
@@ -293,7 +284,7 @@ MyPocket should treat scan-only as a future enhancement for receipt preview qual
 | `404 NOT_FOUND` | Unknown document, wrong owner, or retained metadata gone. | Mark OCR job unavailable; keep manual receipt entry path. |
 | `410 RESULT_EXPIRED` | OCR result TTL expired. | Use persisted MyPocket OCR data if available; otherwise request re-scan. |
 | `413 URL_CONTENT_TOO_LARGE` | Upload exceeds deployment limit. | Show max size from `limits.maxUploadBytes`; ask user to reduce/split file. |
-| `415 UNSUPPORTED_MEDIA_TYPE` | Unsupported input media, or non-image sent to scan route. | Reject unsupported upload in UI before submission when possible. |
+| `415 UNSUPPORTED_MEDIA_TYPE` | Unsupported input media. | Reject unsupported upload in UI before submission when possible. |
 | object-storage `403` XML | Signed upload headers/body mismatch or expired upload URL. | Request a fresh presign URL; do not submit stale `sourceUrl`. |
 | OCR `failed` status | Worker could not complete recognition. | Keep attachment, allow retry, and support manual transaction entry. |
 
@@ -327,4 +318,5 @@ Suggested MyPocket internal data additions:
 
 ## Linked Decisions
 
+- [Two-flow AI review plan](../work/tickets/TICKET-09-DETAIL_DESIGN.md): OCR-first/text-only model input, source provenance, private upload and retention proposals. Review pending; no integration implemented by this docs update.
 - No ADR yet. Create an ADR when the team approves OCR Platform as the durable OCR provider or when secrets/runtime architecture is finalized.

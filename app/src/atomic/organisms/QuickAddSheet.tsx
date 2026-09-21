@@ -75,7 +75,7 @@ function initialState(transaction?: Transaction): EditorState {
   };
 }
 
-export function QuickAddSheet({ onClose, onSaved, transaction, initialWalletID }: { onClose: () => void; onSaved: () => void; transaction?: Transaction; initialWalletID?: string }) {
+export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initialWalletID }: { onClose: () => void; onSaved: () => void; onAiEntry?: () => void; transaction?: Transaction; initialWalletID?: string }) {
   const [state, setState] = useState(() => ({...initialState(transaction), walletID:transaction?.wallet_id ?? initialWalletID ?? ""}));
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -166,6 +166,7 @@ export function QuickAddSheet({ onClose, onSaved, transaction, initialWalletID }
     <BaseBottomSheet presentation="form" closingDisabled={saving} title={choosingCategory ? "Chọn nhóm" : transaction ? COPY.editTitle : COPY.addTitle} closeLabel={choosingCategory ? "Quay lại" : "Hủy"} onClose={() => { if (saving) return; if (choosingCategory) setChoosingCategory(false); else onClose(); }}>
       {choosingCategory ? <div className="space-y-4"><SegmentedControl value={state.type} onChange={(type) => changeScope({type})} options={[{value:"expense",label:COPY.expense},{value:"income",label:COPY.income}]} /><CategorySelectionList categories={applicableCategories} onSelect={(categoryID) => {setState(current => ({...current,categoryID}));setChoosingCategory(false);}} /></div> :
       <div className="space-y-3">
+        {!transaction && onAiEntry ? <BaseButton variant="secondary" disabled={saving} onClick={onAiEntry}>Nhập bằng AI</BaseButton> : null}
         {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
         {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
         {!loading && wallets.length === 0 ? <StatusMessage>{COPY.noWallet}</StatusMessage> : null}

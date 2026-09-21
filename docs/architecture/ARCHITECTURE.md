@@ -31,6 +31,8 @@ MyPocket is currently a modular monolith: a Vite/React mobile-first client calls
 
 ## Modules
 
+AI entry is implemented as HTTP adapters → `usecase.AIEntryService` → repository/provider interfaces. `infrastructure/ai` holds the text-only compatible provider client and OCR polling; `infrastructure/repository/ai_entry_postgres.go` persists drafts and atomically approves ordinary ledger entries. No model write tools. Long-press global Add opens the entry sheet; advice remains separate and unimplemented. Processing is bounded/synchronous with a session lease, not a durable worker. API main reads ignored `.env.local` from backend working directory without overriding process env. S3 config exists for future retained receipts but is not used by transient OCR. [ADR-005](../decisions/ADR-005-ai-entry-review.md).
+
 Frontend UI ownership: one primitive source `app/src/ui/theme.css` is imported by `styles.css`; named component variants live in `ui/variants.ts`. Atoms own native controls, typography, surface and progress visuals; molecules compose reusable patterns; organisms own screen state/API composition. Build enforces the base contract through `scripts/check-design.mjs`. See [ADR-002](../decisions/ADR-002-design-contract-enforcement.md) and [design gateway](../design/README.md).
 
 | Module | Responsibility | Key Files | Notes |

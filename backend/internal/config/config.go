@@ -9,6 +9,18 @@ import (
 )
 
 type Config struct {
+	AIBaseURL          string
+	AIAPIKey           string
+	AIModel            string
+	OCRAPIURL          string
+	OCRAPIKey          string
+	S3Endpoint         string
+	S3Region           string
+	S3Bucket           string
+	S3Prefix           string
+	S3AccessKeyID      string
+	S3SecretAccessKey  string
+	S3ForcePathStyle   bool
 	AppEnv             string
 	HTTPAddr           string
 	DatabaseURL        string
@@ -28,6 +40,18 @@ type Config struct {
 
 func Load() Config {
 	return Config{
+		AIBaseURL:          getenv("AI_BASE_URL", ""),
+		AIAPIKey:           getenv("AI_API_KEY", ""),
+		AIModel:            getenv("AI_MODEL", ""),
+		OCRAPIURL:          getenv("OCR_API_URL", "https://ocr.dungxbuif.com"),
+		OCRAPIKey:          getenv("OCR_API_KEY", ""),
+		S3Endpoint:         getenv("S3_ENDPOINT", ""),
+		S3Region:           getenv("S3_REGION", ""),
+		S3Bucket:           getenv("S3_BUCKET", ""),
+		S3Prefix:           getenv("S3_PREFIX", "mypocket/receipts"),
+		S3AccessKeyID:      getenv("S3_ACCESS_KEY_ID", ""),
+		S3SecretAccessKey:  getenv("S3_SECRET_ACCESS_KEY", ""),
+		S3ForcePathStyle:   getenvBool("S3_FORCE_PATH_STYLE", true),
 		AppEnv:             getenv("APP_ENV", "development"),
 		HTTPAddr:           getenv("HTTP_ADDR", ":8080"),
 		DatabaseURL:        getenv("DATABASE_URL", "postgres://dev:password@127.0.0.1:5432/postgres?sslmode=disable"),

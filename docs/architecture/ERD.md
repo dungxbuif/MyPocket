@@ -10,6 +10,10 @@ shared_fields: [status, trace]
 
 # ERD
 
+## Implemented AI entry schema — migration 000010
+
+`ai_entry_sessions`: owner FK user, processing token/expiry, error and timestamps. `ai_entry_messages`: session FK, user/assistant text and private extracted source text. `ai_entry_proposals`: composite `(session_id,owner_id)` FK to session owner, positive version, pending/approved/rejected status, JSONB draft/questions, unique nullable transaction receipt ID. Check constraint requires receipt iff approved. Receipt deliberately has no ledger FK, so deleting a ledger row cannot enable replay/recreation. `ai_entry_requests`: `(session_id,request_id)` primary key and payload hash to deduplicate extraction. Deleting an account cascades these owned records. No image bytes, S3 objects, reusable bank-wallet mapping or balance counters added. [ADR-005](../decisions/ADR-005-ai-entry-review.md), [slice](../work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md). Version 10 applied to dev PostgreSQL; proof uses isolated test-owned IDs and cleanup.
+
 ## Implemented budget schema — migration 000009
 
 `budgets`: text UUID id, owner_id FK user, name, positive safe-integer limit_amount, nullable wallet_id/category_id FKs, start_at/end_at timestamptz with end > start, timestamps. Owner/period index. Delete owner/wallet/category cascades matching budget configuration; deleting budget never removes transactions. Spent/remaining days/ended are derived fields, not stored counters. [ADR-004](../decisions/ADR-004-budget-api-data.md), [API design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md). Dev DB migrated successfully to version 9; no AutoMigrate introduced. Historical rename-pending note below is superseded by explicit migrations already applied.

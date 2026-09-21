@@ -19,6 +19,11 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+- Added hold-Add AI entry chat with persisted prefilled proposal list, edit-before-approve and reject, version conflict handling and atomic approval replay protection (migration 000010). Normal Add remains manual. Added text-only provider/OCR adapters and private local env configuration; live AI extraction awaits endpoint/model/key. S3 credentials configured locally, retained image storage remains separate. [Scope and proof](../work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [ADR-005](../decisions/ADR-005-ai-entry-review.md).
+- Corrected shared system-category wallet applicability to stay within each account when reading or replacing selections; AI context and confirmation cannot inherit another account's wallet assignments. OCR text is preserved when subsequent model extraction fails.
+
+- Added [two-flow AI feasibility and implementation plan](../work/tickets/TICKET-09-DETAIL_DESIGN.md) for owner review: OCR-first entry, multi-bank reconciliation, atomic confirmation, read-only Q&A, prompt evaluations and jar dependencies. Documentation only, implementation approval pending. Corrected stale OCR scan endpoint guidance against the current public OpenAPI.
+
 - Replaced mounted budget mock data with authenticated persisted CRUD and ledger-derived progress via migration 000009. Explicit date intervals, wallet/category scope, child groups, overlap protection, report exclusion, masking, empty/error/retry states. Recurrence/notifications remain unsupported. Added FE-proxy API roundtrip proof and clean-up of test-only fixtures. [Design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md).
 - Savings now restricts the picker/API to actual savings catalog groups; external money requires no counterpart wallet. History shows real group names/icons; shared transaction form uses grouped bases. API client decodes problem+json errors into readable messages instead of raw JSON.
 

@@ -25,6 +25,22 @@ updated: 2026-09-13
 
 This file maps accepted behavior and work items to proof.
 
+## AI plan review — 2026-09-21
+
+### AI-ENTRY-01 implementation follow-up
+
+- [Approved slice and execution proof](tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [UI contract/proof](../design/screens/assistant/README.md), [ADR-005](../decisions/ADR-005-ai-entry-review.md). Entry scope is implemented for review; this does not complete all REQ-17, financial Q&A, transfer matching or retained receipts.
+- Backend red→green tests: missing validator/repository/service/config functionality; actual regressions caught hidden category-template acceptance, too-large history blocking follow-up, and cross-session owner quota bypass. PostgreSQL fixtures prove zero writes before approval, eight concurrent approvals producing one row, stale version conflict, cross-owner rejection, terminal reject, deleted-ledger replay safety and explicit report=false preservation. HTTP fixture test exercises real provider adapter → service → DB → edit/approve/reject and reload.
+- Independent review remediation: shared category wallet scopes no longer disclose/overwrite other owners' assignments; OCR source survives model failure; post-claim history includes the previous completion. All three regressions observed red then green; new fixture category/wallets removed after verification.
+- Final post-review run: full `go test -race ./... -count=1` with local `TEST_DATABASE_URL` passed; frontend `test:ai`, `check:design`, `test:design`, `test:transactions`, `build` passed. Local documentation scan 184 links/22 Markdown files: pass. Git-visible files contain none of the supplied credentials; ignored local env mode is 0600. Runtime restarted with final source.
+- `rtk go run ./cmd/migrate up` pass, schema 000010; `rtk go generate ./cmd/api` pass. Go suite/race with `TEST_DATABASE_URL` runs real DB tests; fixture records are cleaned, owner data untouched.
+- Frontend `test:ai`, `check:design`, `test:design`, `test:transactions`, `build` pass; Chrome test fixtures prove hold/cancel/release suppression and review flow. Live Chrome through localhost:4173 verifies normal Add/manual form, AI entry alternative, configured OCR/unconfigured AI display. No artificial proposals were inserted into the owner's account.
+- Live proxy auth guard returns 401, Swagger 200 with eight entry paths. OCR key is stored but public capability/auth-format probes do not prove actual OCR extraction. Live AI/OCR quality, physical touch and owner acceptance are pending provider config/sample UAT. S3 env is private/ignored but bucket/region and upload implementation remain pending.
+
+- [DESIGN-09-AI](tickets/TICKET-09-DETAIL_DESIGN.md): docs-only feasibility/design/plan delivered for review. Existing two AI tickets remain draft; product approval, provider quality, ledger integration and UAT are pending.
+- Read-only evidence: transaction entity/handler/repository confirm current income/expense-only ledger and missing AI confirmation path. OCR public OpenAPI and capabilities returned HTTP 200; current contract does not list scan endpoints. Authenticated OCR/model calls were not run.
+- Docs validation: `rtk proxy node --input-type=module -e '…'` checked 117 local Markdown links across the 10 touched documents: pass, zero missing targets. `rtk git diff --check`: pass. Placeholder scan in the new plan found no TODO/TBD. App/Go tests skipped because no runtime code changed. Planned unit, PostgreSQL concurrency, provider contract, model eval and browser UAT gates are in T0–T7; none are claimed passed by this planning work.
+
 ## Runtime Verification — 2026-09-13
 
 ### Follow-up 2026-09-20
