@@ -23,7 +23,7 @@ The user's correction on 2026-09-21 is authoritative: each operation is an API a
 
 ## PDF and error behavior
 
-Validate file count, MIME, decoded bytes, file signatures, and size before contacting OCR. Pass a PDF through the OCR platform's documented private-upload flow; never send PDF bytes to the text model. Persist OCR text for the process and supply only that text to extraction. OCR failure must prevent model invocation and all ledger writes. Distinguish local validation/configuration errors from upstream OCR/model failures in status/code; do not claim an upstream request may have been billed when validation proves no provider call occurred. Provider errors remain redacted and are not automatically retried.
+Files are always processed by backend code and OCR before any LLM call. The LLM must never receive the original file, base64 data, a file URL (signed or public), or a multimodal file/image input. Validate file count, MIME, decoded bytes, file signatures, and size before contacting OCR. Store originals privately in environment-separated S3, then pass them to the OCR platform only through its documented private-upload flow. After OCR completes, persist the extracted text and send only that text plus the minimal wallet/category catalog needed for structured extraction to the LLM. OCR failure must prevent model invocation and all ledger writes. Distinguish local validation/configuration errors from upstream OCR/model failures in status/code; do not claim an upstream request may have been billed when validation proves no provider call occurred. Provider errors remain redacted and are not automatically retried.
 
 ## Data and lifecycle
 
@@ -36,8 +36,8 @@ Keep the approved one-shot composer and result-card layout. Submit once; on ambi
 ## Acceptance and regression tests
 
 1. Frontend sends one request to `/ai/entry/process`, with text/files and an idempotency key; no session route is called. A read-only `GET /requests/{request_id}` recovers the result after an ambiguous timeout without repeating provider work.
-2. A valid PDF fixture passes server validation and OCR adapter submission; a PDF MIME spoof, unsupported file, >5 MiB file, or more than three files is rejected before any provider request.
-3. OCR failure does not call the model; extraction failure returns no proposals/ledger writes and is not retried automatically.
+2. A valid PDF fixture passes server validation and private OCR upload; a PDF MIME spoof, unsupported file, >5 MiB file, or more than three files is rejected before any provider request.
+3. For PDF and image inputs, captured LLM HTTP requests contain extracted OCR text but no file bytes, base64, file URL, or image content. OCR failure does not call the model; extraction failure returns no proposals/ledger writes and is not retried automatically.
 4. Replaying an identical request key returns the same process result without a second OCR/model submission; changed content with the same key conflicts.
 5. Process reads, proposal edits, rejects, and approvals are owner-scoped. Approval replay creates one ledger row and attachment links only for the approved proposal.
 6. Existing manual transaction entry remains unaffected. Frontend design guards/tests/build and backend tests pass.
