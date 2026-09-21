@@ -39,3 +39,4 @@ Feedback must be triaged here before it can be entered into the `BACKLOG.md`.
 | --- | --- | --- | --- | --- | --- | --- | --- |
 | FB-001 | TBD | TBD | TBD | TBD | raw | TBD | TBD |
 | FB-002 | 2026-09-13 | “chuẩn hoa dvaf thêm guardrail và rèacgor luôn nhé”, “luôn”; extract image behavior into specs and remove redundant exports | Owner conversation | Enhancement | converted | [UI-BASE-01](tickets/UI-BASE-01-DETAIL_DESIGN.md) | Approved documentation normalization, guardrails and frontend refactor |
+| FB-003 | 2026-09-21 | “ko tạo hội thoại chat… giữ nút hiện hộp chat; submit hiển thị list giao dịch… file cứ lưu S3 với giao dịch… path S3 config để phân biệt môi trường” | Owner conversation | Enhancement | converted | [AI-ENTRY-02](tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md) | Replace visible conversation with one-shot AI batch review; retain approved attachments privately per environment. |

@@ -70,9 +70,13 @@ try {
   const render = p => renderToStaticMarkup(React.createElement(EntryProposalRow,{proposal:p,wallets,categories,onUpdated(){},onSaved(){}}));
   assert.match(render(proposal),/42000/);
   for (const status of ['approved','rejected']) assert.doesNotMatch(render({...proposal,status}),/<input|<select|<button/,'terminal rows are immutable');
+  const { AiEntrySheet } = await server.ssrLoadModule('/src/atomic/organisms/AiEntrySheet.tsx');
+  const sheet = renderToStaticMarkup(React.createElement(AiEntrySheet,{onClose(){},onSaved(){}}));
+  assert.doesNotMatch(sheet,/Cuộc trò chuyện mới|Hội thoại/,'AI entry is a batch list, never a conversation UI');
+  assert.match(sheet,/Lưu tất cả/,'batch list exposes an explicit save-all action');
   const { BaseFileUpload } = await server.ssrLoadModule('/src/atomic/atoms/BaseFileUpload.tsx');
   const upload = renderToStaticMarkup(React.createElement(BaseFileUpload,{label:'Images',onFiles(){}}));
-  assert.match(upload,/type="file"/); assert.match(upload,/accept="image\/jpeg,image\/png"/); assert.match(upload,/multiple=""/);
+  assert.match(upload,/type="file"/); assert.match(upload,/accept="image\/jpeg,image\/png,application\/pdf"/); assert.match(upload,/multiple=""/);
   console.log('AI entry contracts passed: hold/cancel, draft validation, edit/version/approve/reject, real service payloads/errors, terminal rows and upload.');
 } finally { globalThis.fetch = originalFetch; globalThis.localStorage = originalStorage; await server.close(); }
 

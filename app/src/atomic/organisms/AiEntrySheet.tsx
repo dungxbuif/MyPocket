@@ -14,17 +14,15 @@ import { fetchCategories, type Category } from "../../services/categories";
 import { fetchWallets, type Wallet } from "../../services/wallets";
 
 const COPY = {
-  title: "Nhập giao dịch bằng AI", close: "Đóng", reload: "Tải lại phiên", loading: "Đang tải hội thoại...",
+  title: "Nhập giao dịch bằng AI", close: "Đóng", reload: "Tải lại", loading: "Đang tải...",
   unavailable: "AI chưa được cấu hình. Bạn vẫn có thể xem và xử lý đề xuất đã lưu hoặc nhập giao dịch thủ công.",
   noOcr: "OCR chưa được cấu hình. Hiện chỉ gửi được nội dung chữ.", processing: "Phiên đang xử lý. Tải lại phiên để kiểm tra kết quả; không gửi lại nội dung.",
-  empty: "Mô tả khoản thu, chi hoặc gửi ảnh để nhận đề xuất. Chỉ khi bạn duyệt, giao dịch mới được ghi sổ.",
-  messages: "Hội thoại", proposals: "Đề xuất giao dịch", text: "Nội dung", images: "Ảnh chứng từ (tối đa 3)",
-  transient: "JPEG/PNG, tối đa 5 MiB mỗi ảnh. Ảnh chỉ dùng tạm để OCR, không được lưu làm ảnh đính kèm. Văn bản trích xuất được lưu trong hội thoại.",
+  empty: "Nhập mô tả hoặc đính kèm chứng từ để tạo danh sách giao dịch. Bạn sửa và duyệt từng dòng.",
+  proposals: "Danh sách giao dịch", text: "Nhập giao dịch", images: "Đính kèm tệp (tối đa 3)",
+  transient: "JPEG, PNG hoặc PDF; tối đa 5 MiB mỗi tệp.",
   clear: "Bỏ ảnh đã chọn", send: "Gửi nội dung", sending: "Đang xử lý...", failed: "Không thể thực hiện yêu cầu.",
   ambiguous: "Yêu cầu có thể đã được tiếp nhận. Tải lại phiên để kiểm tra trước khi gửi nội dung khác. Không tự động gửi lại.",
   reloadConfirm: "Tải lại phiên sẽ bỏ thay đổi chưa lưu trong các đề xuất. Tiếp tục?",
-  newConversation: "Cuộc trò chuyện mới",
-  newConversationConfirm: "Bắt đầu cuộc trò chuyện mới? Nội dung, ảnh đã chọn và thay đổi đề xuất chưa lưu sẽ bị bỏ. Hội thoại đã lưu vẫn được giữ trên máy chủ.",
 };
 
 export function AiEntrySheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
@@ -101,7 +99,6 @@ export function AiEntrySheet({ onClose, onSaved }: { onClose: () => void; onSave
   const blocked = busy || loading || !ready || !!session?.processing;
   return <BaseBottomSheet presentation="form" title={COPY.title} closeLabel={COPY.close} onClose={() => { if (!busy) onClose(); }} closingDisabled={busy}>
     <div className="space-y-4">
-      <BaseButton variant="secondary" disabled={blocked} loading={creating} loadingLabel={COPY.newConversation} onClick={() => void newConversation()}>{COPY.newConversation}</BaseButton>
       <BaseButton variant="secondary" disabled={loading || busy} onClick={() => {
         if (requestActive.current) return;
         if (!window.confirm(COPY.reloadConfirm)) return;
@@ -114,19 +111,12 @@ export function AiEntrySheet({ onClose, onSaved }: { onClose: () => void; onSave
       {capabilities && !capabilities.ocr_configured ? <StatusMessage>{COPY.noOcr}</StatusMessage> : null}
       {session?.processing ? <StatusMessage>{COPY.processing}</StatusMessage> : null}
       {uncertain ? <StatusMessage>{COPY.ambiguous}</StatusMessage> : null}
-      <Heading as="h3" size="field">{COPY.messages}</Heading>
       {!loading && !session?.messages?.length ? <StatusMessage variant="plain">{COPY.empty}</StatusMessage> : null}
-      <div role="log" aria-label={COPY.messages} className="space-y-2">
-        {(session?.messages ?? []).map(message => <SurfaceCard key={message.id} padding="md" className="space-y-1">
-          <Text weight="bold">{message.role === "user" ? "Bạn" : message.role === "assistant" ? "AI" : "Hệ thống"}</Text>
-          <Text className="whitespace-pre-wrap break-words">{message.content}</Text>
-        </SurfaceCard>)}
-      </div>
       {(session?.proposals?.length ?? 0) > 0 ? <Heading as="h3" size="field">{COPY.proposals}</Heading> : null}
       {(session?.proposals ?? []).map(proposal => <EntryProposalRow key={`${revision}:${proposal.id}:${proposal.version}:${proposal.status}`}
         proposal={proposal} wallets={wallets} categories={categories} disabled={blocked} onBusy={value => { requestActive.current = value; setBusy(value); }} onSaved={onSaved}
         onUpdated={updated => setSession(current => current ? { ...current, proposals: current.proposals.map(item => item.id === updated.id ? updated : item) } : current)} />)}
-      <form className="space-y-3" onSubmit={event => { event.preventDefault(); void send(); }}>
+      <form className="sticky bottom-0 space-y-3 border-t border-line bg-card pt-3" onSubmit={event => { event.preventDefault(); void send(); }}>
         <FormField label={COPY.text}><BaseTextInput value={text} disabled={blocked || !capabilities?.ai_configured || uncertain} onChange={event => setText(event.target.value)} /></FormField>
         <BaseFileUpload label={COPY.images} disabled={blocked || !capabilities?.ai_configured || !capabilities?.ocr_configured || uncertain} onFiles={selected => {
           const issue = validateImages(selected);

@@ -28,9 +28,9 @@ export function localEntryDate(value: string): string {
 }
 
 export function validateImages(files: Pick<File, "type" | "size">[]): string {
-  if (files.length > 3) return "Chọn tối đa 3 ảnh.";
-  if (files.some(file => !["image/jpeg", "image/png"].includes(file.type))) return "Chỉ hỗ trợ ảnh JPEG hoặc PNG.";
-  if (files.some(file => file.size > 5 * 1024 * 1024)) return "Mỗi ảnh không được lớn hơn 5 MiB.";
+	if (files.length > 3) return "Chọn tối đa 3 tệp.";
+	if (files.some(file => !["image/jpeg", "image/png", "application/pdf"].includes(file.type))) return "Chỉ hỗ trợ JPEG, PNG hoặc PDF.";
+	if (files.some(file => file.size > 5 * 1024 * 1024)) return "Mỗi tệp không được lớn hơn 5 MiB.";
   return "";
 }
 
