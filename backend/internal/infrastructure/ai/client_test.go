@@ -383,7 +383,7 @@ func TestInvalidImagesFailBeforeSubmission(t *testing.T) {
 	binary.BigEndian.PutUint32(data[20:24], 100000)
 	binary.BigEndian.PutUint32(data[29:33], crc32.ChecksumIEEE(data[12:29]))
 	pixels.Base64 = base64.StdEncoding.EncodeToString(data)
-	for _, images := range [][]Image{{wrong}, {wrongPDF}, {bad}, {badPDF}, {large}, {largePDF}, {pixels}, {good, wrong}, {good, good, good, good}} {
+	for _, images := range [][]Image{{wrong}, {wrongPDF}, {bad}, {badPDF}, {large}, {largePDF}, {pixels}, {good, wrong}, {good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good}} {
 		c := testClient(t, func(w http.ResponseWriter, r *http.Request) { t.Error("invalid image triggered provider call") })
 		if _, err := c.Extract(context.Background(), Input{Images: images}); err == nil {
 			t.Fatal("invalid image accepted")
@@ -391,7 +391,7 @@ func TestInvalidImagesFailBeforeSubmission(t *testing.T) {
 	}
 }
 
-func TestJPEGAndThreeImages(t *testing.T) {
+func TestJPEGAndTwentyImages(t *testing.T) {
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 2, 2)), nil); err != nil {
 		t.Fatal(err)
@@ -412,9 +412,13 @@ func TestJPEGAndThreeImages(t *testing.T) {
 			t.Error("unexpected path")
 		}
 	})
-	out, err := c.Extract(context.Background(), Input{Images: []Image{img, img, img}})
-	if err != nil || submissions.Load() != 3 || out.SourceText != "receipt\n\nreceipt\n\nreceipt" {
-		t.Fatalf("three JPEG flow failed: %v", err)
+	images := make([]Image, 20)
+	for i := range images {
+		images[i] = img
+	}
+	out, err := c.Extract(context.Background(), Input{Images: images})
+	if err != nil || submissions.Load() != 20 || strings.Count(out.SourceText, "receipt") != 20 {
+		t.Fatalf("twenty JPEG flow failed: %v submissions=%d", err, submissions.Load())
 	}
 }
 

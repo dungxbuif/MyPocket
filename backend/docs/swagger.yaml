@@ -904,7 +904,7 @@ paths:
         name: timezone
         required: true
         type: string
-      - description: JPEG, PNG, or PDF, up to three files
+      - description: JPEG, PNG, or PDF, up to twenty files
         in: formData
         name: files
         type: file

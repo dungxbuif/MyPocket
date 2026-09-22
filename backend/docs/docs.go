@@ -314,7 +314,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "file",
-                        "description": "JPEG, PNG, or PDF, up to three files",
+                        "description": "JPEG, PNG, or PDF, up to twenty files",
                         "name": "files",
                         "in": "formData"
                     }

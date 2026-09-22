@@ -19,7 +19,7 @@ import (
 )
 
 const (
-	maxImages      = 3
+	maxImages      = 20
 	maxImageBytes  = 5 * 1024 * 1024
 	maxImagePixels = 25_000_000
 	maxOCRPolls    = 60

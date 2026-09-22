@@ -249,8 +249,8 @@ func (s *AIEntryService) validate(in AIEntryMessageInput) error {
 	if _, err := time.LoadLocation(in.Timezone); err != nil {
 		return fmt.Errorf("%w: múi giờ không hợp lệ", port.ErrAIInvalid)
 	}
-	if len(in.Text) > 16000 || len(in.Images) > 3 || (in.Text == "" && len(in.Images) == 0) {
-		return fmt.Errorf("%w: cần nội dung hoặc tối đa 3 tệp", port.ErrAIInvalid)
+	if len(in.Text) > 16000 || len(in.Images) > 20 || (in.Text == "" && len(in.Images) == 0) {
+		return fmt.Errorf("%w: cần nội dung hoặc tối đa 20 tệp", port.ErrAIInvalid)
 	}
 	if len(in.Images) > 0 && !s.Extractor.OCRConfigured() {
 		return fmt.Errorf("%w: OCR chưa được cấu hình", ErrAIUnavailable)

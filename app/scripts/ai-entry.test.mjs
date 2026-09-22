@@ -39,7 +39,7 @@ try {
   assert.equal(sameDraft(draft, {...draft,note:'Edited'}), false);
   assert.equal(sameDraft(draft, {...draft}), true);
   assert.equal(validateEntryFiles([{type:'image/png',size:5*1024*1024}]), '');
-  for (const files of [[{type:'image/gif',size:1}],[{type:'image/jpeg',size:5*1024*1024+1}],Array(4).fill({type:'image/png',size:1})]) assert.ok(validateEntryFiles(files));
+  for (const files of [[{type:'image/gif',size:1}],[{type:'image/jpeg',size:5*1024*1024+1}],Array(21).fill({type:'image/png',size:1})]) assert.ok(validateEntryFiles(files));
 
   const calls = [];
   let current = {...proposal};

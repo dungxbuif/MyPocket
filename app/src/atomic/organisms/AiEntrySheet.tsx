@@ -6,7 +6,7 @@ import { AssistantResultCard } from "../molecules/AssistantResultCard";
 import { BaseBottomSheet } from "../molecules/BaseBottomSheet";
 import { EntryProposalRow } from "../molecules/EntryProposalRow";
 import { saveEntryProposal, decideEntryProposal, type EntryDraft, fetchEntryCapabilities, fetchEntryRequest, processEntry, type EntryCapabilities, type EntryProcess } from "../../services/ai";
-import { proposalIssues, sameDraft, validateEntryFiles } from "../../services/aiEntryLogic";
+import { MAX_AI_ENTRY_FILES, proposalIssues, sameDraft, validateEntryFiles } from "../../services/aiEntryLogic";
 import { fetchCategories, type Category } from "../../services/categories";
 import { fetchWallets, type Wallet } from "../../services/wallets";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
@@ -17,7 +17,7 @@ const COPY = {
   noOcr: "OCR chưa được cấu hình. Hiện chỉ gửi được nội dung chữ.", processing: "Yêu cầu đang xử lý. Tải lại kết quả để kiểm tra; không gửi lại nội dung.",
   noStorage: "Lưu trữ chứng từ chưa sẵn sàng. Bạn vẫn có thể nhập nội dung chữ.",
   empty: "Nhập mô tả hoặc đính kèm chứng từ để tạo danh sách giao dịch. Bạn sửa và duyệt từng dòng.",
-  transient: "JPEG, PNG hoặc PDF; tối đa 5 MiB mỗi tệp.", failed: "Không thể thực hiện yêu cầu.",
+  transient: "JPEG, PNG hoặc PDF; tối đa 20 tệp, 5 MiB mỗi tệp.", failed: "Không thể thực hiện yêu cầu.",
   ambiguous: "Yêu cầu có thể đã được tiếp nhận. Tải lại kết quả để kiểm tra trước khi gửi nội dung khác. Không tự động gửi lại.",
   reloadConfirm: "Tải lại kết quả sẽ bỏ thay đổi chưa lưu trong các đề xuất. Tiếp tục?",
 };
@@ -145,7 +145,7 @@ export function AiEntrySheet({ onClose, onSaved }: { onClose: () => void; onSave
       </AssistantResultCard> : null}
       <AssistantComposer text={text} files={files} disabled={blocked || !capabilities?.ai_configured || uncertain} uploadDisabled={!capabilities?.files_configured} loading={busy} canSend={!!capabilities?.ai_configured && !uncertain && (!!text.trim() || !!files.length)} hint={COPY.transient}
         onTextChange={setText} onFiles={selected => {
-          const issue = validateEntryFiles(selected);
+          const issue = validateEntryFiles(selected, MAX_AI_ENTRY_FILES);
           if (issue) { setError(issue); return; }
           setFiles(selected); setError("");
         }} onClearFiles={() => setFiles([])} onSubmit={() => void send()} />

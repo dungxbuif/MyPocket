@@ -4,6 +4,8 @@ import type { Wallet } from "./wallets";
 import { categoryAppliesToTransaction } from "./transactionLogic";
 import { localDateTimeAt } from "./accountTime";
 
+export const MAX_AI_ENTRY_FILES = 20;
+
 export function proposalIssues(draft: EntryDraft, wallets: Wallet[], categories: Category[]): string[] {
   const issues: string[] = [];
   if (draft.type !== "income" && draft.type !== "expense") issues.push(draft.type === "transfer" ? "Chuyển tiền chưa thể duyệt trong phiên bản này." : "Chọn khoản thu hoặc khoản chi, rồi lưu bản nháp trước khi duyệt.");
@@ -27,9 +29,15 @@ export function localEntryDate(value: string, timezone = Intl.DateTimeFormat().r
   return localDateTimeAt(value, timezone);
 }
 
-export function validateEntryFiles(files: Pick<File, "type" | "size">[]): string {
-  if (files.length > 3) return "Chọn tối đa 3 tệp.";
-  if (files.some(file => !["image/jpeg", "image/png", "application/pdf"].includes(file.type))) return "Chỉ hỗ trợ JPEG, PNG hoặc PDF.";
+export function validateEntryFiles(files: Pick<File, "type" | "size" | "name">[], maxFiles = MAX_AI_ENTRY_FILES): string {
+	if (files.length > maxFiles) return `Chọn tối đa ${maxFiles} tệp.`;
+	if (files.some(file => !["image/jpeg", "image/png", "application/pdf"].includes(file.type))) return "Chỉ hỗ trợ JPEG, PNG hoặc PDF.";
 	if (files.some(file => file.size > 5 * 1024 * 1024)) return "Mỗi tệp không được lớn hơn 5 MiB.";
-  return "";
+	const seen = new Set<string>();
+	for (const file of files) {
+		const key = `${file.name}\u0000${file.type}\u0000${file.size}`;
+		if (seen.has(key)) return "Không thể chọn tệp trùng nhau.";
+		seen.add(key);
+	}
+	return "";
 }

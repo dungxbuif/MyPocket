@@ -19,7 +19,7 @@ const (
 	aiUnavailableCode = "ai_entry_unavailable"
 	aiNotFoundCode    = "ai_entry_not_found"
 	aiFailureCode     = "ai_entry_failed"
-	aiMaxBody         = 22 * 1024 * 1024
+	aiMaxBody         = 101 * 1024 * 1024
 )
 
 type AIEntryHandler struct{ Service *usecase.AIEntryService }
@@ -93,7 +93,7 @@ func processResponse(process *entity.AIEntrySession) aiEntryProcessResponse {
 // @Param request_id formData string true "Idempotency UUID"
 // @Param text formData string false "Transaction description"
 // @Param timezone formData string true "IANA timezone"
-// @Param files formData file false "JPEG, PNG, or PDF, up to three files"
+// @Param files formData file false "JPEG, PNG, or PDF, up to twenty files"
 // @Success 200 {object} Response
 // @Failure 400 {object} Problem
 // @Failure 503 {object} Problem
@@ -114,7 +114,7 @@ func (h *AIEntryHandler) Process(c *gin.Context) {
 	}
 	in := usecase.AIEntryMessageInput{RequestID: c.PostForm("request_id"), Text: c.PostForm("text"), Timezone: c.PostForm("timezone")}
 	files := c.Request.MultipartForm.File["files"]
-	if len(files) > 3 {
+	if len(files) > 20 {
 		aiEntryFail(c, port.ErrAIInvalid)
 		return
 	}
