@@ -69,6 +69,37 @@ func TestAIEntryProcessRejectsSpoofedPDFBeforeProviderWork(t *testing.T) {
 	}
 }
 
+func TestAIEntryProcessAcceptsPNGWhenClientPartMIMEIsBlankOrWrong(t *testing.T) {
+	body := []byte("\x89PNG\r\n\x1a\nvalid-png-payload")
+	formBody := &bytes.Buffer{}
+	form := multipart.NewWriter(formBody)
+	header := textproto.MIMEHeader{}
+	header.Set("Content-Disposition", `form-data; name="files"; filename="IMG_7868.PNG"`)
+	header.Set("Content-Type", "application/octet-stream")
+	part, err := form.CreatePart(header)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := part.Write(body); err != nil {
+		t.Fatal(err)
+	}
+	if err := form.Close(); err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, "/process", formBody)
+	request.Header.Set("Content-Type", form.FormDataContentType())
+	if err := request.ParseMultipartForm(2 << 20); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := parseAIEntryFiles(request.MultipartForm.File["files"])
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(parsed) != 1 || parsed[0].MIMEType != "image/png" {
+		t.Fatalf("unexpected parsed image: %+v", parsed)
+	}
+}
+
 func TestAIEntryHTTPReviewEditApproveRejectWithRealDatabase(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {

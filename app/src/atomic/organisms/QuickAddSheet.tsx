@@ -5,7 +5,6 @@ import { BaseButton } from "../atoms/BaseButton";
 import { TransactionFields, type TransactionFormState } from "../molecules/TransactionFields";
 import { TransferFields, type TransferFormState } from "../molecules/TransferFields";
 import { BaseSelect, BaseTextInput, FormField } from "../atoms/FormField";
-import { SegmentedControl } from "../atoms/SegmentedControl";
 import { StatusMessage } from "../atoms/StatusMessage";
 import { BaseBottomSheet } from "../molecules/BaseBottomSheet";
 import { SurfaceCard } from "../atoms/SurfaceCard";
@@ -78,9 +77,9 @@ function initialTransferState(timezone: string): TransferFormState {
   return { sourceWalletID: "", destinationWalletID: "", amount: "", occurredAt: localDateTimeValue(new Date(), timezone), note: "" };
 }
 
-export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initialWalletID }: { onClose: () => void; onSaved: () => void; onAiEntry?: () => void; transaction?: Transaction; initialWalletID?: string }) {
+export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initialWalletID, transferOnly = false }: { onClose: () => void; onSaved: () => void; onAiEntry?: () => void; transaction?: Transaction; initialWalletID?: string; transferOnly?: boolean }) {
   const timezone=useAccountTimezone();
-  const [mode, setMode] = useState<"transaction" | "transfer">("transaction");
+  const [mode, setMode] = useState<"transaction" | "transfer">(transferOnly ? "transfer" : "transaction");
   const [state, setState] = useState(() => ({...initialState(transaction,timezone), walletID:transaction?.wallet_id ?? initialWalletID ?? ""}));
   const [transferState, setTransferState] = useState(() => initialTransferState(timezone));
   const [wallets, setWallets] = useState<Wallet[]>([]);
@@ -219,13 +218,12 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
   try { instantFromLocalDateTime(state.occurredAt,timezone); } catch { validTime=false; }
   const transferValid = wallets.some(wallet => wallet.id === transferState.sourceWalletID) && wallets.some(wallet => wallet.id === transferState.destinationWalletID) && transferState.sourceWalletID !== transferState.destinationWalletID && Number.isSafeInteger(Number(transferState.amount)) && Number(transferState.amount) > 0 && (() => { try { instantFromLocalDateTime(transferState.occurredAt, timezone); return true; } catch { return false; } })();
   const valid = mode === "transfer" ? transferValid : wallets.some(wallet => wallet.id === state.walletID) && Number.isSafeInteger(Number(state.amount)) && Number(state.amount) > 0 && validTime;
-  return <BaseBottomSheet presentation="form" closingDisabled={saving} title={transaction ? COPY.editTitle : COPY.addTitle} closeLabel="Hủy" onClose={() => { if (!saving) onClose(); }}
+  return <BaseBottomSheet presentation="form" closingDisabled={saving} title={transaction ? COPY.editTitle : transferOnly ? "Chuyển tiền đến ví khác" : COPY.addTitle} closeLabel="Hủy" onClose={() => { if (!saving) onClose(); }}
     footer={<div className="flex gap-3"><BaseButton className="flex-1" size="lg" loading={saving} disabled={loading || !valid} onClick={() => void submit()}>Lưu</BaseButton>{transaction ? <BaseButton variant="danger" disabled={saving} aria-label={COPY.delete} onClick={() => void remove()}><Trash2 size={20} /></BaseButton> : onAiEntry ? <BaseButton disabled={saving} aria-label="Nhập bằng AI từ ảnh hoặc nội dung" onClick={onAiEntry}><ImagePlus size={22} /></BaseButton> : null}</div>}>
     <div className="space-y-3">
       {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
       {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
       {!loading && wallets.length === 0 ? <StatusMessage variant="plain">{COPY.noWallet}</StatusMessage> : null}
-      {!transaction ? <SegmentedControl disabled={saving || loading} value={mode} options={[{ value: "transaction", label: COPY.transaction }, { value: "transfer", label: COPY.transfer }]} onChange={next => setMode(next)} /> : null}
       {mode === "transfer" && !transaction ? <TransferFields state={transferState} onChange={setTransferState} wallets={wallets} disabled={saving || loading} /> : <TransactionFields state={state} onChange={setState} wallets={wallets} categories={categories} jars={jarOptions} disabled={saving || loading} />}
       {!transaction && onAiEntry && mode === "transaction" ? <BaseButton variant="ghost" className="w-full" disabled={saving} onClick={onAiEntry}>Nhập bằng AI</BaseButton> : null}
     </div>

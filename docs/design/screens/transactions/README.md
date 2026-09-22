@@ -14,7 +14,7 @@ The page header uses the shared `ScreenHeader` molecule so title/action spacing 
 | Date group | `SurfaceCard`, `Text` | Groups real API rows by the user's local calendar date and displays the signed group total. |
 | Transaction row | `TransactionItem` | Category icon/title, wallet and optional note, signed VND amount; activation opens edit mode. |
 | Editor shell | `BaseBottomSheet` | Modal focus trap, Escape/backdrop cancel, and return focus follow the shared sheet contract. |
-| Type, amount and metadata | `SegmentedControl`, `AmountField`, `DateField`, `FormSelectorRow`, `CategoryTreeSelector` → `BaseCategoryTree` selection mode, `FormField`/`BaseSelect` for optional jar, `BaseTextInput`, `BaseSwitch` | Ordinary entries use `expense` and `income`. Transfer mode uses the same amount/date/note bases plus two wallet selects and submits the paired transfer contract; it never shows category, jar, or report controls. |
+| Type, amount and metadata | `AmountField`, `DateField`, `FormSelectorRow`, `CategoryTreeSelector` → `BaseCategoryTree` selection mode, `FormField`/`BaseSelect` for optional jar, `BaseTextInput`, `BaseSwitch` | The global add sheet is ordinary `expense`/`income` only. Transfer uses a separate transfer-only sheet opened from the transactions screen's three-dot options menu; it uses the same amount/date/note bases plus two wallet selects and never shows category, jar, or report controls. |
 | Feedback/actions | `StatusMessage`, `BaseButton` | Save has loading/disabled behavior; delete exists only in edit mode and requires confirmation. |
 
 No screen-local color, shape, input, button or card styling is allowed. Debt, receipt/OCR and advanced filter controls stay out of this screen until their own approved slices exist.
@@ -25,8 +25,8 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 | --- | --- |
 | Enter `/transactions` | Load transactions, wallets and visible groups from their authenticated APIs. Never replace an error with mock rows. |
 | Open an expense editor | Load jar choices for the transaction's account-local month; show only active monthly configurations, plus the existing historical assignment when editing. |
-| Activate global add | Open a clean editor with `expense`, current local date/time, report inclusion enabled, and the first available wallet. |
-| Choose “Chuyển tiền đến ví khác” | Open the same sheet in transfer mode with source/destination wallet selects; submit calls the atomic transfer endpoint and refreshes both wallet balances and the ledger. |
+| Activate global add | Open a clean ordinary editor with `expense`, current local date/time, report inclusion enabled, and the first available wallet. It does not offer transfer mode. |
+| Choose “Chuyển tiền đến ví khác” from the three-dot options menu | Open a transfer-only sheet with source/destination wallet selects; submit calls the atomic transfer endpoint and refreshes both wallet balances and the ledger. |
 | Hold global add for 500ms | Open [AI entry chat](../assistant/README.md) with persistent prefilled review proposals. Release does not also open the manual editor; moving/cancelling cancels hold. Manual create offers keyboard-accessible “Nhập bằng AI”. |
 | Change wallet | Keep the selected group only if it applies to the new wallet; otherwise clear the group. |
 | Change type | Keep the selected group only if its kind matches; otherwise clear the group. |

@@ -102,8 +102,7 @@ try {
   await until(`document.body.textContent.includes('Giao dịch') && !!document.querySelector('[aria-label="Tùy chọn giao dịch"]')`);
   await evaluate(`document.querySelector('[aria-label="Tùy chọn giao dịch"]').click()`);
   await clickText("Chuyển tiền đến ví khác");
-  await until(`!!document.querySelector('[role="dialog"][aria-label="Thêm giao dịch"]') && document.body.textContent.includes('Chuyển ví')`);
-  await clickText("Chuyển ví");
+  await until(`!!document.querySelector('[role="dialog"][aria-label="Chuyển tiền đến ví khác"]') && document.body.textContent.includes('Chuyển ví')`);
   await until(`!!document.querySelector('[aria-label="Ví chuyển đi"]') && !!document.querySelector('[aria-label="Ví nhận"]')`);
   assert.ok(await evaluate(`document.body.textContent.includes(${JSON.stringify(source.name)})`), `source wallet must be rendered in the transfer UI: ${await evaluate("document.body.innerText")}`);
   assert.ok(await evaluate(`document.body.textContent.includes(${JSON.stringify(destination.name)})`), `destination wallet must be rendered in the transfer UI: ${await evaluate("document.body.innerText")}`);
@@ -114,7 +113,7 @@ try {
   await setInput('[aria-label="Số tiền"]', "25000");
   await setInput('[aria-label="Ghi chú chuyển ví"]', "UI E2E transfer");
   await clickText("Lưu");
-  await until(`!document.querySelector('[role="dialog"][aria-label="Thêm giao dịch"]')`);
+  await until(`!document.querySelector('[role="dialog"][aria-label="Chuyển tiền đến ví khác"]')`);
   await until(`document.body.textContent.includes('UI E2E transfer')`);
   const transactions = await request("/transactions");
   const rows = transactions.filter(row => row.note === "UI E2E transfer");

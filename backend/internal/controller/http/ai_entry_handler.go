@@ -9,6 +9,7 @@ import (
 	"github.com/mypocket/backend/internal/usecase"
 	"gorm.io/gorm"
 	"io"
+	"mime/multipart"
 	"net/http"
 )
 
@@ -113,40 +114,45 @@ func (h *AIEntryHandler) Process(c *gin.Context) {
 		defer c.Request.MultipartForm.RemoveAll()
 	}
 	in := usecase.AIEntryMessageInput{RequestID: c.PostForm("request_id"), Text: c.PostForm("text"), Timezone: c.PostForm("timezone")}
-	files := c.Request.MultipartForm.File["files"]
-	if len(files) > 20 {
-		aiEntryFail(c, port.ErrAIInvalid)
+	parsedImages, err := parseAIEntryFiles(c.Request.MultipartForm.File["files"])
+	if err != nil {
+		aiEntryFail(c, err)
 		return
 	}
-	for _, header := range files {
-		if header.Size <= 0 || header.Size > 5*1024*1024 || len(header.Filename) > 255 {
-			aiEntryFail(c, port.ErrAIInvalid)
-			return
-		}
-		file, err := header.Open()
-		if err != nil {
-			aiEntryFail(c, port.ErrAIInvalid)
-			return
-		}
-		data, readErr := io.ReadAll(io.LimitReader(file, 5*1024*1024+1))
-		closeErr := file.Close()
-		if readErr != nil || closeErr != nil || int64(len(data)) != header.Size || len(data) > 5*1024*1024 {
-			aiEntryFail(c, port.ErrAIInvalid)
-			return
-		}
-		mime := http.DetectContentType(data)
-		if mime != header.Header.Get("Content-Type") || (mime != "image/jpeg" && mime != "image/png" && mime != "application/pdf") {
-			aiEntryFail(c, port.ErrAIInvalid)
-			return
-		}
-		in.Images = append(in.Images, entity.AIImage{Name: header.Filename, MIMEType: mime, Base64: base64.StdEncoding.EncodeToString(data)})
-	}
+	in.Images = parsedImages
 	process, err := h.Service.Process(c.Request.Context(), owner, in)
 	if err != nil {
 		aiEntryFail(c, err)
 		return
 	}
 	OK(c, processResponse(process))
+}
+
+func parseAIEntryFiles(files []*multipart.FileHeader) ([]entity.AIImage, error) {
+	if len(files) > 20 {
+		return nil, port.ErrAIInvalid
+	}
+	images := make([]entity.AIImage, 0, len(files))
+	for _, header := range files {
+		if header.Size <= 0 || header.Size > 5*1024*1024 || len(header.Filename) > 255 {
+			return nil, port.ErrAIInvalid
+		}
+		file, err := header.Open()
+		if err != nil {
+			return nil, port.ErrAIInvalid
+		}
+		data, readErr := io.ReadAll(io.LimitReader(file, 5*1024*1024+1))
+		closeErr := file.Close()
+		if readErr != nil || closeErr != nil || int64(len(data)) != header.Size || len(data) > 5*1024*1024 {
+			return nil, port.ErrAIInvalid
+		}
+		mime := http.DetectContentType(data)
+		if mime != "image/jpeg" && mime != "image/png" && mime != "application/pdf" {
+			return nil, port.ErrAIInvalid
+		}
+		images = append(images, entity.AIImage{Name: header.Filename, MIMEType: mime, Base64: base64.StdEncoding.EncodeToString(data)})
+	}
+	return images, nil
 }
 
 // Request godoc
