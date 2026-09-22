@@ -4,7 +4,6 @@ import { Tags } from "lucide-react";
 import { Text } from "../atoms/Text";
 import { BudgetGauge } from "../atoms/Progress";
 import { MetricBox } from "../atoms/MetricBox";
-import { SectionTitle } from "../atoms/SectionTitle";
 import { BaseButton } from "../atoms/BaseButton";
 import { BaseSelect, BaseTextInput, FormField } from "../atoms/FormField";
 import { StatusMessage } from "../atoms/StatusMessage";
@@ -19,6 +18,7 @@ import { formatVND, ratioPercent } from "../utils/format";
 import { budgetDateInput } from "../../services/budgetDates";
 import { accountMonthKey, monthDateRange, todayDateKey } from "../../services/accountTime";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
+import { ScreenHeader } from "../molecules/ScreenHeader";
 
 type Draft={name:string;amount:string;wallet:string;category:string;start:string;end:string};
 function initialDraft(budget:Budget|undefined,timezone:string):Draft {
@@ -66,7 +66,7 @@ export function BudgetsPanel({ masked, refreshKey=0, onChanged }: { masked:boole
   const locked=saving || (editor!==null && editor!=="new" && editor.ended);
   const money=(value:number)=>masked?"••••••":formatVND(value);
   return <>
-    <SectionTitle title="Ngân sách" action="Thêm" onAction={()=>open()} />
+    <ScreenHeader title="Ngân sách" action={<BaseButton variant="chip" size="sm" onClick={()=>open()}>Thêm</BaseButton>} />
     {loading?<StatusMessage>Đang tải ngân sách...</StatusMessage>:error?<StatusMessage tone="danger">{error}<BaseButton variant="ghost" onClick={()=>setReload(value=>value+1)}>Thử lại</BaseButton></StatusMessage>:data?<>
       {data.items.length===0?<StatusMessage variant="plain">Chưa có ngân sách.</StatusMessage>:<>
         <SurfaceCard padding="lg"><Text weight="semibold">Các ngân sách đang chạy</Text><BudgetGauge value={ratioPercent(data.spent,data.limit_amount)} label="Đã dùng" /><div className="grid grid-cols-3 gap-2"><MetricBox label="Ngân sách" value={money(data.limit_amount)} /><MetricBox label="Đã chi" value={money(data.spent)} danger /><MetricBox label="Còn lại" value={money(data.limit_amount-data.spent)} /></div></SurfaceCard>

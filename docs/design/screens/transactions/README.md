@@ -4,6 +4,8 @@ Status: implementation contract for [TICKET-02-01](../../../work/tickets/TICKET-
 
 ## Composition
 
+The page header uses the shared `ScreenHeader` molecule so title/action spacing matches Budgets and Account screens; the options action remains a `BaseButton` chip.
+
 2026-09-20: editor uses grouped SurfaceCards for wallet/large amount/category/note and date, retaining the shared inputs and form-sheet shell. Goal category selection is restricted to real savings catalog keys and backend enforces the same rule; category remains optional. Unsupported old goal categories remain visible in history but must be cleared/reselected before editing. Report flag for external entries defaults true. This is not the paired-wallet transfer flow.
 
 | Region | Base implementation | Contract |

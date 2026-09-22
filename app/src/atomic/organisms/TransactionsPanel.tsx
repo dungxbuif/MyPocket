@@ -19,6 +19,7 @@ import { fetchTransactions, signedTransactionAmount, type Transaction } from "..
 import { fetchWallets, type Wallet } from "../../services/wallets";
 import { dateKeyAt, todayDateKey } from "../../services/accountTime";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
+import { ScreenHeader } from "../molecules/ScreenHeader";
 
 const COPY = { title: "Giao dịch", loading: "Đang tải giao dịch...", empty: "Chưa có giao dịch. Dùng nút + để ghi khoản thu hoặc chi đầu tiên.", error: "Không thể tải giao dịch.", retry: "Thử lại" } as const;
 
@@ -78,7 +79,7 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
 
   return (
     <section className="space-y-3">
-      <div className="flex items-center justify-between"><Text as="h1" size="xl" weight="bold">{COPY.title}</Text><BaseButton variant="chip" size="sm" aria-label="Tùy chọn giao dịch" onClick={() => setMenu(true)}><MoreHorizontal size={20} /></BaseButton></div>
+      <ScreenHeader title={COPY.title} action={<BaseButton variant="chip" size="sm" aria-label="Tùy chọn giao dịch" onClick={() => setMenu(true)}><MoreHorizontal size={20} /></BaseButton>} />
       {from || to ? <BaseButton variant="ghost" onClick={() => setPeriod(true)}>{from || "Từ đầu"} — {to || "Hiện tại"}</BaseButton> : null}
       {!loading && !error && transactions.length > 0 ? <SurfaceCard tone="form" padding="md"><div className="flex justify-between"><Text>Tiền vào</Text><Text tone="action" numeric>{formatVND(visible.filter(item => item.type === "income").reduce((sum, item) => sum + item.amount, 0))}</Text></div><div className="mt-3 flex justify-between"><Text>Tiền ra</Text><Text tone="danger" numeric>{formatVND(visible.filter(item => item.type === "expense").reduce((sum, item) => sum + item.amount, 0))}</Text></div></SurfaceCard> : null}
       {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}

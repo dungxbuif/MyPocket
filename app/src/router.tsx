@@ -8,6 +8,7 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/" });
 const transactionsRoute = createRoute({ getParentRoute: () => rootRoute, path: "transactions" });
 const budgetsRoute = createRoute({ getParentRoute: () => rootRoute, path: "budgets" });
+const accountBudgetsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/budgets" });
 const assistantRoute = createRoute({ getParentRoute: () => rootRoute, path: "assistant" });
 const jarsRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -30,6 +31,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   transactionsRoute,
   budgetsRoute,
+  accountBudgetsRoute,
   assistantRoute,
   jarsRoute,
   monthDetailRoute,
