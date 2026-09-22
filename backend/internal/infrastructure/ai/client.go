@@ -39,6 +39,7 @@ const (
 	maxWalletDescriptionBytes = 2048
 	extractTimeout            = 90 * time.Second
 	modelTimeout              = 30 * time.Second
+	modelMaxTokens            = 2048
 )
 
 var ErrNotConfigured = errors.New("AI provider is not configured")
@@ -192,10 +193,20 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, err
 	}
 	request := struct {
-		Model          string         `json:"model"`
-		Messages       []chatMessage  `json:"messages"`
-		ResponseFormat map[string]any `json:"response_format"`
-	}{c.config.Model, messages, transactionResponseFormat()}
+		Model              string         `json:"model"`
+		Messages           []chatMessage  `json:"messages"`
+		ResponseFormat     map[string]any `json:"response_format"`
+		MaxTokens          int            `json:"max_tokens"`
+		Temperature        float64        `json:"temperature"`
+		ChatTemplateKwargs map[string]any `json:"chat_template_kwargs"`
+	}{
+		Model:              c.config.Model,
+		Messages:           messages,
+		ResponseFormat:     transactionResponseFormat(),
+		MaxTokens:          modelMaxTokens,
+		Temperature:        0,
+		ChatTemplateKwargs: map[string]any{"enable_thinking": false},
+	}
 	modelCtx, modelCancel := context.WithTimeout(ctx, modelTimeout)
 	defer modelCancel()
 	modelStarted := time.Now()

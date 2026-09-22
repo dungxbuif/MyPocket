@@ -92,6 +92,14 @@ func TestTextOnlyRequestAndUnverifiedIDs(t *testing.T) {
 		if responseFormat.Type != "json_schema" || responseFormat.JSONSchema.Name != "transaction_proposal" || !responseFormat.JSONSchema.Strict {
 			t.Errorf("response format must use strict OpenAI-compatible JSON Schema: %+v", responseFormat)
 		}
+		var maxTokens int
+		if err := json.Unmarshal(req["max_tokens"], &maxTokens); err != nil || maxTokens != modelMaxTokens {
+			t.Errorf("model output must be explicitly bounded: got %s", string(req["max_tokens"]))
+		}
+		var templateKwargs map[string]any
+		if err := json.Unmarshal(req["chat_template_kwargs"], &templateKwargs); err != nil || templateKwargs["enable_thinking"] != false {
+			t.Errorf("thinking must be disabled for bounded extraction: %s", string(req["chat_template_kwargs"]))
+		}
 		if properties, ok := responseFormat.JSONSchema.Schema["properties"].(map[string]any); !ok || properties["drafts"] == nil {
 			t.Errorf("schema missing drafts property: %+v", responseFormat.JSONSchema.Schema)
 		}

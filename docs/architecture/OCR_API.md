@@ -36,11 +36,11 @@ trace:
 
 ## Status
 
-- 2026-09-22 runtime update: one-shot AI upload accepts JPEG/PNG/PDF. Backend validates the uploaded bytes and stores the original in private environment-qualified MyPocket S3. It sends validated image bytes as Base64 to OCR Platform and uses OCR Platform's private presign flow for PDFs; it no longer submits a MyPocket signed URL as an OCR source because OCR Platform only treats its own `s3://` source URLs as app-owned. OCR completes before text extraction; the LLM receives only user/OCR text (never file bytes, base64, URL or image input). A live provider probe with the configured credential now accepts Base64 submission; provider source-URL failures are covered by regression evidence.
+- 2026-09-23 runtime update: one-shot AI upload accepts JPEG/PNG/PDF. Backend validates the uploaded bytes and stores the original in private environment-qualified MyPocket S3. It sends validated image bytes as Base64 to OCR Platform and uses OCR Platform's private presign flow for PDFs; it no longer submits a MyPocket signed URL as an OCR source because OCR Platform only treats its own `s3://` source URLs as app-owned. OCR completes before text extraction; the LLM receives only user/OCR text (never file bytes, base64, URL or image input). The configured credential passed a live Base64 submission and a real receipt image completed through OCR and Qwen extraction in 13.97 seconds; an intentionally blank 1×1 PNG was correctly rejected by OCR as `ocr_failed`.
 - ID: API-OCR-001
-- Status: implemented locally; live provider credential blocked
+- Status: implemented locally; live provider credential and receipt extraction validated in local staging
 - Owner: shared
-- Public contract checked 2026-09-20: OpenAPI and capabilities returned HTTP 200. Scan-only routes are not advertised; do not implement against older scan guidance. This check did not run an authenticated OCR job.
+- Public contract checked 2026-09-20: OpenAPI and capabilities returned HTTP 200. Scan-only routes are not advertised; do not implement against older scan guidance. Authenticated Base64 OCR and the MyPocket receipt-to-proposal path were subsequently validated in local staging on 2026-09-23.
 - Source documentation:
   - `https://ocr.dungxbuif.com/`
   - `https://ocr.dungxbuif.com/guides/onboarding`
