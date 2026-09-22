@@ -25,6 +25,7 @@ type Config struct {
 	HTTPAddr           string
 	DatabaseURL        string
 	RedisURL           string
+	FeedbackAgentToken string
 	JWTSecret          string
 	JWTTTL             time.Duration
 	OAuthFixtureMode   bool
@@ -56,6 +57,7 @@ func Load() Config {
 		HTTPAddr:           getenv("HTTP_ADDR", ":8080"),
 		DatabaseURL:        getenv("DATABASE_URL", "postgres://dev:password@127.0.0.1:5432/postgres?sslmode=disable"),
 		RedisURL:           getenv("REDIS_URL", "redis://127.0.0.1:6379/0"),
+		FeedbackAgentToken: getenv("FEEDBACK_AGENT_TOKEN", ""),
 		JWTSecret:          getenv("JWT_SECRET", "change-this-development-jwt-secret-32-bytes"),
 		JWTTTL:             getDuration("JWT_TTL_SECONDS", 3600),
 		OAuthFixtureMode:   getenvBool("OAUTH_FIXTURE_MODE", false),
