@@ -610,8 +610,17 @@ func TestContextTimeoutAndCancellation(t *testing.T) {
 				in.Images = []Image{pngImage(t)}
 			}
 			start := time.Now()
-			if _, err := c.Extract(ctx, in); !errors.Is(err, context.DeadlineExceeded) {
+			_, err := c.Extract(ctx, in)
+			if !errors.Is(err, context.DeadlineExceeded) {
 				t.Fatalf("expected deadline: %v", err)
+			}
+			if ocr {
+				// A stuck OCR queue must remain attributable to the OCR poll stage;
+				// otherwise the use case records an opaque generic provider failure.
+				var providerErr *AIProviderError
+				if !errors.As(err, &providerErr) || providerErr.Stage != "ocr_poll" || providerErr.Code != "ocr_poll_wait" {
+					t.Fatalf("expected safe OCR polling timeout diagnostic: %T %+v", err, err)
+				}
 			}
 			if time.Since(start) > time.Second {
 				t.Fatal("deadline not respected")

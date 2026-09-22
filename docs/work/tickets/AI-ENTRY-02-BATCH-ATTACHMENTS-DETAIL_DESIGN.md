@@ -26,7 +26,7 @@ UI reference: follow the interaction layout in the [Money Lover AI entry guide](
 ## Scope and boundaries
 
 - Keep the existing private, owner-scoped processing record internally for idempotency and draft approval, but remove conversation/history/new-conversation UI and wording. It is an implementation detail named a batch at the HTTP/UI boundary.
-- Submit text plus up to three JPEG, PNG, or PDF files. Store immutable originals in configured S3 before OCR; OCR receives a short-lived presigned read URL or supported provider source URL, never a public object URL.
+- Submit text plus up to twenty JPEG, PNG, or PDF files. Store immutable originals in configured S3 before OCR; OCR receives validated image bytes or the provider's private PDF presign source, never a MyPocket object URL or public object URL.
 - Create attachment metadata as `pending` on submission. On each draft approval, atomically link all batch attachments to that created transaction. Attachment bytes are not copied per draft.
 - A rejected draft never gets an attachment link. A batch with no approved drafts has pending attachments; the explicit cleanup command deletes only expired unlinked attachments after 24 hours. It is not scheduled automatically.
 - Attachment download is an authenticated API that verifies transaction ownership and returns a short-lived S3 GET URL. Keys, bucket name and provider URLs never reach the browser in normal transaction payloads.

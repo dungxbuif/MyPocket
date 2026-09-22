@@ -118,7 +118,7 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 				break
 			}
 			if err := waitForPoll(ctx, headers.Get("Retry-After")); err != nil {
-				return "", err
+				return "", wrapProviderError("ocr_poll", "ocr_poll_wait", err)
 			}
 		default:
 			return "", wrapProviderError("ocr_poll", "ocr_status_unsupported", errors.New("OCR returned an unsupported document status"))

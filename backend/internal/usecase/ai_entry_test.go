@@ -127,7 +127,7 @@ func TestAIEntryInvalidFileIsClientErrorBeforeProviderCharge(t *testing.T) {
 	}
 }
 
-func TestAIEntryStoresOriginalPrivatelyAndPassesOnlyReadURLToOCR(t *testing.T) {
+func TestAIEntryStoresOriginalPrivatelyAndPassesValidatedBytesToOCR(t *testing.T) {
 	r := &entryRepoStub{}
 	var seen entity.AIExtractInput
 	storage := &attachmentStoreStub{signedURL: "https://private-storage.invalid/read?signature=temporary"}
@@ -140,8 +140,8 @@ func TestAIEntryStoresOriginalPrivatelyAndPassesOnlyReadURLToOCR(t *testing.T) {
 	if string(storage.data) != string(fileBytes) || storage.contentType != "application/pdf" || len(r.attachments) != 1 {
 		t.Fatalf("original was not retained privately: bytes=%d type=%s metadata=%d", len(storage.data), storage.contentType, len(r.attachments))
 	}
-	if len(seen.Images) != 1 || seen.Images[0].Base64 != "" || seen.Images[0].SourceURL != storage.signedURL {
-		t.Fatalf("OCR input must carry only a short-lived private read URL: %+v", seen.Images)
+	if len(seen.Images) != 1 || seen.Images[0].Base64 != base64.StdEncoding.EncodeToString(fileBytes) || seen.Images[0].SourceURL != "" {
+		t.Fatalf("OCR input must carry validated bytes and no MyPocket storage URL: %+v", seen.Images)
 	}
 }
 

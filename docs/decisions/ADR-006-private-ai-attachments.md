@@ -14,7 +14,7 @@ AI entry accepts user receipts for OCR, but originals must not be sent to the LL
 
 ## Decision
 
-The backend validates uploaded bytes, stores originals in private environment-qualified S3, then gives OCR a short-lived signed read URL. The LLM receives only user text, OCR text and bounded reference catalogs. PostgreSQL stores owner/process/file metadata and OCR text. Each explicit proposal approval creates a ledger row and links the process attachments in the same transaction. Download requires both transaction ownership and an attachment link, then redirects to a five-minute signed URL. Expired, unlinked objects are intended to be removed by an explicit cleanup command; failed deletion retains metadata for retry.
+The backend validates uploaded bytes and stores originals in private environment-qualified S3. It sends validated image bytes to OCR as Base64 and uploads PDFs through OCR Platform's private presign flow; a MyPocket signed URL is not sent to OCR because it is not an OCR Platform-owned `s3://` source. The LLM receives only user text, OCR text and bounded reference catalogs. PostgreSQL stores owner/process/file metadata and OCR text. Each explicit proposal approval creates a ledger row and links the process attachments in the same transaction. Download requires both transaction ownership and an attachment link, then redirects to a five-minute signed URL. Expired, unlinked objects are intended to be removed by an explicit cleanup command; failed deletion retains metadata for retry.
 
 Environment is part of every object key under a neutral configured prefix. S3 credentials remain backend-only; outside development, API startup requires complete storage configuration. No public ACLs or direct browser-to-S3 uploads are allowed.
 

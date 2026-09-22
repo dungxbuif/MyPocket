@@ -191,14 +191,13 @@ func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string,
 			rollback()
 			return nil, nil, err
 		}
-		readURL, err := s.Storage.SignedGet(ctx, key)
-		if err != nil {
-			rollback()
-			return nil, nil, err
-		}
 		digest := sha256.Sum256(data)
 		attachments = append(attachments, entity.AIEntryAttachment{ID: id, OwnerID: owner, ProcessID: process, ObjectKey: key, Filename: filepath.Base(file.Name), MIMEType: file.MIMEType, SizeBytes: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), OCRStatus: "pending", DeleteAfter: time.Now().Add(24 * time.Hour)})
-		prepared = append(prepared, entity.AIImage{Name: file.Name, MIMEType: file.MIMEType, SourceURL: readURL, AttachmentID: id})
+		// The original remains in MyPocket's private storage for evidence/download.
+		// OCR Platform cannot dereference a signed URL from MyPocket's bucket as an
+		// app-owned s3:// source, so pass the already validated bytes to the OCR
+		// adapter. The adapter's output boundary still sends only OCR text to the LLM.
+		prepared = append(prepared, entity.AIImage{Name: file.Name, MIMEType: file.MIMEType, Base64: file.Base64, AttachmentID: id})
 	}
 	sort.Slice(attachments, func(i, j int) bool { return attachments[i].ID < attachments[j].ID })
 	sort.Slice(prepared, func(i, j int) bool { return prepared[i].AttachmentID < prepared[j].AttachmentID })
