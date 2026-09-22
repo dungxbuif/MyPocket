@@ -294,6 +294,7 @@ Finance Assistant local vertical slice — 2026-09-22:
 | Credential lifecycle | `go test ./internal/usecase -run 'TestAdvisorOrchestratorRevalidatesPrincipalBeforeProviderAndTool|TestUserAPIKeyValidatePrincipalRejectsRevokedKey'` | PASS: provider/tool boundaries re-read principal; revoked key is rejected |
 | Cancellation commit guard | `TEST_DATABASE_URL=... go test ./internal/infrastructure/repository -run TestAdvisorPostgresStartRunIsIdempotentAndBusyScoped` | PASS: cancelled run rejects late assistant message with lease-lost error |
 | In-process cancellation | `go test -race ./internal/usecase -run TestAdvisorServiceCancelInterruptsInFlightProvider` | PASS: cancel endpoint path cancels the provider context and submit returns an error |
+| History pagination | `npm run test:ai-history` | PASS: older pages merge without duplicate boundary messages and remain chronological |
 | Assistant cards | `npm run typecheck && npm run check:design && npm run build` | PASS: normalized summary/comparison/search/budget plus wallet/goal/jar cards compile and satisfy base/design guards |
 
 The above is local regression proof. Configured-provider browser chat, SSE/reconnect, durable Redis audit delivery/alerting and production deployment remain unverified release gates.

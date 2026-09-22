@@ -6,7 +6,7 @@ import { SurfaceCard } from "../atoms/SurfaceCard";
 import { Text } from "../atoms/Text";
 import { AssistantComposer } from "../molecules/AssistantComposer";
 import { FinanceAssistantPart } from "../molecules/FinanceAssistantPart";
-import { fetchAdvisorCapabilities, fetchAdvisorMessages, fetchAdvisorOverview, submitAdvisorMessage, type AdvisorMessage, type AdvisorOverview } from "../../services/aiAdvisor";
+import { fetchAdvisorCapabilities, fetchAdvisorMessages, fetchAdvisorOverview, mergeAdvisorMessages, submitAdvisorMessage, type AdvisorMessage, type AdvisorOverview } from "../../services/aiAdvisor";
 
 const CONVERSATION_KEY = "mypocket.advisor.conversation";
 
@@ -16,6 +16,8 @@ export function FinanceAssistantPanel({ ownerID, masked = false }: { ownerID: st
   const [text, setText] = useState("");
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [loadingOlder, setLoadingOlder] = useState(false);
+  const [hasOlder, setHasOlder] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [error, setError] = useState("");
   const storageKey = `${CONVERSATION_KEY}:${ownerID}`;
@@ -28,6 +30,7 @@ export function FinanceAssistantPanel({ ownerID, masked = false }: { ownerID: st
         if (cancelled) return;
         setEnabled(capabilities.enabled);
         setMessages(history);
+        setHasOlder(history.length === 50);
         setOverview(summary);
         setError("");
       })
@@ -37,6 +40,34 @@ export function FinanceAssistantPanel({ ownerID, masked = false }: { ownerID: st
   }, [conversationID]);
 
   const suggestions = useMemo(() => ["Tháng này tôi tiêu thế nào?", "Tìm các giao dịch trên 200.000đ", "So sánh chi tiêu với tháng trước"], []);
+
+  const reloadHistory = async (): Promise<void> => {
+    if (!conversationID) return;
+    try {
+      const history = await fetchAdvisorMessages(conversationID);
+      setMessages(history);
+      setHasOlder(history.length === 50);
+      setError("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Không thể tải lại lịch sử");
+    }
+  };
+
+  const loadOlder = async (): Promise<void> => {
+    const first = messages[0];
+    if (!conversationID || !first || loadingOlder || !hasOlder) return;
+    setLoadingOlder(true);
+    try {
+      const older = await fetchAdvisorMessages(conversationID, first.seq);
+      setMessages(current => mergeAdvisorMessages(current, older));
+      setHasOlder(older.length === 50);
+      setError("");
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Không thể tải tin cũ");
+    } finally {
+      setLoadingOlder(false);
+    }
+  };
 
   const submit = async (): Promise<void> => {
     const value = text.trim();
@@ -49,6 +80,7 @@ export function FinanceAssistantPanel({ ownerID, masked = false }: { ownerID: st
       setText("");
       const history = await fetchAdvisorMessages(result.conversation_id);
       setMessages(history);
+      setHasOlder(history.length === 50);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Không thể gửi câu hỏi");
     } finally {
@@ -61,7 +93,7 @@ export function FinanceAssistantPanel({ ownerID, masked = false }: { ownerID: st
   return <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-3 p-4 pb-24">
     <div className="flex items-start justify-between gap-3">
       <div><Heading as="h1" size="screen">Finance Assistant</Heading><Text tone="secondary" size="xs">Hỏi đáp trên dữ liệu tài chính thật · chỉ đọc</Text></div>
-      {messages.length ? <BaseButton variant="ghost" size="sm" onClick={() => conversationID ? void fetchAdvisorMessages(conversationID).then(setMessages).catch(caught => setError(caught instanceof Error ? caught.message : "Không thể tải lại lịch sử")) : undefined}>Tải lại lịch sử</BaseButton> : null}
+      {messages.length ? <div className="flex items-center gap-2">{hasOlder ? <BaseButton variant="ghost" size="sm" loading={loadingOlder} onClick={() => void loadOlder()}>Tải tin cũ</BaseButton> : null}<BaseButton variant="ghost" size="sm" onClick={() => void reloadHistory()}>Tải lại lịch sử</BaseButton></div> : null}
     </div>
     {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
     {overview ? <FinanceAssistantPart type={overview.view_kind} data={{ view: overview.view, source: overview.source }} masked={masked} /> : null}

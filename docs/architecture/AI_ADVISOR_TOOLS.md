@@ -39,8 +39,10 @@ Advisor routes accept either the existing JWT/session or an owner-scoped user AP
 - `GET /api/v1/ai/advisor/capabilities`
 - `GET /api/v1/ai/advisor/overview?month=YYYY-MM` (real report summary; no model call)
 - `POST /api/v1/ai/advisor/messages`
-- `GET /api/v1/ai/advisor/conversation/messages?conversation_id=...`
+- `GET /api/v1/ai/advisor/conversation/messages?conversation_id=...&before_seq=...` (last 50 by default; pass the oldest loaded sequence to page backwards)
 - `GET /api/v1/ai/advisor/runs/{id}`
 - `POST /api/v1/ai/advisor/runs/{id}/cancel`
 
 `GET` capabilities/overview/history/run use `advisor:read`; `POST /messages` and cancel use `advisor:chat`. Create/list/revoke keys through the JWT-only `/api/v1/api-keys` endpoints; the secret is returned only on creation and only its hash is persisted. Advisor auth decisions are written best-effort to Redis stream `mypocket:audit:advisor` with request ID, credential type/ID, route, status, decision and latency; prompts, notes, tokens and monetary rows are excluded. `POST /messages` currently waits for the bounded provider/tool loop and returns JSON. SSE events, lost-POST recovery, conversation clear, fact-bundle drilldown, durable audit delivery/alerting and public deployment are not yet release claims.
+
+The web panel loads the newest 50 messages, exposes “Tải tin cũ” when another page may exist, requests `before_seq` using the oldest loaded message and merges pages by message ID in chronological order. Reloading never clears the current list; duplicate boundary rows are collapsed client-side.

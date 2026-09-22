@@ -1,5 +1,6 @@
 import { apiRequest } from "./api";
 import { getStoredToken } from "./auth";
+export { mergeAdvisorMessages } from "./advisorHistory";
 
 export type AdvisorPart = { type: string; text?: string; data?: unknown };
 export type AdvisorMessage = { id: string; conversation_id: string; seq: number; role: "user" | "assistant"; parts: AdvisorPart[]; created_at: string };
@@ -23,8 +24,9 @@ export function fetchAdvisorOverview(month?: string): Promise<AdvisorOverview> {
   return request<AdvisorOverview>(`/overview${suffix}`);
 }
 
-export function fetchAdvisorMessages(conversationId: string): Promise<AdvisorMessage[]> {
-  return request<AdvisorMessage[]>(`/conversation/messages?conversation_id=${encodeURIComponent(conversationId)}`).then(messages => [...messages].sort((left, right) => left.seq - right.seq));
+export function fetchAdvisorMessages(conversationId: string, beforeSeq?: number): Promise<AdvisorMessage[]> {
+  const before = beforeSeq && beforeSeq > 0 ? `&before_seq=${encodeURIComponent(beforeSeq)}` : "";
+  return request<AdvisorMessage[]>(`/conversation/messages?conversation_id=${encodeURIComponent(conversationId)}${before}`).then(messages => [...messages].sort((left, right) => left.seq - right.seq));
 }
 
 export function fetchAdvisorRun(id: string): Promise<AdvisorRun> {
