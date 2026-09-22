@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type RefObject } from "react";
 import html2canvas from "html2canvas";
 import { MessageSquarePlus, X } from "lucide-react";
 import { BaseButton } from "../atoms/BaseButton";
@@ -9,9 +9,9 @@ import { StatusMessage } from "../atoms/StatusMessage";
 import { Text } from "../atoms/Text";
 import { createFeedback, type FeedbackType } from "../../services/feedback";
 
-async function captureCurrentScreen(): Promise<Blob | null> {
+async function captureCurrentScreen(root: HTMLElement): Promise<Blob | null> {
   try {
-    const canvas = await html2canvas(document.documentElement, {
+    const canvas = await html2canvas(root, {
       backgroundColor: getComputedStyle(document.documentElement).getPropertyValue("--color-canvas").trim() || undefined,
       scale: Math.min(window.devicePixelRatio || 1, 2),
       ignoreElements: element => element.getAttribute("data-feedback-overlay") === "true",
@@ -22,7 +22,7 @@ async function captureCurrentScreen(): Promise<Blob | null> {
   }
 }
 
-export function FeedbackFloatingBubble() {
+export function FeedbackFloatingBubble({ captureRoot, onSubmitted }: { captureRoot: RefObject<HTMLElement | null>; onSubmitted?: () => void }) {
   const [open, setOpen] = useState(false);
   const [type, setType] = useState<FeedbackType>("bug");
   const [title, setTitle] = useState("");
@@ -36,7 +36,7 @@ export function FeedbackFloatingBubble() {
     setMessage("");
     setError("");
     setOpen(true);
-    void captureCurrentScreen().then(setScreenshot);
+    void (captureRoot.current ? captureCurrentScreen(captureRoot.current) : Promise.resolve(null)).then(setScreenshot);
   };
 
   const closeFeedback = () => {
@@ -56,6 +56,7 @@ export function FeedbackFloatingBubble() {
       setDescription("");
       setScreenshot(null);
       setMessage("Đã gửi phản hồi kèm hiện trạng màn hình.");
+      onSubmitted?.();
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : "Không thể gửi phản hồi.");
     } finally {
@@ -78,6 +79,7 @@ export function FeedbackFloatingBubble() {
         <FormField label="Loại"><BaseSelect value={type} onChange={event => setType(event.target.value as FeedbackType)}><option value="bug">Báo lỗi</option><option value="feature">Tính năng</option><option value="improvement">Cải thiện</option></BaseSelect></FormField>
         <FormField label="Tiêu đề"><BaseTextInput value={title} maxLength={200} onChange={event => setTitle(event.target.value)} placeholder="Ví dụ: Số dư chưa cập nhật" /></FormField>
         <FormField label="Mô tả"><BaseTextArea rows={5} maxLength={10000} value={description} onChange={event => setDescription(event.target.value)} placeholder="Mô tả điều đã xảy ra hoặc điều bạn muốn cải thiện" /></FormField>
+        {screenshot ? <div className="flex items-center justify-between gap-2"><Text size="xs" tone="secondary">Ảnh màn hình hiện tại sẽ được đính kèm.</Text><BaseButton type="button" size="sm" variant="ghost" onClick={() => setScreenshot(null)}>Bỏ ảnh</BaseButton></div> : <Text size="xs" tone="secondary">Đang chuẩn bị ảnh màn hình hiện tại…</Text>}
         {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
         {message ? <StatusMessage>{message}</StatusMessage> : null}
         <BaseButton type="button" className="w-full" loading={saving} disabled={saving || !title.trim() || !description.trim()} onClick={() => void submit()}>Gửi phản hồi</BaseButton>

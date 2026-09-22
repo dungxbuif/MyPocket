@@ -28,6 +28,8 @@ All notable changes should be recorded here.
 
 ## [Unreleased]
 
+- Fixed receipt upload validation to use the detected file signature instead of trusting an empty or incorrect browser MIME header; valid PNG/JPEG/PDF uploads now reach OCR while spoofed content remains rejected. Added a shared floating feedback bubble that captures the current mounted app view (excluding its overlay) and submits an optional private screenshot through the feedback API. Transfer creation is now exposed from the transactions three-dot menu. Live OCR remains blocked only by the configured provider credential returning HTTP 401; see [OCR_API](../architecture/OCR_API.md#401-troubleshooting).
+
 - Fixed Finance Assistant tool contracts and lifecycle safety: all read tools expose typed model schemas, OpenAI-compatible tool-call history is serialized correctly, four-call loops can finish with a final answer, revoked/expired credentials are revalidated during execution, and cancelled runs reject late assistant writes. Added wallet/budget/goal/jar assistant cards and corrected history reload/count formatting. [AI-ADVISOR-01](../work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md)
 - Cancellation now propagates to the in-process provider context while retaining the database lease guard; cross-process interruption remains explicitly unreleased.
 - Added bounded advisor history pagination: the UI loads older messages through `before_seq`, deduplicates page boundaries and preserves chronological order without clearing the visible conversation.

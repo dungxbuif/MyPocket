@@ -7,7 +7,7 @@ import { Text } from "../atoms/Text";
 import { createFeedback, fetchChangelog, fetchFeedback, type Changelog, type Feedback, type FeedbackType } from "../../services/feedback";
 import { FeedbackStatus } from "../molecules/FeedbackStatus";
 
-export function FeedbackPanel() {
+export function FeedbackPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const [items, setItems] = useState<Feedback[]>([]);
   const [changelog, setChangelog] = useState<Changelog[]>([]);
   const [type, setType] = useState<FeedbackType>("bug");
@@ -25,7 +25,7 @@ export function FeedbackPanel() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); }, [refreshKey]);
 
   const submit = async () => {
     if (saving || !title.trim() || !description.trim()) return;

@@ -36,9 +36,9 @@ trace:
 
 ## Status
 
-- 2026-09-22 runtime update: one-shot AI upload accepts JPEG/PNG/PDF. Backend validates the uploaded bytes, stores the original in private environment-qualified MyPocket S3, and sends OCR Platform a short-lived signed source URL. OCR completes before text extraction; the LLM receives only user/OCR text (never file bytes, base64, URL or image input). Provider adapter tests also retain coverage for OCR Platform's own private PDF presign flow, but the app upload path uses MyPocket S3 source URLs for both images and PDFs. Live OCR against the user's PDF has not been retried.
+- 2026-09-22 runtime update: one-shot AI upload accepts JPEG/PNG/PDF. Backend validates the uploaded bytes, stores the original in private environment-qualified MyPocket S3, and sends OCR Platform a short-lived signed source URL. OCR completes before text extraction; the LLM receives only user/OCR text (never file bytes, base64, URL or image input). Provider adapter tests also retain coverage for OCR Platform's own private PDF presign flow, but the app upload path uses MyPocket S3 source URLs for both images and PDFs. A live provider probe currently returns HTTP 401 `UNAUTHORIZED` for the configured credential; this is an external secret provisioning/rotation blocker, not a file-type or client MIME failure.
 - ID: API-OCR-001
-- Status: ready for future implementation
+- Status: implemented locally; live provider credential blocked
 - Owner: shared
 - Public contract checked 2026-09-20: OpenAPI and capabilities returned HTTP 200. Scan-only routes are not advertised; do not implement against older scan guidance. This check did not run an authenticated OCR job.
 - Source documentation:
@@ -192,6 +192,10 @@ Rules:
 - Use the exact headers returned by presign.
 - Do not submit `sourceUrl` if the byte upload failed.
 - Do not construct `s3://` or storage URLs manually.
+
+## 401 troubleshooting
+
+If `/api/v1/ai/entry/process` returns `503 ai_entry_unavailable` and the server diagnostic contains `stage=ocr_submit`, `code=ocr_submit_request`, and `provider_status=401`, the OCR platform rejected the configured `OCR_API_KEY`. The adapter already sends the documented `Authorization: Bearer` header and fails closed without saving transactions. Rotate or re-enable the key in the backend secret store, restart the API, and verify the provider with a server-side request; never place the key in browser code or bypass OCR authentication. A 401 cannot be repaired by changing the uploaded image MIME header.
 
 ### 3. Submit source URL
 
