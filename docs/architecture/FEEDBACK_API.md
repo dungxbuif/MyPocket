@@ -94,7 +94,13 @@ Read one published changelog entry. This never returns the feedback rows that pr
 
 Account → Phản hồi uses the authenticated user endpoints. A fixed row shows `Đã xử lý` and, when linked, `Fixed in <version>`. The browser never receives or stores `FEEDBACK_AGENT_TOKEN`.
 
+The app also renders a floating feedback bubble above the bottom navigation on every authenticated screen. Opening it captures the current DOM view in the background (excluding the feedback overlay itself); submitting the form sends that PNG as the optional `screenshot` multipart field. If browser capture fails, text feedback still submits without an attachment.
+
 ## AI-agent quick reference
+
+## Screenshot capture
+
+`POST /feedback` also accepts `multipart/form-data` with `type`, `title`, `description`, and one `screenshot` PNG (maximum 1 MiB). The server stores it privately and exposes only `screenshot_available` in feedback JSON. `GET /feedback/{id}/screenshot` is owner-scoped and returns a short-lived `302` signed URL; `GET /agent/feedback/{id}/screenshot` uses the dedicated feedback-agent token. Storage object keys are never returned.
 
 ```text
 1. GET /api/v1/agent/feedback?status=open with Authorization: Bearer FEEDBACK_AGENT_TOKEN.

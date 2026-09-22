@@ -17,7 +17,8 @@ func TestFeedbackRoutesExposeOwnerAgentAndPublicBoundaries(t *testing.T) {
 	}
 	for _, expected := range []string{
 		"GET /api/v1/feedback", "POST /api/v1/feedback", "GET /api/v1/feedback/:id",
-		"GET /api/v1/agent/feedback", "PATCH /api/v1/internal/feedback/:id/status", "POST /api/v1/internal/changelog",
+		"GET /api/v1/feedback/:id/screenshot", "GET /api/v1/agent/feedback", "GET /api/v1/agent/feedback/:id/screenshot",
+		"PATCH /api/v1/internal/feedback/:id/status", "POST /api/v1/internal/changelog",
 		"GET /api/v1/changelog", "GET /api/v1/changelog/:id",
 	} {
 		if !routes[expected] {

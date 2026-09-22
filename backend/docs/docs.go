@@ -56,6 +56,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/agent/feedback/{id}/screenshot": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback Agent"
+                ],
+                "summary": "Get a short-lived feedback screenshot URL for the local agent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Feedback ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Found"
+                    }
+                }
+            }
+        },
         "/api/v1/ai/advisor/capabilities": {
             "get": {
                 "security": [
@@ -1355,6 +1385,36 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/feedback/{id}/screenshot": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback"
+                ],
+                "summary": "Get a short-lived private feedback screenshot URL",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Feedback ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Found"
+                    }
+                }
+            }
+        },
         "/api/v1/home": {
             "get": {
                 "security": [
@@ -2611,6 +2671,9 @@ const docTemplate = `{
                 },
                 "id": {
                     "type": "string"
+                },
+                "screenshot_available": {
+                    "type": "boolean"
                 },
                 "status": {
                     "type": "string"

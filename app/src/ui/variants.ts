@@ -96,6 +96,7 @@ export const BUTTON_SIZES = {
 export const ICON_BUTTON_VARIANTS = {
   surface: "border border-line bg-card shadow-sm hover:bg-row",
   bare: "border border-transparent bg-transparent shadow-none hover:bg-transparent active:scale-100",
+  brand: "border border-action bg-brand text-card shadow-raised hover:bg-brand-hover",
 } as const;
 
 export const HEADING_SIZES = {

@@ -14,6 +14,7 @@ export type Feedback = {
   changelog_id?: string;
   created_at: string;
   updated_at: string;
+  screenshot_available?: boolean;
 };
 
 export type Changelog = {
@@ -30,7 +31,15 @@ export function fetchFeedback(): Promise<Feedback[]> {
   return request<Feedback[]>("/feedback");
 }
 
-export function createFeedback(input: { type: FeedbackType; title: string; description: string }): Promise<Feedback> {
+export function createFeedback(input: { type: FeedbackType; title: string; description: string; screenshot?: Blob | null }): Promise<Feedback> {
+  if (input.screenshot) {
+    const body = new FormData();
+    body.append("type", input.type);
+    body.append("title", input.title.trim());
+    body.append("description", input.description.trim());
+    body.append("screenshot", input.screenshot, "screen.png");
+    return request<Feedback>("/feedback", { method: "POST", body });
+  }
   return request<Feedback>("/feedback", { method: "POST", body: JSON.stringify({ type: input.type, title: input.title.trim(), description: input.description.trim() }) });
 }
 

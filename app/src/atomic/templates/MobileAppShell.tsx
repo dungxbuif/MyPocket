@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import { AppHeader } from "../organisms/AppHeader";
 import { BottomNavigation } from "../organisms/BottomNavigation";
 import type { PrototypeTab } from "../pages/FinancePrototypePage";
+import { FeedbackFloatingBubble } from "../organisms/FeedbackFloatingBubble";
 
 export function MobileAppShell({
   tab,
@@ -30,6 +31,7 @@ export function MobileAppShell({
         {showHeader ? <AppHeader masked={masked} onToggleMask={onToggleMask} refreshKey={refreshKey} /> : null}
         <section className="space-y-3 px-4">{children}</section>
         <BottomNavigation tab={tab} onTabChange={onTabChange} onAdd={onAdd} onAiAdd={onAiAdd} />
+        <FeedbackFloatingBubble />
       </div>
     </main>
   );

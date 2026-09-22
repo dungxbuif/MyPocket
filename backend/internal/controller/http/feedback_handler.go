@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http"
 	"strconv"
 	"strings"
@@ -70,18 +72,51 @@ func (h *FeedbackHandler) Create(c *gin.Context) {
 		feedbackFailure(c, errors.New("feedback service unavailable"))
 		return
 	}
-	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
-	var input feedbackInput
-	if c.ShouldBindJSON(&input) != nil {
+	input, err := parseFeedbackInput(c)
+	if err != nil {
 		feedbackBadRequest(c)
 		return
 	}
-	row, err := h.Service.Create(feedbackContext(c, "user"), owner, usecase.FeedbackInput{Type: input.Type, Title: input.Title, Description: input.Description})
+	row, err := h.Service.Create(feedbackContext(c, "user"), owner, input)
 	if err != nil {
 		feedbackFailure(c, err)
 		return
 	}
 	Created(c, row)
+}
+
+func parseFeedbackInput(c *gin.Context) (usecase.FeedbackInput, error) {
+	if !strings.HasPrefix(strings.ToLower(c.GetHeader("Content-Type")), "multipart/form-data") {
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 1<<20)
+		var input feedbackInput
+		if err := c.ShouldBindJSON(&input); err != nil {
+			return usecase.FeedbackInput{}, err
+		}
+		return usecase.FeedbackInput{Type: input.Type, Title: input.Title, Description: input.Description}, nil
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 2<<20)
+	if err := c.Request.ParseMultipartForm(2 << 20); err != nil {
+		return usecase.FeedbackInput{}, err
+	}
+	input := usecase.FeedbackInput{Type: c.PostForm("type"), Title: c.PostForm("title"), Description: c.PostForm("description")}
+	file, header, err := c.Request.FormFile("screenshot")
+	if err != nil {
+		if errors.Is(err, http.ErrMissingFile) {
+			return input, nil
+		}
+		return usecase.FeedbackInput{}, err
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, 1<<20+1))
+	if err != nil || len(data) == 0 || len(data) > 1<<20 {
+		return usecase.FeedbackInput{}, errors.New("invalid screenshot size")
+	}
+	detected := http.DetectContentType(data)
+	if detected != "image/png" || (header != nil && header.Size > 1<<20) {
+		return usecase.FeedbackInput{}, errors.New("invalid screenshot type")
+	}
+	input.Screenshot, input.ScreenshotMIME, input.ScreenshotSize = bytes.NewReader(data), detected, int64(len(data))
+	return input, nil
 }
 
 // GetFeedback godoc
@@ -108,6 +143,32 @@ func (h *FeedbackHandler) Get(c *gin.Context) {
 		return
 	}
 	OK(c, row)
+}
+
+// GetFeedbackScreenshot godoc
+// @Summary Get a short-lived private feedback screenshot URL
+// @Tags Feedback
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Feedback ID"
+// @Success 302
+// @Router /api/v1/feedback/{id}/screenshot [get]
+func (h *FeedbackHandler) Screenshot(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		feedbackUnauthorized(c)
+		return
+	}
+	if h.Service == nil {
+		feedbackFailure(c, errors.New("feedback service unavailable"))
+		return
+	}
+	url, err := h.Service.Screenshot(feedbackContext(c, "user"), owner, c.Param("id"))
+	if err != nil {
+		feedbackFailure(c, err)
+		return
+	}
+	c.Redirect(http.StatusFound, url)
 }
 
 // ListAgentFeedback godoc
@@ -143,6 +204,27 @@ func (h *FeedbackHandler) AgentList(c *gin.Context) {
 		return
 	}
 	OK(c, rows)
+}
+
+// GetAgentFeedbackScreenshot godoc
+// @Summary Get a short-lived feedback screenshot URL for the local agent
+// @Tags Feedback Agent
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Feedback ID"
+// @Success 302
+// @Router /api/v1/agent/feedback/{id}/screenshot [get]
+func (h *FeedbackHandler) AgentScreenshot(c *gin.Context) {
+	if h.Service == nil {
+		feedbackFailure(c, errors.New("feedback service unavailable"))
+		return
+	}
+	url, err := h.Service.AgentScreenshot(feedbackContext(c, "agent"), c.Param("id"))
+	if err != nil {
+		feedbackFailure(c, err)
+		return
+	}
+	c.Redirect(http.StatusFound, url)
 }
 
 // SetFeedbackStatus godoc
@@ -190,6 +272,10 @@ func feedbackFailure(c *gin.Context, err error) {
 		status, code, detail = http.StatusConflict, "FEEDBACK_CONFLICT", "Trạng thái phản hồi không thể chuyển tiếp."
 	case errors.Is(err, repository.ErrFeedbackInvalid), errors.Is(err, usecase.ErrFeedbackAgentInput), errors.Is(err, entity.ErrFeedbackTypeInvalid), errors.Is(err, entity.ErrFeedbackTitleRequired), errors.Is(err, entity.ErrFeedbackDescription), errors.Is(err, entity.ErrFeedbackStatusInvalid):
 		status, code, detail = http.StatusBadRequest, problemCodeBadRequest, "Dữ liệu phản hồi không hợp lệ."
+	case errors.Is(err, usecase.ErrFeedbackScreenshotInvalid):
+		status, code, detail = http.StatusBadRequest, "FEEDBACK_SCREENSHOT_INVALID", "Ảnh chụp màn hình không hợp lệ hoặc vượt quá 1 MiB."
+	case errors.Is(err, usecase.ErrFeedbackStorage):
+		status, code, detail = http.StatusServiceUnavailable, "FEEDBACK_SCREENSHOT_STORAGE_UNAVAILABLE", "Không thể lưu ảnh chụp màn hình lúc này."
 	case errors.Is(err, entity.ErrChangelogVersionRequired), errors.Is(err, entity.ErrChangelogTitleRequired), errors.Is(err, entity.ErrChangelogDescription):
 		status, code, detail = http.StatusBadRequest, problemCodeBadRequest, "Thông tin changelog không hợp lệ."
 	}

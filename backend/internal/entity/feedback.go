@@ -27,16 +27,21 @@ var (
 )
 
 type Feedback struct {
-	ID          string     `json:"id" gorm:"primaryKey"`
-	UserID      string     `json:"-" gorm:"column:user_id;index;not null"`
-	Type        string     `json:"type" gorm:"not null"`
-	Title       string     `json:"title" gorm:"not null"`
-	Description string     `json:"description" gorm:"not null"`
-	Status      string     `json:"status" gorm:"not null;default:open"`
-	FixedAt     *time.Time `json:"fixed_at,omitempty"`
-	ChangelogID *string    `json:"changelog_id,omitempty" gorm:"column:changelog_id;index"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ID                  string     `json:"id" gorm:"primaryKey"`
+	UserID              string     `json:"-" gorm:"column:user_id;index;not null"`
+	Type                string     `json:"type" gorm:"not null"`
+	Title               string     `json:"title" gorm:"not null"`
+	Description         string     `json:"description" gorm:"not null"`
+	Status              string     `json:"status" gorm:"not null;default:open"`
+	FixedAt             *time.Time `json:"fixed_at,omitempty"`
+	ChangelogID         *string    `json:"changelog_id,omitempty" gorm:"column:changelog_id;index"`
+	CreatedAt           time.Time  `json:"created_at"`
+	UpdatedAt           time.Time  `json:"updated_at"`
+	ScreenshotObjectKey string     `json:"-" gorm:"column:screenshot_object_key"`
+	ScreenshotMIMEType  string     `json:"-" gorm:"column:screenshot_mime_type"`
+	ScreenshotSizeBytes int64      `json:"-" gorm:"column:screenshot_size_bytes"`
+	ScreenshotCreatedAt *time.Time `json:"-" gorm:"column:screenshot_created_at"`
+	ScreenshotAvailable bool       `json:"screenshot_available" gorm:"-"`
 }
 
 func (Feedback) TableName() string { return "feedback" }

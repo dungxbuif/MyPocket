@@ -145,7 +145,7 @@ func main() {
 	router.RegisterAdvisorRoutes(&httpapi.AdvisorHandler{Service: advisorService, Users: userRepo, Finance: financeQueryService})
 	feedbackRepository := repo.NewFeedbackPostgresRepository(database)
 	changelogRepository := repo.NewChangelogPostgresRepository(database)
-	feedbackService := usecase.NewFeedbackService(feedbackRepository, cacheRepo, time.Now)
+	feedbackService := usecase.NewFeedbackServiceWithStorage(feedbackRepository, cacheRepo, attachmentStorage, time.Now)
 	changelogService := usecase.NewChangelogService(feedbackRepository, changelogRepository, cacheRepo, time.Now)
 	if cfg.AppEnv != "development" && strings.TrimSpace(cfg.FeedbackAgentToken) == "" {
 		log.Fatal("FEEDBACK_AGENT_TOKEN must be configured outside development")
