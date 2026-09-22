@@ -26,7 +26,7 @@ try {
  await request(`/transactions/${interest.id}`,'DELETE',undefined,204);await balance(600000);
  await request('/transactions','POST',{...input,category_id:id('income_salary')},400);
  const now=new Date(),start=new Date(now.getFullYear(),now.getMonth(),1),end=new Date(now.getFullYear(),now.getMonth()+1,1);
- const config={name:'API proof budget',limit_amount:1000000,wallet_id:basic.id,category_id:id('expense_food'),start_at:start.toISOString(),end_at:end.toISOString()};
+ const config={name:'API proof budget',limit_amount:1000000,wallet_id:basic.id,category_id:id('expense_food'),start_date:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-01`,end_date:`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(new Date(now.getFullYear(),now.getMonth()+1,0).getDate()).padStart(2,'0')}`};
  const budget=await request('/budgets','POST',config,201);budgets.push(budget.id);
  await request('/budgets','POST',config,409);
  const txInput={...input,wallet_id:basic.id,type:'expense',category_id:id('expense_food_coffee'),amount:50000};

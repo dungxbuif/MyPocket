@@ -8,6 +8,8 @@ definitions:
         type: string
       included_in_reports:
         type: boolean
+      jar_id:
+        type: string
       note:
         type: string
       occurred_at:
@@ -44,6 +46,62 @@ definitions:
       version:
         type: integer
     type: object
+  entity.AdvisorMessage:
+    properties:
+      conversation_id:
+        type: string
+      created_at:
+        type: string
+      generation:
+        type: integer
+      id:
+        type: string
+      parts:
+        items:
+          $ref: '#/definitions/entity.AdvisorPart'
+        type: array
+      parts_version:
+        type: integer
+      role:
+        type: string
+      run_id:
+        type: string
+      seq:
+        type: integer
+    type: object
+  entity.AdvisorPart:
+    properties:
+      data: {}
+      text:
+        type: string
+      type:
+        type: string
+    type: object
+  entity.AdvisorRun:
+    properties:
+      client_request_id:
+        type: string
+      conversation_id:
+        type: string
+      created_at:
+        type: string
+      credential_kind:
+        type: string
+      error_code:
+        type: string
+      finished_at:
+        type: string
+      generation:
+        type: integer
+      id:
+        type: string
+      last_event_seq:
+        type: integer
+      owner_id:
+        type: string
+      status:
+        type: string
+    type: object
   entity.Budget:
     properties:
       category_id:
@@ -52,8 +110,8 @@ definitions:
         type: string
       days_remaining:
         type: integer
-      end_at:
-        type: string
+      end_date:
+        $ref: '#/definitions/entity.CalendarDate'
       ended:
         type: boolean
       id:
@@ -66,8 +124,8 @@ definitions:
         type: string
       spent:
         type: integer
-      start_at:
-        type: string
+      start_date:
+        $ref: '#/definitions/entity.CalendarDate'
       updated_at:
         type: string
       wallet_id:
@@ -83,6 +141,11 @@ definitions:
         type: integer
       spent:
         type: integer
+    type: object
+  entity.CalendarDate:
+    properties:
+      time.Time:
+        type: string
     type: object
   entity.Category:
     properties:
@@ -111,6 +174,200 @@ definitions:
           type: string
         type: array
     type: object
+  entity.Changelog:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      published_at:
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  entity.Feedback:
+    properties:
+      changelog_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      fixed_at:
+        type: string
+      id:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.JarCumulativeMonth:
+    properties:
+      allocation_covered:
+        type: boolean
+      calculated_allocation:
+        type: integer
+      month:
+        type: string
+      name:
+        type: string
+      spent:
+        type: integer
+    type: object
+  entity.JarCumulativeSummary:
+    properties:
+      allocation_months:
+        type: integer
+      allocation_variance:
+        type: integer
+      from_month:
+        type: string
+      jar_id:
+        type: string
+      months:
+        items:
+          $ref: '#/definitions/entity.JarCumulativeMonth'
+        type: array
+      months_in_range:
+        type: integer
+      name:
+        type: string
+      to_month:
+        type: string
+      total_allocated:
+        type: integer
+      total_spent:
+        type: integer
+    type: object
+  entity.JarIdentity:
+    properties:
+      jar_id:
+        type: string
+      name:
+        type: string
+    type: object
+  entity.JarMonthConfig:
+    properties:
+      active:
+        type: boolean
+      allocation_amount:
+        type: integer
+      allocation_mode:
+        type: string
+      created_at:
+        type: string
+      jar_id:
+        type: string
+      month:
+        $ref: '#/definitions/entity.CalendarDate'
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.JarMonthItem:
+    properties:
+      active:
+        type: boolean
+      allocation_amount:
+        type: integer
+      allocation_mode:
+        type: string
+      allocation_percent:
+        type: number
+      calculated_allocation:
+        type: integer
+      jar_id:
+        type: string
+      name:
+        type: string
+      spent:
+        type: integer
+    type: object
+  entity.JarMonthSummary:
+    properties:
+      actual_income:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/entity.JarMonthItem'
+        type: array
+      jars:
+        items:
+          $ref: '#/definitions/entity.JarIdentity'
+        type: array
+      month:
+        type: string
+      over_income:
+        type: boolean
+      over_one_hundred_percent:
+        type: boolean
+      timezone:
+        type: string
+      total_allocated:
+        type: integer
+      total_allocation_percent:
+        type: number
+      total_spent:
+        type: integer
+      unassigned_spent:
+        type: integer
+    type: object
+  entity.MonthCategoryTotal:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      count:
+        type: integer
+      name:
+        type: string
+      type:
+        type: string
+    type: object
+  entity.MonthSummary:
+    properties:
+      calculated_at:
+        type: string
+      categories:
+        items:
+          $ref: '#/definitions/entity.MonthCategoryTotal'
+        type: array
+      expense:
+        type: integer
+      income:
+        type: integer
+      is_complete:
+        type: boolean
+      is_current:
+        type: boolean
+      jar_summary:
+        $ref: '#/definitions/entity.JarMonthSummary'
+      month:
+        type: string
+      net:
+        type: integer
+      next_start_at:
+        type: string
+      note:
+        type: string
+      start_at:
+        type: string
+      timezone:
+        type: string
+      transaction_count:
+        type: integer
+    type: object
   entity.Transaction:
     properties:
       amount:
@@ -123,17 +380,46 @@ definitions:
         type: string
       included_in_reports:
         type: boolean
+      jar_id:
+        type: string
+      jar_name:
+        type: string
       note:
         type: string
       occurred_at:
         type: string
       owner_id:
         type: string
+      transfer_id:
+        type: string
       type:
         type: string
       updated_at:
         type: string
       wallet_id:
+        type: string
+    type: object
+  entity.UserAPIKey:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      last_used_at:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      revoked_at:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+      updated_at:
         type: string
     type: object
   entity.Wallet:
@@ -167,7 +453,7 @@ definitions:
       target_amount:
         type: integer
       target_date:
-        type: string
+        $ref: '#/definitions/entity.CalendarDate'
       type:
         type: string
       updated_at:
@@ -195,6 +481,24 @@ definitions:
       data: {}
       meta: {}
     type: object
+  httpapi.advisorMessageInput:
+    properties:
+      client_request_id:
+        type: string
+      text:
+        type: string
+    type: object
+  httpapi.advisorSubmitResponse:
+    properties:
+      conversation_id:
+        type: string
+      run_id:
+        type: string
+      status:
+        type: string
+      text:
+        type: string
+    type: object
   httpapi.aiProposalDecision:
     properties:
       version:
@@ -207,17 +511,43 @@ definitions:
       version:
         type: integer
     type: object
+  httpapi.apiKeyCreateInput:
+    properties:
+      expires_at:
+        type: string
+      name:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+    type: object
+  httpapi.apiKeyCreatedResponse:
+    properties:
+      expires_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+      secret:
+        type: string
+    type: object
   httpapi.budgetInput:
     properties:
       category_id:
         type: string
-      end_at:
+      end_date:
         type: string
       limit_amount:
         type: integer
       name:
         type: string
-      start_at:
+      start_date:
         type: string
       wallet_id:
         type: string
@@ -244,11 +574,63 @@ definitions:
           type: string
         type: array
     type: object
+  httpapi.changelogInput:
+    properties:
+      description:
+        type: string
+      feedback_ids:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  httpapi.feedbackInput:
+    properties:
+      description:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  httpapi.feedbackStatusInput:
+    properties:
+      status:
+        type: string
+    type: object
+  httpapi.jarInput:
+    properties:
+      allocation_amount:
+        type: integer
+      allocation_mode:
+        type: string
+      allocation_percent:
+        type: number
+      month:
+        type: string
+      name:
+        type: string
+    type: object
   httpapi.loginRequest:
     properties:
       email:
         type: string
       password:
+        type: string
+    type: object
+  httpapi.monthNoteInput:
+    properties:
+      note:
+        type: string
+    type: object
+  httpapi.timezoneInput:
+    properties:
+      initialize_only:
+        type: boolean
+      timezone:
         type: string
     type: object
   httpapi.transactionInput:
@@ -259,6 +641,8 @@ definitions:
         type: string
       included_in_reports:
         type: boolean
+      jar_id:
+        type: string
       note:
         type: string
       occurred_at:
@@ -266,6 +650,19 @@ definitions:
       type:
         type: string
       wallet_id:
+        type: string
+    type: object
+  httpapi.transferInput:
+    properties:
+      amount:
+        type: integer
+      destination_wallet_id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      source_wallet_id:
         type: string
     type: object
   httpapi.walletInput:
@@ -320,6 +717,10 @@ definitions:
         type: string
       name:
         type: string
+      timezone:
+        type: string
+      timezone_confirmed:
+        type: boolean
     type: object
 host: localhost:8080
 info:
@@ -328,6 +729,148 @@ info:
   title: MyPocket API
   version: 0.1.0
 paths:
+  /api/v1/agent/feedback:
+    get:
+      parameters:
+      - description: open, triaged, in_progress, fixed, rejected
+        in: query
+        name: status
+        type: string
+      - description: Maximum rows (1-100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Feedback'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List feedback for the local development agent
+      tags:
+      - Feedback Agent
+  /api/v1/ai/advisor/capabilities:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Read Finance Assistant capabilities
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/conversation/messages:
+    get:
+      parameters:
+      - description: Read messages before sequence
+        in: query
+        name: before_seq
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.AdvisorMessage'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Read persisted Finance Assistant messages
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/messages:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Question
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.advisorMessageInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.advisorSubmitResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit a Finance Assistant read-only question
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/overview:
+    get:
+      parameters:
+      - description: Account-local calendar month YYYY-MM
+        in: query
+        name: month
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Read Finance Assistant overview without calling the model
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/runs/{id}:
+    get:
+      parameters:
+      - description: Run ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AdvisorRun'
+      security:
+      - BearerAuth: []
+      summary: Read one Finance Assistant run
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/runs/{id}/cancel:
+    post:
+      parameters:
+      - description: Run ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Cancel a queued or running Finance Assistant run
+      tags:
+      - AI Advisor
   /api/v1/ai/entry/capabilities:
     get:
       produces:
@@ -490,6 +1033,62 @@ paths:
       summary: Read one-shot AI process status and proposals by idempotency key
       tags:
       - AI Entry
+  /api/v1/api-keys:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.UserAPIKey'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List current user's API keys
+      tags:
+      - API Keys
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: API key configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.apiKeyCreateInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpapi.apiKeyCreatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a user API key
+      tags:
+      - API Keys
+  /api/v1/api-keys/{id}:
+    delete:
+      parameters:
+      - description: API key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Revoke a current user's API key
+      tags:
+      - API Keys
   /api/v1/auth/google:
     get:
       parameters:
@@ -586,6 +1185,36 @@ paths:
       security:
       - BearerAuth: []
       summary: Get authenticated user profile
+      tags:
+      - Account
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: IANA timezone
+        in: body
+        name: timezone
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.timezoneInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.UserProfile'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Set the authenticated account timezone
       tags:
       - Account
   /api/v1/budgets:
@@ -836,6 +1465,101 @@ paths:
       summary: Update wallets applicable to a visible category
       tags:
       - Categories
+  /api/v1/changelog:
+    get:
+      parameters:
+      - description: Maximum rows (1-100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Changelog'
+            type: array
+      summary: List published changelog entries
+      tags:
+      - Changelog
+  /api/v1/changelog/{id}:
+    get:
+      parameters:
+      - description: Changelog ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Changelog'
+      summary: Get one published changelog entry
+      tags:
+      - Changelog
+  /api/v1/feedback:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Feedback'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List the authenticated user's feedback
+      tags:
+      - Feedback
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Feedback
+        in: body
+        name: feedback
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.feedbackInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Feedback'
+      security:
+      - BearerAuth: []
+      summary: Create owner-scoped feedback
+      tags:
+      - Feedback
+  /api/v1/feedback/{id}:
+    get:
+      parameters:
+      - description: Feedback ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Feedback'
+      security:
+      - BearerAuth: []
+      summary: Get one feedback item owned by the authenticated user
+      tags:
+      - Feedback
   /api/v1/home:
     get:
       produces:
@@ -862,6 +1586,180 @@ paths:
       summary: Get authenticated home summary
       tags:
       - Account
+  /api/v1/internal/changelog:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Changelog
+        in: body
+        name: changelog
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.changelogInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Changelog'
+      security:
+      - BearerAuth: []
+      summary: Publish a changelog and mark referenced in-progress feedback fixed
+      tags:
+      - Feedback Agent
+  /api/v1/internal/feedback/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Feedback ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Next status
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.feedbackStatusInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Feedback'
+      security:
+      - BearerAuth: []
+      summary: Advance feedback status through the agent lifecycle
+      tags:
+      - Feedback Agent
+  /api/v1/jars:
+    get:
+      parameters:
+      - description: Calendar month YYYY-MM; defaults to account-local current month
+        in: query
+        name: month
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.JarMonthSummary'
+      security:
+      - BearerAuth: []
+      summary: Get account jars and derived spending for a month
+      tags:
+      - Jars
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Jar configuration
+        in: body
+        name: jar
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.jarInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.JarMonthConfig'
+      security:
+      - BearerAuth: []
+      summary: Create a stable jar and its configuration for one month
+      tags:
+      - Jars
+  /api/v1/jars/{jar_id}/months/{month}:
+    delete:
+      parameters:
+      - description: Stable jar ID
+        in: path
+        name: jar_id
+        required: true
+        type: string
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Remove a jar from one month's active configuration and preserve its
+        history
+      tags:
+      - Jars
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stable jar ID
+        in: path
+        name: jar_id
+        required: true
+        type: string
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      - description: Jar month configuration
+        in: body
+        name: jar
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.jarInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.JarMonthConfig'
+      security:
+      - BearerAuth: []
+      summary: Update one jar's month-specific configuration
+      tags:
+      - Jars
+  /api/v1/jars/{jar_id}/report:
+    get:
+      parameters:
+      - description: Stable jar ID
+        in: path
+        name: jar_id
+        required: true
+        type: string
+      - description: First month YYYY-MM; omitted means full history
+        in: query
+        name: from
+        type: string
+      - description: Last month YYYY-MM; omitted means account-local current month
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.JarCumulativeSummary'
+      security:
+      - BearerAuth: []
+      summary: Get a stable jar's monthly history through an inclusive end month
+      tags:
+      - Jars
   /api/v1/login:
     post:
       consumes:
@@ -895,6 +1793,67 @@ paths:
       summary: Login with email and password
       tags:
       - Authentication
+  /api/v1/months/{month}:
+    get:
+      parameters:
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.MonthSummary'
+      security:
+      - BearerAuth: []
+      summary: Get live account-local month figures, jars, and independent note
+      tags:
+      - Months
+  /api/v1/months/{month}/note:
+    delete:
+      parameters:
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete the user's note for one account month
+      tags:
+      - Months
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      - description: User note
+        in: body
+        name: note
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.monthNoteInput'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Save the user's independent note for an account month
+      tags:
+      - Months
   /api/v1/transactions:
     get:
       produces:
@@ -1037,6 +1996,47 @@ paths:
       security:
       - BearerAuth: []
       summary: Download a private attachment linked to an owned transaction
+      tags:
+      - Transactions
+  /api/v1/transactions/transfer:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Internal transfer input
+        in: body
+        name: transfer
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.transferInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            items:
+              $ref: '#/definitions/entity.Transaction'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create an atomic internal wallet transfer
       tags:
       - Transactions
   /api/v1/wallets:

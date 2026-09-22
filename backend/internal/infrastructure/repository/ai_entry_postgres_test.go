@@ -194,9 +194,9 @@ func TestAIEntryPersistsReviewAndApprovesExactlyOnce(t *testing.T) {
 	if count != 0 {
 		t.Fatal("retry resurrected deleted ledger")
 	}
-	// Opening a new session cannot bypass the per-owner provider budget.
+	// Current product policy has no per-user AI usage limit; prior requests must not block a new session.
 	for i := 0; i < 19; i++ {
-		if err = db.Create(&entity.AIEntryRequest{SessionID: s.ID, RequestID: uuid.NewString(), Hash: "budget", Token: uuid.NewString()}).Error; err != nil {
+		if err = db.Create(&entity.AIEntryRequest{SessionID: s.ID, RequestID: uuid.NewString(), Hash: "prior", Token: uuid.NewString()}).Error; err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -204,8 +204,8 @@ func TestAIEntryPersistsReviewAndApprovesExactlyOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err = r.BeginMessage(ctx, owner, next.ID, "over-budget", "hash", "hello"); !errors.Is(err, port.ErrAIRateLimited) {
-		t.Fatalf("owner budget bypass: %v", err)
+	if _, started, err := r.BeginMessage(ctx, owner, next.ID, uuid.NewString(), "hash", "hello"); err != nil || !started {
+		t.Fatalf("prior requests should not rate-limit user usage: started=%v err=%v", started, err)
 	}
 }
 
@@ -249,5 +249,74 @@ func TestAIEntryOCRTextMapsByStableAttachmentID(t *testing.T) {
 	}
 	if gotA.OCRText != "OCR for a" || gotZ.OCRText != "OCR for z" {
 		t.Fatalf("OCR text mapped by timestamp instead of stable file order: a=%q z=%q", gotA.OCRText, gotZ.OCRText)
+	}
+}
+
+func TestAIEntryDoesNotLimitUserUsageAndReplayIsFree(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("requires migrated TEST_DATABASE_URL")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	owner := uuid.NewString()
+	if err = db.Create(&entity.User{ID: owner, Email: owner + "@test.invalid", GoogleSubject: owner}).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Where("id = ?", owner).Delete(&entity.User{}) })
+	r := NewAIEntryPostgresRepository(db)
+	processID := uuid.NewString()
+	if err = r.CreateProcess(ctx, owner, processID); err != nil {
+		t.Fatal(err)
+	}
+	token, started, err := r.BeginMessage(ctx, owner, processID, "00000000-0000-4000-8000-000000000001", "hash-1", "first")
+	if err != nil || !started || token == "" {
+		t.Fatalf("first request should start: token=%q started=%v err=%v", token, started, err)
+	}
+	replayToken, replayStarted, err := r.BeginMessage(ctx, owner, processID, "00000000-0000-4000-8000-000000000001", "hash-1", "first")
+	if err != nil || replayStarted || replayToken != "" {
+		t.Fatalf("idempotent replay should not consume usage: token=%q started=%v err=%v", replayToken, replayStarted, err)
+	}
+	for i := 2; i <= 25; i++ {
+		nextID := uuid.NewString()
+		if err = r.CreateProcess(ctx, owner, nextID); err != nil {
+			t.Fatal(err)
+		}
+		token, started, err = r.BeginMessage(ctx, owner, nextID, uuid.NewString(), "hash", "next")
+		if err != nil || !started || token == "" {
+			t.Fatalf("request %d should not be rate-limited: token=%q started=%v err=%v", i, token, started, err)
+		}
+	}
+}
+
+func TestAttachmentDeleteStatusRequiresClaimedDeletingState(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("requires migrated TEST_DATABASE_URL")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx := context.Background()
+	owner := uuid.NewString()
+	if err = db.Create(&entity.User{ID: owner, Email: owner + "@test.invalid", GoogleSubject: owner}).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { db.Where("id = ?", owner).Delete(&entity.User{}) })
+	r := NewAIEntryPostgresRepository(db)
+	processID := uuid.NewString()
+	if err = r.CreateProcess(ctx, owner, processID); err != nil {
+		t.Fatal(err)
+	}
+	attachment := entity.AIEntryAttachment{ID: uuid.NewString(), OwnerID: owner, ProcessID: processID, ObjectKey: "private/not-claimed.pdf", Filename: "not-claimed.pdf", MIMEType: "application/pdf", SizeBytes: 64, SHA256: "not-claimed", OCRStatus: "failed", DeleteAfter: time.Now().Add(-time.Hour)}
+	if err = r.CreateAttachments(ctx, []entity.AIEntryAttachment{attachment}); err != nil {
+		t.Fatal(err)
+	}
+	if err = r.SetAttachmentDeleteStatus(ctx, attachment.ID, "deleted"); !errors.Is(err, port.ErrAIConflict) {
+		t.Fatalf("delete status without active claim should conflict: %v", err)
 	}
 }

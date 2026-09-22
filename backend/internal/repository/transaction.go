@@ -1,6 +1,15 @@
 package repository
 
-import "github.com/mypocket/backend/internal/entity"
+import (
+	"errors"
+
+	"github.com/mypocket/backend/internal/entity"
+)
+
+var (
+	ErrTransferInvalid       = errors.New("invalid internal transfer")
+	ErrTransferWalletInvalid = errors.New("invalid transfer wallet")
+)
 
 type TransactionRepository interface {
 	List(ownerID string) ([]entity.Transaction, error)

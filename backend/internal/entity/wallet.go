@@ -66,6 +66,7 @@ type Transaction struct {
 	OccurredAt        time.Time `json:"occurred_at" gorm:"index;not null"`
 	Note              *string   `json:"note,omitempty"`
 	IncludedInReports bool      `json:"included_in_reports" gorm:"not null;default:true"`
+	TransferID        *string   `json:"transfer_id,omitempty" gorm:"column:transfer_id;index"`
 	CreatedAt         time.Time `json:"created_at"`
 	UpdatedAt         time.Time `json:"updated_at"`
 }

@@ -17,7 +17,27 @@ shared_fields: [status]
 
 All notable changes should be recorded here.
 
+- Started local Finance Assistant V1 vertical slice: migration 000018 stores one owner conversation/run with replay and busy guards; shared owner-scoped finance queries, eight read-only tools, bounded provider orchestration, JWT routes and `/assistant` base-first UI are implemented. SSE/reconnect, public API-key auth, configured-provider browser proof and deployment remain release gates. [AI-ADVISOR-01](../work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md)
+
+- Added local user API-key authentication for the read-only Finance Assistant: migration `000019_user_api_keys`, one-time `mpk_...` secret issuance with digest-only storage, owner-scoped JWT key management, scope checks (`finance:read`, `advisor:read`, `advisor:chat`), expiry/revocation and advisor middleware tests. Redis audit, configured-provider browser proof and production deployment remain open.
+
+- Added best-effort Redis advisor access audit on the `mypocket:audit:advisor` stream. Events include request/credential metadata, route, decision, status and latency; prompts, notes, tokens and monetary rows are excluded. Durable delivery/alerting is still a production gate.
+
 ## [Unreleased]
+
+- Fixed Finance Assistant tool contracts and lifecycle safety: all read tools expose typed model schemas, OpenAI-compatible tool-call history is serialized correctly, four-call loops can finish with a final answer, revoked/expired credentials are revalidated during execution, and cancelled runs reject late assistant writes. Added wallet/budget/goal/jar assistant cards and corrected history reload/count formatting. [AI-ADVISOR-01](../work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md)
+- Cancellation now propagates to the in-process provider context while retaining the database lease guard; cross-process interruption remains explicitly unreleased.
+
+- Completed local Feedback → Fix → Changelog wiring: backend routes are registered with JWT owner scope and dedicated agent token/audit, lifecycle transitions are locked, changelog publication requires `in_progress` feedback and is atomic, Swagger is regenerated, and Account → Phản hồi UI uses real APIs. Browser feedback E2E and production deployment remain pending. [FEEDBACK_API](../architecture/FEEDBACK_API.md)
+- Documentation follow-up: expanded the Finance Assistant plan with [technical implementation instructions](../superpowers/plans/2026-09-22-finance-assistant-technical-guide.md), detailed subtask gates, SQL/Go/API/SSE/UI contracts and isolated accounting fixtures. The docs now distinguish the implemented local JSON/overview/typed-part slice from remaining release gates.
+
+- Design history: added [Finance Assistant design](../work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md) and [V1 task plan](../superpowers/plans/2026-09-22-finance-assistant-v1.md), grounded in the Go/React app. The implementation is now a local read-only pilot; recovery/security/audit release gates and staged confirmed actions remain separate.
+
+- Added internal wallet transfers: `POST /api/v1/transactions/transfer` creates a source expense and destination income atomically, links them with `transfer_id`, excludes both from reports/jars, and adds a Quick Add transfer mode using shared base fields. Automated handler/PostgreSQL/design/build proof passes; owner browser UAT and pair edit/delete remain pending. [TICKET-02-02](../work/tickets/TICKET-02-02-TRANSFER-DETAIL_DESIGN.md)
+
+- Removed the hardcoded AI entry per-user request cap. MyPocket currently does not enforce user AI/OCR usage limits; idempotent request replay still avoids repeating provider work. Future cost consent, provider pricing and usage budgets remain in [AI-ENTRY-03](../work/tickets/AI-ENTRY-03-PROVIDER-SELECTION.md), with the current decision captured in [AI-USAGE-01](../work/tickets/AI-USAGE-01-DETAIL_DESIGN.md).
+
+- Hardened private attachment cleanup finalization: a stale cleanup worker now gets a conflict if an attachment is no longer in the claimed `deleting` state, instead of silently marking success. Regression evidence is recorded in [AI-ENTRY-02](../work/tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md).
 
 - Implemented account IANA timezone settings, date-only wallet/budget dates, optional transaction-to-jar assignment, per-month jar configurations/cumulative calculations, and live monthly totals with an independent note and automatic account-local completion (migrations `000013`–`000015`). Added `/jars` and `/months/YYYY-MM` real-API screens using documented shared bases. Backend/PostgreSQL and frontend design/calendar/jar/build checks pass; owner UAT remains pending. No cron close or immutable report snapshot was added. [CORE-03](../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md).
 

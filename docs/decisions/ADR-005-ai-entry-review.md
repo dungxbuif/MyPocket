@@ -26,7 +26,7 @@ Manual Add remains normal click. Long press opens a one-shot AI entry sheet; fin
 - Letting the model call transaction-create would blur intent and approval; explicit UI approval is the sole ledger entry point.
 - Full worker/storage/transfer rollout would widen this owner-directed UI slice substantially. Bounded synchronous extraction ships the review flow first, with visible failure/unknown-submission recovery and unsupported transfer approval.
 
-Tradeoffs: no retained image preview, no durable background OCR recovery, no automatic proposal merge across messages, and no transfer/credit ledger. Unsupported/missing fields require correction or rejection. Account limit is 20 extraction attempts per rolling 24 hours and 20 messages/session. Live AI quality requires actual model credentials and owner samples; fixture success is not a quality benchmark.
+Tradeoffs: no retained image preview, no durable background OCR recovery, no automatic proposal merge across messages, and no transfer/credit ledger. Unsupported/missing fields require correction or rejection. The original pilot cap was superseded by [AI-USAGE-01](../work/tickets/AI-USAGE-01-DETAIL_DESIGN.md): MyPocket currently enforces no per-user AI/OCR usage limit. Live AI quality requires actual model credentials and owner samples; fixture success is not a quality benchmark.
 
 ## Trace and verification
 

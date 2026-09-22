@@ -6,7 +6,7 @@ import { StatusMessage } from "../atoms/StatusMessage";
 import { Text } from "../atoms/Text";
 import { updateAccountTimezone, type UserProfile } from "../../services/auth";
 import { ProfileHeroCard } from "../molecules/ProfileHeroCard";
-import { Wallet, Layers3 } from "lucide-react";
+import { Wallet, Layers3, MessageSquareText } from "lucide-react";
 import { AccountMenuRow } from "../molecules/AccountMenuRow";
 import { SurfaceCard } from "../atoms/SurfaceCard";
 
@@ -58,6 +58,8 @@ export function AccountPanel({
         <AccountMenuRow to="/account/wallets" icon={Wallet} label="Ví của tôi" />
         <Divider className="mx-4" />
         <AccountMenuRow to="/account/groups" icon={Layers3} label="Nhóm" />
+        <Divider className="mx-4" />
+        <AccountMenuRow to="/account/feedback" icon={MessageSquareText} label="Phản hồi" />
       </SurfaceCard>
       <SurfaceCard padding="md" className="space-y-3">
         <Text weight="semibold">Múi giờ</Text>

@@ -47,7 +47,8 @@ func (s *ChangelogService) Publish(ctx context.Context, input ChangelogInput) (*
 	if s.Audit != nil {
 		sorted := append([]string(nil), ids...)
 		sort.Strings(sorted)
-		_ = s.Audit.Record(ctx, repository.AuditEvent{Action: "changelog.published", ChangelogID: row.ID, FeedbackIDs: sorted, Version: row.Version})
+		requestID, actor := auditContextValues(ctx)
+		_ = s.Audit.Record(ctx, repository.AuditEvent{RequestID: requestID, ActorKind: actor, Action: "changelog.published", ChangelogID: row.ID, FeedbackIDs: sorted, Version: row.Version})
 	}
 	return row, nil
 }

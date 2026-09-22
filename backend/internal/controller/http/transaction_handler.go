@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"errors"
 	"net/http"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ type TransactionHandler struct {
 	Categories   categoryrepo.CategoryRepository
 	Users        categoryrepo.UserRepository
 	Jars         categoryrepo.JarRepository
+	Transfers    transactionrepo.TransferRepository
 }
 
 type transactionInput struct {
@@ -46,7 +48,110 @@ type transactionInput struct {
 }
 
 func NewTransactionHandler(transactions transactionrepo.TransactionRepository, wallets walletrepo.WalletRepository, categories categoryrepo.CategoryRepository) *TransactionHandler {
-	return &TransactionHandler{Transactions: transactions, Wallets: wallets, Categories: categories}
+	handler := &TransactionHandler{Transactions: transactions, Wallets: wallets, Categories: categories}
+	if transfers, ok := transactions.(transactionrepo.TransferRepository); ok {
+		handler.Transfers = transfers
+	}
+	return handler
+}
+
+type transferInput struct {
+	SourceWalletID      string  `json:"source_wallet_id"`
+	DestinationWalletID string  `json:"destination_wallet_id"`
+	Amount              int64   `json:"amount"`
+	OccurredAt          string  `json:"occurred_at"`
+	Note                *string `json:"note"`
+}
+
+// CreateTransfer godoc
+// @Summary Create an atomic internal wallet transfer
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param transfer body transferInput true "Internal transfer input"
+// @Success 201 {array} entity.Transaction
+// @Failure 400 {object} Problem
+// @Failure 401 {object} Problem
+// @Failure 404 {object} Problem
+// @Failure 501 {object} Problem
+// @Router /api/v1/transactions/transfer [post]
+func (h *TransactionHandler) CreateTransfer(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h.Transfers == nil {
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "luồng chuyển ví chưa được cấu hình"})
+		return
+	}
+	var input transferInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	input.SourceWalletID, input.DestinationWalletID = strings.TrimSpace(input.SourceWalletID), strings.TrimSpace(input.DestinationWalletID)
+	if input.Amount <= 0 {
+		transactionBadRequest(c, transactionAmountMessage)
+		return
+	}
+	if input.SourceWalletID == "" || input.DestinationWalletID == "" || input.SourceWalletID == input.DestinationWalletID {
+		transactionBadRequest(c, "Ví chuyển đi và ví nhận phải khác nhau.")
+		return
+	}
+	sourceWallet, sourceErr := h.Wallets.Find(owner, input.SourceWalletID)
+	destinationWallet, destinationErr := h.Wallets.Find(owner, input.DestinationWalletID)
+	if sourceErr != nil || destinationErr != nil {
+		Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionWalletNotFound, Title: problemTitleNotFound, Detail: transactionWalletMessage})
+		return
+	}
+	if sourceWallet.Type == entity.WalletTypeCredit || destinationWallet.Type == entity.WalletTypeCredit {
+		transactionBadRequest(c, transactionCreditWalletMessage)
+		return
+	}
+	occurredAt := time.Now().UTC()
+	if strings.TrimSpace(input.OccurredAt) != "" {
+		parsed, err := time.Parse(time.RFC3339, input.OccurredAt)
+		if err != nil {
+			transactionBadRequest(c, transactionDateMessage)
+			return
+		}
+		occurredAt = parsed.UTC()
+	}
+	var sourceCategoryID, destinationCategoryID string
+	categories, err := h.Categories.ListVisible(owner)
+	if err != nil {
+		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		return
+	}
+	for _, category := range categories {
+		if category.SystemKey == nil {
+			continue
+		}
+		switch *category.SystemKey {
+		case "expense_transfer_out":
+			sourceCategoryID = category.ID
+		case "income_transfer_in":
+			destinationCategoryID = category.ID
+		}
+	}
+	if sourceCategoryID == "" || destinationCategoryID == "" {
+		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "thiếu nhóm hệ thống cho chuyển ví"})
+		return
+	}
+	transferID := uuid.NewString()
+	source := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: sourceWallet.ID, CategoryID: &sourceCategoryID, Type: entity.TransactionTypeExpense, Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: false, TransferID: &transferID}
+	destination := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: destinationWallet.ID, CategoryID: &destinationCategoryID, Type: entity.TransactionTypeIncome, Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: false, TransferID: &transferID}
+	if err := h.Transfers.CreateTransfer(owner, source, destination); err != nil {
+		if errors.Is(err, transactionrepo.ErrTransferWalletInvalid) || errors.Is(err, transactionrepo.ErrTransferInvalid) {
+			transactionBadRequest(c, "Chuyển ví không hợp lệ.")
+			return
+		}
+		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		return
+	}
+	Created(c, []*entity.Transaction{source, destination})
 }
 
 // ListTransactions godoc

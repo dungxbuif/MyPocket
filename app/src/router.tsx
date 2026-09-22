@@ -8,6 +8,7 @@ const rootRoute = createRootRoute({
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/" });
 const transactionsRoute = createRoute({ getParentRoute: () => rootRoute, path: "transactions" });
 const budgetsRoute = createRoute({ getParentRoute: () => rootRoute, path: "budgets" });
+const assistantRoute = createRoute({ getParentRoute: () => rootRoute, path: "assistant" });
 const jarsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "jars",
@@ -21,6 +22,7 @@ const groupsRoute = createRoute({ getParentRoute: () => rootRoute, path: "accoun
 const groupNewRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups/new" });
 const groupEditRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups/$categoryId/edit" });
 const walletsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/wallets" });
+const feedbackRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/feedback" });
 const authRoute = createRoute({ getParentRoute: () => rootRoute, path: "auth/google" });
 const authCallbackRoute = createRoute({ getParentRoute: () => rootRoute, path: "auth/callback" });
 
@@ -28,6 +30,7 @@ const routeTree = rootRoute.addChildren([
   indexRoute,
   transactionsRoute,
   budgetsRoute,
+  assistantRoute,
   jarsRoute,
   monthDetailRoute,
   // reportsRoute,
@@ -36,6 +39,7 @@ const routeTree = rootRoute.addChildren([
   groupNewRoute,
   groupEditRoute,
   walletsRoute,
+  feedbackRoute,
   authRoute,
   authCallbackRoute,
 ]);

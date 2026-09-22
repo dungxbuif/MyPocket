@@ -97,7 +97,14 @@ func (r *AIEntryPostgresRepository) SetAttachmentDeleteStatus(ctx context.Contex
 	if status != "deleted" && status != "delete_failed" {
 		return port.ErrAIInvalid
 	}
-	return r.db.WithContext(ctx).Model(&entity.AIEntryAttachment{}).Where("id = ? AND ocr_status = 'deleting'", id).Update("ocr_status", status).Error
+	result := r.db.WithContext(ctx).Model(&entity.AIEntryAttachment{}).Where("id = ? AND ocr_status = 'deleting'", id).Update("ocr_status", status)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return port.ErrAIConflict
+	}
+	return nil
 }
 func (r *AIEntryPostgresRepository) Session(ctx context.Context, owner, id string) (*entity.AIEntrySession, error) {
 	var s entity.AIEntrySession
@@ -132,7 +139,7 @@ func (r *AIEntryPostgresRepository) LatestSession(ctx context.Context, owner str
 }
 func (r *AIEntryPostgresRepository) BeginMessage(ctx context.Context, owner, id, requestID, hash, text string) (token string, started bool, err error) {
 	err = r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// Serialize the owner budget across separate sessions, without blocking FK reads.
+		// Serialize provider work start across separate sessions, without blocking FK reads.
 		var account entity.User
 		if e := tx.Select("id").Clauses(clause.Locking{Strength: "NO KEY UPDATE"}).Where("id = ?", owner).First(&account).Error; e != nil {
 			return e
@@ -154,13 +161,6 @@ func (r *AIEntryPostgresRepository) BeginMessage(ctx context.Context, owner, id,
 		}
 		if s.ProcessingUntil != nil && time.Now().Before(*s.ProcessingUntil) {
 			return port.ErrAIBusy
-		}
-		var daily int64
-		if e = tx.Model(&entity.AIEntryRequest{}).Joins("JOIN ai_entry_sessions ON ai_entry_sessions.id = ai_entry_requests.session_id").Where("ai_entry_sessions.owner_id = ? AND ai_entry_requests.created_at > ?", owner, time.Now().Add(-24*time.Hour)).Count(&daily).Error; e != nil {
-			return e
-		}
-		if daily >= 20 {
-			return port.ErrAIRateLimited
 		}
 		token = uuid.NewString()
 		until := time.Now().Add(2 * time.Minute)

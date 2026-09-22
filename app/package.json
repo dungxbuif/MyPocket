@@ -10,6 +10,9 @@
     "test:transactions": "node --test scripts/transactions.test.ts",
     "test:calendar": "node --test scripts/account-time.test.ts scripts/month-jar-logic.test.ts",
     "test:transaction-jars": "node scripts/transaction-jar.test.mjs",
+    "test:transfer:integrated": "node scripts/transfer-roundtrip.mjs",
+    "test:transfer:e2e": "node scripts/transfer-browser.test.mjs",
+    "test:api:full": "node scripts/full-api-roundtrip.mjs",
     "test:ai": "node scripts/ai-entry.test.mjs && node scripts/ai-entry-browser.test.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"

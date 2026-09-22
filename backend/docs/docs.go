@@ -15,6 +15,241 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
+        "/api/v1/agent/feedback": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback Agent"
+                ],
+                "summary": "List feedback for the local development agent",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "open, triaged, in_progress, fixed, rejected",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum rows (1-100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Feedback"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/capabilities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Read Finance Assistant capabilities",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/conversation/messages": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Read persisted Finance Assistant messages",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Read messages before sequence",
+                        "name": "before_seq",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.AdvisorMessage"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/messages": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Submit a Finance Assistant read-only question",
+                "parameters": [
+                    {
+                        "description": "Question",
+                        "name": "message",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.advisorMessageInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.advisorSubmitResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/overview": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Read Finance Assistant overview without calling the model",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account-local calendar month YYYY-MM",
+                        "name": "month",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/runs/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Read one Finance Assistant run",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AdvisorRun"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/runs/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Cancel a queued or running Finance Assistant run",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
         "/api/v1/ai/entry/capabilities": {
             "get": {
                 "security": [
@@ -274,6 +509,99 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/api-keys": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "List current user's API keys",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.UserAPIKey"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "Create a user API key",
+                "parameters": [
+                    {
+                        "description": "API key configuration",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.apiKeyCreateInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.apiKeyCreatedResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/api-keys/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "API Keys"
+                ],
+                "summary": "Revoke a current user's API key",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "API key ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
         "/api/v1/auth/google": {
             "get": {
                 "produces": [
@@ -422,6 +750,54 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Account"
+                ],
+                "summary": "Set the authenticated account timezone",
+                "parameters": [
+                    {
+                        "description": "IANA timezone",
+                        "name": "timezone",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.timezoneInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/usecase.UserProfile"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
                         }
                     }
                 }
@@ -825,6 +1201,160 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/changelog": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Changelog"
+                ],
+                "summary": "List published changelog entries",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "Maximum rows (1-100)",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Changelog"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/changelog/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Changelog"
+                ],
+                "summary": "Get one published changelog entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Changelog ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Changelog"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/feedback": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback"
+                ],
+                "summary": "List the authenticated user's feedback",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Feedback"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback"
+                ],
+                "summary": "Create owner-scoped feedback",
+                "parameters": [
+                    {
+                        "description": "Feedback",
+                        "name": "feedback",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.feedbackInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Feedback"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/feedback/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback"
+                ],
+                "summary": "Get one feedback item owned by the authenticated user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Feedback ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Feedback"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/home": {
             "get": {
                 "security": [
@@ -862,6 +1392,286 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/internal/changelog": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback Agent"
+                ],
+                "summary": "Publish a changelog and mark referenced in-progress feedback fixed",
+                "parameters": [
+                    {
+                        "description": "Changelog",
+                        "name": "changelog",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.changelogInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Changelog"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/internal/feedback/{id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback Agent"
+                ],
+                "summary": "Advance feedback status through the agent lifecycle",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Feedback ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Next status",
+                        "name": "status",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.feedbackStatusInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Feedback"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/jars": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jars"
+                ],
+                "summary": "Get account jars and derived spending for a month",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Calendar month YYYY-MM; defaults to account-local current month",
+                        "name": "month",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.JarMonthSummary"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jars"
+                ],
+                "summary": "Create a stable jar and its configuration for one month",
+                "parameters": [
+                    {
+                        "description": "Jar configuration",
+                        "name": "jar",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.jarInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.JarMonthConfig"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/jars/{jar_id}/months/{month}": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jars"
+                ],
+                "summary": "Update one jar's month-specific configuration",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stable jar ID",
+                        "name": "jar_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Calendar month YYYY-MM",
+                        "name": "month",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Jar month configuration",
+                        "name": "jar",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.jarInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.JarMonthConfig"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Jars"
+                ],
+                "summary": "Remove a jar from one month's active configuration and preserve its history",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stable jar ID",
+                        "name": "jar_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Calendar month YYYY-MM",
+                        "name": "month",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/api/v1/jars/{jar_id}/report": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Jars"
+                ],
+                "summary": "Get a stable jar's monthly history through an inclusive end month",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stable jar ID",
+                        "name": "jar_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "First month YYYY-MM; omitted means full history",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Last month YYYY-MM; omitted means account-local current month",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.JarCumulativeSummary"
                         }
                     }
                 }
@@ -914,6 +1724,106 @@ const docTemplate = `{
                                 "type": "string"
                             }
                         }
+                    }
+                }
+            }
+        },
+        "/api/v1/months/{month}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Months"
+                ],
+                "summary": "Get live account-local month figures, jars, and independent note",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Calendar month YYYY-MM",
+                        "name": "month",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.MonthSummary"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/months/{month}/note": {
+            "put": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Months"
+                ],
+                "summary": "Save the user's independent note for an account month",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Calendar month YYYY-MM",
+                        "name": "month",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "User note",
+                        "name": "note",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.monthNoteInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Months"
+                ],
+                "summary": "Delete the user's note for one account month",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Calendar month YYYY-MM",
+                        "name": "month",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
                     }
                 }
             }
@@ -998,6 +1908,71 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/transactions/transfer": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Create an atomic internal wallet transfer",
+                "parameters": [
+                    {
+                        "description": "Internal transfer input",
+                        "name": "transfer",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.transferInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Transaction"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
                         "schema": {
                             "$ref": "#/definitions/httpapi.Problem"
                         }
@@ -1343,6 +2318,9 @@ const docTemplate = `{
                 "included_in_reports": {
                     "type": "boolean"
                 },
+                "jar_id": {
+                    "type": "string"
+                },
                 "note": {
                     "type": "string"
                 },
@@ -1398,6 +2376,91 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.AdvisorMessage": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "parts": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.AdvisorPart"
+                    }
+                },
+                "parts_version": {
+                    "type": "integer"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "seq": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.AdvisorPart": {
+            "type": "object",
+            "properties": {
+                "data": {},
+                "text": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.AdvisorRun": {
+            "type": "object",
+            "properties": {
+                "client_request_id": {
+                    "type": "string"
+                },
+                "conversation_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "credential_kind": {
+                    "type": "string"
+                },
+                "error_code": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_event_seq": {
+                    "type": "integer"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.Budget": {
             "type": "object",
             "properties": {
@@ -1410,8 +2473,8 @@ const docTemplate = `{
                 "days_remaining": {
                     "type": "integer"
                 },
-                "end_at": {
-                    "type": "string"
+                "end_date": {
+                    "$ref": "#/definitions/entity.CalendarDate"
                 },
                 "ended": {
                     "type": "boolean"
@@ -1431,8 +2494,8 @@ const docTemplate = `{
                 "spent": {
                     "type": "integer"
                 },
-                "start_at": {
-                    "type": "string"
+                "start_date": {
+                    "$ref": "#/definitions/entity.CalendarDate"
                 },
                 "updated_at": {
                     "type": "string"
@@ -1456,6 +2519,14 @@ const docTemplate = `{
                 },
                 "spent": {
                     "type": "integer"
+                }
+            }
+        },
+        "entity.CalendarDate": {
+            "type": "object",
+            "properties": {
+                "time.Time": {
+                    "type": "string"
                 }
             }
         },
@@ -1500,6 +2571,302 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.Changelog": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "published_at": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.Feedback": {
+            "type": "object",
+            "properties": {
+                "changelog_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "fixed_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.JarCumulativeMonth": {
+            "type": "object",
+            "properties": {
+                "allocation_covered": {
+                    "type": "boolean"
+                },
+                "calculated_allocation": {
+                    "type": "integer"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "spent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.JarCumulativeSummary": {
+            "type": "object",
+            "properties": {
+                "allocation_months": {
+                    "type": "integer"
+                },
+                "allocation_variance": {
+                    "type": "integer"
+                },
+                "from_month": {
+                    "type": "string"
+                },
+                "jar_id": {
+                    "type": "string"
+                },
+                "months": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.JarCumulativeMonth"
+                    }
+                },
+                "months_in_range": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "to_month": {
+                    "type": "string"
+                },
+                "total_allocated": {
+                    "type": "integer"
+                },
+                "total_spent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.JarIdentity": {
+            "type": "object",
+            "properties": {
+                "jar_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.JarMonthConfig": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "allocation_amount": {
+                    "type": "integer"
+                },
+                "allocation_mode": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "jar_id": {
+                    "type": "string"
+                },
+                "month": {
+                    "$ref": "#/definitions/entity.CalendarDate"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.JarMonthItem": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "allocation_amount": {
+                    "type": "integer"
+                },
+                "allocation_mode": {
+                    "type": "string"
+                },
+                "allocation_percent": {
+                    "type": "number"
+                },
+                "calculated_allocation": {
+                    "type": "integer"
+                },
+                "jar_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "spent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.JarMonthSummary": {
+            "type": "object",
+            "properties": {
+                "actual_income": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.JarMonthItem"
+                    }
+                },
+                "jars": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.JarIdentity"
+                    }
+                },
+                "month": {
+                    "type": "string"
+                },
+                "over_income": {
+                    "type": "boolean"
+                },
+                "over_one_hundred_percent": {
+                    "type": "boolean"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "total_allocated": {
+                    "type": "integer"
+                },
+                "total_allocation_percent": {
+                    "type": "number"
+                },
+                "total_spent": {
+                    "type": "integer"
+                },
+                "unassigned_spent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.MonthCategoryTotal": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.MonthSummary": {
+            "type": "object",
+            "properties": {
+                "calculated_at": {
+                    "type": "string"
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.MonthCategoryTotal"
+                    }
+                },
+                "expense": {
+                    "type": "integer"
+                },
+                "income": {
+                    "type": "integer"
+                },
+                "is_complete": {
+                    "type": "boolean"
+                },
+                "is_current": {
+                    "type": "boolean"
+                },
+                "jar_summary": {
+                    "$ref": "#/definitions/entity.JarMonthSummary"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "net": {
+                    "type": "integer"
+                },
+                "next_start_at": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "start_at": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "transaction_count": {
+                    "type": "integer"
+                }
+            }
+        },
         "entity.Transaction": {
             "type": "object",
             "properties": {
@@ -1518,6 +2885,12 @@ const docTemplate = `{
                 "included_in_reports": {
                     "type": "boolean"
                 },
+                "jar_id": {
+                    "type": "string"
+                },
+                "jar_name": {
+                    "type": "string"
+                },
                 "note": {
                     "type": "string"
                 },
@@ -1527,6 +2900,9 @@ const docTemplate = `{
                 "owner_id": {
                     "type": "string"
                 },
+                "transfer_id": {
+                    "type": "string"
+                },
                 "type": {
                     "type": "string"
                 },
@@ -1534,6 +2910,41 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.UserAPIKey": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "last_used_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "updated_at": {
                     "type": "string"
                 }
             }
@@ -1584,7 +2995,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "target_date": {
-                    "type": "string"
+                    "$ref": "#/definitions/entity.CalendarDate"
                 },
                 "type": {
                     "type": "string"
@@ -1627,6 +3038,34 @@ const docTemplate = `{
                 "meta": {}
             }
         },
+        "httpapi.advisorMessageInput": {
+            "type": "object",
+            "properties": {
+                "client_request_id": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.advisorSubmitResponse": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "text": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.aiProposalDecision": {
             "type": "object",
             "properties": {
@@ -1646,13 +3085,53 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.apiKeyCreateInput": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "httpapi.apiKeyCreatedResponse": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "scopes": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "secret": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.budgetInput": {
             "type": "object",
             "properties": {
                 "category_id": {
                     "type": "string"
                 },
-                "end_at": {
+                "end_date": {
                     "type": "string"
                 },
                 "limit_amount": {
@@ -1661,7 +3140,7 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
-                "start_at": {
+                "start_date": {
                     "type": "string"
                 },
                 "wallet_id": {
@@ -1703,6 +3182,68 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.changelogInput": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "feedback_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.feedbackInput": {
+            "type": "object",
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.feedbackStatusInput": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.jarInput": {
+            "type": "object",
+            "properties": {
+                "allocation_amount": {
+                    "type": "integer"
+                },
+                "allocation_mode": {
+                    "type": "string"
+                },
+                "allocation_percent": {
+                    "type": "number"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.loginRequest": {
             "type": "object",
             "properties": {
@@ -1710,6 +3251,25 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.monthNoteInput": {
+            "type": "object",
+            "properties": {
+                "note": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.timezoneInput": {
+            "type": "object",
+            "properties": {
+                "initialize_only": {
+                    "type": "boolean"
+                },
+                "timezone": {
                     "type": "string"
                 }
             }
@@ -1726,6 +3286,9 @@ const docTemplate = `{
                 "included_in_reports": {
                     "type": "boolean"
                 },
+                "jar_id": {
+                    "type": "string"
+                },
                 "note": {
                     "type": "string"
                 },
@@ -1736,6 +3299,26 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.transferInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "destination_wallet_id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "source_wallet_id": {
                     "type": "string"
                 }
             }
@@ -1819,6 +3402,12 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "timezone_confirmed": {
+                    "type": "boolean"
                 }
             }
         }

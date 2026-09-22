@@ -15,9 +15,11 @@ import (
 )
 
 type transactionRepositoryStub struct {
-	created  *entity.Transaction
-	existing *entity.Transaction
-	updated  *entity.Transaction
+	created             *entity.Transaction
+	existing            *entity.Transaction
+	updated             *entity.Transaction
+	transferSource      *entity.Transaction
+	transferDestination *entity.Transaction
 }
 
 func (s *transactionRepositoryStub) List(string) ([]entity.Transaction, error) { return nil, nil }
@@ -32,6 +34,10 @@ func (s *transactionRepositoryStub) Update(string, string, map[string]any) (*ent
 	return s.updated, nil
 }
 func (s *transactionRepositoryStub) Delete(string, string) error { return nil }
+func (s *transactionRepositoryStub) CreateTransfer(_ string, source, destination *entity.Transaction) error {
+	s.transferSource, s.transferDestination = source, destination
+	return nil
+}
 
 type transactionUserRepositoryStub struct{ user entity.User }
 
@@ -109,9 +115,57 @@ func transactionTestRouter(handler *TransactionHandler) *gin.Engine {
 	router := gin.New()
 	router.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
 	router.POST("/transactions", handler.CreateTransaction)
+	router.POST("/transactions/transfer", handler.CreateTransfer)
 	router.PATCH("/transactions/:id", handler.UpdateTransaction)
 	return router
 }
+
+func TestCreateTransferPersistsAtomicPairedRows(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
+		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
+		"wallet-2": {ID: "wallet-2", OwnerID: "owner-1", Type: entity.WalletTypeGoal},
+	}}
+	categories := &transactionCategoryRepositoryStub{categories: []entity.Category{
+		{ID: "cat-out", IsSystem: true, SystemKey: stringPtr("expense_transfer_out")},
+		{ID: "cat-in", IsSystem: true, SystemKey: stringPtr("income_transfer_in")},
+	}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, categories))
+	request := httptest.NewRequest(http.MethodPost, "/transactions/transfer", bytes.NewBufferString(`{"source_wallet_id":"wallet-1","destination_wallet_id":"wallet-2","amount":50000,"occurred_at":"2026-09-22T10:00:00+07:00","note":"tiết kiệm"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if transactions.transferSource == nil || transactions.transferDestination == nil {
+		t.Fatal("expected both transfer rows")
+	}
+	if transactions.transferSource.Type != entity.TransactionTypeExpense || transactions.transferDestination.Type != entity.TransactionTypeIncome {
+		t.Fatalf("unexpected transfer directions: %#v %#v", transactions.transferSource, transactions.transferDestination)
+	}
+	if transactions.transferSource.TransferID == nil || transactions.transferDestination.TransferID == nil || *transactions.transferSource.TransferID != *transactions.transferDestination.TransferID {
+		t.Fatal("transfer rows must share a transfer id")
+	}
+	if transactions.transferSource.IncludedInReports || transactions.transferDestination.IncludedInReports {
+		t.Fatal("internal transfer rows must be excluded from reports")
+	}
+}
+
+func TestCreateTransferRejectsSameWallet(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic}}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPost, "/transactions/transfer", bytes.NewBufferString(`{"source_wallet_id":"wallet-1","destination_wallet_id":"wallet-1","amount":1}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || transactions.transferSource != nil {
+		t.Fatalf("same-wallet transfer should be rejected: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func stringPtr(value string) *string { return &value }
 
 func TestUpdatingUnchangedJarAssignmentSurvivesTimezoneRebucketing(t *testing.T) {
 	occurredAt := time.Date(2026, time.February, 1, 0, 30, 0, 0, time.UTC)

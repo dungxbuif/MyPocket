@@ -12,10 +12,10 @@ Status: implementation contract for [TICKET-02-01](../../../work/tickets/TICKET-
 | Date group | `SurfaceCard`, `Text` | Groups real API rows by the user's local calendar date and displays the signed group total. |
 | Transaction row | `TransactionItem` | Category icon/title, wallet and optional note, signed VND amount; activation opens edit mode. |
 | Editor shell | `BaseBottomSheet` | Modal focus trap, Escape/backdrop cancel, and return focus follow the shared sheet contract. |
-| Type, amount and metadata | `SegmentedControl`, `AmountField`, `DateField`, `FormSelectorRow`, `CategoryTreeSelector` → `BaseCategoryTree` selection mode, `FormField`/`BaseSelect` for optional jar, `BaseTextInput`, `BaseSwitch` | Only `expense` and `income` are enabled in this slice. Amount is a positive integer VND value. Group selection uses the same root/child tree base as Account → Manage Groups; incompatible rows are not selectable. Expense can optionally select one jar configured for the transaction's account-local month. |
+| Type, amount and metadata | `SegmentedControl`, `AmountField`, `DateField`, `FormSelectorRow`, `CategoryTreeSelector` → `BaseCategoryTree` selection mode, `FormField`/`BaseSelect` for optional jar, `BaseTextInput`, `BaseSwitch` | Ordinary entries use `expense` and `income`. Transfer mode uses the same amount/date/note bases plus two wallet selects and submits the paired transfer contract; it never shows category, jar, or report controls. |
 | Feedback/actions | `StatusMessage`, `BaseButton` | Save has loading/disabled behavior; delete exists only in edit mode and requires confirmation. |
 
-No screen-local color, shape, input, button or card styling is allowed. Transfer, debt, receipt/OCR and advanced filter controls stay out of this screen until their own approved slices exist.
+No screen-local color, shape, input, button or card styling is allowed. Debt, receipt/OCR and advanced filter controls stay out of this screen until their own approved slices exist.
 
 ## Events and effects
 
@@ -24,6 +24,7 @@ No screen-local color, shape, input, button or card styling is allowed. Transfer
 | Enter `/transactions` | Load transactions, wallets and visible groups from their authenticated APIs. Never replace an error with mock rows. |
 | Open an expense editor | Load jar choices for the transaction's account-local month; show only active monthly configurations, plus the existing historical assignment when editing. |
 | Activate global add | Open a clean editor with `expense`, current local date/time, report inclusion enabled, and the first available wallet. |
+| Choose “Chuyển tiền đến ví khác” | Open the same sheet in transfer mode with source/destination wallet selects; submit calls the atomic transfer endpoint and refreshes both wallet balances and the ledger. |
 | Hold global add for 500ms | Open [AI entry chat](../assistant/README.md) with persistent prefilled review proposals. Release does not also open the manual editor; moving/cancelling cancels hold. Manual create offers keyboard-accessible “Nhập bằng AI”. |
 | Change wallet | Keep the selected group only if it applies to the new wallet; otherwise clear the group. |
 | Change type | Keep the selected group only if its kind matches; otherwise clear the group. |
@@ -52,13 +53,14 @@ No screen-local color, shape, input, button or card styling is allowed. Transfer
 - Backend owns authorization and final validation. Client validation is recovery guidance, not a security boundary.
 - `wallet_id` must belong to the authenticated owner. Basic income/expense accepts `basic` and `goal`; `credit` is excluded until its separate debt/payment ledger is implemented.
 - `type` is `income` or `expense`; `amount` is an integer greater than zero.
+- Transfer mode requires two different non-credit owner wallets and a positive integer amount; the API creates the paired rows and sets report inclusion false.
 - Category is optional. It must be visible, match the transaction type, and either have no wallet restriction or include the selected wallet ID.
 - `occurred_at` is sent as an RFC3339 timestamp. Note is trimmed and omitted when empty.
 - `included_in_reports` defaults to true.
 - `jar_id` is optional and may reference one active owner/month configuration only for ordinary expenses; income and transfer-out rows cannot be assigned. Clearing the selection sends null.
 - Wallet current balance is derived from ledger rows: opening balance plus income minus expense. Editing/deleting a row changes the derived balance; it does not mutate opening balance.
 
-APIs: `GET/POST /api/v1/transactions`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options.
+APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options.
 
 ## Copy and formatting
 
@@ -68,4 +70,4 @@ Use Vietnamese product copy. Money uses signed integer VND via the shared format
 
 Automated proof covers backend owner scope, positive amount/type validation, wallet ownership, category kind and wallet applicability, report flag, optional jar-link validation, and frontend design/build guardrails. `npm run test:transaction-jars` renders the real form and verifies jar selection for ordinary expenses while hiding it for income/transfer-out. Manual UAT still needs to cover create/edit/delete, jar assignment/clear, and refreshed wallet totals.
 
-Residual gaps remain separate tickets: attachments/OCR, transfer/adjustment, debt/credit ledger, advanced search/filter/pagination, and owner UAT sign-off.
+Transfer proof now includes `npm run test:transfer:e2e` (real Chromium UI/state) and `npm run test:transfer:integrated` (Vite proxy/API/PostgreSQL state). Residual gaps remain separate tickets: transfer-pair edit/delete, attachments/OCR, debt/credit ledger, advanced search/filter/pagination, and owner UAT sign-off.

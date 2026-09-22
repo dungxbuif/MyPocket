@@ -3,6 +3,7 @@ import { ImagePlus, Trash2 } from "lucide-react";
 
 import { BaseButton } from "../atoms/BaseButton";
 import { TransactionFields, type TransactionFormState } from "../molecules/TransactionFields";
+import { TransferFields, type TransferFormState } from "../molecules/TransferFields";
 import { BaseSelect, BaseTextInput, FormField } from "../atoms/FormField";
 import { SegmentedControl } from "../atoms/SegmentedControl";
 import { StatusMessage } from "../atoms/StatusMessage";
@@ -16,6 +17,7 @@ import { fetchJarMonth, type JarMonthSummary } from "../../services/jars";
 import { isMonthKey, jarAssignmentNeedsSelection } from "../../services/monthJarLogic";
 import {
   categoryAppliesToTransaction,
+  createTransfer,
   createTransaction,
   deleteTransaction,
   updateTransaction,
@@ -48,6 +50,8 @@ const COPY = {
   saveError: "Không thể lưu giao dịch. Dữ liệu bạn nhập vẫn được giữ lại.",
   deleteError: "Không thể xóa giao dịch. Vui lòng thử lại.",
   confirmDelete: "Xóa giao dịch này? Số dư ví và báo cáo sẽ được tính lại.",
+  transfer: "Chuyển ví",
+  transaction: "Giao dịch",
 } as const;
 
 function localDateTimeValue(value:Date,timezone:string):string {
@@ -70,9 +74,15 @@ function initialState(transaction:Transaction|undefined,timezone:string): Editor
   };
 }
 
+function initialTransferState(timezone: string): TransferFormState {
+  return { sourceWalletID: "", destinationWalletID: "", amount: "", occurredAt: localDateTimeValue(new Date(), timezone), note: "" };
+}
+
 export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initialWalletID }: { onClose: () => void; onSaved: () => void; onAiEntry?: () => void; transaction?: Transaction; initialWalletID?: string }) {
   const timezone=useAccountTimezone();
+  const [mode, setMode] = useState<"transaction" | "transfer">("transaction");
   const [state, setState] = useState(() => ({...initialState(transaction,timezone), walletID:transaction?.wallet_id ?? initialWalletID ?? ""}));
+  const [transferState, setTransferState] = useState(() => initialTransferState(timezone));
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [jarSummary, setJarSummary] = useState<JarMonthSummary | null>(null);
@@ -82,14 +92,14 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
 
   const transactionMonth = state.occurredAt.slice(0, 7);
   useEffect(() => {
-    if (state.type !== "expense" || !isMonthKey(transactionMonth)) {
+    if (mode !== "transaction" || state.type !== "expense" || !isMonthKey(transactionMonth)) {
       setJarSummary(null);
       return;
     }
     let cancelled = false;
     fetchJarMonth(transactionMonth).then(value => { if (!cancelled) setJarSummary(value); }).catch(() => { if (!cancelled) setJarSummary(null); });
     return () => { cancelled = true; };
-  }, [state.type, transactionMonth]);
+  }, [mode, state.type, transactionMonth]);
 
 
   useEffect(() => {
@@ -101,6 +111,7 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
         setWallets(ledgerWallets);
         setCategories(nextCategories);
         setState((current) => ({ ...current, walletID: current.walletID || ledgerWallets[0]?.id || "" }));
+        setTransferState((current) => ({ ...current, sourceWalletID: current.sourceWalletID || ledgerWallets[0]?.id || "", destinationWalletID: current.destinationWalletID || ledgerWallets.find(wallet => wallet.id !== (current.sourceWalletID || ledgerWallets[0]?.id))?.id || "" }));
       })
       .catch(() => { if (!cancelled) setError(COPY.loadError); })
       .finally(() => { if (!cancelled) setLoading(false); });
@@ -129,6 +140,26 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
 
   const submit = async () => {
     if (saving || loading) return;
+    if (mode === "transfer") {
+      const amount = Number(transferState.amount);
+      if (!wallets.some(wallet => wallet.id === transferState.sourceWalletID) || !wallets.some(wallet => wallet.id === transferState.destinationWalletID) || transferState.sourceWalletID === transferState.destinationWalletID || !Number.isSafeInteger(amount) || amount <= 0 || !Number.isFinite(Date.parse(transferState.occurredAt))) {
+        setError("Hãy chọn hai ví khác nhau và nhập số tiền nguyên lớn hơn 0.");
+        return;
+      }
+      let occurredAt: string;
+      try { occurredAt = instantFromLocalDateTime(transferState.occurredAt, timezone); }
+      catch { setError("Giờ này không tồn tại trong múi giờ đã chọn. Hãy chọn thời điểm khác."); return; }
+      try {
+        setSaving(true);
+        setError("");
+        await createTransfer({ source_wallet_id: transferState.sourceWalletID, destination_wallet_id: transferState.destinationWalletID, amount, occurred_at: occurredAt, note: transferState.note.trim() || undefined });
+        onSaved();
+        onClose();
+      } catch {
+        setError("Không thể tạo chuyển ví. Dữ liệu bạn nhập vẫn được giữ lại.");
+      } finally { setSaving(false); }
+      return;
+    }
     const amount = Number(state.amount);
     if (!wallets.some(wallet => wallet.id === state.walletID) || !Number.isSafeInteger(amount) || amount <= 0 || !Number.isFinite(Date.parse(state.occurredAt))) {
       setError(COPY.validationError);
@@ -186,15 +217,17 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
 
   let validTime=true;
   try { instantFromLocalDateTime(state.occurredAt,timezone); } catch { validTime=false; }
-  const valid = wallets.some(wallet => wallet.id === state.walletID) && Number.isSafeInteger(Number(state.amount)) && Number(state.amount) > 0 && validTime;
+  const transferValid = wallets.some(wallet => wallet.id === transferState.sourceWalletID) && wallets.some(wallet => wallet.id === transferState.destinationWalletID) && transferState.sourceWalletID !== transferState.destinationWalletID && Number.isSafeInteger(Number(transferState.amount)) && Number(transferState.amount) > 0 && (() => { try { instantFromLocalDateTime(transferState.occurredAt, timezone); return true; } catch { return false; } })();
+  const valid = mode === "transfer" ? transferValid : wallets.some(wallet => wallet.id === state.walletID) && Number.isSafeInteger(Number(state.amount)) && Number(state.amount) > 0 && validTime;
   return <BaseBottomSheet presentation="form" closingDisabled={saving} title={transaction ? COPY.editTitle : COPY.addTitle} closeLabel="Hủy" onClose={() => { if (!saving) onClose(); }}
     footer={<div className="flex gap-3"><BaseButton className="flex-1" size="lg" loading={saving} disabled={loading || !valid} onClick={() => void submit()}>Lưu</BaseButton>{transaction ? <BaseButton variant="danger" disabled={saving} aria-label={COPY.delete} onClick={() => void remove()}><Trash2 size={20} /></BaseButton> : onAiEntry ? <BaseButton disabled={saving} aria-label="Nhập bằng AI từ ảnh hoặc nội dung" onClick={onAiEntry}><ImagePlus size={22} /></BaseButton> : null}</div>}>
     <div className="space-y-3">
       {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
       {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
       {!loading && wallets.length === 0 ? <StatusMessage variant="plain">{COPY.noWallet}</StatusMessage> : null}
-      <TransactionFields state={state} onChange={setState} wallets={wallets} categories={categories} jars={jarOptions} disabled={saving || loading} />
-      {!transaction && onAiEntry ? <BaseButton variant="ghost" className="w-full" disabled={saving} onClick={onAiEntry}>Nhập bằng AI</BaseButton> : null}
+      {!transaction ? <SegmentedControl disabled={saving || loading} value={mode} options={[{ value: "transaction", label: COPY.transaction }, { value: "transfer", label: COPY.transfer }]} onChange={next => setMode(next)} /> : null}
+      {mode === "transfer" && !transaction ? <TransferFields state={transferState} onChange={setTransferState} wallets={wallets} disabled={saving || loading} /> : <TransactionFields state={state} onChange={setState} wallets={wallets} categories={categories} jars={jarOptions} disabled={saving || loading} />}
+      {!transaction && onAiEntry && mode === "transaction" ? <BaseButton variant="ghost" className="w-full" disabled={saving} onClick={onAiEntry}>Nhập bằng AI</BaseButton> : null}
     </div>
   </BaseBottomSheet>;
 }

@@ -12,7 +12,7 @@ shared_fields: [status, trace]
 
 ## Implemented calendar, jar, and month schema — migrations 000013–000015
 
-Migration `000013` adds `user.timezone` and `timezone_confirmed`, converts `wallets.target_date` to `date`, and replaces budget timestamp bounds with account-calendar `start_date`/`end_date` date columns while preserving existing labels. Migration `000014` adds stable owner-scoped `jars`, initialized month records (`jar_months`), per-month configurations (`jar_month_configs`), and nullable `transactions.jar_id` with a composite same-owner FK. Migration `000015` adds `month_notes`, uniquely keyed by owner and first day of month. Local dev DB is at migration 15, `dirty=false`; repository integration tests use PostgreSQL. Month figures are derived from live ledger data; no report snapshot/close table or cron job exists. [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md) is proposed; [CORE-03](../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md) is in progress pending UAT and reconciliation.
+Migration `000013` adds `user.timezone` and `timezone_confirmed`, converts `wallets.target_date` to `date`, and replaces budget timestamp bounds with account-calendar `start_date`/`end_date` date columns while preserving existing labels. Migration `000014` adds stable owner-scoped `jars`, initialized month records (`jar_months`), per-month configurations (`jar_month_configs`), and nullable `transactions.jar_id` with a composite same-owner FK. Migration `000015` adds `month_notes`, uniquely keyed by owner and first day of month. Migration `000016` adds nullable `transactions.transfer_id` for atomic paired wallet transfers. Local dev DB is at migration 16, `dirty=false`; repository integration tests use PostgreSQL. Month figures are derived from live ledger data; no report snapshot/close table or cron job exists. [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md) is proposed; [CORE-03](../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md) is in progress pending UAT and reconciliation.
 
 ## Implemented AI entry schema — migrations 000010–000012
 
@@ -91,7 +91,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `wallets` | User-owned basic/goal/credit wallet | User | Migrated; VND enforced for this stage. |
 | `categories` | System or user-owned group | System/User | Migrated; owner-approved system catalog is seeded through `000004`. |
 | `category_wallets` | Quan hệ nhóm–ví áp dụng | Cùng user với nhóm/ví | Migrated; owner consistency remains use-case enforced. |
-| `transactions` | Owner-scoped income/expense ledger entry | User | Migrated; belongs to one wallet and optional visible category. |
+| `transactions` | Owner-scoped income/expense ledger entry | User | Migrated; belongs to one wallet and optional visible category. Nullable `transfer_id` links the two rows of an internal transfer. |
 | `jars` | Stable owner-scoped jar identity | User | Migration `000014`; month-specific names/allocation live in `jar_month_configs`. |
 | `jar_months` | Marks a month whose jar configuration has been initialized | User/month | Migration `000014`; serializes one-time prior-month copy, including empty initialization. |
 | `jar_month_configs` | Name, allocation rule and active state for one jar/month | User/month/jar | Migration `000014`; historical rows remain when a later month changes. |
@@ -111,6 +111,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `jar_months` | `jar_month_configs` | 1-to-many | Composite `(owner_id, month)` FK; a month is copied/initialized once. |
 | `jars` | `jar_month_configs` | 1-to-many | Composite `(owner_id, jar_id)` FK prevents cross-owner configuration. |
 | `jars` | `transactions` | 1-to-many optional | Composite owner/jar FK; use case additionally validates ordinary-expense kind and month configuration. |
+| `transactions` | `transactions` | Paired 1-to-1 by nullable `transfer_id` | Source expense and destination income share a transfer id; both rows are created atomically and excluded from reports/jars. |
 | `transactions` | `transaction_attachments` | Many-to-many | Qua `transaction_attachment_links`; transaction owner and attachment owner are both checked before signed download. |
 
 ## Constraints
@@ -126,9 +127,9 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 ## Migrations
 
 - Versioned SQL migrations are active. [`DATABASE.md`](DATABASE.md) defines the dev/prod command and migration ledger; API startup does not invoke `AutoMigrate`.
-- Applied migration sequence: `000013_account_timezone_and_calendar_dates`, `000014_jars`, `000015_month_notes`; local migration ledger reports version 15, clean.
+- Applied migration sequence: `000013_account_timezone_and_calendar_dates`, `000014_jars`, `000015_month_notes`, `000016_transaction_transfer_links`; local migration ledger reports version 16, clean.
 - Rollbacks of `000014`/`000015` refuse to drop user jar/note data. Do not run destructive down migrations against populated environments. `000013` rollback retains account timezone preferences.
-- Paired transfers, adjustment ledger, credit/debt semantics, and recurring execution remain separate designs; this schema does not claim to implement them.
+- Adjustment ledger, credit/debt semantics, and recurring execution remain separate designs. Paired internal transfers are implemented through migration `000016`; pair edit/delete and replay idempotency remain follow-up work.
 
 ## Linked Decisions
 

@@ -12,6 +12,8 @@ shared_fields: [status, trace]
 
 # Hai luồng AI MyPocket — Đánh giá và Implementation Plan
 
+**Advisor planning update 2026-09-22:** [AI-ADVISOR-01](AI-ADVISOR-01-DETAIL_DESIGN.md) supersedes the proposed shared two-mode UI and advisor T6/T7 details below: a separate persistent `/assistant` experience, bounded tools/facts/cards and staged confirmed actions. The current one-shot AI-entry contract remains unchanged. Current capability evidence is in the new design; old migration/provider/jar/transfer observations below are historical, not the latest implementation state.
+
 **Owner correction/implementation 2026-09-21:** Add click remains manual; Add hold opens entry chat directly with a prefilled editable approve/reject list. Advice is a separate entry point. [AI-ENTRY-01](TICKET-09-01-ENTRY-DETAIL_DESIGN.md) implements this approved bounded slice and overrides the two-mode UI proposal below. Broader roadmap, retained storage, transfer and Q&A are still pending; the full plan is not blanket-approved.
 
 > **For agentic workers:** Khi được duyệt triển khai, dùng `superpowers:executing-plans` hoặc `superpowers:subagent-driven-development`, thực hiện từng task và cập nhật checkbox. File này đang để owner review; chưa phê duyệt API, migration hoặc runtime.
@@ -251,7 +253,7 @@ Mọi route giữ `{data, meta}` và problem details hiện hành; sai owner tr�
 - PostgreSQL worker chạy riêng `backend/cmd/worker`; restart phục hồi lease hết hạn; late result có lease token cũ không được ghi đè. Redis chỉ dùng tăng tốc nếu cần.
 - Đề xuất chỉ lưu ảnh tạm 7 ngày, OCR text/ngữ cảnh nháp 30 ngày; ảnh user chọn giữ làm chứng từ thì lưu đến khi gỡ. Hết hạn/xóa source không xóa ledger. TTL này **chờ review**; provider retention phải xác minh riêng, không hứa xóa dữ liệu bên provider khi API không hỗ trợ.
 - Private object storage cần có trước public release. URL xem ảnh có hạn và kiểm tra owner trước khi cấp. Không log text OCR, tài khoản ngân hàng đầy đủ hoặc signed URLs; model chỉ nhận phần text cần thiết, che định danh không cần cho đối chiếu.
-- Chưa ước tính giá tiền vì chưa có provider/model/quota. Công thức đo: số ảnh × giá OCR + input/output tokens × đơn giá AI + storage/egress. Báo riêng retry và tỷ lệ chỉnh tay; đề xuất trần 20 lượt AI/account/ngày cho pilot, configurable và hiển thị khi chạm trần.
+- Chưa ước tính giá tiền vì chưa có provider/model/quota. Công thức đo: số ảnh × giá OCR + input/output tokens × đơn giá AI + storage/egress. Báo riêng retry và tỷ lệ chỉnh tay. Theo quyết định hiện tại trong [AI-USAGE-01](AI-USAGE-01-DETAIL_DESIGN.md), không giới hạn usage user lúc này; trần chi phí/quota nếu cần sẽ thuộc provider-selection/cost-consent slice sau.
 
 ## 8. UI và base components
 

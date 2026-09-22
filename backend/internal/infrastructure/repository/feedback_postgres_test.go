@@ -52,6 +52,12 @@ func TestFeedbackPostgresOwnerScopeAndChangelogAtomicity(t *testing.T) {
 	if _, err := feedbackRepo.FindByOwner(context.Background(), other, first.ID); err == nil {
 		t.Fatal("cross-owner feedback read must fail")
 	}
+	if _, err := feedbackRepo.UpdateStatus(context.Background(), first.ID, entity.FeedbackStatusTriaged, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := feedbackRepo.UpdateStatus(context.Background(), first.ID, entity.FeedbackStatusInProgress, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
 
 	changelog := &entity.Changelog{ID: uuid.NewString(), Version: version, Title: "Feedback fix", Description: "Fixed the issue", PublishedAt: time.Now().UTC()}
 	if err := changelogRepo.Publish(context.Background(), changelog, []string{first.ID}); err != nil {

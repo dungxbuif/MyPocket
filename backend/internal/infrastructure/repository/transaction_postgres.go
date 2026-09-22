@@ -76,6 +76,58 @@ func (r *TransactionPostgresRepository) Create(transaction *entity.Transaction) 
 	})
 }
 
+func (r *TransactionPostgresRepository) CreateTransfer(ownerID string, source, destination *entity.Transaction) error {
+	if source == nil || destination == nil || source.TransferID == nil || destination.TransferID == nil || *source.TransferID != *destination.TransferID {
+		return transactionrepo.ErrTransferInvalid
+	}
+	if source.OwnerID != ownerID || destination.OwnerID != ownerID || source.WalletID == destination.WalletID {
+		return transactionrepo.ErrTransferInvalid
+	}
+	if source.Type != entity.TransactionTypeExpense || destination.Type != entity.TransactionTypeIncome || source.Amount <= 0 || destination.Amount != source.Amount || source.JarID != nil || destination.JarID != nil || source.IncludedInReports || destination.IncludedInReports {
+		return transactionrepo.ErrTransferInvalid
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var wallets []entity.Wallet
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND id IN ?", ownerID, []string{source.WalletID, destination.WalletID}).Find(&wallets).Error; err != nil {
+			return err
+		}
+		if len(wallets) != 2 {
+			return transactionrepo.ErrTransferWalletInvalid
+		}
+		for _, wallet := range wallets {
+			if wallet.Type == entity.WalletTypeCredit {
+				return transactionrepo.ErrTransferWalletInvalid
+			}
+		}
+		var categories []entity.Category
+		if err := tx.Where("is_system = true AND system_key IN ?", []string{"expense_transfer_out", "income_transfer_in"}).Find(&categories).Error; err != nil {
+			return err
+		}
+		categoryIDs := map[string]string{}
+		for _, category := range categories {
+			if category.SystemKey != nil {
+				categoryIDs[*category.SystemKey] = category.ID
+			}
+		}
+		if source.CategoryID == nil || destination.CategoryID == nil || categoryIDs["expense_transfer_out"] != *source.CategoryID || categoryIDs["income_transfer_in"] != *destination.CategoryID {
+			return transactionrepo.ErrTransferInvalid
+		}
+		// GORM's `default:true` tag omits a false zero value even when selected.
+		// Use a parameterized insert so the transfer contract explicitly writes
+		// included_in_reports=false, then hydrate timestamps for the response.
+		insert := `INSERT INTO transactions (id, owner_id, wallet_id, category_id, type, amount, occurred_at, note, included_in_reports, transfer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, false, ?)`
+		for _, row := range []*entity.Transaction{source, destination} {
+			if err := tx.Exec(insert, row.ID, row.OwnerID, row.WalletID, row.CategoryID, row.Type, row.Amount, row.OccurredAt, row.Note, row.TransferID).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("id = ?", source.ID).First(source).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", destination.ID).First(destination).Error
+	})
+}
+
 func (r *TransactionPostgresRepository) Update(ownerID, id string, updates map[string]any) (*entity.Transaction, error) {
 	var updated entity.Transaction
 	err := r.db.Transaction(func(tx *gorm.DB) error {

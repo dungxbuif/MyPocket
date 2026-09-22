@@ -9,8 +9,9 @@ import (
 )
 
 var (
-	ErrFeedbackInvalid  = errors.New("invalid feedback")
-	ErrFeedbackConflict = errors.New("feedback state conflict")
+	ErrFeedbackInvalid   = errors.New("invalid feedback")
+	ErrFeedbackConflict  = errors.New("feedback state conflict")
+	ErrChangelogConflict = errors.New("changelog conflict")
 )
 
 type FeedbackRepository interface {

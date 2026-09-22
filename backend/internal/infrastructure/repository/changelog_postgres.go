@@ -2,9 +2,11 @@ package repository
 
 import (
 	"context"
+	"errors"
 	"sort"
 	"time"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/mypocket/backend/internal/entity"
 	contract "github.com/mypocket/backend/internal/repository"
 	"gorm.io/gorm"
@@ -32,7 +34,7 @@ func (r *ChangelogPostgresRepository) Publish(ctx context.Context, changelog *en
 			return contract.ErrNotFound
 		}
 		for _, row := range rows {
-			if row.Status == entity.FeedbackStatusFixed || row.Status == entity.FeedbackStatusRejected || row.ChangelogID != nil {
+			if row.Status != entity.FeedbackStatusInProgress || row.ChangelogID != nil {
 				return contract.ErrFeedbackConflict
 			}
 		}
@@ -40,6 +42,10 @@ func (r *ChangelogPostgresRepository) Publish(ctx context.Context, changelog *en
 			changelog.PublishedAt = time.Now().UTC()
 		}
 		if err := tx.Create(changelog).Error; err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				return contract.ErrChangelogConflict
+			}
 			return err
 		}
 		now := time.Now().UTC()

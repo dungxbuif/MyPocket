@@ -25,6 +25,24 @@ updated: 2026-09-22
 
 This file maps accepted behavior and work items to proof.
 
+## Full implemented-scope regression audit — 2026-09-22
+
+- Backend: `TEST_DATABASE_URL=<local dev PostgreSQL> go test -race ./... -count=1` PASS — 110 tests in 15 packages; migration CLI reports `version: 16 dirty: false`.
+- Frontend: `npm run check:design`, `npm run test:design` (7), `node --test scripts/form-logic.test.ts` (2), `npm run test:transactions` (5), `npm run test:calendar` (9), `npm run test:transaction-jars`, `npm run test:ai`, `npm run test:api:full`, `npm run test:transfer:integrated`, `npm run test:transfer:e2e`, and `npm run build` PASS. Production build transformed 1,764 Vite modules. AI/transfer browser suites were run sequentially; a deliberately parallel attempt produced a fixture timeout from shared Vite/Chrome ports and passed on the clean serial rerun.
+- API harness: `TEST_API_ORIGIN=http://127.0.0.1:4173 TEST_DATABASE_URL=<local dev PostgreSQL> npm run test:api:full` PASS through the real FE proxy. It verifies authenticated profile/home, timezone validation, category CRUD and wallet scope, jar create/list/update/report/remove, month summary and note save/delete, AI capabilities, Swagger, and unauthenticated guards. It removes only its generated category, jar/configuration, and note; no ledger rows are created. The seeded account timezone value is unchanged (the valid same-timezone call may confirm an unconfirmed account, as the endpoint contract requires).
+- Transfer harnesses: integrated FE-proxy/PostgreSQL roundtrip and real Chromium 390×844 flow both PASS; paired rows, balances, report/jar exclusion, auth guard, rendered wallet options, submit, refresh and persisted state were asserted. Only generated wallets/transactions are removed.
+- Fixture correction: `app/scripts/api-roundtrip.mjs` now uses the documented budget contract `start_date`/`end_date` (the stale `start_at`/`end_at` fixture was the only initial red).
+- Residual human/platform proof remains explicit: owner visual sign-off, mobile/PWA install, Google OAuth with real credentials, live S3/OCR/LLM, and deployment verification are outside this local regression run. AI browser/provider tests intentionally do not claim live OCR/LLM quality or proposal approval.
+
+## TICKET-02-02 atomic wallet transfer — 2026-09-22
+
+- Scope and trace: [detail design](tickets/TICKET-02-02-TRANSFER-DETAIL_DESIGN.md), [transaction screen](../design/screens/transactions/README.md), [API contract](../architecture/API.md), [ERD](../architecture/ERD.md).
+- Schema proof: migration `000016_transaction_transfer_links` applied locally; `go run ./cmd/migrate version` reports `version: 16 dirty: false`.
+- Backend proof: `TEST_DATABASE_URL=<local dev database> go test ./... -count=1` PASS. Handler tests cover valid paired creation and same-wallet rejection. PostgreSQL integration proves exactly two linked rows, explicit `included_in_reports=false`, owner/credit guards and atomic persistence.
+- Frontend proof: `npm run check:design` PASS; `npm run test:design` PASS (7 guardrails plus base contracts); `npm run build` PASS (1,764 Vite modules). TransferFields composes `BaseSelect`, `AmountField`, `DateField`, `BaseTextInput` and `SurfaceCard`; no native controls or literal colors were added outside bases.
+- Integrated proof: `npm run test:transfer:integrated` PASS through Vite proxy → Gin → PostgreSQL; verifies persisted pair, balances, report/jar exclusion and unauthenticated 401, then cleans only test IDs. `npm run test:transfer:e2e` PASS in real Chromium at 390×844; opens the actual transaction page, selects both rendered wallet options, submits the real sheet, waits for the refreshed UI note, re-reads API state and saves `/tmp/mypocket-transfer-e2e.png`.
+- Residual UAT: owner visual sign-off remains human-owned. Pair edit/delete and idempotency-key replay are intentionally follow-up scope.
+
 ## CORE-03 timezone, jars, and live monthly summary — 2026-09-22
 
 - Scope and trace: [CORE-03 design](tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md), [execution plan](../superpowers/plans/2026-09-22-timezone-jars-month.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md), [account settings](../design/screens/current-ui.md), [jar screen](../design/screens/jars/README.md), [month detail](../design/screens/month-detail/README.md), [overview](../design/screens/overview/README.md), [transaction form](../design/screens/transactions/README.md).
@@ -59,6 +77,7 @@ This file maps accepted behavior and work items to proof.
 - OCR: PASS against the configured live provider, 3.815 s; synthetic mock total of 45,000 VND recognized.
 - LLM: all five cases failed strict draft-schema validation; field score 0/15 (0%). LLM latency p50 15.089 s, p95 21.7 s. Transfer-safety gate failed; OCR + receipt-case pipeline measured 25.516 s. AI-ENTRY-01 schema compatibility is not verified and is not a successful intelligence score.
 - Safe diagnostic log follow-up: `rtk proxy go test ./internal/infrastructure/ai -run '^(TestSchemaMismatchLogReportsStructureWithoutLoggingModelContent|TestSchemaDiagnosticShowsArrayElementShapeWithoutValues|TestSchemaValidation)$' -count=1 -v` PASS; full `rtk proxy go test ./... -count=1` in `backend/` PASS; `rtk proxy git diff --check` PASS. A live run showed root arrays with wallet-like item fields (`currency,id,name,type`) and objects with input-context keys (`categories,now,timezone,untrusted_source_text,wallets`); one of five calls timed out. Five-case metrics: LLM p50 21.138 s, p95 30.001 s; OCR 3.805 s; OCR + receipt pipeline 33.806 s; 0/15 fields. Latest text-only live call logged `finish_reason=stop`, root array/item shape with input-context keys, 363 response bytes, and 14.706 s latency. Logs retain only allowlisted schema/catalog keys, redact arbitrary key names and exclude values/full response bodies. See [AI-ENTRY-01](tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md).
+- Cleanup regression: `TestAttachmentDeleteStatusRequiresClaimedDeletingState` red→green; stale or unclaimed attachment cleanup finalization now returns conflict instead of silently reporting success.
 - Synthetic fixture only; no user PDF, proposal approval, or ledger write. See [BUG-001](bugs/BUG-001-s3-presigned-get-signature.md).
 
 ## AI-ENTRY-01 OpenAI-compatible JSON Schema resolution — 2026-09-22
@@ -75,7 +94,7 @@ This file maps accepted behavior and work items to proof.
 ### AI-ENTRY-01 implementation follow-up
 
 - [Approved slice and execution proof](tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [UI contract/proof](../design/screens/assistant/README.md), [ADR-005](../decisions/ADR-005-ai-entry-review.md). Entry scope is implemented for review; this does not complete all REQ-17, financial Q&A, transfer matching or retained receipts.
-- Backend red→green tests: missing validator/repository/service/config functionality; actual regressions caught hidden category-template acceptance, too-large history blocking follow-up, and cross-session owner quota bypass. PostgreSQL fixtures prove zero writes before approval, eight concurrent approvals producing one row, stale version conflict, cross-owner rejection, terminal reject, deleted-ledger replay safety and explicit report=false preservation. HTTP fixture test exercises real provider adapter → service → DB → edit/approve/reject and reload.
+- Backend red→green tests: missing validator/repository/service/config functionality; actual regressions caught hidden category-template acceptance and too-large history blocking follow-up. PostgreSQL fixtures prove zero writes before approval, eight concurrent approvals producing one row, stale version conflict, cross-owner rejection, terminal reject, deleted-ledger replay safety, explicit report=false preservation and the current no-user-usage-limit policy for AI entry. HTTP fixture test exercises real provider adapter → service → DB → edit/approve/reject and reload.
 - Independent review remediation: shared category wallet scopes no longer disclose/overwrite other owners' assignments; OCR source survives model failure; post-claim history includes the previous completion. All three regressions observed red then green; new fixture category/wallets removed after verification.
 - Final post-review run: full `go test -race ./... -count=1` with local `TEST_DATABASE_URL` passed; frontend `test:ai`, `check:design`, `test:design`, `test:transactions`, `build` passed. Local documentation scan 184 links/22 Markdown files: pass. Git-visible files contain none of the supplied credentials; ignored local env mode is 0600. Runtime restarted with final source.
 - `rtk go run ./cmd/migrate up` pass, schema 000010; `rtk go generate ./cmd/api` pass. Go suite/race with `TEST_DATABASE_URL` runs real DB tests; fixture records are cleaned, owner data untouched.
@@ -221,8 +240,60 @@ rtk proxy node -e 'const fs=require("fs"),path=require("path");let files=["docs/
 - Corrected deletion/duplicate-name decisions across design, backlog, ERD, architecture and context. Research is not app UAT; no wallet API/schema/seed executed. Full technical design still needs review.
 - Documentation-only verification: diff whitespace and local Markdown link checks; product tests/UAT not run for this research update.
 
+### Finance Assistant planning and implementation — 2026-09-22
+
+- [AI-ADVISOR-01](tickets/AI-ADVISOR-01-DETAIL_DESIGN.md) and [V1 task plan](../superpowers/plans/2026-09-22-finance-assistant-v1.md): design remains in review; advisor implementation is **partially shipped locally** as a JWT/API-key synchronous JSON pilot.
+- Docs proof: `rtk git diff --check` passes; Node local-link check reports 8 valid relative targets across the new design/plan. Reviewed current code evidence and official chat-library docs; no dependency installed.
+- Runtime/provider/E2E/UAT: backend race/DB and frontend type/design/build are proven for the local slice; local user API-key unit, PostgreSQL, middleware and Redis stream audit proof is now present. Configured provider, typed cards, SSE/recovery, durable audit delivery/alerting, browser state and public deployment remain unproven. Detailed gates are specified in the design/plan.
+- API/schema/runtime changed for the local advisor slice (migration 000018 plus JWT routes/UI). Existing transfer work remains independent; Feedback implementation and deployment checks remain separate.
+
+Technical-plan follow-up:
+
+- [Implementation guide](../superpowers/plans/2026-09-22-finance-assistant-technical-guide.md) added; [task plan](../superpowers/plans/2026-09-22-finance-assistant-v1.md) expanded to 8 tasks / 42 ordered subtask gates. Covers SQL/Go ports, tool defaults, recovery/drilldown APIs, SSE/React, exact accounting fixtures and operational limits.
+- Code evidence from plan review: jar `ListMonth` can initialize config, API helper buffers response text, composer copy is entry-specific, navigation had only five existing slots, and migrate CLI has no down command. The runtime slice now addresses the jar path, composer/navigation wiring, query/overview boundary, local API-key auth and best-effort Redis access audit; SSE/recovery/durable audit remain open.
+- Docs validation: local Node checker over design/plan/guide verified 12 relative link targets, 4 JSON examples and 27 paired fenced blocks; no failures. `rtk git diff --check` passes. Placeholder scan of plan/guide returned no matches.
+- Runtime/code snippets in the guide remain instructional; the actual local implementation is verified in the vertical-slice checkpoint below. Public docs now include the implemented tool catalog, routes and API-key contract; proposed SSE/recovery contracts remain marked as unreleased.
+
+Feedback implementation completion checkpoint — 2026-09-22:
+
+- PASS: backend `rtk go test -race ./...` after wiring `main.go`, lifecycle locking, audit context, handler validation and Swagger annotations.
+- PASS: frontend `rtk npm run typecheck`, `rtk npm run check:design`, `rtk npm run build` after Account → Feedback route/panel/service.
+- PASS: `rtk go generate ./cmd/api`; generated Swagger includes feedback/changelog models and routes.
+- PASS: public/agent API contract documented in [FEEDBACK_API](../architecture/FEEDBACK_API.md). Redis audit remains best-effort after commit; no finance access is granted to the service token.
+- NOT RUN: browser feedback E2E and real API roundtrip; no dedicated script currently exists in the dirty worktree. Residual risk is recorded; do not claim production deployment or full user UAT.
+
+Finance Assistant Task 1 foundation — 2026-09-22:
+
+- PASS: entity normalization tests cover invalid/reversed/overlong calendar ranges, DST next-local-midnight conversion, JavaScript-safe money bounds, filter defaults/deduplication and zero-baseline percentage semantics.
+- PASS: PostgreSQL fixture through `TEST_DATABASE_URL=postgres://dev:password@127.0.0.1:5432/postgres?sslmode=disable go test ./internal/infrastructure/repository -run TestFinanceQueryPostgresSummary -count=1 -v` proves owner scope, 1000/150/850 report totals, 55 full-scope rows versus a 50-row page, cursor replay/scope rejection, category subtree filtering, baseline-zero comparison and no jar/config row mutation.
+- PASS: shared `FinanceQueryService` delegates validated owner-scoped bundles; full backend suite remains green. Advisor persistence/provider/HTTP/UI proof is recorded in the vertical-slice checkpoint below; SSE is still open.
+
+Finance Assistant local vertical slice — 2026-09-22:
+
+- PASS: migration `000018_advisor_conversations` applied locally (`version: 18 dirty: false`); PostgreSQL proof covers one conversation per owner, same-request replay, changed-payload conflict, active-run busy guard and cancellation.
+- PASS: tool registry/provider/orchestrator/parts tests cover eight read-only tools, `get_transaction` owner isolation, unknown/owner override rejection, provider tool-call round trip, bounded loop, server-built view parts and no write/SQL/confirmation tools.
+- PASS: JWT advisor routes now include a model-free `/overview` summary, real Account navigation slot, read-only composer mode, owner-scoped localStorage, masked assistant values, typecheck/design/build and full backend race/DB tests. The local provider-backed chat remains disabled when AI credentials are absent, while overview/history remain available.
+- PASS: local API smoke with fixture login against `127.0.0.1:18080` returned `enabled=false` without AI credentials and a real account-local September overview (`income=0`, `expense=0`, `net=0`, `count=0`) without a model call; the route was then stopped. No provider secret was logged or committed.
+- PASS: local user API-key creation/list/revoke, digest-only persistence, scope implication/denial, expiry/revocation and advisor middleware owner-isolation tests; migration `000019_user_api_keys` applied locally (`version: 19 dirty: false`).
+- PASS: advisor auth audit writes redacted access metadata to the dedicated Redis stream `mypocket:audit:advisor`; integration proof ran against local Redis.
+- NOT RUN: real browser chat round-trip through a configured provider, SSE/reconnect transport, durable audit delivery/alerting and production deployment. These are release gates, not claimed by this local slice.
+
 - Add or update a row when a requirement, ticket, bug, public contract, or accepted behavior is created or changed.
 - Mark proof columns `yes`, `no`, or `not_required`.
 - Link evidence to `docs/templates/TEST_VERIFICATION.md`, ticket verification sections, UAT, docs review, release notes, or command output summaries.
 - Do not set `implemented` until required proof has evidence.
 - If a proof type is `not_required`, record the reason in the linked ticket, bug, or verification artifact.
+
+### AI Advisor bug-fix verification — 2026-09-22
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Tool contract | `go test ./internal/usecase -run TestAdvisorToolDefinitionsExposeModelParameters` | PASS: all eight read tools expose model-visible properties; range/month required fields are explicit |
+| Provider wire contract | `go test ./internal/infrastructure/ai -run TestAdvisorClientEncodesOpenAICompatibleToolCalls` | PASS: assistant calls use `type=function` and nested function name/arguments; tool result keeps `tool_call_id` |
+| Orchestration cap | `go test ./internal/usecase -run TestAdvisorOrchestratorAllowsFinalAnswerAfterFourToolCalls` | PASS: four read calls may be followed by one final answer; further calls remain rejected |
+| Credential lifecycle | `go test ./internal/usecase -run 'TestAdvisorOrchestratorRevalidatesPrincipalBeforeProviderAndTool|TestUserAPIKeyValidatePrincipalRejectsRevokedKey'` | PASS: provider/tool boundaries re-read principal; revoked key is rejected |
+| Cancellation commit guard | `TEST_DATABASE_URL=... go test ./internal/infrastructure/repository -run TestAdvisorPostgresStartRunIsIdempotentAndBusyScoped` | PASS: cancelled run rejects late assistant message with lease-lost error |
+| In-process cancellation | `go test -race ./internal/usecase -run TestAdvisorServiceCancelInterruptsInFlightProvider` | PASS: cancel endpoint path cancels the provider context and submit returns an error |
+| Assistant cards | `npm run typecheck && npm run check:design && npm run build` | PASS: normalized summary/comparison/search/budget plus wallet/goal/jar cards compile and satisfy base/design guards |
+
+The above is local regression proof. Configured-provider browser chat, SSE/reconnect, durable Redis audit delivery/alerting and production deployment remain unverified release gates.

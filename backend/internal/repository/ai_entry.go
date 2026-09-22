@@ -8,10 +8,9 @@ import (
 )
 
 var (
-	ErrAIRateLimited = errors.New("đã dùng hết 20 lượt AI trong 24 giờ; vui lòng thử lại sau")
-	ErrAIInvalid     = errors.New("dữ liệu đề xuất chưa hợp lệ")
-	ErrAIConflict    = errors.New("kết quả hoặc đề xuất đã thay đổi; hãy tải lại")
-	ErrAIBusy        = errors.New("yêu cầu đang xử lý, vui lòng chờ")
+	ErrAIInvalid  = errors.New("dữ liệu đề xuất chưa hợp lệ")
+	ErrAIConflict = errors.New("kết quả hoặc đề xuất đã thay đổi; hãy tải lại")
+	ErrAIBusy     = errors.New("yêu cầu đang xử lý, vui lòng chờ")
 )
 
 type AIEntryRepository interface {

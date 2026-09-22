@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"log"
+	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	_ "github.com/mypocket/backend/docs"
@@ -103,7 +105,11 @@ func main() {
 		return authUc.VerifySession(context.Background(), sessionID)
 	}
 	middleware := httpapi.NewAuthMiddleware(jwtSvc, verifySession)
+	apiKeyService := usecase.NewUserAPIKeyService(repo.NewUserAPIKeyPostgresRepository(database))
+	middleware.APIKeys = apiKeyService
+	middleware.Audit = cacheRepo
 	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, walletHandler, transactionHandler, middleware, cfg.CORSAllowedOrigins)
+	router.RegisterAPIKeyRoutes(&httpapi.APIKeyHandler{Service: apiKeyService})
 	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: repo.NewBudgetPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Transactions: repo.NewTransactionPostgresRepository(database), Users: userRepo})
 	router.RegisterJarRoutes(&httpapi.JarHandler{Jars: jarRepository, Users: userRepo})
 	router.RegisterMonthRoutes(&httpapi.MonthHandler{Users: userRepo, Transactions: transactionRepository, Categories: categoryRepository, Jars: jarRepository, Notes: monthNotes})
@@ -113,6 +119,38 @@ func main() {
 		log.Fatalf("configure private attachment storage failed: %v", err)
 	}
 	router.RegisterAIEntryRoutes(&httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: attachmentStorage, Users: userRepo}})
+	financeReader := repo.NewFinanceQueryPostgresRepository(database)
+	financeQueryService := usecase.NewFinanceQueryService(financeReader)
+	advisorProvider := ai.NewAdvisorClient(ai.AdvisorClientConfig{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel})
+	advisorStore := repo.NewAdvisorPostgresRepository(database)
+	advisorOrchestrator := usecase.NewAdvisorOrchestrator(advisorProvider, usecase.NewAdvisorToolRegistry(financeQueryService))
+	advisorOrchestrator.Validator = usecase.AdvisorPrincipalValidatorFunc(func(ctx context.Context, principal usecase.Principal) error {
+		switch principal.CredentialKind {
+		case "user_api_key":
+			return apiKeyService.ValidatePrincipal(ctx, principal)
+		case "session":
+			if !principal.ExpiresAt.IsZero() && !principal.ExpiresAt.After(time.Now().UTC()) {
+				return usecase.ErrAdvisorPrincipalInvalid
+			}
+			ownerID, err := verifySession(principal.CredentialID)
+			if err != nil || ownerID != principal.OwnerID {
+				return usecase.ErrAdvisorPrincipalInvalid
+			}
+			return nil
+		default:
+			return usecase.ErrAdvisorPrincipalInvalid
+		}
+	})
+	advisorService := usecase.NewAdvisorService(advisorStore, advisorOrchestrator)
+	router.RegisterAdvisorRoutes(&httpapi.AdvisorHandler{Service: advisorService, Users: userRepo, Finance: financeQueryService})
+	feedbackRepository := repo.NewFeedbackPostgresRepository(database)
+	changelogRepository := repo.NewChangelogPostgresRepository(database)
+	feedbackService := usecase.NewFeedbackService(feedbackRepository, cacheRepo, time.Now)
+	changelogService := usecase.NewChangelogService(feedbackRepository, changelogRepository, cacheRepo, time.Now)
+	if cfg.AppEnv != "development" && strings.TrimSpace(cfg.FeedbackAgentToken) == "" {
+		log.Fatal("FEEDBACK_AGENT_TOKEN must be configured outside development")
+	}
+	router.RegisterFeedbackRoutes(&httpapi.FeedbackHandler{Service: feedbackService}, &httpapi.ChangelogHandler{Service: changelogService}, httpapi.NewFeedbackAgentMiddleware(cfg.FeedbackAgentToken))
 	router.Engine.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	if err := router.Engine.Run(cfg.HTTPAddr); err != nil {

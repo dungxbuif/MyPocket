@@ -10,6 +10,14 @@ shared_fields: [status, links]
 
 # MyPocket Docs Guide
 
+Finance Assistant design and execution record: [design](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md), [V1 implementation plan](superpowers/plans/2026-09-22-finance-assistant-v1.md), and the implemented [tool catalog](architecture/AI_ADVISOR_TOOLS.md). These are plain Markdown for humans and agents. The local advisor is a JWT/API-key synchronous JSON pilot with best-effort Redis access audit; it is not yet a public streaming/durable-audit release.
+
+Implementation companion: [Finance Assistant technical guide](superpowers/plans/2026-09-22-finance-assistant-technical-guide.md) — Go interfaces, SQL tables, API/SSE contracts, React state machine, exact test fixtures and rollout instructions. It separates implemented local behavior from remaining release gates.
+
+Implemented API reference: [Feedback → Fix → Changelog](architecture/FEEDBACK_API.md), including the user JWT, local agent token, lifecycle, atomic publication, and AI-agent quick reference.
+
+Finance Assistant implementation: [screen contract](design/screens/finance-assistant/README.md) and [AI advisor design/plan](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md). The local V1 slice is read-only; provider-backed chat requires configured AI credentials and public launch still requires durable Redis audit delivery/alerting, browser proof and deployment evidence.
+
 This is the documentation entry point for MyPocket. Start with [requirements/SPEC.md](requirements/SPEC.md), [requirements/BUSINESS_RULES.md](requirements/BUSINESS_RULES.md), and [requirements/REPORTS.md](requirements/REPORTS.md) for the product under review.
 
 Product design is currently being reviewed as a whole, with [business tickets grouped into parents and children](work/tickets/README.md). These are draft business scopes and acceptance criteria; no implementation phase has been scheduled. Existing reference designs and framework examples are not the current product contract. Reusable artifact templates remain available for actual implementation work when requested.

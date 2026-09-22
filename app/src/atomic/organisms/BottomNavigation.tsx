@@ -1,4 +1,4 @@
-import { Home, PieChart, Plus, ReceiptText, Settings } from "lucide-react";
+import { Home, MessageCircle, PieChart, Plus, ReceiptText, Settings } from "lucide-react";
 import type { PrototypeTab } from "../pages/FinancePrototypePage";
 import { BaseFab, BaseNavigationItem } from "../atoms/BaseNavigation";
 
@@ -6,6 +6,7 @@ const items = [
   { key: "overview", label: "Tổng quan", icon: Home },
   { key: "transactions", label: "Giao dịch", icon: ReceiptText },
   { key: "budgets", label: "Ngân sách", icon: PieChart },
+  { key: "assistant", label: "Trợ lý", icon: MessageCircle },
   { key: "account", label: "Tài khoản", icon: Settings },
 ] as const;
 
@@ -31,7 +32,7 @@ export function BottomNavigation({
       >
         <Plus size={26} />
       </BaseFab>
-      <div className="grid grid-cols-5">
+      <div className="grid grid-cols-6">
         {items.map((item, index) => {
           const Icon = item.icon;
           const active = tab === item.key;
@@ -42,7 +43,7 @@ export function BottomNavigation({
               type="button"
               onClick={() => onTabChange(item.key)}
               className={`${
-                index === 1 ? "pr-5" : index === 2 ? "col-start-4 pl-5" : index === 3 ? "col-start-5" : ""
+                index === 1 ? "pr-5" : index === 2 ? "col-start-4 pl-5" : index === 3 ? "col-start-5" : index === 4 ? "col-start-6" : ""
               }`}
             >
               <Icon size={20} />

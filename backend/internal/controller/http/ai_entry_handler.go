@@ -256,8 +256,6 @@ func (h *AIEntryHandler) decide(c *gin.Context, approve bool) {
 func aiEntryFail(c *gin.Context, err error) {
 	status, code, detail := http.StatusInternalServerError, aiFailureCode, "Không xử lý được yêu cầu. Vui lòng thử lại."
 	switch {
-	case errors.Is(err, port.ErrAIRateLimited):
-		status, code, detail = http.StatusTooManyRequests, "ai_entry_rate_limited", err.Error()
 	case errors.Is(err, gorm.ErrRecordNotFound):
 		status, code, detail = http.StatusNotFound, aiNotFoundCode, "Không tìm thấy yêu cầu hoặc đề xuất."
 	case errors.Is(err, port.ErrAIConflict), errors.Is(err, port.ErrAIBusy):

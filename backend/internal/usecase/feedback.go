@@ -11,6 +11,24 @@ import (
 	"github.com/mypocket/backend/internal/repository"
 )
 
+type auditContextKey string
+
+const (
+	auditRequestIDKey auditContextKey = "mypocket.audit.request_id"
+	auditActorKey     auditContextKey = "mypocket.audit.actor_kind"
+)
+
+func WithAuditContext(ctx context.Context, requestID, actorKind string) context.Context {
+	ctx = context.WithValue(ctx, auditRequestIDKey, strings.TrimSpace(requestID))
+	return context.WithValue(ctx, auditActorKey, strings.TrimSpace(actorKind))
+}
+
+func auditContextValues(ctx context.Context) (string, string) {
+	requestID, _ := ctx.Value(auditRequestIDKey).(string)
+	actor, _ := ctx.Value(auditActorKey).(string)
+	return requestID, actor
+}
+
 var (
 	ErrFeedbackTransition = errors.New("feedback transition is not allowed")
 	ErrFeedbackAgentInput = errors.New("feedback agent input is invalid")
@@ -98,6 +116,7 @@ func (s *FeedbackService) SetStatus(ctx context.Context, id, status string) (*en
 }
 
 func (s *FeedbackService) record(ctx context.Context, event repository.AuditEvent) {
+	event.RequestID, event.ActorKind = auditContextValues(ctx)
 	if s.Audit != nil {
 		_ = s.Audit.Record(ctx, event)
 	}
