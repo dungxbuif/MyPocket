@@ -43,7 +43,7 @@
 
 - [x] Write failing PostgreSQL tests for owner scope, pending attachment lifecycle, atomic approval link and replay/concurrent approval.
 - [x] Add attachment metadata/link tables, repository methods and transactional link during approval.
-- [x] Run migrations 000011–000012 and real PostgreSQL tests (dev schema version 12, clean).
+- [x] Apply the Stage v1 baseline and run real PostgreSQL tests on a fresh disposable database.
 
 ### Task 3: Stateless one-shot API and OCR-first JPEG/PNG/PDF pipeline
 

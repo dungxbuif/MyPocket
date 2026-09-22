@@ -59,7 +59,7 @@ trace:
 
 ## BUD — Budget
 
-Budget theo mô hình Money Lover được ghi nhận trong [nghiên cứu hiện có](../../refereces/disappointed_app/docs/research/moneylover/FEATURE-PARITY-2026-09-08.md), các dòng M20–M24. Đây là nguồn tham chiếu nghiệp vụ, không phải bằng chứng triển khai MyPocket.
+Budget theo mô hình Money Lover được chuẩn hoá trực tiếp trong tài liệu nghiệp vụ hiện hành; các dòng M20–M24 dưới đây là contract của MyPocket, không phải bằng chứng triển khai từ ứng dụng khác.
 
 - BUD-01: Budget gồm số tiền, phạm vi ví/danh mục và kỳ. Giao dịch khớp phạm vi tự vào tiến độ; không có yêu cầu gắn trực tiếp một budget vào giao dịch.
 - BUD-02: Kỳ gồm tuần, tháng, quý, năm, ngày tùy chỉnh. Kỳ cố định có lựa chọn lặp; kỳ tùy chỉnh không lặp.

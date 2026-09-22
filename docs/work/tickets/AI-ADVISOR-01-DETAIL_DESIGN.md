@@ -258,7 +258,7 @@ Detailed executable tasks now cover **V1 only**. Later stages have boundaries an
 ## 13. Docs reconciliation and review
 
 - This task changes planning docs only; API/ERD/architecture master docs and Swagger are **not** updated to claim proposed endpoints exist.
-- Human-facing guide and machine-readable tool/parts JSON schemas, endpoint catalog and plain Markdown are required with implementation. Add entry links from `docs/README.md`; integrate actual publication path only after confirming current hosting configuration. The old Docusaurus under `refereces/disappointed_app` is not assumed to publish the current app.
+- Human-facing guide and machine-readable tool/parts JSON schemas, endpoint catalog and plain Markdown are required with implementation. Add entry links from `docs/README.md`; integrate an external publication path only after confirming current hosting configuration.
 - Internal docs at implementation: API, ERD, ARCHITECTURE, report rules, assistant screen/base contracts, runbook (SSE proxy/lease/cancel/audit), ADR, validation/changelog/context. Preserve quick-add screen spec independently.
 - Source capability observations are dated; provider tool-calling support and assistant-ui compatibility remain measured gates, not assertions of readiness.
 - Documentation verification: check local Markdown links, whitespace and roadmap/tool/card coverage. Runtime tests are not required for this docs-only change; no runtime success claimed.
@@ -280,4 +280,5 @@ Detailed executable tasks now cover **V1 only**. Later stages have boundaries an
 - Added credential revalidation at provider/tool boundaries and before assistant persistence. API-key principals are re-read from storage, so expiry/revocation stops an in-flight advisor run. Session principals are rechecked through the existing session verifier. Cancelled runs cannot accept a late assistant message because repository persistence requires queued/running status.
 - Cancellation now propagates to the in-process provider context through a service-owned run registry; the database status remains authoritative and the repository lease guard prevents late commits. Cross-process immediate interruption remains a release follow-up requiring durable pub/sub or worker ownership.
 - Conversation history now pages backward through the existing `before_seq` route, merges by message ID and preserves chronological order in the UI; the newest page remains bounded at 50 messages and reload does not clear visible state.
+- Provider context is now bounded deterministically to the 12 most recent persisted text messages in chronological order; no hidden summary-model call is introduced and current figures remain tool-sourced.
 - Regression evidence: the new schema, wire, four-call, principal-revalidation and cancelled-run tests were red before the fixes and green after them. Remaining release gates are configured-provider browser proof, SSE/reconnect, durable audit delivery and owner UAT.

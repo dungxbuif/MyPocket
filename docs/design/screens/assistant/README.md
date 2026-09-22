@@ -32,7 +32,7 @@ All API paths/types follow the linked authoritative design. Backend owns final v
 
 Browser proof uses deterministic HTTP fixtures and real Chrome interactions. It covers hold vs short-press, no conversation UI, multiline composer/file affordance, grouped result card, edit/save one/save all/delete item, transfer lock, date picker cancel/select/time preservation, budget editor, and grouped transactions. No live transaction is created by the fixture suite. Owner UAT and provider extraction quality remain pending.
 
-Frontend implementation is in review; owner UAT and live provider integration remain pending. Current browser proof checks multipart one-shot submit, absence of session/message calls, editable proposal rows and manual-entry regression. No live transaction was created during fixture tests. Backend private S3 retention, migration 000011–000012, approval links, download route and cleanup command are implemented and tested against local PostgreSQL; live bucket/OCR and browser download UAT remain pending.
+Frontend implementation is in review; owner UAT and live provider integration remain pending. Current browser proof checks multipart one-shot submit, absence of session/message calls, editable proposal rows and manual-entry regression. No live transaction was created during fixture tests. Backend private S3 retention, Stage v1 attachment schema, approval links, download route and cleanup command are implemented and tested against local PostgreSQL; live bucket/OCR and browser download UAT remain pending.
 
 Commands from `app/` (run with `rtk`):
 

@@ -74,7 +74,7 @@ Người dùng cần tạo, xem, sửa và xoá các ví thuộc tài khoản đ
 
 ### Quyết định đã chốt và kết quả nghiên cứu
 
-- Bộ nhóm mặc định tái sử dụng từ [catalog app cũ](../../../refereces/disappointed_app/backend/migrations/0011_phase002_category_catalog.sql), đối chiếu [nghiên cứu cũ](../../../refereces/disappointed_app/docs/research/moneylover/moneylover-full-research.md#17-default-categories). Giữ tên tiếng Việt, `system_key`, loại thu/chi/vay-nợ và quan hệ cha/con; khi migrate phải đối chiếu cả seed tiền nhiệm mà catalog tham chiếu. Không tự thay catalog bằng bộ nhóm Money Lover mới hoặc mock FE. Chỉ port seed khi triển khai danh mục; không chạy SQL của app cũ vào DB mới.
+- Bộ nhóm mặc định dùng `system_key`, loại thu/chi/vay-nợ và quan hệ cha–con theo contract hiện hành. Seed canonical nằm trong migration Stage v1; không chạy SQL ngoài repository vào DB mới.
 
 - Owner đã chốt xoá thực ví và dữ liệu liên quan sau cảnh báo/xác nhận. Không hỏi lại lựa chọn chặn xoá chỉ vì ví có giao dịch.
 - Owner đồng ý cho phép trùng tên ví; phân biệt bằng ID, không có unique constraint cho tên.

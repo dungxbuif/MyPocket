@@ -67,13 +67,7 @@ func (s *AdvisorService) Submit(ctx context.Context, principal Principal, input 
 		_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
 		return AdvisorAnswer{}, err
 	}
-	chat := make([]AdvisorChatMessage, 0, len(messages))
-	for i := len(messages) - 1; i >= 0; i-- {
-		content := messageText(messages[i])
-		if content != "" {
-			chat = append(chat, AdvisorChatMessage{Role: messages[i].Role, Content: content})
-		}
-	}
+	chat := BuildAdvisorContext(messages)
 	if len(chat) == 0 {
 		chat = []AdvisorChatMessage{{Role: entity.AdvisorRoleUser, Content: messageText(*userMessage)}}
 	}

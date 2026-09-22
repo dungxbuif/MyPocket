@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -159,5 +160,20 @@ func TestAdvisorServiceCancelInterruptsInFlightProvider(t *testing.T) {
 	}
 	if err := <-done; err == nil {
 		t.Fatal("cancelled submit must return an error")
+	}
+}
+
+func TestBuildAdvisorContextKeepsOnlyTwelveRecentMessages(t *testing.T) {
+	messages := make([]entity.AdvisorMessage, 0, 20)
+	for index := 1; index <= 20; index++ {
+		role := entity.AdvisorRoleUser
+		if index%2 == 0 {
+			role = entity.AdvisorRoleAssistant
+		}
+		messages = append(messages, entity.AdvisorMessage{Seq: int64(index), Role: role, Parts: []entity.AdvisorPart{{Type: "text", Text: fmt.Sprintf("message-%02d", index)}}})
+	}
+	chat := BuildAdvisorContext(messages)
+	if len(chat) != 12 || chat[0].Content != "message-09" || chat[11].Content != "message-20" {
+		t.Fatalf("context must keep the twelve latest messages in order: len=%d first=%q last=%q", len(chat), chat[0].Content, chat[11].Content)
 	}
 }

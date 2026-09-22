@@ -441,7 +441,7 @@ Local key API: JWT-only `POST /api/v1/api-keys`, `GET /api/v1/api-keys`, `DELETE
 
 Key creation enforces `advisor:chat` implies `advisor:read`; POST additionally verifies both scopes at runtime so externally provisioned malformed keys cannot start an unreadable run. All API-key/session auth failures occur before reading response payloads; a model-selected operation can only narrow effective scope, never expand it.
 
-API-key storage is isolated in migration `000019_user_api_keys`, not advisor tables. Contract tests prove digest-only persistence, owner isolation, expiry/revocation, scope checks and the no-JWT-fallback claim; public release still needs Redis audit and deployment evidence.
+API-key storage is isolated in the Stage v1 baseline, not advisor tables. Contract tests prove digest-only persistence, owner isolation, expiry/revocation, scope checks and the no-JWT-fallback claim; public release still needs Redis audit and deployment evidence.
 
 ## 8. SSE wire and frontend state machine
 

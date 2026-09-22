@@ -10,17 +10,17 @@ shared_fields: [status, trace]
 
 # ERD
 
-## Implemented calendar, jar, and month schema — migrations 000013–000015
+## Implemented calendar, jar, and month schema — Stage v1 baseline
 
-Migration `000013` adds `user.timezone` and `timezone_confirmed`, converts `wallets.target_date` to `date`, and replaces budget timestamp bounds with account-calendar `start_date`/`end_date` date columns while preserving existing labels. Migration `000014` adds stable owner-scoped `jars`, initialized month records (`jar_months`), per-month configurations (`jar_month_configs`), and nullable `transactions.jar_id` with a composite same-owner FK. Migration `000015` adds `month_notes`, uniquely keyed by owner and first day of month. Migration `000016` adds nullable `transactions.transfer_id` for atomic paired wallet transfers. Local dev DB is at migration 16, `dirty=false`; repository integration tests use PostgreSQL. Month figures are derived from live ledger data; no report snapshot/close table or cron job exists. [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md) is proposed; [CORE-03](../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md) is in progress pending UAT and reconciliation.
+The Stage v1 baseline adds `user.timezone` and `timezone_confirmed`, converts `wallets.target_date` to `date`, replaces budget timestamp bounds with account-calendar `start_date`/`end_date` date columns, and creates owner-scoped jars, month records, per-month configurations, month notes and nullable `transactions.transfer_id`. A fresh staging database reports migration version 1, `dirty=false`; repository integration tests use PostgreSQL. Month figures are derived from live ledger data; no report snapshot/close table or cron job exists. [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md) is proposed; [CORE-03](../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md) is in progress pending UAT and reconciliation.
 
-## Implemented AI entry schema — migrations 000010–000012
+## Implemented AI entry schema — Stage v1 baseline
 
-Migration `000010` created `ai_entry_sessions`, `ai_entry_messages`, `ai_entry_proposals`, and `ai_entry_requests`. The one-shot API uses the owner-scoped session row internally for process/idempotency only; it writes no messages or exposes history. `ai_entry_messages` is legacy and unused. Migrations `000011`–`000012` add `transaction_attachments` (private object key, owner/process, source metadata, OCR text/state and cleanup deadline) and unique `(transaction_id,attachment_id)` links, plus safe cleanup claim state. Approval writes links in the same SQL transaction as the ledger row; owner/link-scoped download is implemented. Those migrations are part of the current clean local version 15; real DB repository tests pass. Explicit cleanup command is implemented but not run against bucket contents. Live S3/OCR and browser download UAT remain pending. [ADR-005](../decisions/ADR-005-ai-entry-review.md), [ADR-006](../decisions/ADR-006-private-ai-attachments.md), [AI-ENTRY-02](../work/tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md).
+The Stage v1 baseline creates `ai_entry_sessions`, `ai_entry_messages`, `ai_entry_proposals`, `ai_entry_requests`, `transaction_attachments` and attachment links. The one-shot API uses the owner-scoped session row internally for process/idempotency only; it writes no messages or exposes history. `ai_entry_messages` is legacy and unused. Approval writes links in the same SQL transaction as the ledger row; owner/link-scoped download is implemented. Explicit cleanup command is implemented but not run against bucket contents. Live S3/OCR and browser download UAT remain pending. [ADR-005](../decisions/ADR-005-ai-entry-review.md), [ADR-006](../decisions/ADR-006-private-ai-attachments.md), [AI-ENTRY-02](../work/tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md).
 
-## Implemented budget schema — migrations 000009 and 000013
+## Implemented budget schema — Stage v1 baseline
 
-`budgets`: text UUID id, owner_id FK user, name, positive safe-integer limit_amount, nullable wallet_id/category_id FKs, account-calendar `start_date`/`end_date` SQL `date`, timestamps. Owner/period index. Delete owner/wallet/category cascades matching budget configuration; deleting budget never removes transactions. Spent/remaining days/ended are derived fields, not stored counters. Existing labels were backfilled in `000013` using the existing-account timezone. [ADR-004](../decisions/ADR-004-budget-api-data.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md), [API design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md). No AutoMigrate is used.
+`budgets`: text UUID id, owner_id FK user, name, positive safe-integer limit_amount, nullable wallet_id/category_id FKs, account-calendar `start_date`/`end_date` SQL `date`, timestamps. Owner/period index. Delete owner/wallet/category cascades matching budget configuration; deleting budget never removes transactions. Spent/remaining days/ended are derived fields, not stored counters. The Stage v1 baseline creates the final date-only schema. [ADR-004](../decisions/ADR-004-budget-api-data.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md), [API design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md). No AutoMigrate is used.
 
 ## Field Ownership
 
@@ -127,7 +127,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 ## Migrations
 
 - Versioned SQL migrations are active. [`DATABASE.md`](DATABASE.md) defines the dev/prod command and migration ledger; API startup does not invoke `AutoMigrate`.
-- Applied migration sequence: `000013_account_timezone_and_calendar_dates`, `000014_jars`, `000015_month_notes`, `000016_transaction_transfer_links`; local migration ledger reports version 16, clean.
+- Stage v1 uses one forward baseline, `000001_stage_v1`, and reports version 1 clean on a fresh staging database.
 - Rollbacks of `000014`/`000015` refuse to drop user jar/note data. Do not run destructive down migrations against populated environments. `000013` rollback retains account timezone preferences.
 - Adjustment ledger, credit/debt semantics, and recurring execution remain separate designs. Paired internal transfers are implemented through migration `000016`; pair edit/delete and replay idempotency remain follow-up work.
 

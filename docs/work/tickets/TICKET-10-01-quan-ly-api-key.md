@@ -23,4 +23,4 @@ Ticket lớn: [Kết nối công cụ cá nhân](TICKET-10-ket-noi-cong-cu.md).
 - [x] Thu hồi khiến công cụ không tiếp tục dùng key đó được.
 - [x] Key không tạo/quản lý key khác; management routes JWT-only và luôn owner-scoped.
 
-Local implementation: migration `000019_user_api_keys`, `POST/GET/DELETE /api/v1/api-keys`, `mpk_<lookup>.<random>` format, digest-only persistence, expiry/revocation, advisor scope enforcement and redacted best-effort Redis advisor access audit. Remaining before public release: durable audit delivery/alerting, self-key endpoints, browser/provider E2E and deployment proof.
+Local implementation: the Stage v1 baseline plus `POST/GET/DELETE /api/v1/api-keys`, `mpk_<lookup>.<random>` format, digest-only persistence, expiry/revocation, advisor scope enforcement and redacted best-effort Redis advisor access audit. Remaining before public release: durable audit delivery/alerting, self-key endpoints, browser/provider E2E and deployment proof.

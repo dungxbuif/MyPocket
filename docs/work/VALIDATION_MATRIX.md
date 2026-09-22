@@ -245,7 +245,7 @@ rtk proxy node -e 'const fs=require("fs"),path=require("path");let files=["docs/
 - [AI-ADVISOR-01](tickets/AI-ADVISOR-01-DETAIL_DESIGN.md) and [V1 task plan](../superpowers/plans/2026-09-22-finance-assistant-v1.md): design remains in review; advisor implementation is **partially shipped locally** as a JWT/API-key synchronous JSON pilot.
 - Docs proof: `rtk git diff --check` passes; Node local-link check reports 8 valid relative targets across the new design/plan. Reviewed current code evidence and official chat-library docs; no dependency installed.
 - Runtime/provider/E2E/UAT: backend race/DB and frontend type/design/build are proven for the local slice; local user API-key unit, PostgreSQL, middleware and Redis stream audit proof is now present. Configured provider, typed cards, SSE/recovery, durable audit delivery/alerting, browser state and public deployment remain unproven. Detailed gates are specified in the design/plan.
-- API/schema/runtime changed for the local advisor slice (migration 000018 plus JWT routes/UI). Existing transfer work remains independent; Feedback implementation and deployment checks remain separate.
+- API/schema/runtime changed for the local advisor slice (Stage v1 baseline plus JWT routes/UI). Existing transfer work remains independent; Feedback implementation and deployment checks remain separate.
 
 Technical-plan follow-up:
 
@@ -274,7 +274,7 @@ Finance Assistant local vertical slice — 2026-09-22:
 - PASS: tool registry/provider/orchestrator/parts tests cover eight read-only tools, `get_transaction` owner isolation, unknown/owner override rejection, provider tool-call round trip, bounded loop, server-built view parts and no write/SQL/confirmation tools.
 - PASS: JWT advisor routes now include a model-free `/overview` summary, real Account navigation slot, read-only composer mode, owner-scoped localStorage, masked assistant values, typecheck/design/build and full backend race/DB tests. The local provider-backed chat remains disabled when AI credentials are absent, while overview/history remain available.
 - PASS: local API smoke with fixture login against `127.0.0.1:18080` returned `enabled=false` without AI credentials and a real account-local September overview (`income=0`, `expense=0`, `net=0`, `count=0`) without a model call; the route was then stopped. No provider secret was logged or committed.
-- PASS: local user API-key creation/list/revoke, digest-only persistence, scope implication/denial, expiry/revocation and advisor middleware owner-isolation tests; migration `000019_user_api_keys` applied locally (`version: 19 dirty: false`).
+- PASS: local user API-key creation/list/revoke, digest-only persistence, scope implication/denial, expiry/revocation and advisor middleware owner-isolation tests; the Stage v1 baseline applied to a fresh disposable database (`version: 1 dirty: false`).
 - PASS: advisor auth audit writes redacted access metadata to the dedicated Redis stream `mypocket:audit:advisor`; integration proof ran against local Redis.
 - NOT RUN: real browser chat round-trip through a configured provider, SSE/reconnect transport, durable audit delivery/alerting and production deployment. These are release gates, not claimed by this local slice.
 
@@ -295,6 +295,7 @@ Finance Assistant local vertical slice — 2026-09-22:
 | Cancellation commit guard | `TEST_DATABASE_URL=... go test ./internal/infrastructure/repository -run TestAdvisorPostgresStartRunIsIdempotentAndBusyScoped` | PASS: cancelled run rejects late assistant message with lease-lost error |
 | In-process cancellation | `go test -race ./internal/usecase -run TestAdvisorServiceCancelInterruptsInFlightProvider` | PASS: cancel endpoint path cancels the provider context and submit returns an error |
 | History pagination | `npm run test:ai-history` | PASS: older pages merge without duplicate boundary messages and remain chronological |
+| Context bound | `go test ./internal/usecase -run TestBuildAdvisorContextKeepsOnlyTwelveRecentMessages` | PASS: provider context keeps the newest 12 messages in chronological order |
 | Assistant cards | `npm run typecheck && npm run check:design && npm run build` | PASS: normalized summary/comparison/search/budget plus wallet/goal/jar cards compile and satisfy base/design guards |
 
 The above is local regression proof. Configured-provider browser chat, SSE/reconnect, durable Redis audit delivery/alerting and production deployment remain unverified release gates.

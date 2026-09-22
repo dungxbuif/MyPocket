@@ -43,7 +43,7 @@ The use case owns sequencing and cleanup compensation. A narrow `AttachmentStora
 
 Backend: AI entry entity/use case/repository/handler, OCR adapter, API composition/config, migrations, S3 infrastructure, transaction attachment read endpoint. Frontend: `AiEntrySheet`, AI service/types, file input validation and proposal-row composition; reuse manual transaction field bases, no screen-specific controls. Docs: API, ERD, architecture, integrations/OCR, assistant screen contract, ADR, validation, context/backlog/changelog.
 
-Direct dependencies inspected: existing owner-scoped process/proposal persistence, transaction creation, OCR image/PDF adapters, S3-compatible adapter/config, `BaseFileUpload`, `EntryProposalRow`. The API/UI stateless contract, OCR-before-LLM ordering, private S3 application wiring, attachment metadata/migrations 000011–000012, atomic approval links, authenticated download and explicit cleanup command are implemented in code as of 2026-09-22. Fake/unit/provider and local PostgreSQL proofs pass. Remaining scope: owner UAT against live S3/OCR and browser download. Never auto-retry a previously submitted document.
+Direct dependencies inspected: existing owner-scoped process/proposal persistence, transaction creation, OCR image/PDF adapters, S3-compatible adapter/config, `BaseFileUpload`, `EntryProposalRow`. The API/UI stateless contract, OCR-before-LLM ordering, private S3 application wiring, Stage v1 attachment metadata, atomic approval links, authenticated download and explicit cleanup command are implemented in code as of 2026-09-22. Fake/unit/provider and local PostgreSQL proofs pass. Remaining scope: owner UAT against live S3/OCR and browser download. Never auto-retry a previously submitted document.
 
 ## API/data contract
 
@@ -64,7 +64,7 @@ Tables: `transaction_attachments` (owner, batch, object key, original filename, 
 4. Cross-owner batch, proposal, attachment download and object-key traversal attempts fail; bucket/key never appear in normal client payloads.
 5. Fake S3 tests prove put/delete/presign behavior and configuration/key construction; live S3/OCR and browser attachment UAT remain owner-facing acceptance.
 
-Proof run: migrations 000011–000012 applied to local dev PostgreSQL (version 12, clean); `TEST_DATABASE_URL=... go test ./... -count=1` passed, including real owner-scoped approval/link/download-query and cleanup-claim tests. The 2026-09-22 live synthetic-image evaluation is blocked by [BUG-001](../bugs/BUG-001-s3-presigned-get-signature.md): S3 PUT succeeds but signed GET returns `SignatureDoesNotMatch`, before OCR/LLM. The user's previous PDF was not retried.
+Proof run: the Stage v1 baseline applied cleanly to a fresh disposable PostgreSQL database; `TEST_DATABASE_URL=... go test ./... -count=1` passed, including real owner-scoped approval/link/download-query and cleanup-claim tests. The 2026-09-22 live synthetic-image evaluation is blocked by [BUG-001](../bugs/BUG-001-s3-presigned-get-signature.md): S3 PUT succeeds but signed GET returns `SignatureDoesNotMatch`, before OCR/LLM. The user's previous PDF was not retried.
 
 ## Live evaluation attempt — 2026-09-22
 

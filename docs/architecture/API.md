@@ -30,7 +30,7 @@ Goal transaction categories, when explicitly selected, must use real catalog key
 
 2026-09-21 ownership correction: system category wallet applicability is read/replaced within the authenticated owner's wallets. Changing a shared category's selection preserves other owners' assignments. AI catalog and confirmation use the same scope.
 
-## Account timezone and calendar dates — migrations 000013–000015
+## Account timezone and calendar dates — Stage v1 baseline
 
 `GET/PATCH /api/v1/auth/profile` reads or updates the authenticated account's IANA `timezone`; invalid zone names return 400. The new-account browser-zone initialization is conditional and does not silently change an existing confirmed setting. Timestamp fields such as `transactions.occurred_at` remain RFC3339 instants; date labels are `YYYY-MM-DD` and month keys are `YYYY-MM`. Month/report intervals are derived from the account timezone as half-open UTC instants.
 
