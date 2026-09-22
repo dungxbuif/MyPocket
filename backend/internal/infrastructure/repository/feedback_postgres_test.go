@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ func TestFeedbackPostgresOwnerScopeAndChangelogAtomicity(t *testing.T) {
 		t.Fatal(err)
 	}
 	owner, other := uuid.NewString(), uuid.NewString()
+	version := fmt.Sprintf("1.4.2-test-%s", owner[:8])
 	for _, id := range []string{owner, other} {
 		if err := db.Create(&entity.User{ID: id, Email: id + "@feedback.test", GoogleSubject: id}).Error; err != nil {
 			t.Fatal(err)
@@ -29,6 +31,7 @@ func TestFeedbackPostgresOwnerScopeAndChangelogAtomicity(t *testing.T) {
 	}
 	t.Cleanup(func() {
 		db.Where("user_id IN ?", []string{owner, other}).Delete(&entity.Feedback{})
+		db.Where("version = ?", version).Delete(&entity.Changelog{})
 		db.Where("id IN ?", []string{owner, other}).Delete(&entity.User{})
 	})
 
@@ -50,7 +53,7 @@ func TestFeedbackPostgresOwnerScopeAndChangelogAtomicity(t *testing.T) {
 		t.Fatal("cross-owner feedback read must fail")
 	}
 
-	changelog := &entity.Changelog{ID: uuid.NewString(), Version: "1.4.2-test", Title: "Feedback fix", Description: "Fixed the issue", PublishedAt: time.Now().UTC()}
+	changelog := &entity.Changelog{ID: uuid.NewString(), Version: version, Title: "Feedback fix", Description: "Fixed the issue", PublishedAt: time.Now().UTC()}
 	if err := changelogRepo.Publish(context.Background(), changelog, []string{first.ID}); err != nil {
 		t.Fatal(err)
 	}
@@ -58,7 +61,7 @@ func TestFeedbackPostgresOwnerScopeAndChangelogAtomicity(t *testing.T) {
 	if err != nil || fixed.Status != entity.FeedbackStatusFixed || fixed.ChangelogID == nil || *fixed.ChangelogID != changelog.ID || fixed.FixedAt == nil {
 		t.Fatalf("feedback was not finalized: %+v err=%v", fixed, err)
 	}
-	if err := changelogRepo.Publish(context.Background(), &entity.Changelog{ID: uuid.NewString(), Version: "1.4.2-test", Title: "Duplicate", Description: "Duplicate", PublishedAt: time.Now().UTC()}, []string{second.ID}); err == nil {
+	if err := changelogRepo.Publish(context.Background(), &entity.Changelog{ID: uuid.NewString(), Version: version, Title: "Duplicate", Description: "Duplicate", PublishedAt: time.Now().UTC()}, []string{second.ID}); err == nil {
 		t.Fatal("duplicate changelog version must fail")
 	}
 }
