@@ -441,6 +441,65 @@ func TestOCRSubmissionNeverRetriedOrRedirected(t *testing.T) {
 	}
 }
 
+func TestOCRSubmissionFailureCarriesSafeProviderStage(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "private OCR provider details", http.StatusBadRequest)
+	})
+	_, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}})
+	var providerErr *AIProviderError
+	if !errors.As(err, &providerErr) || providerErr.Stage != "ocr_submit" || providerErr.HTTPStatus != http.StatusBadRequest {
+		t.Fatalf("expected safe OCR submission stage, got %T %+v", err, err)
+	}
+	if strings.Contains(err.Error(), "private OCR provider details") || strings.Contains(err.Error(), "test-ocr-key") {
+		t.Fatalf("provider details leaked: %v", err)
+	}
+}
+
+func TestOCRPollingFailureCarriesSafeProviderStage(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = io.WriteString(w, `{"documentId":"doc_failed"}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"status":"failed"}`)
+	})
+	_, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}})
+	var providerErr *AIProviderError
+	if !errors.As(err, &providerErr) || providerErr.Stage != "ocr_poll" || providerErr.Code != "ocr_failed" {
+		t.Fatalf("expected safe OCR polling stage, got %T %+v", err, err)
+	}
+}
+
+func TestModelFailureCarriesSafeProviderStage(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/chat/completions" {
+			http.Error(w, "private model provider details", http.StatusBadGateway)
+			return
+		}
+		t.Error("unexpected OCR request")
+	})
+	_, err := c.Extract(context.Background(), Input{Text: "test"})
+	var providerErr *AIProviderError
+	if !errors.As(err, &providerErr) || providerErr.Stage != "model" || providerErr.HTTPStatus != http.StatusBadGateway {
+		t.Fatalf("expected safe model stage, got %T %+v", err, err)
+	}
+	if strings.Contains(err.Error(), "private model provider details") {
+		t.Fatalf("provider details leaked: %v", err)
+	}
+}
+
+func TestSchemaMismatchCarriesSafeProviderStage(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":null,"drafts":[]}`)
+	})
+	_, err := c.Extract(context.Background(), Input{Text: "test"})
+	var providerErr *AIProviderError
+	if !errors.As(err, &providerErr) || providerErr.Stage != "schema" || providerErr.Code != "schema_mismatch" {
+		t.Fatalf("expected safe schema stage, got %T %+v", err, err)
+	}
+}
+
 func TestModelFailurePreservesOCRSource(t *testing.T) {
 	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {

@@ -43,6 +43,78 @@ const (
 
 var ErrNotConfigured = errors.New("AI provider is not configured")
 
+// AIProviderError carries only a safe stage/code and optional HTTP status. Its
+// message never includes upstream response bodies, URLs, credentials, or OCR
+// text; callers may still inspect the underlying error with errors.Is/As.
+type AIProviderError struct {
+	Stage      string
+	Code       string
+	HTTPStatus int
+	Err        error
+}
+
+func (e *AIProviderError) Error() string {
+	if e == nil {
+		return "AI provider request failed"
+	}
+	switch e.Stage {
+	case "ocr_submit":
+		return "OCR provider submission failed"
+	case "ocr_poll":
+		return "OCR provider processing failed"
+	case "model":
+		return "AI provider request failed"
+	case "schema":
+		return errSchema.Error()
+	default:
+		return "AI provider request failed"
+	}
+}
+
+func (e *AIProviderError) Unwrap() error { return e.Err }
+
+// Diagnostic is intentionally small so the usecase can audit the failure
+// without importing this infrastructure package.
+func (e *AIProviderError) Diagnostic() (string, string, int) {
+	if e == nil {
+		return "provider", "provider_error", 0
+	}
+	return e.Stage, e.Code, e.HTTPStatus
+}
+
+type providerRequestError struct {
+	Provider string
+	Status   int
+	Err      error
+}
+
+func (e *providerRequestError) Error() string {
+	if e == nil {
+		return "provider request failed"
+	}
+	if e.Status > 0 {
+		return fmt.Sprintf("%s provider returned HTTP %d", e.Provider, e.Status)
+	}
+	if e.Err != nil {
+		return fmt.Sprintf("%s provider request failed", e.Provider)
+	}
+	return "provider request failed"
+}
+
+func (e *providerRequestError) Unwrap() error { return e.Err }
+
+func wrapProviderError(stage, code string, err error) error {
+	if err == nil {
+		return nil
+	}
+	var requestErr *providerRequestError
+	status := 0
+	if errors.As(err, &requestErr) {
+		status = requestErr.Status
+	}
+	return &AIProviderError{Stage: stage, Code: code, HTTPStatus: status, Err: err}
+}
+
 //go:embed extract.v1.txt
 var extractionPrompt string
 
@@ -129,7 +201,7 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	modelStarted := time.Now()
 	body, _, err := c.request(modelCtx, http.MethodPost, c.config.BaseURL+"/chat/completions", c.config.APIKey, request, "AI")
 	if err != nil {
-		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, err
+		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, wrapProviderError("model", "model_request", err)
 	}
 	var response struct {
 		Choices []struct {
@@ -172,6 +244,13 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	out.SourceText = source
 	out.AttachmentTexts = attachmentTexts
 	out.OCRComplete = ocrComplete
+	if err != nil {
+		var mismatch *SchemaMismatchError
+		if errors.As(err, &mismatch) {
+			return out, wrapProviderError("schema", "schema_mismatch", err)
+		}
+		return out, wrapProviderError("schema", "response_invalid", err)
+	}
 	return out, err
 }
 
@@ -289,17 +368,17 @@ func (c *Client) request(ctx context.Context, method, endpoint, key string, payl
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, fmt.Errorf("%s provider returned HTTP %d", provider, resp.StatusCode)
+		return nil, nil, &providerRequestError{Provider: provider, Status: resp.StatusCode}
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
 		if ctx.Err() != nil {
 			return nil, nil, ctx.Err()
 		}
-		return nil, nil, fmt.Errorf("%s response could not be read", provider)
+		return nil, nil, &providerRequestError{Provider: provider, Err: err}
 	}
 	if len(body) > maxResponseBytes {
-		return nil, nil, fmt.Errorf("%s response exceeds limit", provider)
+		return nil, nil, &providerRequestError{Provider: provider, Err: errors.New("response exceeds limit")}
 	}
 	return body, resp.Header, nil
 }

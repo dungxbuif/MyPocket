@@ -79,6 +79,7 @@ type AIEntrySession struct {
 	ProcessingUntil *time.Time        `json:"-"`
 	Processing      bool              `json:"processing" gorm:"-"`
 	Error           string            `json:"error,omitempty"`
+	ErrorCode       string            `json:"error_code,omitempty"`
 	Messages        []AIEntryMessage  `json:"messages" gorm:"-"`
 	Proposals       []AIEntryProposal `json:"proposals" gorm:"-"`
 	CreatedAt       time.Time         `json:"created_at"`

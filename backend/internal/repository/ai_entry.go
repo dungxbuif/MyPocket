@@ -23,7 +23,7 @@ type AIEntryRepository interface {
 	LatestSession(context.Context, string) (*entity.AIEntrySession, error)
 	BeginMessage(ctx context.Context, owner, id, requestID, hash, text string) (token string, started bool, err error)
 	FinishMessage(ctx context.Context, owner, id, token string, output entity.AIExtractOutput) error
-	FailMessage(ctx context.Context, owner, id, token, message, sourceText string) error
+	FailMessage(ctx context.Context, owner, id, token, message, errorCode, sourceText string) error
 	EditProposal(ctx context.Context, owner, id string, version int, draft entity.AIEntryDraft) (*entity.AIEntryProposal, error)
 	DecideProposal(ctx context.Context, owner, id string, version int, approve bool) (*entity.AIEntryProposal, error)
 }

@@ -3,12 +3,24 @@ package usecase
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"github.com/mypocket/backend/internal/entity"
 	port "github.com/mypocket/backend/internal/repository"
+	"strings"
 	"testing"
 	"time"
 )
+
+func TestAIEntrySessionSerializesSafeErrorCode(t *testing.T) {
+	data, err := json.Marshal(entity.AIEntrySession{ID: "session", Error: "OCR không đọc được chứng từ.", ErrorCode: "ocr_failed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(data) == "" || !strings.Contains(string(data), `"error_code":"ocr_failed"`) {
+		t.Fatalf("error code missing from session JSON: %s", data)
+	}
+}
 
 type entryRepoStub struct {
 	port.AIEntryRepository
@@ -64,7 +76,7 @@ func TestAIEntryKeepsOCRSourceWhenModelFails(t *testing.T) {
 		t.Fatalf("OCR evidence lost on model failure: %q %v", r.failureSource, err)
 	}
 }
-func (r *entryRepoStub) FailMessage(_ context.Context, _, _, _, _, sourceText string) error {
+func (r *entryRepoStub) FailMessage(_ context.Context, _, _, _, _, _, sourceText string) error {
 	r.failed = true
 	r.failureSource = sourceText
 	return nil

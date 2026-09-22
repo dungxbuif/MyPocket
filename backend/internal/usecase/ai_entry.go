@@ -11,6 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/mypocket/backend/internal/entity"
 	port "github.com/mypocket/backend/internal/repository"
+	"log/slog"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -87,14 +88,14 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		}
 		prepared, attachments, err := s.storeForOCR(ctx, owner, id, in.Images)
 		if err != nil {
-			s.failWith(owner, id, token, ErrAIStorage.Error(), "")
+			s.failWith(owner, id, token, ErrAIStorage.Error(), "storage_error", "")
 			return nil, ErrAIStorage
 		}
 		if err := s.Entries.CreateAttachments(ctx, attachments); err != nil {
 			for _, attachment := range attachments {
 				_ = s.Storage.Delete(context.WithoutCancel(ctx), attachment.ObjectKey)
 			}
-			s.failWith(owner, id, token, ErrAIStorage.Error(), "")
+			s.failWith(owner, id, token, ErrAIStorage.Error(), "storage_error", "")
 			return nil, ErrAIStorage
 		}
 		in.Images = prepared
@@ -109,7 +110,7 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		}
 	}
 	if err != nil {
-		s.fail(owner, id, token, boundedAIContext(out.SourceText, 64000))
+		s.failWithDiagnostic(owner, id, token, err, boundedAIContext(out.SourceText, 64000))
 		return nil, ErrAIProvider
 	}
 	if len(out.Drafts) > 30 || len(out.Reply) > 16000 || len(out.SourceText) > 200000 {
@@ -279,10 +280,24 @@ func boundedAIContext(text string, limit int) string {
 	return text + "\n[excerpt; earlier content omitted]"
 }
 func (s *AIEntryService) fail(owner, id, token, sourceText string) {
-	s.failWith(owner, id, token, ErrAIProvider.Error(), sourceText)
+	s.failWith(owner, id, token, ErrAIProvider.Error(), "provider_error", sourceText)
 }
-func (s *AIEntryService) failWith(owner, id, token, message, sourceText string) {
+func (s *AIEntryService) failWith(owner, id, token, message, errorCode, sourceText string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = s.Entries.FailMessage(ctx, owner, id, token, message, sourceText)
+	_ = s.Entries.FailMessage(ctx, owner, id, token, message, errorCode, sourceText)
+}
+
+type providerDiagnostic interface {
+	Diagnostic() (stage, code string, status int)
+}
+
+func (s *AIEntryService) failWithDiagnostic(owner, id, token string, providerErr error, sourceText string) {
+	stage, code, status := "provider", "provider_error", 0
+	var diagnostic providerDiagnostic
+	if errors.As(providerErr, &diagnostic) {
+		stage, code, status = diagnostic.Diagnostic()
+	}
+	slog.Warn("AI provider processing failed", "process_id", id, "request_id", id, "stage", stage, "code", code, "provider_status", status)
+	s.failWith(owner, id, token, ErrAIProvider.Error(), code, sourceText)
 }

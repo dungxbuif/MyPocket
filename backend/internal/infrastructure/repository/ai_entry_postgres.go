@@ -169,7 +169,7 @@ func (r *AIEntryPostgresRepository) BeginMessage(ctx context.Context, owner, id,
 			return e
 		}
 		_ = text // request content is not retained as conversation history.
-		if e = tx.Model(&s).Updates(map[string]any{"request_token": token, "processing_until": until, "error": ""}).Error; e != nil {
+		if e = tx.Model(&s).Updates(map[string]any{"request_token": token, "processing_until": until, "error": "", "error_code": ""}).Error; e != nil {
 			return e
 		}
 		started = true
@@ -198,10 +198,10 @@ func (r *AIEntryPostgresRepository) FinishMessage(ctx context.Context, owner, id
 				return err
 			}
 		}
-		return tx.Model(&s).Updates(map[string]any{"request_token": "", "processing_until": nil, "error": ""}).Error
+		return tx.Model(&s).Updates(map[string]any{"request_token": "", "processing_until": nil, "error": "", "error_code": ""}).Error
 	})
 }
-func (r *AIEntryPostgresRepository) FailMessage(ctx context.Context, owner, id, token, message, sourceText string) error {
+func (r *AIEntryPostgresRepository) FailMessage(ctx context.Context, owner, id, token, message, errorCode, sourceText string) error {
 	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var s entity.AIEntrySession
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ? AND request_token = ?", id, owner, token).First(&s).Error; err != nil {
@@ -211,7 +211,10 @@ func (r *AIEntryPostgresRepository) FailMessage(ctx context.Context, owner, id, 
 			return port.ErrAIInvalid
 		}
 		_ = sourceText // OCR evidence is not stored in a conversation message.
-		return tx.Model(&s).Updates(map[string]any{"request_token": "", "processing_until": nil, "error": message}).Error
+		if strings.TrimSpace(errorCode) == "" {
+			errorCode = "provider_error"
+		}
+		return tx.Model(&s).Updates(map[string]any{"request_token": "", "processing_until": nil, "error": message, "error_code": errorCode}).Error
 	})
 }
 func (r *AIEntryPostgresRepository) EditProposal(ctx context.Context, owner, id string, version int, draft entity.AIEntryDraft) (*entity.AIEntryProposal, error) {

@@ -72,18 +72,18 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 		body, _, err = c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, map[string]any{"input": map[string]string{"base64": img.Base64}}, "OCR")
 	}
 	if err != nil {
-		return "", err
+		return "", wrapProviderError("ocr_submit", "ocr_submit_request", err)
 	}
 	var submitted struct {
 		DocumentID string `json:"documentId"`
 	}
 	if json.Unmarshal(body, &submitted) != nil || !validDocumentID(submitted.DocumentID) {
-		return "", errors.New("invalid OCR submission response")
+		return "", wrapProviderError("ocr_submit", "ocr_submission_invalid", errors.New("invalid OCR submission response"))
 	}
 	for attempt := 0; attempt < maxOCRPolls; attempt++ {
 		body, headers, err := c.request(ctx, http.MethodGet, c.config.OCRURL+"/v1/documents/"+submitted.DocumentID, c.config.OCRKey, nil, "OCR")
 		if err != nil {
-			return "", err
+			return "", wrapProviderError("ocr_poll", "ocr_poll_request", err)
 		}
 		var document struct {
 			Status          string `json:"status"`
@@ -93,7 +93,7 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 			} `json:"result"`
 		}
 		if json.Unmarshal(body, &document) != nil {
-			return "", errors.New("invalid OCR document response")
+			return "", wrapProviderError("ocr_poll", "ocr_response_invalid", errors.New("invalid OCR document response"))
 		}
 		switch document.Status {
 		case "completed":
@@ -108,11 +108,11 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 			}
 			return document.Result.Text, nil
 		case "failed":
-			return "", errors.New("OCR recognition failed")
+			return "", wrapProviderError("ocr_poll", "ocr_failed", errors.New("OCR recognition failed"))
 		case "cancelled", "canceled":
-			return "", errors.New("OCR recognition was cancelled")
+			return "", wrapProviderError("ocr_poll", "ocr_cancelled", errors.New("OCR recognition was cancelled"))
 		case "expired":
-			return "", errors.New("OCR result expired")
+			return "", wrapProviderError("ocr_poll", "ocr_expired", errors.New("OCR result expired"))
 		case "queued", "processing":
 			if attempt == maxOCRPolls-1 {
 				break
@@ -121,10 +121,10 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 				return "", err
 			}
 		default:
-			return "", errors.New("OCR returned an unsupported document status")
+			return "", wrapProviderError("ocr_poll", "ocr_status_unsupported", errors.New("OCR returned an unsupported document status"))
 		}
 	}
-	return "", errors.New("OCR polling limit exceeded")
+	return "", wrapProviderError("ocr_poll", "ocr_poll_limit", errors.New("OCR polling limit exceeded"))
 }
 
 func validOCRSourceURL(raw string) bool {
