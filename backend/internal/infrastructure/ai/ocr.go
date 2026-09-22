@@ -28,7 +28,7 @@ const (
 
 func validateImages(images []Image) error {
 	if len(images) > maxImages {
-		return errors.New("at most 3 receipt images are allowed")
+		return errors.New("at most 20 receipt files are allowed")
 	}
 	for _, img := range images {
 		if (img.MIMEType != "image/jpeg" && img.MIMEType != "image/png" && img.MIMEType != "application/pdf") || len(img.Name) > 255 {

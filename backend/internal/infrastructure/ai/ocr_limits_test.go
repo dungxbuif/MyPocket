@@ -2,6 +2,7 @@ package ai
 
 import (
 	"net/url"
+	"strings"
 	"testing"
 )
 
@@ -22,5 +23,7 @@ func TestValidateImagesRejectsTheTwentyFirstReceiptFile(t *testing.T) {
 	}
 	if err := validateImages(images); err == nil {
 		t.Fatal("the twenty-first receipt file must be rejected")
+	} else if !strings.Contains(err.Error(), "20 receipt files") {
+		t.Fatalf("limit error should explain the active limit: %v", err)
 	}
 }
