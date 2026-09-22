@@ -13,6 +13,7 @@ type AIEntryDraft struct {
 	Amount            int64   `json:"amount"`
 	WalletID          string  `json:"wallet_id"`
 	CategoryID        *string `json:"category_id"`
+	JarID             *string `json:"jar_id,omitempty"`
 	OccurredAt        string  `json:"occurred_at"`
 	Note              string  `json:"note"`
 	IncludedInReports bool    `json:"included_in_reports"`
@@ -23,23 +24,52 @@ type AIExtractDraft struct {
 	Questions []string `json:"questions"`
 }
 type AIImage struct {
-	Name     string `json:"name"`
-	MIMEType string `json:"mime_type"`
-	Base64   string `json:"base64"`
+	Name         string `json:"name"`
+	MIMEType     string `json:"mime_type"`
+	Base64       string `json:"base64"`
+	SourceURL    string `json:"-"`
+	AttachmentID string `json:"-"`
 }
-type AIHistoryMessage struct{ Role, Content string }
+
+type AIEntryAttachment struct {
+	ID          string    `json:"id" gorm:"primaryKey"`
+	OwnerID     string    `json:"-"`
+	ProcessID   string    `json:"-" gorm:"column:session_id"`
+	ObjectKey   string    `json:"-"`
+	Filename    string    `json:"filename"`
+	MIMEType    string    `json:"mime_type"`
+	SizeBytes   int64     `json:"size_bytes"`
+	SHA256      string    `json:"-"`
+	OCRStatus   string    `json:"-"`
+	OCRText     string    `json:"-"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"-"`
+	DeleteAfter time.Time `json:"-"`
+}
+
+func (AIEntryAttachment) TableName() string { return "transaction_attachments" }
+
+type AIEntryAttachmentLink struct {
+	TransactionID string `gorm:"primaryKey"`
+	AttachmentID  string `gorm:"primaryKey"`
+	CreatedAt     time.Time
+}
+
+func (AIEntryAttachmentLink) TableName() string { return "transaction_attachment_links" }
+
 type AIExtractInput struct {
 	Text, Timezone string
 	Now            time.Time
 	Wallets        []Wallet
 	Categories     []Category
-	History        []AIHistoryMessage
 	Images         []AIImage
 }
 type AIExtractOutput struct {
-	Reply      string
-	Drafts     []AIExtractDraft
-	SourceText string
+	Reply           string
+	Drafts          []AIExtractDraft
+	SourceText      string
+	AttachmentTexts []string
+	OCRComplete     bool
 }
 
 type AIEntrySession struct {
@@ -64,13 +94,14 @@ type AIEntryMessage struct {
 }
 type AIEntryProposal struct {
 	ID            string       `json:"id" gorm:"primaryKey"`
-	SessionID     string       `json:"session_id"`
+	SessionID     string       `json:"process_id"`
 	OwnerID       string       `json:"-"`
 	Version       int          `json:"version"`
 	Status        string       `json:"status"`
 	Draft         AIEntryDraft `json:"draft" gorm:"serializer:json;type:jsonb"`
 	Questions     []string     `json:"questions" gorm:"serializer:json;type:jsonb"`
 	TransactionID *string      `json:"transaction_id,omitempty"`
+	AttachmentIDs []string     `json:"attachment_ids,omitempty" gorm:"-"`
 	CreatedAt     time.Time    `json:"created_at"`
 	UpdatedAt     time.Time    `json:"updated_at"`
 }

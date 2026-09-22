@@ -14,9 +14,11 @@ Owner requested long-press Add → AI chat → prefilled transaction list, editi
 
 ## Decision
 
-Persist sessions, messages, proposals and request identities in PostgreSQL (migration 000010). Draft extraction has no write tools. Owner-scoped approval locks the proposal, revalidates wallet/category/date/amount, writes one ordinary income/expense row and updates proposal status in the same transaction. A proposal's transaction ID remains a receipt after ledger deletion, preventing replay from recreating deleted data. Editing uses expected version; approved/rejected proposals are terminal.
+2026-09-22 follow-up: the owner replaced conversation/session behavior with a one-shot process. The legacy `ai_entry_sessions`/`ai_entry_messages` schema remains for process compatibility, but no messages are written or exposed; see [ADR-006](ADR-006-private-ai-attachments.md) and the [stateless contract](../superpowers/specs/2026-09-21-stateless-ai-entry-design.md).
 
-Manual Add remains normal click. Long press opens the separate entry chat; financial Q&A is not a mode in this entry UI. Image input goes through OCR then a text-only model adapter. This bounded first slice uses synchronous requests and a two-minute processing lease; no automatic provider POST retries. Images are transient, while extracted text is persisted with the session. Durable receipt storage/retention and queued workers remain future scope. S3 env is configurable but not used for uploads in this slice.
+Persist an owner-scoped process/idempotency record, proposals and request identities in PostgreSQL (migration 000010); conversation messages were part of the initial implementation but are now unused. Draft extraction has no write tools. Owner-scoped approval locks the proposal, revalidates wallet/category/date/amount, writes one ordinary income/expense row and updates proposal status in the same transaction. A proposal's transaction ID remains a receipt after ledger deletion, preventing replay from recreating deleted data. Editing uses expected version; approved/rejected proposals are terminal.
+
+Manual Add remains normal click. Long press opens a one-shot AI entry sheet; financial Q&A is not a mode in this entry UI. Image/PDF input goes through backend OCR then a text-only model adapter. This bounded slice uses synchronous requests and a two-minute processing lease; no automatic provider POST retries. Approved attachment retention is defined by [ADR-006](ADR-006-private-ai-attachments.md).
 
 ## Alternatives and consequences
 

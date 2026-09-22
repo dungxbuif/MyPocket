@@ -22,11 +22,11 @@ func TestBudgetInputValidation(t *testing.T) {
 		body string
 		want int
 	}{
-		{`{"name":"Food","limit_amount":1000,"start_at":"2026-09-01T00:00:00Z","end_at":"2026-10-01T00:00:00Z"}`, 201},
-		{`{"name":"Food","limit_amount":0,"start_at":"2026-09-01T00:00:00Z","end_at":"2026-10-01T00:00:00Z"}`, 400},
-		{`{"name":"Food","limit_amount":1000,"wallet_id":"foreign","start_at":"2026-09-01T00:00:00Z","end_at":"2026-10-01T00:00:00Z"}`, 400},
-		{`{"name":"Food","limit_amount":1000,"category_id":"income","start_at":"2026-09-01T00:00:00Z","end_at":"2026-10-01T00:00:00Z"}`, 400},
-		{`{"name":"Food","limit_amount":1000,"start_at":"2026-10-01T00:00:00Z","end_at":"2026-09-01T00:00:00Z"}`, 400},
+		{`{"name":"Food","limit_amount":1000,"start_date":"2026-09-01","end_date":"2026-09-30"}`, 201},
+		{`{"name":"Food","limit_amount":0,"start_date":"2026-09-01","end_date":"2026-09-30"}`, 400},
+		{`{"name":"Food","limit_amount":1000,"wallet_id":"foreign","start_date":"2026-09-01","end_date":"2026-09-30"}`, 400},
+		{`{"name":"Food","limit_amount":1000,"category_id":"income","start_date":"2026-09-01","end_date":"2026-09-30"}`, 400},
+		{`{"name":"Food","limit_amount":1000,"start_date":"2026-10-01","end_date":"2026-09-30"}`, 400},
 	} {
 		repo := &budgetRepoStub{}
 		h := &BudgetHandler{Budgets: repo, Wallets: &transactionWalletRepositoryStub{}, Categories: &transactionCategoryRepositoryStub{}, Transactions: &transactionRepositoryStub{}}

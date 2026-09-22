@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Thêm ngân sách</title>
+<!-- Tailwind CSS CDN with plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<script data-purpose="tailwind-config">
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+          },
+          colors: {
+            appBg: '#f2f3f7',
+            sheetBg: '#f3f4f8',
+            cardBg: '#ffffff',
+            primaryText: '#1c1c1e',
+            subText: '#8e8e93',
+            separator: '#f0f0f2',
+            btnDisabled: '#c7c7cc',
+          }
+        }
+      }
+    };
+  </script>
+<style data-purpose="custom-layout">
+    body {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    /* iOS Custom Toggle Switch */
+    .ios-switch {
+      position: relative;
+      display: inline-block;
+      width: 51px;
+      height: 31px;
+    }
+    .ios-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #e3e3e8;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 27px;
+      width: 27px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.18);
+    }
+    input:checked + .slider {
+      background-color: #34c759;
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+  </style>
+</head>
+<body class="bg-black flex justify-center min-h-screen text-primaryText antialiased selection:bg-none">
+<!-- BEGIN: PhoneFrameContainer -->
+<!-- Container simulating an iOS Device screen -->
+<div class="w-full max-w-[428px] min-h-screen bg-black flex flex-col justify-end relative shadow-2xl overflow-hidden" data-purpose="mobile-viewport">
+<!-- Top simulated background to give the feel of stacked modal sheet -->
+<div class="h-10 w-full flex justify-between items-center px-8 text-white/90 text-[15px] font-semibold tracking-tight select-none pt-2" data-purpose="status-bar-bg">
+<span>22:46</span>
+<div class="flex items-center space-x-1.5 text-white">
+<!-- Cellular Signal Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 17 12">
+<rect height="4" rx="0.5" width="2.8" x="0" y="8"></rect>
+<rect height="6.5" rx="0.5" width="2.8" x="4.5" y="5.5"></rect>
+<rect height="9" rx="0.5" width="2.8" x="9" y="3"></rect>
+<rect height="12" rx="0.5" width="2.8" x="13.5" y="0"></rect>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 24 24">
+<path d="M12 4C7.31 4 3.07 5.9 0 8.98L12 21 24 8.98A16.88 16.88 0 0012 4zm0 2.9c3.97 0 7.57 1.62 10.18 4.25L12 19.35 1.82 11.15C4.43 8.52 8.03 6.9 12 6.9z"></path>
+</svg>
+<!-- Battery Icon -->
+<div class="flex items-center">
+<div class="w-6 h-3 rounded-md border border-white/80 p-0.5 flex items-center">
+<div class="bg-white h-full w-[48%] rounded-[2px]"></div>
+</div>
+<div class="w-0.5 h-1.5 bg-white/80 rounded-r-sm"></div>
+</div>
+</div>
+</div>
+<!-- BEGIN: ModalSheet -->
+<!-- The Bottom Sheet styled rounded surface matching IMG_7712.PNG -->
+<div class="w-full flex-1 bg-[#f3f4f8] rounded-t-[36px] flex flex-col justify-between px-5 pt-4 pb-8 shadow-2xl relative mt-2" data-purpose="modal-sheet">
+<!-- Top Section: Header & Form Cards -->
+<div class="w-full flex flex-col">
+<!-- BEGIN: ModalHeader -->
+<!-- Header with rounded pill 'Huỷ' button, title, and spacing -->
+<header class="w-full flex items-center justify-between pt-1 pb-4" data-purpose="sheet-header">
+<!-- Cancel Button -->
+<button class="px-5 py-2.5 bg-white rounded-full text-base font-medium text-primaryText shadow-sm active:scale-95 transition-transform" data-purpose="cancel-button" type="button">
+            Huỷ
+          </button>
+<!-- Modal Title -->
+<h1 class="text-[17px] font-bold text-primaryText text-center tracking-tight" data-purpose="modal-title">
+            Thêm ngân sách
+          </h1>
+<!-- Balanced spacing placeholder (invisible or reserved for save) -->
+<div class="w-16"></div>
+</header>
+<!-- END: ModalHeader -->
+<!-- BEGIN: MainBudgetCard -->
+<!-- Primary Form Card holding Category, Amount, Duration, and Wallet -->
+<section class="w-full bg-cardBg rounded-[28px] shadow-[0_2px_8px_rgba(0,0,0,0.03)] mt-3 overflow-hidden" data-purpose="main-budget-card">
+<!-- Row 1: Chọn nhóm (Category Selector) -->
+<div class="flex items-center px-5 py-4 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors" data-purpose="category-row">
+<div aria-label="Icon đại diện nhóm" class="w-10 h-10 rounded-full bg-[#d2d4dc] flex-shrink-0"></div>
+<div class="ml-4 flex-1 flex items-center justify-between">
+<span class="text-[17px] text-[#9a9aa0] font-normal">Chọn nhóm</span>
+<!-- Chevron Right -->
+<svg class="w-4 h-4 text-[#c7c7cc]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+<!-- Divider -->
+<div class="ml-16 h-[1px] bg-[#f0f0f4]"></div>
+<!-- Row 2: Số tiền (Amount Input) -->
+<div class="flex items-center px-5 py-3.5" data-purpose="amount-row">
+<!-- Currency Badge Tag -->
+<div class="w-12 h-8 rounded-lg border border-[#e5e5ea] flex items-center justify-center text-[12px] font-semibold text-[#8e8e93] bg-[#fbfbfd]">
+              VND
+            </div>
+<!-- Input area with label -->
+<div class="ml-4 flex-1 flex flex-col justify-center">
+<span class="text-[12px] text-[#8e8e93] font-medium leading-none mb-1">Số tiền</span>
+<div class="text-[26px] font-bold text-primaryText leading-none">0</div>
+</div>
+</div>
+<!-- Divider -->
+<div class="ml-16 h-[1px] bg-[#f0f0f4]"></div>
+<!-- Row 3: Thời gian (Date Range Selector) -->
+<div class="flex items-center px-5 py-4 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors" data-purpose="duration-row">
+<!-- Calendar Icon -->
+<div class="w-9 h-9 flex items-center justify-center text-primaryText flex-shrink-0">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<rect height="18" rx="3" ry="3" width="18" x="3" y="4"></rect>
+<line x1="16" x2="16" y1="2" y2="6"></line>
+<line x1="8" x2="8" y1="2" y2="6"></line>
+<line x1="3" x2="21" y1="10" y2="10"></line>
+<!-- Dots inside calendar -->
+<circle cx="8" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="12" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="16" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="8" cy="18" fill="currentColor" r="1"></circle>
+<circle cx="12" cy="18" fill="currentColor" r="1"></circle>
+</svg>
+</div>
+<div class="ml-4 flex-1 flex items-center justify-between">
+<span class="text-[16px] text-primaryText font-medium">Tháng này (05/08 - 04/09)</span>
+<!-- Chevron Right -->
+<svg class="w-4 h-4 text-[#c7c7cc]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+<!-- Divider -->
+<div class="ml-16 h-[1px] bg-[#f0f0f4]"></div>
+<!-- Row 4: Ví / Nguồn tiền (Wallet Selector) -->
+<div class="flex items-center px-5 py-4 cursor-pointer hover:bg-gray-50 active:bg-gray-100 transition-colors" data-purpose="wallet-row">
+<!-- Globe Color Icon -->
+<div class="w-9 h-9 flex items-center justify-center flex-shrink-0">
+<svg class="w-6 h-6" fill="none" stroke="#2c9a8e" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<circle cx="12" cy="12" fill="#e1f5fe" r="10"></circle>
+<line stroke="#f4a261" x1="2" x2="22" y1="12" y2="12"></line>
+<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" stroke="#457b9d"></path>
+</svg>
+</div>
+<div class="ml-4 flex-1 flex items-center justify-between">
+<span class="text-[16px] text-primaryText font-medium">Tổng cộng</span>
+<!-- Chevron Right -->
+<svg class="w-4 h-4 text-[#c7c7cc]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+</div>
+</section>
+<!-- END: MainBudgetCard -->
+<!-- BEGIN: RepeatSettingCard -->
+<!-- Toggle section for repeating budget setting -->
+<section class="w-full bg-cardBg rounded-[24px] shadow-[0_2px_8px_rgba(0,0,0,0.03)] mt-5 p-5 flex items-center justify-between" data-purpose="repeat-setting-card">
+<div class="flex-1 pr-4">
+<h2 class="text-[16px] font-semibold text-primaryText leading-snug">Lặp lại ngân sách này</h2>
+<p class="text-[13px] text-[#8e8e93] mt-1 leading-normal">Ngân sách được tự động lặp lại ở kỳ hạn tiếp theo.</p>
+</div>
+<!-- Toggle Component -->
+<div class="flex-shrink-0 flex items-center">
+<label class="ios-switch">
+<input aria-label="Bật hoặc tắt lặp lại ngân sách" type="checkbox"/>
+<span class="slider"></span>
+</label>
+</div>
+</section>
+<!-- END: RepeatSettingCard -->
+</div>
+<!-- BEGIN: BottomActionButton -->
+<!-- Bottom persistent primary CTA button (Disabled State: #c7c7cc) -->
+<footer class="w-full pt-6 pb-2" data-purpose="footer-action">
+<button class="w-full h-14 bg-[#c7c7cc] text-white text-[17px] font-semibold rounded-full flex items-center justify-center cursor-not-allowed shadow-sm transition-opacity" data-purpose="submit-button" disabled="" type="button">
+          Lưu
+        </button>
+<!-- Home Indicator Bar -->
+<div class="w-36 h-1 bg-black/30 rounded-full mx-auto mt-6" data-purpose="home-indicator"></div>
+</footer>
+<!-- END: BottomActionButton -->
+</div>
+<!-- END: ModalSheet -->
+</div>
+<!-- END: PhoneFrameContainer -->
+</body></html>

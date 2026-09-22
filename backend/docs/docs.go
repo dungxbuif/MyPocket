@@ -39,6 +39,73 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/ai/entry/process": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Entry"
+                ],
+                "summary": "Process one text and optional file submission into reviewable transaction proposals",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Idempotency UUID",
+                        "name": "request_id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Transaction description",
+                        "name": "text",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "IANA timezone",
+                        "name": "timezone",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "JPEG, PNG, or PDF, up to three files",
+                        "name": "files",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ai/entry/proposals/{id}": {
             "patch": {
                 "security": [
@@ -174,31 +241,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/api/v1/ai/entry/sessions": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI Entry"
-                ],
-                "summary": "Create an owner-scoped AI entry chat",
-                "responses": {
-                    "201": {
-                        "description": "Created",
-                        "schema": {
-                            "$ref": "#/definitions/entity.AIEntrySession"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/ai/entry/sessions/latest": {
+        "/api/v1/ai/entry/requests/{request_id}": {
             "get": {
                 "security": [
                     {
@@ -211,36 +254,12 @@ const docTemplate = `{
                 "tags": [
                     "AI Entry"
                 ],
-                "summary": "Resume latest AI entry chat",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/entity.AIEntrySession"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/ai/entry/sessions/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI Entry"
-                ],
-                "summary": "Read AI entry chat and proposals",
+                "summary": "Read one-shot AI process status and proposals by idempotency key",
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "Session ID",
-                        "name": "id",
+                        "description": "Idempotency UUID",
+                        "name": "request_id",
                         "in": "path",
                         "required": true
                     }
@@ -249,70 +268,7 @@ const docTemplate = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/entity.AIEntrySession"
-                        }
-                    }
-                }
-            }
-        },
-        "/api/v1/ai/entry/sessions/{id}/messages": {
-            "post": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "AI Entry"
-                ],
-                "summary": "Extract reviewable drafts from text and OCR-first images",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Session ID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    },
-                    {
-                        "description": "Message",
-                        "name": "message",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/usecase.AIEntryMessageInput"
-                        }
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/entity.AIEntrySession"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/httpapi.Problem"
-                        }
-                    },
-                    "409": {
-                        "description": "Conflict",
-                        "schema": {
-                            "$ref": "#/definitions/httpapi.Problem"
-                        }
-                    },
-                    "503": {
-                        "description": "Service Unavailable",
-                        "schema": {
-                            "$ref": "#/definitions/httpapi.Problem"
+                            "$ref": "#/definitions/httpapi.Response"
                         }
                     }
                 }
@@ -1149,6 +1105,49 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/transactions/{id}/attachments/{attachmentId}/download": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/octet-stream"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Download a private attachment linked to an owned transaction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transaction ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Attachment ID",
+                        "name": "attachmentId",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "302": {
+                        "description": "Redirect to a short-lived private object URL"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/wallets": {
             "get": {
                 "security": [
@@ -1358,26 +1357,15 @@ const docTemplate = `{
                 }
             }
         },
-        "entity.AIEntryMessage": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "role": {
-                    "type": "string"
-                }
-            }
-        },
         "entity.AIEntryProposal": {
             "type": "object",
             "properties": {
+                "attachment_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -1387,14 +1375,14 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "process_id": {
+                    "type": "string"
+                },
                 "questions": {
                     "type": "array",
                     "items": {
                         "type": "string"
                     }
-                },
-                "session_id": {
-                    "type": "string"
                 },
                 "status": {
                     "type": "string"
@@ -1407,52 +1395,6 @@ const docTemplate = `{
                 },
                 "version": {
                     "type": "integer"
-                }
-            }
-        },
-        "entity.AIEntrySession": {
-            "type": "object",
-            "properties": {
-                "created_at": {
-                    "type": "string"
-                },
-                "error": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "messages": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/entity.AIEntryMessage"
-                    }
-                },
-                "processing": {
-                    "type": "boolean"
-                },
-                "proposals": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/entity.AIEntryProposal"
-                    }
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "entity.AIImage": {
-            "type": "object",
-            "properties": {
-                "base64": {
-                    "type": "string"
-                },
-                "mime_type": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
                 }
             }
         },
@@ -1823,26 +1765,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
-                    "type": "string"
-                }
-            }
-        },
-        "usecase.AIEntryMessageInput": {
-            "type": "object",
-            "properties": {
-                "images": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/entity.AIImage"
-                    }
-                },
-                "request_id": {
-                    "type": "string"
-                },
-                "text": {
-                    "type": "string"
-                },
-                "timezone": {
                     "type": "string"
                 }
             }

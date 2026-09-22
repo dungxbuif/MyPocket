@@ -1,12 +1,14 @@
 ---
 artifact_type: ticket
 id: TICKET-04-01
-status: draft
+status: in_progress
 owner: human
 parent: TICKET-04
 trace:
   parent: TICKET-04-hu-chi-tieu.md
   guide: README.md
+  detail_design: CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md
+  validation: ../VALIDATION_MATRIX.md
 ---
 
 # TICKET-04-01 — Quản lý hũ theo tháng
@@ -25,4 +27,4 @@ Thêm/sửa/xóa hũ; đặt mức tham khảo theo % thu thực tế hoặc ti�
 
 ## Cần chốt
 
-Xóa hũ đang có giao dịch và phân loại khoản nào thuộc tổng thu thực tế. Xem các tình huống còn mở trong [quy tắc nghiệp vụ](../../requirements/BUSINESS_RULES.md#các-tình-huống-cần-thống-nhất-tiếp).
+Quyết định đã chốt: gỡ cấu hình hũ trong một tháng không xóa giao dịch, ID hũ hoặc cấu hình tháng khác. Phần trăm tính theo thu thực tế đủ điều kiện, loại nhóm chuyển nội bộ. Xem [thiết kế triển khai](CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md).

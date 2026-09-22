@@ -6,10 +6,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"image"
 	_ "image/jpeg"
 	_ "image/png"
+	"io"
 	"net/http"
+	"net/url"
 	"strconv"
 	"strings"
 	"time"
@@ -28,15 +31,27 @@ func validateImages(images []Image) error {
 		return errors.New("at most 3 receipt images are allowed")
 	}
 	for _, img := range images {
-		if (img.MIMEType != "image/jpeg" && img.MIMEType != "image/png") || len(img.Name) > 255 {
-			return errors.New("receipt image must be JPEG or PNG with a bounded filename")
+		if (img.MIMEType != "image/jpeg" && img.MIMEType != "image/png" && img.MIMEType != "application/pdf") || len(img.Name) > 255 {
+			return errors.New("receipt file must be JPEG, PNG, or PDF with a bounded filename")
+		}
+		if img.SourceURL != "" {
+			if img.Base64 != "" || !validOCRSourceURL(img.SourceURL) {
+				return errors.New("invalid private OCR source")
+			}
+			continue
 		}
 		if len(img.Base64) > base64.StdEncoding.EncodedLen(maxImageBytes) {
 			return errors.New("receipt image exceeds 5 MiB")
 		}
 		data, err := base64.StdEncoding.Strict().DecodeString(img.Base64)
 		if err != nil || len(data) == 0 || len(data) > maxImageBytes {
-			return errors.New("invalid receipt image encoding or size")
+			return errors.New("invalid receipt file encoding or size")
+		}
+		if img.MIMEType == "application/pdf" {
+			if len(data) < 8 || string(data[:5]) != "%PDF-" {
+				return errors.New("receipt PDF content does not match its MIME type")
+			}
+			continue
 		}
 		config, format, err := image.DecodeConfig(bytes.NewReader(data))
 		if err != nil || "image/"+format != img.MIMEType || config.Width <= 0 || config.Height <= 0 || int64(config.Width) > maxImagePixels/int64(config.Height) {
@@ -47,7 +62,15 @@ func validateImages(images []Image) error {
 }
 
 func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
-	body, _, err := c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, map[string]any{"input": map[string]string{"base64": img.Base64}}, "OCR")
+	var body []byte
+	var err error
+	if img.SourceURL != "" {
+		body, _, err = c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, map[string]any{"input": map[string]string{"url": img.SourceURL}}, "OCR")
+	} else if img.MIMEType == "application/pdf" {
+		body, err = c.uploadPrivatePDF(ctx, img)
+	} else {
+		body, _, err = c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, map[string]any{"input": map[string]string{"base64": img.Base64}}, "OCR")
+	}
 	if err != nil {
 		return "", err
 	}
@@ -102,6 +125,67 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 		}
 	}
 	return "", errors.New("OCR polling limit exceeded")
+}
+
+func validOCRSourceURL(raw string) bool {
+	u, err := url.Parse(raw)
+	return err == nil && u.Scheme == "https" && u.Host != "" && u.User == nil && u.Fragment == "" && u.RawQuery != ""
+}
+
+func (c *Client) uploadPrivatePDF(ctx context.Context, file Image) ([]byte, error) {
+	data, err := base64.StdEncoding.Strict().DecodeString(file.Base64)
+	if err != nil {
+		return nil, errors.New("invalid PDF encoding")
+	}
+	presigned, _, err := c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/uploads/presign", c.config.OCRKey, map[string]any{
+		"filename": file.Name, "sizeBytes": len(data), "contentType": "application/pdf",
+	}, "OCR")
+	if err != nil {
+		return nil, err
+	}
+	var target struct {
+		Method    string            `json:"method"`
+		UploadURL string            `json:"uploadUrl"`
+		SourceURL string            `json:"sourceUrl"`
+		Headers   map[string]string `json:"headers"`
+	}
+	if json.Unmarshal(presigned, &target) != nil || target.Method != http.MethodPut || !validOCRUploadURL(target.UploadURL) || !validURL(target.SourceURL) {
+		return nil, errors.New("invalid OCR upload grant")
+	}
+	contentLength, lengthOK := target.Headers["Content-Length"]
+	contentType, typeOK := target.Headers["Content-Type"]
+	if !lengthOK || contentLength != fmt.Sprint(len(data)) || !typeOK || contentType != "application/pdf" {
+		return nil, errors.New("invalid OCR upload headers")
+	}
+	upload, err := http.NewRequestWithContext(ctx, http.MethodPut, target.UploadURL, bytes.NewReader(data))
+	if err != nil {
+		return nil, errors.New("invalid OCR upload URL")
+	}
+	upload.Header.Set("Content-Type", contentType)
+	upload.ContentLength = int64(len(data))
+	response, err := c.http.Do(upload)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		return nil, errors.New("OCR file upload failed")
+	}
+	io.Copy(io.Discard, io.LimitReader(response.Body, 4096))
+	response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return nil, fmt.Errorf("OCR file upload returned HTTP %d", response.StatusCode)
+	}
+	body, _, err := c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, map[string]any{"input": map[string]string{"url": target.SourceURL}}, "OCR")
+	return body, err
+}
+
+func validOCRUploadURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil || u.Fragment != "" || (u.Scheme != "https" && u.Scheme != "http") {
+		return false
+	}
+	// Permit plain HTTP only for local test servers; real pre-signed uploads must use TLS.
+	return u.Scheme == "https" || u.Hostname() == "127.0.0.1" || u.Hostname() == "localhost" || u.Hostname() == "::1"
 }
 
 func validDocumentID(id string) bool {

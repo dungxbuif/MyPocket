@@ -36,7 +36,7 @@ trace:
 
 ## Status
 
-- 2026-09-21 runtime update: bounded base64 OCR adapter is implemented for AI-entry JPEG/PNG inputs before text-only extraction. Images are transient; no retained-receipt/S3 upload or durable OCR worker is implemented yet. Adapter protocol tests pass; live OCR document extraction remains unverified. The retained-receipt sequence below is still future design. [Entry slice](../work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md).
+- 2026-09-22 runtime update: one-shot AI upload accepts JPEG/PNG/PDF. Backend validates the uploaded bytes, stores the original in private environment-qualified MyPocket S3, and sends OCR Platform a short-lived signed source URL. OCR completes before text extraction; the LLM receives only user/OCR text (never file bytes, base64, URL or image input). Provider adapter tests also retain coverage for OCR Platform's own private PDF presign flow, but the app upload path uses MyPocket S3 source URLs for both images and PDFs. Live OCR against the user's PDF has not been retried.
 - ID: API-OCR-001
 - Status: ready for future implementation
 - Owner: shared

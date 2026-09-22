@@ -24,7 +24,11 @@ trace:
 
 # Ticket nghiệp vụ MyPocket
 
-11 ticket lớn, 31 ticket nhỏ. Ticket lớn gom một nhóm nhu cầu; ticket nhỏ mô tả một phần việc có thể nghiệm thu riêng. Tất cả đang là bản nháp để review phạm vi, chưa phải quyết định bắt đầu triển khai.
+11 ticket lớn, 32 ticket nhỏ. Ticket lớn gom một nhóm nhu cầu; ticket nhỏ mô tả một phần việc có thể nghiệm thu riêng. Tất cả đang là bản nháp để review phạm vi, chưa phải quyết định bắt đầu triển khai.
+
+## Công việc nền tảng ngoài bộ ticket nghiệp vụ
+
+- [WORKER-01 — Dịch vụ worker chạy cronjob](WORKER-01-cron-service.md): yêu cầu riêng về worker dùng chung code backend, với giao dịch định kỳ và chốt/tạo report tháng làm ví dụ. Đây là work item high-risk ở trạng thái `draft`, không nằm trong thống kê 11 ticket lớn/32 ticket con. Cần chốt report là live/rebuildable hay snapshot/immutable close và quy tắc recurring trước detail design; hiện CORE-03 chưa có cron close.
 
 ## Danh sách ticket lớn
 
@@ -38,7 +42,7 @@ trace:
 | [TICKET-06 — Tiết kiệm, tín dụng và khoản nợ](TICKET-06-tiet-kiem-tin-dung-no.md) | 4 | REQ-09, REQ-10, REQ-11 |
 | [TICKET-07 — Báo cáo, Money Insider và tổng kết tháng](TICKET-07-bao-cao-tong-ket.md) | 4 | REQ-12, REQ-13 |
 | [TICKET-08 — Theo dõi danh mục tài sản](TICKET-08-danh-muc-tai-san.md) | 2 | REQ-14 |
-| [TICKET-09 — Trợ lý nhập liệu và tư vấn](TICKET-09-tro-ly-ai.md) | 2 | REQ-17 |
+| [TICKET-09 — Trợ lý nhập liệu và tư vấn](TICKET-09-tro-ly-ai.md) | 3 | REQ-17 |
 | [TICKET-10 — Kết nối công cụ cá nhân](TICKET-10-ket-noi-cong-cu.md) | 2 | REQ-15, REQ-16 |
 | [TICKET-11 — Sử dụng liên tục và quản lý dữ liệu](TICKET-11-su-dung-du-lieu.md) | 3 | REQ-18 |
 

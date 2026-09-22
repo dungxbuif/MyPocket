@@ -25,7 +25,8 @@ export async function apiRequest<T>(path: string, options: RequestInit = {}, tok
   if (authToken) {
     headers.set("Authorization", `Bearer ${authToken}`);
   }
-  if (method !== "GET" && method !== "HEAD" && !headers.has("Content-Type")) {
+  const isFormData = typeof FormData !== "undefined" && options.body instanceof FormData;
+  if (method !== "GET" && method !== "HEAD" && !isFormData && !headers.has("Content-Type")) {
     headers.set("Content-Type", "application/json");
   }
 

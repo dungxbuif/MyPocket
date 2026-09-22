@@ -83,13 +83,13 @@ Thay đổi so với kỳ trước = (hiện tại − trước) / trước × 1
 
 ## Tổng kết tháng: số liệu cập nhật, note giữ riêng
 
-Trong tháng, user xem báo cáo realtime và ghi note bất kỳ lúc nào. Hết tháng, hệ thống tạo mục tổng kết/chốt kỳ theo timezone account. User vẫn sửa/nhập bù/xóa giao dịch tháng đó; số liệu và bối cảnh liên quan được tính lại.
+Trong tháng, user xem báo cáo realtime và ghi note bất kỳ lúc nào. Khi account-local calendar sang tháng mới, report tháng trước tự hiển thị trạng thái hoàn tất trên lần đọc kế tiếp; không cần job đóng tháng hay thao tác chốt tay. Số liệu luôn được tính lại từ ledger hiện tại, kể cả khi user sửa/nhập bù/xóa giao dịch cũ.
 
 Màn hình có bốn phần độc lập:
 
 | Phần | Nguồn | Khi dữ liệu tháng đổi |
 | --- | --- | --- |
-| Số liệu, biểu đồ | Query/report service | Cập nhật theo dữ liệu hiện tại |
+| Số liệu, biểu đồ | Query/report service | Cập nhật theo dữ liệu hiện tại; không phải snapshot bất biến |
 | Ghi chú của tôi | User nhập, một note/account/tháng | Giữ nguyên trừ khi user sửa/xóa |
 | Bối cảnh tháng | Liên kết sự kiện, chuyến đi, hũ và các hoạt động có thật | Tự đính kèm/cập nhật; không ghi đè note |
 | Tổng kết AI | Dữ liệu report đã tính và bối cảnh | Nhận biết phiên bản cũ, tạo lại phần AI riêng |
@@ -123,4 +123,4 @@ Nếu có mức phân bổ, thêm tổng phân bổ và chênh lệch trên đú
 5. View cộng dồn không đếm trùng và không tự chuyển dư; tháng thiếu phân bổ được phân biệt.
 6. Query dùng account timezone; date thuần và UTC không bị trộn nghĩa.
 7. Thu 0, thiếu lịch sử, thiếu giá, AI lỗi hoặc AI cũ không tạo số liệu giả.
-8. Note user không bị AI hoặc job tổng kết ghi đè; lọc ví không tạo note tháng mới.
+8. Note user không bị AI hoặc tác vụ nền ghi đè; lọc ví không tạo note tháng mới. Trạng thái hoàn tất kỳ được suy ra từ timezone account, không phụ thuộc scheduler.

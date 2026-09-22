@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Thêm Giao Dịch - Chọn Ngày</title>
+<!-- Tailwind CSS v3 with forms and container-queries plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'sans-serif'],
+          },
+          colors: {
+            appGreen: '#23a24d',
+            appGreenLight: '#eaf7ee',
+            appGreenDark: '#1b803c',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="base-styles">
+    body {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-stone-300 min-h-screen flex items-center justify-center p-0 sm:p-4">
+<!-- BEGIN: MobileDeviceContainer -->
+<div class="relative w-full max-w-[420px] h-[912px] bg-white sm:rounded-[50px] shadow-2xl overflow-hidden flex flex-col justify-between">
+<!-- BEGIN: BackgroundScreenContent -->
+<!-- Content underneath the modal popup -->
+<div class="absolute inset-0 flex flex-col justify-between pointer-events-none select-none z-0">
+<!-- Top Section -->
+<div class="w-full">
+<!-- Status Bar -->
+<div class="pt-3 px-8 flex justify-between items-center text-black text-sm font-semibold tracking-tight">
+<span>22:26</span>
+<div class="flex items-center gap-1.5">
+<!-- Cellular icon -->
+<svg class="w-4 h-3 fill-current" viewbox="0 0 17 12">
+<rect height="4" rx="0.5" width="2.5" x="0" y="8"></rect>
+<rect height="6" rx="0.5" width="2.5" x="4" y="6"></rect>
+<rect height="9" rx="0.5" width="2.5" x="8" y="3"></rect>
+<rect height="12" rx="0.5" width="2.5" x="12" y="0"></rect>
+</svg>
+<!-- Wifi icon -->
+<svg class="w-4 h-3 fill-current" viewbox="0 0 16 12">
+<path d="M8 2.5a11.25 11.25 0 0 1 6.36 1.98.5.5 0 0 0 .7-.06l.8-.89a.5.5 0 0 0-.07-.72A13.2 13.2 0 0 0 8 .8c-2.83 0-5.4.88-7.79 2.51a.5.5 0 0 0-.07.72l.8.89a.5.5 0 0 0 .7.06A11.25 11.25 0 0 1 8 2.5zm0 3.75c-1.85 0-3.55.61-4.94 1.63a.5.5 0 0 0-.07.73l.8.89a.5.5 0 0 0 .7.04C5.43 8.84 6.67 8.5 8 8.5c1.33 0 2.57.34 3.51 1.04a.5.5 0 0 0 .7-.04l.8-.89a.5.5 0 0 0-.07-.73A8.2 8.2 0 0 0 8 6.25zm0 3.75c-.83 0-1.59.29-2.2.78a.4.4 0 0 0-.06.58l1.98 2.2a.4.4 0 0 0 .56 0l1.98-2.2a.4.4 0 0 0-.06-.58c-.61-.49-1.37-.78-2.2-.78z"></path>
+</svg>
+<!-- Battery icon -->
+<div class="flex items-center">
+<div class="w-6 h-3 rounded-[4px] border border-black/80 p-[1.5px] flex items-center">
+<div class="h-full bg-black rounded-[2px] w-[73%]"></div>
+</div>
+<div class="w-[1.5px] h-[4px] bg-black/80 rounded-r-[1px] ml-[0.5px]"></div>
+</div>
+<span class="text-xs font-bold -ml-0.5">73</span>
+</div>
+</div>
+<!-- Sheet Header Bar -->
+<div class="mt-4 px-5 flex items-center justify-between">
+<button class="px-5 py-2 rounded-full bg-stone-100 text-stone-700 font-semibold text-sm">
+            Huỷ
+          </button>
+<h1 class="text-lg font-bold text-stone-900 pr-12">Thêm Giao Dịch</h1>
+<div></div>
+</div>
+<!-- Segmented Tab Control -->
+<div class="mt-5 mx-5 p-1 bg-stone-100 rounded-full flex items-center justify-between text-xs font-semibold text-stone-500">
+<div class="flex-1 py-1.5 text-center">Khoản chi</div>
+<div class="flex-1 py-1.5 text-center bg-white rounded-full shadow-sm text-stone-900 font-bold">Khoản thu</div>
+<div class="flex-1 py-1.5 text-center">Vay/Nợ</div>
+</div>
+<!-- Account Selector Item -->
+<div class="mt-6 mx-5 flex items-center justify-between border-b border-stone-100 pb-4">
+<div class="flex items-center gap-3">
+<!-- Credit Card Icon Placeholder -->
+<div class="w-8 h-8 rounded-full bg-teal-500/20 flex items-center justify-center text-teal-600">
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<rect height="14" rx="3" stroke-width="2" width="20" x="2" y="5"></rect>
+<line stroke-width="2" x1="2" x2="22" y1="10" y2="10"></line>
+</svg>
+</div>
+<span class="text-sm font-semibold text-stone-800">ACB Credit Platinum</span>
+</div>
+<svg class="w-4 h-4 text-stone-400" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5"></path>
+</svg>
+</div>
+<!-- Amount Row -->
+<div class="mt-3 mx-5">
+<div class="text-xs text-stone-400 font-medium">Số tiền</div>
+<div class="mt-1 flex items-center gap-2">
+<span class="px-2 py-0.5 border border-stone-200 text-stone-400 text-xs rounded font-medium">VND</span>
+<span class="text-3xl font-bold text-stone-900 tracking-tight">0</span>
+</div>
+</div>
+</div>
+<!-- Bottom Buttons Bar (Blurred background) -->
+<div class="p-5 pb-8 flex items-center gap-3">
+<button class="flex-1 py-3.5 bg-stone-300 text-stone-400 text-base font-bold rounded-full text-center">
+          Lưu
+        </button>
+<button class="w-12 h-12 rounded-full bg-emerald-600 text-white flex items-center justify-center shrink-0">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+</div>
+<!-- END: BackgroundScreenContent -->
+<!-- BEGIN: ModalBackdrop -->
+<!-- Dimmed semi-transparent overlay backdrop -->
+<div class="absolute inset-0 bg-black/40 backdrop-blur-[1px] z-10 flex items-center justify-center p-4">
+<!-- BEGIN: CalendarDatePickerModal -->
+<div class="w-full max-w-[342px] bg-white rounded-[26px] shadow-2xl p-5 pt-4 pb-4 flex flex-col justify-between animate-in fade-in zoom-in duration-150">
+<!-- Header: Month Selector & Navigation Controls -->
+<div class="flex items-center justify-between mb-3 px-1">
+<!-- Prev Month Button -->
+<button aria-label="Tháng trước" class="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center text-emerald-600 active:bg-stone-50 transition-colors" type="button">
+<svg class="w-4 h-4 stroke-current stroke-[2.5]" fill="none" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Current Month & Year Display -->
+<div class="flex items-center gap-1.5 cursor-pointer select-none">
+<span class="text-emerald-600 font-bold text-base tracking-tight">thg 8 2026</span>
+<svg class="w-3.5 h-3.5 text-emerald-600 stroke-current stroke-[3]" fill="none" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Next Month Button -->
+<button aria-label="Tháng sau" class="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center text-emerald-600 active:bg-stone-50 transition-colors" type="button">
+<svg class="w-4 h-4 stroke-current stroke-[2.5]" fill="none" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Weekdays Row -->
+<div class="grid grid-cols-7 text-center text-[11px] font-semibold text-stone-800 mb-2.5">
+<span>Thứ 2</span>
+<span>Thứ 3</span>
+<span>Thứ 4</span>
+<span>Thứ 5</span>
+<span>Thứ 6</span>
+<span>Thứ 7</span>
+<span>CN</span>
+</div>
+<!-- Calendar Days Grid -->
+<div class="grid grid-cols-7 text-center text-[13px] font-medium gap-y-2">
+<!-- Row 1 -->
+<span class="text-stone-300 py-1 flex items-center justify-center">27</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">28</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">29</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">30</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">31</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">1</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">2</span>
+<!-- Row 2 -->
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">3</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">4</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">5</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">6</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">7</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">8</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">9</span>
+<!-- Row 3 -->
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">10</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">11</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">12</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">13</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">14</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">15</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">16</span>
+<!-- Row 4 -->
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">17</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">18</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">19</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">20</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">21</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">22</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">23</span>
+<!-- Row 5 -->
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">24</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">25</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">26</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">27</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">28</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">29</span>
+<span class="text-stone-900 py-1 flex items-center justify-center font-semibold">30</span>
+<!-- Row 6: Selected Date (31) and next month preview -->
+<div class="flex items-center justify-center">
+<!-- Selected Date: Green circle indicator -->
+<span class="w-[30px] h-[30px] rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center shadow-sm">
+              31
+            </span>
+</div>
+<span class="text-stone-300 py-1 flex items-center justify-center">1</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">2</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">3</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">4</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">5</span>
+<span class="text-stone-300 py-1 flex items-center justify-center">6</span>
+</div>
+<!-- Modal Footer: Dismiss / Cancel Button -->
+<div class="mt-4 pt-1 flex items-center justify-start">
+<button class="text-stone-900 font-semibold text-sm hover:text-stone-600 transition-colors pl-1 py-1" type="button">
+            Huỷ
+          </button>
+</div>
+</div>
+<!-- END: CalendarDatePickerModal -->
+</div>
+<!-- END: ModalBackdrop -->
+</div>
+<!-- END: MobileDeviceContainer -->
+</body></html>

@@ -27,7 +27,20 @@ func TestBudgetUpdateDoesNotResurrectMissingRow(t *testing.T) {
 	}
 	defer db.Where("id = ?", owner).Delete(&entity.User{})
 	repo := NewBudgetPostgresRepository(db)
-	budget := entity.Budget{ID: id, Name: "race fixture", LimitAmount: 100, StartAt: time.Now(), EndAt: time.Now().Add(time.Hour)}
+	location, err := time.LoadLocation("Asia/Ho_Chi_Minh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	today := time.Now().In(location)
+	startDate, err := entity.ParseCalendarDate(today.Format("2006-01-02"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	endDate, err := entity.ParseCalendarDate(today.AddDate(0, 0, 1).Format("2006-01-02"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	budget := entity.Budget{ID: id, Name: "race fixture", LimitAmount: 100, StartDate: startDate, EndDate: endDate}
 	if err = repo.Save(owner, &budget, true); err != nil {
 		t.Fatal(err)
 	}

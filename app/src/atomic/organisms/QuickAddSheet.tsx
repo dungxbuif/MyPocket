@@ -1,16 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
-import { Trash2 } from "lucide-react";
+import { ImagePlus, Trash2 } from "lucide-react";
 
 import { BaseButton } from "../atoms/BaseButton";
-import { BaseCheckbox } from "../atoms/BaseCheckbox";
+import { TransactionFields, type TransactionFormState } from "../molecules/TransactionFields";
 import { BaseSelect, BaseTextInput, FormField } from "../atoms/FormField";
 import { SegmentedControl } from "../atoms/SegmentedControl";
 import { StatusMessage } from "../atoms/StatusMessage";
 import { BaseBottomSheet } from "../molecules/BaseBottomSheet";
-import { CategorySelectionList } from "../molecules/CategorySelectionList";
 import { SurfaceCard } from "../atoms/SurfaceCard";
 import { fetchCategories, type Category } from "../../services/categories";
 import { fetchWallets, type Wallet } from "../../services/wallets";
+import { instantFromLocalDateTime, localDateTimeAt } from "../../services/accountTime";
+import { useAccountTimezone } from "../../services/AccountTimezoneContext";
+import { fetchJarMonth, type JarMonthSummary } from "../../services/jars";
+import { isMonthKey, jarAssignmentNeedsSelection } from "../../services/monthJarLogic";
 import {
   categoryAppliesToTransaction,
   createTransaction,
@@ -21,15 +24,7 @@ import {
   type TransactionType,
 } from "../../services/transactions";
 
-type EditorState = {
-  type: TransactionType;
-  amount: string;
-  walletID: string;
-  categoryID: string;
-  occurredAt: string;
-  note: string;
-  includedInReports: boolean;
-};
+type EditorState = TransactionFormState;
 
 const COPY = {
   addTitle: "Thêm giao dịch",
@@ -55,34 +50,47 @@ const COPY = {
   confirmDelete: "Xóa giao dịch này? Số dư ví và báo cáo sẽ được tính lại.",
 } as const;
 
-function localDateTimeValue(value = new Date()): string {
-  const local = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
-  return local.toISOString().slice(0, 16);
+function localDateTimeValue(value:Date,timezone:string):string {
+  return localDateTimeAt(value,timezone);
 }
 
-function initialState(transaction?: Transaction): EditorState {
+function initialState(transaction:Transaction|undefined,timezone:string): EditorState {
   if (!transaction) {
-    return { type: "expense", amount: "", walletID: "", categoryID: "", occurredAt: localDateTimeValue(), note: "", includedInReports: true };
+    return { type: "expense", amount: "", walletID: "", categoryID: "", jarID: "", occurredAt: localDateTimeValue(new Date(),timezone), note: "", includedInReports: true };
   }
   return {
     type: transaction.type,
     amount: String(transaction.amount),
     walletID: transaction.wallet_id,
     categoryID: transaction.category_id ?? "",
-    occurredAt: localDateTimeValue(new Date(transaction.occurred_at)),
+    jarID: transaction.jar_id ?? "",
+    occurredAt: localDateTimeValue(new Date(transaction.occurred_at),timezone),
     note: transaction.note ?? "",
     includedInReports: transaction.included_in_reports,
   };
 }
 
 export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initialWalletID }: { onClose: () => void; onSaved: () => void; onAiEntry?: () => void; transaction?: Transaction; initialWalletID?: string }) {
-  const [state, setState] = useState(() => ({...initialState(transaction), walletID:transaction?.wallet_id ?? initialWalletID ?? ""}));
+  const timezone=useAccountTimezone();
+  const [state, setState] = useState(() => ({...initialState(transaction,timezone), walletID:transaction?.wallet_id ?? initialWalletID ?? ""}));
   const [wallets, setWallets] = useState<Wallet[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
+  const [jarSummary, setJarSummary] = useState<JarMonthSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const [choosingCategory, setChoosingCategory] = useState(false);
+
+  const transactionMonth = state.occurredAt.slice(0, 7);
+  useEffect(() => {
+    if (state.type !== "expense" || !isMonthKey(transactionMonth)) {
+      setJarSummary(null);
+      return;
+    }
+    let cancelled = false;
+    fetchJarMonth(transactionMonth).then(value => { if (!cancelled) setJarSummary(value); }).catch(() => { if (!cancelled) setJarSummary(null); });
+    return () => { cancelled = true; };
+  }, [state.type, transactionMonth]);
+
 
   useEffect(() => {
     let cancelled = false;
@@ -103,6 +111,12 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
     () => categories.filter((category) => categoryAppliesToTransaction(category, state.type, state.walletID, wallets.find(wallet => wallet.id === state.walletID)?.type)),
     [categories, state.type, state.walletID, wallets],
   );
+  const jarOptions = useMemo(() => {
+    const configured = (jarSummary?.items ?? []).filter(item => item.active || item.jar_id === state.jarID).map(item => ({ jar_id: item.jar_id, name: item.name, active: item.active }));
+    const stableJarName = jarSummary?.jars.find(item => item.jar_id === state.jarID)?.name;
+    if (state.jarID && !configured.some(item => item.jar_id === state.jarID)) configured.push({ jar_id: state.jarID, name: transaction?.jar_name ?? stableJarName ?? "Hũ không có cấu hình tháng", active: false });
+    return configured;
+  }, [jarSummary, state.jarID, transaction?.jar_name]);
 
   const changeScope = (updates: Partial<Pick<EditorState, "type" | "walletID">>) => {
     setState((current) => {
@@ -124,12 +138,20 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
       setError("Nhóm cũ không phù hợp với ví này. Hãy chọn lại hoặc bỏ chọn nhóm.");
       return;
     }
+    let occurredAt:string;
+    try { occurredAt=instantFromLocalDateTime(state.occurredAt,timezone); }
+    catch { setError("Giờ này không tồn tại trong múi giờ đã chọn. Hãy chọn thời điểm khác."); return; }
+    if (jarAssignmentNeedsSelection(state.jarID, jarOptions, transaction?.occurred_at, occurredAt)) {
+      setError("Hũ đã gỡ khỏi tháng này. Hãy bỏ chọn hoặc chọn một hũ đang hoạt động cho tháng giao dịch.");
+      return;
+    }
     const input: TransactionInput = {
       wallet_id: state.walletID,
       category_id: state.categoryID || undefined,
+      jar_id: state.jarID || null,
       type: state.type,
       amount,
-      occurred_at: new Date(state.occurredAt).toISOString(),
+      occurred_at: occurredAt,
       note: state.note.trim() || undefined,
       included_in_reports: state.includedInReports,
     };
@@ -162,27 +184,17 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
     }
   };
 
-  return (
-    <BaseBottomSheet presentation="form" closingDisabled={saving} title={choosingCategory ? "Chọn nhóm" : transaction ? COPY.editTitle : COPY.addTitle} closeLabel={choosingCategory ? "Quay lại" : "Hủy"} onClose={() => { if (saving) return; if (choosingCategory) setChoosingCategory(false); else onClose(); }}>
-      {choosingCategory ? <div className="space-y-4"><SegmentedControl value={state.type} onChange={(type) => changeScope({type})} options={[{value:"expense",label:COPY.expense},{value:"income",label:COPY.income}]} /><CategorySelectionList categories={applicableCategories} onSelect={(categoryID) => {setState(current => ({...current,categoryID}));setChoosingCategory(false);}} /></div> :
-      <div className="space-y-3">
-        {!transaction && onAiEntry ? <BaseButton variant="secondary" disabled={saving} onClick={onAiEntry}>Nhập bằng AI</BaseButton> : null}
-        {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
-        {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
-        {!loading && wallets.length === 0 ? <StatusMessage>{COPY.noWallet}</StatusMessage> : null}
-        <SegmentedControl value={state.type} onChange={(type) => changeScope({ type })} options={[{ value: "expense", label: COPY.expense }, { value: "income", label: COPY.income }]} />
-        <SurfaceCard padding="md" className="space-y-3">
-        <FormField label={COPY.wallet}><BaseSelect required disabled={saving || loading || wallets.length === 0} value={state.walletID} onChange={(event) => changeScope({ walletID: event.target.value })}><option value="">Chọn ví</option>{wallets.map((wallet) => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</BaseSelect></FormField>
-        <FormField label={COPY.amount}><BaseTextInput variant="title" autoFocus inputMode="numeric" required disabled={saving || loading} value={state.amount} onChange={(event) => setState({ ...state, amount: event.target.value.replace(/\D/g, "") })} /></FormField>
-        <BaseButton variant="row" disabled={saving || loading} onClick={() => setChoosingCategory(true)}>{categories.find(category => category.id === state.categoryID)?.name ?? "Chọn nhóm"}</BaseButton>
-        <FormField label={COPY.note}><BaseTextInput variant="inline" disabled={saving || loading} value={state.note} onChange={(event) => setState({ ...state, note: event.target.value })} /></FormField>
-        </SurfaceCard>
-        <SurfaceCard padding="md">
-        <FormField label={COPY.occurredAt}><BaseTextInput type="datetime-local" required disabled={saving || loading} value={state.occurredAt} onChange={(event) => setState({ ...state, occurredAt: event.target.value })} /></FormField>
-        </SurfaceCard>
-        <BaseCheckbox label={COPY.reports} disabled={saving || loading} checked={state.includedInReports} onChange={(event) => setState({ ...state, includedInReports: event.target.checked })}>{COPY.reports}</BaseCheckbox>
-        <div className="flex gap-2"><BaseButton className="flex-1" loading={saving} disabled={loading || wallets.length === 0} onClick={() => void submit()}>{COPY.save}</BaseButton>{transaction ? <BaseButton variant="danger" disabled={saving} onClick={() => void remove()}><Trash2 size={16} />{COPY.delete}</BaseButton> : null}</div>
-      </div>}
-    </BaseBottomSheet>
-  );
+  let validTime=true;
+  try { instantFromLocalDateTime(state.occurredAt,timezone); } catch { validTime=false; }
+  const valid = wallets.some(wallet => wallet.id === state.walletID) && Number.isSafeInteger(Number(state.amount)) && Number(state.amount) > 0 && validTime;
+  return <BaseBottomSheet presentation="form" closingDisabled={saving} title={transaction ? COPY.editTitle : COPY.addTitle} closeLabel="Hủy" onClose={() => { if (!saving) onClose(); }}
+    footer={<div className="flex gap-3"><BaseButton className="flex-1" size="lg" loading={saving} disabled={loading || !valid} onClick={() => void submit()}>Lưu</BaseButton>{transaction ? <BaseButton variant="danger" disabled={saving} aria-label={COPY.delete} onClick={() => void remove()}><Trash2 size={20} /></BaseButton> : onAiEntry ? <BaseButton disabled={saving} aria-label="Nhập bằng AI từ ảnh hoặc nội dung" onClick={onAiEntry}><ImagePlus size={22} /></BaseButton> : null}</div>}>
+    <div className="space-y-3">
+      {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
+      {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
+      {!loading && wallets.length === 0 ? <StatusMessage variant="plain">{COPY.noWallet}</StatusMessage> : null}
+      <TransactionFields state={state} onChange={setState} wallets={wallets} categories={categories} jars={jarOptions} disabled={saving || loading} />
+      {!transaction && onAiEntry ? <BaseButton variant="ghost" className="w-full" disabled={saving} onClick={onAiEntry}>Nhập bằng AI</BaseButton> : null}
+    </div>
+  </BaseBottomSheet>;
 }

@@ -1,7 +1,7 @@
 import { apiRequest } from "./api";
 import { getStoredToken } from "./auth";
 
-export type BudgetInput = {name:string; limit_amount:number; wallet_id?:string|null; category_id?:string|null; start_at:string; end_at:string};
+export type BudgetInput = {name:string; limit_amount:number; wallet_id?:string|null; category_id?:string|null; start_date:string; end_date:string};
 export type Budget = BudgetInput & {id:string; spent:number; days_remaining:number; ended:boolean};
 export type BudgetSummary = {items:Budget[]; limit_amount:number; spent:number};
 const PATH="/api/v1/budgets";

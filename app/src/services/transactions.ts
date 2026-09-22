@@ -10,6 +10,8 @@ export type Transaction = {
   owner_id: string;
   wallet_id: string;
   category_id?: string | null;
+  jar_id?: string | null;
+  jar_name?: string;
   type: TransactionType;
   amount: number;
   occurred_at: string;
@@ -22,6 +24,7 @@ export type Transaction = {
 export type TransactionInput = {
   wallet_id: string;
   category_id?: string;
+  jar_id?: string | null;
   type: TransactionType;
   amount: number;
   occurred_at: string;

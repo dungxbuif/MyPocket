@@ -17,14 +17,15 @@ type BudgetHandler struct {
 	Wallets      repository.WalletRepository
 	Categories   repository.CategoryRepository
 	Transactions repository.TransactionRepository
+	Users        repository.UserRepository
 }
 type budgetInput struct {
 	Name        string  `json:"name"`
 	LimitAmount int64   `json:"limit_amount"`
 	WalletID    *string `json:"wallet_id"`
 	CategoryID  *string `json:"category_id"`
-	StartAt     string  `json:"start_at"`
-	EndAt       string  `json:"end_at"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
 }
 
 // ListBudgets godoc
@@ -56,7 +57,21 @@ func (h *BudgetHandler) ListBudgets(c *gin.Context) {
 		budgetFailure(c, err)
 		return
 	}
-	OK(c, entity.CalculateBudgets(budgets, transactions, categories, time.Now().UTC()))
+	if h.Users == nil {
+		budgetFailure(c, errors.New("account timezone repository unavailable"))
+		return
+	}
+	user, err := h.Users.FindByID(owner)
+	if err != nil {
+		budgetFailure(c, err)
+		return
+	}
+	location, err := time.LoadLocation(user.Timezone)
+	if err != nil {
+		budgetFailure(c, err)
+		return
+	}
+	OK(c, entity.CalculateBudgetsInLocation(budgets, transactions, categories, time.Now(), location))
 }
 
 // CreateBudget godoc
@@ -98,10 +113,10 @@ func (h *BudgetHandler) save(c *gin.Context, creating bool) {
 		budgetBadRequest(c, "Dữ liệu ngân sách không hợp lệ.")
 		return
 	}
-	start, e1 := time.Parse(time.RFC3339, input.StartAt)
-	end, e2 := time.Parse(time.RFC3339, input.EndAt)
+	start, e1 := entity.ParseCalendarDate(input.StartDate)
+	end, e2 := entity.ParseCalendarDate(input.EndDate)
 	input.Name = strings.TrimSpace(input.Name)
-	if input.Name == "" || len(input.Name) > 200 || input.LimitAmount <= 0 || input.LimitAmount > 9007199254740991 || e1 != nil || e2 != nil || !end.After(start) {
+	if input.Name == "" || len(input.Name) > 200 || input.LimitAmount <= 0 || input.LimitAmount > 9007199254740991 || e1 != nil || e2 != nil || end.Time.Before(start.Time) {
 		budgetBadRequest(c, "Nhập tên, hạn mức nguyên dương và khoảng ngày hợp lệ.")
 		return
 	}
@@ -136,7 +151,7 @@ func (h *BudgetHandler) save(c *gin.Context, creating bool) {
 		budgetBadRequest(c, "Ngân sách không hợp lệ.")
 		return
 	}
-	budget := entity.Budget{ID: id, OwnerID: owner, Name: input.Name, LimitAmount: input.LimitAmount, WalletID: input.WalletID, CategoryID: input.CategoryID, StartAt: start.UTC(), EndAt: end.UTC()}
+	budget := entity.Budget{ID: id, OwnerID: owner, Name: input.Name, LimitAmount: input.LimitAmount, WalletID: input.WalletID, CategoryID: input.CategoryID, StartDate: start, EndDate: end}
 	if err := h.Budgets.Save(owner, &budget, creating); err != nil {
 		budgetFailure(c, err)
 		return

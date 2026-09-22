@@ -19,7 +19,7 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-09-13
+updated: 2026-09-22
 ---
 
 # Project Context
@@ -32,7 +32,12 @@ updated: 2026-09-13
 
 ## Current Status
 
-- 2026-09-21 implementation follow-up: [AI-ENTRY-01](work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md) implements normal Add/manual vs hold/chat, API-backed persistent proposal list, editing/approve/reject, atomic replay-safe ledger writes and text/OCR adapters. Migration 000010 applied; real DB HTTP/concurrency tests pass. Runtime backend restarted through FE proxy; live Chrome verified manual form and AI configuration state. Actual AI endpoint/model/key are still missing, so extraction UAT remains pending. OCR/S3 secrets are in ignored backend `.env.local`; S3 bucket/region absent, durable receipt storage not implemented.
+- 2026-09-22 CORE-03 implementation checkpoint: account IANA timezone/date-only migrations, jar/month APIs and screens, optional transaction jar selection, live month totals/note are implemented through migrations 000013–000015. Local DB is version 15 clean; backend PostgreSQL suite and frontend design/calendar/jar/build checks pass. Owner UAT remains pending; see [validation evidence](work/VALIDATION_MATRIX.md#core-03-timezone-jars-and-live-monthly-summary--2026-09-22). Monthly completion is derived, with no cron close/snapshot.
+- Dedicated shared-code scheduler request is separately captured as high-risk draft [WORKER-01](work/tickets/WORKER-01-cron-service.md), with recurring transactions and month-end reporting/close as candidate jobs. No worker/runtime/schema implementation is approved; report artifact semantics and recurring edge rules need resolution first.
+- 2026-09-21 implementation follow-up: [AI-ENTRY-01](work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md) implements normal Add/manual vs hold/AI entry, API-backed proposals, editing/approve/reject and atomic replay-safe ledger writes. Migration 000010 applied; real DB HTTP/concurrency tests pass. The 2026-09-22 strict JSON Schema follow-up now passes a synthetic five-case live extraction benchmark; owner UAT remains pending.
+- 2026-09-22 AI-ENTRY-02 follow-up: one-shot multipart `POST /api/v1/ai/entry/process`, read-only recovery and independent proposal APIs are implemented. Backend stores originals in environment-qualified private S3, OCRs via a short-lived signed URL before LLM, and sends OCR text only. Migrations 000011–000012 add attachment/OCR metadata, approval links and cleanup claims; approval links are atomic and authenticated download checks owner/link. Local dev DB is migration 12; real PostgreSQL tests pass. Explicit cleanup command is implemented but not run against bucket contents; browser download UAT remains pending. Do not retry the user's prior PDF automatically.
+- 2026-09-22 LLM resolution: JSON-object mode previously scored 0/15; strict OpenAI-compatible JSON Schema mode now passes 5/5 synthetic cases and 24/24 scored fields. Live S3 PUT/readback 83 ms, OCR 4.034 s, LLM p50 19.769 s/p95 25.655 s, OCR+receipt-case pipeline 29.689 s; transfer-safety passes. Provider calls use the existing standard `net/http` adapter, with no additional SDK. Saved wallet descriptions now enter the bounded, untrusted wallet-matching context (2 KiB each). No transactions were approved or written. Broader model evaluation and owner UAT remain pending. Future multi-provider selection and sourced price transparency are captured in draft [AI-ENTRY-03](work/tickets/AI-ENTRY-03-PROVIDER-SELECTION.md); no additional provider was enabled.
+- Local test servers restarted with latest code: frontend `http://localhost:4173/` returns 200 and backend `http://localhost:8080/api/v1/health` returns 200. Keep them running for owner UAT.
 
 - 2026-09-21: owner requested feasibility assessment and a reviewable file for the two AI flows. [DESIGN-09-AI](work/tickets/TICKET-09-DETAIL_DESIGN.md) is `in_review`, approval pending: text/OCR proposals, internal-transfer reconciliation, read-only financial Q&A, prompt/eval contracts and T0–T7 delivery plan. No AI/transfer/jar runtime implemented in this documentation task.
 
@@ -42,24 +47,29 @@ updated: 2026-09-13
 
 - Status: The root `app/` Vite React Tailwind app renders the Financial Clarity preview and is connected to the dev Gin API; Google OAuth and development CORS are enabled for local testing. PostgreSQL uses explicit versioned migrations; API startup does not mutate schema.
 - Active backlog: `docs/work/BACKLOG.md`
-- Current queue focus: wallet CRUD and basic income/expense ledger are implemented and verified for review. Account → Nhóm remains closed; receipt/jar and credit/adjustment ledgers remain separate follow-ups.
+- Current queue focus: finish CORE-03 reconciliation and owner UAT; WORKER-01 remains draft pending report and recurrence semantics. AI-ENTRY-01/02 UAT, AI-ENTRY-03 owner design review, UI-FORMS-03 visual review, transfer/adjustment and credit ledger remain separate open work.
 - Active phase: None.
-- Active ticket: TICKET-01-02 and the approved basic slice of TICKET-02-01 are `in_review`.
-- Active bug: None.
+- Active ticket: [CORE-03](work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md) is in progress through docs reconciliation and owner UAT. [AI-ENTRY-02](work/tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md) and [UI-FORMS-03](work/tickets/UI-FORMS-03-DETAIL_DESIGN.md) remain in progress/review for their independent UAT.
+- Verified bug: [BUG-001](work/bugs/BUG-001-s3-presigned-get-signature.md), fixed with AWS SDK Go v2; [ADR-007](decisions/ADR-007-aws-s3-presigning.md) records the choice.
 
 ## Current Focus
 
-Yêu cầu hiện tại: cập nhật docs cho Tài khoản → Quản lý nhóm → chọn nhóm → Sửa, với nhóm cha, “category” và ví áp dụng. Nguồn UI: `docs/design/system/DESIGN.md#account--quản-lý-nhóm`. Ý nghĩa “category” còn chờ trả lời; cập nhật docs không tự phê duyệt API/schema.
+Owner requested continuing the approved timezone/jars/month goal. [CORE-03](work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md) now has real API-backed screens, migrations 13–15 and automated verification; next is owner UAT and reconciliation of remaining acceptance gaps. Monthly reports are live/recalculable, notes are independent, and automatic completion does not freeze ledger data. The new request for a cron worker is tracked separately in [WORKER-01](work/tickets/WORKER-01-cron-service.md); no implementation starts until month-end artifact semantics and recurrence rules are reviewed.
 
-Review the MyPocket product/business specification and its BA ticket breakdown. The owner now requests large tickets with smaller child tickets, written briefly in business language. This supersedes the earlier request to avoid creating tickets. No implementation phase or technical plan is scheduled by this breakdown.
+The independent UI-FORMS-03/AI flows still use the base-first contracts: `CategorySelectionList` is removed and transaction/budget/savings use `CategoryTreeSelector`; Money Lover guides AI input/result layout while MyPocket retains review/approve. Their visual/provider/browser UAT remains separate. AI entry is one-shot, stores no conversation, OCRs files before LLM, retains private S3 evidence and links it on approval.
 
 ## Recently Touched Areas
 
-- `backend/internal/controller/http/transaction_handler.go`, wallet ledger balance repository/model, handler tests and generated Swagger.
+- `app/src/services/{accountTime,months,jars}.ts`, timezone context, jar/month API-backed screens and transaction/AI jar selectors; backend migrations 000013–000015 and owner-scoped calendar/jar/month repositories.
+- `docs/work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md`, `WORKER-01-cron-service.md`, API/ERD/ADR-008, report/business rules, validation matrix, backlog and changelog.
+- `app/src/atomic/atoms/BaseCategoryTree.tsx`, `molecules/CategoryTreeSelector.tsx`, AI composer/result-card bases, transaction/budget form composition and browser fixture tests.
+- `docs/design/system/BASE_COMPONENTS.md`, category-tree contract, assistant/transaction/budget screen specs, UI-FORMS-03.
+
+- `backend/internal/controller/http/transaction_handler.go`, wallet ledger balance repository/model, handler tests and generated Swagger; `backend/internal/infrastructure/ai/` now enforces strict JSON Schema output and includes bounded wallet descriptions for model disambiguation.
 - `app/src/services/transactions.ts`, transaction/wallet rule tests, real Overview/Header/Transactions/Quick Add/Wallet consumers.
 - `docs/design/screens/transactions/`, wallet/transaction verification, API/backlog/validation/changelog reconciliation.
 
-- `docs/work/tickets/`: 11 parent tickets, 31 children and a business-oriented index; all tickets are `draft` pending review.
+- `docs/work/tickets/`: 11 parent tickets, 32 children and a business-oriented index; newly captured provider-choice draft remains pending owner review.
 - `docs/requirements/SPEC.md`, `BUSINESS_RULES.md`, `REPORTS.md`, `REQUIREMENTS.md`, `USER_STORIES.md`
 - `docs/work/VALIDATION_MATRIX.md`, `docs/work/ROADMAP.md`, `docs/releases/CHANGELOG.md`
 - Standards relocated unchanged from `docs/templates/standards/` to the mandatory `docs/standards/` path; unused Harness CLI phase example removed.
@@ -75,6 +85,7 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 
 ## Recent Decisions
 
+- CORE-03 month completion is account-local and derived; monthly figures stay recalculable and user notes remain independent. A cron close/snapshot would change this contract, so WORKER-01 is intake only until the owner chooses report artifact semantics.
 - Basic income/expense entries may use `basic` and `goal` wallets. `credit` is intentionally rejected until CRD-01…04 purchase/refund/payment semantics have an approved ledger; applying ordinary expense direction would corrupt debt meaning.
 - Category selection obeys both transaction kind and applicable-wallet scope at UI and API. Empty `wallet_ids` means all owner wallets.
 - Wallet API list exposes ledger-derived `current_balance`; `opening_balance` remains unchanged by transaction CRUD. Header total uses current balances only for `is_in_total` wallets.
@@ -127,37 +138,13 @@ Review the MyPocket product/business specification and its BA ticket breakdown. 
 
 ## Next Steps
 
-- Configure AI_BASE_URL/AI_MODEL/AI_API_KEY and run real extraction/owner review for [AI entry](work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md). S3 bucket/region needed before separate retained-receipt storage work. User clarified: hold Add opens entry chat directly, manual click stays unchanged; financial advice has a separate entry point. No two-mode assistant at Add.
-
-- Review [two-flow AI plan](work/tickets/TICKET-09-DETAIL_DESIGN.md), especially transfer-linked wallet deletion, attachment retention and v1 limits. Existing owner decisions recorded: OCR-first/text-only AI, configurable compatible endpoint, session-only bank context, explicit confirmation. Prepare provider credentials/private storage before live integration; jars remain a separate dependency slice.
-
-- Owner visual acceptance of API-only budget and savings screens; complete shared paired transfers as separately designed work. Browser inspected budget empty/editor and grouped transaction form without writing to owner's account. Automated API persistence test covers savings and budgets using isolated created fixtures. Do not confuse this with complete browser CRUD UAT or full budget roadmap acceptance.
-
-- Owner resolved savings counterpart question: money may come from outside app; ordinary savings entries affect one wallet. Shared transfer-to-another-wallet is separate. Official Money Lover transfer guide checked and linked in savings design. Continue specialized savings categories without requiring counterpart wallet; internal-transfer ledger remains separate unfinished work.
-
-- Latest execution: wallet list rebuilt as reference-based WalletSelectionList; create uses BaseSelect. Goal date API and SavingsSummary/SavingsWalletPanel implemented; selecting goal opens real progress/history. QuickAdd accepts wallet context and shared searchable category list. [TICKET-06-01 design/proof](work/tickets/TICKET-06-01-DETAIL_DESIGN.md). Automated tests/build pass; browser creation draft inspected/canceled. Pending: answer whether savings transfers require counterpart wallet, specialized categories, exact transaction-form fidelity, full persistence UAT. Notifications/reports remain unsupported. Prior “select/date missing” notes are historical.
-
-- Latest: [wallet screen specification](design/screens/wallets/README.md) normalized using owner decisions and official Money Lover docs. BaseSelect during creation only; type immutable after save. Runtime picker replacement is pending. Per-type goal/credit detail screens and date/statement fields remain explicitly incomplete.
-
-- Latest owner direction: normalize both newly supplied wallet references, tighten base enforcement, reimplement Add Wallet and wallet-type selection. [UI-WALLET-02](work/tickets/UI-WALLET-02-DETAIL_DESIGN.md) implementation and automated checks pass; browser/owner visual review pending. Existing-wallet selector reference is normalized but its runtime scope/filter flow remains unimplemented. This UI work takes priority over transfer/adjustment.
-
-- Owner follow-up: removed the note field from wallet creation only; editing existing notes remains available. UI review pending.
-
-- UI-EMPTY-01 follow-up: owner spotted the remaining “Chưa có ví” border. Both Overview and wallet management now opt into the same plain status variant; pending visual review.
-
-- 2026-09-20: owner reports previously tested bugs are OK and requests continued implementation. Record this as owner-reported acceptance of the tested fixes, not blanket completion of remaining product scope. Transaction empty-state border correction is tracked in [UI-EMPTY-01](work/tickets/UI-EMPTY-01.md). Next product work remains transfer/adjustment detail design before implementation.
-- Local OAuth launch: load Google credentials from the existing reference app environment without printing secrets; use `GOOGLE_REDIRECT_URL=http://localhost:4173/api/v1/auth/google/callback` through the frontend `/api` proxy. This session verified HTTP 302 with that redirect URI; Google Console must register the identical URI. No credentials were copied into tracked files.
-
-- Review the verified core wallet and basic ledger slices. The next independent product choices are receipt/OCR and jar assignment for TICKET-02-01, or transfer/adjustment and credit statement/payment semantics; none are represented by mocks in the implemented ledger.
-
-- For every next UI slice, read `docs/design/README.md`, list reused bases, create missing base contracts/components first, and record the screen's behavior/proof. Run `npm run check:design`, `npm run test:design` and `npm run build` in `app/`.
-
-- Review the parent/child ticket list and resolve business questions in the affected children; prioritize implementation only when requested.
-- Continue implementation from the Financial Clarity design and reference-app behavior; local runtime proof for auth/profile/home is now available, while product feature validation remains pending.
-- When implementing receipt OCR, use `docs/architecture/OCR_API.md` as the provider contract and keep `OCR_API_KEY` server-side only.
-- Product UAT and runtime proof remain pending; documentation review must not be presented as implemented behavior.
+- Finish CORE-03 owner UAT at the local frontend (`/account` timezone setting, `/jars`, current/past `/months/YYYY-MM`, transaction and AI proposal jar assignment). Confirm data behavior visually and with an account the owner is comfortable testing; automated evidence is in [VALIDATION_MATRIX](work/VALIDATION_MATRIX.md).
+- Clarify [WORKER-01](work/tickets/WORKER-01-cron-service.md): whether “chốt sổ/tạo report” means a persisted month-end artifact or only a scheduled trigger/cache over recalculable figures, plus recurring catch-up/idempotency/timezone behavior. Then prepare detail design for review before code/runtime changes.
+- Keep AI-ENTRY-01/02 live/provider/attachment UAT and UI-FORMS-03 visual review as separate backlog work; broader AI model evaluation remains required beyond the five synthetic cases.
+- Preserve base-first screen rules and run `npm run check:design`, `npm run test:design`, and `npm run build` for frontend changes. API/DB/runtime changes require PostgreSQL tests and migration evidence.
 
 ## Open Questions
 
-- Deletion of linked objects and paired-wallet effects; Travel Mode for backdated/offline/delayed confirmation; recurring month-end/catch-up/timezone changes.
+- WORKER-01 month-end semantics: CORE-03 says live/recalculable report and derived completion; the new request names a cron job that closes/generates a report. Decide whether any stored artifact is authoritative or merely rebuildable/cache output. Recurring month-end/catch-up/duplicate prevention/timezone changes also need rules.
+- Deletion of linked objects and paired-wallet effects; Travel Mode for backdated/offline/delayed confirmation.
 - Exact income/refund classification for jar allocation; credit overpayment/refund/statement allocation; portfolio funding and historical deletion behavior.

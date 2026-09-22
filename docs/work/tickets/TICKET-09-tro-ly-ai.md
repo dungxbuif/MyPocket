@@ -25,6 +25,7 @@ Ghi chép nhanh từ nội dung/chứng từ và hỏi về tài chính cá nhâ
 | --- | --- |
 | [TICKET-09-01 — Nhập giao dịch bằng nội dung hoặc chứng từ](TICKET-09-01-nhap-lieu-chung-tu.md) | Gửi nội dung/ảnh, nhận đề xuất, sửa rồi xác nhận hoặc từ chối. |
 | [TICKET-09-02 — Hỏi đáp tài chính cá nhân](TICKET-09-02-hoi-dap-tai-chinh.md) | Hỏi trợ lý về giao dịch, reports, budget, hũ, nợ và tài sản. |
+| [AI-ENTRY-03 — Chọn provider và minh bạch chi phí](AI-ENTRY-03-PROVIDER-SELECTION.md) | Thiết kế tương lai cho nhiều provider/model, giá và lựa chọn minh bạch; chưa duyệt triển khai. |
 
 ## Hoàn thành khi
 

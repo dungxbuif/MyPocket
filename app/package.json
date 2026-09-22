@@ -8,6 +8,8 @@
     "check:design": "node scripts/check-design.mjs && node scripts/check-design-docs.mjs",
     "test:design": "node --test scripts/check-design.test.mjs && node scripts/base-contract.test.mjs",
     "test:transactions": "node --test scripts/transactions.test.ts",
+    "test:calendar": "node --test scripts/account-time.test.ts scripts/month-jar-logic.test.ts",
+    "test:transaction-jars": "node scripts/transaction-jar.test.mjs",
     "test:ai": "node scripts/ai-entry.test.mjs && node scripts/ai-entry-browser.test.mjs",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"

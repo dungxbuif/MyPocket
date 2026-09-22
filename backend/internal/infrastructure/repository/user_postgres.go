@@ -105,6 +105,18 @@ func (r *UserPostgresRepository) Create(user *entity.User) error {
 	return r.db.Create(user).Error
 }
 
+func (r *UserPostgresRepository) SetTimezone(userID, timezone string, initializeOnly bool) (*entity.User, error) {
+	query := r.db.Model(&entity.User{}).Where("id = ?", userID)
+	if initializeOnly {
+		query = query.Where("timezone_confirmed = false")
+	}
+	result := query.Updates(map[string]any{"timezone": timezone, "timezone_confirmed": true, "updated_at": time.Now().UTC()})
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	return r.FindByID(userID)
+}
+
 const (
 	UserColumnEmail         = "email"
 	UserColumnID            = "id"

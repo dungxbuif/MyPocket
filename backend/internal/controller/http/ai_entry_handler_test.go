@@ -11,11 +11,63 @@ import (
 	"github.com/mypocket/backend/internal/usecase"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"net/textproto"
 	"os"
+	"strings"
 	"testing"
 )
+
+func TestAIEntryRoutesExposeOneShotProcessInsteadOfSessions(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := &Router{Engine: gin.New(), AuthMiddleware: &AuthMiddleware{}}
+	router.RegisterAIEntryRoutes(&AIEntryHandler{})
+	routes := map[string]bool{}
+	for _, route := range router.Engine.Routes() {
+		routes[route.Method+" "+route.Path] = true
+	}
+	if !routes["POST /api/v1/ai/entry/process"] || !routes["GET /api/v1/ai/entry/requests/:request_id"] {
+		t.Fatalf("missing one-shot processing/recovery routes: %+v", routes)
+	}
+	if !routes["GET /api/v1/transactions/:id/attachments/:attachmentId/download"] {
+		t.Fatalf("missing owner-scoped transaction attachment download route: %+v", routes)
+	}
+	for route := range routes {
+		if strings.Contains(route, "/sessions") || strings.Contains(route, "/messages") {
+			t.Fatalf("conversation/session route must not be public: %s", route)
+		}
+	}
+}
+
+func TestAIEntryProcessRejectsSpoofedPDFBeforeProviderWork(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner"); c.Next() })
+	engine.POST("/process", (&AIEntryHandler{}).Process)
+	body := &bytes.Buffer{}
+	form := multipart.NewWriter(body)
+	_ = form.WriteField("request_id", uuid.NewString())
+	_ = form.WriteField("text", "receipt")
+	_ = form.WriteField("timezone", "UTC")
+	header := textproto.MIMEHeader{}
+	header.Set("Content-Disposition", `form-data; name="files"; filename="receipt.pdf"`)
+	header.Set("Content-Type", "application/pdf")
+	part, err := form.CreatePart(header)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = part.Write([]byte("this is not a pdf"))
+	_ = form.Close()
+	req := httptest.NewRequest(http.MethodPost, "/process", body)
+	req.Header.Set("Content-Type", form.FormDataContentType())
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("spoofed PDF status = %d; body=%s", rec.Code, rec.Body.String())
+	}
+}
 
 func TestAIEntryHTTPReviewEditApproveRejectWithRealDatabase(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
@@ -54,10 +106,8 @@ func TestAIEntryHTTPReviewEditApproveRejectWithRealDatabase(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) { c.Set(contextUserIDKey, c.GetHeader("X-Test-Owner")); c.Next() })
-	engine.POST("/sessions", h.CreateSession)
-	engine.GET("/sessions/latest", h.LatestSession)
-	engine.GET("/sessions/:id", h.Session)
-	engine.POST("/sessions/:id/messages", h.Message)
+	engine.POST("/process", h.Process)
+	engine.GET("/requests/:request_id", h.Request)
 	engine.PATCH("/proposals/:id", h.EditProposal)
 	engine.POST("/proposals/:id/approve", h.ApproveProposal)
 	engine.POST("/proposals/:id/reject", h.RejectProposal)
@@ -84,23 +134,54 @@ func TestAIEntryHTTPReviewEditApproveRejectWithRealDatabase(t *testing.T) {
 			}
 		}
 	}
-	var s entity.AIEntrySession
-	request("POST", "/sessions", map[string]any{}, 201, &s)
-	input := map[string]any{"request_id": uuid.NewString(), "text": "ăn sáng 35k, ăn trưa 35k", "timezone": "Asia/Ho_Chi_Minh"}
-	request("POST", "/sessions/"+s.ID+"/messages", input, 200, &s)
-	if len(s.Proposals) != 2 || len(s.Messages) != 2 {
-		t.Fatalf("missing review list: %+v", s)
+	requestID := uuid.NewString()
+	process := func(want int, out any) {
+		t.Helper()
+		body := &bytes.Buffer{}
+		form := multipart.NewWriter(body)
+		_ = form.WriteField("request_id", requestID)
+		_ = form.WriteField("text", "ăn sáng 35k, ăn trưa 35k")
+		_ = form.WriteField("timezone", "Asia/Ho_Chi_Minh")
+		_ = form.Close()
+		req := httptest.NewRequest("POST", "/process", body)
+		req.Header.Set("Content-Type", form.FormDataContentType())
+		req.Header.Set("X-Test-Owner", owner)
+		rec := httptest.NewRecorder()
+		engine.ServeHTTP(rec, req)
+		if rec.Code != want {
+			t.Fatalf("POST /process: %d %s", rec.Code, rec.Body.String())
+		}
+		var envelope struct {
+			Data json.RawMessage `json:"data"`
+		}
+		if err := json.Unmarshal(rec.Body.Bytes(), &envelope); err != nil {
+			t.Fatal(err)
+		}
+		if err := json.Unmarshal(envelope.Data, out); err != nil {
+			t.Fatal(err)
+		}
+	}
+	requestID = uuid.NewString()
+	var processView aiEntryProcessResponse
+	process(200, &processView)
+	if len(processView.Proposals) != 2 || processView.ID != requestID {
+		t.Fatalf("missing one-shot review list: %+v", processView)
+	}
+	var messageCount int64
+	db.Model(&entity.AIEntryMessage{}).Where("session_id = ?", requestID).Count(&messageCount)
+	if messageCount != 0 {
+		t.Fatalf("one-shot request stored chat messages: %d", messageCount)
 	}
 	var count int64
 	db.Model(&entity.Transaction{}).Where("owner_id = ?", owner).Count(&count)
 	if count != 0 {
 		t.Fatal("extraction wrote ledger")
 	}
-	request("POST", "/sessions/"+s.ID+"/messages", input, 200, &s)
-	if providerCalls != 1 || len(s.Proposals) != 2 {
-		t.Fatal("message retry repeated extraction")
+	process(200, &processView)
+	if providerCalls != 1 || len(processView.Proposals) != 2 {
+		t.Fatal("request replay repeated extraction")
 	}
-	p := s.Proposals[0]
+	p := processView.Proposals[0]
 	p.Draft.Amount = 45000
 	p.Draft.IncludedInReports = false
 	request("PATCH", "/proposals/"+p.ID, map[string]any{"version": p.Version, "draft": p.Draft}, 200, &p)
@@ -110,17 +191,17 @@ func TestAIEntryHTTPReviewEditApproveRejectWithRealDatabase(t *testing.T) {
 		t.Fatal("approval not persisted")
 	}
 	request("POST", "/proposals/"+p.ID+"/approve", map[string]any{"version": 2}, 200, &p)
-	request("POST", "/proposals/"+s.Proposals[1].ID+"/reject", map[string]any{"version": 1}, 200, nil)
+	request("POST", "/proposals/"+processView.Proposals[1].ID+"/reject", map[string]any{"version": 1}, 200, nil)
 	var rows []entity.Transaction
 	db.Where("owner_id = ?", owner).Find(&rows)
 	if len(rows) != 1 || rows[0].Amount != 45000 || rows[0].IncludedInReports {
 		t.Fatalf("wrong approved ledger: %+v", rows)
 	}
-	request("GET", "/sessions/latest", nil, 200, &s)
-	if s.Proposals[0].Status == "pending" || s.Proposals[1].Status == "pending" {
+	request("GET", "/requests/"+requestID, nil, 200, &processView)
+	if processView.Proposals[0].Status == "pending" || processView.Proposals[1].Status == "pending" {
 		t.Fatal("review state not restored")
 	}
 	owner = "other"
-	request("GET", "/sessions/"+s.ID, nil, 404, nil)
+	request("GET", "/requests/"+requestID, nil, 404, nil)
 	owner = wallet.OwnerID // Cleanup always uses the test fixture's owner.
 }

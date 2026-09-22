@@ -13,13 +13,17 @@ import { TransactionsPanel } from "../organisms/TransactionsPanel";
 import { GroupManagementPanel } from "../organisms/GroupManagementPanel";
 import { GroupEditorPage } from "../organisms/GroupEditorPage";
 import { WalletManagementPanel } from "../organisms/WalletManagementPanel";
+import { JarManagementPanel } from "../organisms/JarManagementPanel";
+import { MonthDetailPanel } from "../organisms/MonthDetailPanel";
 import { MobileAppShell } from "../templates/MobileAppShell";
 import { APP_CONFIG, APP_ROUTES, API_ROUTES } from "../../config/app";
+import { AccountTimezoneProvider, DEFAULT_ACCOUNT_TIMEZONE } from "../../services/AccountTimezoneContext";
 import {
   clearSession,
   extractFixtureLoginFromQueryParams,
   fetchHome,
   fetchProfile,
+  initializeAccountTimezone,
   getStoredToken,
   HomeOutput,
   isAuthCallbackPath,
@@ -93,7 +97,8 @@ export function FinancePrototypePage() {
           setAuth({ phase: "unauthenticated", errorMessage: "", user: null, home: null });
           return;
         }
-        const [profile, home] = await Promise.all([fetchProfile(token), fetchHome(token)]);
+        const rawProfile = await fetchProfile(token);
+        const [profile, home] = await Promise.all([initializeAccountTimezone(rawProfile, token), fetchHome(token)]);
         if (!cancelled) {
           setAuth({ phase: "authenticated", errorMessage: "", user: profile, home });
         }
@@ -124,7 +129,8 @@ export function FinancePrototypePage() {
       expiresAt: loginOutput.expires_at,
     });
     const token = loginOutput.token;
-    const [profile, home] = await Promise.all([fetchProfile(token), fetchHome(token)]);
+    const rawProfile = await fetchProfile(token);
+    const [profile, home] = await Promise.all([initializeAccountTimezone(rawProfile, token), fetchHome(token)]);
     setAuth({
       phase: "authenticated",
       errorMessage: "",
@@ -163,6 +169,7 @@ export function FinancePrototypePage() {
   const userName = auth.user?.name || "Người dùng";
 
   return (
+    <AccountTimezoneProvider value={auth.user?.timezone || DEFAULT_ACCOUNT_TIMEZONE}>
     <>
       <MobileAppShell
         tab={tab}
@@ -172,17 +179,20 @@ export function FinancePrototypePage() {
         onAdd={() => setQuickAddOpen(true)}
         onAiAdd={() => { setQuickAddOpen(false); setAiEntryOpen(true); }}
         refreshKey={transactionRefresh}
-        showHeader={!location.pathname.startsWith("/account/groups") && !location.pathname.startsWith("/account/wallets")}
+        showHeader={location.pathname !== "/jars" && !location.pathname.startsWith("/months/") && !location.pathname.startsWith("/account/groups") && !location.pathname.startsWith("/account/wallets")}
       >
-        {tab === "overview" ? <OverviewPanel masked={masked} refreshKey={transactionRefresh} /> : null}
+        {location.pathname === "/" ? <OverviewPanel masked={masked} refreshKey={transactionRefresh} /> : null}
+        {location.pathname === "/jars" ? <JarManagementPanel masked={masked} refreshKey={transactionRefresh} /> : null}
+        {/\/months\/[^/]+$/.test(location.pathname) ? <MonthDetailPanel month={decodeURIComponent(location.pathname.split("/").at(-1) ?? "")} masked={masked} refreshKey={transactionRefresh} /> : null}
         {tab === "transactions" ? <TransactionsPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : null}
         {tab === "budgets" ? <BudgetsPanel masked={masked} refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh(value=>value+1)} /> : null}
         {/* ReportsPanel awaits its real reporting API. */}
-        {tab === "account" ? (location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : <AccountPanel user={auth.user} onLogout={handleLogout} />) : null}
+        {tab === "account" ? (location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : <AccountPanel user={auth.user} onLogout={handleLogout} onTimezoneChange={user => setAuth(current => ({ ...current, user }))} />) : null}
       </MobileAppShell>
       {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} onAiEntry={() => { setQuickAddOpen(false); setAiEntryOpen(true); }} onSaved={() => setTransactionRefresh((value) => value + 1)} /> : null}
       {aiEntryOpen ? <AiEntrySheet onClose={() => setAiEntryOpen(false)} onSaved={() => setTransactionRefresh(value => value + 1)} /> : null}
     </>
+    </AccountTimezoneProvider>
   );
 }
 

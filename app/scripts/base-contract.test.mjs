@@ -10,6 +10,8 @@ try {
   const { StatusMessage } = await server.ssrLoadModule('/src/atomic/atoms/StatusMessage.tsx');
   const { Progress, BudgetGauge } = await server.ssrLoadModule('/src/atomic/atoms/Progress.tsx');
   const { BaseTextInput } = await server.ssrLoadModule('/src/atomic/atoms/FormField.tsx');
+  const { BaseCategoryTree } = await server.ssrLoadModule('/src/atomic/molecules/BaseCategoryTree.tsx');
+  const { CategoryTreeSelector } = await server.ssrLoadModule('/src/atomic/molecules/CategoryTreeSelector.tsx');
   const { WalletEditorForm, EMPTY_WALLET_FORM } = await server.ssrLoadModule('/src/atomic/molecules/WalletEditorForm.tsx');
   const { BaseDonutChart } = await server.ssrLoadModule('/src/atomic/molecules/BaseCharts.tsx');
   const { WalletCreateForm, WalletTypePicker, canCreateWallet } = await server.ssrLoadModule('/src/atomic/molecules/WalletCreateForm.tsx');
@@ -22,13 +24,13 @@ try {
   assert.doesNotMatch(maskedBudget,/123[.,]456|200[.,]000/);
   const { apiRequest } = await server.ssrLoadModule('/src/services/api.ts');
   const { budgetDateInput } = await server.ssrLoadModule('/src/services/budgetDates.ts');
-  const originalPeriod={start_at:'2026-08-31T17:00:00Z',end_at:'2026-09-30T17:00:00Z'};
   const priorTZ=process.env.TZ;
   try {
     process.env.TZ='UTC';
-    const preserved=budgetDateInput('2026-08-31','2026-09-30',originalPeriod);
-    assert.equal(preserved.start_at,originalPeriod.start_at);
-    assert.equal(preserved.end_at,originalPeriod.end_at);
+    const utcLabels=budgetDateInput('2026-08-31','2026-09-30');
+    process.env.TZ='America/Los_Angeles';
+    assert.deepEqual(budgetDateInput('2026-08-31','2026-09-30'),utcLabels);
+    assert.deepEqual(utcLabels,{start_date:'2026-08-31',end_date:'2026-09-30'});
   } finally {if(priorTZ===undefined)delete process.env.TZ;else process.env.TZ=priorTZ;}
   const originalFetch=globalThis.fetch;
   try {
@@ -49,6 +51,14 @@ try {
   assert.match(html(Progress,{value:-10,label:'Food'}),/aria-valuenow="0"/);
   assert.match(html(BudgetGauge,{value:115,label:'Food'}),/stroke-danger/);
   const inline = html(BaseTextInput,{variant:'inline','aria-label':'Name'}); assert.doesNotMatch(inline,/border-line/); assert.match(inline,/focus-visible:outline-action/);
+  const selectingTree = html(BaseCategoryTree,{mode:'selection',selectedID:'child',root:{id:'root',name:'Food',subtitle:'Default group',isSystem:true,isEditable:true},children:[{id:'child',name:'Coffee',subtitle:'Personal group',isSystem:false,isEditable:true}],onSelect(){}});
+  assert.equal((selectingTree.match(/aria-pressed="true"/g)??[]).length,1,'category tree selection mode marks the chosen row');
+  assert.equal((selectingTree.match(/aria-pressed="false"/g)??[]).length,1,'category tree selection mode exposes sibling rows as selectable controls');
+  const categories=[{id:'root',parent_id:null,kind:'expense',name:'Food',system_key:'expense_food',icon_key:'expense_food',is_system:true,wallet_ids:[]},{id:'child',parent_id:'root',kind:'expense',name:'Coffee',system_key:null,icon_key:'expense_coffee',is_system:false,wallet_ids:[]}];
+  const treePicker=html(CategoryTreeSelector,{categories,selectableIDs:['child'],selectedID:'child',onSelect(){}});
+  assert.match(treePicker,/aria-pressed="true"/,'category picker preserves selected child group');
+  assert.match(treePicker,/Không áp dụng cho lựa chọn này/,'non-selectable parent remains visible as tree context');
+  assert.match(treePicker,/Không chọn nhóm/,'category picker provides its clear-selection action');
   const wallet = html(WalletEditorForm,{state:EMPTY_WALLET_FORM,saving:true,onChange(){},onSubmit(){},onCancel(){}});
   assert.equal((wallet.match(/disabled=""/g) ?? []).length,6); // name, balance, checkbox, select, save and cancel
   assert.doesNotMatch(wallet, /Ghi chú/);

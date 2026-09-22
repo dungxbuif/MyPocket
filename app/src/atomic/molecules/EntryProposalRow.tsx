@@ -1,97 +1,76 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { BaseButton } from "../atoms/BaseButton";
-import { BaseCheckbox } from "../atoms/BaseCheckbox";
-import { BaseSelect, BaseTextInput, FormField } from "../atoms/FormField";
+import { BaseSelect, FormField } from "../atoms/FormField";
 import { Heading } from "../atoms/Heading";
 import { StatusMessage } from "../atoms/StatusMessage";
 import { SurfaceCard } from "../atoms/SurfaceCard";
 import { Text } from "../atoms/Text";
+import { TransactionFields } from "./TransactionFields";
 import { decideEntryProposal, saveEntryProposal, type EntryDraft, type EntryProposal } from "../../services/ai";
 import { localEntryDate, proposalIssues, sameDraft } from "../../services/aiEntryLogic";
 import type { Category } from "../../services/categories";
-import { categoryAppliesToTransaction } from "../../services/transactionLogic";
 import type { Wallet } from "../../services/wallets";
+import { instantFromLocalDateTime } from "../../services/accountTime";
+import { useAccountTimezone } from "../../services/AccountTimezoneContext";
+import { fetchJarMonth, type JarMonthSummary } from "../../services/jars";
+import { jarAssignmentNeedsSelection, monthKeyForInstant } from "../../services/monthJarLogic";
 
-const COPY = {
-  pending: "Đề xuất chưa ghi sổ", approved: "Đã duyệt", rejected: "Đã từ chối", type: "Loại giao dịch",
-  expense: "Khoản chi", income: "Khoản thu", amount: "Số tiền (VND)", wallet: "Ví", category: "Nhóm",
-  chooseWallet: "Chọn ví", noCategory: "Không chọn nhóm", date: "Ngày và giờ", note: "Ghi chú", reports: "Tính vào báo cáo",
-  save: "Lưu bản nháp", approve: "Duyệt giao dịch", reject: "Từ chối", dirty: "Có thay đổi chưa lưu. Lưu bản nháp trước khi duyệt.",
-  confirmReject: "Từ chối đề xuất này? Không tạo giao dịch và không thể sửa lại đề xuất đã từ chối.",
-  unknown: "Chưa xác định — chọn loại", transfer: "Chuyển tiền — chưa hỗ trợ",
-  transferBlocked: "Chuyển tiền chưa thể duyệt cho đến khi có giao dịch chuyển tiền ghi sổ hai ví.",
-  failed: "Thao tác thất bại. Dữ liệu đang sửa được giữ lại. Tải lại phiên để kiểm tra trạng thái trước khi thử lại.",
-};
-
-export function EntryProposalRow({ proposal, wallets, categories, disabled = false, onUpdated, onSaved, onBusy }: {
+export function EntryProposalRow({ proposal, wallets, categories, disabled = false, onUpdated, onSaved, onBusy, onDraftChange }: {
   proposal: EntryProposal; wallets: Wallet[]; categories: Category[]; disabled?: boolean;
-  onUpdated: (proposal: EntryProposal) => void; onSaved: () => void; onBusy?: (busy: boolean) => void;
+  onUpdated: (proposal: EntryProposal) => void; onSaved: () => void; onBusy?: (busy: boolean) => void; onDraftChange?: (draft: EntryDraft) => void;
 }) {
+  const timezone=useAccountTimezone();
   const [draft, setDraft] = useState(proposal.draft);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const running = useRef(false);
-  const dirty = !sameDraft(draft, proposal.draft);
+  const [jarSummary, setJarSummary] = useState<JarMonthSummary | null>(null);
+  const [busy, setBusy] = useState(false), [error, setError] = useState("");
+  const running = useRef(false), saved = useRef(proposal);
   const transfer = proposal.draft.type === "transfer";
   const supported = draft.type === "income" || draft.type === "expense";
-  const issues = proposalIssues(draft, wallets, categories);
+  const draftMonth = monthKeyForInstant(draft.occurred_at, timezone);
+  useEffect(() => {
+    if (!supported || draft.type !== "expense") {
+      setJarSummary(null);
+      return;
+    }
+    let cancelled = false;
+    fetchJarMonth(draftMonth).then(value => { if (!cancelled) setJarSummary(value); }).catch(() => { if (!cancelled) setJarSummary(null); });
+    return () => { cancelled = true; };
+  }, [supported, draft.type, draftMonth]);
+  const jarOptions = (jarSummary?.items ?? []).filter(item => item.active || item.jar_id === draft.jar_id).map(item => ({ jar_id: item.jar_id, name: item.name, active: item.active }));
+  const stableJarName = jarSummary?.jars.find(item => item.jar_id === draft.jar_id)?.name;
+  if (draft.jar_id && !jarOptions.some(item => item.jar_id === draft.jar_id)) jarOptions.push({ jar_id: draft.jar_id, name: stableJarName ?? "Hũ không có cấu hình tháng", active: false });
+  const issues = [
+    ...proposalIssues(draft, wallets, categories),
+    ...(draft.jar_id && draft.type !== "expense" ? ["Chỉ khoản chi thông thường mới được gắn hũ."] : []),
+    ...(jarAssignmentNeedsSelection(draft.jar_id, jarOptions, proposal.draft.occurred_at, draft.occurred_at) ? ["Hũ đã gỡ khỏi tháng này. Bỏ chọn hoặc chọn hũ đang hoạt động trước khi lưu."] : []),
+  ];
   const locked = busy || disabled;
-  const wallet = wallets.find(item => item.id === draft.wallet_id);
-  const applicable = categories.filter(category => (draft.type === "income" || draft.type === "expense") && categoryAppliesToTransaction(category, draft.type, draft.wallet_id, wallet?.type));
-  const change = (patch: Partial<EntryDraft>) => setDraft(current => ({ ...current, ...patch }));
-  const perform = async (action: "save" | "approve" | "reject") => {
+  const change = (next: EntryDraft) => { setDraft(next); onDraftChange?.(next); };
+  const perform = async (action: "approve" | "reject") => {
     if (running.current || disabled || proposal.status !== "pending") return;
-    if (action === "approve" && (dirty || issues.length || !supported || transfer)) return;
-    if (action === "reject" && !window.confirm(COPY.confirmReject)) return;
+    if (action === "approve" && (issues.length || !supported || transfer)) return;
     running.current = true; setBusy(true); onBusy?.(true); setError("");
     try {
-      const updated = action === "save" ? await saveEntryProposal(proposal, draft) : await decideEntryProposal(proposal, action);
+      if (action === "approve" && !sameDraft(draft, saved.current.draft)) saved.current = await saveEntryProposal(saved.current, draft);
+      const updated = await decideEntryProposal(saved.current, action);
       onUpdated(updated);
       if (updated.status === "approved") onSaved();
     } catch (reason) {
-      setError(`${reason instanceof Error ? reason.message : COPY.failed} ${COPY.failed}`);
+      setError(reason instanceof Error ? reason.message : "Không thể lưu giao dịch. Dữ liệu đang sửa được giữ lại.");
     } finally { running.current = false; setBusy(false); onBusy?.(false); }
   };
-
   if (proposal.status !== "pending") return <SurfaceCard padding="md" className="space-y-2">
-    <Heading as="h3" size="field">{COPY[proposal.status]}</Heading>
-    <Text>{proposal.draft.type} · {proposal.draft.amount.toLocaleString("vi-VN")} VND</Text>
-    <Text>{wallets.find(item => item.id === proposal.draft.wallet_id)?.name ?? proposal.draft.wallet_id}</Text>
-    <Text>{categories.find(item => item.id === proposal.draft.category_id)?.name ?? COPY.noCategory}</Text>
-    <Text>{localEntryDate(proposal.draft.occurred_at).replace("T", " ")}</Text>
+    <Heading as="h3" size="field">{proposal.status === "approved" ? "Đã lưu" : "Đã xóa"}</Heading>
+    <Text>{proposal.draft.amount.toLocaleString("vi-VN")} VND · {wallets.find(item => item.id === proposal.draft.wallet_id)?.name}</Text>
     <Text>{proposal.draft.note}</Text>
-    <Text tone="secondary">{COPY.reports}: {proposal.draft.included_in_reports ? "Có" : "Không"}</Text>
   </SurfaceCard>;
-
-  return <SurfaceCard padding="md" className="space-y-3">
-    <Heading as="h3" size="field">{COPY.pending}</Heading>
-    {(proposal.questions ?? []).map((question, index) => <StatusMessage key={index}>{question}</StatusMessage>)}
+  return <section className="space-y-3" aria-label="Giao dịch đề xuất">
     {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
-    {transfer ? <StatusMessage>{COPY.transferBlocked}</StatusMessage> : null}
-    <FormField label={COPY.type}><BaseSelect value={draft.type} disabled={locked || transfer} onChange={event => change({ type: event.target.value })}>
-      {!supported ? <option value={draft.type}>{transfer ? COPY.transfer : COPY.unknown}</option> : null}
-      <option value="expense">{COPY.expense}</option><option value="income">{COPY.income}</option>
-    </BaseSelect></FormField>
-    <FormField label={COPY.amount}><BaseTextInput inputMode="numeric" type="number" min="1" step="1" value={draft.amount || ""} disabled={locked} onChange={event => change({ amount: Number(event.target.value) })} /></FormField>
-    <FormField label={COPY.wallet}><BaseSelect value={draft.wallet_id} disabled={locked} onChange={event => change({ wallet_id: event.target.value })}>
-      <option value="">{COPY.chooseWallet}</option>
-      {draft.wallet_id && !wallets.some(item => item.id === draft.wallet_id && item.type !== "credit") ? <option value={draft.wallet_id}>Ví không phù hợp</option> : null}
-      {wallets.filter(item => item.type === "basic" || item.type === "goal").map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-    </BaseSelect></FormField>
-    <FormField label={COPY.category}><BaseSelect value={draft.category_id ?? ""} disabled={locked} onChange={event => change({ category_id: event.target.value || null })}>
-      <option value="">{COPY.noCategory}</option>
-      {draft.category_id && !applicable.some(item => item.id === draft.category_id) ? <option value={draft.category_id}>Nhóm không phù hợp</option> : null}
-      {applicable.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
-    </BaseSelect></FormField>
-    <FormField label={COPY.date}><BaseTextInput type="datetime-local" disabled={locked} value={localEntryDate(draft.occurred_at)} onChange={event => change({ occurred_at: event.target.value && Number.isFinite(Date.parse(event.target.value)) ? new Date(event.target.value).toISOString() : "" })} /></FormField>
-    <FormField label={COPY.note}><BaseTextInput disabled={locked} value={draft.note} onChange={event => change({ note: event.target.value })} /></FormField>
-    <BaseCheckbox label={COPY.reports} disabled={locked} checked={draft.included_in_reports} onChange={event => change({ included_in_reports: event.target.checked })}>{COPY.reports}</BaseCheckbox>
-    {issues.map(issue => <StatusMessage key={issue}>{issue}</StatusMessage>)}
-    {dirty ? <StatusMessage>{COPY.dirty}</StatusMessage> : null}
-    <div className="flex flex-wrap gap-2">
-      <BaseButton variant="secondary" disabled={locked || !dirty} onClick={() => void perform("save")}>{COPY.save}</BaseButton>
-      <BaseButton disabled={locked || dirty || issues.length > 0 || !supported || transfer} onClick={() => void perform("approve")}>{COPY.approve}</BaseButton>
-      <BaseButton variant="danger" disabled={locked} onClick={() => void perform("reject")}>{COPY.reject}</BaseButton>
-    </div>
-  </SurfaceCard>;
+    {!supported ? <FormField label="Loại giao dịch"><BaseSelect disabled={locked || transfer} value={draft.type} onChange={e => change({ ...draft, type: e.target.value })}><option value={draft.type}>{transfer ? "Chuyển tiền — chưa hỗ trợ" : "Chọn loại giao dịch"}</option><option value="expense">Khoản chi</option><option value="income">Khoản thu</option></BaseSelect></FormField> : null}
+    <TransactionFields state={{ type: draft.type === "income" ? "income" : "expense", amount: draft.amount ? String(draft.amount) : "", walletID: draft.wallet_id, categoryID: draft.category_id ?? "", jarID: draft.jar_id ?? "", occurredAt: localEntryDate(draft.occurred_at,timezone), note: draft.note, includedInReports: draft.included_in_reports }}
+      disabled={locked || !supported || transfer} wallets={wallets} categories={categories} jars={jarOptions}
+      onChange={next => { let occurredAt=""; try { if(next.occurredAt) occurredAt=instantFromLocalDateTime(next.occurredAt,timezone); } catch { /* invalid wall times remain unapprovable */ } change({ type: next.type, amount: Number(next.amount), wallet_id: next.walletID, category_id: next.categoryID || null, jar_id: next.jarID || null, occurred_at: occurredAt, note: next.note, included_in_reports: next.includedInReports }); }} />
+    {issues.map(issue => <StatusMessage variant="plain" key={issue}>{issue}</StatusMessage>)}
+    <div className="flex gap-2"><BaseButton className="flex-1" disabled={locked || issues.length > 0 || !supported || transfer} onClick={() => void perform("approve")}>Lưu giao dịch</BaseButton><BaseButton variant="ghost" disabled={locked} onClick={() => void perform("reject")}>Xóa item</BaseButton></div>
+  </section>;
 }

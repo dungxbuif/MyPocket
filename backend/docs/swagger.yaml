@@ -17,31 +17,24 @@ definitions:
       wallet_id:
         type: string
     type: object
-  entity.AIEntryMessage:
-    properties:
-      content:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: string
-      role:
-        type: string
-    type: object
   entity.AIEntryProposal:
     properties:
+      attachment_ids:
+        items:
+          type: string
+        type: array
       created_at:
         type: string
       draft:
         $ref: '#/definitions/entity.AIEntryDraft'
       id:
         type: string
+      process_id:
+        type: string
       questions:
         items:
           type: string
         type: array
-      session_id:
-        type: string
       status:
         type: string
       transaction_id:
@@ -50,36 +43,6 @@ definitions:
         type: string
       version:
         type: integer
-    type: object
-  entity.AIEntrySession:
-    properties:
-      created_at:
-        type: string
-      error:
-        type: string
-      id:
-        type: string
-      messages:
-        items:
-          $ref: '#/definitions/entity.AIEntryMessage'
-        type: array
-      processing:
-        type: boolean
-      proposals:
-        items:
-          $ref: '#/definitions/entity.AIEntryProposal'
-        type: array
-      updated_at:
-        type: string
-    type: object
-  entity.AIImage:
-    properties:
-      base64:
-        type: string
-      mime_type:
-        type: string
-      name:
-        type: string
     type: object
   entity.Budget:
     properties:
@@ -324,19 +287,6 @@ definitions:
       type:
         type: string
     type: object
-  usecase.AIEntryMessageInput:
-    properties:
-      images:
-        items:
-          $ref: '#/definitions/entity.AIImage'
-        type: array
-      request_id:
-        type: string
-      text:
-        type: string
-      timezone:
-        type: string
-    type: object
   usecase.HomeOutput:
     properties:
       greeting:
@@ -390,6 +340,50 @@ paths:
       security:
       - BearerAuth: []
       summary: AI entry configuration availability
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/process:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Idempotency UUID
+        in: formData
+        name: request_id
+        required: true
+        type: string
+      - description: Transaction description
+        in: formData
+        name: text
+        type: string
+      - description: IANA timezone
+        in: formData
+        name: timezone
+        required: true
+        type: string
+      - description: JPEG, PNG, or PDF, up to three files
+        in: formData
+        name: files
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Process one text and optional file submission into reviewable transaction
+        proposals
       tags:
       - AI Entry
   /api/v1/ai/entry/proposals/{id}:
@@ -476,26 +470,12 @@ paths:
       summary: Reject a proposal without changing ledger
       tags:
       - AI Entry
-  /api/v1/ai/entry/sessions:
-    post:
-      produces:
-      - application/json
-      responses:
-        "201":
-          description: Created
-          schema:
-            $ref: '#/definitions/entity.AIEntrySession'
-      security:
-      - BearerAuth: []
-      summary: Create an owner-scoped AI entry chat
-      tags:
-      - AI Entry
-  /api/v1/ai/entry/sessions/{id}:
+  /api/v1/ai/entry/requests/{request_id}:
     get:
       parameters:
-      - description: Session ID
+      - description: Idempotency UUID
         in: path
-        name: id
+        name: request_id
         required: true
         type: string
       produces:
@@ -504,64 +484,10 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/entity.AIEntrySession'
+            $ref: '#/definitions/httpapi.Response'
       security:
       - BearerAuth: []
-      summary: Read AI entry chat and proposals
-      tags:
-      - AI Entry
-  /api/v1/ai/entry/sessions/{id}/messages:
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: Session ID
-        in: path
-        name: id
-        required: true
-        type: string
-      - description: Message
-        in: body
-        name: message
-        required: true
-        schema:
-          $ref: '#/definitions/usecase.AIEntryMessageInput'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/entity.AIEntrySession'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/httpapi.Problem'
-        "409":
-          description: Conflict
-          schema:
-            $ref: '#/definitions/httpapi.Problem'
-        "503":
-          description: Service Unavailable
-          schema:
-            $ref: '#/definitions/httpapi.Problem'
-      security:
-      - BearerAuth: []
-      summary: Extract reviewable drafts from text and OCR-first images
-      tags:
-      - AI Entry
-  /api/v1/ai/entry/sessions/latest:
-    get:
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/entity.AIEntrySession'
-      security:
-      - BearerAuth: []
-      summary: Resume latest AI entry chat
+      summary: Read one-shot AI process status and proposals by idempotency key
       tags:
       - AI Entry
   /api/v1/auth/google:
@@ -1084,6 +1010,33 @@ paths:
       security:
       - BearerAuth: []
       summary: Update an income or expense transaction
+      tags:
+      - Transactions
+  /api/v1/transactions/{id}/attachments/{attachmentId}/download:
+    get:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Attachment ID
+        in: path
+        name: attachmentId
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "302":
+          description: Redirect to a short-lived private object URL
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Download a private attachment linked to an owned transaction
       tags:
       - Transactions
   /api/v1/wallets:

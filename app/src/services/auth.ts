@@ -5,6 +5,8 @@ export type UserProfile = {
   id: string;
   name: string;
   email: string;
+  timezone: string;
+  timezone_confirmed: boolean;
   created_at: string;
 };
 
@@ -80,6 +82,8 @@ export async function startGoogleLogin(): Promise<LoginOutput | null> {
       id: String(candidate.user.id ?? ""),
       name: String(candidate.user.name ?? ""),
       email: candidate.user.email,
+      timezone: String(candidate.user.timezone ?? "Asia/Ho_Chi_Minh"),
+      timezone_confirmed: Boolean(candidate.user.timezone_confirmed),
       created_at: String(candidate.user.created_at ?? ""),
     },
   };
@@ -117,6 +121,8 @@ export function extractFixtureLoginFromQueryParams(query: URLSearchParams): Logi
     id: query.get("user_id")?.trim() ?? query.get("id")?.trim() ?? "",
     name: query.get("name")?.trim() ?? "",
     email: query.get("email")?.trim() ?? "",
+    timezone: "Asia/Ho_Chi_Minh",
+    timezone_confirmed: false,
     created_at: query.get("created_at")?.trim() ?? "",
   };
 
@@ -133,6 +139,24 @@ export function extractFixtureLoginFromQueryParams(query: URLSearchParams): Logi
 
 export async function fetchProfile(token?: string): Promise<UserProfile> {
   return apiRequest<UserProfile>(API_ROUTES.PROFILE, {}, token);
+}
+
+export async function updateAccountTimezone(timezone: string, initializeOnly = false, token?: string): Promise<UserProfile> {
+  return apiRequest<UserProfile>(API_ROUTES.PROFILE, {
+    method: "PATCH",
+    body: JSON.stringify({ timezone, initialize_only: initializeOnly }),
+  }, token);
+}
+
+export async function initializeAccountTimezone(profile: UserProfile, token: string): Promise<UserProfile> {
+  if (profile.timezone_confirmed) return profile;
+  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  if (!browserTimezone) return profile;
+  try {
+    return await updateAccountTimezone(browserTimezone, true, token);
+  } catch {
+    return profile;
+  }
 }
 
 export async function fetchHome(token?: string): Promise<HomeOutput> {

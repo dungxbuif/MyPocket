@@ -1,7 +1,7 @@
-import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes } from "react";
+import type { InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from "react";
 import { ChevronDown } from "lucide-react";
 import { Heading } from "./Heading";
-import { FORM_CONTROL_VARIANTS } from "./tokens";
+import { FORM_CONTROL_VARIANTS, TEXTAREA_VARIANTS } from "./tokens";
 
 type FieldProps = { label: string; children: ReactNode };
 
@@ -12,6 +12,10 @@ export function FormField({ label, children }: FieldProps) {
 type ControlVariant = keyof typeof FORM_CONTROL_VARIANTS;
 export function BaseTextInput({ variant = "default", className = "", ...props }: InputHTMLAttributes<HTMLInputElement> & { variant?: ControlVariant }) {
   return <input {...props} className={`${FORM_CONTROL_VARIANTS[variant]} ${className}`} />;
+}
+
+export function BaseTextArea({ variant = "default", className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement> & { variant?: keyof typeof TEXTAREA_VARIANTS }) {
+  return <textarea {...props} className={`${TEXTAREA_VARIANTS[variant]} ${className}`} />;
 }
 
 export function BaseSelect({ className = "", variant = "default", ...props }: SelectHTMLAttributes<HTMLSelectElement> & { variant?: ControlVariant }) {

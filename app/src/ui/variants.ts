@@ -107,9 +107,15 @@ export const HEADING_SIZES = {
 export const FORM_CONTROL_CLASS = `mt-1.5 w-full ${BASE_COMPONENT_RADIUS} border border-line bg-card px-3 py-2.5 text-sm text-heading outline-none transition focus:border-accent focus:ring-2 focus:ring-success-line disabled:cursor-not-allowed disabled:bg-row disabled:text-muted`;
 
 export const FORM_CONTROL_VARIANTS = {
+  amount: "w-full min-w-0 min-h-14 border-0 bg-transparent text-4xl font-medium text-heading outline-none focus-visible:ring-2 focus-visible:ring-success-line disabled:text-muted",
   default: FORM_CONTROL_CLASS,
   inline: "w-full min-h-11 rounded-control border border-transparent bg-transparent px-0 text-base font-medium text-ink focus-visible:outline-2 focus-visible:outline-action disabled:text-muted",
   title: "w-full min-h-11 rounded-control border border-transparent bg-transparent px-0 text-xl font-bold text-heading focus-visible:outline-2 focus-visible:outline-action disabled:text-muted",
+} as const;
+
+export const TEXTAREA_VARIANTS = {
+  default: `${FORM_CONTROL_CLASS} min-h-28 resize-y`,
+  composer: "min-h-24 w-full resize-y rounded-control border-0 bg-transparent px-1 py-1 text-base text-heading outline-none placeholder:text-muted focus-visible:ring-2 focus-visible:ring-success-line disabled:text-muted",
 } as const;
 
 export const CATEGORY_TREE_LAYOUTS = {

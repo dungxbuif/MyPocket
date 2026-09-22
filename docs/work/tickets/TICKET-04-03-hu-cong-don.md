@@ -1,12 +1,14 @@
 ---
 artifact_type: ticket
 id: TICKET-04-03
-status: draft
+status: in_progress
 owner: human
 parent: TICKET-04
 trace:
   parent: TICKET-04-hu-chi-tieu.md
   guide: README.md
+  detail_design: CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md
+  validation: ../VALIDATION_MATRIX.md
 ---
 
 # TICKET-04-03 — Xem hũ cộng dồn

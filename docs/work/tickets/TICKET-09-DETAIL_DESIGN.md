@@ -257,7 +257,7 @@ Mọi route giữ `{data, meta}` và problem details hiện hành; sai owner tr�
 
 Một màn Trợ lý với hai mode “Nhập giao dịch” / “Hỏi tài chính”; lưu mode trong phiên, có thao tác chuyển mode rõ ràng. Proposal và bước confirm vẫn riêng để user nhìn thấy tác động tiền trước khi lưu.
 
-Tái sử dụng từ `app/src/atomic/atoms/`: `BaseButton`, `IconButton`, `Text`, `Heading`, `FormField` (kiểm tra exports input/select trước dùng), `SurfaceCard`, `StatusMessage`, `BaseCheckbox`, `SegmentedControl`. Từ `molecules/`: `BaseBottomSheet`, `WalletSelectionList`, `CategorySelectionList`, `TransactionItem`.
+Tái sử dụng từ `app/src/atomic/atoms/`: `BaseButton`, `IconButton`, `Text`, `Heading`, `FormField` (kiểm tra exports input/select trước dùng), `SurfaceCard`, `StatusMessage`, `BaseCheckbox`, `SegmentedControl`. Từ `molecules/`: `BaseBottomSheet`, `WalletSelectionList`, `CategoryTreeSelector` backed by `BaseCategoryTree`, `TransactionItem`.
 
 Base mới cần đặc tả trước JSX: `BaseFileUpload` (accept/size/remove/keyboard), `AttachmentList` (file progress/error/source), `AIProposalCard` (missing/edit/source/confirm state), `AIAnswerSources` (scope/as_of/facts). Các molecules compose atom; không copy CSS card/control vào màn.
 

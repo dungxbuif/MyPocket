@@ -16,7 +16,7 @@
 | 10 | Numeric keypad | QuickAddSheet preview | partial, arithmetic not complete |
 | 11 | Wallet list | WalletCard, wallet-management composition | implemented visual; API wallet management separately tested |
 | 12 | Transaction list | TransactionItem | implemented visual; source preview data |
-| 13 | Category tree | BaseCategoryTree | partial; fixed expanded, named nested/line spacing |
+| 13 | Category tree | BaseCategoryTree | implemented for navigation and selection; fixed expanded, named nested/line spacing |
 | 14 | Date group header | TransactionsPanel + Text | partial; date-header molecule needed for real ledger |
 | 15 | Total balance | AppHeader | partial; preview data remains |
 | 16 | Budget progress | BudgetProgressItem + Progress | partial; no time marker/warning policy |
@@ -36,4 +36,6 @@
 Additional foundation atoms: SurfaceCard, Text, Heading, FormField, BaseTextInput, BaseSelect, BaseCheckbox, BaseLink, Divider, IconButton, Progress, Chip.
 No inventory entry claims all 28 are complete. Existing retained preview components must meet the same automated checks as mounted code.
 
-Screen contracts: [Account groups](screens/account-groups/README.md) · [Transactions](screens/transactions/README.md).
+New shared bases: BaseTextArea and the button variant of BaseFileUpload support the AI composer; AssistantComposer and AssistantResultCard provide the Money Lover inspired input/result layout while leaving submission and approval behavior to the screen. CategoryTreeSelector composes BaseCategoryTree selection mode for transaction, budget and proposal pickers. These use the existing theme tokens and transaction field bases.
+
+Screen contracts: [Overview](screens/overview/README.md) · [Account groups](screens/account-groups/README.md) · [Transactions](screens/transactions/README.md) · [Budgets](screens/budgets/README.md) · [Jars](screens/jars/README.md) · [Month detail](screens/month-detail/README.md) · [Assistant](screens/assistant/README.md).

@@ -1,0 +1,233 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" name="viewport"/>
+<title>Thêm Giao Dịch</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'sans-serif'],
+          },
+          colors: {
+            bgPrimary: '#f2f4f7',
+            brandGreen: '#34c759',
+            emeraldCustom: '#1db584',
+            lightGrey: '#e5e7eb',
+            textSub: '#8e8e93',
+            cardBg: '#ffffff',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-layout">
+    body {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      background-color: #e5e7eb;
+    }
+    /* Hide scrollbar */
+    ::-webkit-scrollbar {
+      display: none;
+    }
+  </style>
+</head>
+<body class="flex justify-center items-center min-h-screen text-slate-800 antialiased p-0 sm:p-4 select-none">
+<!-- BEGIN: MobileDeviceFrame -->
+<div class="relative w-full max-w-[420px] h-[100vh] sm:h-[880px] bg-[#f1f3f6] sm:rounded-[52px] shadow-2xl overflow-hidden flex flex-col justify-between border-0 sm:border-[8px] border-slate-900/10">
+<!-- Top Container: Status Bar + App Header + Form Content -->
+<div class="flex-1 flex flex-col overflow-y-auto">
+<!-- BEGIN: StatusBar -->
+<header class="w-full pt-3 px-7 pb-1 flex justify-between items-center text-black font-semibold text-[15px] tracking-tight shrink-0 z-20">
+<!-- iOS Time -->
+<span class="font-bold tracking-normal text-[15px]">22:24</span>
+<!-- iOS Icons: Cellular, Wifi, Battery -->
+<div class="flex items-center space-x-2">
+<!-- Signal Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 24 24">
+<rect height="6" rx="1" width="3.2" x="2" y="16"></rect>
+<rect height="10" rx="1" width="3.2" x="7.6" y="12"></rect>
+<rect height="15" rx="1" width="3.2" x="13.2" y="7"></rect>
+<rect height="20" rx="1" width="3.2" x="18.8" y="2"></rect>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 24 24">
+<path d="M12 4c4.3 0 8.2 1.6 11.2 4.4l-2 2.2C18.8 8.4 15.5 7.1 12 7.1s-6.8 1.3-9.2 3.5L.8 8.4C3.8 5.6 7.7 4 12 4zm0 6c2.7 0 5.2 1 7.1 2.8l-2.1 2.2C15.6 13.8 13.9 13 12 13s-3.6.8-5 2l-2.1-2.2C6.8 11 9.3 10 12 10zm0 6c1.2 0 2.2.5 3 1.3L12 21.2l-3-3.9c.8-.8 1.8-1.3 3-1.3z"></path>
+</svg>
+<!-- Battery Icon (73%) -->
+<div class="flex items-center space-x-0.5">
+<div class="w-6 h-3 border border-black rounded-[4px] p-0.5 flex items-center justify-start relative">
+<div class="h-full bg-black rounded-[2px]" style="width: 73%;"></div>
+</div>
+<div class="w-0.5 h-1.5 bg-black rounded-r-full"></div>
+<span class="text-[11px] font-bold pl-0.5">73</span>
+</div>
+</div>
+</header>
+<!-- END: StatusBar -->
+<!-- BEGIN: NavigationHeader -->
+<nav class="relative px-5 pt-3 pb-3 flex items-center justify-between shrink-0">
+<!-- Cancel Button -->
+<button class="px-5 py-2.5 bg-white rounded-full shadow-sm text-[15px] font-semibold text-slate-800 hover:bg-slate-50 transition active:scale-95" type="button">
+          Huỷ
+        </button>
+<!-- Title -->
+<h1 class="absolute left-1/2 -translate-x-1/2 text-[18px] font-bold text-slate-900 tracking-tight">
+          Thêm Giao Dịch
+        </h1>
+<div class="w-12"></div> <!-- Spacer for symmetry -->
+</nav>
+<!-- END: NavigationHeader -->
+<!-- Main Form Wrapper inside rounded white container/sheet -->
+<main class="px-4 pt-1 pb-4 flex flex-col space-y-3">
+<!-- BEGIN: MainCard -->
+<div class="bg-white rounded-[26px] p-4 shadow-sm border border-slate-100/60 flex flex-col space-y-3">
+<!-- Segmented Tab: Khoản chi / Khoản thu / Vay/Nợ -->
+<div class="bg-[#ebeef2] p-1 rounded-2xl flex items-center justify-between text-[14px] font-semibold text-slate-700">
+<button class="flex-1 py-1.5 bg-white text-slate-900 rounded-xl shadow-sm text-center font-bold transition-all" type="button">
+              Khoản chi
+            </button>
+<button class="flex-1 py-1.5 text-[#5e6573] hover:text-slate-900 text-center font-medium transition-all" type="button">
+              Khoản thu
+            </button>
+<button class="flex-1 py-1.5 text-[#5e6573] hover:text-slate-900 text-center font-medium transition-all" type="button">
+              Vay/Nợ
+            </button>
+</div>
+<!-- Section: Account Selector (ACB Credit Platinum) -->
+<div class="flex items-center justify-between py-2 border-b border-slate-100 cursor-pointer active:opacity-70">
+<div class="flex items-center space-x-3.5">
+<!-- Credit Card Icon / Badge -->
+<div class="w-8 h-6 rounded-md bg-[#3ea897] flex flex-col justify-between p-1 shadow-sm">
+<div class="w-full h-1 bg-[#257266] rounded-xs"></div>
+<div class="flex justify-between items-center">
+<div class="w-1.5 h-1 bg-white/60 rounded-[1px]"></div>
+<div class="w-2.5 h-1 bg-white/80 rounded-[1px]"></div>
+</div>
+</div>
+<span class="text-[16px] font-semibold text-slate-800">ACB Credit Platinum</span>
+</div>
+<!-- Chevron Right -->
+<svg class="w-5 h-5 text-slate-300 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Section: Amount Input -->
+<div class="pt-0.5 pb-2 border-b border-slate-100">
+<span class="text-[12px] font-medium text-slate-400 block mb-1">Số tiền</span>
+<div class="flex items-center space-x-3">
+<div class="px-2.5 py-1 bg-slate-50 border border-slate-200/80 rounded-lg text-[13px] font-semibold text-slate-500">
+                VND
+              </div>
+<span class="text-[34px] font-normal tracking-tight text-slate-950 font-sans leading-none">
+                0
+              </span>
+</div>
+</div>
+<!-- Section: Category Selector (Chọn nhóm) -->
+<div class="flex items-center justify-between py-2.5 border-b border-slate-100 cursor-pointer active:opacity-70">
+<div class="flex items-center space-x-3.5">
+<!-- Placeholder Circle Icon -->
+<div class="w-7 h-7 rounded-full bg-slate-300"></div>
+<span class="text-[18px] text-slate-400 font-normal tracking-wide">Chọn nhóm</span>
+</div>
+<!-- Chevron Right -->
+<svg class="w-5 h-5 text-slate-300 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Section: Note (Ghi chú) -->
+<div class="flex items-center justify-between py-2.5 border-b border-slate-100 cursor-pointer active:opacity-70">
+<div class="flex items-center space-x-3.5">
+<!-- Notes / List Icon -->
+<div class="w-7 flex flex-col justify-center items-center">
+<svg class="w-6 h-6 text-slate-800" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<path d="M4 6h16M4 12h10M4 18h16" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-[16px] font-semibold text-slate-800">Ghi chú</span>
+</div>
+<!-- Chevron Right -->
+<svg class="w-5 h-5 text-slate-300 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Section: Date Selector -->
+<div class="flex items-center justify-between pt-1 pb-1">
+<!-- Calendar Icon -->
+<div class="w-7 flex items-center justify-center">
+<svg class="w-6 h-6 text-slate-800" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24">
+<rect height="18" rx="2" ry="2" width="18" x="3" y="4"></rect>
+<line x1="16" x2="16" y1="2" y2="6"></line>
+<line x1="8" x2="8" y1="2" y2="6"></line>
+<line x1="3" x2="21" y1="10" y2="10"></line>
+<circle cx="8" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="12" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="16" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="8" cy="18" fill="currentColor" r="1"></circle>
+<circle cx="12" cy="18" fill="currentColor" r="1"></circle>
+</svg>
+</div>
+<!-- Date Selector Controls: Prev / Current Date / Next -->
+<div class="flex items-center space-x-2 flex-1 justify-end">
+<!-- Left Arrow Button -->
+<button class="w-8 h-8 rounded-lg bg-[#ebedf0] flex items-center justify-center text-slate-500 hover:bg-slate-200 transition" type="button">
+<svg class="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15 19l-7-7 7-7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Date Pill -->
+<div class="px-4 py-1.5 bg-[#f0f3f3] rounded-lg text-[14px] font-semibold text-[#48a868] text-center flex-1 max-w-[200px]">
+                Thứ Hai, 31/08/2026
+              </div>
+<!-- Right Arrow Button -->
+<button class="w-8 h-8 rounded-lg bg-[#ebedf0] flex items-center justify-center text-slate-500 hover:bg-slate-200 transition" type="button">
+<svg class="w-4 h-4 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+</div>
+</div>
+<!-- END: MainCard -->
+<!-- BEGIN: MoreDetailsButton -->
+<button class="w-full py-3.5 bg-white rounded-full text-center text-[#35a864] font-bold text-[15px] shadow-sm hover:bg-slate-50 active:scale-[0.99] transition" type="button">
+          Thêm chi tiết
+        </button>
+<!-- END: MoreDetailsButton -->
+</main>
+</div>
+<!-- BEGIN: BottomActionBar -->
+<footer class="p-4 bg-transparent shrink-0">
+<div class="flex items-center space-x-3 max-w-full">
+<!-- Save Button (Disabled State) -->
+<button class="flex-1 py-3 bg-[#caccd0] text-white rounded-2xl font-bold text-[16px] tracking-wide text-center cursor-not-allowed shadow-none" disabled="" type="button">
+          Lưu
+        </button>
+<!-- Floating Camera/Gallery Quick Action Button -->
+<button class="w-12 h-12 rounded-full bg-[#34c759] text-white flex items-center justify-center shadow-md active:scale-95 transition hover:brightness-105 shrink-0" type="button">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewbox="0 0 24 24">
+<rect height="18" rx="3" stroke-width="2" width="18" x="3" y="3"></rect>
+<circle cx="8.5" cy="8.5" fill="currentColor" r="1.5"></circle>
+<path d="M21 15l-5-5L5 21" stroke-linecap="round" stroke-linejoin="round"></path>
+<!-- Tiny Plus indicator -->
+<path d="M19 19v-4m-2 2h4" stroke-linecap="round" stroke-linejoin="round" stroke-width="2.2"></path>
+</svg>
+</button>
+</div>
+<!-- iOS Home Indicator -->
+<div class="w-32 h-1 bg-black/20 rounded-full mx-auto mt-4 mb-1"></div>
+</footer>
+<!-- END: BottomActionBar -->
+</div>
+<!-- END: MobileDeviceFrame -->
+</body></html>

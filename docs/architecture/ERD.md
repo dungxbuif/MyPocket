@@ -10,13 +10,17 @@ shared_fields: [status, trace]
 
 # ERD
 
-## Implemented AI entry schema — migration 000010
+## Implemented calendar, jar, and month schema — migrations 000013–000015
 
-`ai_entry_sessions`: owner FK user, processing token/expiry, error and timestamps. `ai_entry_messages`: session FK, user/assistant text and private extracted source text. `ai_entry_proposals`: composite `(session_id,owner_id)` FK to session owner, positive version, pending/approved/rejected status, JSONB draft/questions, unique nullable transaction receipt ID. Check constraint requires receipt iff approved. Receipt deliberately has no ledger FK, so deleting a ledger row cannot enable replay/recreation. `ai_entry_requests`: `(session_id,request_id)` primary key and payload hash to deduplicate extraction. Deleting an account cascades these owned records. No image bytes, S3 objects, reusable bank-wallet mapping or balance counters added. [ADR-005](../decisions/ADR-005-ai-entry-review.md), [slice](../work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md). Version 10 applied to dev PostgreSQL; proof uses isolated test-owned IDs and cleanup.
+Migration `000013` adds `user.timezone` and `timezone_confirmed`, converts `wallets.target_date` to `date`, and replaces budget timestamp bounds with account-calendar `start_date`/`end_date` date columns while preserving existing labels. Migration `000014` adds stable owner-scoped `jars`, initialized month records (`jar_months`), per-month configurations (`jar_month_configs`), and nullable `transactions.jar_id` with a composite same-owner FK. Migration `000015` adds `month_notes`, uniquely keyed by owner and first day of month. Local dev DB is at migration 15, `dirty=false`; repository integration tests use PostgreSQL. Month figures are derived from live ledger data; no report snapshot/close table or cron job exists. [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md) is proposed; [CORE-03](../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md) is in progress pending UAT and reconciliation.
 
-## Implemented budget schema — migration 000009
+## Implemented AI entry schema — migrations 000010–000012
 
-`budgets`: text UUID id, owner_id FK user, name, positive safe-integer limit_amount, nullable wallet_id/category_id FKs, start_at/end_at timestamptz with end > start, timestamps. Owner/period index. Delete owner/wallet/category cascades matching budget configuration; deleting budget never removes transactions. Spent/remaining days/ended are derived fields, not stored counters. [ADR-004](../decisions/ADR-004-budget-api-data.md), [API design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md). Dev DB migrated successfully to version 9; no AutoMigrate introduced. Historical rename-pending note below is superseded by explicit migrations already applied.
+Migration `000010` created `ai_entry_sessions`, `ai_entry_messages`, `ai_entry_proposals`, and `ai_entry_requests`. The one-shot API uses the owner-scoped session row internally for process/idempotency only; it writes no messages or exposes history. `ai_entry_messages` is legacy and unused. Migrations `000011`–`000012` add `transaction_attachments` (private object key, owner/process, source metadata, OCR text/state and cleanup deadline) and unique `(transaction_id,attachment_id)` links, plus safe cleanup claim state. Approval writes links in the same SQL transaction as the ledger row; owner/link-scoped download is implemented. Those migrations are part of the current clean local version 15; real DB repository tests pass. Explicit cleanup command is implemented but not run against bucket contents. Live S3/OCR and browser download UAT remain pending. [ADR-005](../decisions/ADR-005-ai-entry-review.md), [ADR-006](../decisions/ADR-006-private-ai-attachments.md), [AI-ENTRY-02](../work/tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md).
+
+## Implemented budget schema — migrations 000009 and 000013
+
+`budgets`: text UUID id, owner_id FK user, name, positive safe-integer limit_amount, nullable wallet_id/category_id FKs, account-calendar `start_date`/`end_date` SQL `date`, timestamps. Owner/period index. Delete owner/wallet/category cascades matching budget configuration; deleting budget never removes transactions. Spent/remaining days/ended are derived fields, not stored counters. Existing labels were backfilled in `000013` using the existing-account timezone. [ADR-004](../decisions/ADR-004-budget-api-data.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md), [API design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md). No AutoMigrate is used.
 
 ## Field Ownership
 
@@ -88,6 +92,12 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `categories` | System or user-owned group | System/User | Migrated; owner-approved system catalog is seeded through `000004`. |
 | `category_wallets` | Quan hệ nhóm–ví áp dụng | Cùng user với nhóm/ví | Migrated; owner consistency remains use-case enforced. |
 | `transactions` | Owner-scoped income/expense ledger entry | User | Migrated; belongs to one wallet and optional visible category. |
+| `jars` | Stable owner-scoped jar identity | User | Migration `000014`; month-specific names/allocation live in `jar_month_configs`. |
+| `jar_months` | Marks a month whose jar configuration has been initialized | User/month | Migration `000014`; serializes one-time prior-month copy, including empty initialization. |
+| `jar_month_configs` | Name, allocation rule and active state for one jar/month | User/month/jar | Migration `000014`; historical rows remain when a later month changes. |
+| `month_notes` | User-authored note for one account-local month | User/month | Migration `000015`; independent from calculated report figures. |
+| `transaction_attachments` | Private S3 receipt metadata and OCR text/state | User/process | Migration `000011`–`000012`; object key is backend-only; 24-hour unlinked cleanup lifecycle. |
+| `transaction_attachment_links` | Approved transaction-to-receipt relation | User via both FKs | Unique transaction/attachment pair; only created inside proposal approval. |
 
 ## Relationships
 
@@ -97,6 +107,11 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `user` | `categories` | 1-to-many | `categories.owner_id` references `user.id` for personal groups. |
 | `categories` | `categories` | Parent 0..1 / children 0..N | Tối đa hai cấp. |
 | `categories` | `wallets` | Many-to-many | Qua `category_wallets`; use case xác minh liên kết cùng owner. |
+| `user` | `jars`, `month_notes`, `jar_months` | 1-to-many | Rows are owner-scoped; month and note keys use the first calendar day. |
+| `jar_months` | `jar_month_configs` | 1-to-many | Composite `(owner_id, month)` FK; a month is copied/initialized once. |
+| `jars` | `jar_month_configs` | 1-to-many | Composite `(owner_id, jar_id)` FK prevents cross-owner configuration. |
+| `jars` | `transactions` | 1-to-many optional | Composite owner/jar FK; use case additionally validates ordinary-expense kind and month configuration. |
+| `transactions` | `transaction_attachments` | Many-to-many | Qua `transaction_attachment_links`; transaction owner and attachment owner are both checked before signed download. |
 
 ## Constraints
 
@@ -104,15 +119,17 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 - `wallets.owner_id` is required and indexed; every repository query scopes by owner.
 - `wallets.type` accepts `basic`, `goal`, or `credit`.
 - `wallets.currency` is fixed to `VND` for the current stage.
+- `user.timezone` must be a valid IANA zone. Instants remain UTC `timestamptz`; calendar dates and month keys have no time-of-day or implicit UTC conversion.
+- Jar/month configuration and note repositories are owner-scoped. Jar spend, monthly totals and completion state are derived; they are not stored as counters or immutable close snapshots.
 - Xoá thực sau xác nhận đã được owner chốt, kể cả ví có giao dịch. Migration `000003` cascade xoá transaction thuộc ví; không cascade xoá danh mục toàn account từ liên kết ví. Không có unique constraint tên ví. Chi tiết tác động tới ví đối ứng cần thiết kế cùng giao dịch liên kết.
 
 ## Migrations
 
 - Versioned SQL migrations are active. [`DATABASE.md`](DATABASE.md) defines the dev/prod command and migration ledger; API startup does not invoke `AutoMigrate`.
-- Wallet migration (after design approval): add `wallets` with UUID primary key, owner foreign key/index, type, name, opening balance, currency, total-inclusion flag, description and timestamps.
-- Migration vẫn chờ detail design được review: bổ sung trường riêng goal/credit và xác định ledger cho số dư khởi tạo/điều chỉnh trước khi chốt schema. Chỉ tạo migration cho phần triển khai; việc xoá giao dịch hai vế cần ma trận ảnh hưởng riêng.
-- Rollback: disable wallet routes and retain the additive table; do not drop user data automatically.
+- Applied migration sequence: `000013_account_timezone_and_calendar_dates`, `000014_jars`, `000015_month_notes`; local migration ledger reports version 15, clean.
+- Rollbacks of `000014`/`000015` refuse to drop user jar/note data. Do not run destructive down migrations against populated environments. `000013` rollback retains account timezone preferences.
+- Paired transfers, adjustment ledger, credit/debt semantics, and recurring execution remain separate designs; this schema does not claim to implement them.
 
 ## Linked Decisions
 
-- TBD
+- [ADR-008 — Account timezone and calendar dates](../decisions/ADR-008-account-timezone-and-calendar-dates.md) (proposed; implementation evidence recorded, owner decision status remains human-owned).

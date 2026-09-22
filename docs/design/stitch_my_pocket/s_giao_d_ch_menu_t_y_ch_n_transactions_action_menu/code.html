@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Sổ Giao Dịch - Menu Tác Vụ Mở Rộng</title>
+<!-- Tailwind CSS CDN -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          },
+          colors: {
+            app: {
+              bg: '#F3F4F8',
+              primary: '#22C55E',
+              danger: '#EF4444',
+              subtext: '#8E8E93',
+              pill: '#D9D9D9',
+              dark: '#1C1C1E',
+            }
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Stylesheet -->
+<style data-purpose="base-enhancements">
+    body {
+      font-family: 'Manrope', sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+    /* Hide scrollbars for slick native app feeling */
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 flex justify-center items-center min-h-screen p-0 sm:p-4 text-slate-900 selection:bg-emerald-500 selection:text-white">
+<!-- BEGIN: MobileContainer -->
+<!-- iPhone 15/16 Pro Ratio Container (approx 414 x 896 or 430 x 932) -->
+<main class="w-full max-w-[430px] h-[932px] max-h-screen sm:max-h-[932px] bg-[#F2F3F7] relative flex flex-col overflow-hidden sm:rounded-[44px] sm:shadow-2xl border border-black/5">
+<!-- BEGIN: TopStatusBar -->
+<header class="w-full pt-3 px-7 pb-1 flex justify-between items-center z-20 select-none" data-purpose="status-bar">
+<span class="text-[15px] font-bold tracking-tight text-black">22:45</span>
+<div class="flex items-center space-x-2">
+<!-- Cellular Bars -->
+<svg class="w-4 h-3 text-black fill-current" viewbox="0 0 17 12">
+<rect height="4" rx="0.5" width="2.5" x="0" y="8"></rect>
+<rect height="6" rx="0.5" width="2.5" x="4.5" y="6"></rect>
+<rect height="9" rx="0.5" width="2.5" x="9" y="3"></rect>
+<rect height="12" rx="0.5" width="2.5" x="13.5" y="0"></rect>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3.5 text-black stroke-current stroke-[1.8] fill-none" viewbox="0 0 24 24">
+<path d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12 18.5h.01" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<!-- Battery Icon with 48% inside -->
+<div class="relative flex items-center">
+<div class="w-6 h-[11.5px] border border-black rounded-[3.5px] p-[1.5px] flex items-center">
+<div class="h-full bg-black rounded-[1.5px] w-[48%]"></div>
+</div>
+<div class="w-[2px] h-[4px] bg-black rounded-r-[1px] ml-[1px]"></div>
+<span class="text-[9px] font-bold text-black ml-1">48</span>
+</div>
+</div>
+</header>
+<!-- END: TopStatusBar -->
+<!-- BEGIN: HeaderNav -->
+<nav class="px-5 pt-2 pb-1 flex justify-between items-center z-20" data-purpose="app-bar">
+<!-- Question Help Icon Button -->
+<button class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-black/[0.04] text-slate-700 active:scale-95 transition-transform" type="button">
+<svg class="w-5 h-5 text-slate-800 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M8.25 9a3.75 3.75 0 115.5 3.32c-.63.35-1 .98-1 1.68v.5M12 18h.01" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Account / Wallet Selector Button -->
+<button class="flex items-center space-x-2 bg-white px-3.5 py-1.5 rounded-full shadow-sm border border-black/[0.04] active:scale-95 transition-transform" type="button">
+<svg class="w-5 h-5 text-slate-700 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="9.5"></circle>
+<path d="M2.5 12h19M12 2.5a15.3 15.3 0 014 9.5 15.3 15.3 0 01-4 9.5 15.3 15.3 0 01-4-9.5 15.3 15.3 0 014-9.5z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-sm font-semibold text-slate-800">Tổng cộng</span>
+<svg class="w-3.5 h-3.5 text-slate-500 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19.5 8.25l-7.5 7.5-7.5-7.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+<!-- Dots / More Menu Button Placeholder Underneath -->
+<button class="w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-sm border border-black/[0.04] text-slate-700 active:scale-95 transition-transform opacity-70" type="button">
+<svg class="w-5 h-5" fill="currentColor" viewbox="0 0 24 24">
+<circle cx="12" cy="6" r="1.5"></circle>
+<circle cx="12" cy="12" r="1.5"></circle>
+<circle cx="12" cy="18" r="1.5"></circle>
+</svg>
+</button>
+</nav>
+<!-- END: HeaderNav -->
+<!-- BEGIN: BackgroundTransactionsView -->
+<!-- Scrollable Screen Area underneath the popover -->
+<div class="flex-1 overflow-y-auto px-4 pt-2 pb-24 no-scrollbar relative z-10 space-y-4" data-purpose="transactions-content">
+<!-- Time Frame Tabs -->
+<section class="border-b border-slate-200/80 pb-0" data-purpose="time-tabs">
+<div class="flex items-center justify-between text-xs text-slate-400 font-medium px-2">
+<span class="truncate">2026 - 09/08/2026</span>
+<div class="flex flex-col items-center">
+<span class="text-sm font-bold text-slate-900 pb-2 border-b-2 border-black">TUẦN TRƯỚC</span>
+</div>
+<span class="truncate">U</span>
+</div>
+</section>
+<!-- Overview Income / Outcome Strip -->
+<section class="bg-white rounded-3xl p-5 shadow-sm border border-black/[0.03] space-y-3" data-purpose="cashflow-summary">
+<div class="flex justify-between items-center text-sm font-medium text-slate-600">
+<span>Tiền vào</span>
+<span class="font-bold text-slate-800 text-base">0 đ</span>
+</div>
+<div class="flex justify-between items-center text-sm font-medium text-slate-600">
+<span>Tiền ra</span>
+<span class="font-bold text-slate-800 text-base">8.160.000 đ</span>
+</div>
+<div class="pt-2 border-t border-slate-100 flex justify-center">
+<button class="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center space-x-1" type="button">
+<span>Xem báo cáo cho giai đoạn này</span>
+<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</button>
+</div>
+</section>
+<!-- Day Card: 15 Thang 8 -->
+<article class="bg-white rounded-3xl p-4 shadow-sm border border-black/[0.03]" data-purpose="day-group-15">
+<!-- Date Header Row -->
+<header class="flex justify-between items-baseline pb-3 border-b border-slate-100 mb-3">
+<div class="flex items-center space-x-3">
+<span class="text-3xl font-extrabold text-slate-900 leading-none">15</span>
+<div class="flex flex-col text-[11px] leading-tight text-slate-500 font-medium">
+<span>Thứ Bảy</span>
+<span>tháng 8 2026</span>
+</div>
+</div>
+<div class="text-right">
+<span class="text-base font-bold text-slate-900">-8.000.000 đ</span>
+</div>
+</header>
+<!-- Transaction Items List -->
+<div class="space-y-4">
+<!-- Item 1 -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<!-- Custom Category Icon: Debt with badge -->
+<div class="relative w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+<svg class="w-6 h-6 text-emerald-700" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14.5h-2v-1h2v1zm0-3h-2c0-2 2-2.5 2-4 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.2 1.8-4 4-4s4 1.8 4 4c0 1.8-1.5 2.5-2 3.5v.5z"></path>
+</svg>
+<!-- Red small badge -->
+<div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+<svg class="w-2.5 h-2.5 text-white stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 14l-7 7m0 0l-7-7m7 7V3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-900">Trả nợ</p>
+<p class="text-xs text-slate-400">Trả cho ai đó</p>
+</div>
+</div>
+<span class="text-sm font-bold text-red-500">1.000.000 đ</span>
+</div>
+<!-- Item 2 -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="relative w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+<svg class="w-6 h-6 text-emerald-700" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14.5h-2v-1h2v1zm0-3h-2c0-2 2-2.5 2-4 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.2 1.8-4 4-4s4 1.8 4 4c0 1.8-1.5 2.5-2 3.5v.5z"></path>
+</svg>
+<div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+<svg class="w-2.5 h-2.5 text-white stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 14l-7 7m0 0l-7-7m7 7V3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-900">Trả nợ</p>
+<p class="text-xs text-slate-400">Trả cho ai đó</p>
+</div>
+</div>
+<span class="text-sm font-bold text-red-500">1.000.000 đ</span>
+</div>
+<!-- Item 3 -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="relative w-11 h-11 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+<svg class="w-6 h-6 text-emerald-700" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 14.5h-2v-1h2v1zm0-3h-2c0-2 2-2.5 2-4 0-1.1-.9-2-2-2s-2 .9-2 2H7c0-2.2 1.8-4 4-4s4 1.8 4 4c0 1.8-1.5 2.5-2 3.5v.5z"></path>
+</svg>
+<div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+<svg class="w-2.5 h-2.5 text-white stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 14l-7 7m0 0l-7-7m7 7V3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-900">Trả nợ</p>
+<p class="text-xs text-slate-400">Trả cho ai đó</p>
+</div>
+</div>
+<span class="text-sm font-bold text-red-500">6.000.000 đ</span>
+</div>
+</div>
+</article>
+<!-- Day Card: 14 Thang 8 -->
+<article class="bg-white rounded-3xl p-4 shadow-sm border border-black/[0.03]" data-purpose="day-group-14">
+<!-- Date Header Row -->
+<header class="flex justify-between items-baseline pb-3 border-b border-slate-100 mb-3">
+<div class="flex items-center space-x-3">
+<span class="text-3xl font-extrabold text-slate-900 leading-none">14</span>
+<div class="flex flex-col text-[11px] leading-tight text-slate-500 font-medium">
+<span>Thứ Sáu</span>
+<span>tháng 8 2026</span>
+</div>
+</div>
+<div class="text-right">
+<span class="text-base font-bold text-slate-900">-160.000 đ</span>
+</div>
+</header>
+<!-- Transaction Items List -->
+<div class="space-y-4">
+<!-- Snack / An vat -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="relative w-11 h-11 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+<!-- Candy / Snack icon -->
+<svg class="w-6 h-6 text-amber-600" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"></path>
+</svg>
+<div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+<svg class="w-2.5 h-2.5 text-white stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 14l-7 7m0 0l-7-7m7 7V3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-900">Ăn vặt</p>
+<p class="text-xs text-slate-400">Xiên bẩn</p>
+</div>
+</div>
+<span class="text-sm font-bold text-red-500">120.000 đ</span>
+</div>
+<!-- Rice Meal / Com bua -->
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3">
+<div class="relative w-11 h-11 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+<!-- Food Bowl icon -->
+<svg class="w-6 h-6 text-orange-600" fill="currentColor" viewbox="0 0 24 24">
+<path d="M12 4a8 8 0 00-8 8v1h16v-1a8 8 0 00-8-8zm-6 11h12v1a4 4 0 01-4 4h-4a4 4 0 01-4-4v-1z"></path>
+</svg>
+<div class="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center border-2 border-white">
+<svg class="w-2.5 h-2.5 text-white stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M19 14l-7 7m0 0l-7-7m7 7V3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</div>
+<div>
+<p class="text-sm font-semibold text-slate-900">Cơm Bữa</p>
+<p class="text-xs text-slate-400">Ăn trưa</p>
+</div>
+</div>
+<span class="text-sm font-bold text-red-500">40.000 đ</span>
+</div>
+</div>
+</article>
+</div>
+<!-- END: BackgroundTransactionsView -->
+<!-- BEGIN: ContextActionMenuPopover -->
+<!-- Floating Menu Overlay positioned precisely at top-right per IMG_7706 -->
+<section class="absolute top-[68px] right-3 z-30 w-[240px] pointer-events-auto" data-purpose="extended-action-menu">
+<div class="bg-white/95 backdrop-blur-xl rounded-[32px] p-3 shadow-2xl border border-white/60 ring-1 ring-black/[0.08] flex flex-col space-y-2.5 animate-in fade-in zoom-in-95 duration-150">
+<!-- Action 1: Khoảng thời gian -->
+<button class="w-full py-2.5 px-3 bg-[#E2E4E9] hover:bg-[#D4D7DF] active:scale-[0.98] rounded-full text-[14px] font-semibold text-slate-800 text-center transition-all shadow-sm" type="button">
+          Khoảng thời gian
+        </button>
+<!-- Action 2: Xem theo nhóm -->
+<button class="w-full py-2.5 px-3 bg-[#E2E4E9] hover:bg-[#D4D7DF] active:scale-[0.98] rounded-full text-[14px] font-semibold text-slate-800 text-center transition-all shadow-sm" type="button">
+          Xem theo nhóm
+        </button>
+<!-- Action 3: Xoá nhiều giao dịch -->
+<button class="w-full py-2.5 px-3 bg-[#E2E4E9] hover:bg-[#D4D7DF] active:scale-[0.98] rounded-full text-[14px] font-semibold text-slate-800 text-center transition-all shadow-sm" type="button">
+          Xoá nhiều giao dịch
+        </button>
+<!-- Action 4: Chuyển tiền đến ví khác -->
+<button class="w-full py-2.5 px-3 bg-[#E2E4E9] hover:bg-[#D4D7DF] active:scale-[0.98] rounded-full text-[14px] font-semibold text-slate-800 text-center transition-all shadow-sm" type="button">
+          Chuyển tiền đến ví khác
+        </button>
+<!-- Action 5: Điều chỉnh số dư -->
+<button class="w-full py-2.5 px-3 bg-[#E2E4E9] hover:bg-[#D4D7DF] active:scale-[0.98] rounded-full text-[14px] font-semibold text-slate-800 text-center transition-all shadow-sm" type="button">
+          Điều chỉnh số dư
+        </button>
+<!-- Action 6: Đồng bộ ví -->
+<button class="w-full py-2.5 px-3 bg-[#E2E4E9] hover:bg-[#D4D7DF] active:scale-[0.98] rounded-full text-[14px] font-semibold text-slate-800 text-center transition-all shadow-sm" type="button">
+          Đồng bộ ví
+        </button>
+</div>
+</section>
+<!-- END: ContextActionMenuPopover -->
+<!-- BEGIN: BottomNavigationBar -->
+<!-- Native iOS Bottom Tab Bar -->
+<nav class="absolute bottom-3 left-4 right-4 bg-white/95 backdrop-blur-md h-[72px] rounded-[36px] shadow-lg border border-black/[0.05] flex items-center justify-around px-2 z-40" data-purpose="bottom-nav">
+<!-- Nav 1: Tổng quan -->
+<a class="flex flex-col items-center justify-center flex-1 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<svg class="w-6 h-6 stroke-[2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M2.25 12l8.954-8.955a1.126 1.126 0 011.592 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-semibold mt-1">Tổng quan</span>
+</a>
+<!-- Nav 2: Sổ giao dịch (Active) -->
+<a class="flex flex-col items-center justify-center flex-1 text-slate-900 font-bold" href="#">
+<div class="bg-slate-100 rounded-full px-4 py-1 flex flex-col items-center">
+<svg class="w-6 h-6 stroke-[2.2] text-slate-900" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M21 12a2.25 2.25 0 00-2.25-2.25H15a3 3 0 11-6 0H5.25A2.25 2.25 0 003 12m18 0v6a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 18v-6m18 0V9M3 12V9m18 0a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 9m18 0V6a2.25 2.25 0 00-2.25-2.25H5.25A2.25 2.25 0 003 6v3" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] tracking-tight mt-0.5">Sổ giao dịch</span>
+</div>
+</a>
+<!-- Center Floating Action Button (+) -->
+<div class="flex items-center justify-center -mt-6">
+<button aria-label="Thêm mới giao dịch" class="w-13 h-13 p-3.5 bg-[#22C55E] text-white rounded-full shadow-lg shadow-emerald-500/40 hover:bg-emerald-600 active:scale-90 transition-all flex items-center justify-center" type="button">
+<svg class="w-6 h-6 stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 4.5v15m7.5-7.5h-15" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</button>
+</div>
+<!-- Nav 3: Ngân sách -->
+<a class="flex flex-col items-center justify-center flex-1 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<svg class="w-6 h-6 stroke-[2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-semibold mt-1">Ngân sách</span>
+</a>
+<!-- Nav 4: Tài khoản -->
+<a class="flex flex-col items-center justify-center flex-1 text-slate-400 hover:text-slate-600 transition-colors" href="#">
+<svg class="w-6 h-6 stroke-[2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+<span class="text-[10px] font-semibold mt-1">Tài khoản</span>
+</a>
+</nav>
+<!-- END: BottomNavigationBar -->
+<!-- BEGIN: HomeIndicator -->
+<!-- Native iOS Home bar indicator -->
+<div class="absolute bottom-1 inset-x-0 flex justify-center pointer-events-none z-50">
+<div class="w-36 h-1 bg-black/30 rounded-full"></div>
+</div>
+<!-- END: HomeIndicator -->
+</main>
+<!-- END: MobileContainer -->
+</body></html>

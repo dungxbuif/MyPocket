@@ -12,7 +12,8 @@
 | BaseLink | to/label/content | Một link tương tác duy nhất; không bọc button trong anchor |
 | BaseNavigationItem / BaseFab | active / children, action | aria-current, named selected color; FAB 56px; consumer chỉ quyết định vị trí |
 | Text / Heading | semantic tag, size, weight, tone; numeric | Manrope, type scale và màu chung; className chỉ layout |
-| FormField / BaseTextInput / BaseSelect | native props; default/inline/title | label association; focus còn thấy; disabled forwarding; select chevron không ăn click |
+| FormField / BaseTextInput / BaseTextArea / BaseSelect | native props; default/inline/title/composer | label association; focus còn thấy; disabled forwarding; textarea hỗ trợ multiline composer theo token; select chevron không ăn click |
+| BaseFileUpload | field/button | Chọn nhiều JPEG/PNG/PDF; giới hạn và xử lý tệp do consumer cung cấp; button variant kích hoạt input ẩn có nhãn truy cập được |
 | BaseCheckbox | checked/disabled/label/onChange | controlled boolean, native keyboard, hàng min 44px |
 | IconBadge | size xs/sm/md/lg; rounded/circle; tone | Một tone map, không chồng class màu. Icon visual size không đồng nghĩa hit target |
 | Progress | value/label/danger | clamp thanh 0–100, aria-valuenow, rounded cap; nhãn/số tiền bên ngoài giữ giá trị nghiệp vụ thật |
@@ -28,18 +29,20 @@ Wallet empty states in Overview (“Chưa có ví.”) and WalletManagementPanel
 | Base | Composition và behavior | Chi tiết |
 | --- | --- | --- |
 | BaseBottomSheet | Heading + IconButton, modal shell; focus trap, Escape, backdrop, return focus, scroll lock | [Behavior](BEHAVIOR.md) |
-| BaseCategoryTree | SurfaceCard + BaseButton row + IconBadge + Text; root/children/trailing content | [Tree](../molecules/category-tree/README.md) |
+| BaseCategoryTree | SurfaceCard + BaseButton row + IconBadge + Text; root/children/trailing content; navigation/selection mode | [Tree](../molecules/category-tree/README.md) |
 | WalletCard / TransactionItem | shared row/button, badge và numeric Text; domain tone maps | [Cards](../atoms/base-cards/README.md) |
 | FormSelectorRow / InlineControlRow | leading/content/trailing slots; native input chỉ qua base | [Rows](../molecules/transaction-form-rows/README.md) |
 | CategoryEditForm / ApplicableWalletsCard | base fields, icon picker, checkbox, status/save | [Edit group](../molecules/edit-group/README.md) |
 | BudgetProgressItem / GoalCard | SurfaceCard + IconBadge + Text + Progress | [Budget](../molecules/budget-progress-cards/README.md) |
+| DateField / AmountField | BaseButton, FormSelectorRow, BaseCalendar, BaseModal | date stepping/calendar and integer-safe calculator shared by transaction and budget forms |
 | PageBackHeader | BaseLink + Heading + trailing slot | một tầng interactive |
 | AccountMenuRow / ProfileHeroCard | shared identity/navigation presentation | screen-specific actions thuộc consumer |
 | BaseBarChart / BaseDonutChart | values/shares/label; shared visual geometry and theme-based data colors | source preview only; tooltip/drilldown not implemented |
+| AssistantComposer / AssistantResultCard | SurfaceCard, BaseTextArea, BaseFileUpload, BaseButton, Text/Heading | vùng soạn một yêu cầu nhiều dòng có thể kèm tệp; thẻ kết quả AI chỉ trình bày nhóm đề xuất và action từ consumer, không sở hữu hội thoại/history hoặc lưu giao dịch |
 
 ## Contract gate
 
-WalletSelectionList: controlled selectedID/editing, aggregate excludes is_in_total=false, grouped shared rows and selection marks; callbacks own navigation. SavingsSummary: clamped Progress with real remaining/reached state, calendar-day countdown. CategorySelectionList: BaseTextInput search and base rows of API-supplied applicable categories; onSelect returns category ID. These molecules reuse controls and tokens, not custom screen styling.
+WalletSelectionList: controlled selectedID/editing, aggregate excludes is_in_total=false, grouped shared rows and selection marks; callbacks own navigation. SavingsSummary: clamped Progress with real remaining/reached state, calendar-day countdown. CategoryTreeSelector: BaseTextInput search, clear action and BaseCategoryTree selection mode; retains a non-applicable parent as context when an applicable child exists, and only selectable IDs invoke onSelect. Transaction, proposal and budget pickers share this tree used in group management.
 
 Wallet follow-up: BaseSwitch owns the native checkbox role=switch, 44px target, checked/focus/disabled visuals and controlled onChange. BaseBottomSheet `presentation=form` owns canvas/tall shell, cancel/title/headerAction; same focus trap, Escape and restoration. WalletCreateForm composes shared cards/inline controls/switch; WalletTypePicker composes row buttons with aria-pressed selection. See [wallet contract](../screens/wallets/README.md).
 

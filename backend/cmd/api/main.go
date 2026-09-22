@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
 
 	"github.com/google/uuid"
@@ -14,6 +15,7 @@ import (
 	"github.com/mypocket/backend/internal/infrastructure/cache"
 	"github.com/mypocket/backend/internal/infrastructure/db"
 	repo "github.com/mypocket/backend/internal/infrastructure/repository"
+	"github.com/mypocket/backend/internal/infrastructure/storage"
 	"github.com/mypocket/backend/internal/usecase"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -72,6 +74,8 @@ func main() {
 	}
 
 	userRepo := repo.NewUserPostgresRepository(database)
+	jarRepository := repo.NewJarPostgresRepository(database)
+	monthNotes := repo.NewMonthPostgresRepository(database)
 	jwtSvc := auth.NewJWT(cfg.JWTSecret, cfg.JWTTTL)
 	googleOAuth := auth.NewGoogleOAuth(auth.GoogleOAuthConfig{
 		ClientID:     cfg.GoogleClientID,
@@ -91,18 +95,38 @@ func main() {
 	categoryHandler := httpapi.NewCategoryHandler(usecase.NewCategoryInteractor(categoryRepository))
 	walletRepository := repo.NewWalletPostgresRepository(database)
 	walletHandler := httpapi.NewWalletHandler(walletRepository)
-	transactionHandler := httpapi.NewTransactionHandler(repo.NewTransactionPostgresRepository(database), walletRepository, categoryRepository)
+	transactionRepository := repo.NewTransactionPostgresRepository(database)
+	transactionHandler := httpapi.NewTransactionHandler(transactionRepository, walletRepository, categoryRepository)
+	transactionHandler.Users = userRepo
+	transactionHandler.Jars = jarRepository
 	verifySession := func(sessionID string) (string, error) {
 		return authUc.VerifySession(context.Background(), sessionID)
 	}
 	middleware := httpapi.NewAuthMiddleware(jwtSvc, verifySession)
 	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, walletHandler, transactionHandler, middleware, cfg.CORSAllowedOrigins)
-	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: repo.NewBudgetPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Transactions: repo.NewTransactionPostgresRepository(database)})
+	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: repo.NewBudgetPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Transactions: repo.NewTransactionPostgresRepository(database), Users: userRepo})
+	router.RegisterJarRoutes(&httpapi.JarHandler{Jars: jarRepository, Users: userRepo})
+	router.RegisterMonthRoutes(&httpapi.MonthHandler{Users: userRepo, Transactions: transactionRepository, Categories: categoryRepository, Jars: jarRepository, Notes: monthNotes})
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey})
-	router.RegisterAIEntryRoutes(&httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient}})
+	attachmentStorage, err := newAttachmentStorage(cfg)
+	if err != nil {
+		log.Fatalf("configure private attachment storage failed: %v", err)
+	}
+	router.RegisterAIEntryRoutes(&httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: attachmentStorage, Users: userRepo}})
 	router.Engine.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	if err := router.Engine.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("server failed: %v", err)
 	}
+}
+
+func newAttachmentStorage(cfg config.Config) (*storage.S3, error) {
+	configured := cfg.S3Endpoint != "" || cfg.S3Region != "" || cfg.S3Bucket != "" || cfg.S3AccessKeyID != "" || cfg.S3SecretAccessKey != ""
+	if !configured {
+		if cfg.AppEnv != "development" {
+			return nil, errors.New("private attachment storage must be configured outside development")
+		}
+		return nil, nil
+	}
+	return storage.NewS3(storage.S3Config{Endpoint: cfg.S3Endpoint, Region: cfg.S3Region, Bucket: cfg.S3Bucket, Prefix: cfg.S3Prefix, Environment: cfg.AppEnv, AccessKeyID: cfg.S3AccessKeyID, SecretAccessKey: cfg.S3SecretAccessKey, ForcePathStyle: cfg.S3ForcePathStyle})
 }

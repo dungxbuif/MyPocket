@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Thêm Giao Dịch</title>
+<!-- Tailwind CSS v3 with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Manrope & Inter -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;family=SF+Pro+Display:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Lucide Icons CDN -->
+<script src="https://unpkg.com/lucide@latest"></script>
+<!-- Tailwind Configuration -->
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            appBg: '#F0F2F5',
+            brandGreen: '#48B553',
+            brandGreenHover: '#3ea248',
+            keyBg: '#EFF1F4',
+            chipBg: '#F0F2F4',
+            cardBg: '#FFFFFF',
+            accentMuted: '#EBF6EC',
+            textPrimary: '#1E232A',
+            textSecondary: '#8E95A2',
+            textPlaceholder: '#B7BDC7',
+            borderLight: '#F3F4F6'
+          },
+          fontFamily: {
+            sans: ['Manrope', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+<!-- Custom Stylesheet -->
+<style data-purpose="custom-ios-styling">
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .active-scale:active {
+      transform: scale(0.96);
+      transition: transform 0.08s ease;
+    }
+  </style>
+</head>
+<body class="bg-[#1C1C1E] flex justify-center items-center min-h-screen p-0 sm:p-4 font-sans antialiased text-textPrimary">
+<!-- BEGIN: PhoneContainer -->
+<!-- Device Frame (iOS Container) -->
+<main class="w-full max-w-[425px] h-[100dvh] sm:h-[880px] sm:max-h-[92vh] bg-appBg sm:rounded-[48px] shadow-2xl relative flex flex-col overflow-hidden border-0 sm:border-[8px] sm:border-[#2C2C2E]">
+<!-- iOS Top Status Bar Area -->
+<section aria-label="Status Bar" class="w-full pt-3 px-7 pb-1 flex justify-between items-center shrink-0 z-20">
+<div class="font-bold text-[15px] tracking-tight text-black">22:24</div>
+<div class="flex items-center space-x-1.5 text-black">
+<!-- Cellular Signal Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 17 12">
+<rect height="4" rx="0.7" width="2.5" x="0" y="8"></rect>
+<rect height="6.5" rx="0.7" width="2.5" x="4.5" y="5.5"></rect>
+<rect height="9" rx="0.7" width="2.5" x="9" y="3"></rect>
+<rect height="12" rx="0.7" width="2.5" x="13.5" y="0"></rect>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3.5 stroke-current fill-none stroke-2" stroke-linecap="round" stroke-linejoin="round" viewbox="0 0 24 24">
+<path d="M5 12.55a11 11 0 0 1 14.08 0"></path>
+<path d="M1.42 9a16 16 0 0 1 21.16 0"></path>
+<path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+<line x1="12" x2="12.01" y1="20" y2="20"></line>
+</svg>
+<!-- iOS Battery Icon 73% -->
+<div class="flex items-center gap-0.5">
+<div class="w-6 h-[11.5px] border-[1.5px] border-black/80 rounded-[3.5px] p-[1px] flex items-center">
+<div class="h-full w-[73%] bg-black rounded-[1.5px]"></div>
+</div>
+<div class="w-[1px] h-[4px] bg-black/80 rounded-r-sm"></div>
+</div>
+</div>
+</section>
+<!-- BEGIN: TopHeader -->
+<!-- App Navigation Header -->
+<header class="w-full px-4 pt-1 pb-3 flex items-center relative shrink-0 z-10">
+<!-- Cancel Button -->
+<button class="bg-cardBg active-scale text-[15px] font-semibold text-textPrimary px-4 py-2 rounded-full shadow-sm border border-black/5 flex items-center justify-center transition hover:bg-gray-50" type="button">
+        Huỷ
+      </button>
+<!-- Title -->
+<h1 class="absolute left-1/2 -translate-x-1/2 text-[17px] font-bold tracking-normal text-[#1A1A1A]">
+        Thêm Giao Dịch
+      </h1>
+</header>
+<!-- END: TopHeader -->
+<!-- BEGIN: ScrollableContent -->
+<!-- Main Transaction Form Container -->
+<div class="flex-1 overflow-y-auto px-4 space-y-3.5 no-scrollbar pb-6" data-purpose="transaction-form-scroll">
+<!-- Primary Transaction Card -->
+<div class="bg-cardBg rounded-[28px] p-4 shadow-sm border border-black/[0.03]">
+<!-- Tab Switcher: Expense / Income / Debt -->
+<nav aria-label="Loại giao dịch" class="bg-[#ECEEF1] p-1 rounded-full flex items-center mb-4">
+<button class="flex-1 py-1.5 rounded-full bg-white font-semibold text-[13.5px] text-textPrimary shadow-sm text-center transition" type="button">
+            Khoản chi
+          </button>
+<button class="flex-1 py-1.5 rounded-full text-textSecondary font-medium text-[13.5px] text-center hover:text-textPrimary transition" type="button">
+            Khoản thu
+          </button>
+<button class="flex-1 py-1.5 rounded-full text-textSecondary font-medium text-[13.5px] text-center hover:text-textPrimary transition" type="button">
+            Vay/Nợ
+          </button>
+</nav>
+<!-- Form Rows Container -->
+<div class="divide-y divide-gray-100">
+<!-- Row 1: Wallet / Account Selector -->
+<div class="py-2.5 flex items-center justify-between cursor-pointer active:opacity-75 transition">
+<div class="flex items-center space-x-3.5">
+<!-- Credit Card Icon Graphic -->
+<div class="w-8 h-8 rounded-lg bg-[#34A895] flex flex-col justify-between p-1.5 shadow-sm text-white">
+<div class="w-full h-1 bg-white/40 rounded-sm"></div>
+<div class="flex justify-between items-end">
+<div class="w-2.5 h-1.5 bg-yellow-300 rounded-[1px]"></div>
+<div class="w-2 h-1 bg-white/60 rounded-[1px]"></div>
+</div>
+</div>
+<span class="font-semibold text-[16px] text-textPrimary">ACB Credit Platinum</span>
+</div>
+<i class="w-5 h-5 text-gray-400 stroke-[2.2]" data-lucide="chevron-right"></i>
+</div>
+<!-- Row 2: Amount Input Row -->
+<div class="pt-2.5 pb-3">
+<label class="block text-[13px] text-gray-400 font-medium mb-1">Số tiền</label>
+<div class="flex items-center justify-between">
+<div class="flex items-center space-x-3 flex-1">
+<span class="px-2 py-0.5 border border-gray-200 rounded-md text-[13px] font-bold text-gray-500 tracking-wide bg-gray-50/50">
+                  VND
+                </span>
+<span class="text-4xl font-semibold tracking-tight text-textPrimary">
+                  0
+                </span>
+</div>
+<!-- Clear Button (Disabled / Muted Gray State) -->
+<button aria-label="Xóa số tiền" class="text-gray-300 hover:text-gray-400 active:scale-95 transition" type="button">
+<i class="w-6 h-6 fill-gray-300 text-white" data-lucide="x-circle"></i>
+</button>
+</div>
+</div>
+<!-- Row 3: Category Picker -->
+<div class="py-3 flex items-center justify-between cursor-pointer active:opacity-75 transition">
+<div class="flex items-center space-x-3.5">
+<div class="w-8 h-8 rounded-full bg-[#C4C7CC] flex items-center justify-center"></div>
+<span class="text-[17px] text-textPlaceholder font-normal">Chọn nhóm</span>
+</div>
+<i class="w-5 h-5 text-gray-400 stroke-[2.2]" data-lucide="chevron-right"></i>
+</div>
+<!-- Row 4: Notes / Description -->
+<div class="py-3 flex items-center justify-between cursor-pointer active:opacity-75 transition">
+<div class="flex items-center space-x-3.5">
+<div class="w-8 h-8 flex items-center justify-center text-textPrimary">
+<!-- 3 Bars / Menu Outline Icon -->
+<svg class="w-6 h-6 text-gray-700 stroke-2" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h10.5" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<span class="text-[16px] text-textPrimary font-medium">Ghi chú</span>
+</div>
+<i class="w-5 h-5 text-gray-400 stroke-[2.2]" data-lucide="chevron-right"></i>
+</div>
+<!-- Row 5: Date Selector -->
+<div class="pt-3 pb-1 flex items-center justify-between">
+<div class="w-8 h-8 flex items-center justify-center text-gray-700">
+<i class="w-5 h-5 text-gray-700 stroke-[2.2]" data-lucide="calendar"></i>
+</div>
+<!-- Date Pagination Control -->
+<div class="flex items-center space-x-2">
+<button class="w-8 h-8 rounded-lg bg-keyBg flex items-center justify-center text-gray-600 active:scale-90 transition" type="button">
+<i class="w-4 h-4 text-gray-500 stroke-[2.5]" data-lucide="chevron-left"></i>
+</button>
+<div class="px-4 py-1.5 rounded-lg bg-accentMuted text-[#3BA646] font-semibold text-[14px]">
+                Thứ Hai, 31/08/2026
+              </div>
+<button class="w-8 h-8 rounded-lg bg-keyBg flex items-center justify-center text-gray-600 active:scale-90 transition" type="button">
+<i class="w-4 h-4 text-gray-500 stroke-[2.5]" data-lucide="chevron-right"></i>
+</button>
+</div>
+</div>
+</div>
+</div>
+<!-- Secondary Info Card: With People / Event -->
+<div class="bg-cardBg rounded-[28px] px-4 py-3.5 shadow-sm border border-black/[0.03] flex items-center justify-between cursor-pointer active:opacity-75 transition">
+<div class="flex items-center space-x-3.5">
+<div class="w-8 h-8 flex items-center justify-center text-gray-600">
+<i class="w-5 h-5 text-gray-700 stroke-[2]" data-lucide="users"></i>
+</div>
+<span class="text-[16px] text-gray-400">Với</span>
+</div>
+<i class="w-5 h-5 text-gray-400 stroke-[2.2]" data-lucide="chevron-right"></i>
+</div>
+</div>
+<!-- END: ScrollableContent -->
+<!-- BEGIN: BottomKeypadSection -->
+<!-- Calculator Keypad & Quick Amount Drawer -->
+<div class="w-full bg-white rounded-t-[34px] shadow-[0_-8px_30px_rgba(0,0,0,0.06)] px-4 pt-3 pb-6 flex flex-col shrink-0 z-30" data-purpose="custom-calculator-pad">
+<!-- Action Bar: Save & Receipt Camera -->
+<div class="flex items-center gap-3 mb-2.5">
+<button class="flex-1 py-3 bg-[#C8CBD1] text-white font-bold text-[16px] rounded-2xl shadow-sm tracking-wide cursor-default" type="button">
+          Lưu
+        </button>
+<button aria-label="Chụp hóa đơn" class="w-12 h-12 rounded-2xl bg-[#48B553] flex items-center justify-center text-white active:scale-95 shadow-sm transition hover:bg-brandGreenHover" type="button">
+<i class="w-6 h-6 stroke-[2.2]" data-lucide="image-plus"></i>
+</button>
+</div>
+<!-- Quick Amount Suggestions Bar -->
+<div class="flex items-center gap-2 overflow-x-auto no-scrollbar pb-2 pt-0.5">
+<button class="px-4 py-2 bg-chipBg hover:bg-gray-200 active-scale rounded-xl font-bold text-[14px] text-textPrimary whitespace-nowrap" type="button">
+          150.000
+        </button>
+<button class="px-4 py-2 bg-chipBg hover:bg-gray-200 active-scale rounded-xl font-bold text-[14px] text-textPrimary whitespace-nowrap" type="button">
+          50.000
+        </button>
+<button class="px-4 py-2 bg-chipBg hover:bg-gray-200 active-scale rounded-xl font-bold text-[14px] text-textPrimary whitespace-nowrap" type="button">
+          500.000
+        </button>
+<button class="px-4 py-2 bg-chipBg hover:bg-gray-200 active-scale rounded-xl font-bold text-[14px] text-textPrimary whitespace-nowrap" type="button">
+          40...
+        </button>
+</div>
+<!-- Numeric Keypad Grid (5 Rows x 4 Cols) -->
+<div class="grid grid-cols-4 gap-2 mt-1 select-none">
+<!-- Row 1 -->
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-[#48B553] text-[22px] font-bold" type="button">
+          C
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-[#48B553] text-[24px] font-bold leading-none" type="button">
+          ÷
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-[#48B553] text-[22px] font-bold leading-none" type="button">
+          ×
+        </button>
+<button aria-label="Xóa 1 số" class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-[#48B553] leading-none" type="button">
+<!-- iOS Calculator Backspace Icon -->
+<div class="relative flex items-center justify-center w-6 h-5">
+<svg class="w-6 h-6 fill-[#48B553]" viewbox="0 0 24 24">
+<path d="M22 3H7c-.69 0-1.23.35-1.59.88L0 12l5.41 8.11c.36.53.9.89 1.59.89h15c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-3 12.59L17.59 17 14 13.41 10.41 17 9 15.59 12.59 12 9 8.41 10.41 7 14 10.59 17.59 7 19 8.41 15.41 12 19 15.59z"></path>
+</svg>
+</div>
+</button>
+<!-- Row 2 -->
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          7
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          8
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          9
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-[#48B553] text-[26px] font-bold leading-none" type="button">
+          −
+        </button>
+<!-- Row 3 -->
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          4
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          5
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          6
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-[#48B553] text-[24px] font-bold leading-none" type="button">
+          +
+        </button>
+<!-- Row 4 & 5 Combined with Span-2 'XONG' Button -->
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          1
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          2
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          3
+        </button>
+<!-- Large Green Done Button (Spanning 2 rows) -->
+<button class="row-span-2 rounded-2xl bg-[#48B553] hover:bg-brandGreenHover active:scale-95 shadow-md flex items-center justify-center text-white text-[16px] font-extrabold tracking-wider transition" type="button">
+          XONG
+        </button>
+<!-- Row 5 Remaining Keys -->
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          0
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[20px] font-bold" type="button">
+          000
+        </button>
+<button class="h-12 rounded-2xl bg-keyBg active-scale flex items-center justify-center text-textPrimary text-[24px] font-bold" type="button">
+          ,
+        </button>
+</div>
+</div>
+<!-- END: BottomKeypadSection -->
+<!-- iOS Home Bar Indicator -->
+<div class="w-full bg-white pb-2 flex justify-center items-center shrink-0">
+<div class="w-36 h-1 bg-black/80 rounded-full"></div>
+</div>
+</main>
+<!-- END: PhoneContainer -->
+<!-- Icon Replacement Script -->
+<script data-purpose="icon-initialization">
+    lucide.createIcons();
+  </script>
+</body></html>

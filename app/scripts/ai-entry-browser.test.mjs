@@ -48,145 +48,124 @@ try {
   assert.deepEqual(await evaluate('[fixture.manualOpens,fixture.aiOpens]'),[1,0]);
   await clickText('Hủy');
   p=await down(); await wait(550); await up(p);
-  await until(`!!document.querySelector('[role="dialog"][aria-label="Nhập giao dịch bằng AI"]') && document.body.textContent.includes('Lunch and taxi')`);
-  assert.deepEqual(await evaluate('[fixture.manualOpens,fixture.aiOpens]'),[1,1],'release must not open manual');
+
+  await until(`!!document.querySelector('textarea[aria-label="Mô tả giao dịch"]')`);
+  await evaluate(`(()=>{const input=document.querySelector('textarea[aria-label="Mô tả giao dịch"]');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'Lunch and taxi');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await clickText('Gửi');
+  await until(`document.querySelectorAll('[aria-label="Giao dịch đề xuất"]').length===3`);
+  assert.ok(await evaluate(`fixture.calls.some(c=>c.path.endsWith('/process') && c.method==='POST')`),'AI entry must submit through the one-shot endpoint');
+  assert.equal(await evaluate(`fixture.calls.some(c=>c.path.includes('/sessions') || c.path.endsWith('/messages'))`),false,'AI entry must not call session or conversation endpoints');
+  assert.deepEqual(await evaluate('[fixture.manualOpens,fixture.aiOpens]'),[1,1]);
+  assert.equal(await evaluate(`document.querySelectorAll('textarea[aria-label="Mô tả giao dịch"]').length`),1,'AI input should be a multiline assistant composer');
+  assert.equal(await evaluate(`!!document.querySelector('[aria-label="Đính kèm ảnh hoặc PDF"]')`),true,'composer should expose a clear attachment action');
+  assert.equal(await evaluate(`!!document.querySelector('[aria-label="Kết quả AI"]')`),true,'recognized transactions should be grouped in an assistant result card');
+  assert.equal(await evaluate('!!document.querySelector(\'[role="log"]\')'),false);
+  assert.equal(await evaluate('document.body.textContent.includes("Cuộc trò chuyện mới")'),false);
   if(process.env.AI_ENTRY_SCREENSHOT){const {data}=await call('Page.captureScreenshot',{format:'png'});await writeFile(process.env.AI_ENTRY_SCREENSHOT,Buffer.from(data,'base64'));}
-  await clickText('Đóng');
-  for(const kind of ['move','pointercancel','blur','unmount']) {
-    p=await down();
-    if(kind==='move')await call('Input.dispatchMouseEvent',{type:'mouseMoved',x:p.x+15,y:p.y,button:'left'});
-    if(kind==='pointercancel')await evaluate(`document.querySelector('[aria-label="Thêm giao dịch"]').dispatchEvent(new PointerEvent('pointercancel',{bubbles:true,pointerId:1}))`);
-    if(kind==='blur')await evaluate(`window.dispatchEvent(new Event('blur'))`);
-    if(kind==='unmount')await clickText('Toggle navigation');
-    await wait(550);await up(p);await wait(20);
-    assert.deepEqual(await evaluate('[fixture.manualOpens,fixture.aiOpens]'),[1,1],`${kind} must cancel hold and click`);
-    if(kind==='unmount')await clickText('Toggle navigation');
-  }
-  await evaluate(`document.querySelector('[aria-label="Thêm giao dịch"]').focus()`);
-  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
-  await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
-  await until(`!!document.querySelector('[role="dialog"][aria-label="Thêm giao dịch"]')`);
-  await clickText('Nhập bằng AI');
-  await until(`document.body.textContent.includes('Lunch and taxi')`);
-  assert.equal(await evaluate(`fixture.calls.filter(c=>c.path.endsWith('/latest')).length`),2,'reopening GETs latest');
-  const rows=`Array.from(document.querySelectorAll('section')).filter(s=>s.querySelector('h3')?.textContent==='Đề xuất chưa ghi sổ')`;
-  assert.equal(await evaluate(`${rows}.length`),3);
-  assert.equal(await evaluate(`${rows}[1].querySelector('input[type="number"]').value`),'','missing amount stays empty');
-  assert.equal(await evaluate(`${rows}[2].querySelector('select').disabled`),true,'transfer cannot be converted');
-  assert.equal(await evaluate(`Array.from(${rows}[2].querySelectorAll('button')).find(b=>b.textContent==='Duyệt giao dịch').disabled`),true);
-  await evaluate(`(()=>{const input=${rows}[0].querySelector('input[type="number"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'50000');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-  await until(`Array.from(${rows}[0].querySelectorAll('button')).find(b=>b.textContent==='Duyệt giao dịch').disabled`);
-  assert.equal(await evaluate('fixture.refreshes'),0);
-  await clickText('Lưu bản nháp');
-  await until(`fixture.calls.some(c=>c.method==='PATCH')`);
-  assert.equal(await evaluate(`fixture.calls.find(c=>c.method==='PATCH').body.draft.amount`),50000);
-  assert.equal(await evaluate('fixture.refreshes'),0,'saving draft must not refresh ledger');
-  await until(`!Array.from(${rows}[0].querySelectorAll('button')).find(b=>b.textContent==='Duyệt giao dịch').disabled`);
-  await clickText('Duyệt giao dịch');
+  const rows = `Array.from(document.querySelectorAll('[aria-label="Giao dịch đề xuất"]'))`;
+  const input = async (selector,value) => {
+    await evaluate(`(()=>{const input=${selector};Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,${JSON.stringify(value)});input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+    await wait(40);
+  };
+  await input(`${rows}[0].querySelector('[aria-label="Số tiền"]')`,'50000');
+  await clickText('Lưu giao dịch');
   await until('fixture.refreshes===1');
-  assert.equal(await evaluate(`fixture.calls.find(c=>c.path.endsWith('/approve')).body.version`),2,'approval uses saved version');
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('section')).find(s=>s.querySelector('h3')?.textContent==='Đã duyệt').querySelectorAll('input,select,button').length`),0);
-  await evaluate('window.confirm=()=>true');
-  await evaluate('fixture.holdProposal=true;fixture.releaseProposal=null');
-  await clickText('Từ chối');
-  await until('!!fixture.releaseProposal');
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Cuộc trò chuyện mới').disabled`),true,'new session blocked during rejection');
-  await evaluate('fixture.holdProposal=false;fixture.releaseProposal()');
-  await until(`document.body.textContent.includes('Đã từ chối')`);
-  assert.equal(await evaluate('fixture.refreshes'),1,'reject never refreshes ledger');
-  await evaluate(`(()=>{const input=document.querySelector('input[type="file"]');const transfer=new DataTransfer();transfer.items.add(new File(['abc'],'receipt.png',{type:'image/png'}));input.files=transfer.files;input.dispatchEvent(new Event('change',{bubbles:true}));})()`);
-  await clickText('Gửi nội dung');
-  await until(`fixture.calls.some(c=>c.path.endsWith('/messages'))`);
-  assert.deepEqual(await evaluate(`fixture.calls.find(c=>c.path.endsWith('/messages')).body.images`),[{name:'receipt.png',mime_type:'image/png',base64:'YWJj'}],'selected images are read and sent as raw base64');
-  await until(`!document.body.textContent.includes('receipt.png')`);
-  const requestsBeforeFailure=await evaluate(`fixture.calls.filter(c=>c.path.endsWith('/messages')).length`);
-  await evaluate(`(()=>{fixture.failMessages=true;const input=Array.from(document.querySelectorAll('label')).find(l=>l.textContent==='Nội dung').querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'Coffee');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-  await clickText('Gửi nội dung');
-  await until(`document.body.textContent.includes('Provider unavailable')`);
-  assert.equal(await evaluate(`fixture.calls.filter(c=>c.path.endsWith('/messages')).length`),requestsBeforeFailure+1,'provider submission is not retried');
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Gửi nội dung').disabled`),true);
+  assert.equal(await evaluate(`fixture.calls.find(c=>c.method==='PATCH').body.draft.amount`),50000);
+  assert.equal(await evaluate(`fixture.calls.find(c=>c.path.endsWith('/approve')).body.version`),2);
+  assert.equal(await evaluate(`${rows}.length`),2);
+  await clickText('Xóa item');
+  await until(`${rows}.length===1`);
+  assert.equal(await evaluate('fixture.refreshes'),1,'remove candidate must not refresh ledger');
+  assert.equal(await evaluate(`${rows}[0].querySelector('select').disabled`),true,'transfer remains blocked');
+  await clickText('Xóa item');
+  await until(`${rows}.length===0`);
   await clickText('Đóng');
-  await evaluate('fixture.configured=false');
+
+  // Two edited valid cards: save-all persists both, exactly once per proposal.
+  await evaluate(`fixture.nextProposals=[...Array(2)].map((_,i)=>({id:'all-'+i,process_id:'',version:1,status:'pending',draft:{type:'expense',amount:12000,wallet_id:'w',category_id:null,occurred_at:'2026-09-21T05:00:00Z',note:'Batch',included_in_reports:true},questions:[]}))`);
   p=await down();await wait(550);await up(p);
-  await until(`document.body.textContent.includes('AI chưa được cấu hình')`);
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Gửi nội dung').disabled`),true);
-  assert.ok(await evaluate(`document.body.textContent.includes('Đã duyệt') && document.body.textContent.includes('Đã từ chối')`),'terminal decisions persist on reopening');
-  // Recovery from an unclassified proposal must require an explicit choice and saved version.
-  await evaluate(`fixture.configured=true;fixture.failMessages=false;fixture.session.proposals.push({id:'unknown',session_id:'s',version:1,status:'pending',draft:{...fixture.session.proposals[0].draft,type:'unknown'},questions:[]})`);
-  await clickText('Tải lại phiên');
-  await until(`${rows}.some(r=>r.querySelector('select')?.value==='unknown')`);
-  const unknownRow=`${rows}.find(r=>r.querySelector('select')?.value==='unknown')`;
-  assert.deepEqual(await evaluate(`({unknownSelectable:!${unknownRow}.querySelector('select').disabled,newConversationAction:Array.from(document.querySelectorAll('button')).some(b=>b.textContent==='Cuộc trò chuyện mới')})`),
-    {unknownSelectable:true,newConversationAction:true},'unknown classification and new conversation must be available explicitly');
-  for(const type of ['income','expense']) {
-    if(type==='expense') {
-      await evaluate(`fixture.session.proposals.push({id:'unknown-expense',session_id:'s',version:1,status:'pending',draft:{...fixture.session.proposals[0].draft,type:'unknown'},questions:[]})`);
-      await clickText('Tải lại phiên');
-      await until(`${rows}.some(r=>r.querySelector('select')?.value==='unknown')`);
-    }
-    assert.equal(await evaluate(`Array.from(${unknownRow}.querySelectorAll('button')).find(b=>b.textContent==='Duyệt giao dịch').disabled`),true);
-    await evaluate(`(()=>{const select=${unknownRow}.querySelector('select');Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value').set.call(select,${JSON.stringify(type)});select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
-    const recoveryRow=`${rows}.at(-1)`;
-    await until(`${recoveryRow}.querySelector('select').value===${JSON.stringify(type)}`);
-    assert.equal(await evaluate(`Array.from(${recoveryRow}.querySelectorAll('button')).find(b=>b.textContent==='Duyệt giao dịch').disabled`),true,'manual classification must be saved before approval');
-    await evaluate('fixture.holdProposal=true;fixture.releaseProposal=null');
-    await evaluate(`Array.from(${recoveryRow}.querySelectorAll('button')).find(b=>b.textContent==='Lưu bản nháp').click()`);
-    await until('!!fixture.releaseProposal');
-    assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Cuộc trò chuyện mới').disabled`),true,'new session blocked during proposal PATCH');
-    await evaluate('fixture.holdProposal=false;fixture.releaseProposal()');
-    await until(`!Array.from(${recoveryRow}.querySelectorAll('button')).find(b=>b.textContent==='Duyệt giao dịch').disabled`);
-    const refreshed=await evaluate('fixture.refreshes');
-    await evaluate('fixture.holdProposal=true;fixture.releaseProposal=null');
-    await evaluate(`Array.from(${recoveryRow}.querySelectorAll('button')).find(b=>b.textContent==='Duyệt giao dịch').click()`);
-    await until('!!fixture.releaseProposal');
-    assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Cuộc trò chuyện mới').disabled`),true,'new session blocked during approval');
-    await evaluate('fixture.holdProposal=false;fixture.releaseProposal()');
-    await until(`fixture.refreshes===${refreshed+1}`);
-    assert.deepEqual(await evaluate(`(()=>{const p=fixture.session.proposals.find(p=>p.id===${JSON.stringify(type==='income'?'unknown':'unknown-expense')});return {type:p.draft.type,status:p.status,version:p.version}})()`),{type,status:'approved',version:2});
-  }
-  assert.equal(await evaluate(`${rows}[0].querySelector('select').disabled`),true,'transfer remains unclassifiable');
-  // Start a new conversation with unsaved row/text/files and an ambiguous message failure.
-  await evaluate(`(()=>{const input=${rows}[0].querySelector('input[type="number"]');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'777');input.dispatchEvent(new Event('input',{bubbles:true}));const text=Array.from(document.querySelectorAll('label')).find(l=>l.textContent==='Nội dung').querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(text,'Unsent');text.dispatchEvent(new Event('input',{bubbles:true}));const files=document.querySelector('input[type="file"]');const data=new DataTransfer();data.items.add(new File(['abc'],'pending.png',{type:'image/png'}));files.files=data.files;files.dispatchEvent(new Event('change',{bubbles:true}));fixture.failMessages=true;})()`);
-  await clickText('Gửi nội dung');
-  await until(`document.body.textContent.includes('Provider unavailable')`);
-  await evaluate(`window.confirm=message=>{window.lastConfirmation=message;return false;}`);
-  await clickText('Cuộc trò chuyện mới');
-  assert.equal(await evaluate('fixture.createdSessions'),0,'cancel keeps session');
-  assert.ok(await evaluate(`lastConfirmation.includes('chưa lưu')`),'confirmation warns about unsaved changes');
-  assert.ok(await evaluate(`document.body.textContent.includes('pending.png') && document.body.textContent.includes('Lunch and taxi')`));
-  await evaluate(`window.confirm=()=>true;fixture.failCreate=true`);
-  await clickText('Cuộc trò chuyện mới');
-  await until(`document.body.textContent.includes('Could not create session')`);
-  assert.equal(await evaluate(`${rows}[0].querySelector('input[type="number"]').value`),'777','failed create preserves row edits');
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('label')).find(l=>l.textContent==='Nội dung').querySelector('input').value`),'Unsent','failed create preserves message');
-  assert.ok(await evaluate(`document.body.textContent.includes('pending.png')`));
-  await evaluate('fixture.failCreate=false;fixture.holdCreate=true;fixture.releaseCreate=null');
-  await clickText('Cuộc trò chuyện mới');
-  await until('!!fixture.releaseCreate');
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Cuộc trò chuyện mới').disabled`),true,'create is guarded while busy');
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Tải lại phiên').disabled`),true);
-  await clickText('Cuộc trò chuyện mới');
-  const createRequests=await evaluate(`fixture.calls.filter(c=>c.path.endsWith('/sessions') && c.method==='POST').length`);
-  assert.equal(createRequests,2,'one failed request and one pending request; double click creates no duplicate');
-  await evaluate('fixture.holdCreate=false;fixture.releaseCreate()');
-  await until(`fixture.createdSessions===1 && !document.body.textContent.includes('Lunch and taxi')`);
-  assert.equal(await evaluate(`${rows}.length`),0,'new conversation clears old proposals');
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('label')).find(l=>l.textContent==='Nội dung').querySelector('input').value`),'');
-  assert.ok(await evaluate(`!document.body.textContent.includes('pending.png') && !document.body.textContent.includes('Yêu cầu có thể đã được tiếp nhận')`),'files and uncertainty reset');
-  assert.deepEqual(await evaluate(`fixture.calls.filter(c=>c.path.endsWith('/sessions')).at(-1).body`),{});
-  await evaluate(`(()=>{fixture.failMessages=false;const input=Array.from(document.querySelectorAll('label')).find(l=>l.textContent==='Nội dung').querySelector('input');Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value').set.call(input,'New conversation message');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-  await clickText('Gửi nội dung');
-  await until(`fixture.calls.some(c=>c.path==='/api/v1/ai/entry/sessions/new-1/messages')`);
-  await until(`document.querySelector('[role="log"]').textContent.includes('New conversation message')`);
+  await until(`!!document.querySelector('textarea[aria-label="Mô tả giao dịch"]')`);
+  await evaluate(`(()=>{const input=document.querySelector('textarea[aria-label="Mô tả giao dịch"]');Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype,'value').set.call(input,'Two expenses');input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
+  await clickText('Gửi');
+  await until(`${rows}.length===2`);
+  await input(`${rows}[1].querySelector('[aria-label="Số tiền"]')`,'25000');
+  await clickText('Lưu tất cả');
+  await until('fixture.refreshes===3');
+  assert.deepEqual(await evaluate('fixture.process.proposals.map(p=>[p.status,p.draft.amount])'),[['approved',12000],['approved',25000]]);
   await clickText('Đóng');
-  await evaluate('fixture.holdLatest=true;fixture.releaseLatest=null');
-  p=await down();await wait(550);await up(p);
-  await until('!!fixture.releaseLatest');
-  assert.equal(await evaluate(`Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Cuộc trò chuyện mới').disabled`),true,'new session blocked during initial loading');
-  await evaluate('fixture.holdLatest=false;fixture.releaseLatest()');
-  await until(`document.querySelector('[role="log"]')?.textContent.includes('New conversation message')`);
-  assert.ok(await evaluate(`!document.body.textContent.includes('Lunch and taxi')`),'latest resumes newly created session');
-  console.log('Browser passed: entry gestures, proposal review/refresh, provider errors, images, unknown manual classification, confirmed new sessions, failure preservation and request guards.');
+
+  // Manual form calendar cancel/selection keeps time, nested Escape preserves sheet.
+  p=await down();await wait(50);await up(p);
+  await until(`document.querySelector('[role="dialog"][aria-label="Thêm giao dịch"]') && !document.body.textContent.includes('Đang tải dữ liệu')`);
+  await input(`document.querySelector('[aria-label="Số tiền"]')`,'35000');
+  await evaluate(`document.querySelector('[aria-label="Nhóm"]').click()`);
+  await until(`!!document.querySelector('[role="dialog"][aria-label="Chọn nhóm"]')`);
+  assert.equal(await evaluate(`document.querySelectorAll('[role="dialog"][aria-label="Chọn nhóm"] [aria-pressed="false"]').length`),2,'transaction picker uses selectable category-tree rows');
+  await evaluate(`Array.from(document.querySelectorAll('[role="dialog"][aria-label="Chọn nhóm"] button')).find(b=>b.textContent.includes('Cà phê')).click()`);
+  await until(`!document.querySelector('[role="dialog"][aria-label="Chọn nhóm"]')`);
+  assert.ok(await evaluate(`document.querySelector('[aria-label="Nhóm"]').textContent.includes('Cà phê')`),'selected group returns to transaction form');
+  await clickText('Thêm chi tiết');
+  const beforeTime=await evaluate(`document.querySelector('[aria-label="Giờ giao dịch"]').value`);
+  await evaluate(`document.querySelector('[aria-label="Ngày giao dịch"]').click()`);
+  await until(`!!document.querySelector('[role="dialog"][aria-label="Chọn ngày"]')`);
+  const beforeDay=await evaluate(`document.querySelector('[aria-selected="true"][data-day]').dataset.day`);
+  await evaluate(`document.querySelector('[aria-label="Tháng trước"]').click()`);
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await until(`!document.querySelector('[role="dialog"][aria-label="Chọn ngày"]')`);
+  assert.ok(await evaluate(`!!document.querySelector('[aria-label="Thêm giao dịch"]')`),'Escape closes only calendar');
+  await evaluate(`document.querySelector('[aria-label="Ngày giao dịch"]').click()`);
+  await until(`!!document.querySelector('[role="dialog"][aria-label="Chọn ngày"]')`);
+  assert.equal(await evaluate(`document.querySelector('[aria-selected="true"][data-day]').dataset.day`),beforeDay,'cancel does not change date');
+  await evaluate(`document.querySelector('[aria-label="Tháng trước"]').click()`);
+  const selectedDay=await evaluate(`(()=>{const button=document.querySelectorAll('[data-day]')[15];const day=button.dataset.day;button.click();return day;})()`);
+  await until(`!document.querySelector('[role="dialog"][aria-label="Chọn ngày"]')`);
+  assert.equal(await evaluate(`document.querySelector('[aria-label="Giờ giao dịch"]').value`),beforeTime);
+  if(process.env.FORM_SCREENSHOT_DIR){const {data}=await call('Page.captureScreenshot',{format:'png'});await writeFile(path.join(process.env.FORM_SCREENSHOT_DIR,'transaction.png'),Buffer.from(data,'base64'));}
+  await evaluate(`document.querySelector('[aria-label="Ngày giao dịch"]').click()`);
+  if(process.env.FORM_SCREENSHOT_DIR){const {data}=await call('Page.captureScreenshot',{format:'png'});await writeFile(path.join(process.env.FORM_SCREENSHOT_DIR,'calendar.png'),Buffer.from(data,'base64'));}
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await clickText('Lưu');
+  await until(`fixture.calls.some(c=>c.path.endsWith('/transactions') && c.method==='POST')`);
+  const tx=await evaluate(`fixture.calls.find(c=>c.path.endsWith('/transactions') && c.method==='POST').body`);
+  assert.equal(tx.amount,35000);
+  assert.equal(tx.wallet_id,'w');
+  assert.equal(tx.category_id,'coffee');
+  assert.equal(await evaluate(`(()=>{const d=new Date(${JSON.stringify(tx.occurred_at)});return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');})()`),selectedDay);
+  assert.equal(await evaluate(`!!document.querySelector('[role="dialog"][aria-label="Thêm giao dịch"]')`),false);
+
+  await clickText('Budget fixture');
+  await until(`document.body.textContent.includes('Chưa có ngân sách')`);
+  await clickText('Thêm');
+  await input(`document.querySelector('[aria-label="Tên ngân sách"]')`,'Ăn uống');
+  await input(`document.querySelector('[aria-label="Hạn mức"]')`,'2000000');
+  await evaluate(`document.querySelector('[aria-label="Nhóm chi"]').click()`);
+  await until(`!!document.querySelector('[role="dialog"][aria-label="Nhóm chi"]')`);
+  assert.equal(await evaluate(`document.querySelectorAll('[role="dialog"][aria-label="Nhóm chi"] [aria-pressed="false"]').length`),2,'budget picker uses the same selectable category tree');
+  await evaluate(`Array.from(document.querySelectorAll('[role="dialog"][aria-label="Nhóm chi"] button')).find(b=>b.textContent.includes('Ăn uống')).click()`);
+  await until(`!document.querySelector('[role="dialog"][aria-label="Nhóm chi"]')`);
+  await evaluate(`document.querySelector('[aria-label="Khoảng thời gian"]').click()`);
+  await until(`!!document.querySelector('[role="dialog"][aria-label="Khoảng thời gian"]')`);
+  await evaluate(`document.querySelector('[aria-label="Từ ngày"]').click()`);
+  await until(`!!document.querySelector('[role="dialog"][aria-label="Chọn ngày"]')`);
+  await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Escape',code:'Escape',windowsVirtualKeyCode:27});
+  await until(`!document.querySelector('[role="dialog"][aria-label="Chọn ngày"]')`);
+  assert.equal(await evaluate(`document.querySelectorAll('[role="dialog"]').length`),2);
+  await clickText('Xong');
+  if(process.env.FORM_SCREENSHOT_DIR){const {data}=await call('Page.captureScreenshot',{format:'png'});await writeFile(path.join(process.env.FORM_SCREENSHOT_DIR,'budget.png'),Buffer.from(data,'base64'));}
+  await clickText('Lưu');
+  await until(`fixture.calls.some(c=>c.path.endsWith('/budgets') && c.method==='POST')`);
+  assert.equal(await evaluate(`fixture.calls.find(c=>c.path.endsWith('/budgets') && c.method==='POST').body.limit_amount`),2000000);
+
+  await clickText('Transactions fixture');
+  await until(`document.body.textContent.includes('Lunch') && document.body.textContent.includes('Refund')`);
+  assert.ok((await evaluate('document.body.innerText')).indexOf('Refund') < (await evaluate('document.body.innerText')).indexOf('Lunch'),'days sorted newest first');
+  if(process.env.FORM_SCREENSHOT_DIR){const {data}=await call('Page.captureScreenshot',{format:'png'});await writeFile(path.join(process.env.FORM_SCREENSHOT_DIR,'transactions.png'),Buffer.from(data,'base64'));}
+  await evaluate(`document.querySelector('[aria-label="Tùy chọn giao dịch"]').click()`);
+  await clickText('Xem theo nhóm');
+  assert.ok(await evaluate(`document.body.textContent.includes('1 giao dịch')`));
+
+  console.log('Browser passed: shared form/card editing, save-all, reject/transfer guard, date cancel/select/time preservation, nested Escape, real-shaped transaction/budget payloads, grouped ledger.');
+
 } finally {
   socket?.close();
   if(chrome && chrome.exitCode===null){chrome.kill();await new Promise(resolve=>chrome.once('exit',resolve));}

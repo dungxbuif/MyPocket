@@ -16,6 +16,10 @@ import (
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/credentials"
+	awss3 "github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 const signedGetTTL = 5 * time.Minute
@@ -29,9 +33,15 @@ type S3 struct {
 	cfg      S3Config
 	endpoint *url.URL
 	http     *http.Client
+	presign  *awss3.PresignClient
 }
 
 var safeFilename = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._ -]{0,240}$`)
+var safeEnvironment = regexp.MustCompile(`^[A-Za-z0-9_-]{1,32}$`)
+var safePrefix = regexp.MustCompile(`^[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$`)
+var safeObjectID = regexp.MustCompile(`^[A-Za-z0-9_-]{1,128}$`)
+var safeBucket = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._-]{0,61}$`)
+var safeRegion = regexp.MustCompile(`^[A-Za-z0-9-]{1,64}$`)
 
 func NewS3(cfg S3Config) (*S3, error) {
 	cfg.Endpoint, cfg.Region, cfg.Bucket = strings.TrimRight(strings.TrimSpace(cfg.Endpoint), "/"), strings.TrimSpace(cfg.Region), strings.TrimSpace(cfg.Bucket)
@@ -39,19 +49,36 @@ func NewS3(cfg S3Config) (*S3, error) {
 	if cfg.Endpoint == "" || cfg.Region == "" || cfg.Bucket == "" || cfg.Environment == "" || cfg.AccessKeyID == "" || cfg.SecretAccessKey == "" {
 		return nil, errors.New("S3 storage is not configured")
 	}
+	if !safeBucket.MatchString(cfg.Bucket) || !safeRegion.MatchString(cfg.Region) {
+		return nil, errors.New("invalid S3 bucket or region")
+	}
 	u, err := url.Parse(cfg.Endpoint)
 	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
 		return nil, errors.New("invalid S3 endpoint")
 	}
-	if strings.Contains(cfg.Environment, "/") || strings.Contains(cfg.Environment, "..") {
+	if !safeEnvironment.MatchString(cfg.Environment) {
 		return nil, errors.New("invalid S3 environment")
 	}
-	return &S3{cfg: cfg, endpoint: u, http: &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}}, nil
+	if cfg.Prefix != "" && !safePrefix.MatchString(cfg.Prefix) {
+		return nil, errors.New("invalid S3 prefix")
+	}
+	client := awss3.NewFromConfig(aws.Config{
+		Region:      cfg.Region,
+		Credentials: credentials.NewStaticCredentialsProvider(cfg.AccessKeyID, cfg.SecretAccessKey, ""),
+	}, func(options *awss3.Options) {
+		options.BaseEndpoint = aws.String(cfg.Endpoint)
+		options.UsePathStyle = cfg.ForcePathStyle
+	})
+	return &S3{
+		cfg: cfg, endpoint: u,
+		http:    &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
+		presign: awss3.NewPresignClient(client),
+	}, nil
 }
 
 func (s *S3) Key(owner, batch, attachment, filename string) (string, error) {
 	for _, part := range []string{owner, batch, attachment} {
-		if part == "" || strings.ContainsAny(part, "/\\") || strings.Contains(part, "..") {
+		if !safeObjectID.MatchString(part) {
 			return "", errors.New("invalid attachment key identifier")
 		}
 	}
@@ -113,22 +140,16 @@ func (s *S3) SignedGet(ctx context.Context, key string) (string, error) {
 	if key == "" {
 		return "", errors.New("invalid attachment key")
 	}
-	u := s.objectURL(key)
-	now := time.Now().UTC()
-	scopeDate := now.Format("20060102")
-	scope := scopeDate + "/" + s.cfg.Region + "/s3/aws4_request"
-	q := u.Query()
-	q.Set("X-Amz-Algorithm", "AWS4-HMAC-SHA256")
-	q.Set("X-Amz-Credential", s.cfg.AccessKeyID+"/"+scope)
-	q.Set("X-Amz-Date", now.Format("20060102T150405Z"))
-	q.Set("X-Amz-Expires", fmt.Sprint(int(signedGetTTL.Seconds())))
-	q.Set("X-Amz-SignedHeaders", "host")
-	u.RawQuery = q.Encode()
-	canonical := strings.Join([]string{http.MethodGet, canonicalURI(u), canonicalQuery(u.Query()), "host:" + u.Host + "\n", "host", "UNSIGNED-PAYLOAD"}, "\n")
-	toSign := strings.Join([]string{"AWS4-HMAC-SHA256", now.Format("20060102T150405Z"), scope, hex.EncodeToString(hash([]byte(canonical)))}, "\n")
-	q.Set("X-Amz-Signature", hex.EncodeToString(hmacSHA256(s.signingKey(scopeDate), []byte(toSign))))
-	u.RawQuery = q.Encode()
-	return u.String(), nil
+	result, err := s.presign.PresignGetObject(ctx, &awss3.GetObjectInput{
+		Bucket: aws.String(s.cfg.Bucket),
+		Key:    aws.String(key),
+	}, func(options *awss3.PresignOptions) {
+		options.Expires = signedGetTTL
+	})
+	if err != nil {
+		return "", fmt.Errorf("S3 signed read URL generation failed: %w", err)
+	}
+	return result.URL, nil
 }
 
 func (s *S3) objectURL(key string) *url.URL {

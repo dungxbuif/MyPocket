@@ -146,11 +146,11 @@ Ví dụ không phí: mua 1 đơn vị giá 100.000 và 1 đơn vị giá 140.00
 - REP-01: Reports dùng dữ liệu đã ghi nhận trong phạm vi account/ví/ngày/timezone và lựa chọn tính vào báo cáo. Draft/proposal không có hiệu ứng tiền.
 - REP-02: Cùng chỉ số và phạm vi phải cho cùng số trên dashboard, Reports và Insider. Drilldown giải thích được tổng; chuyển nội bộ/điều chỉnh không tự thành thu/chi thường.
 - REP-03: Sửa/xóa dữ liệu nguồn cập nhật cả báo cáo hiện tại và lịch sử liên quan. Cache phải được làm mới hoặc ghi rõ thời điểm; có SQL không tự bảo đảm cache/AI đã cập nhật.
-- MONTH-01: Trong tháng có preview realtime; hết tháng tạo mục tổng kết để nhìn lại. Đây là trạng thái hoàn tất kỳ thời gian, không đóng băng số liệu hay khóa giao dịch.
+- MONTH-01: Trong tháng có preview realtime. Khi account-local calendar sang tháng mới, report của tháng trước tự mang trạng thái hoàn tất trên lần đọc kế tiếp; hệ thống không cần cron close, không đóng băng số liệu và không khóa giao dịch. Report luôn tính lại từ ledger hiện tại.
 - MONTH-02: Một ghi chú user theo `(account, YYYY-MM)`. User sửa/xóa chủ động; query, thay đổi giao dịch, tổng kết tự động và tạo lại AI không ghi đè note.
 - MONTH-03: Bối cảnh tự đính kèm từ dữ liệu thực: chuyến đi/sự kiện, hũ, tiết kiệm, tín dụng và các biến động liên quan. Nội dung tự sinh phân biệt với note user.
 - MONTH-04: AI nhận dữ liệu báo cáo đã tính và bối cảnh đúng account/kỳ. Không tự tạo số, suy diễn lý do như một sự thật, hoặc sửa tài chính.
-- MONTH-05: Nội dung AI gắn kỳ, timezone, phạm vi và phiên bản/thời điểm dữ liệu. Khi nguồn đổi, không được hiển thị kết luận cũ như kết quả mới; đánh dấu cần cập nhật và tạo lại phần AI. Lỗi AI không cản report, note hoặc chốt kỳ.
+- MONTH-05: Nội dung AI gắn kỳ, timezone, phạm vi và phiên bản/thời điểm dữ liệu. Khi nguồn đổi, không được hiển thị kết luận cũ như kết quả mới; đánh dấu cần cập nhật và tạo lại phần AI. Lỗi AI không cản report, note hoặc trạng thái hoàn tất kỳ.
 - MONTH-06: Note thuộc tháng của account, không nhân bản theo bộ lọc ví. Nội dung AI/bối cảnh theo bộ lọc phải có nhãn phạm vi; không gán kết luận một ví thành kết luận toàn account.
 
 ## KEY, API, AI — Tích hợp và trợ lý

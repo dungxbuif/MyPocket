@@ -8,10 +8,12 @@ type LoginInput struct {
 }
 
 type UserProfile struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
+	ID                string    `json:"id"`
+	Name              string    `json:"name"`
+	Email             string    `json:"email"`
+	Timezone          string    `json:"timezone"`
+	TimezoneConfirmed bool      `json:"timezone_confirmed"`
+	CreatedAt         time.Time `json:"created_at"`
 }
 
 type LoginOutput struct {

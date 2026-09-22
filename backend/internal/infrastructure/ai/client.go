@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -21,7 +22,6 @@ type Input = entity.AIExtractInput
 type Output = entity.AIExtractOutput
 type Draft = entity.AIExtractDraft
 type Image = entity.AIImage
-type Message = entity.AIHistoryMessage
 
 // Keep the provider wire contract independent of shared entity JSON tags.
 type chatMessage struct {
@@ -32,14 +32,13 @@ type chatMessage struct {
 type Config struct{ BaseURL, APIKey, Model, OCRURL, OCRKey string }
 
 const (
-	maxTextBytes     = 32 * 1024
-	maxSourceBytes   = 64 * 1024
-	maxPromptBytes   = 128 * 1024
-	maxResponseBytes = 256 * 1024
-	maxHistory       = 12
-	maxHistoryBytes  = 8192
-	extractTimeout   = 90 * time.Second
-	modelTimeout     = 30 * time.Second
+	maxTextBytes              = 32 * 1024
+	maxSourceBytes            = 64 * 1024
+	maxPromptBytes            = 128 * 1024
+	maxResponseBytes          = 256 * 1024
+	maxWalletDescriptionBytes = 2048
+	extractTimeout            = 90 * time.Second
+	modelTimeout              = 30 * time.Second
 )
 
 var ErrNotConfigured = errors.New("AI provider is not configured")
@@ -75,6 +74,8 @@ func (c *Client) OCRConfigured() bool {
 	return c != nil && validURL(c.config.OCRURL) && strings.TrimSpace(c.config.OCRKey) != ""
 }
 
+func (c *Client) ValidateFiles(files []Image) error { return validateImages(files) }
+
 func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	if !c.Configured() {
 		return Output{}, ErrNotConfigured
@@ -87,14 +88,6 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	if len(input.Text) > maxTextBytes || len(input.Timezone) > 128 || (strings.TrimSpace(input.Text) == "" && len(input.Images) == 0) {
 		return Output{}, errors.New("invalid AI input: text is empty or exceeds limits")
 	}
-	if len(input.History) > maxHistory {
-		input.History = input.History[len(input.History)-maxHistory:]
-	}
-	for _, m := range input.History {
-		if (m.Role != "user" && m.Role != "assistant") || len(m.Content) > maxHistoryBytes {
-			return Output{}, errors.New("invalid AI history")
-		}
-	}
 	if err := validateImages(input.Images); err != nil {
 		return Output{}, err
 	}
@@ -106,33 +99,37 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		return Output{}, err
 	}
 	source := input.Text
+	attachmentTexts := make([]string, 0, len(input.Images))
 	for _, img := range input.Images {
 		extracted, err := c.ocr(ctx, img)
 		if err != nil {
-			return Output{}, err
+			return Output{AttachmentTexts: attachmentTexts}, err
 		}
+		attachmentTexts = append(attachmentTexts, extracted)
 		if source != "" {
 			source += "\n\n"
 		}
 		source += extracted
 		if len(source) > maxSourceBytes {
-			return Output{}, errors.New("OCR source text exceeds limit")
+			return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: true}, errors.New("OCR source text exceeds limit")
 		}
 	}
+	ocrComplete := true
 	messages, err := buildMessages(input, source)
 	if err != nil {
-		return Output{SourceText: source}, err
+		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, err
 	}
 	request := struct {
-		Model          string            `json:"model"`
-		Messages       []chatMessage     `json:"messages"`
-		ResponseFormat map[string]string `json:"response_format"`
-	}{c.config.Model, messages, map[string]string{"type": "json_object"}}
+		Model          string         `json:"model"`
+		Messages       []chatMessage  `json:"messages"`
+		ResponseFormat map[string]any `json:"response_format"`
+	}{c.config.Model, messages, transactionResponseFormat()}
 	modelCtx, modelCancel := context.WithTimeout(ctx, modelTimeout)
 	defer modelCancel()
+	modelStarted := time.Now()
 	body, _, err := c.request(modelCtx, http.MethodPost, c.config.BaseURL+"/chat/completions", c.config.APIKey, request, "AI")
 	if err != nil {
-		return Output{SourceText: source}, err
+		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, err
 	}
 	var response struct {
 		Choices []struct {
@@ -152,17 +149,40 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		return Output{SourceText: source}, errors.New("AI response was incomplete or requested tools")
 	}
 	out, err := parseOutput([]byte(choice.Message.Content))
+	if mismatch := new(SchemaMismatchError); errors.As(err, &mismatch) {
+		attributes := []any{
+			"reason_code", "schema_mismatch",
+			"model", c.config.Model,
+			"finish_reason", choice.FinishReason,
+			"latency_ms", time.Since(modelStarted).Milliseconds(),
+			"response_bytes", len(choice.Message.Content),
+			"issue_count", len(mismatch.Issues),
+		}
+		for i, issue := range mismatch.Issues {
+			prefix := fmt.Sprintf("issue_%d_", i)
+			attributes = append(attributes,
+				prefix+"code", issue.Code,
+				prefix+"path", issue.Path,
+				prefix+"expected", issue.Expected,
+				prefix+"actual", issue.Actual,
+			)
+		}
+		slog.Warn("AI provider response rejected", attributes...)
+	}
 	out.SourceText = source
+	out.AttachmentTexts = attachmentTexts
+	out.OCRComplete = ocrComplete
 	return out, err
 }
 
 func buildMessages(input Input, source string) ([]chatMessage, error) {
 	// Only the fields needed to resolve references leave the application.
 	type wallet struct {
-		ID       string `json:"id"`
-		Name     string `json:"name"`
-		Type     string `json:"type"`
-		Currency string `json:"currency"`
+		ID          string `json:"id"`
+		Name        string `json:"name"`
+		Type        string `json:"type"`
+		Currency    string `json:"currency"`
+		Description string `json:"description,omitempty"`
 	}
 	type category struct {
 		ID        string   `json:"id"`
@@ -176,7 +196,14 @@ func buildMessages(input Input, source string) ([]chatMessage, error) {
 	}
 	wallets := make([]wallet, 0, len(input.Wallets))
 	for _, w := range input.Wallets {
-		wallets = append(wallets, wallet{w.ID, w.Name, w.Type, w.Currency})
+		description := ""
+		if w.Description != nil {
+			if len(*w.Description) > maxWalletDescriptionBytes {
+				return nil, errors.New("AI wallet description exceeds limit")
+			}
+			description = *w.Description
+		}
+		wallets = append(wallets, wallet{w.ID, w.Name, w.Type, w.Currency, description})
 	}
 	categories := make([]category, 0, len(input.Categories))
 	for _, c := range input.Categories {
@@ -192,17 +219,45 @@ func buildMessages(input Input, source string) ([]chatMessage, error) {
 	if err != nil {
 		return nil, errors.New("invalid AI reference context")
 	}
-	messages := make([]chatMessage, 0, len(input.History)+2)
+	messages := make([]chatMessage, 0, 2)
 	messages = append(messages, chatMessage{Role: "system", Content: extractionPrompt})
-	for _, message := range input.History {
-		messages = append(messages, chatMessage{Role: message.Role, Content: message.Content})
-	}
 	messages = append(messages, chatMessage{Role: "user", Content: string(content)})
 	encoded, err := json.Marshal(messages)
 	if err != nil || len(encoded) > maxPromptBytes {
 		return nil, errors.New("AI input context exceeds limit")
 	}
 	return messages, nil
+}
+
+func transactionResponseFormat() map[string]any {
+	draftSchema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"type":                map[string]any{"type": "string", "enum": []string{"income", "expense", "transfer", "unknown"}},
+			"amount":              map[string]any{"type": "integer", "minimum": 0},
+			"wallet_id":           map[string]any{"type": "string"},
+			"category_id":         map[string]any{"type": []string{"string", "null"}},
+			"occurred_at":         map[string]any{"type": "string"},
+			"note":                map[string]any{"type": "string"},
+			"included_in_reports": map[string]any{"type": "boolean"},
+			"questions":           map[string]any{"type": "array", "items": map[string]any{"type": "string"}},
+		},
+		"required":             []string{"type", "amount", "wallet_id", "category_id", "occurred_at", "note", "included_in_reports", "questions"},
+		"additionalProperties": false,
+	}
+	resultSchema := map[string]any{
+		"type": "object",
+		"properties": map[string]any{
+			"reply":  map[string]any{"type": "string"},
+			"drafts": map[string]any{"type": "array", "items": draftSchema},
+		},
+		"required":             []string{"reply", "drafts"},
+		"additionalProperties": false,
+	}
+	return map[string]any{
+		"type":        "json_schema",
+		"json_schema": map[string]any{"name": "transaction_proposal", "strict": true, "schema": resultSchema},
+	}
 }
 
 // request never returns upstream bodies, URLs, or transport errors to callers.

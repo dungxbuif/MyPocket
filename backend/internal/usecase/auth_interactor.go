@@ -15,6 +15,7 @@ import (
 
 var ErrInvalidCredentials = errors.New("email hoặc mật khẩu không đúng")
 var ErrInvalidGoogleProfile = errors.New("thông tin Google không hợp lệ")
+var ErrInvalidTimezone = errors.New("múi giờ IANA không hợp lệ")
 
 type AuthInteractor struct {
 	UserRepo      repository.UserRepository
@@ -103,10 +104,12 @@ func (a *AuthInteractor) buildLoginOutput(ctx context.Context, user *entity.User
 		Token:     token,
 		ExpiresAt: exp,
 		User: UserProfile{
-			ID:        user.ID,
-			Name:      user.Name,
-			Email:     user.Email,
-			CreatedAt: user.CreatedAt,
+			ID:                user.ID,
+			Name:              user.Name,
+			Email:             user.Email,
+			Timezone:          user.Timezone,
+			TimezoneConfirmed: user.TimezoneConfirmed,
+			CreatedAt:         user.CreatedAt,
 		},
 	}, nil
 }
@@ -117,7 +120,7 @@ func (a *AuthInteractor) Profile(ctx context.Context, userID string) (*UserProfi
 	if a.CacheRepo != nil {
 		if cached, ok, err := a.CacheRepo.Get(cacheKey); err == nil && ok {
 			var profile UserProfile
-			if err := json.Unmarshal([]byte(cached), &profile); err == nil {
+			if err := json.Unmarshal([]byte(cached), &profile); err == nil && profile.Timezone != "" {
 				return &profile, nil
 			}
 		}
@@ -130,14 +133,38 @@ func (a *AuthInteractor) Profile(ctx context.Context, userID string) (*UserProfi
 		return nil, err
 	}
 	profile := &UserProfile{
-		ID:        user.ID,
-		Name:      user.Name,
-		Email:     user.Email,
-		CreatedAt: user.CreatedAt,
+		ID:                user.ID,
+		Name:              user.Name,
+		Email:             user.Email,
+		Timezone:          user.Timezone,
+		TimezoneConfirmed: user.TimezoneConfirmed,
+		CreatedAt:         user.CreatedAt,
 	}
 	if a.CacheRepo != nil {
 		raw, _ := json.Marshal(profile)
 		_ = a.CacheRepo.Set(cacheKey, string(raw), cacheProfileTTL*time.Second)
+	}
+	return profile, nil
+}
+
+func (a *AuthInteractor) SetTimezone(ctx context.Context, userID, timezone string, initializeOnly bool) (*UserProfile, error) {
+	_ = ctx
+	timezone = strings.TrimSpace(timezone)
+	location, err := time.LoadLocation(timezone)
+	if err != nil || timezone == "" || timezone == "Local" {
+		return nil, ErrInvalidTimezone
+	}
+	user, err := a.UserRepo.SetTimezone(userID, location.String(), initializeOnly)
+	if err != nil {
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrInvalidCredentials
+		}
+		return nil, err
+	}
+	profile := &UserProfile{ID: user.ID, Name: user.Name, Email: user.Email, Timezone: user.Timezone, TimezoneConfirmed: user.TimezoneConfirmed, CreatedAt: user.CreatedAt}
+	if a.CacheRepo != nil {
+		_ = a.CacheRepo.Delete(fmt.Sprintf("%s%s", profileCachePrefix, userID))
+		_ = a.CacheRepo.Delete(fmt.Sprintf("%s%s", homeCachePrefix, userID))
 	}
 	return profile, nil
 }

@@ -2,13 +2,16 @@ export function SegmentedControl<T extends string>({
   value,
   options,
   onChange,
+  disabled = false,
 }: {
   value: T;
   options: ReadonlyArray<{ value: T; label: string }>;
   onChange: (value: T) => void;
+  disabled?: boolean;
 }) {
   return (
     <div className="grid rounded-full bg-line p-1" style={{ gridTemplateColumns: `repeat(${options.length}, minmax(0, 1fr))` }} role="tablist" onKeyDown={(event) => {
+      if (disabled) return;
       const index = options.findIndex(option => option.value === value);
       const next = event.key === "Home" ? 0 : event.key === "End" ? options.length - 1 : event.key === "ArrowRight" ? (index + 1) % options.length : event.key === "ArrowLeft" ? (index - 1 + options.length) % options.length : -1;
       if (next < 0 || !options[next]) return;
@@ -19,6 +22,7 @@ export function SegmentedControl<T extends string>({
         <button
           key={option.value}
           type="button"
+          disabled={disabled}
           onClick={() => onChange(option.value)}
           role="tab"
           aria-selected={value === option.value}

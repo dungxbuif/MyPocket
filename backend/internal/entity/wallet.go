@@ -15,23 +15,23 @@ const (
 )
 
 type Wallet struct {
-	ID                   string     `json:"id" gorm:"primaryKey"`
-	OwnerID              string     `json:"owner_id" gorm:"index;not null"`
-	Name                 string     `json:"name" gorm:"not null"`
-	Type                 string     `json:"type" gorm:"not null"`
-	Currency             string     `json:"currency" gorm:"not null;default:VND"`
-	OpeningBalance       int64      `json:"opening_balance"`
-	CurrentBalance       int64      `json:"current_balance" gorm:"-"`
-	IsInTotal            bool       `json:"is_in_total" gorm:"not null;default:true"`
-	Description          *string    `json:"description,omitempty"`
-	TargetAmount         *int64     `json:"target_amount,omitempty"`
-	TargetDate           *time.Time `json:"target_date,omitempty"`
-	CreditLimit          *int64     `json:"credit_limit,omitempty"`
-	LastStatementBalance *int64     `json:"last_statement_balance,omitempty"`
-	StatementDay         *int       `json:"statement_day,omitempty"`
-	PaymentDueDay        *int       `json:"payment_due_day,omitempty"`
-	CreatedAt            time.Time  `json:"created_at"`
-	UpdatedAt            time.Time  `json:"updated_at"`
+	ID                   string        `json:"id" gorm:"primaryKey"`
+	OwnerID              string        `json:"owner_id" gorm:"index;not null"`
+	Name                 string        `json:"name" gorm:"not null"`
+	Type                 string        `json:"type" gorm:"not null"`
+	Currency             string        `json:"currency" gorm:"not null;default:VND"`
+	OpeningBalance       int64         `json:"opening_balance"`
+	CurrentBalance       int64         `json:"current_balance" gorm:"-"`
+	IsInTotal            bool          `json:"is_in_total" gorm:"not null;default:true"`
+	Description          *string       `json:"description,omitempty"`
+	TargetAmount         *int64        `json:"target_amount,omitempty"`
+	TargetDate           *CalendarDate `json:"target_date,omitempty" gorm:"column:target_date;type:date"`
+	CreditLimit          *int64        `json:"credit_limit,omitempty"`
+	LastStatementBalance *int64        `json:"last_statement_balance,omitempty"`
+	StatementDay         *int          `json:"statement_day,omitempty"`
+	PaymentDueDay        *int          `json:"payment_due_day,omitempty"`
+	CreatedAt            time.Time     `json:"created_at"`
+	UpdatedAt            time.Time     `json:"updated_at"`
 }
 
 type Category struct {
@@ -59,6 +59,8 @@ type Transaction struct {
 	OwnerID           string    `json:"owner_id" gorm:"index;not null"`
 	WalletID          string    `json:"wallet_id" gorm:"index;not null"`
 	CategoryID        *string   `json:"category_id,omitempty" gorm:"index"`
+	JarID             *string   `json:"jar_id,omitempty" gorm:"column:jar_id;index"`
+	JarName           string    `json:"jar_name,omitempty" gorm:"-"`
 	Type              string    `json:"type" gorm:"not null"`
 	Amount            int64     `json:"amount" gorm:"not null"`
 	OccurredAt        time.Time `json:"occurred_at" gorm:"index;not null"`

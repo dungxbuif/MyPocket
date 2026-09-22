@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	stdurl "net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,44 @@ func TestS3UsesEnvironmentQualifiedPrivateKeys(t *testing.T) {
 	}
 	if _, err := s.Key("owner", "batch", "attachment", "../bank statement.pdf"); err == nil {
 		t.Fatal("expected traversal filename rejection")
+	}
+}
+
+func TestS3RejectsUnsafeEnvironmentPrefixAndIdentifiers(t *testing.T) {
+	base := S3Config{Endpoint: "https://storage.example.test", Region: "us-east-1", Bucket: "receipts", Environment: "development", AccessKeyID: "access", SecretAccessKey: "secret"}
+	for _, environment := range []string{"../prod", "dev\nname", "prod/blue"} {
+		cfg := base
+		cfg.Environment = environment
+		if _, err := NewS3(cfg); err == nil {
+			t.Fatalf("unsafe environment accepted: %q", environment)
+		}
+	}
+	for _, prefix := range []string{"root/../outside", "root\\outside", "root\nname"} {
+		cfg := base
+		cfg.Prefix = prefix
+		if _, err := NewS3(cfg); err == nil {
+			t.Fatalf("unsafe prefix accepted: %q", prefix)
+		}
+	}
+	for _, field := range []struct{ name, value string }{{"bucket", "mybucket/other"}, {"region", "us-east\n1"}} {
+		cfg := base
+		if field.name == "bucket" {
+			cfg.Bucket = field.value
+		} else {
+			cfg.Region = field.value
+		}
+		if _, err := NewS3(cfg); err == nil {
+			t.Fatalf("unsafe %s accepted", field.name)
+		}
+	}
+	s, err := NewS3(base)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, owner := range []string{"../owner", "owner/name", "owner\nname"} {
+		if _, err := s.Key(owner, "batch-1", "attachment-1", "receipt.pdf"); err == nil {
+			t.Fatalf("unsafe owner identifier accepted: %q", owner)
+		}
 	}
 }
 
@@ -89,11 +128,22 @@ func TestS3PutAndSignedGetNeverUsePublicURL(t *testing.T) {
 	if !strings.HasPrefix(gotAuth, "AWS4-HMAC-SHA256 ") {
 		t.Fatalf("missing sigv4 authorization: %q", gotAuth)
 	}
-	url, err := s.SignedGet(context.Background(), key)
+	signedURL, err := s.SignedGet(context.Background(), key)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(url, "X-Amz-Signature=") || strings.Contains(url, "secret") {
-		t.Fatalf("unexpected signed URL: %s", url)
+	parsed, err := stdurl.Parse(signedURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := parsed.Query()
+	if parsed.Host != strings.TrimPrefix(server.URL, "http://") || parsed.Path != "/receipts/"+key {
+		t.Fatalf("unexpected path-style presigned URL: %s", signedURL)
+	}
+	if query.Get("X-Amz-Algorithm") != "AWS4-HMAC-SHA256" || query.Get("X-Amz-Expires") != "300" || query.Get("X-Amz-SignedHeaders") != "host" || query.Get("X-Amz-Signature") == "" {
+		t.Fatalf("unexpected presign query: %v", query)
+	}
+	if strings.Contains(signedURL, "secret") {
+		t.Fatalf("presigned URL exposed secret key: %s", signedURL)
 	}
 }
