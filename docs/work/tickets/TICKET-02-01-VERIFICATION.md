@@ -6,7 +6,7 @@ owner: ai
 trace:
   ticket: TICKET-02-01-ghi-thu-chi.md
   detail_design: TICKET-02-01-DETAIL_DESIGN.md
-  ui_spec: ../../design/screens/transactions/README.md
+  ui_spec: ../../design/pages/transactions/README.md
   validation_matrix: ../VALIDATION_MATRIX.md
   release_notes: ../../releases/CHANGELOG.md
 ---

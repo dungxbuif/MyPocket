@@ -9,7 +9,7 @@ trace:
   validation: ../VALIDATION_MATRIX.md
   api: ../../architecture/API.md
   erd: ../../architecture/ERD.md
-  screen: ../../design/screens/account-groups/README.md
+  page: ../../design/pages/account-groups/README.md
 ---
 
 # Detail design — Icon và card Ví áp dụng cho Nhóm

@@ -18,6 +18,57 @@ updated: 2026-09-22
 
 # Validation Matrix
 
+## UI-LEDGER-WEEK — 2026-09-24
+
+- Latest owner correction: basic uses the same Week/Custom, period cashflow and date-grouped list as aggregate, with both totals and rows wallet-scoped. `test:transactions` RED first caught the old basic branch including an August row in a September week; GREEN 7/7 after the range correction. `test:calendar` 11/11, period/goal SSR scripts, `test:design` 7/7 plus base contracts, `check:design`, TypeScript typecheck and Vite build all PASS. Live Chrome local page confirmed selecting `Tiền mặt` shows the shared period strip/cashflow/list, previous week 14–20/09 shows zero totals and no rows, and returning to 21–27/09 restores in-week rows. Goal browser selection/mobile visual UAT remain NOT RUN because that user account has no goal wallet; credit specialized accounting remains out of scope.
+
+- [Design and scope](tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md), [transaction page](../design/pages/transactions/README.md), [user/agent guide](../guides/transactions.md).
+- RED→GREEN: week/calendar and combined wallet/date tests failed before implementation; `npm run test:calendar` 11/11 and `npm run test:transactions` 6/6 now pass. SSR period selector confirms tab labels, inclusive range and disabled future-week control.
+- `npm run test:design` 7/7 plus base contracts PASS; `npm run build` PASS (1,776 modules, existing bundle-size warning); `git diff --check` PASS.
+- Real Chrome local preview: All → current week 21–27/9 (spending 30,000 đ) → previous week 14–20/9 (empty, 0 đ) → current week; next-week disabled, custom-date cancel preserved week, then All restored. No data writes. Owner mobile visual sign-off and deployment remain open.
+
+## AI entry review-first regression — 2026-09-23
+
+[Design, reproduction, docs review and limits](bugs/AI-ENTRY-REVIEW-FIRST-DETAIL_DESIGN.md).
+
+| Proof | Result |
+| --- | --- |
+| Configured provider, old prompt | RED: synthetic overlap lost cropped-date row; nine-image stored OCR replay returned 0 drafts |
+| Held-out overlap fixture, corrected prompt | PASS: 3 drafts, repeated reference merged, distinct dates preserved, missing date blank with question, sole wallet prefilled, balance excluded |
+| Nine-image stored OCR replay, output cap 32768 | PASS: 30 owned-wallet drafts, 40.682s model call; no proposal/ledger writes; not a ground-truth completeness assertion |
+| Full Go suite; focused AI/usecase race tests; backend build | PASS; env-gated integration/live tests not implied by default suite |
+| Truncated provider result; complete 30-draft response | PASS: reject partial output without retry; accept completed batch |
+| Restarted local backend and frontend HTTP checks | PASS: /api/v1/health and :4173 return 200 |
+| Fresh browser upload/save, full financial reconciliation, production deploy | NOT RUN; owner UAT pending |
+
+### Unlimited proposal-count correction — 2026-09-23
+
+| Proof | Result |
+| --- | --- |
+| Strict parser accepts 31 drafts | PASS: no application count rejection |
+| Usecase/repository proposal count guards | PASS: `>30` guards removed; each valid draft is persisted for review |
+| Provider safety envelope | PASS: 32768 output tokens and 256 KiB response remain transport protections; truncated JSON is rejected atomically |
+| Full backend tests and race-focused AI/usecase tests | PASS |
+
+### AI provider timeout regression — 2026-09-23
+
+| Proof | Result |
+| --- | --- |
+| Failed real request timing | RED: AI process returned 503 after ~91s while `/api/v1/health` remained 200; failure was model timeout, not service/database outage |
+| Timeout budget correction | PASS: model HTTP/client budget 180s; enclosing extraction/usecase budget 210s; no automatic retry |
+| Focused AI/usecase tests and backend build | PASS |
+| Restarted local API health check | PASS: HTTP 200 |
+
+### AI diagnostics, model usage and instruction scope — 2026-09-23
+
+| Proof | Result |
+| --- | --- |
+| AI extraction logs | PASS: start/OCR/model/schema/success/failure stages log counts, sizes, latency, status and token counts only |
+| User instruction contract | PASS: provider fixture sees separate `user_instruction` for month filtering; OCR/source remains untrusted context |
+| Usage retention | PASS: provider usage is normalized and stored only when `AI_STORE_USAGE=true`; public process response excludes it |
+| Owner isolation audit | PASS for user-facing AI entry/advisor queries: owner predicates or owner-verified joins cover sessions, proposals, attachments, runs, messages, events and finance tools. Attachment cleanup is an internal global sweeper by design and exposes no data. |
+| Streaming timeout decision | VERIFIED DESIGN: partial streamed JSON is unsafe for proposal persistence; async job + existing request polling/SSE is the follow-up transport, not enabled in this correction |
+
 ## Field Ownership
 
 - Human owns proof overrides and acceptance sign-off.
@@ -36,7 +87,7 @@ This file maps accepted behavior and work items to proof.
 
 ## TICKET-02-02 atomic wallet transfer — 2026-09-22
 
-- Scope and trace: [detail design](tickets/TICKET-02-02-TRANSFER-DETAIL_DESIGN.md), [transaction screen](../design/screens/transactions/README.md), [API contract](../architecture/API.md), [ERD](../architecture/ERD.md).
+- Scope and trace: [detail design](tickets/TICKET-02-02-TRANSFER-DETAIL_DESIGN.md), [transaction page](../design/pages/transactions/README.md), [API contract](../architecture/API.md), [ERD](../architecture/ERD.md).
 - Schema proof: migration `000016_transaction_transfer_links` applied locally; `go run ./cmd/migrate version` reports `version: 16 dirty: false`.
 - Backend proof: `TEST_DATABASE_URL=<local dev database> go test ./... -count=1` PASS. Handler tests cover valid paired creation and same-wallet rejection. PostgreSQL integration proves exactly two linked rows, explicit `included_in_reports=false`, owner/credit guards and atomic persistence.
 - Frontend proof: `npm run check:design` PASS; `npm run test:design` PASS (7 guardrails plus base contracts); `npm run build` PASS (1,764 Vite modules). TransferFields composes `BaseSelect`, `AmountField`, `DateField`, `BaseTextInput` and `SurfaceCard`; no native controls or literal colors were added outside bases.
@@ -45,7 +96,7 @@ This file maps accepted behavior and work items to proof.
 
 ## CORE-03 timezone, jars, and live monthly summary — 2026-09-22
 
-- Scope and trace: [CORE-03 design](tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md), [execution plan](../superpowers/plans/2026-09-22-timezone-jars-month.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md), [account settings](../design/screens/current-ui.md), [jar screen](../design/screens/jars/README.md), [month detail](../design/screens/month-detail/README.md), [overview](../design/screens/overview/README.md), [transaction form](../design/screens/transactions/README.md).
+- Scope and trace: [CORE-03 design](tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md), [execution plan](../superpowers/plans/2026-09-22-timezone-jars-month.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md), [account settings](../design/pages/current-ui.md), [jar page](../design/pages/jars/README.md), [month detail](../design/pages/month-detail/README.md), [overview](../design/pages/overview/README.md), [transaction form](../design/pages/transactions/README.md).
 - Persistence/API proof: additive migrations `000013`–`000015` are applied locally; `go run ./cmd/migrate version` reports version 15, `dirty=false`. PostgreSQL repository tests cover month-note owner scope/clear, stable jar month initialization under concurrent calls and owner isolation, empty summary collections, and account-local calendar behavior. Backend full suite `TEST_DATABASE_URL=<local dev database> go test ./... -count=1` PASS; database URL intentionally omitted from this record.
 - Frontend proof: `npm run check:design` PASS (105 local design links and base/color/native-control checks); `npm run test:design` PASS (7 design guardrails plus base contracts); `npm run test:transactions` PASS (5); `npm run test:ai` PASS; `npm run test:calendar` PASS (9); `npm run test:transaction-jars` PASS; `npm run build` PASS (1,763 Vite modules). The Vite-backed AI and jar tests were run sequentially to avoid shared dev-server port contention.
 - Integration/runtime proof: backend health and frontend root returned HTTP 200 on the already-running local servers. No owner ledger was changed. Migration backfill, live transaction CRUD with jars, month note editing, timezone switching and visual acceptance still require owner UAT; do not mark the feature complete on automated tests alone.
@@ -53,7 +104,7 @@ This file maps accepted behavior and work items to proof.
 
 ## UI-FORMS-03 reference follow-up — 2026-09-21
 
-- Scope and trace: [UI-FORMS-03](tickets/UI-FORMS-03-DETAIL_DESIGN.md), [transaction screen](../design/screens/transactions/README.md), [budget screen](../design/screens/budgets/README.md), [assistant screen](../design/screens/assistant/README.md), [BaseCategoryTree](../design/molecules/category-tree/README.md).
+- Scope and trace: [UI-FORMS-03](tickets/UI-FORMS-03-DETAIL_DESIGN.md), [transaction page](../design/pages/transactions/README.md), [budget page](../design/pages/budgets/README.md), [assistant page](../design/pages/assistant/README.md), [BaseCategoryTree](../design/molecules/category-tree/README.md).
 - Owner decisions: Money Lover guides the AI composer/result presentation; MyPocket keeps per-item edit/remove/save and save-all confirmation. Group pickers use the same BaseCategoryTree as Account → Manage Groups; no screen-local category list.
 - Frontend fixture proof: `rtk proxy npm run test:ai` in `app/` PASS after checking AI textarea/attachment/result card, transaction and budget tree pickers, parent/child selection, and transaction category ID payload. `rtk proxy node scripts/base-contract.test.mjs` PASS for tree selection and selected mark. Earlier first red was a test fixture omission (no `onSelect` callback), then isolated rerun passed; no code fix was needed for that assertion.
 - `rtk proxy npm run check:design` in `app/`: PASS (theme/native-control guard and 96 local links); `rtk proxy npm run test:design`: PASS (7 guardrail fixtures + base contracts); `rtk proxy npm run test:transactions`: PASS (5 cases); `rtk proxy node --test scripts/form-logic.test.ts`: PASS (2 cases); `rtk proxy npm run build`: PASS (TypeScript and 1,756 Vite modules); `rtk proxy git diff --check`: PASS.
@@ -80,6 +131,13 @@ This file maps accepted behavior and work items to proof.
 - Cleanup regression: `TestAttachmentDeleteStatusRequiresClaimedDeletingState` red→green; stale or unclaimed attachment cleanup finalization now returns conflict instead of silently reporting success.
 - Synthetic fixture only; no user PDF, proposal approval, or ledger write. See [BUG-001](bugs/BUG-001-s3-presigned-get-signature.md).
 
+## AI-ENTRY-01 model timeout regression — 2026-09-23
+
+- Root cause: MyPocket omitted `max_tokens` from the OpenAI-compatible request. oMLX inherited its local 1,000,000-token default; Qwen generation was cancelled at the 30-second model-client timeout and logged `stage=model`, `code=model_request`, `provider_status=0`.
+- Fix: production extraction requests now send `max_tokens=2048`, `temperature=0`, and `chat_template_kwargs.enable_thinking=false`. The provider boundary test asserts all three fields; `go test ./... -count=1` passes (162 tests / 15 packages).
+- Live verification after restart: text-only extraction returned HTTP 200 in 10.73 seconds; a real 1,027,882-byte receipt image returned HTTP 200 in 13.97 seconds with one review proposal. Capabilities reported `ai_configured=true`, `ocr_configured=true`, and `files_configured=true`.
+- Negative probe: an intentionally blank 1×1 PNG returned the expected generic 503 with safe log diagnostic `stage=ocr_poll`, `code=ocr_failed`; this is OCR content rejection, not the model timeout regression. No ledger transaction was auto-written by either probe.
+
 ## AI-ENTRY-01 OpenAI-compatible JSON Schema resolution — 2026-09-22
 
 - Comparison: prior `response_format: json_object` production path scored 0/15 and returned input-context-shaped roots. A forced tool/function-calling probe reached response streaming but did not complete within the 30 s HTTP-client timeout; tool calling is not used because extraction must never execute a tool. Strict `response_format: {type: json_schema, json_schema: {strict: true, ...}}` is supported by the configured OpenAI-compatible endpoint/model.
@@ -93,7 +151,7 @@ This file maps accepted behavior and work items to proof.
 
 ### AI-ENTRY-01 implementation follow-up
 
-- [Approved slice and execution proof](tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [UI contract/proof](../design/screens/assistant/README.md), [ADR-005](../decisions/ADR-005-ai-entry-review.md). Entry scope is implemented for review; this does not complete all REQ-17, financial Q&A, transfer matching or retained receipts.
+- [Approved slice and execution proof](tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [UI contract/proof](../design/pages/assistant/README.md), [ADR-005](../decisions/ADR-005-ai-entry-review.md). Entry scope is implemented for review; this does not complete all REQ-17, financial Q&A, transfer matching or retained receipts.
 - Backend red→green tests: missing validator/repository/service/config functionality; actual regressions caught hidden category-template acceptance and too-large history blocking follow-up. PostgreSQL fixtures prove zero writes before approval, eight concurrent approvals producing one row, stale version conflict, cross-owner rejection, terminal reject, deleted-ledger replay safety, explicit report=false preservation and the current no-user-usage-limit policy for AI entry. HTTP fixture test exercises real provider adapter → service → DB → edit/approve/reject and reload.
 - Independent review remediation: shared category wallet scopes no longer disclose/overwrite other owners' assignments; OCR source survives model failure; post-claim history includes the previous completion. All three regressions observed red then green; new fixture category/wallets removed after verification.
 - Final post-review run: full `go test -race ./... -count=1` with local `TEST_DATABASE_URL` passed; frontend `test:ai`, `check:design`, `test:design`, `test:transactions`, `build` passed. Local documentation scan 184 links/22 Markdown files: pass. Git-visible files contain none of the supplied credentials; ignored local env mode is 0600. Runtime restarted with final source.
@@ -154,7 +212,7 @@ This file maps accepted behavior and work items to proof.
 
 - CORS preflight: `OPTIONS /api/v1/profile` with `Origin: http://localhost:4173` returned `204` with allow-origin, credentials, methods and headers.
 - API health: `GET /api/v1/health` returned `{"status":"ok"}`.
-- Google OAuth start: `GET /api/v1/auth/google` returned `302` to Google with redirect URI `http://localhost:8080/api/v1/auth/google/callback`.
+- Google OAuth start: `GET /api/v1/auth/google` returned `302` to Google with redirect URI `http://localhost:4173/api/v1/auth/google/callback`; Vite proxies the callback to the backend on port 8080.
 - Swagger UI: `GET /api/v1/docs/index.html` and `GET /api/v1/docs/doc.json` returned `200`; generated paths cover only the implemented auth/profile/home/health endpoints.
 
 Policy lives in `docs/standards/VALIDATION.md`. This matrix is runtime project state and should change as work is planned, implemented, changed, or retired.

@@ -55,6 +55,6 @@ Account navigation remains a five-destination shell after removing Budgets from 
 ## Documentation surfaces
 
 - `docs/architecture/API.md`, `docs/architecture/FEEDBACK_API.md`, and `docs/architecture/OCR_API.md`
-- `docs/design/screens/budgets/README.md`, `docs/design/screens/transactions/README.md`, and a new feedback floating-composer screen note
+- `docs/design/pages/budgets/README.md`, `docs/design/pages/transactions/README.md`, and a new feedback floating-composer page note
 - `docs/standards/DEBUGGING.md` and `docs/releases/CHANGELOG.md`
 - generated API docs under `backend/docs/` after route/schema changes

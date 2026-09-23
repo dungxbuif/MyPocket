@@ -73,7 +73,7 @@
 - Create: `backend/internal/controller/http/ai_entry_limits_test.go`
 - Create: `app/scripts/ai-attachments.test.mjs`
 - Modify: `docs/design/atoms/file-upload/README.md`
-- Modify: `docs/design/screens/assistant/README.md`
+- Modify: `docs/design/pages/assistant/README.md`
 
 **Interfaces:**
 - `MAX_AI_ENTRY_FILES = 20` is exported from the frontend validation module and mirrored by backend constants.
@@ -99,8 +99,8 @@
 - Modify: `app/src/atomic/organisms/TransactionsPanel.tsx`
 - Create: `app/src/atomic/molecules/ScreenHeader.tsx`
 - Modify: `app/src/atomic/organisms/BudgetsPanel.tsx`
-- Modify: `docs/design/screens/budgets/README.md`
-- Modify: `docs/design/screens/transactions/README.md`
+- Modify: `docs/design/pages/budgets/README.md`
+- Modify: `docs/design/pages/transactions/README.md`
 - Create: `app/scripts/account-budgets-navigation.test.mjs`
 
 **Interfaces:**
@@ -155,7 +155,7 @@
 - Create: `app/src/atomic/organisms/FloatingFeedback.test.tsx`
 - Modify: `app/src/atomic/organisms/FeedbackPanel.tsx`
 - Create: `app/scripts/feedback-screenshot-browser.test.mjs`
-- Modify: `docs/design/screens/current-ui.md`
+- Modify: `docs/design/pages/current-ui.md`
 
 **Interfaces:**
 - `createFeedback` accepts `{type,title,description,screenshot?: Blob}` and uses JSON when no screenshot is present, multipart otherwise.
@@ -176,9 +176,9 @@
 - Modify: `docs/architecture/API.md`
 - Modify: `docs/architecture/OCR_API.md`
 - Modify: `docs/architecture/FEEDBACK_API.md`
-- Modify: `docs/design/screens/assistant/README.md`
-- Modify: `docs/design/screens/budgets/README.md`
-- Modify: `docs/design/screens/transactions/README.md`
+- Modify: `docs/design/pages/assistant/README.md`
+- Modify: `docs/design/pages/budgets/README.md`
+- Modify: `docs/design/pages/transactions/README.md`
 - Modify: `docs/standards/DEBUGGING.md`
 - Modify: `docs/releases/CHANGELOG.md`
 - Modify: `docs/work/VALIDATION_MATRIX.md`

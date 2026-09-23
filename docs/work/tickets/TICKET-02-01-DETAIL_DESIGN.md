@@ -11,7 +11,7 @@ trace:
   tests: ../../work/VALIDATION_MATRIX.md
   database_operations: ../../architecture/DATABASE.md
   adr: ../../decisions/ADR-001-versioned-database-migrations.md
-  ui_spec: ../../design/screens/transactions/README.md
+  ui_spec: ../../design/pages/transactions/README.md
 ---
 
 # Thu/chi cơ bản trên ledger
@@ -34,7 +34,7 @@ Nhóm không có `wallet_ids` áp dụng cho mọi ví. Nhóm có `wallet_ids` c
 
 Số dư hiện tại của ví là giá trị suy ra theo WAL-02: `opening_balance + income - expense`. CRUD giao dịch không ghi đè `opening_balance`; list ví trả thêm `current_balance` để các màn dùng cùng một nguồn dữ liệu.
 
-UI compose từ các base đã có: `BaseBottomSheet`, `SegmentedControl`, `FormField`/`BaseTextInput`/`BaseSelect`, `BaseCheckbox`, `StatusMessage`, `SurfaceCard`, `BaseButton` và `TransactionItem`. Behavior màn được khóa tại [screen spec](../../design/screens/transactions/README.md); không dựng control/card/màu riêng trong organism.
+UI compose từ các base đã có: `BaseBottomSheet`, `SegmentedControl`, `FormField`/`BaseTextInput`/`BaseSelect`, `BaseCheckbox`, `StatusMessage`, `SurfaceCard`, `BaseButton` và `TransactionItem`. Behavior màn được khóa tại [page spec](../../design/pages/transactions/README.md); không dựng control/card/màu riêng trong organism.
 
 ## Proof và reconciliation
 

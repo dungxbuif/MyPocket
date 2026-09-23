@@ -27,7 +27,7 @@ Bottom nav giữ bốn mục và slot tạo ở giữa; FAB nằm giữa frame h
 ## Tài khoản → Quản lý nhóm
 
 Routes list/new/edit dùng PageBackHeader, SegmentedControl, BaseButton, BaseCategoryTree, CategoryEditForm và ApplicableWalletsCard. List root/child hai tầng; icon theo catalog. Click row mở route edit. Hiện tree hiển thị con cố định; collapse trong export là ý định thiết kế chưa implement, không được mô tả đã có.
-System metadata read-only; ví áp dụng vẫn sửa được. Nhóm cá nhân có name/kind/parent/icon và ví; đổi kind reset parent. Xem [screen contract](../screens/account-groups/README.md).
+System metadata read-only; ví áp dụng vẫn sửa được. Nhóm cá nhân có name/kind/parent/icon và ví; đổi kind reset parent. Xem [page contract](../pages/account-groups/README.md).
 
 ## Quy tắc mở rộng
 

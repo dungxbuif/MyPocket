@@ -1,6 +1,6 @@
 # Edit group — component contract
 
-Source IMG-03, code.html and editable enable.html reference: [extraction](../../system/SOURCE_EXTRACTION.md). [Screen](../../screens/account-groups/README.md).
+Source IMG-03, code.html and editable enable.html reference: [extraction](../../system/SOURCE_EXTRACTION.md). [Page](../../pages/account-groups/README.md).
 
 ## Composition
 

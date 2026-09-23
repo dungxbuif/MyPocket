@@ -28,4 +28,4 @@ System/read-only là quyền nghiệp vụ, khác disabled tạm thời khi savi
 - Hai budget export không thống nhất ngưỡng warning (80/99/100 so với tiến độ theo ngày). Khi triển khai budget thật, ghi decision tại screen/ticket; hiện chỉ có over-limit danger.
 - Ảnh không chứng minh swipe, long-press, autosave, validation, networking hoặc animation timing. Không tự biến chúng thành rule.
 
-[Source extraction](SOURCE_EXTRACTION.md) · [Screen template](../screens/README.md).
+[Source extraction](SOURCE_EXTRACTION.md) · [Page template](../pages/README.md).

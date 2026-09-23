@@ -21,6 +21,6 @@ Reused bases: `app/src/atomic/atoms/StatusMessage.tsx`, `Text.tsx`, `SurfaceCard
 
 Acceptance: empty messages render semantic status text without a card; error feedback retains alert semantics. No new keyboard interaction.
 
-Links: [Backlog](../BACKLOG.md), [validation](../VALIDATION_MATRIX.md), [screen spec](../../design/screens/transactions/README.md), [base contract](../../design/system/BASE_COMPONENTS.md), [release](../../releases/CHANGELOG.md), [context](../../CONTEXT.md). Phase: none. Separate detail design and ADR: not required for this owner-directed presentation correction. Requirements/API/ERD/architecture: unchanged.
+Links: [Backlog](../BACKLOG.md), [validation](../VALIDATION_MATRIX.md), [page spec](../../design/pages/transactions/README.md), [base contract](../../design/system/BASE_COMPONENTS.md), [release](../../releases/CHANGELOG.md), [context](../../CONTEXT.md). Phase: none. Separate detail design and ADR: not required for this owner-directed presentation correction. Requirements/API/ERD/architecture: unchanged.
 
 Verification: `rtk proxy npm run check:design`, `rtk proxy npm run test:design`, and `rtk proxy npm run build` pass in `app/`. Shared SSR coverage checks borderless status content and preserved danger alert styling. Visual UAT for the new presentation remains pending owner review in the running app. Docs review: base/screen contracts and trace links updated; no master business/API/schema change or new ADR required.

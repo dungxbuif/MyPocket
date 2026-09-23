@@ -45,7 +45,7 @@ Wallet empty states in Overview (“Chưa có ví.”) and WalletManagementPanel
 
 WalletSelectionList: controlled selectedID/editing, aggregate excludes is_in_total=false, grouped shared rows and selection marks; callbacks own navigation. SavingsSummary: clamped Progress with real remaining/reached state, calendar-day countdown. CategoryTreeSelector: BaseTextInput search, clear action and BaseCategoryTree selection mode; retains a non-applicable parent as context when an applicable child exists, and only selectable IDs invoke onSelect. Transaction, proposal and budget pickers share this tree used in group management.
 
-Wallet follow-up: BaseSwitch owns the native checkbox role=switch, 44px target, checked/focus/disabled visuals and controlled onChange. BaseBottomSheet `presentation=form` owns canvas/tall shell, cancel/title/headerAction; same focus trap, Escape and restoration. WalletCreateForm composes shared cards/inline controls/switch; WalletTypePicker composes row buttons with aria-pressed selection. See [wallet contract](../screens/wallets/README.md).
+Wallet follow-up: BaseSwitch owns the native checkbox role=switch, 44px target, checked/focus/disabled visuals and controlled onChange. BaseBottomSheet `presentation=form` owns canvas/tall shell, cancel/title/headerAction; same focus trap, Escape and restoration. WalletCreateForm composes shared cards/inline controls/switch; WalletTypePicker composes row buttons with aria-pressed selection. See [wallet contract](../pages/wallets/README.md).
 
 Trước một biến thể mới, ghi: intent, anatomy, props, event/effect, states, keyboard, tokens, consumers, proof. Sau đó implement base và kiểm thử consumer. API lớp UI có thể mở rộng theo task đã duyệt; không tự tạo palette/interaction model riêng.
 

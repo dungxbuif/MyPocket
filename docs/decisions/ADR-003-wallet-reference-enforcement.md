@@ -7,7 +7,7 @@ owner: shared
 
 # Reference fidelity is part of base-first implementation
 
-Owner requested tighter rules and wallet reference implementation. [Trigger/design](../work/tickets/UI-WALLET-02-DETAIL_DESIGN.md), [screen](../design/screens/wallets/README.md), [prior decision](ADR-002-design-contract-enforcement.md).
+Owner requested tighter rules and wallet reference implementation. [Trigger/design](../work/tickets/UI-WALLET-02-DETAIL_DESIGN.md), [page](../design/pages/wallets/README.md), [prior decision](ADR-002-design-contract-enforcement.md).
 
 Using base controls is necessary but not sufficient: screen composition must map reference regions, actions and states to named bases. New shared behaviors are specified before consumers. Visual overrides on cards and clickable native wrappers are blocked by AST checks, with regression fixtures.
 

@@ -18,7 +18,7 @@ Architecture: entity/repository interface + Postgres repository and pure progres
 
 Risks: overlap race (serialize writes per owner), timezone date boundaries (send explicit RFC3339), stale aggregates (fetch on shared refresh), category descendants/double counting (pure tests), owner isolation (validation + owner-scoped repository; real API negative test). Test first pure calculation and validation; run all Go tests, design tests, transaction tests/build; real local API roundtrip and browser UAT. No production deployment.
 
-Trace/reconciliation: [API](../../architecture/API.md), [ERD](../../architecture/ERD.md), [ADR](../../decisions/ADR-004-budget-api-data.md), [validation](../VALIDATION_MATRIX.md), [release](../../releases/CHANGELOG.md), [context](../../CONTEXT.md), [screen](../../design/screens/budgets/README.md). Automated and runtime proof to be recorded here; owner visual acceptance pending. Design approved by explicit API integration instruction; no separate approval inferred for recurring scheduler or transfer pairs.
+Trace/reconciliation: [API](../../architecture/API.md), [ERD](../../architecture/ERD.md), [ADR](../../decisions/ADR-004-budget-api-data.md), [validation](../VALIDATION_MATRIX.md), [release](../../releases/CHANGELOG.md), [context](../../CONTEXT.md), [page](../../design/pages/budgets/README.md). Automated and runtime proof to be recorded here; owner visual acceptance pending. Design approved by explicit API integration instruction; no separate approval inferred for recurring scheduler or transfer pairs.
 
 ## Verification and docs review — 2026-09-20
 

@@ -263,7 +263,7 @@ Tái sử dụng từ `app/src/atomic/atoms/`: `BaseButton`, `IconButton`, `Text
 
 Base mới cần đặc tả trước JSX: `BaseFileUpload` (accept/size/remove/keyboard), `AttachmentList` (file progress/error/source), `AIProposalCard` (missing/edit/source/confirm state), `AIAnswerSources` (scope/as_of/facts). Các molecules compose atom; không copy CSS card/control vào màn.
 
-Tạo `docs/design/screens/assistant/README.md` và component contracts ở task UI; đọc tokens/base contracts và ADR-002/003 khi thực hiện. Trạng thái bắt buộc: chưa cấu hình, đang OCR, lỗi từng ảnh, AI timeout, thiếu trường, nghi trùng, ready, đang confirm, stale, đã lưu một phần, empty Q&A và unavailable. App không hiển thị fixture như dữ liệu thật.
+Tạo `docs/design/pages/assistant/README.md` và component contracts ở task UI; đọc tokens/base contracts và ADR-002/003 khi thực hiện. Trạng thái bắt buộc: chưa cấu hình, đang OCR, lỗi từng ảnh, AI timeout, thiếu trường, nghi trùng, ready, đang confirm, stale, đã lưu một phần, empty Q&A và unavailable. App không hiển thị fixture như dữ liệu thật.
 
 ## 9. Implementation plan — chia lát để review
 
@@ -352,7 +352,7 @@ Interface: `Query(ctx, authenticatedOwnerID, toolName, validatedArgs)` → facts
 
 ### T7 — Màn Trợ lý, UAT và release pilot (3–4 ngày)
 
-Create: `app/src/services/ai.ts`; `app/src/atomic/organisms/AIAssistantPanel.tsx`; bases/molecules nêu mục 8; `app/scripts/ai.test.ts`; `docs/design/screens/assistant/README.md` và component specs. Modify router/app navigation, refresh propagation ví/giao dịch/budget sau confirm; thêm source/evidence UI ở giao dịch nếu giữ receipt.
+Create: `app/src/services/ai.ts`; `app/src/atomic/organisms/AIAssistantPanel.tsx`; bases/molecules nêu mục 8; `app/scripts/ai.test.ts`; `docs/design/pages/assistant/README.md` và component specs. Modify router/app navigation, refresh propagation ví/giao dịch/budget sau confirm; thêm source/evidence UI ở giao dịch nếu giữ receipt.
 
 - [ ] Đặc tả base mới và mapping UI trước JSX; tests keyboard/file input, lỗi từng ảnh, proposal editing, stale version, disable double submit, partial confirm và source facts.
 - [ ] Gắn API T2–T6; refresh sau confirm, reload giữ phiên và trạng thái; bỏ cấu hình provider vẫn ghi tay được.

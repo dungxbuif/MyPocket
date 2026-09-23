@@ -6,7 +6,7 @@ artifact_source: visual_reference
 
 Runtime update: WalletSelectionList now implements grouped rows, total, selection check, header/actions through WalletManagementPanel. Edit selects a wallet into its edit sheet. Goal selection opens savings details; basic/credit currently retain local selection only, not global report/transaction filtering. This supersedes the reference-only status below. Browser list/create navigation inspected; complete downstream scope flow remains pending.
 
-Owner-supplied screen.png and code.html are input evidence. Existing-wallet list shows aggregate, included wallets, selection check and actions. It is not a wallet-type specification. Its icon/title/subtitle/check row anatomy is reused for basic/goal/credit selection. Existing-wallet aggregate/filter behavior remains a separate scope. See [screen contract](../screens/wallets/README.md).
+Owner-supplied screen.png and code.html are input evidence. Existing-wallet list shows aggregate, included wallets, selection check and actions. It is not a wallet-type specification. Its icon/title/subtitle/check row anatomy is reused for basic/goal/credit selection. Existing-wallet aggregate/filter behavior remains a separate scope. See [page contract](../../pages/wallets/README.md).
 
 ## Normalized composition
 

@@ -49,7 +49,7 @@ Du lịch hiện là `Travel Mode`/sự kiện gắn giao dịch theo [TICKET-05
 
 ## Phân biệt Chọn Ví và quản lý ví
 
-[Ảnh Chọn Ví](../../ch_n_v_wallet_selector/README.md) chọn ví đã tồn tại hoặc Tổng cộng cho một màn tiêu thụ; không chọn loại. Runtime dùng lựa chọn này trong màn quản lý ví và bộ lọc đầu sổ giao dịch; [Ảnh Thêm Ví](../../th_m_v_add_wallet/README.md) là tham chiếu bố cục form.
+[Ảnh Chọn Ví](../../references/wallet-selector/README.md) chọn ví đã tồn tại hoặc Tổng cộng cho một màn tiêu thụ; không chọn loại. Runtime dùng lựa chọn này trong màn quản lý ví và bộ lọc đầu sổ giao dịch; [Ảnh Thêm Ví](../../references/add-wallet/README.md) là tham chiếu bố cục form.
 
 ## Nguồn Money Lover đã kiểm tra
 
@@ -68,7 +68,7 @@ Runtime dùng WalletTypePicker cho loại ví và WalletDetailPanel cho mọi v�
 
 ## Bản triển khai trước quyết định select — chỉ để đối chiếu
 
-Route `/account/wallets`. [Work/design](../../../work/tickets/UI-WALLET-02-DETAIL_DESIGN.md), [reference](../../th_m_v_add_wallet/README.md).
+Route `/account/wallets`. [Work/design](../../../work/tickets/UI-WALLET-02-DETAIL_DESIGN.md), [reference](../../references/add-wallet/README.md).
 
 Add opens one BaseBottomSheet, canvas/form presentation, with Hủy / Thêm Ví / Lưu header. SurfaceCard groups IconBadge + inline title input, fixed VND, and opening balance. Divider separates rows. No note. A row opens the three-type picker; goal requires positive target and credit positive limit. Service linking is disabled and labeled unavailable. BaseSwitch “Không tính vào tổng” inversely maps to is_in_total.
 

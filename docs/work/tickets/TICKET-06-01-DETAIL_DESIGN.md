@@ -30,7 +30,7 @@ UI: BaseSelect for immutable-on-save type; grouped goal form; date input; real g
 
 Alternatives: copied reference HTML rejected; synthetic categories/transfer entries rejected because they corrupt semantics. Change only wallet date contract, goal UI and direct consumers. Tests: invalid/valid dates, update omission/clear, goal calculations, shared SSR, design checks, ledger helpers, backend Go tests/build. Regenerate Swagger.
 
-Trace: [ticket](TICKET-06-01-muc-tieu-tiet-kiem.md), [screen](../../design/screens/savings/README.md), [backlog](../BACKLOG.md), [validation](../VALIDATION_MATRIX.md), [release](../../releases/CHANGELOG.md), [context](../../CONTEXT.md), [API](../../architecture/API.md). Phase none. ADR: additive date exposure uses existing schema and date-label semantics, no new architecture. Docs review and UAT recorded after verification.
+Trace: [ticket](TICKET-06-01-muc-tieu-tiet-kiem.md), [page](../../design/pages/savings/README.md), [backlog](../BACKLOG.md), [validation](../VALIDATION_MATRIX.md), [release](../../releases/CHANGELOG.md), [context](../../CONTEXT.md), [API](../../architecture/API.md). Phase none. ADR: additive date exposure uses existing schema and date-label semantics, no new architecture. Docs review and UAT recorded after verification.
 
 ## Verification and remaining work
 

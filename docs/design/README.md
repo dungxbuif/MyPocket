@@ -12,11 +12,11 @@
 6. Organism sở hữu fetching, state, điều hướng và composition. Molecule sở hữu bố cục tái sử dụng. Atom sở hữu hình thức và hành vi control.
 7. Build bắt buộc qua npm run check:design. Thêm base phải thêm test cho behavior; không sửa guardrail để miễn trừ màn riêng.
 
-## Chỉ giữ đặc tả
+## Đặc tả và visual evidence
 
-Ảnh PNG và HTML export đã được đọc trực quan/OCR, đối chiếu và cô đọng tại [SOURCE_EXTRACTION](system/SOURCE_EXTRACTION.md). Theo yêu cầu owner ngày 2026-09-13, docs/design giữ Markdown specification; không yêu cầu duy trì code.html/screen.png nữa. Bản gốc tra được trong Git ở commit 1bc013d. Browser fixture kiểm thử nằm trong app/tests, không phải một design source khác.
+Ảnh PNG và HTML export đã được đọc trực quan/OCR, đối chiếu và cô đọng tại [SOURCE_EXTRACTION](system/SOURCE_EXTRACTION.md). Markdown là design contract; các bundle có `artifact_source: visual_reference` được giữ tại [references](references/README.md) như bằng chứng owner, không phải code runtime. Browser fixture kiểm thử nằm trong app/tests, không phải một design source khác.
 
-Khi implement đến màn nào, thêm/cập nhật screens/<screen>/README.md của màn đó: route, composition, states, event → effect, validation, quyền thao tác, copy, API dependency, proof và known gaps. Không suy đoán behavior chưa thấy trong ảnh thành quyết định sản phẩm. Xem [screen template](screens/README.md).
+Khi implement đến route nào, thêm/cập nhật `pages/<page>/README.md`: route, composition, states, event → effect, validation, quyền thao tác, copy, API dependency, proof và known gaps. Không suy đoán behavior chưa thấy trong ảnh thành quyết định sản phẩm. Xem [page template](pages/README.md).
 
 ## Authority và verification
 

@@ -205,7 +205,7 @@ if duplicateSeqs != 0 { t.Fatal("duplicate events reached message reducer") }
 - [ ] 6d. Write shared component contracts then metric/category/comparison/message/tool-status molecules; mask DOM/ARIA amounts.
 - [ ] 6e. Extend AssistantComposer with advisor mode and IME-safe Enter while preserving entry defaults; evaluate optional headless adapter in a fixture only.
 
-**Files:** create `app/src/services/aiAdvisor.ts`, `app/src/services/aiAdvisorParts.ts`, `app/src/services/aiAdvisorStream.ts`, `app/src/atomic/molecules/AssistantMessageList.tsx`, `AssistantToolStatus.tsx`, `AssistantPart.tsx`, `FinanceMetricGroup.tsx`, `FinanceComparisonCard.tsx`, `FinanceCategoryBreakdown.tsx`; modify `AssistantComposer.tsx`; tests `app/scripts/ai-advisor.test.ts`. Reuse existing budget/goal/transaction bases. Add planned screen spec `docs/design/screens/finance-assistant/README.md` and update base inventory before JSX.
+**Files:** create `app/src/services/aiAdvisor.ts`, `app/src/services/aiAdvisorParts.ts`, `app/src/services/aiAdvisorStream.ts`, `app/src/atomic/molecules/AssistantMessageList.tsx`, `AssistantToolStatus.tsx`, `AssistantPart.tsx`, `FinanceMetricGroup.tsx`, `FinanceComparisonCard.tsx`, `FinanceCategoryBreakdown.tsx`; modify `AssistantComposer.tsx`; tests `app/scripts/ai-advisor.test.ts`. Reuse existing budget/goal/transaction bases. Add planned page spec `docs/design/pages/finance-assistant/README.md` and update base inventory before JSX.
 
 **Interfaces:** discriminated `AdvisorPart` union validates `parts_version=1`, money/range/arrays; `reduceAdvisorEvent(state,event)` dedupes `(run_id,seq)` and upserts stable part IDs. Service owns POST/recovery/fetch SSE; renderer cannot call arbitrary API URLs from part data.
 

@@ -24,6 +24,15 @@ updated: 2026-09-22
 
 # Project Context
 
+## Latest AI entry correction — 2026-09-23
+
+[Review-first bug](work/bugs/AI-ENTRY-REVIEW-FIRST-DETAIL_DESIGN.md) is in_review pending owner UAT. Replaced conflicting clarification-first prompt rules with partial draft extraction, within-batch duplicate merging and inferred/default supplied wallets. Real stored nine-image OCR replay changed from zero drafts to 30 with owned wallets after raising the truncated 2048-token response budget; the current provider envelope is 32768 tokens. The application no longer caps proposal count; only provider response/transport envelopes remain. Held-out duplicate/distinct-date/missing-date fixture, 31-draft parser test, full Go tests, focused race tests and backend build pass. Local API restarted; backend health and frontend :4173 both HTTP 200. No ledger writes from replay, no production deployment; owner still reviews amounts/duplicates and existing requests retain cached outcomes.
+
+2026-09-23 diagnostics follow-up: AI entry and Finance Assistant provider calls now emit privacy-safe stage/latency/status/count diagnostics, and `AI_STORE_USAGE=true` persists normalized request/finish/latency/token metadata internally without exposing it in public responses. User text is sent as a separate `user_instruction` field, so explicit filters such as “chỉ lấy giao dịch tháng 9” guide selection while OCR/source text remains untrusted evidence. User-facing repository reads were audited for owner predicates; the only owner-independent operation is the internal attachment cleanup sweeper, which does not return financial data. Streaming remains deferred; the synchronous JSON contract and bounded 180s model/210s extraction timeouts are the current behavior.
+2026-09-23 runtime regression fix: initializing empty `model_usage` maps on new AI entry/advisor rows prevents the non-null JSONB columns from receiving SQL `NULL`, which had surfaced as a generic 500 before provider work. The database default remains as a safety net; creation and integration tests now cover the path.
+2026-09-23 wallet/ledger UI follow-up: wallet selection now opens a shared detail panel for basic, goal and credit wallets; the transaction ledger has a top wallet scope select with `Tổng cộng` or an owner wallet. Credit detail is read-only until its dedicated debt ledger exists.
+2026-09-24 ledger correction: `/transactions` has one wallet selector. Basic and `Tổng cộng` now share Week/Custom controls, period cashflow card and grouped rows; basic adds only a wallet-ID predicate. Goal alone shows progress and full monthly history; provisional credit keeps the shared period layout read-only. No shared All-time tab. Live Chrome verified basic/aggregate parity and previous-week empty state after the correction; owner mobile sign-off and deployment are not claimed. Credit statement/payment/detail contract is not approved; its visible rows cannot open the ordinary editor. Travel Mode remains a draft event linkage, not a wallet type. See [ticket](work/tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md).
+
 ## Field Ownership
 
 - Human owns project intent, priority overrides, and unresolved product questions.
@@ -32,7 +41,7 @@ updated: 2026-09-22
 
 ## Current Status
 
-- 2026-09-22 Stage v1 reset: the historical incremental SQL files were squashed into `backend/migrations/000001_stage_v1.up.sql` with a non-destructive down file. A fresh disposable database applies cleanly at version 1. Existing databases that still report an older historical version must be recreated/reset in the staging environment before using this baseline; production data is never dropped automatically. The former `refereces/` tree was removed; this repository is now the canonical implementation and documentation source.
+- 2026-09-22 Stage v1 reset: the historical incremental SQL files were squashed into `backend/migrations/000001_stage_v1.up.sql` with a non-destructive down file. A fresh disposable database applies cleanly at version 1. Existing databases that still report an older historical version must be recreated/reset in the staging environment before using this baseline; production data is never dropped automatically. The former legacy reference tree was removed; this repository is now the canonical implementation and documentation source.
 
 - 2026-09-22 planning follow-up (before implementation): owner requested detailed writing-plan and technical instructions. Added [technical guide](superpowers/plans/2026-09-22-finance-assistant-technical-guide.md) and expanded V1 into ordered subtask gates: concrete Go ports/SQL/API/SSE/UI contracts, isolated fixtures and operational checks. Code inspection found `JarRepository.ListMonth` writes month config; the advisor runtime now uses a read-only jar path. The later implementation checkpoint below is the current proof source.
 - 2026-09-22 Finance Assistant implementation has started from the approved plan: semantic query foundation, advisor conversation/run and user API-key schema, read-only tool registry/provider loop, JWT/API-key endpoints, best-effort Redis advisor audit and `/assistant` UI are present locally. Replayable SSE, durable audit delivery/alerting, configured-provider proof, public deployment and merchant normalization remain release gaps; V2 confirmed actions and later intelligence remain roadmap.
@@ -50,7 +59,7 @@ updated: 2026-09-22
 
 - 2026-09-20 latest: owner requested API-only screens. All mounted data screens now use real APIs, including new budget explicit-interval CRUD/progress. Savings catalog filtering enforced FE/BE; category names/icons resolved in goal history. API roundtrip through FE proxy passed with PostgreSQL, test fixtures cleaned. Migration 000009 applied. [API-SCREENS-01](work/tickets/API-SCREENS-01-DETAIL_DESIGN.md) and savings remain in review/partial product scope; recurring budgets, internal paired transfers, reports and notifications are not completed. Earlier mock-budget/counterpart-pending notes below are historical.
 
-- Latest owner request (2026-09-13): finish wallet management and adding transactions, then verify wallet–transaction–category logic and UI. Core wallet and basic income/expense slices are in review with [wallet proof](work/tickets/TICKET-01-02-VERIFICATION.md), [ledger proof](work/tickets/TICKET-02-01-VERIFICATION.md), and a durable [screen contract](design/screens/transactions/README.md).
+- Latest owner request (2026-09-13): finish wallet management and adding transactions, then verify wallet–transaction–category logic and UI. Core wallet and basic income/expense slices are in review with [wallet proof](work/tickets/TICKET-01-02-VERIFICATION.md), [ledger proof](work/tickets/TICKET-02-01-VERIFICATION.md), and a durable [page contract](design/pages/transactions/README.md).
 
 - Status: The root `app/` Vite React Tailwind app renders the Financial Clarity preview and is connected to the dev Gin API; Google OAuth and development CORS are enabled for local testing. PostgreSQL uses the explicit Stage v1 baseline migration; API startup does not mutate schema.
 - Active backlog: `docs/work/BACKLOG.md`
@@ -76,7 +85,7 @@ The independent UI-FORMS-03/AI flows still use the base-first contracts: `Catego
 
 - `backend/internal/controller/http/transaction_handler.go`, wallet ledger balance repository/model, handler tests and generated Swagger; `backend/internal/infrastructure/ai/` now enforces strict JSON Schema output and includes bounded wallet descriptions for model disambiguation.
 - `app/src/services/transactions.ts`, transaction/wallet rule tests, real Overview/Header/Transactions/Quick Add/Wallet consumers.
-- `docs/design/screens/transactions/`, wallet/transaction verification, API/backlog/validation/changelog reconciliation.
+- `docs/design/pages/transactions/`, wallet/transaction verification, API/backlog/validation/changelog reconciliation.
 
 - `docs/work/tickets/`: 11 parent tickets, 32 children and a business-oriented index; newly captured provider-choice draft remains pending owner review.
 - `docs/requirements/SPEC.md`, `BUSINESS_RULES.md`, `REPORTS.md`, `REQUIREMENTS.md`, `USER_STORIES.md`

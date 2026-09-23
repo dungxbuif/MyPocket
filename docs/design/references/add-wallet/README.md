@@ -4,7 +4,7 @@ artifact_source: visual_reference
 
 # Add Wallet reference
 
-Owner-supplied screen.png and code.html are input evidence, not runtime implementations. Sheet with cancel/title/save; primary grouped card for name, VND, balance; service action; exclude-total switch plus help. No note field. App typography, colors and 12px card geometry come from shared bases. See [screen contract](../screens/wallets/README.md).
+Owner-supplied screen.png and code.html are input evidence, not runtime implementations. Sheet with cancel/title/save; primary grouped card for name, VND, balance; service action; exclude-total switch plus help. No note field. App typography, colors and 12px card geometry come from shared bases. See [page contract](../../pages/wallets/README.md).
 
 ## Normalized composition
 
