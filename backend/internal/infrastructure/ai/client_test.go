@@ -259,21 +259,17 @@ func TestOCRBeforeModel(t *testing.T) {
 				t.Error("incorrect OCR submission")
 			}
 			var body struct {
-				Input struct {
+				Mode          string `json:"mode"`
+				WaitTimeoutMs int    `json:"waitTimeoutMs"`
+				Input         struct {
 					Base64 string `json:"base64"`
 				} `json:"input"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Input.Base64 != img.Base64 {
-				t.Error("missing OCR bytes")
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Mode != "wait" || body.WaitTimeoutMs != 15000 || body.Input.Base64 != img.Base64 {
+				t.Errorf("invalid wait OCR request: mode=%q wait=%d base64=%t", body.Mode, body.WaitTimeoutMs, body.Input.Base64 != "")
 			}
 			w.WriteHeader(http.StatusAccepted)
-			_, _ = io.WriteString(w, `{"documentId":"doc_123","status":"queued"}`)
-		case "/v1/documents/doc_123":
-			polls.Add(1)
-			if r.Method != "GET" {
-				t.Error("incorrect OCR poll")
-			}
-			_, _ = io.WriteString(w, `{"status":"completed","result":{"text":"Receipt total 42000"}}`)
+			_, _ = io.WriteString(w, `{"documentId":"doc_123","status":"completed","result":{"text":"Receipt total 42000"}}`)
 		case "/v1/chat/completions":
 			models.Add(1)
 			body, _ := io.ReadAll(r.Body)
@@ -286,8 +282,44 @@ func TestOCRBeforeModel(t *testing.T) {
 		}
 	})
 	out, err := c.Extract(context.Background(), Input{Text: "lunch", Images: []Image{img}})
-	if err != nil || !strings.Contains(out.SourceText, "Receipt total 42000") || submits.Load() != 1 || polls.Load() != 1 || models.Load() != 1 {
+	if err != nil || !strings.Contains(out.SourceText, "Receipt total 42000") || submits.Load() != 1 || polls.Load() != 0 || models.Load() != 1 {
 		t.Fatalf("OCR flow failed: %v %+v", err, out)
+	}
+}
+
+func TestOCRWaitModeFallsBackOnlyForUnknownMode(t *testing.T) {
+	var submissions atomic.Int32
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/documents" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected OCR request: %s %s", r.Method, r.URL.Path)
+		}
+		submissions.Add(1)
+		var request struct {
+			Mode          string `json:"mode"`
+			WaitTimeoutMs int    `json:"waitTimeoutMs"`
+			Input         struct {
+				Base64 string `json:"base64"`
+			} `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if submissions.Load() == 1 {
+			if request.Mode != "wait" || request.WaitTimeoutMs != ocrWaitTimeout || request.Input.Base64 == "" {
+				t.Fatalf("first OCR request must use wait mode: %+v", request)
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"detail":"json: unknown field \"mode\""}`)
+			return
+		}
+		if request.Mode != "" || request.WaitTimeoutMs != 0 || request.Input.Base64 == "" {
+			t.Fatalf("compatibility OCR request must use queue contract: %+v", request)
+		}
+		_, _ = io.WriteString(w, `{"documentId":"doc_legacy","status":"completed","result":{"text":"legacy receipt"}}`)
+	})
+	text, err := c.ocr(context.Background(), pngImage(t))
+	if err != nil || text != "legacy receipt" || submissions.Load() != 2 {
+		t.Fatalf("OCR compatibility flow failed: text=%q err=%v submissions=%d", text, err, submissions.Load())
 	}
 }
 
@@ -308,7 +340,7 @@ func TestPDFIsUploadedToOCRPrivatelyBeforeTextOnlyModel(t *testing.T) {
 			if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Filename != "statement.pdf" || request.SizeBytes != len(pdf) || request.ContentType != "application/pdf" {
 				t.Errorf("invalid presign payload: %+v (%v)", request, err)
 			}
-			_ = json.NewEncoder(w).Encode(map[string]any{"method": "PUT", "uploadUrl": "http://" + r.Host + "/upload-target", "sourceUrl": "https://ocr-source.example/doc.pdf", "headers": map[string]string{"Content-Length": fmt.Sprint(len(pdf)), "Content-Type": "application/pdf"}})
+			_ = json.NewEncoder(w).Encode(map[string]any{"method": "PUT", "uploadUrl": "http://" + r.Host + "/upload-target", "sourceUrl": "s3://ocr-source/doc.pdf", "headers": map[string]string{"Content-Length": fmt.Sprint(len(pdf)), "Content-Type": "application/pdf"}})
 		case "/upload-target":
 			uploads.Add(1)
 			body, _ := io.ReadAll(r.Body)
@@ -319,11 +351,13 @@ func TestPDFIsUploadedToOCRPrivatelyBeforeTextOnlyModel(t *testing.T) {
 		case "/v1/documents":
 			ocrSubmissions.Add(1)
 			var request struct {
-				Input struct {
+				Mode          string `json:"mode"`
+				WaitTimeoutMs int    `json:"waitTimeoutMs"`
+				Input         struct {
 					URL string `json:"url"`
 				} `json:"input"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Input.URL != "https://ocr-source.example/doc.pdf" {
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Mode != "wait" || request.WaitTimeoutMs != 15000 || request.Input.URL != "s3://ocr-source/doc.pdf" {
 				t.Error("OCR source URL was not submitted")
 			}
 			_ = json.NewEncoder(w).Encode(map[string]string{"documentId": "doc_pdf_1", "status": "queued"})

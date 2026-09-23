@@ -24,7 +24,17 @@ const (
 	maxImagePixels = 25_000_000
 	maxOCRPolls    = 60
 	pollInterval   = time.Second
+	ocrWaitTimeout = 15_000
 )
+
+type ocrDocument struct {
+	DocumentID      string `json:"documentId"`
+	Status          string `json:"status"`
+	ResultExpiresAt string `json:"resultExpiresAt"`
+	Result          *struct {
+		Text string `json:"text"`
+	} `json:"result"`
+}
 
 func validateImages(images []Image) error {
 	if len(images) > maxImages {
@@ -65,19 +75,33 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 	var body []byte
 	var err error
 	if img.SourceURL != "" {
-		body, _, err = c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, map[string]any{"input": map[string]string{"url": img.SourceURL}}, "OCR")
+		body, err = c.submitOCR(ctx, map[string]string{"url": img.SourceURL})
 	} else if img.MIMEType == "application/pdf" {
 		body, err = c.uploadPrivatePDF(ctx, img)
 	} else {
-		body, _, err = c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, map[string]any{"input": map[string]string{"base64": img.Base64}}, "OCR")
+		body, err = c.submitOCR(ctx, map[string]string{"base64": img.Base64})
 	}
 	if err != nil {
 		return "", wrapProviderError("ocr_submit", "ocr_submit_request", err)
 	}
-	var submitted struct {
-		DocumentID string `json:"documentId"`
+	submitted, err := decodeOCRDocument(body)
+	if err != nil {
+		return "", wrapProviderError("ocr_submit", "ocr_submission_invalid", errors.New("invalid OCR submission response"))
 	}
-	if json.Unmarshal(body, &submitted) != nil || !validDocumentID(submitted.DocumentID) {
+	if submitted.Status == "completed" {
+		text, err := completedOCRText(submitted)
+		if err != nil {
+			return "", wrapProviderError("ocr_submit", "ocr_result_invalid", err)
+		}
+		return text, nil
+	}
+	if submitted.Status == "failed" {
+		return "", wrapProviderError("ocr_submit", "ocr_failed", errors.New("OCR recognition failed"))
+	}
+	if submitted.Status == "cancelled" || submitted.Status == "canceled" {
+		return "", wrapProviderError("ocr_submit", "ocr_cancelled", errors.New("OCR recognition was cancelled"))
+	}
+	if !validDocumentID(submitted.DocumentID) {
 		return "", wrapProviderError("ocr_submit", "ocr_submission_invalid", errors.New("invalid OCR submission response"))
 	}
 	for attempt := 0; attempt < maxOCRPolls; attempt++ {
@@ -85,28 +109,13 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 		if err != nil {
 			return "", wrapProviderError("ocr_poll", "ocr_poll_request", err)
 		}
-		var document struct {
-			Status          string `json:"status"`
-			ResultExpiresAt string `json:"resultExpiresAt"`
-			Result          *struct {
-				Text string `json:"text"`
-			} `json:"result"`
-		}
-		if json.Unmarshal(body, &document) != nil {
+		document, err := decodeOCRDocument(body)
+		if err != nil {
 			return "", wrapProviderError("ocr_poll", "ocr_response_invalid", errors.New("invalid OCR document response"))
 		}
 		switch document.Status {
 		case "completed":
-			if document.ResultExpiresAt != "" {
-				expires, err := time.Parse(time.RFC3339, document.ResultExpiresAt)
-				if err != nil || !expires.After(time.Now()) {
-					return "", errors.New("OCR result expired or has an invalid expiry")
-				}
-			}
-			if document.Result == nil || strings.TrimSpace(document.Result.Text) == "" || len(document.Result.Text) > maxSourceBytes {
-				return "", errors.New("OCR result text is missing or exceeds limit")
-			}
-			return document.Result.Text, nil
+			return completedOCRText(document)
 		case "failed":
 			return "", wrapProviderError("ocr_poll", "ocr_failed", errors.New("OCR recognition failed"))
 		case "cancelled", "canceled":
@@ -125,6 +134,51 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 		}
 	}
 	return "", wrapProviderError("ocr_poll", "ocr_poll_limit", errors.New("OCR polling limit exceeded"))
+}
+
+func ocrWaitRequest(input map[string]string) map[string]any {
+	return map[string]any{"mode": "wait", "waitTimeoutMs": ocrWaitTimeout, "input": input}
+}
+
+func ocrQueueRequest(input map[string]string) map[string]any {
+	return map[string]any{"input": input}
+}
+
+func (c *Client) submitOCR(ctx context.Context, input map[string]string) ([]byte, error) {
+	body, _, err := c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, ocrWaitRequest(input), "OCR")
+	if err == nil {
+		return body, nil
+	}
+	var requestErr *providerRequestError
+	if !errors.As(err, &requestErr) || !requestErr.UnknownMode {
+		return nil, err
+	}
+	// The public OCR host may lag the provider release that introduced wait
+	// mode. The exact unknown-field response proves no document was accepted;
+	// use the original queue contract once so existing deployments keep working.
+	body, _, err = c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, ocrQueueRequest(input), "OCR")
+	return body, err
+}
+
+func decodeOCRDocument(body []byte) (ocrDocument, error) {
+	var document ocrDocument
+	if err := json.Unmarshal(body, &document); err != nil {
+		return ocrDocument{}, err
+	}
+	return document, nil
+}
+
+func completedOCRText(document ocrDocument) (string, error) {
+	if document.ResultExpiresAt != "" {
+		expires, err := time.Parse(time.RFC3339, document.ResultExpiresAt)
+		if err != nil || !expires.After(time.Now()) {
+			return "", errors.New("OCR result expired or has an invalid expiry")
+		}
+	}
+	if document.Result == nil || strings.TrimSpace(document.Result.Text) == "" || len(document.Result.Text) > maxSourceBytes {
+		return "", errors.New("OCR result text is missing or exceeds limit")
+	}
+	return document.Result.Text, nil
 }
 
 func validOCRSourceURL(raw string) bool {
@@ -149,7 +203,7 @@ func (c *Client) uploadPrivatePDF(ctx context.Context, file Image) ([]byte, erro
 		SourceURL string            `json:"sourceUrl"`
 		Headers   map[string]string `json:"headers"`
 	}
-	if json.Unmarshal(presigned, &target) != nil || target.Method != http.MethodPut || !validOCRUploadURL(target.UploadURL) || !validURL(target.SourceURL) {
+	if json.Unmarshal(presigned, &target) != nil || target.Method != http.MethodPut || !validOCRUploadURL(target.UploadURL) || !validOCRProviderSourceURL(target.SourceURL) {
 		return nil, errors.New("invalid OCR upload grant")
 	}
 	contentLength, lengthOK := target.Headers["Content-Length"]
@@ -175,7 +229,7 @@ func (c *Client) uploadPrivatePDF(ctx context.Context, file Image) ([]byte, erro
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
 		return nil, fmt.Errorf("OCR file upload returned HTTP %d", response.StatusCode)
 	}
-	body, _, err := c.request(ctx, http.MethodPost, c.config.OCRURL+"/v1/documents", c.config.OCRKey, map[string]any{"input": map[string]string{"url": target.SourceURL}}, "OCR")
+	body, err := c.submitOCR(ctx, map[string]string{"url": target.SourceURL})
 	return body, err
 }
 
@@ -186,6 +240,14 @@ func validOCRUploadURL(raw string) bool {
 	}
 	// Permit plain HTTP only for local test servers; real pre-signed uploads must use TLS.
 	return u.Scheme == "https" || u.Hostname() == "127.0.0.1" || u.Hostname() == "localhost" || u.Hostname() == "::1"
+}
+
+func validOCRProviderSourceURL(raw string) bool {
+	u, err := url.Parse(raw)
+	if err != nil || u.Host == "" || u.User != nil || u.Fragment != "" || u.RawQuery != "" {
+		return false
+	}
+	return u.Scheme == "s3" || u.Scheme == "https"
 }
 
 func validDocumentID(id string) bool {

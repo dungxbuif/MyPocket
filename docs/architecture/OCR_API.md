@@ -36,11 +36,11 @@ trace:
 
 ## Status
 
-- 2026-09-23 runtime update: one-shot AI upload accepts JPEG/PNG/PDF. Backend validates the uploaded bytes and stores the original in private environment-qualified MyPocket S3. It sends validated image bytes as Base64 to OCR Platform and uses OCR Platform's private presign flow for PDFs; it no longer submits a MyPocket signed URL as an OCR source because OCR Platform only treats its own `s3://` source URLs as app-owned. OCR completes before text extraction; the LLM receives only user/OCR text (never file bytes, base64, URL or image input). The configured credential passed a live Base64 submission and a real receipt image completed through OCR and Qwen extraction in 13.97 seconds; an intentionally blank 1×1 PNG was correctly rejected by OCR as `ocr_failed`.
+- 2026-09-23 runtime update: one-shot AI upload accepts JPEG/PNG/PDF. Backend validates the uploaded bytes and stores the original in private environment-qualified MyPocket S3. It sends validated image bytes as Base64 to OCR Platform and uses OCR Platform's private presign flow for PDFs; it no longer submits a MyPocket signed URL as an OCR source because OCR Platform only treats its own `s3://` source URLs as app-owned. MyPocket now submits `mode: "wait"` with `waitTimeoutMs: 15000`; a terminal `200` response is consumed inline, while a timeout `202` receipt continues through the existing bounded poll loop. OCR completes before text extraction; the LLM receives only user/OCR text (never file bytes, base64, URL or image input). Unit coverage verifies both inline and queued responses.
 - ID: API-OCR-001
-- Status: implemented locally; live provider credential and receipt extraction validated in local staging
+- Status: implemented locally and live wait-mode contract validated against the OCR provider
 - Owner: shared
-- Public contract checked 2026-09-20: OpenAPI and capabilities returned HTTP 200. Scan-only routes are not advertised; do not implement against older scan guidance. Authenticated Base64 OCR and the MyPocket receipt-to-proposal path were subsequently validated in local staging on 2026-09-23.
+- Public contract checked 2026-09-23: OpenAPI and capabilities returned HTTP 200 and `DocumentSubmission` advertises `mode`/`waitTimeoutMs` with `200` and `202` responses. A live authenticated Base64 receipt completed with `mode=wait` and returned inline `result`; MyPocket also retains a narrowly-scoped fallback for older deployments that reject only the unknown `mode` field. Scan-only routes are not advertised; do not implement against older scan guidance. Authenticated Base64 OCR and the MyPocket receipt-to-proposal path were previously validated in local staging on 2026-09-23.
 - Source documentation:
   - `https://ocr.dungxbuif.com/`
   - `https://ocr.dungxbuif.com/guides/onboarding`
@@ -64,7 +64,7 @@ The first implementation should support:
 | Contract | Type | Auth | Status | Notes |
 | --- | --- | --- | --- | --- |
 | `GET /v1/ocr/capabilities` | HTTP | none documented for quickstart | ready | Discover accepted file types, recognition options, and active limits. |
-| `POST /v1/documents` | HTTP | Bearer API key | ready | Submit OCR job from URL/Base64/presigned source URL. Returns `202 Accepted` and `documentId`. |
+| `POST /v1/documents` | HTTP | Bearer API key | ready | Submit OCR job from URL/Base64/presigned source URL. MyPocket sends `mode=wait` and `waitTimeoutMs=15000`; provider returns terminal `200` when ready or `202 Accepted` with `documentId` when the bounded wait expires. |
 | `GET /v1/documents/{documentId}` | HTTP | Bearer API key | ready | Poll one known document. Completed response includes `result`; no separate result endpoint. |
 | `POST /v1/uploads/presign` | HTTP | Bearer API key | ready | Request signed upload URL for large/private files. |
 | object storage `PUT uploadUrl` | HTTP | signed URL only | ready | Upload bytes directly; do not send OCR API key. |
@@ -107,8 +107,8 @@ sequenceDiagram
     API->>OCR: POST /v1/uploads/presign
     OCR-->>API: uploadUrl, sourceUrl, signed headers
     API->>OCR: PUT uploadUrl with file bytes
-    API->>OCR: POST /v1/documents with sourceUrl
-    OCR-->>API: documentId, queued status
+    API->>OCR: POST /v1/documents with mode=wait, waitTimeoutMs=15000
+    OCR-->>API: terminal document (200) or documentId (202)
     API-->>FE: receiptOcrJobId/documentId
     FE->>API: Poll receipt OCR status
     API->>OCR: GET /v1/documents/{documentId}
@@ -120,6 +120,20 @@ sequenceDiagram
 
 ## Basic OCR Submission
 
+MyPocket's integration uses bounded wait mode so a short receipt can finish in one request:
+
+```json
+{
+  "mode": "wait",
+  "waitTimeoutMs": 15000,
+  "input": {"url": "https://files.example.com/receipt.pdf"}
+}
+```
+
+The same envelope is used for Base64 input. A terminal response is the normal document representation with `status: "completed"` or `status: "failed"` and HTTP `200`. If the timeout expires first, the provider returns the normal `202` receipt; MyPocket then polls `GET /v1/documents/{documentId}` and never resubmits the document.
+
+The public OCR deployment advertises `mode` and `waitTimeoutMs` in `/api/v1/openapi.json`. MyPocket keeps a compatibility fallback to the legacy queue envelope only when a provider explicitly returns `400` with `unknown field "mode"`; arbitrary `400` errors are not retried.
+
 Use a public HTTPS URL only when the file can safely be public:
 
 ```bash
@@ -128,6 +142,8 @@ curl --fail --silent --show-error \
   -H "Authorization: Bearer $OCR_API_KEY" \
   -H "Content-Type: application/json" \
   -d '{
+    "mode": "wait",
+    "waitTimeoutMs": 15000,
     "input": {"url": "https://files.example.com/receipt.pdf"},
     "options": {
       "recognitionLevel": "accurate",
@@ -137,12 +153,12 @@ curl --fail --silent --show-error \
   }'
 ```
 
-Expected initial response:
+Expected terminal response:
 
 ```json
 {
   "documentId": "doc_18f673199c0",
-  "status": "queued",
+  "status": "completed",
   "createdAt": "2026-08-15T08:30:00Z",
   "links": [
     {"rel": "self", "href": "https://ocr.dungxbuif.com/v1/documents/doc_18f673199c0"}
@@ -150,7 +166,7 @@ Expected initial response:
 }
 ```
 
-Implementation rule: persist `documentId`. Public document listing is intentionally unavailable.
+Implementation rule: persist `documentId` whenever it is returned. Public document listing is intentionally unavailable.
 
 ## Private Or Large File Upload
 
@@ -204,7 +220,7 @@ curl --fail --silent --show-error \
   -X POST "$OCR_API_URL/v1/documents" \
   -H "Authorization: Bearer $OCR_API_KEY" \
   -H "Content-Type: application/json" \
-  -d "{\"input\":{\"url\":\"$SOURCE_URL\"}}"
+  -d "{\"mode\":\"wait\",\"waitTimeoutMs\":15000,\"input\":{\"url\":\"$SOURCE_URL\"}}"
 ```
 
 ## Poll Document Status

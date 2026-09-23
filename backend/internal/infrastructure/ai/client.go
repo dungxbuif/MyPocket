@@ -87,9 +87,10 @@ func (e *AIProviderError) Diagnostic() (string, string, int) {
 }
 
 type providerRequestError struct {
-	Provider string
-	Status   int
-	Err      error
+	Provider    string
+	Status      int
+	Err         error
+	UnknownMode bool
 }
 
 func (e *providerRequestError) Error() string {
@@ -354,7 +355,10 @@ func transactionResponseFormat() map[string]any {
 }
 
 // request never returns upstream bodies, URLs, or transport errors to callers.
-// POSTs carry no idempotency header and are never retried by this adapter.
+// Ordinary POSTs carry no idempotency header and are never retried by this
+// adapter. The OCR wait-mode caller may inspect the bounded, boolean-only
+// UnknownMode marker to negotiate with a provider deployment that predates the
+// wait fields; it then sends one legacy queue request.
 func (c *Client) request(ctx context.Context, method, endpoint, key string, payload any, provider string) ([]byte, http.Header, error) {
 	var reader io.Reader
 	if payload != nil {
@@ -382,7 +386,12 @@ func (c *Client) request(ctx context.Context, method, endpoint, key string, payl
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, nil, &providerRequestError{Provider: provider, Status: resp.StatusCode}
+		errorBody, _ := io.ReadAll(io.LimitReader(resp.Body, 8192))
+		return nil, nil, &providerRequestError{
+			Provider:    provider,
+			Status:      resp.StatusCode,
+			UnknownMode: provider == "OCR" && resp.StatusCode == http.StatusBadRequest && containsUnknownMode(errorBody),
+		}
 	}
 	body, err := io.ReadAll(io.LimitReader(resp.Body, maxResponseBytes+1))
 	if err != nil {
@@ -395,4 +404,9 @@ func (c *Client) request(ctx context.Context, method, endpoint, key string, payl
 		return nil, nil, &providerRequestError{Provider: provider, Err: errors.New("response exceeds limit")}
 	}
 	return body, resp.Header, nil
+}
+
+func containsUnknownMode(body []byte) bool {
+	normalized := strings.ToLower(string(body))
+	return strings.Contains(normalized, `unknown field "mode"`) || strings.Contains(normalized, `unknown field \"mode\"`) || strings.Contains(normalized, "unknown field 'mode'")
 }
