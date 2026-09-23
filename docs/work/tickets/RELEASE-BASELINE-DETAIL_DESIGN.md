@@ -161,6 +161,7 @@ secret staging before commit.
 - Static repository link scan excluding this plan/inventory and the rewritten changelog:
   PASS; no stale live `design/screens`, old visual bundle, or legacy reference-tree path
   remains.
+- Full local Markdown relative-link scan after final review: PASS; 0 broken links.
 - Visual evidence inventory: PASS; 12 `screen.png` and 12 `code.html` files are under
   `docs/design/references/`.
 - Backend `go test ./...`: PASS.
@@ -169,6 +170,8 @@ secret staging before commit.
   NOT RUN successfully because this environment has no Node executable (`env: node: No
   such file or directory`). These commands remain a release gate in the changelog.
 - Secret-pattern scan over the current diff: no matches.
+- Fresh review found five moved visual-reference links with an incorrect relative depth;
+  commit `dc70f852` corrected them and the full Markdown link scan then passed.
 
 ## 8. Reconciliation
 
