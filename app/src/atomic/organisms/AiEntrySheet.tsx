@@ -122,7 +122,10 @@ export function AiEntrySheet({ onClose, onSaved }: { onClose: () => void; onSave
     finally { requestActive.current = false; setBusy(false); }
   };
   const blocked = busy || loading || !ready || !!process?.processing;
-  return <BaseBottomSheet presentation="form" title={COPY.title} closeLabel={COPY.close} onClose={() => { if (!busy) onClose(); }} closingDisabled={busy}>
+  const visibleProposals = process?.proposals.filter(proposal => proposal.status !== "rejected") ?? [];
+  const hasPendingProposals = process?.proposals.some(proposal => proposal.status === "pending") ?? false;
+  return <BaseBottomSheet presentation="form" title={COPY.title} closeLabel={COPY.close} onClose={() => { if (!busy) onClose(); }} closingDisabled={busy}
+    headerAction={visibleProposals.length > 0 ? <BaseButton size="sm" loading={busy} disabled={busy || loading || !hasPendingProposals} onClick={() => void saveAll()}>Lưu tất cả</BaseButton> : undefined}>
     <div className="space-y-4">
       {(uncertain || process?.processing) ? <BaseButton variant="secondary" disabled={loading || busy} onClick={() => {
         if (requestActive.current) return;
@@ -138,7 +141,7 @@ export function AiEntrySheet({ onClose, onSaved }: { onClose: () => void; onSave
       {process?.processing ? <StatusMessage>{COPY.processing}</StatusMessage> : null}
       {uncertain ? <StatusMessage>{COPY.ambiguous}</StatusMessage> : null}
       {!loading && !(process?.proposals?.length) ? <StatusMessage variant="plain">{COPY.empty}</StatusMessage> : null}
-      {(process?.proposals?.filter(proposal => proposal.status !== "rejected").length ?? 0) > 0 ? <AssistantResultCard count={process!.proposals.filter(proposal => proposal.status !== "rejected").length} action={<BaseButton size="sm" className="w-full" disabled={busy || loading || !process?.proposals.some(item => item.status === "pending")} onClick={() => void saveAll()}>Lưu tất cả</BaseButton>}>
+      {visibleProposals.length > 0 ? <AssistantResultCard count={visibleProposals.length}>
         {(process?.proposals ?? []).filter(proposal => proposal.status !== "rejected").map(proposal => <EntryProposalRow key={`${proposal.id}:${proposal.version}:${proposal.status}`}
           onDraftChange={draft => setEdits(current => ({ ...current, [proposal.id]: draft }))} proposal={proposal} wallets={wallets} categories={categories} disabled={blocked} onBusy={value => { requestActive.current = value; setBusy(value); }} onSaved={onSaved}
           onUpdated={updated => setProcess(current => current ? { ...current, proposals: current.proposals.map(item => item.id === updated.id ? updated : item) } : current)} />)}

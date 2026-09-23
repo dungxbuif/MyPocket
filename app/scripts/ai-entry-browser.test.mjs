@@ -59,6 +59,8 @@ try {
   assert.equal(await evaluate(`document.querySelectorAll('textarea[aria-label="Mô tả giao dịch"]').length`),1,'AI input should be a multiline assistant composer');
   assert.equal(await evaluate(`!!document.querySelector('[aria-label="Đính kèm ảnh hoặc PDF"]')`),true,'composer should expose a clear attachment action');
   assert.equal(await evaluate(`!!document.querySelector('[aria-label="Kết quả AI"]')`),true,'recognized transactions should be grouped in an assistant result card');
+  assert.equal(await evaluate(`document.querySelector('[role="dialog"][aria-label="Nhập giao dịch bằng AI"] header > span.justify-self-end button')?.textContent.trim()`),'Lưu tất cả','save-all action must stay in the bottom-sheet header while results scroll');
+  assert.equal(await evaluate(`document.querySelector('[role="dialog"][aria-label="Nhập giao dịch bằng AI"] header > span.justify-self-end button')?.closest('header')?.parentElement?.querySelector('.min-h-0.flex-1.overflow-y-auto') !== null`),true,'AI results must remain in the sheet scroll region below the header');
   assert.equal(await evaluate('!!document.querySelector(\'[role="log"]\')'),false);
   assert.equal(await evaluate('document.body.textContent.includes("Cuộc trò chuyện mới")'),false);
   if(process.env.AI_ENTRY_SCREENSHOT){const {data}=await call('Page.captureScreenshot',{format:'png'});await writeFile(process.env.AI_ENTRY_SCREENSHOT,Buffer.from(data,'base64'));}

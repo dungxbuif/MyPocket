@@ -17,6 +17,7 @@ try {
   const { WalletCreateForm, WalletTypePicker, canCreateWallet } = await server.ssrLoadModule('/src/atomic/molecules/WalletCreateForm.tsx');
   const { savingsProgress, SavingsSummary } = await server.ssrLoadModule('/src/atomic/molecules/SavingsSummary.tsx');
   const { WalletSelectionList } = await server.ssrLoadModule('/src/atomic/molecules/WalletSelectionList.tsx');
+  const { FeedbackFloatingBubble } = await server.ssrLoadModule('/src/atomic/organisms/FeedbackFloatingBubble.tsx');
   const html = (component, props) => renderToStaticMarkup(React.createElement(component, props));
   const { BudgetProgressItem } = await server.ssrLoadModule('/src/atomic/molecules/BudgetProgressItem.tsx');
   const { Wallet } = await server.ssrLoadModule('lucide-react');
@@ -93,5 +94,9 @@ try {
   const walletList=html(WalletSelectionList,{wallets:[goalWallet,{...goalWallet,id:'excluded',name:'Excluded',is_in_total:false}],selectedID:null,editing:false,onSelect(){},onAdd(){}});
   assert.match(walletList,/TÍNH VÀO TỔNG/); assert.match(walletList,/KHÔNG TÍNH VÀO TỔNG/);
   assert.equal((walletList.match(/aria-pressed="true"/g)??[]).length,1);
+  const feedbackBubble=html(FeedbackFloatingBubble,{captureRoot:{current:null}});
+  assert.match(feedbackBubble,/fixed bottom-24 right-4 z-40/);
+  assert.match(feedbackBubble,/border-line bg-card shadow-sm/,'feedback bubble should use the shared surface icon treatment');
+  assert.doesNotMatch(feedbackBubble,/border-action bg-brand/,'feedback bubble should not use a one-off brand treatment');
   console.log('Base contracts passed: loading, single elevation, clamped progress, danger gauge, inline input focus.');
 } finally { await server.close(); }

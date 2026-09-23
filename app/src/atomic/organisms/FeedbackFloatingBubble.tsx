@@ -66,7 +66,7 @@ export function FeedbackFloatingBubble({ captureRoot, onSubmitted }: { captureRo
 
   return <>
     <div className="fixed bottom-24 right-4 z-40" data-feedback-overlay="true">
-      <IconButton label="Gửi phản hồi" variant="brand" onClick={openFeedback}>
+      <IconButton label="Gửi phản hồi" variant="surface" onClick={openFeedback}>
         <MessageSquarePlus size={20} aria-hidden />
       </IconButton>
     </div>
