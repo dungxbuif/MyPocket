@@ -2,7 +2,7 @@
 
 ## Cập nhật implementation mới nhất
 
-BaseSelect đã thay tương tác picker loại khi tạo. Danh sách đã dùng WalletSelectionList: Đóng/Chọn Ví/Sửa, Tổng cộng, hai nhóm tính/không tính vào tổng và card hành động. Sửa bật chế độ chọn ví để edit; xóa nằm trong edit. Chọn ví goal mở SavingsWalletPanel; lựa chọn basic/credit hiện chỉ có dấu chọn cục bộ, chưa áp bộ lọc toàn app. Goal hỗ trợ target_date qua API và UI. Các ghi chú “select chưa triển khai” trong lịch sử phía dưới đã được thay thế bởi cập nhật này. Xem [savings](../savings/README.md).
+BaseSelect đã thay tương tác picker loại khi tạo. Danh sách đã dùng WalletSelectionList: Đóng/Chọn Ví/Sửa, Tổng cộng, hai nhóm tính/không tính vào tổng và card hành động. Sửa bật chế độ chọn ví để edit; xóa nằm trong edit. Chọn bất kỳ ví nào mở WalletDetailPanel với số dư, dòng tiền và lịch sử giao dịch; ví tín dụng chỉ xem lịch sử và không mở editor thu/chi thường. Goal hỗ trợ target_date qua API và UI. Sổ giao dịch có select đầu màn hình cho `Tổng cộng` hoặc từng ví; ví thường dùng cùng layout/kỳ với `Tổng cộng` và chỉ lọc giao dịch của ví được chọn. Xem [savings](../savings/README.md).
 
 ## Quyết định hiện hành
 
@@ -27,11 +27,15 @@ Màu, font, bo góc theo [tokens](../../system/TOKENS.md) và [base contracts](.
 
 | Loại | Khi tạo | Sau khi mở ví — thiết kế nghiệp vụ | Hiện trạng |
 | --- | --- | --- | --- |
-| Thường | Tên, VND, số dư đầu, tính vào tổng | Số dư và lịch sử thu/chi; chuyển ví/điều chỉnh là luồng riêng | CRUD và thu/chi có; chưa có màn chi tiết riêng đầy đủ |
-| Tiết kiệm | Trường chung, mục tiêu > 0, hạn tùy chọn | Đã có, còn thiếu, tiến độ theo số dư thật; nạp/rút cập nhật tiến độ; không tự tính lãi ngân hàng | Có target trong form/API; ngày mục tiêu và UI tiến độ đầy đủ còn thiếu |
-| Tín dụng | Tên, VND, hạn mức > 0; thiết kế tiếp số dư sao kê gần nhất, ngày sao kê/hạn trả | Dư nợ, hạn mức khả dụng, mua/hoàn tiền/phí, thanh toán và sao kê; không dùng ledger thu/chi thường | Mới có core CRUD/hạn mức; ledger và màn chi tiết tín dụng chưa hoàn chỉnh |
+| Thường | Tên, VND, số dư đầu, tính vào tổng | Số dư và lịch sử thu/chi; chuyển ví/điều chỉnh là luồng riêng | CRUD, màn chi tiết và thu/chi có |
+| Tiết kiệm | Trường chung, mục tiêu > 0, hạn tùy chọn | Đã có, còn thiếu, tiến độ theo số dư thật; nạp/rút cập nhật tiến độ; không tự tính lãi ngân hàng | Có target/ngày mục tiêu trong form/API, tiến độ và lịch sử thực trong chi tiết; visual UAT còn thiếu |
+| Tín dụng | Tên, VND, hạn mức > 0; thiết kế tiếp số dư sao kê gần nhất, ngày sao kê/hạn trả | Dư nợ, hạn mức khả dụng, mua/hoàn tiền/phí, thanh toán và sao kê; không dùng ledger thu/chi thường | Core CRUD/hạn mức và màn chi tiết đọc lịch sử đã có; ledger tín dụng chuyên biệt vẫn chưa triển khai |
 
 Không suy diễn số dư sao kê bằng dư nợ hiện tại. Màn chi tiết theo loại cần contract và proof riêng trước khi coi hoàn thành; các trường dữ liệu mới cần detail design API/schema.
+
+Ví tín dụng hiện **mới có đặc tả nghiệp vụ cấp cao** ở [SPEC](../../../requirements/SPEC.md) và [BUSINESS_RULES](../../../requirements/BUSINESS_RULES.md): hạn mức, dư nợ, sao kê, ngày đến hạn, mua/hoàn/phí/lãi/trả nợ và tránh tính chi hai lần. Chưa có đặc tả màn chi tiết được duyệt cho kỳ sao kê, hạn trả, phân bổ thanh toán/trả dư và các API/schema tương ứng; vì vậy màn đang có chỉ là danh sách lịch sử đọc được, không được gắn nhãn hoàn thiện hay dùng thu/chi thường để ghi thẻ.
+
+Du lịch hiện là `Travel Mode`/sự kiện gắn giao dịch theo [TICKET-05-03](../../../work/tickets/TICKET-05-03-su-kien-travel-mode.md), không phải loại ví thứ tư. Chưa có màn/contract UI riêng cho chuyến đi được phê duyệt và chưa có runtime Travel Mode; không hiển thị nhãn “ví du lịch” hoặc hứa rằng số dư ví thuộc riêng chuyến đi. Khi thiết kế màn chuyến đi, cần phân biệt tổng thu/chi của giao dịch liên kết với số dư của các ví nguồn.
 
 ## Sự kiện và trạng thái
 
@@ -45,7 +49,7 @@ Không suy diễn số dư sao kê bằng dư nợ hiện tại. Màn chi tiết
 
 ## Phân biệt Chọn Ví và quản lý ví
 
-[Ảnh Chọn Ví](../../ch_n_v_wallet_selector/README.md) chọn ví đã tồn tại hoặc Tổng cộng cho một màn tiêu thụ; không chọn loại. Runtime chọn phạm vi này chưa hoàn chỉnh và cần chốt phạm vi bộ lọc. [Ảnh Thêm Ví](../../th_m_v_add_wallet/README.md) là tham chiếu bố cục form.
+[Ảnh Chọn Ví](../../ch_n_v_wallet_selector/README.md) chọn ví đã tồn tại hoặc Tổng cộng cho một màn tiêu thụ; không chọn loại. Runtime dùng lựa chọn này trong màn quản lý ví và bộ lọc đầu sổ giao dịch; [Ảnh Thêm Ví](../../th_m_v_add_wallet/README.md) là tham chiếu bố cục form.
 
 ## Nguồn Money Lover đã kiểm tra
 
@@ -58,7 +62,7 @@ Khóa loại sau tạo là quyết định MyPocket, không gán cho Money Lover
 
 ## Acceptance và khoảng trống
 
-Runtime vẫn dùng WalletTypePicker; thay bằng BaseSelect chưa thực hiện trong lượt docs này. Proof cũ không chứng minh thay đổi select hoặc màn chi tiết chưa xây. Cần test create/edit khóa loại, validation theo loại, switch tổng, save/error/cancel, keyboard/mobile và visual UAT. Chạy check:design, test:design, build khi sửa UI.
+Runtime dùng WalletTypePicker cho loại ví và WalletDetailPanel cho mọi ví. Proof cần bổ sung visual UAT cho detail basic/goal/credit, chọn `Tổng cộng`/ví trong sổ giao dịch, create/edit khóa loại, validation theo loại, switch tổng, save/error/cancel và keyboard/mobile. Chạy check:design, test:design, build khi môi trường frontend có Node.
 
 [Backlog](../../../work/BACKLOG.md) · [Validation](../../../work/VALIDATION_MATRIX.md) · [Ticket](../../../work/tickets/TICKET-01-02-quan-ly-vi.md) · [Release](../../../releases/CHANGELOG.md).
 

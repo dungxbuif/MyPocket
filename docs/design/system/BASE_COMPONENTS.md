@@ -35,6 +35,7 @@ Wallet empty states in Overview (“Chưa có ví.”) and WalletManagementPanel
 | CategoryEditForm / ApplicableWalletsCard | base fields, icon picker, checkbox, status/save | [Edit group](../molecules/edit-group/README.md) |
 | BudgetProgressItem / GoalCard | SurfaceCard + IconBadge + Text + Progress | [Budget](../molecules/budget-progress-cards/README.md) |
 | DateField / AmountField | BaseButton, FormSelectorRow, BaseCalendar, BaseModal | date stepping/calendar and integer-safe calculator shared by transaction and budget forms |
+| LedgerPeriodSelector | SegmentedControl + BaseButton + Text | Ledger Week/Custom tabs for aggregate, basic and provisional credit scopes; inclusive account-local week label and previous/next controls; consumer owns filter state and date dialog. Goal alone hides this control. |
 | PageBackHeader | BaseLink + Heading + trailing slot | một tầng interactive |
 | AccountMenuRow / ProfileHeroCard | shared identity/navigation presentation | screen-specific actions thuộc consumer |
 | BaseBarChart / BaseDonutChart | values/shares/label; shared visual geometry and theme-based data colors | source preview only; tooltip/drilldown not implemented |

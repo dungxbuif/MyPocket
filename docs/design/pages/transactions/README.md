@@ -6,11 +6,14 @@ Status: implementation contract for [TICKET-02-01](../../../work/tickets/TICKET-
 
 The page header uses the shared `ScreenHeader` molecule so title/action spacing matches Budgets and Account screens; the options action remains a `BaseButton` chip.
 
+2026-09-24 owner correction: the supplied savings screenshot's “TẤT CẢ CÁC GIAO DỊCH” is a goal-history heading, not a shared All-time tab. Keep one wallet selector at the top. `Tổng cộng`, selected basic wallets and the provisional read-only credit scope share the same ledger layout: account-local Monday–Sunday Week/Custom controls, period cashflow card and date-grouped rows. Selecting a basic wallet filters both totals and rows by wallet ID; it does not create a special body or show all-time history. Goal alone shows distinct balance/remaining/progress and complete monthly history. No API/schema change or server-side week query is introduced. [Correction design](../../../work/tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md#owner-correction--wallet-specific-ledger-2026-09-24).
+
 2026-09-20: editor uses grouped SurfaceCards for wallet/large amount/category/note and date, retaining the shared inputs and form-sheet shell. Goal category selection is restricted to real savings catalog keys and backend enforces the same rule; category remains optional. Unsupported old goal categories remain visible in history but must be cleared/reselected before editing. Report flag for external entries defaults true. This is not the paired-wallet transfer flow.
 
 | Region | Base implementation | Contract |
 | --- | --- | --- |
-| Search/filter summary | `Chip`, `IconButton` | Passive until the search/filter ticket is implemented; it must not imply working filtering. |
+| Wallet scope filter | `FormField` + `BaseSelect` | Always visible below the header. `Tổng cộng` is the aggregate wallet scope, not an All-time period. Switching a goal wallet selects its specialized ledger body; other scopes use the same selector. |
+| Period and week navigation | `SegmentedControl`, `BaseButton`, `Text` | Aggregate/basic/credit: current week by default, previous/next week and custom range; no All-time tab. Goal: hide period control and show full goal history. |
 | Date group | `SurfaceCard`, `Text` | Groups real API rows by the user's local calendar date and displays the signed group total. |
 | Transaction row | `TransactionItem` | Category icon/title, wallet and optional note, signed VND amount; activation opens edit mode. |
 | Editor shell | `BaseBottomSheet` | Modal focus trap, Escape/backdrop cancel, and return focus follow the shared sheet contract. |
@@ -24,6 +27,12 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 | Event | State/effect |
 | --- | --- |
 | Enter `/transactions` | Load transactions, wallets and visible groups from their authenticated APIs. Never replace an error with mock rows. |
+| Select wallet scope | Recompute the real ledger view locally without another API call; `Tổng cộng` clears the wallet predicate. |
+| Select a goal wallet | Show real savings summary/progress and monthly history; do not show ordinary weekly cashflow cards or an All-time period control. |
+| Select a basic wallet | Keep the aggregate layout, including Week/Custom control and cashflow card; filter both totals and day rows to the selected wallet and current period. |
+| Select an aggregate/basic/credit scope or step week | Start/restart at the current account-local Monday–Sunday week; step through prior weeks. Never navigate into a future week. A timezone change recalculates the week from the account-local current date. |
+| Select `Tùy chọn` | Open the existing date-range dialog. A valid range filters both summary and rows; cancel keeps the previous period choice and dates. |
+| Return from custom range to week | Show the current account-local week. There is no All-time period tab for ordinary scopes. |
 | Open an expense editor | Load jar choices for the transaction's account-local month; show only active monthly configurations, plus the existing historical assignment when editing. |
 | Activate global add | Open a clean ordinary editor with `expense`, current local date/time, report inclusion enabled, and the first available wallet. It does not offer transfer mode. |
 | Choose “Chuyển tiền đến ví khác” from the three-dot options menu | Open a transfer-only sheet with source/destination wallet selects; submit calls the atomic transfer endpoint and refreshes both wallet balances and the ledger. |
@@ -71,5 +80,7 @@ Use Vietnamese product copy. Money uses signed integer VND via the shared format
 ## Proof and residual gaps
 
 Automated proof covers backend owner scope, positive amount/type validation, wallet ownership, category kind and wallet applicability, report flag, optional jar-link validation, and frontend design/build guardrails. `npm run test:transaction-jars` renders the real form and verifies jar selection for ordinary expenses while hiding it for income/transfer-out. Manual UAT still needs to cover create/edit/delete, jar assignment/clear, and refreshed wallet totals.
+
+2026-09-24 weekly-ledger proof: `test:calendar` covers Monday–Sunday and year boundaries in account-local time; `test:transactions` covers wallet + week predicate at UTC boundary; the SSR period-selector fixture covers tab labels/range/future-week disable. Chrome on the local preview showed All → 21–27/9 → 14–20/9 with cashflow/list updates, empty state, next-week disable, and custom-dialog cancel preserving week. Build/design checks pass. Owner mobile visual acceptance remains open. [User guide](../../../guides/transactions.md).
 
 Transfer proof now includes `npm run test:transfer:e2e` (real Chromium UI/state) and `npm run test:transfer:integrated` (Vite proxy/API/PostgreSQL state). Residual gaps remain separate tickets: transfer-pair edit/delete, attachments/OCR, debt/credit ledger, advanced search/filter/pagination, and owner UAT sign-off.

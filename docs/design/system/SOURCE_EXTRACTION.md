@@ -2,7 +2,10 @@
 
 Đã đọc trực quan đủ 7 PNG, đối chiếu HTML và code hiện tại. Đây là trích xuất bằng khả năng đọc ảnh của agent; không có OCR CLI trên máy. Copy đọc được và hình học là observed; interaction trong HTML là source behavior; behavior không thấy/không chạy thử không được khẳng định.
 
-Nguồn gốc: commit 1bc013d, docs/design. PNG/HTML được loại khỏi cây docs sau khi chuyển nội dung sang specs theo owner. Dùng Git để xem lại nguyên bản, không lấy source legacy làm authority cao hơn contract hiện hành.
+Nguồn gốc: commit 1bc013d, docs/design. Bảy ảnh nền tảng được trích xuất trước đây vẫn là
+đường dẫn lịch sử trong Git; mười hai bundle owner hiện được giữ dưới
+`../references/` như bằng chứng thị giác. Dùng Git hoặc references để xem lại nguyên bản,
+không lấy source legacy làm authority cao hơn contract hiện hành.
 
 | ID / source path lịch sử | Nội dung đọc được | Behavior có căn cứ | Spec thay thế |
 | --- | --- | --- | --- |
@@ -13,6 +16,12 @@ Nguồn gốc: commit 1bc013d, docs/design. PNG/HTML được loại khỏi cây
 | IMG-05 molecules/budget-meter/screen.png, 340×1600 | Mua sắm/Ăn uống/Di chuyển; “VƯỢT 15%”, “Đã chi lố: -450.000đ”; marker Hôm nay | Text spec: warning vượt marker ngày, danger >100; marker currentDay/totalDays | [Gauge](../molecules/budget-meter/README.md) |
 | IMG-06 molecules/transaction-form-rows/screen.png, 266×1600 | wallet, VND/0, Chọn nhóm, Ghi chú, date arrows, Với, Đặt vị trí, Chọn sự kiện, Đặt nhắc nhở, Thêm Hình Ảnh, switch và Save | Anatomy slots 36–40px + flex + chevron/date/toggle; default/filled/pressed states ghi trong ảnh | [Rows](../molecules/transaction-form-rows/README.md) |
 | IMG-07 molecules/category-tree/nested/screen.png, 234×1600 | Nhóm, Nhóm mới, Ăn uống → Ăn vặt/Cà phê/Cơm Bữa, Hóa đơn → điện thoại/nước/điện; “Hoạt động trong 3 ví”, “Hiển thị nhóm không hoạt động” | 40px root/32px child, 2px curved tree connector; chevron rotate là design intent | [Tree](../molecules/category-tree/README.md) |
+
+## Current evidence policy
+
+- The current owner bundles are indexed at [references](../references/README.md).
+- `screen.png` and `code.html` remain evidence only; production components must use the
+  tokens and base contracts in this directory.
 
 ## Conflict resolutions
 
