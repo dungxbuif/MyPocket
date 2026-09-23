@@ -37,9 +37,12 @@ const (
 	maxPromptBytes            = 128 * 1024
 	maxResponseBytes          = 256 * 1024
 	maxWalletDescriptionBytes = 2048
-	extractTimeout            = 90 * time.Second
-	modelTimeout              = 30 * time.Second
-	modelMaxTokens            = 2048
+	// A cold local Qwen model may need over 30 seconds just to prefill a
+	// 5k-token catalog prompt. Keep enough headroom for first-use startup while
+	// still bounding a stuck provider request.
+	extractTimeout = 180 * time.Second
+	modelTimeout   = 90 * time.Second
+	modelMaxTokens = 2048
 )
 
 var ErrNotConfigured = errors.New("AI provider is not configured")

@@ -66,6 +66,15 @@ func TestConfigured(t *testing.T) {
 	}
 }
 
+func TestExtractionBudgetIncludesColdModelStart(t *testing.T) {
+	if modelTimeout < 60*time.Second {
+		t.Fatalf("model timeout %s leaves no headroom for a cold local model start", modelTimeout)
+	}
+	if extractTimeout <= modelTimeout {
+		t.Fatalf("extract timeout %s must exceed model timeout %s", extractTimeout, modelTimeout)
+	}
+}
+
 func TestTextOnlyRequestAndUnverifiedIDs(t *testing.T) {
 	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != "POST" || r.URL.Path != "/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer test-model-key" {
