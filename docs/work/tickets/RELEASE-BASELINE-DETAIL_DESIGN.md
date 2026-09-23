@@ -155,8 +155,30 @@ secret staging before commit.
 - Reconciliation: update `docs/CONTEXT.md`, `docs/README.md`, design index/gateway,
   changelog, and validation matrix only where the moved paths or release status require it.
 
-## 7. Approval gate
+## 7. Verification results
 
-Implementation is blocked until the owner approves this design. The key scope decision
-is to preserve owner-provided visual references under `docs/design/references/` and
-remove only duplicate/orphaned artifacts proven safe by link and inventory checks.
+- `git diff --check`: PASS.
+- Static repository link scan excluding this plan/inventory and the rewritten changelog:
+  PASS; no stale live `design/screens`, old visual bundle, or legacy reference-tree path
+  remains.
+- Visual evidence inventory: PASS; 12 `screen.png` and 12 `code.html` files are under
+  `docs/design/references/`.
+- Backend `go test ./...`: PASS.
+- Backend `go vet ./...`: PASS.
+- Frontend `npm run lint`, `npm run build`, `npm run check:design`, and `npm test`:
+  NOT RUN successfully because this environment has no Node executable (`env: node: No
+  such file or directory`). These commands remain a release gate in the changelog.
+- Secret-pattern scan over the current diff: no matches.
+
+## 8. Reconciliation
+
+- Design gateway, inventory, system extraction register, page contracts, work tickets,
+  backlog, validation references, context, release README, and changelog were updated.
+- No API, database, authentication, deployment, or secret behavior was changed by this
+  cleanup. Existing runtime/migration changes remain in the worktree for separate review.
+
+## 9. Approval gate
+
+The owner approved this design on 2026-09-24. The key scope decision was to preserve
+owner-provided visual references under `docs/design/references/` and remove only
+duplicate/orphaned artifacts proven safe by link and inventory checks.

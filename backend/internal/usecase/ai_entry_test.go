@@ -13,12 +13,15 @@ import (
 )
 
 func TestAIEntrySessionSerializesSafeErrorCode(t *testing.T) {
-	data, err := json.Marshal(entity.AIEntrySession{ID: "session", Error: "OCR không đọc được chứng từ.", ErrorCode: "ocr_failed"})
+	data, err := json.Marshal(entity.AIEntrySession{ID: "session", Error: "OCR không đọc được chứng từ.", ErrorCode: "ocr_failed", Reply: "Chọn ví để tiếp tục."})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if string(data) == "" || !strings.Contains(string(data), `"error_code":"ocr_failed"`) {
 		t.Fatalf("error code missing from session JSON: %s", data)
+	}
+	if !strings.Contains(string(data), `"reply":"Chọn ví để tiếp tục."`) {
+		t.Fatalf("provider reply missing from session JSON: %s", data)
 	}
 }
 
@@ -65,6 +68,25 @@ func TestAIEntryExtractsOnlySubmittedTextForOneShot(t *testing.T) {
 	}
 	if seen.Text != "chọn ví w" {
 		t.Fatalf("extractor received content outside the one-shot input: %q", seen.Text)
+	}
+}
+
+func TestAIEntryDefaultsMissingDateToAccountToday(t *testing.T) {
+	r := &entryRepoStub{}
+	s := &AIEntryService{Entries: r, Wallets: entryWallets{}, Categories: entryCategories{}, Extractor: entryExtractor{configured: true, out: entity.AIExtractOutput{Drafts: []entity.AIExtractDraft{{AIEntryDraft: entity.AIEntryDraft{Type: "expense", Amount: 45000, WalletID: "w"}}}}}}
+	if _, err := s.Send(context.Background(), "owner", "session", AIEntryMessageInput{RequestID: "00000000-0000-0000-0000-000000000011", Text: "cà phê", Timezone: "Asia/Ho_Chi_Minh"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.output.Drafts) != 1 {
+		t.Fatalf("expected one draft, got %d", len(r.output.Drafts))
+	}
+	location, _ := time.LoadLocation("Asia/Ho_Chi_Minh")
+	parsed, err := time.Parse(time.RFC3339, r.output.Drafts[0].OccurredAt)
+	if err != nil || parsed.In(location).Format("2006-01-02") != time.Now().In(location).Format("2006-01-02") {
+		t.Fatalf("missing date was not defaulted to account today: %q", r.output.Drafts[0].OccurredAt)
+	}
+	if !strings.Contains(strings.Join(r.output.Drafts[0].Questions, " "), "ngày hiện tại") {
+		t.Fatalf("defaulted date should be disclosed for review: %#v", r.output.Drafts[0].Questions)
 	}
 }
 
@@ -234,14 +256,25 @@ func TestAIEntryProviderFailureDoesNotPersistProposals(t *testing.T) {
 	}
 }
 
-func TestAIEntryUnknownWalletCannotBePrefilledAsOwned(t *testing.T) {
+func TestAIEntryUnknownWalletFallsBackToSuppliedWallet(t *testing.T) {
 	r := &entryRepoStub{}
 	s := &AIEntryService{Entries: r, Wallets: entryWallets{}, Categories: entryCategories{}, Extractor: entryExtractor{configured: true, out: entity.AIExtractOutput{Reply: "review", Drafts: []entity.AIExtractDraft{{AIEntryDraft: entity.AIEntryDraft{Type: "expense", Amount: 35000, WalletID: "foreign"}}}}}}
 	_, err := s.Send(context.Background(), "owner", "session", AIEntryMessageInput{RequestID: "00000000-0000-4000-8000-000000000001", Text: "ăn 35k", Timezone: "Asia/Ho_Chi_Minh"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !r.finished || r.output.Drafts[0].WalletID != "" || len(r.output.Drafts[0].Questions) == 0 {
-		t.Fatalf("foreign wallet not cleared: %+v", r.output)
+	if !r.finished || r.output.Drafts[0].WalletID != "w" || len(r.output.Drafts[0].Questions) == 0 {
+		t.Fatalf("foreign wallet did not fall back safely: %+v", r.output)
+	}
+}
+
+func TestAIEntryUsesSoleWalletWhenModelLeavesWalletBlank(t *testing.T) {
+	r := &entryRepoStub{}
+	s := &AIEntryService{Entries: r, Wallets: entryWallets{}, Categories: entryCategories{}, Extractor: entryExtractor{configured: true, out: entity.AIExtractOutput{Reply: "review", Drafts: []entity.AIExtractDraft{{AIEntryDraft: entity.AIEntryDraft{Type: "expense", Amount: 35000}}}}}}
+	if _, err := s.Send(context.Background(), "owner", "session", AIEntryMessageInput{RequestID: "00000000-0000-4000-8000-000000000001", Text: "ăn 35k", Timezone: "Asia/Ho_Chi_Minh"}); err != nil {
+		t.Fatal(err)
+	}
+	if !r.finished || r.output.Drafts[0].WalletID != "w" {
+		t.Fatalf("sole wallet fallback missing: %+v", r.output)
 	}
 }

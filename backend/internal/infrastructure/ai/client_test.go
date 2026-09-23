@@ -67,11 +67,82 @@ func TestConfigured(t *testing.T) {
 }
 
 func TestExtractionBudgetIncludesColdModelStart(t *testing.T) {
-	if modelTimeout < 60*time.Second {
-		t.Fatalf("model timeout %s leaves no headroom for a cold local model start", modelTimeout)
+	if modelTimeout < 120*time.Second {
+		t.Fatalf("model timeout %s is too short for a multi-image batch", modelTimeout)
 	}
 	if extractTimeout <= modelTimeout {
 		t.Fatalf("extract timeout %s must exceed model timeout %s", extractTimeout, modelTimeout)
+	}
+}
+
+func TestExtractionRejectsTruncatedBatchWithoutRetry(t *testing.T) {
+	var calls int
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		// Even apparently valid partial JSON must not be treated as a complete batch.
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{
+			"message":       map[string]any{"content": `{"reply":"partial","drafts":[` + validDraft + `]}`},
+			"finish_reason": "length",
+		}}})
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "batch of receipts"})
+	if err == nil || len(out.Drafts) != 0 || calls != 1 {
+		t.Fatalf("truncated batch must fail without partial proposals or retry: error=%v drafts=%d calls=%d", err, len(out.Drafts), calls)
+	}
+}
+
+func TestExtractionAcceptsCompleteThirtyDraftBatch(t *testing.T) {
+	drafts := make([]string, 30)
+	for i := range drafts {
+		drafts[i] = validDraft
+	}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":"Review before saving","drafts":[`+strings.Join(drafts, ",")+`]}`)
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "batch of receipts"})
+	if err != nil || len(out.Drafts) != 30 {
+		t.Fatalf("complete batch rejected: error=%v drafts=%d", err, len(out.Drafts))
+	}
+}
+
+func TestExtractionAcceptsMoreThanThirtyDrafts(t *testing.T) {
+	drafts := make([]string, 31)
+	for i := range drafts {
+		drafts[i] = validDraft
+	}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":"Review all rows","drafts":[`+strings.Join(drafts, ",")+`]}`)
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "large batch"})
+	if err != nil || len(out.Drafts) != 31 {
+		t.Fatalf("large batch rejected: error=%v drafts=%d", err, len(out.Drafts))
+	}
+}
+
+func TestExtractionSeparatesUserInstructionAndStoresUsageWhenEnabled(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Messages []chatMessage `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(request.Messages[1].Content, `"user_instruction":"chỉ lấy giao dịch tháng 9"`) {
+			t.Fatal("user instruction was not sent as a separate field")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id": "provider-request-1",
+			"choices": []any{map[string]any{"message": map[string]any{"content": `{"reply":"Đã lọc theo tháng","drafts":[` + validDraft + `]}`}, "finish_reason": "stop"}},
+			"usage": map[string]any{"prompt_tokens": 101, "completion_tokens": 23, "total_tokens": 124, "prompt_tokens_details": map[string]any{"cached_tokens": 7}},
+		})
+	})
+	c.config.StoreUsage = true
+	out, err := c.Extract(context.Background(), Input{Text: "giao dịch chứng từ", Instruction: "chỉ lấy giao dịch tháng 9", Timezone: "Asia/Ho_Chi_Minh", Now: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.ModelUsage == nil || modelUsageInt(out.ModelUsage, "total_tokens") != 124 || out.ModelUsage["request_id"] != "provider-request-1" {
+		t.Fatalf("usage metadata not retained: %#v", out.ModelUsage)
 	}
 }
 
@@ -132,11 +203,17 @@ func TestTextOnlyRequestAndUnverifiedIDs(t *testing.T) {
 			t.Errorf("one-shot request must have only system and input messages: %d", len(messages))
 		}
 		last := messages[len(messages)-1].Content
-		if !strings.Contains(last, "coffee") || !strings.Contains(last, "wallet-1") || !strings.Contains(last, `"description":"Daily cash for food and transit"`) || strings.Contains(last, "private-owner") {
+		if !strings.Contains(last, "coffee") || !strings.Contains(last, "wallet-1") || !strings.Contains(last, `"description":"Daily cash for food and transit"`) || !strings.Contains(last, "wallet_assignment_policy") || strings.Contains(last, "private-owner") {
 			t.Errorf("incorrect catalog projection")
 		}
 		if !strings.Contains(messages[0].Content, "descriptions") || !strings.Contains(messages[0].Content, "untrusted data") {
 			t.Errorf("system prompt must treat wallet descriptions as untrusted reference data")
+		}
+		if !strings.Contains(messages[0].Content, "wallet_assignment_policy") || !strings.Contains(messages[0].Content, "every recognizable entry") {
+			t.Errorf("system prompt must require wallet selection when a single wallet is supplied")
+		}
+		if !strings.Contains(messages[0].Content, "MUST return one or more drafts") || !strings.Contains(messages[0].Content, "forbidden to return drafts:[]") {
+			t.Errorf("system prompt must forbid empty results caused only by wallet labels")
 		}
 		modelResponse(w, `{"reply":"Please clarify","drafts":[`+validDraft+`]}`)
 	})
@@ -167,7 +244,6 @@ func TestSchemaValidation(t *testing.T) {
 		`{"reply":"?","drafts":[` + strings.Replace(validDraft, "9007199254740991", "-1", 1) + `]}`,
 		`{"reply":"?","drafts":[` + strings.Replace(validDraft, "9007199254740991", "1.5", 1) + `]}`,
 		`{"reply":"?","drafts":[` + strings.Replace(validDraft, `"included_in_reports":false`, `"included_in_reports":null`, 1) + `]}`,
-		`{"reply":"?","drafts":[` + strings.TrimSuffix(strings.Repeat(validDraft+",", 31), ",") + `]}`,
 	}
 	for i, content := range cases {
 		t.Run(string(rune('A'+i)), func(t *testing.T) {
@@ -222,6 +298,30 @@ func TestSchemaMismatchLogReportsStructureWithoutLoggingModelContent(t *testing.
 		if strings.Contains(output, secret) {
 			t.Errorf("diagnostic log exposed model/input content %q", secret)
 		}
+	}
+}
+
+func TestSuccessfulExtractionLogReportsOnlySafeMetadata(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	privateText := "private source narrative sentinel"
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":"`+privateText+`","drafts":[]}`)
+	})
+	if _, err := c.Extract(context.Background(), Input{Text: privateText, Timezone: "Asia/Ho_Chi_Minh"}); err != nil {
+		t.Fatal(err)
+	}
+	output := logs.String()
+	for _, want := range []string{"AI provider extraction completed", "model", "test-model", "latency_ms", "ocr_attachments", "draft_count", "reply_bytes"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("safe extraction diagnostic missing %q: %s", want, output)
+		}
+	}
+	if strings.Contains(output, privateText) {
+		t.Fatalf("extraction diagnostic exposed source/reply content: %s", output)
 	}
 }
 

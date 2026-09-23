@@ -22,12 +22,12 @@ func NewAIEntryPostgresRepository(db *gorm.DB) *AIEntryPostgresRepository {
 }
 
 func (r *AIEntryPostgresRepository) CreateSession(ctx context.Context, owner string) (*entity.AIEntrySession, error) {
-	s := entity.AIEntrySession{ID: uuid.NewString(), OwnerID: owner, Messages: []entity.AIEntryMessage{}, Proposals: []entity.AIEntryProposal{}}
+	s := entity.AIEntrySession{ID: uuid.NewString(), OwnerID: owner, ModelUsage: map[string]any{}, Messages: []entity.AIEntryMessage{}, Proposals: []entity.AIEntryProposal{}}
 	err := r.db.WithContext(ctx).Create(&s).Error
 	return &s, err
 }
 func (r *AIEntryPostgresRepository) CreateProcess(ctx context.Context, owner, requestID string) error {
-	process := entity.AIEntrySession{ID: requestID, OwnerID: owner, Proposals: []entity.AIEntryProposal{}}
+	process := entity.AIEntrySession{ID: requestID, OwnerID: owner, ModelUsage: map[string]any{}, Proposals: []entity.AIEntryProposal{}}
 	if err := r.db.WithContext(ctx).Clauses(clause.OnConflict{Columns: []clause.Column{{Name: "id"}}, DoNothing: true}).Create(&process).Error; err != nil {
 		return err
 	}
@@ -163,7 +163,10 @@ func (r *AIEntryPostgresRepository) BeginMessage(ctx context.Context, owner, id,
 			return port.ErrAIBusy
 		}
 		token = uuid.NewString()
-		until := time.Now().Add(2 * time.Minute)
+		// The provider may spend up to 180s on a cold multi-image model start.
+		// Keep the persistence lease longer so a valid late response can still
+		// finish atomically instead of becoming a false conflict.
+		until := time.Now().Add(4 * time.Minute)
 		request := entity.AIEntryRequest{SessionID: id, RequestID: requestID, Hash: hash, Token: token}
 		if e = tx.Create(&request).Error; e != nil {
 			return e
@@ -186,9 +189,6 @@ func (r *AIEntryPostgresRepository) FinishMessage(ctx context.Context, owner, id
 		if s.RequestToken != token || s.ProcessingUntil == nil || !time.Now().Before(*s.ProcessingUntil) {
 			return port.ErrAIConflict
 		}
-		if len(out.Drafts) > 30 {
-			return fmt.Errorf("%w: quá nhiều đề xuất", port.ErrAIInvalid)
-		}
 		for _, d := range out.Drafts {
 			if d.Questions == nil {
 				d.Questions = []string{}
@@ -198,7 +198,11 @@ func (r *AIEntryPostgresRepository) FinishMessage(ctx context.Context, owner, id
 				return err
 			}
 		}
-		return tx.Model(&s).Updates(map[string]any{"request_token": "", "processing_until": nil, "error": "", "error_code": ""}).Error
+		updates := map[string]any{"request_token": "", "processing_until": nil, "error": "", "error_code": "", "reply": out.Reply}
+		if out.ModelUsage != nil {
+			updates["model_usage"] = out.ModelUsage
+		}
+		return tx.Model(&s).Updates(updates).Error
 	})
 }
 func (r *AIEntryPostgresRepository) FailMessage(ctx context.Context, owner, id, token, message, errorCode, sourceText string) error {

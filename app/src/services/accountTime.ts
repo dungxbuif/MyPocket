@@ -56,6 +56,17 @@ export function todayDateKey(timezone: string, now = new Date()): string {
   return dateKeyAt(now, timezone);
 }
 
+export function weekDateRange(today: string, offset: number): { start: string; end: string } {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(today) || !Number.isInteger(offset)) throw new Error("Invalid week anchor.");
+  const anchor = new Date(`${today}T12:00:00Z`);
+  if (Number.isNaN(anchor.getTime()) || anchor.toISOString().slice(0, 10) !== today) throw new Error("Invalid week anchor.");
+  const daysSinceMonday = (anchor.getUTCDay() + 6) % 7;
+  anchor.setUTCDate(anchor.getUTCDate() - daysSinceMonday + offset * 7);
+  const start = anchor.toISOString().slice(0, 10);
+  anchor.setUTCDate(anchor.getUTCDate() + 6);
+  return { start, end: anchor.toISOString().slice(0, 10) };
+}
+
 export function monthDateRange(month: string): { start: string; end: string } {
   const match = /^(\d{4})-(\d{2})$/.exec(month);
   if (!match) throw new Error("Invalid calendar month.");

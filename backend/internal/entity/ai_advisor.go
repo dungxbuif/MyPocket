@@ -86,22 +86,23 @@ func (m AdvisorMessage) Validate() error {
 }
 
 type AdvisorRun struct {
-	ID                  string     `json:"id" gorm:"primaryKey"`
-	OwnerID             string     `json:"owner_id" gorm:"not null;index"`
-	ConversationID      string     `json:"conversation_id" gorm:"not null;index"`
-	Generation          int64      `json:"generation" gorm:"not null"`
-	ClientRequestID     string     `json:"client_request_id" gorm:"not null"`
-	PayloadHash         string     `json:"-" gorm:"not null"`
-	CredentialKind      string     `json:"credential_kind" gorm:"not null"`
-	CredentialID        string     `json:"-" gorm:"not null"`
-	CredentialExpiresAt *time.Time `json:"-"`
-	Status              string     `json:"status" gorm:"not null"`
-	LeaseToken          string     `json:"-"`
-	LeaseUntil          *time.Time `json:"-"`
-	LastEventSeq        int64      `json:"last_event_seq" gorm:"not null;default:0"`
-	ErrorCode           string     `json:"error_code,omitempty"`
-	CreatedAt           time.Time  `json:"created_at"`
-	FinishedAt          *time.Time `json:"finished_at,omitempty"`
+	ID                  string         `json:"id" gorm:"primaryKey"`
+	OwnerID             string         `json:"owner_id" gorm:"not null;index"`
+	ConversationID      string         `json:"conversation_id" gorm:"not null;index"`
+	Generation          int64          `json:"generation" gorm:"not null"`
+	ClientRequestID     string         `json:"client_request_id" gorm:"not null"`
+	PayloadHash         string         `json:"-" gorm:"not null"`
+	CredentialKind      string         `json:"credential_kind" gorm:"not null"`
+	CredentialID        string         `json:"-" gorm:"not null"`
+	CredentialExpiresAt *time.Time     `json:"-"`
+	Status              string         `json:"status" gorm:"not null"`
+	LeaseToken          string         `json:"-"`
+	LeaseUntil          *time.Time     `json:"-"`
+	LastEventSeq        int64          `json:"last_event_seq" gorm:"not null;default:0"`
+	ErrorCode           string         `json:"error_code,omitempty"`
+	ModelUsage          map[string]any `json:"-" gorm:"serializer:json;type:jsonb"`
+	CreatedAt           time.Time      `json:"created_at"`
+	FinishedAt          *time.Time     `json:"finished_at,omitempty"`
 }
 
 func (AdvisorRun) TableName() string { return "advisor_runs" }

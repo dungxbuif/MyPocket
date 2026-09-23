@@ -29,7 +29,10 @@ type chatMessage struct {
 	Content string `json:"content"`
 }
 
-type Config struct{ BaseURL, APIKey, Model, OCRURL, OCRKey string }
+type Config struct {
+	BaseURL, APIKey, Model, OCRURL, OCRKey string
+	StoreUsage                             bool
+}
 
 const (
 	maxTextBytes              = 32 * 1024
@@ -40,9 +43,14 @@ const (
 	// A cold local Qwen model may need over 30 seconds just to prefill a
 	// 5k-token catalog prompt. Keep enough headroom for first-use startup while
 	// still bounding a stuck provider request.
-	extractTimeout = 180 * time.Second
-	modelTimeout   = 90 * time.Second
-	modelMaxTokens = 2048
+	extractTimeout = 210 * time.Second
+	modelTimeout   = 180 * time.Second
+	// The application has no draft-count cap. This is only a per-response
+	// transport budget; schema parsing and persistence accept every draft.
+	// A batch may contain up to twenty attachments and has no application
+	// draft-count cap. Keep a generous provider envelope so complete JSON is
+	// not rejected merely because a large review batch reaches the old 8k cap.
+	modelMaxTokens = 32768
 )
 
 var ErrNotConfigured = errors.New("AI provider is not configured")
@@ -128,6 +136,74 @@ type Client struct {
 	http   *http.Client
 }
 
+func messageBytes(messages []chatMessage) int {
+	encoded, err := json.Marshal(messages)
+	if err != nil {
+		return 0
+	}
+	return len(encoded)
+}
+
+func providerErrorKind(err error) string {
+	if err == nil {
+		return "none"
+	}
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "deadline_exceeded"
+	}
+	if errors.Is(err, context.Canceled) {
+		return "canceled"
+	}
+	var requestErr *providerRequestError
+	if errors.As(err, &requestErr) && requestErr.Status > 0 {
+		return fmt.Sprintf("http_%d", requestErr.Status)
+	}
+	return "transport_error"
+}
+
+func modelUsage(requestID string, raw json.RawMessage, finish string, latency time.Duration) map[string]any {
+	usage := map[string]any{
+		"provider":          "openai_compatible",
+		"request_id":        requestID,
+		"finish_reason":     finish,
+		"latency_ms":        latency.Milliseconds(),
+		"prompt_tokens":     0,
+		"completion_tokens": 0,
+		"total_tokens":      0,
+	}
+	if len(raw) > 0 && string(raw) != "null" {
+		var providerUsage map[string]any
+		if json.Unmarshal(raw, &providerUsage) == nil {
+			usage["provider_usage"] = providerUsage
+			for _, field := range []string{"prompt_tokens", "completion_tokens", "total_tokens"} {
+				if value, ok := providerUsage[field]; ok {
+					usage[field] = value
+				}
+			}
+		}
+	}
+	return usage
+}
+
+func modelUsageInt(usage map[string]any, key string) int64 {
+	if usage == nil {
+		return 0
+	}
+	switch value := usage[key].(type) {
+	case float64:
+		return int64(value)
+	case json.Number:
+		parsed, _ := value.Int64()
+		return parsed
+	case int:
+		return int64(value)
+	case int64:
+		return value
+	default:
+		return 0
+	}
+}
+
 func NewClient(config Config) *Client {
 	config.BaseURL = strings.TrimRight(strings.TrimSpace(config.BaseURL), "/")
 	config.OCRURL = strings.TrimRight(strings.TrimSpace(config.OCRURL), "/")
@@ -154,7 +230,13 @@ func (c *Client) OCRConfigured() bool {
 func (c *Client) ValidateFiles(files []Image) error { return validateImages(files) }
 
 func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
+	instruction := strings.TrimSpace(input.Instruction)
+	if instruction == "" {
+		instruction = strings.TrimSpace(input.Text)
+	}
+	slog.Info("AI extraction started", "model", c.config.Model, "instruction_bytes", len(instruction), "image_count", len(input.Images), "wallet_count", len(input.Wallets), "category_count", len(input.Categories))
 	if !c.Configured() {
+		slog.Warn("AI extraction unavailable", "reason_code", "provider_not_configured")
 		return Output{}, ErrNotConfigured
 	}
 	ctx, cancel := context.WithTimeout(ctx, extractTimeout)
@@ -178,10 +260,19 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	source := input.Text
 	attachmentTexts := make([]string, 0, len(input.Images))
 	for _, img := range input.Images {
+		ocrStarted := time.Now()
+		slog.Info("AI OCR started", "attachment_index", len(attachmentTexts), "mime_type", img.MIMEType, "bytes", len(img.Base64))
 		extracted, err := c.ocr(ctx, img)
 		if err != nil {
+			stage, code, status := "ocr", "ocr_error", 0
+			var diagnostic *AIProviderError
+			if errors.As(err, &diagnostic) {
+				stage, code, status = diagnostic.Diagnostic()
+			}
+			slog.Warn("AI OCR failed", "attachment_index", len(attachmentTexts), "stage", stage, "code", code, "provider_status", status, "latency_ms", time.Since(ocrStarted).Milliseconds())
 			return Output{AttachmentTexts: attachmentTexts}, err
 		}
+		slog.Info("AI OCR completed", "attachment_index", len(attachmentTexts), "text_bytes", len(extracted), "latency_ms", time.Since(ocrStarted).Milliseconds())
 		attachmentTexts = append(attachmentTexts, extracted)
 		if source != "" {
 			source += "\n\n"
@@ -214,8 +305,10 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	modelCtx, modelCancel := context.WithTimeout(ctx, modelTimeout)
 	defer modelCancel()
 	modelStarted := time.Now()
+	slog.Info("AI model request started", "model", c.config.Model, "source_bytes", len(source), "prompt_bytes", messageBytes(messages), "max_tokens", modelMaxTokens)
 	body, _, err := c.request(modelCtx, http.MethodPost, c.config.BaseURL+"/chat/completions", c.config.APIKey, request, "AI")
 	if err != nil {
+		slog.Warn("AI model request failed", "model", c.config.Model, "code", "model_request", "latency_ms", time.Since(modelStarted).Milliseconds(), "error_kind", providerErrorKind(err))
 		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, wrapProviderError("model", "model_request", err)
 	}
 	var response struct {
@@ -227,11 +320,19 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 			} `json:"message"`
 			FinishReason string `json:"finish_reason"`
 		} `json:"choices"`
+		ID    string          `json:"id"`
+		Usage json.RawMessage `json:"usage"`
 	}
 	if json.Unmarshal(body, &response) != nil || len(response.Choices) != 1 {
 		return Output{SourceText: source}, errors.New("invalid AI response envelope")
 	}
 	choice := response.Choices[0]
+	modelUsage := modelUsage(response.ID, response.Usage, choice.FinishReason, time.Since(modelStarted))
+	modelUsage["model"] = c.config.Model
+	if choice.FinishReason == "length" {
+		slog.Warn("AI provider response truncated", "reason_code", "output_token_limit", "max_tokens", modelMaxTokens, "response_bytes", len(choice.Message.Content), "prompt_tokens", modelUsageInt(modelUsage, "prompt_tokens"), "completion_tokens", modelUsageInt(modelUsage, "completion_tokens"))
+		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, errors.New("AI response exceeded output token limit")
+	}
 	if (choice.FinishReason != "" && choice.FinishReason != "stop") || (len(choice.Message.ToolCalls) > 0 && string(choice.Message.ToolCalls) != "null" && string(choice.Message.ToolCalls) != "[]") || (len(choice.Message.FunctionCall) > 0 && string(choice.Message.FunctionCall) != "null") {
 		return Output{SourceText: source}, errors.New("AI response was incomplete or requested tools")
 	}
@@ -259,6 +360,9 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	out.SourceText = source
 	out.AttachmentTexts = attachmentTexts
 	out.OCRComplete = ocrComplete
+	if c.config.StoreUsage {
+		out.ModelUsage = modelUsage
+	}
 	if err != nil {
 		var mismatch *SchemaMismatchError
 		if errors.As(err, &mismatch) {
@@ -266,6 +370,16 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		}
 		return out, wrapProviderError("schema", "response_invalid", err)
 	}
+	slog.Info("AI provider extraction completed",
+		"model", c.config.Model,
+		"latency_ms", time.Since(modelStarted).Milliseconds(),
+		"ocr_attachments", len(attachmentTexts),
+		"draft_count", len(out.Drafts),
+		"reply_bytes", len(out.Reply),
+		"prompt_tokens", modelUsageInt(modelUsage, "prompt_tokens"),
+		"completion_tokens", modelUsageInt(modelUsage, "completion_tokens"),
+		"total_tokens", modelUsageInt(modelUsage, "total_tokens"),
+	)
 	return out, err
 }
 
@@ -303,13 +417,26 @@ func buildMessages(input Input, source string) ([]chatMessage, error) {
 	for _, c := range input.Categories {
 		categories = append(categories, category{c.ID, c.Name, c.Kind, c.ParentID, c.WalletIDs})
 	}
+	walletAssignmentPolicy := "no_wallets; leave wallet_id empty and return drafts with a question to create/select a wallet"
+	if len(wallets) > 1 {
+		walletAssignmentPolicy = "choose_the_best_supplied_wallet; when uncertain default to wallet_id " + wallets[0].ID + "; return drafts with a review question instead of asking first"
+	}
+	if len(wallets) == 1 {
+		walletAssignmentPolicy = "single_wallet; use wallet_id " + wallets[0].ID + " for every recognizable entry; do not ask for account-to-wallet mapping"
+	}
+	instruction := strings.TrimSpace(input.Instruction)
+	if instruction == "" {
+		instruction = strings.TrimSpace(input.Text)
+	}
 	content, err := json.Marshal(struct {
-		Timezone   string     `json:"timezone"`
-		Now        time.Time  `json:"now"`
-		Wallets    []wallet   `json:"wallets"`
-		Categories []category `json:"categories"`
-		Source     string     `json:"untrusted_source_text"`
-	}{input.Timezone, input.Now, wallets, categories, source})
+		Timezone               string     `json:"timezone"`
+		Now                    time.Time  `json:"now"`
+		UserInstruction        string     `json:"user_instruction,omitempty"`
+		WalletAssignmentPolicy string     `json:"wallet_assignment_policy"`
+		Wallets                []wallet   `json:"wallets"`
+		Categories             []category `json:"categories"`
+		Source                 string     `json:"untrusted_source_text"`
+	}{Timezone: input.Timezone, Now: input.Now, UserInstruction: instruction, WalletAssignmentPolicy: walletAssignmentPolicy, Wallets: wallets, Categories: categories, Source: source})
 	if err != nil {
 		return nil, errors.New("invalid AI reference context")
 	}

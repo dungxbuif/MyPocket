@@ -14,6 +14,12 @@ Owner requested long-press Add → AI chat → prefilled transaction list, editi
 
 ## Decision
 
+2026-09-23 owner-approved correction: extraction is review-first, not a gate that asks the user to choose entries before suggesting anything. Merge clear repeated views inside a batch, preserve ambiguous repeats for review, infer/default only to supplied wallets, and surface incomplete rows without fabricating dates/amounts. Existing explicit approval/ownership checks remain mandatory. Do not deduplicate against unseen ledger data or change transfer classification to bypass approval. [Bug/design](../work/bugs/AI-ENTRY-REVIEW-FIRST-DETAIL_DESIGN.md) records conflicting old prompt instructions and the separate 2048-token batch truncation; the bounded provider output budget is now 32768 tokens.
+
+The application does not cap the number of proposals. Parser, usecase and repository accept every valid draft; the model's per-response token envelope and HTTP response-size envelope remain transport safeguards. A truncated structured response is rejected as a whole so the user never reviews an incomplete prefix as if it were complete.
+
+2026-09-23 operational follow-up: keep the endpoint synchronous for this slice. The adapter now emits privacy-safe stage diagnostics and can persist normalized provider usage internally when `AI_STORE_USAGE=true`; public responses never expose prompts, OCR text or credentials. Direct user filters are sent as `user_instruction` separately from untrusted OCR/source text. Streaming is deferred until a separate async/polling or SSE recovery design is approved; increasing bounded model/extraction timeouts is the current mitigation for slow providers.
+
 2026-09-22 follow-up: the owner replaced conversation/session behavior with a one-shot process. The legacy `ai_entry_sessions`/`ai_entry_messages` schema remains for process compatibility, but no messages are written or exposed; see [ADR-006](ADR-006-private-ai-attachments.md) and the [stateless contract](../superpowers/specs/2026-09-21-stateless-ai-entry-design.md).
 
 Persist an owner-scoped process/idempotency record, proposals and request identities in PostgreSQL (migration 000010); conversation messages were part of the initial implementation but are now unused. Draft extraction has no write tools. Owner-scoped approval locks the proposal, revalidates wallet/category/date/amount, writes one ordinary income/expense row and updates proposal status in the same transaction. A proposal's transaction ID remains a receipt after ledger deletion, preventing replay from recreating deleted data. Editing uses expected version; approved/rejected proposals are terminal.
@@ -30,6 +36,6 @@ Tradeoffs: no retained image preview, no durable background OCR recovery, no aut
 
 ## Trace and verification
 
-[Ticket](../work/tickets/TICKET-09-01-nhap-lieu-chung-tu.md) · [Backlog](../work/BACKLOG.md) · [Validation](../work/VALIDATION_MATRIX.md) · [API](../architecture/API.md) · [ERD](../architecture/ERD.md) · [Architecture](../architecture/ARCHITECTURE.md) · [UI](../design/screens/assistant/README.md) · [Release](../releases/CHANGELOG.md).
+[Ticket](../work/tickets/TICKET-09-01-nhap-lieu-chung-tu.md) · [Backlog](../work/BACKLOG.md) · [Validation](../work/VALIDATION_MATRIX.md) · [API](../architecture/API.md) · [ERD](../architecture/ERD.md) · [Architecture](../architecture/ARCHITECTURE.md) · [UI](../design/pages/assistant/README.md) · [Release](../releases/CHANGELOG.md).
 
 Proof: Go unit/HTTP/provider tests, real PostgreSQL concurrent approval and cross-owner fixtures, frontend tests/browser fixtures, and live Chrome opening the chat through the real FE proxy. End-to-end extraction against the owner's AI endpoint is pending configuration; human acceptance remains open.

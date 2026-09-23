@@ -48,6 +48,7 @@ type AdvisorRequest struct {
 type AdvisorResponse struct {
 	Text      string
 	ToolCalls []AdvisorToolCall
+	Usage     map[string]any
 }
 
 type AdvisorProvider interface {
@@ -57,6 +58,7 @@ type AdvisorProvider interface {
 type AdvisorAnswer struct {
 	Text    string
 	Results []entity.FinanceResult
+	Usage   map[string]any
 }
 
 type AdvisorOrchestrator struct {
@@ -67,6 +69,24 @@ type AdvisorOrchestrator struct {
 
 func NewAdvisorOrchestrator(provider AdvisorProvider, tools *AdvisorToolRegistry) *AdvisorOrchestrator {
 	return &AdvisorOrchestrator{Provider: provider, Tools: tools}
+}
+
+func mergeUsage(total, current map[string]any) {
+	for _, key := range []string{"prompt_tokens", "completion_tokens", "total_tokens"} {
+		var value int64
+		switch typed := current[key].(type) {
+		case float64:
+			value = int64(typed)
+		case int64:
+			value = typed
+		case int:
+			value = int64(typed)
+		default:
+			continue
+		}
+		currentTotal, _ := total[key].(int64)
+		total[key] = currentTotal + value
+	}
 }
 
 func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, messages []AdvisorChatMessage) (AdvisorAnswer, error) {
@@ -80,6 +100,8 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 	}
 	sort.Slice(definitions, func(i, j int) bool { return definitions[i].Name < definitions[j].Name })
 	results := make([]entity.FinanceResult, 0, 4)
+	usage := map[string]any{"provider_calls": int64(0), "prompt_tokens": int64(0), "completion_tokens": int64(0), "total_tokens": int64(0)}
+	usageSeen := false
 	providerCalls := 0
 	toolCalls := 0
 	for {
@@ -97,6 +119,7 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 		}
 		response, err := o.Provider.Chat(ctx, AdvisorRequest{Messages: working, Tools: availableTools})
 		providerCalls++
+		usage["provider_calls"] = int64(providerCalls)
 		if err != nil {
 			return AdvisorAnswer{}, err
 		}
@@ -104,7 +127,19 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 			if strings.TrimSpace(response.Text) == "" {
 				return AdvisorAnswer{}, ErrAdvisorProviderUnavailable
 			}
-			return AdvisorAnswer{Text: response.Text, Results: results}, nil
+			mergeUsage(usage, response.Usage)
+			if response.Usage != nil {
+				usageSeen = true
+			}
+			var storedUsage map[string]any
+			if usageSeen {
+				storedUsage = usage
+			}
+			return AdvisorAnswer{Text: response.Text, Results: results, Usage: storedUsage}, nil
+		}
+		mergeUsage(usage, response.Usage)
+		if response.Usage != nil {
+			usageSeen = true
 		}
 		if toolCalls >= 4 {
 			return AdvisorAnswer{}, ErrAdvisorLoopLimit

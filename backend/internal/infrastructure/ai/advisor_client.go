@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -19,9 +20,10 @@ const advisorResponseLimit = 256 * 1024
 var ErrAdvisorNotConfigured = errors.New("advisor provider is not configured")
 
 type AdvisorClientConfig struct {
-	BaseURL string
-	APIKey  string
-	Model   string
+	BaseURL    string
+	APIKey     string
+	Model      string
+	StoreUsage bool
 }
 
 type AdvisorClient struct {
@@ -42,6 +44,8 @@ func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) 
 	if !c.Available() {
 		return usecase.AdvisorResponse{}, ErrAdvisorNotConfigured
 	}
+	started := time.Now()
+	slog.Info("AI advisor model request started", "model", c.config.Model, "message_count", len(input.Messages), "tool_count", len(input.Tools))
 	type wireToolCall struct {
 		ID       string `json:"id"`
 		Type     string `json:"type"`
@@ -93,6 +97,7 @@ func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) 
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.http.Do(req)
 	if err != nil {
+		slog.Warn("AI advisor model request failed", "model", c.config.Model, "latency_ms", time.Since(started).Milliseconds(), "error_kind", advisorErrorKind(err))
 		if ctx.Err() != nil {
 			return usecase.AdvisorResponse{}, ctx.Err()
 		}
@@ -107,6 +112,8 @@ func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) 
 		return usecase.AdvisorResponse{}, ErrAdvisorNotConfigured
 	}
 	var envelope struct {
+		ID      string          `json:"id"`
+		Usage   json.RawMessage `json:"usage"`
 		Choices []struct {
 			Message struct {
 				Content   *string `json:"content"`
@@ -131,5 +138,41 @@ func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) 
 	for _, call := range choice.ToolCalls {
 		response.ToolCalls = append(response.ToolCalls, usecase.AdvisorToolCall{ID: call.ID, Name: call.Function.Name, Arguments: json.RawMessage(call.Function.Arguments)})
 	}
+	usage := map[string]any{"provider": "openai_compatible", "model": c.config.Model, "request_id": envelope.ID, "latency_ms": time.Since(started).Milliseconds()}
+	if len(envelope.Usage) > 0 && string(envelope.Usage) != "null" {
+		var providerUsage map[string]any
+		if json.Unmarshal(envelope.Usage, &providerUsage) == nil {
+			for key, value := range providerUsage {
+				usage[key] = value
+			}
+		}
+	}
+	slog.Info("AI advisor model response completed", "model", c.config.Model, "latency_ms", time.Since(started).Milliseconds(), "prompt_tokens", advisorUsageInt(usage, "prompt_tokens"), "completion_tokens", advisorUsageInt(usage, "completion_tokens"), "total_tokens", advisorUsageInt(usage, "total_tokens"), "tool_call_count", len(response.ToolCalls), "response_bytes", len(responseBody))
+	if c.config.StoreUsage {
+		response.Usage = usage
+	}
 	return response, nil
+}
+
+func advisorUsageInt(usage map[string]any, key string) int64 {
+	switch value := usage[key].(type) {
+	case float64:
+		return int64(value)
+	case int64:
+		return value
+	case int:
+		return int64(value)
+	default:
+		return 0
+	}
+}
+
+func advisorErrorKind(err error) string {
+	if errors.Is(err, context.DeadlineExceeded) {
+		return "deadline_exceeded"
+	}
+	if errors.Is(err, context.Canceled) {
+		return "canceled"
+	}
+	return "transport_error"
 }

@@ -78,11 +78,12 @@ type aiEntryProcessResponse struct {
 	Processing bool                     `json:"processing"`
 	Error      string                   `json:"error,omitempty"`
 	ErrorCode  string                   `json:"error_code,omitempty"`
+	Reply      string                   `json:"reply,omitempty"`
 	Proposals  []entity.AIEntryProposal `json:"proposals"`
 }
 
 func processResponse(process *entity.AIEntrySession) aiEntryProcessResponse {
-	return aiEntryProcessResponse{ID: process.ID, Processing: process.Processing, Error: process.Error, ErrorCode: process.ErrorCode, Proposals: process.Proposals}
+	return aiEntryProcessResponse{ID: process.ID, Processing: process.Processing, Error: process.Error, ErrorCode: process.ErrorCode, Reply: process.Reply, Proposals: process.Proposals}
 }
 
 // Process godoc

@@ -91,6 +91,16 @@ func (s *AdvisorService) Submit(ctx context.Context, principal Principal, input 
 		_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
 		return AdvisorAnswer{}, err
 	}
+	if answer.Usage != nil {
+		if store, ok := s.Store.(interface {
+			StoreRunUsage(context.Context, string, string, map[string]any) error
+		}); ok {
+			if err := store.StoreRunUsage(terminalCtx, principal.OwnerID, run.ID, answer.Usage); err != nil {
+				_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
+				return AdvisorAnswer{}, err
+			}
+		}
+	}
 	if err := s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusCompleted, s.now()); err != nil {
 		return AdvisorAnswer{}, err
 	}

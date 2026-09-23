@@ -57,7 +57,7 @@ func parseOutputStrict(data []byte) (Output, error) {
 		return Output{}, errSchema
 	}
 	var drafts []json.RawMessage
-	if json.Unmarshal(root["drafts"], &drafts) != nil || len(drafts) > 30 {
+	if json.Unmarshal(root["drafts"], &drafts) != nil {
 		return Output{}, errSchema
 	}
 	out.Drafts = make([]Draft, 0, len(drafts))
@@ -132,9 +132,6 @@ func diagnoseOutput(data []byte) []SchemaIssue {
 	if !ok {
 		addTypeIssue(&issues, "$.drafts", "array", draftValue)
 		return issues
-	}
-	if len(drafts) > 30 {
-		issues = append(issues, SchemaIssue{Code: "array_limit", Path: "$.drafts", Expected: "at most 30 items", Actual: "too_many_items"})
 	}
 	for i, item := range drafts {
 		path := "$.drafts[" + strconv.Itoa(i) + "]"

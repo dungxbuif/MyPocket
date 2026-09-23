@@ -25,6 +25,8 @@ var (
 	ErrAIStorage     = errors.New("không lưu được chứng từ; OCR và AI chưa được gọi, không phát sinh lượt xử lý")
 )
 
+const aiProviderTimeout = 210 * time.Second
+
 type AIEntryExtractor interface {
 	Configured() bool
 	OCRConfigured() bool
@@ -54,12 +56,17 @@ type AIEntryMessageInput struct {
 }
 
 func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryMessageInput) (*entity.AIEntrySession, error) {
+	slog.Info("AI entry processing started", "process_id", id, "text_bytes", len(in.Text), "image_count", len(in.Images))
 	in.Text = strings.TrimSpace(in.Text)
 	if err := s.resolveTimezone(ctx, owner, &in); err != nil {
 		return nil, err
 	}
 	if err := s.validate(in); err != nil {
 		return nil, err
+	}
+	accountNow := time.Now()
+	if location, locationErr := time.LoadLocation(in.Timezone); locationErr == nil {
+		accountNow = accountNow.In(location)
 	}
 	if _, err := s.Entries.Session(ctx, owner, id); err != nil {
 		return nil, err
@@ -72,26 +79,32 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 	if err != nil {
 		return nil, err
 	}
+	slog.Info("AI entry catalogs loaded", "process_id", id, "wallet_count", len(wallets), "category_count", len(categories))
 	payload, _ := json.Marshal(in)
 	hash := sha256.Sum256(payload)
 	token, started, err := s.Entries.BeginMessage(ctx, owner, id, in.RequestID, hex.EncodeToString(hash[:]), in.Text)
 	if err != nil {
 		return nil, err
 	}
+	slog.Info("AI entry idempotency resolved", "process_id", id, "started", started)
 	if !started {
+		slog.Info("AI entry replay returned", "process_id", id)
 		return s.Entries.Session(ctx, owner, id)
 	}
 	if len(in.Images) > 0 {
 		if s.Storage == nil {
+			slog.Warn("AI entry storage unavailable", "process_id", id, "stage", "storage", "code", "storage_not_configured")
 			s.fail(owner, id, token, "")
 			return nil, ErrAIUnavailable
 		}
 		prepared, attachments, err := s.storeForOCR(ctx, owner, id, in.Images)
 		if err != nil {
+			slog.Warn("AI entry storage failed", "process_id", id, "stage", "storage", "code", "attachment_put_failed", "file_count", len(in.Images))
 			s.failWith(owner, id, token, ErrAIStorage.Error(), "storage_error", "")
 			return nil, ErrAIStorage
 		}
 		if err := s.Entries.CreateAttachments(ctx, attachments); err != nil {
+			slog.Warn("AI entry attachment metadata failed", "process_id", id, "stage", "storage", "code", "attachment_metadata_failed", "file_count", len(attachments))
 			for _, attachment := range attachments {
 				_ = s.Storage.Delete(context.WithoutCancel(ctx), attachment.ObjectKey)
 			}
@@ -100,11 +113,12 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		}
 		in.Images = prepared
 	}
-	providerCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	providerCtx, cancel := context.WithTimeout(ctx, aiProviderTimeout)
 	defer cancel()
-	out, err := s.Extractor.Extract(providerCtx, entity.AIExtractInput{Text: in.Text, Timezone: in.Timezone, Now: time.Now(), Wallets: wallets, Categories: categories, Images: in.Images})
+	out, err := s.Extractor.Extract(providerCtx, entity.AIExtractInput{Text: in.Text, Instruction: in.Text, Timezone: in.Timezone, Now: accountNow, Wallets: wallets, Categories: categories, Images: in.Images})
 	if len(in.Images) > 0 {
 		if updateErr := s.Entries.UpdateAttachmentOCR(ctx, owner, id, out.AttachmentTexts, out.OCRComplete); updateErr != nil {
+			slog.Warn("AI entry OCR metadata failed", "process_id", id, "stage", "persistence", "code", "ocr_metadata_failed", "attachment_count", len(out.AttachmentTexts))
 			s.fail(owner, id, token, "")
 			return nil, ErrAIProvider
 		}
@@ -113,7 +127,7 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		s.failWithDiagnostic(owner, id, token, err, boundedAIContext(out.SourceText, 64000))
 		return nil, ErrAIProvider
 	}
-	if len(out.Drafts) > 30 || len(out.Reply) > 16000 || len(out.SourceText) > 200000 {
+	if len(out.Reply) > 16000 || len(out.SourceText) > 200000 {
 		s.fail(owner, id, token, "")
 		return nil, ErrAIProvider
 	}
@@ -128,7 +142,19 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 			}
 		}
 		if wallet.ID == "" {
-			d.WalletID = ""
+			// Wallet selection is mandatory for reviewable drafts. The model may
+			// still omit it despite the contract; use the first supplied wallet
+			// as a deterministic fallback and disclose multi-wallet inference.
+			if len(wallets) > 0 {
+				modelWalletID := d.WalletID
+				wallet = wallets[0]
+				d.WalletID = wallet.ID
+				if modelWalletID != "" || len(wallets) > 1 {
+					d.Questions = append(d.Questions, "Ví được suy đoán từ danh mục hiện có; hãy kiểm tra lại trước khi lưu.")
+				}
+			} else {
+				d.WalletID = ""
+			}
 		}
 		if d.CategoryID != nil {
 			for j := range categories {
@@ -148,7 +174,8 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 			d.Amount = 0
 		}
 		if _, e := time.Parse(time.RFC3339, d.OccurredAt); e != nil {
-			d.OccurredAt = ""
+			d.OccurredAt = accountNow.Format(time.RFC3339)
+			appendAIQuestion(d, "Ngày trên chứng từ chưa rõ; đã tự điền ngày hiện tại, hãy kiểm tra lại.")
 		}
 		if d.Questions == nil {
 			d.Questions = []string{}
@@ -158,10 +185,26 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		}
 	}
 	if err = s.Entries.FinishMessage(ctx, owner, id, token, out); err != nil {
+		slog.Warn("AI entry result persistence failed", "process_id", id, "stage", "persistence", "code", "result_persist_failed", "draft_count", len(out.Drafts), "usage_present", out.ModelUsage != nil)
 		s.fail(owner, id, token, boundedAIContext(out.SourceText, 64000))
 		return nil, err
 	}
-	return s.Entries.Session(ctx, owner, id)
+	slog.Info("AI entry processing completed", "process_id", id, "draft_count", len(out.Drafts), "usage_stored", out.ModelUsage != nil)
+	process, err := s.Entries.Session(ctx, owner, id)
+	if err != nil {
+		return nil, err
+	}
+	process.Reply = out.Reply
+	return process, nil
+}
+
+func appendAIQuestion(d *entity.AIExtractDraft, question string) {
+	for _, existing := range d.Questions {
+		if existing == question {
+			return
+		}
+	}
+	d.Questions = append(d.Questions, question)
 }
 
 func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string, files []entity.AIImage) ([]entity.AIImage, []entity.AIEntryAttachment, error) {
@@ -207,12 +250,15 @@ func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string,
 func (s *AIEntryService) Process(ctx context.Context, owner string, in AIEntryMessageInput) (*entity.AIEntrySession, error) {
 	in.Text = strings.TrimSpace(in.Text)
 	if err := s.resolveTimezone(ctx, owner, &in); err != nil {
+		slog.Warn("AI entry validation failed", "process_id", in.RequestID, "stage", "validation", "code", "timezone_invalid")
 		return nil, err
 	}
 	if err := s.validate(in); err != nil {
+		slog.Warn("AI entry validation failed", "process_id", in.RequestID, "stage", "validation", "code", "input_invalid", "file_count", len(in.Images))
 		return nil, err
 	}
 	if err := s.Entries.CreateProcess(ctx, owner, in.RequestID); err != nil {
+		slog.Warn("AI entry process initialization failed", "process_id", in.RequestID, "stage", "persistence", "code", "process_create_failed")
 		return nil, err
 	}
 	return s.Send(ctx, owner, in.RequestID, in)

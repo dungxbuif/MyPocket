@@ -140,7 +140,8 @@ export function AiEntrySheet({ onClose, onSaved }: { onClose: () => void; onSave
       {capabilities && capabilities.ocr_configured && !capabilities.files_configured ? <StatusMessage>{COPY.noStorage}</StatusMessage> : null}
       {process?.processing ? <StatusMessage>{COPY.processing}</StatusMessage> : null}
       {uncertain ? <StatusMessage>{COPY.ambiguous}</StatusMessage> : null}
-      {!loading && !(process?.proposals?.length) ? <StatusMessage variant="plain">{COPY.empty}</StatusMessage> : null}
+      {process?.reply ? <StatusMessage variant="plain">{process.reply}</StatusMessage> : null}
+      {!loading && !(process?.proposals?.length) && !process?.reply ? <StatusMessage variant="plain">{COPY.empty}</StatusMessage> : null}
       {visibleProposals.length > 0 ? <AssistantResultCard count={visibleProposals.length}>
         {(process?.proposals ?? []).filter(proposal => proposal.status !== "rejected").map(proposal => <EntryProposalRow key={`${proposal.id}:${proposal.version}:${proposal.status}`}
           onDraftChange={draft => setEdits(current => ({ ...current, [proposal.id]: draft }))} proposal={proposal} wallets={wallets} categories={categories} disabled={blocked} onBusy={value => { requestActive.current = value; setBusy(value); }} onSaved={onSaved}

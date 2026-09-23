@@ -77,7 +77,7 @@ func TestAIEntryPersistsReviewAndApprovesExactlyOnce(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(s.Proposals) != 2 || len(s.Messages) != 0 || s.Processing {
+	if len(s.Proposals) != 2 || len(s.Messages) != 0 || s.Processing || s.Reply != "review" {
 		t.Fatalf("wrong one-shot process state: %+v", s)
 	}
 	var count int64

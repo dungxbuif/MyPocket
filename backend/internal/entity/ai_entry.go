@@ -58,11 +58,11 @@ type AIEntryAttachmentLink struct {
 func (AIEntryAttachmentLink) TableName() string { return "transaction_attachment_links" }
 
 type AIExtractInput struct {
-	Text, Timezone string
-	Now            time.Time
-	Wallets        []Wallet
-	Categories     []Category
-	Images         []AIImage
+	Text, Instruction, Timezone string
+	Now                         time.Time
+	Wallets                     []Wallet
+	Categories                  []Category
+	Images                      []AIImage
 }
 type AIExtractOutput struct {
 	Reply           string
@@ -70,6 +70,7 @@ type AIExtractOutput struct {
 	SourceText      string
 	AttachmentTexts []string
 	OCRComplete     bool
+	ModelUsage      map[string]any
 }
 
 type AIEntrySession struct {
@@ -80,6 +81,8 @@ type AIEntrySession struct {
 	Processing      bool              `json:"processing" gorm:"-"`
 	Error           string            `json:"error,omitempty"`
 	ErrorCode       string            `json:"error_code,omitempty"`
+	Reply           string            `json:"reply,omitempty"`
+	ModelUsage      map[string]any    `json:"-" gorm:"serializer:json;type:jsonb"`
 	Messages        []AIEntryMessage  `json:"messages" gorm:"-"`
 	Proposals       []AIEntryProposal `json:"proposals" gorm:"-"`
 	CreatedAt       time.Time         `json:"created_at"`

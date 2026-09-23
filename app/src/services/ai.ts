@@ -3,7 +3,7 @@ import { getStoredToken } from "./auth";
 
 export type EntryDraft = { type: string; amount: number; wallet_id: string; category_id: string | null; jar_id?: string | null; occurred_at: string; note: string; included_in_reports: boolean };
 export type EntryProposal = { id: string; process_id: string; version: number; status: "pending" | "approved" | "rejected"; draft: EntryDraft; questions: string[]; transaction_id?: string };
-export type EntryProcess = { id: string; proposals: EntryProposal[]; processing: boolean; error?: string };
+export type EntryProcess = { id: string; proposals: EntryProposal[]; processing: boolean; reply?: string; error?: string };
 export type EntryCapabilities = { ai_configured: boolean; ocr_configured: boolean; files_configured: boolean };
 export type EntryProcessInput = { request_id: string; text: string; timezone: string; files: File[] };
 const ENTRY_PATH = "/api/v1/ai/entry";

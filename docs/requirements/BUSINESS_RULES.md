@@ -159,7 +159,7 @@ Ví dụ không phí: mua 1 đơn vị giá 100.000 và 1 đơn vị giá 140.00
 - KEY-02: Key có quyền chức năng tương đương chủ account, vẫn kiểm tra sở hữu và quy tắc. Key không tạo/liệt kê/quản lý key khác; xem metadata/thu hồi chính key đang dùng được phép.
 - KEY-03: Thu hồi có hiệu lực với mọi đường xác thực/cache. Không ghi secret vào log; kiểm soát tần suất và truy vết theo key ID an toàn.
 - API-01: API có hợp đồng công khai, lỗi ổn định, phân trang; retry cùng thao tác không thêm hiệu ứng. Sửa phiên bản cũ phải báo xung đột thay vì âm thầm ghi đè.
-- AI-01: Nhập liệu tạo proposal/draft hoặc hỏi thông tin thiếu; không tự xác nhận. Tool chỉ gọi dịch vụ nghiệp vụ với quyền do server xác định.
+- AI-01: Nhập liệu tạo bản nháp từ từng giao dịch nhận diện được để user sửa/duyệt, không từ chối cả lô vì thiếu trường hoặc ảnh trùng. AI gộp bản sao rõ ràng trong cùng lần gửi; giữ các giao dịch khác ngày/mã tham chiếu và bản nghi trùng kèm câu hỏi. Tự chọn ví phù hợp trong danh sách, không rõ thì chọn ví đầu tiên làm mặc định; chưa có ví thì để trống để user bổ sung. Không bịa số tiền/ngày, không biến số dư thành giao dịch, không tự xác nhận. Tool chỉ gọi dịch vụ nghiệp vụ với quyền do server xác định.
 - AI-02: Tư vấn chỉ đọc dữ liệu hiện tại; số có nguồn và phạm vi. Trí nhớ hội thoại không thay cho dữ liệu báo cáo.
 - AI-03: OCR là tiền xử lý chứng từ riêng tư; output là dữ liệu chưa tin cậy, cần review. Lỗi/ảnh không thuộc account không được tạo giao dịch.
 - AI-04: AI tổng kết tháng có thể tự sinh phần riêng; không cần biến thao tác tạo văn bản thành xác nhận giao dịch. Có nhãn AI, dữ liệu nguồn và trạng thái cũ/lỗi.

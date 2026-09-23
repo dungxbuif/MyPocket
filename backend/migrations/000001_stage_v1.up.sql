@@ -263,6 +263,8 @@ CREATE TABLE ai_entry_sessions (
  request_token text NOT NULL DEFAULT '',
  processing_until timestamptz,
  error text NOT NULL DEFAULT '',
+ reply text NOT NULL DEFAULT '',
+ model_usage jsonb NOT NULL DEFAULT '{}'::jsonb,
  created_at timestamptz NOT NULL DEFAULT now(),
  updated_at timestamptz NOT NULL DEFAULT now(),
  UNIQUE(id, owner_id)
@@ -466,6 +468,7 @@ CREATE TABLE advisor_runs (
     lease_until timestamptz,
     last_event_seq bigint NOT NULL DEFAULT 0 CHECK (last_event_seq >= 0),
     error_code text,
+    model_usage jsonb NOT NULL DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now(),
     finished_at timestamptz,
     FOREIGN KEY (conversation_id, owner_id) REFERENCES advisor_conversations(id, owner_id) ON DELETE CASCADE,

@@ -56,7 +56,7 @@ func (r *AdvisorPostgresRepository) StartRun(ctx context.Context, input contract
 			return err
 		}
 		now := time.Now().UTC()
-		run = entity.AdvisorRun{ID: uuid.NewString(), OwnerID: input.OwnerID, ConversationID: conversation.ID, Generation: conversation.Generation, ClientRequestID: input.RequestID, PayloadHash: input.PayloadHash, CredentialKind: input.CredentialKind, CredentialID: input.CredentialID, CredentialExpiresAt: input.ExpiresAt, Status: entity.AdvisorStatusQueued, CreatedAt: now}
+		run = entity.AdvisorRun{ID: uuid.NewString(), OwnerID: input.OwnerID, ConversationID: conversation.ID, Generation: conversation.Generation, ClientRequestID: input.RequestID, PayloadHash: input.PayloadHash, CredentialKind: input.CredentialKind, CredentialID: input.CredentialID, CredentialExpiresAt: input.ExpiresAt, Status: entity.AdvisorStatusQueued, ModelUsage: map[string]any{}, CreatedAt: now}
 		if err := tx.Create(&run).Error; err != nil {
 			return err
 		}
@@ -119,6 +119,13 @@ func (r *AdvisorPostgresRepository) MarkRunStatus(ctx context.Context, ownerID, 
 		}
 		return tx.Model(&entity.AdvisorRun{}).Where("id = ? AND owner_id = ?", id, ownerID).Updates(updates).Error
 	})
+}
+
+func (r *AdvisorPostgresRepository) StoreRunUsage(ctx context.Context, ownerID, id string, usage map[string]any) error {
+	if usage == nil {
+		return nil
+	}
+	return r.db.WithContext(ctx).Model(&entity.AdvisorRun{}).Where("id = ? AND owner_id = ?", id, ownerID).Update("model_usage", usage).Error
 }
 
 func (r *AdvisorPostgresRepository) GetRun(ctx context.Context, ownerID, id string) (*entity.AdvisorRun, error) {

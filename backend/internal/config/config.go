@@ -12,6 +12,7 @@ type Config struct {
 	AIBaseURL          string
 	AIAPIKey           string
 	AIModel            string
+	AIStoreUsage       bool
 	OCRAPIURL          string
 	OCRAPIKey          string
 	S3Endpoint         string
@@ -44,6 +45,7 @@ func Load() Config {
 		AIBaseURL:          getenv("AI_BASE_URL", ""),
 		AIAPIKey:           getenv("AI_API_KEY", ""),
 		AIModel:            getenv("AI_MODEL", ""),
+		AIStoreUsage:       getenvBool("AI_STORE_USAGE", true),
 		OCRAPIURL:          getenv("OCR_API_URL", "https://ocr.dungxbuif.com"),
 		OCRAPIKey:          getenv("OCR_API_KEY", ""),
 		S3Endpoint:         getenv("S3_ENDPOINT", ""),

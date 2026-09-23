@@ -87,8 +87,8 @@ try {
   const goalForm=html(WalletCreateForm,{state:{...valid,type:'goal',targetAmount:'1000',targetDate:'2026-12-31'},saving:false,onChange(){},onSubmit(){},onSelectType(){}});
   assert.match(goalForm,/type="date"/); assert.match(goalForm,/2026-12-31/);
   const goalWallet={id:'g',name:'Goal',type:'goal',currency:'VND',opening_balance:0,current_balance:20,target_amount:100,is_in_total:true};
-  const { SavingsWalletPanel } = await server.ssrLoadModule('/src/atomic/organisms/SavingsWalletPanel.tsx');
-  const history=html(SavingsWalletPanel,{wallet:goalWallet,categories:[{id:'interest',name:'Thu lãi',kind:'income',system_key:'income_interest',wallet_ids:[]}],transactions:[{id:'t',wallet_id:'g',category_id:'interest',type:'income',amount:20,occurred_at:'2026-09-20T00:00:00Z'}],onBack(){},onChanged(){}});
+  const { WalletDetailPanel } = await server.ssrLoadModule('/src/atomic/organisms/SavingsWalletPanel.tsx');
+  const history=html(WalletDetailPanel,{wallet:goalWallet,categories:[{id:'interest',name:'Thu lãi',kind:'income',system_key:'income_interest',wallet_ids:[]}],transactions:[{id:'t',wallet_id:'g',category_id:'interest',type:'income',amount:20,occurred_at:'2026-09-20T00:00:00Z'}],onBack(){},onChanged(){}});
   assert.match(history,/Thu lãi/);
   assert.match(html(SavingsSummary,{wallet:goalWallet}),/aria-valuenow="20"/);
   const walletList=html(WalletSelectionList,{wallets:[goalWallet,{...goalWallet,id:'excluded',name:'Excluded',is_in_total:false}],selectedID:null,editing:false,onSelect(){},onAdd(){}});

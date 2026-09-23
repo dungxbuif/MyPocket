@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { WalletSelectionList } from "../molecules/WalletSelectionList";
-import { SavingsWalletPanel } from "./SavingsWalletPanel";
+import { WalletDetailPanel } from "./SavingsWalletPanel";
 import { ArrowLeft, CreditCard, Landmark, PiggyBank, Plus, Trash2, WalletCards } from "lucide-react";
 
 import { BaseButton } from "../atoms/BaseButton";
@@ -98,7 +98,7 @@ export function WalletManagementPanel({ onChanged, refreshKey = 0 }: { onChanged
   };
 
   const selectedWallet = wallets.find(wallet => wallet.id === selectedID);
-  if (selectedWallet?.type === "goal" && !editingList) return <div className="space-y-3">{error ? <StatusMessage tone="danger">{error}<BaseButton variant="ghost" onClick={() => void load()}>Thử lại</BaseButton></StatusMessage> : null}{loading ? <StatusMessage>Đang cập nhật số dư...</StatusMessage> : null}<SavingsWalletPanel wallet={selectedWallet} transactions={transactions} categories={categories} onBack={() => setSelectedID(null)} onChanged={onChanged} /></div>;
+  if (selectedWallet && !editingList) return <div className="space-y-3">{error ? <StatusMessage tone="danger">{error}<BaseButton variant="ghost" onClick={() => void load()}>Thử lại</BaseButton></StatusMessage> : null}{loading ? <StatusMessage>Đang cập nhật số dư...</StatusMessage> : null}<WalletDetailPanel wallet={selectedWallet} transactions={transactions} categories={categories} onBack={() => setSelectedID(null)} onChanged={onChanged} /></div>;
 
   return (
     <section className="space-y-3">

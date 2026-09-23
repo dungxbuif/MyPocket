@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { categoryAppliesToTransaction, signedTransactionAmount } from "../src/services/transactionLogic.ts";
 import { totalWalletBalance } from "../src/services/walletLogic.ts";
+import { filterLedgerTransactions, ledgerRangeForWallet } from "../src/services/transactionLedger.ts";
 
 const category = { id: "category-1", kind: "expense", name: "Ăn uống", icon_key: "expense_food", is_system: true, wallet_ids: ["wallet-1"] };
 
@@ -39,4 +40,28 @@ test("total wallet balance uses current balances and excludes opted-out wallets"
     { current_balance: -50000, is_in_total: true },
     { current_balance: 900000, is_in_total: false },
   ]), 100000);
+});
+
+test("ledger period and wallet scope apply together at account-local day boundaries", () => {
+  const rows = [
+    { id: "a", wallet_id: "cash", occurred_at: "2026-09-20T17:30:00Z" },
+    { id: "b", wallet_id: "cash", occurred_at: "2026-09-27T16:59:00Z" },
+    { id: "c", wallet_id: "cash", occurred_at: "2026-09-27T17:00:00Z" },
+    { id: "d", wallet_id: "bank", occurred_at: "2026-09-23T12:00:00Z" },
+  ];
+  const range = { start: "2026-09-21", end: "2026-09-27" };
+  assert.deepEqual(filterLedgerTransactions(rows, "cash", range, "Asia/Ho_Chi_Minh").map(row => row.id), ["b", "a"]);
+  assert.deepEqual(filterLedgerTransactions(rows, "", range, "Asia/Ho_Chi_Minh").map(row => row.id), ["b", "d", "a"]);
+});
+
+test("basic wallet and aggregate use the same selected week, with basic rows scoped to its wallet", () => {
+  const rows = [
+    { id: "old", wallet_id: "cash", occurred_at: "2026-08-01T12:00:00Z" },
+    { id: "current", wallet_id: "cash", occurred_at: "2026-09-24T12:00:00Z" },
+    { id: "other", wallet_id: "card", occurred_at: "2026-09-24T12:00:00Z" },
+  ];
+  const week = { start: "2026-09-21", end: "2026-09-27" };
+  assert.deepEqual(filterLedgerTransactions(rows, "cash", ledgerRangeForWallet("basic", week), "Asia/Ho_Chi_Minh").map(row => row.id), ["current"]);
+  assert.deepEqual(filterLedgerTransactions(rows, "", ledgerRangeForWallet(undefined, week), "Asia/Ho_Chi_Minh").map(row => row.id), ["current", "other"]);
+  assert.deepEqual(filterLedgerTransactions(rows, "card", ledgerRangeForWallet("credit", week), "Asia/Ho_Chi_Minh").map(row => row.id), ["other"]);
 });

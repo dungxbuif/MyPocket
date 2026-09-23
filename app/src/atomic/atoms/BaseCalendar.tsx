@@ -10,6 +10,7 @@ export function BaseCalendar({ value, onSelect, onCancel }: { value: string; onS
   const [month, setMonth] = useState(new Date(initial.getFullYear(), initial.getMonth(), 1, 12));
   const [focused, setFocused] = useState(value.slice(0, 10) || dateKey(initial));
   const [jump, setJump] = useState(false);
+  const today = dateKey(new Date());
   const grid = useRef<HTMLDivElement>(null);
   const move = (days: number) => {
     const next = shiftDay(focused, days), date = parseDay(next);
@@ -40,6 +41,9 @@ export function BaseCalendar({ value, onSelect, onCancel }: { value: string; onS
     }}>
       {monthDays(month.getFullYear(), month.getMonth()).map(day => <button key={day} type="button" role="gridcell" data-day={day} aria-label={calendarLabel(day)} aria-selected={value.slice(0, 10) === day} tabIndex={focused === day ? 0 : -1} onFocus={() => setFocused(day)} onClick={() => onSelect(day)} className={`min-h-11 min-w-0 rounded-full text-sm focus-visible:outline-2 focus-visible:outline-action ${day === value.slice(0, 10) ? "bg-action font-bold text-card" : parseDay(day).getMonth() === month.getMonth() ? "text-ink hover:bg-row" : "text-muted hover:bg-row"}`}>{parseDay(day).getDate()}</button>)}
     </div>
-    <BaseButton variant="ghost" onClick={onCancel}>Hủy</BaseButton>
+    <div className="flex items-center justify-between gap-2">
+      <BaseButton variant="ghost" onClick={() => { const next = parseDay(today); setFocused(today); setMonth(new Date(next.getFullYear(), next.getMonth(), 1, 12)); onSelect(today); }}>Hôm nay</BaseButton>
+      <BaseButton variant="ghost" onClick={onCancel}>Hủy</BaseButton>
+    </div>
   </div>;
 }

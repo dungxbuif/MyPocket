@@ -17,7 +17,7 @@ export type TransactionItemModel = {
 
 export function TransactionItem({ item, onActivate }: { item: TransactionItemModel; onActivate?: () => void }) {
   return (
-    <BaseButton variant="row" size="row" className="flex w-full items-center gap-3" onClick={onActivate}>
+    <BaseButton variant="row" size="row" className="flex w-full items-center gap-3" onClick={onActivate} disabled={!onActivate}>
       <IconBadge icon={item.icon} tone={item.tone} />
       <div className="min-w-0 flex-1">
         <Text weight="semibold" className="truncate">{item.title}</Text>
