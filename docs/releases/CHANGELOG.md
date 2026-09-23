@@ -21,6 +21,17 @@ as active release entries here.
 
 ## [1.0.0] - 2026-09-24
 
+### Deployment note
+
+- Homelab `money.dungxbuif.com` was redeployed on 2026-09-24 from the
+  `feature/wallet-management` branch. Production PostgreSQL schema was reset
+  and migrated to version 21; Redis DB 1 was flushed. A pre-reset PostgreSQL
+  dump was kept on Pi5 under `/home/dungxbuif/backups/mypocket/`.
+- Production now uses Docker images `homelab/mypocket-api:0ff84828-deploy-20260924015529`
+  and `homelab/mypocket-web:0ff84828-deploy-20260924015529`. The old
+  `mypocket-worker` Swarm service is scaled to zero because this code snapshot
+  has no `cmd/worker` binary.
+
 ### Added
 
 - Authenticated wallet, category, transaction, budget, jar, account-timezone, feedback,
