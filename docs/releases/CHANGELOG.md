@@ -31,6 +31,9 @@ as active release entries here.
   and `homelab/mypocket-web:0ff84828-deploy-20260924015529`. The old
   `mypocket-worker` Swarm service is scaled to zero because this code snapshot
   has no `cmd/worker` binary.
+- Production AI entry, receipt OCR, and Finance Assistant are enabled through
+  server-side environment variables. MyPocket reuses the shared homelab LLM and
+  OCR credentials; no provider keys are exposed to the browser or committed docs.
 
 ### Added
 
