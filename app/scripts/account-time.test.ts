@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { accountMonthKey, instantFromLocalDateTime, localDateTimeAt, dateKeyAt, weekDateRange } from "../src/services/accountTime.ts";
+import { accountMonthKey, instantFromLocalDateTime, isIanaTimezone, localDateTimeAt, dateKeyAt, resolveClientTimezone, weekDateRange } from "../src/services/accountTime.ts";
 
 test("calendar grouping follows the account timezone, not the browser timezone", () => {
   const instant = "2026-09-30T17:30:00.000Z";
@@ -28,4 +28,11 @@ test("ledger weeks start Monday and cross month and year boundaries", () => {
 test("ledger current week anchors to the account date, not UTC date", () => {
   const today = dateKeyAt("2026-09-20T18:00:00Z", "Asia/Ho_Chi_Minh");
   assert.deepEqual(weekDateRange(today, 0), { start: "2026-09-21", end: "2026-09-27" });
+});
+
+test("client timezone resolver rejects non-IANA values before API submission", () => {
+  const resolved = resolveClientTimezone("Local", "");
+  assert.notEqual(resolved, "Local");
+  assert.equal(isIanaTimezone(resolved), true);
+  assert.equal(resolveClientTimezone("America/Los_Angeles"), "America/Los_Angeles");
 });

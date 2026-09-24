@@ -1,4 +1,5 @@
 import { API_ROUTES, APP_ROUTES, STORAGE_KEYS } from "../config/app";
+import { DEFAULT_ACCOUNT_TIMEZONE, resolveClientTimezone } from "./accountTime";
 import { apiRequest } from "./api";
 
 export type UserProfile = {
@@ -82,7 +83,7 @@ export async function startGoogleLogin(): Promise<LoginOutput | null> {
       id: String(candidate.user.id ?? ""),
       name: String(candidate.user.name ?? ""),
       email: candidate.user.email,
-      timezone: String(candidate.user.timezone ?? "Asia/Ho_Chi_Minh"),
+      timezone: resolveClientTimezone(String(candidate.user.timezone ?? "")),
       timezone_confirmed: Boolean(candidate.user.timezone_confirmed),
       created_at: String(candidate.user.created_at ?? ""),
     },
@@ -121,7 +122,7 @@ export function extractFixtureLoginFromQueryParams(query: URLSearchParams): Logi
     id: query.get("user_id")?.trim() ?? query.get("id")?.trim() ?? "",
     name: query.get("name")?.trim() ?? "",
     email: query.get("email")?.trim() ?? "",
-    timezone: "Asia/Ho_Chi_Minh",
+    timezone: DEFAULT_ACCOUNT_TIMEZONE,
     timezone_confirmed: false,
     created_at: query.get("created_at")?.trim() ?? "",
   };
@@ -150,8 +151,7 @@ export async function updateAccountTimezone(timezone: string, initializeOnly = f
 
 export async function initializeAccountTimezone(profile: UserProfile, token: string): Promise<UserProfile> {
   if (profile.timezone_confirmed) return profile;
-  const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  if (!browserTimezone) return profile;
+  const browserTimezone = resolveClientTimezone(profile.timezone);
   try {
     return await updateAccountTimezone(browserTimezone, true, token);
   } catch {

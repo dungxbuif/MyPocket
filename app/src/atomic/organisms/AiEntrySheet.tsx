@@ -10,6 +10,7 @@ import { MAX_AI_ENTRY_FILES, proposalIssues, sameDraft, validateEntryFiles } fro
 import { fetchCategories, type Category } from "../../services/categories";
 import { fetchWallets, type Wallet } from "../../services/wallets";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
+import { resolveClientTimezone } from "../../services/accountTime";
 
 const COPY = {
   title: "Nhập giao dịch bằng AI", close: "Đóng", reload: "Tải lại kết quả", loading: "Đang tải...",
@@ -23,7 +24,7 @@ const COPY = {
 };
 
 export function AiEntrySheet({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
-  const timezone=useAccountTimezone();
+  const timezone=resolveClientTimezone(useAccountTimezone());
   const [edits, setEdits] = useState<Record<string, EntryDraft>>({});
   const [process, setProcess] = useState<EntryProcess | null>(null);
   const [capabilities, setCapabilities] = useState<EntryCapabilities | null>(null);

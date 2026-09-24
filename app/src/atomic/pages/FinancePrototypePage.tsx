@@ -20,6 +20,7 @@ import { FinanceAssistantPanel } from "../organisms/FinanceAssistantPanel";
 import { MobileAppShell } from "../templates/MobileAppShell";
 import { APP_CONFIG, APP_ROUTES, API_ROUTES } from "../../config/app";
 import { AccountTimezoneProvider, DEFAULT_ACCOUNT_TIMEZONE } from "../../services/AccountTimezoneContext";
+import { resolveClientTimezone } from "../../services/accountTime";
 import {
   clearSession,
   extractFixtureLoginFromQueryParams,
@@ -172,7 +173,7 @@ export function FinancePrototypePage() {
   const userName = auth.user?.name || "Người dùng";
 
   return (
-    <AccountTimezoneProvider value={auth.user?.timezone || DEFAULT_ACCOUNT_TIMEZONE}>
+    <AccountTimezoneProvider value={resolveClientTimezone(auth.user?.timezone || DEFAULT_ACCOUNT_TIMEZONE)}>
     <>
       <MobileAppShell
         tab={tab}

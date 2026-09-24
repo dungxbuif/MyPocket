@@ -1,6 +1,32 @@
 type DateTimeParts = { year: number; month: number; day: number; hour: number; minute: number; second: number };
 
+export const DEFAULT_ACCOUNT_TIMEZONE = "Asia/Ho_Chi_Minh";
 const formatters = new Map<string, Intl.DateTimeFormat>();
+
+export function isIanaTimezone(timezone: string): boolean {
+  const value = timezone.trim();
+  if (!value || value === "Local") return false;
+  try {
+    new Intl.DateTimeFormat("en-CA", { timeZone: value }).format(new Date());
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function resolveClientTimezone(...candidates: Array<string | null | undefined>): string {
+  for (const candidate of candidates) {
+    const value = candidate?.trim() ?? "";
+    if (isIanaTimezone(value)) return value;
+  }
+  try {
+    const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (isIanaTimezone(browserTimezone)) return browserTimezone;
+  } catch {
+    // Ignore browsers or embedded webviews that cannot expose a canonical IANA zone.
+  }
+  return DEFAULT_ACCOUNT_TIMEZONE;
+}
 
 function formatter(timezone: string): Intl.DateTimeFormat {
   const cached = formatters.get(timezone);

@@ -36,6 +36,9 @@ as active release entries here.
   OCR credentials; no provider keys are exposed to the browser or committed docs.
 - The production web proxy accepts the same 101 MiB AI-entry upload envelope as
   the backend so receipt images/PDFs are not rejected before OCR processing.
+- The production client now normalizes account and AI-entry timezones before
+  submission, falling back to `Asia/Ho_Chi_Minh` when a browser/webview reports
+  an empty or non-IANA timezone such as `Local`.
 
 ### Added
 
