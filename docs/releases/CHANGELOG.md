@@ -34,6 +34,8 @@ as active release entries here.
 - Production AI entry, receipt OCR, and Finance Assistant are enabled through
   server-side environment variables. MyPocket reuses the shared homelab LLM and
   OCR credentials; no provider keys are exposed to the browser or committed docs.
+- The production web proxy accepts the same 101 MiB AI-entry upload envelope as
+  the backend so receipt images/PDFs are not rejected before OCR processing.
 
 ### Added
 
