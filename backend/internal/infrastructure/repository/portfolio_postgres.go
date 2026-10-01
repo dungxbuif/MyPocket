@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/mypocket/backend/internal/entity"
@@ -100,7 +101,7 @@ func (r *PortfolioPostgresRepository) CreateTrade(ownerID, assetID string, input
 		if err := tx.Where("owner_id = ? AND asset_id = ?", ownerID, assetID).Order("occurred_at ASC, created_at ASC, id ASC").Find(&existing).Error; err != nil {
 			return err
 		}
-		candidate := entity.PortfolioTrade{ID: uuid.NewString(), OwnerID: ownerID, AssetID: assetID, Side: input.Side, QuantityScaled: input.QuantityScaled, UnitPrice: input.UnitPrice, Fee: input.Fee, OccurredAt: input.OccurredAt.UTC(), Note: input.Note}
+		candidate := entity.PortfolioTrade{ID: uuid.NewString(), OwnerID: ownerID, AssetID: assetID, Side: input.Side, QuantityScaled: input.QuantityScaled, UnitPrice: input.UnitPrice, Fee: input.Fee, OccurredAt: input.OccurredAt.UTC(), Note: input.Note, CreatedAt: time.Now().UTC()}
 		_, computeErr := entity.ComputePortfolioPosition(append(existing, candidate))
 		if errors.Is(computeErr, entity.ErrPortfolioInsufficientQuantity) {
 			return portfoliorepo.ErrPortfolioInsufficientQuantity

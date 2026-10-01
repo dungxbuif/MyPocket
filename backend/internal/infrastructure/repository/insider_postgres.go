@@ -155,7 +155,7 @@ func (r *InsiderPostgresRepository) readTopExpenses(tx *gorm.DB, ownerID string,
 }
 
 func (r *InsiderPostgresRepository) scoped(tx *gorm.DB, ownerID string, start, next time.Time, walletID, categoryID string) *gorm.DB {
-	db := tx.Table("transactions AS t").Joins("LEFT JOIN categories AS c ON c.id = t.category_id").Joins("LEFT JOIN wallets AS w ON w.id = t.wallet_id").Where("t.owner_id = ? AND t.occurred_at >= ? AND t.occurred_at < ? AND t.included_in_reports = TRUE AND t.type IN (?, ?)", ownerID, start, next, entity.TransactionTypeIncome, entity.TransactionTypeExpense).Where("NOT (t.type = ? AND c.system_key = ?)", entity.TransactionTypeIncome, "income_transfer_in").Where("NOT (t.type = ? AND c.system_key = ?)", entity.TransactionTypeExpense, "expense_transfer_out")
+	db := tx.Table("transactions AS t").Joins("LEFT JOIN categories AS c ON c.id = t.category_id").Joins("LEFT JOIN wallets AS w ON w.id = t.wallet_id").Where("t.owner_id = ? AND t.occurred_at >= ? AND t.occurred_at < ? AND t.included_in_reports = TRUE AND t.type IN (?, ?)", ownerID, start, next, entity.TransactionTypeIncome, entity.TransactionTypeExpense).Where("NOT (t.type = ? AND COALESCE(c.system_key, '') = ?)", entity.TransactionTypeIncome, "income_transfer_in").Where("NOT (t.type = ? AND COALESCE(c.system_key, '') = ?)", entity.TransactionTypeExpense, "expense_transfer_out")
 	if strings.TrimSpace(walletID) != "" {
 		db = db.Where("t.wallet_id = ?", strings.TrimSpace(walletID))
 	}
