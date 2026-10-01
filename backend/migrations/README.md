@@ -8,6 +8,10 @@ Stage v1 starts with one baseline migration pair and uses additive forward migra
 - `000003_feedback_screenshot.up.sql` adds private screenshot metadata for owner-scoped feedback.
 - `000020_ai_entry_reply.up.sql` persists the bounded model clarification returned with a one-shot AI entry result. The number follows the current deployed schema version so existing version-19 databases can apply it additively.
 - `000021_ai_model_usage.up.sql` adds internal, non-public JSON usage metadata for AI entry and Finance Assistant model calls. It contains provider request/latency/token metadata only; prompts, OCR text and credentials are not stored.
+- `000022_transaction_mutation_idempotency.up.sql` adds owner-scoped idempotency records for transfer mutations.
+- `000023_transaction_adjustments.up.sql` adds immutable explicit balance-adjustment direction metadata.
+- `000024_recurring_transactions.up.sql` adds recurring schedules and idempotent due-occurrence markers.
+- `000025_credit_ledger.up.sql` adds credit entry kind/payment pairing metadata and indexes.
 
 The previous incremental migration files were squashed for the stage reset. Existing databases whose migration table is at version 19 must be recreated or explicitly reset to version 1 in a disposable environment before running this baseline. Do not force or drop a production database.
 

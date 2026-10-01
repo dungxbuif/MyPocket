@@ -24,6 +24,11 @@ func (r *WalletPostgresRepository) List(ownerID string) ([]entity.Wallet, error)
 		return nil, err
 	}
 	calculateCurrentBalances(wallets, transactions)
+	for index := range wallets {
+		if wallets[index].Type == entity.WalletTypeCredit && wallets[index].CreditLimit != nil {
+			wallets[index].AvailableCredit = *wallets[index].CreditLimit + wallets[index].CurrentBalance
+		}
+	}
 	return wallets, nil
 }
 

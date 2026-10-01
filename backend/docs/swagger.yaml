@@ -189,6 +189,21 @@ definitions:
       version:
         type: string
     type: object
+  entity.CreditStatement:
+    properties:
+      available_credit:
+        type: integer
+      balance:
+        type: integer
+      credit_limit:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      wallet_id:
+        type: string
+    type: object
   entity.Feedback:
     properties:
       changelog_id:
@@ -417,6 +432,10 @@ definitions:
         type: string
       created_at:
         type: string
+      credit_kind:
+        type: string
+      credit_payment_id:
+        type: string
       id:
         type: string
       included_in_reports:
@@ -465,6 +484,8 @@ definitions:
     type: object
   entity.Wallet:
     properties:
+      available_credit:
+        type: integer
       created_at:
         type: string
       credit_limit:
@@ -646,6 +667,30 @@ definitions:
       title:
         type: string
       version:
+        type: string
+    type: object
+  httpapi.creditEntryInput:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      kind:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+    type: object
+  httpapi.creditPaymentInput:
+    properties:
+      amount:
+        type: integer
+      note:
+        type: string
+      occurred_at:
+        type: string
+      source_wallet_id:
         type: string
     type: object
   httpapi.feedbackInput:
@@ -1651,6 +1696,128 @@ paths:
       summary: Get one published changelog entry
       tags:
       - Changelog
+  /api/v1/credit/wallets/{wallet_id}/entries:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credit wallet ID
+        in: path
+        name: wallet_id
+        required: true
+        type: string
+      - description: Credit entry
+        in: body
+        name: entry
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.creditEntryInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Record a purchase, refund, fee, or interest entry on a credit wallet
+      tags:
+      - Credit
+  /api/v1/credit/wallets/{wallet_id}/payments:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credit wallet ID
+        in: path
+        name: wallet_id
+        required: true
+        type: string
+      - description: Credit payment
+        in: body
+        name: payment
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.creditPaymentInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            items:
+              $ref: '#/definitions/entity.Transaction'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Record a payment from another wallet to a credit wallet
+      tags:
+      - Credit
+  /api/v1/credit/wallets/{wallet_id}/statement:
+    get:
+      parameters:
+      - description: Credit wallet ID
+        in: path
+        name: wallet_id
+        required: true
+        type: string
+      - description: Inclusive date YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: Exclusive date YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.CreditStatement'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Read a credit wallet statement and available credit
+      tags:
+      - Credit
   /api/v1/feedback:
     get:
       description: Accepts a normal JWT/session or a user API key with feedback:read.

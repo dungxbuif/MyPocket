@@ -18,6 +18,7 @@ import (
 	"github.com/mypocket/backend/internal/infrastructure/db"
 	repo "github.com/mypocket/backend/internal/infrastructure/repository"
 	"github.com/mypocket/backend/internal/infrastructure/storage"
+	transactionrepo "github.com/mypocket/backend/internal/repository"
 	"github.com/mypocket/backend/internal/usecase"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -116,6 +117,8 @@ func main() {
 	router.RegisterMonthRoutes(&httpapi.MonthHandler{Users: userRepo, Transactions: transactionRepository, Categories: categoryRepository, Jars: jarRepository, Notes: monthNotes})
 	recurringRepository := repo.NewRecurringPostgresRepository(database)
 	router.RegisterRecurringRoutes(&httpapi.RecurringHandler{Schedules: recurringRepository, Wallets: walletRepository, Categories: categoryRepository, Users: userRepo})
+	creditRepository, _ := transactionRepository.(transactionrepo.CreditRepository)
+	router.RegisterCreditRoutes(&httpapi.CreditHandler{Credits: creditRepository, Wallets: walletRepository, Categories: categoryRepository})
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
 	attachmentStorage, err := newAttachmentStorage(cfg)
 	if err != nil {

@@ -21,6 +21,7 @@ export type Wallet = {
   target_amount?: number | null;
   target_date?: string | null;
   credit_limit?: number | null;
+  available_credit?: number;
 };
 
 export type WalletInput = {

@@ -8,14 +8,14 @@ Status: implementation contract for [TICKET-02-01](../../../work/tickets/TICKET-
 
 The page header uses the shared `ScreenHeader` molecule so title/action spacing matches Budgets and Account screens; the options action remains a `BaseButton` chip.
 
-2026-09-24 owner correction: the supplied savings screenshot's “TẤT CẢ CÁC GIAO DỊCH” is a goal-history heading, not a shared All-time tab. Keep one wallet selector at the top. `Tổng cộng`, selected basic wallets and the provisional read-only credit scope share the same ledger layout: account-local Monday–Sunday Week/Custom controls, period cashflow card and date-grouped rows. Selecting a basic wallet filters both totals and rows by wallet ID; it does not create a special body or show all-time history. Goal alone shows distinct balance/remaining/progress and complete monthly history. No API/schema change or server-side week query is introduced. [Correction design](../../../work/tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md#owner-correction--wallet-specific-ledger-2026-09-24).
+2026-09-24 owner correction: the supplied savings screenshot's “TẤT CẢ CÁC GIAO DỊCH” is a goal-history heading, not a shared All-time tab. Keep one wallet selector at the top. `Tổng cộng` and selected basic wallets use account-local Monday–Sunday Week/Custom controls, period cashflow and date-grouped rows. Credit wallets use a dedicated debt statement with current debt, available limit, credit rows, and actions for purchase/refund/fee/interest or payment from another non-credit wallet; ordinary period, bulk-delete and transfer/adjustment controls are hidden. Goal alone shows distinct balance/remaining/progress and complete history. [Correction design](../../../work/tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md#owner-correction--wallet-specific-ledger-2026-09-24).
 
 2026-09-20: editor uses grouped SurfaceCards for wallet/large amount/category/note and date, retaining the shared inputs and form-sheet shell. Goal category selection is restricted to real savings catalog keys and backend enforces the same rule; category remains optional. Unsupported old goal categories remain visible in history but must be cleared/reselected before editing. Report flag for external entries defaults true. This is not the paired-wallet transfer flow.
 
 | Region | Base implementation | Contract |
 | --- | --- | --- |
 | Wallet scope filter | `WalletScopeSelector` + `WalletSelectionList` + `BaseBottomSheet` | Always visible below the header as a compact wallet capsule. Opening it shows the shared `Chọn Ví` sheet with `Tổng cộng`, included/excluded wallet groups, real balances, add-wallet and disabled-link states. `Tổng cộng` is the aggregate wallet scope, not an All-time period. Switching a goal wallet selects its specialized ledger body; other scopes use the same selector. |
-| Period and week navigation | `SegmentedControl`, `BaseButton`, `Text` | Aggregate/basic/credit: current week by default, previous/next week and custom range; no All-time tab. Goal: hide period control and show full goal history. |
+| Period and week navigation | `SegmentedControl`, `BaseButton`, `Text` | Aggregate/basic: current week by default, previous/next week and custom range; no All-time tab. Goal and credit: hide ordinary period control. |
 | Date group | `SurfaceCard`, `Text` | Groups real API rows by the user's local calendar date and displays the signed group total. |
 | Transaction row | `TransactionItem` | Category icon/title, wallet and optional note, signed VND amount; activation opens edit mode. Adjustment rows use a neutral tone and cannot be edited or deleted through the ordinary editor. |
 | Editor shell | `BaseBottomSheet` | Modal focus trap, Escape/backdrop cancel, and return focus follow the shared sheet contract. |
@@ -32,7 +32,7 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 | Select wallet scope | Recompute the real ledger view locally without another API call; `Tổng cộng` clears the wallet predicate. |
 | Select a goal wallet | Show real savings summary/progress and monthly history; do not show ordinary weekly cashflow cards or an All-time period control. |
 | Select a basic wallet | Keep the aggregate layout, including Week/Custom control and cashflow card; filter both totals and day rows to the selected wallet and current period. |
-| Select an aggregate/basic/credit scope or step week | Start/restart at the current account-local Monday–Sunday week; step through prior weeks. Never navigate into a future week. A timezone change recalculates the week from the account-local current date. |
+| Select an aggregate/basic scope or step week | Start/restart at the current account-local Monday–Sunday week; step through prior weeks. Never navigate into a future week. A timezone change recalculates the week from the account-local current date. Credit uses its statement instead. |
 | Select `Tùy chọn` | Open the existing date-range dialog. A valid range filters both summary and rows; cancel keeps the previous period choice and dates. |
 | Return from custom range to week | Show the current account-local week. There is no All-time period tab for ordinary scopes. |
 | Open an expense editor | Load jar choices for the transaction's account-local month; show only active monthly configurations, plus the existing historical assignment when editing. |
@@ -66,16 +66,16 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 ## Validation and source of truth
 
 - Backend owns authorization and final validation. Client validation is recovery guidance, not a security boundary.
-- `wallet_id` must belong to the authenticated owner. Basic income/expense accepts `basic` and `goal`; `credit` is excluded until its separate debt/payment ledger is implemented.
+- `wallet_id` must belong to the authenticated owner. Basic income/expense accepts `basic` and `goal`; credit entries use the separate debt/payment ledger and dedicated credit endpoints.
 - `type` is `income` or `expense`; `amount` is an integer greater than zero.
 - Transfer mode requires two different non-credit owner wallets and a positive integer amount; the API creates the paired rows and sets report inclusion false.
 - Category is optional. It must be visible, match the transaction type, and either have no wallet restriction or include the selected wallet ID.
 - `occurred_at` is sent as an RFC3339 timestamp. Note is trimmed and omitted when empty.
 - `included_in_reports` defaults to true.
 - `jar_id` is optional and may reference one active owner/month configuration only for ordinary expenses; income and transfer-out rows cannot be assigned. Clearing the selection sends null.
-- Wallet current balance is derived from ledger rows: opening balance plus income minus expense, with adjustments adding or subtracting by direction. Editing/deleting an ordinary row changes the derived balance; an adjustment is immutable and must be compensated by an opposite adjustment.
+- Wallet current balance is derived from ledger rows: opening balance plus income minus expense, with adjustments adding or subtracting by direction. Credit balance follows the same signed ledger, while available credit is `credit_limit + current_balance`; credit rows are mutated only through the dedicated credit API. Editing/deleting an ordinary row changes the derived balance; an adjustment is immutable and must be compensated by an opposite adjustment.
 
-APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/transfer/{transfer_id}`, `POST /api/v1/transactions/adjustment`, `POST /api/v1/transactions/bulk-delete`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options. Recurring schedules are managed separately from this editor at `/account/recurring`.
+APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/transfer/{transfer_id}`, `POST /api/v1/transactions/adjustment`, `POST /api/v1/transactions/bulk-delete`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options. Credit uses `POST /api/v1/credit/wallets/{id}/entries`, `POST /api/v1/credit/wallets/{id}/payments`, and `GET /api/v1/credit/wallets/{id}/statement`. Recurring schedules are managed separately from this editor at `/account/recurring`.
 
 ## Copy and formatting
 
@@ -87,4 +87,4 @@ Automated proof covers backend owner scope, positive amount/type validation, wal
 
 2026-09-24 weekly-ledger proof: `test:calendar` covers Monday–Sunday and year boundaries in account-local time; `test:transactions` covers wallet + week predicate at UTC boundary; the SSR period-selector fixture covers tab labels/range/future-week disable. Chrome on the local preview showed All → 21–27/9 → 14–20/9 with cashflow/list updates, empty state, next-week disable, and custom-dialog cancel preserving week. Build/design checks pass. Owner mobile visual acceptance remains open. [User guide](../../../guides/transactions.md).
 
-Transfer proof now includes `npm run test:transfer:e2e` (real Chromium UI/state) and `npm run test:transfer:integrated` (Vite proxy/API/PostgreSQL state). Residual gaps remain separate tickets: transfer-pair edit/delete, attachments/OCR, debt/credit ledger, advanced search/filter/pagination, and owner UAT sign-off.
+Transfer proof now includes `npm run test:transfer:e2e` (real Chromium UI/state) and `npm run test:transfer:integrated` (Vite proxy/API/PostgreSQL state). Residual gaps remain separate tickets: attachments/OCR, advanced search/filter/pagination, and owner UAT sign-off.

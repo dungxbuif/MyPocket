@@ -16,6 +16,12 @@ const (
 
 	AdjustmentDirectionIncrease = "increase"
 	AdjustmentDirectionDecrease = "decrease"
+
+	CreditKindPurchase = "purchase"
+	CreditKindRefund   = "refund"
+	CreditKindFee      = "fee"
+	CreditKindInterest = "interest"
+	CreditKindPayment  = "payment"
 )
 
 type Wallet struct {
@@ -26,6 +32,7 @@ type Wallet struct {
 	Currency             string        `json:"currency" gorm:"not null;default:VND"`
 	OpeningBalance       int64         `json:"opening_balance"`
 	CurrentBalance       int64         `json:"current_balance" gorm:"-"`
+	AvailableCredit      int64         `json:"available_credit,omitempty" gorm:"-"`
 	IsInTotal            bool          `json:"is_in_total" gorm:"not null;default:true"`
 	Description          *string       `json:"description,omitempty"`
 	TargetAmount         *int64        `json:"target_amount,omitempty"`
@@ -68,10 +75,23 @@ type Transaction struct {
 	Type                string    `json:"type" gorm:"not null"`
 	Amount              int64     `json:"amount" gorm:"not null"`
 	AdjustmentDirection *string   `json:"adjustment_direction,omitempty" gorm:"column:adjustment_direction"`
+	CreditKind          *string   `json:"credit_kind,omitempty" gorm:"column:credit_kind"`
+	CreditPaymentID     *string   `json:"credit_payment_id,omitempty" gorm:"column:credit_payment_id;index"`
 	OccurredAt          time.Time `json:"occurred_at" gorm:"index;not null"`
 	Note                *string   `json:"note,omitempty"`
 	IncludedInReports   bool      `json:"included_in_reports" gorm:"not null;default:true"`
 	TransferID          *string   `json:"transfer_id,omitempty" gorm:"column:transfer_id;index"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+// CreditStatement is the read model for a credit wallet's debt ledger.
+// Balance is the signed outstanding debt (expense rows reduce it, payment/refund
+// rows increase it), so available credit is credit limit plus balance.
+type CreditStatement struct {
+	WalletID        string        `json:"wallet_id"`
+	CreditLimit     int64         `json:"credit_limit"`
+	Balance         int64         `json:"balance"`
+	AvailableCredit int64         `json:"available_credit"`
+	Items           []Transaction `json:"items"`
 }

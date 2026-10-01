@@ -24,6 +24,52 @@ func TestValidateJarAssignmentPreservesUnchangedHistoricalLink(t *testing.T) {
 	}
 }
 
+func TestCreditLedgerKeepsSignedBalanceAndAtomicPaymentPair(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("requires migrated local TEST_DATABASE_URL")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := uuid.NewString()
+	if err := db.Create(&entity.User{ID: owner, Email: owner + "@credit.test", GoogleSubject: owner, Timezone: "Asia/Ho_Chi_Minh"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	limit := int64(1000000)
+	creditWallet := entity.Wallet{ID: uuid.NewString(), OwnerID: owner, Name: "Thẻ", Type: entity.WalletTypeCredit, Currency: entity.WalletCurrencyVND, CreditLimit: &limit}
+	sourceWallet := entity.Wallet{ID: uuid.NewString(), OwnerID: owner, Name: "Thanh toán", Type: entity.WalletTypeBasic, Currency: entity.WalletCurrencyVND}
+	if err := db.Create(&creditWallet).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&sourceWallet).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		db.Where("owner_id = ?", owner).Delete(&entity.Transaction{})
+		db.Where("owner_id = ?", owner).Delete(&entity.Wallet{})
+		db.Where("id = ?", owner).Delete(&entity.User{})
+	})
+	repo := &TransactionPostgresRepository{db: db}
+	created, err := repo.CreateCreditEntry(owner, transactionrepo.CreditEntryInput{WalletID: creditWallet.ID, Kind: entity.CreditKindPurchase, Amount: 100, OccurredAt: time.Now().UTC()})
+	if err != nil || created == nil || created.CreditKind == nil || *created.CreditKind != entity.CreditKindPurchase {
+		t.Fatalf("create credit entry: row=%#v err=%v", created, err)
+	}
+	statement, err := repo.ListCreditStatement(owner, creditWallet.ID, nil, nil)
+	if err != nil || statement.Balance != -100 || statement.AvailableCredit != 999900 || len(statement.Items) != 1 {
+		t.Fatalf("unexpected statement after purchase: %#v err=%v", statement, err)
+	}
+	rows, err := repo.CreateCreditPayment(owner, creditWallet.ID, sourceWallet.ID, 50, time.Now().UTC(), nil)
+	if err != nil || len(rows) != 2 {
+		t.Fatalf("expected atomic payment pair, rows=%#v err=%v", rows, err)
+	}
+	statement, err = repo.ListCreditStatement(owner, creditWallet.ID, nil, nil)
+	if err != nil || statement.Balance != -50 || statement.AvailableCredit != 999950 || len(statement.Items) != 2 {
+		t.Fatalf("unexpected statement after payment: %#v err=%v", statement, err)
+	}
+}
+
 func TestCreateTransferPersistsExactlyTwoLinkedRows(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {

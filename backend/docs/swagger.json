@@ -1325,6 +1325,198 @@
                 }
             }
         },
+        "/api/v1/credit/wallets/{wallet_id}/entries": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Credit"
+                ],
+                "summary": "Record a purchase, refund, fee, or interest entry on a credit wallet",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Credit wallet ID",
+                        "name": "wallet_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Credit entry",
+                        "name": "entry",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.creditEntryInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Transaction"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/credit/wallets/{wallet_id}/payments": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Credit"
+                ],
+                "summary": "Record a payment from another wallet to a credit wallet",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Credit wallet ID",
+                        "name": "wallet_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Credit payment",
+                        "name": "payment",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.creditPaymentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Transaction"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/credit/wallets/{wallet_id}/statement": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Credit"
+                ],
+                "summary": "Read a credit wallet statement and available credit",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Credit wallet ID",
+                        "name": "wallet_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Inclusive date YYYY-MM-DD",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Exclusive date YYYY-MM-DD",
+                        "name": "to",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.CreditStatement"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/feedback": {
             "get": {
                 "security": [
@@ -3096,6 +3288,29 @@
                 }
             }
         },
+        "entity.CreditStatement": {
+            "type": "object",
+            "properties": {
+                "available_credit": {
+                    "type": "integer"
+                },
+                "balance": {
+                    "type": "integer"
+                },
+                "credit_limit": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.Transaction"
+                    }
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.Feedback": {
             "type": "object",
             "properties": {
@@ -3443,6 +3658,12 @@
                 "created_at": {
                     "type": "string"
                 },
+                "credit_kind": {
+                    "type": "string"
+                },
+                "credit_payment_id": {
+                    "type": "string"
+                },
                 "id": {
                     "type": "string"
                 },
@@ -3516,6 +3737,9 @@
         "entity.Wallet": {
             "type": "object",
             "properties": {
+                "available_credit": {
+                    "type": "integer"
+                },
                 "created_at": {
                     "type": "string"
                 },
@@ -3793,6 +4017,43 @@
                     "type": "string"
                 },
                 "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.creditEntryInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.creditPaymentInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "source_wallet_id": {
                     "type": "string"
                 }
             }

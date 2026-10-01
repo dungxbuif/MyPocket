@@ -106,6 +106,158 @@ func (r *TransactionPostgresRepository) CreateAdjustment(transaction *entity.Tra
 	})
 }
 
+func (r *TransactionPostgresRepository) CreateCreditEntry(ownerID string, input transactionrepo.CreditEntryInput) (*entity.Transaction, error) {
+	if strings.TrimSpace(ownerID) == "" || strings.TrimSpace(input.WalletID) == "" || input.Amount <= 0 || input.OccurredAt.IsZero() {
+		return nil, transactionrepo.ErrCreditInvalid
+	}
+	typeForKind := map[string]string{
+		entity.CreditKindPurchase: entity.TransactionTypeExpense,
+		entity.CreditKindFee:      entity.TransactionTypeExpense,
+		entity.CreditKindInterest: entity.TransactionTypeExpense,
+		entity.CreditKindRefund:   entity.TransactionTypeIncome,
+	}
+	txnType, ok := typeForKind[input.Kind]
+	if !ok {
+		return nil, transactionrepo.ErrCreditInvalid
+	}
+	created := &entity.Transaction{ID: uuid.NewString(), OwnerID: ownerID, WalletID: input.WalletID, CategoryID: input.CategoryID, Type: txnType, Amount: input.Amount, CreditKind: &input.Kind, OccurredAt: input.OccurredAt.UTC(), Note: input.Note, IncludedInReports: true}
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var wallet entity.Wallet
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ?", input.WalletID, ownerID).First(&wallet).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return transactionrepo.ErrCreditWalletInvalid
+			}
+			return err
+		}
+		if wallet.Type != entity.WalletTypeCredit || wallet.CreditLimit == nil || *wallet.CreditLimit <= 0 {
+			return transactionrepo.ErrCreditWalletInvalid
+		}
+		if input.CategoryID != nil {
+			var category entity.Category
+			if err := tx.Where("id = ? AND (is_system = true OR owner_id = ?)", *input.CategoryID, ownerID).First(&category).Error; err != nil {
+				if errors.Is(err, gorm.ErrRecordNotFound) {
+					return transactionrepo.ErrCreditInvalid
+				}
+				return err
+			}
+			if category.Kind != txnType {
+				return transactionrepo.ErrCreditInvalid
+			}
+		}
+		insert := `INSERT INTO transactions (id, owner_id, wallet_id, category_id, type, amount, credit_kind, occurred_at, note, included_in_reports) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, true)`
+		if err := tx.Exec(insert, created.ID, created.OwnerID, created.WalletID, created.CategoryID, created.Type, created.Amount, created.CreditKind, created.OccurredAt, created.Note).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ? AND owner_id = ?", created.ID, ownerID).First(created).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return created, nil
+}
+
+func (r *TransactionPostgresRepository) CreateCreditPayment(ownerID, creditWalletID, sourceWalletID string, amount int64, occurredAt time.Time, note *string) ([]entity.Transaction, error) {
+	if strings.TrimSpace(ownerID) == "" || strings.TrimSpace(creditWalletID) == "" || strings.TrimSpace(sourceWalletID) == "" || creditWalletID == sourceWalletID || amount <= 0 || occurredAt.IsZero() {
+		return nil, transactionrepo.ErrCreditPaymentInvalid
+	}
+	var result []entity.Transaction
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var wallets []entity.Wallet
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND id IN ?", ownerID, []string{creditWalletID, sourceWalletID}).Find(&wallets).Error; err != nil {
+			return err
+		}
+		if len(wallets) != 2 {
+			return transactionrepo.ErrCreditPaymentInvalid
+		}
+		var creditWallet, sourceWallet *entity.Wallet
+		for i := range wallets {
+			wallet := &wallets[i]
+			if wallet.ID == creditWalletID {
+				creditWallet = wallet
+			} else if wallet.ID == sourceWalletID {
+				sourceWallet = wallet
+			}
+		}
+		if creditWallet == nil || sourceWallet == nil || creditWallet.Type != entity.WalletTypeCredit || creditWallet.CreditLimit == nil || *creditWallet.CreditLimit <= 0 || sourceWallet.Type == entity.WalletTypeCredit {
+			return transactionrepo.ErrCreditWalletInvalid
+		}
+		var categories []entity.Category
+		if err := tx.Where("is_system = true AND system_key IN ?", []string{"expense_transfer_out", "income_transfer_in"}).Find(&categories).Error; err != nil {
+			return err
+		}
+		categoryIDs := map[string]string{}
+		for _, category := range categories {
+			if category.SystemKey != nil {
+				categoryIDs[*category.SystemKey] = category.ID
+			}
+		}
+		if categoryIDs["expense_transfer_out"] == "" || categoryIDs["income_transfer_in"] == "" {
+			return transactionrepo.ErrCreditPaymentInvalid
+		}
+		expenseCategoryID := categoryIDs["expense_transfer_out"]
+		incomeCategoryID := categoryIDs["income_transfer_in"]
+		paymentID := uuid.NewString()
+		timestamp := occurredAt.UTC()
+		source := entity.Transaction{ID: uuid.NewString(), OwnerID: ownerID, WalletID: sourceWalletID, CategoryID: &expenseCategoryID, Type: entity.TransactionTypeExpense, Amount: amount, OccurredAt: timestamp, Note: note, IncludedInReports: false, TransferID: &paymentID}
+		creditKind := entity.CreditKindPayment
+		credit := entity.Transaction{ID: uuid.NewString(), OwnerID: ownerID, WalletID: creditWalletID, CategoryID: &incomeCategoryID, Type: entity.TransactionTypeIncome, Amount: amount, CreditKind: &creditKind, CreditPaymentID: &paymentID, OccurredAt: timestamp, Note: note, IncludedInReports: false, TransferID: &paymentID}
+		insert := `INSERT INTO transactions (id, owner_id, wallet_id, category_id, type, amount, credit_kind, credit_payment_id, occurred_at, note, included_in_reports, transfer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?)`
+		if err := tx.Exec(insert, source.ID, source.OwnerID, source.WalletID, source.CategoryID, source.Type, source.Amount, source.CreditKind, source.CreditPaymentID, source.OccurredAt, source.Note, source.TransferID).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(insert, credit.ID, credit.OwnerID, credit.WalletID, credit.CategoryID, credit.Type, credit.Amount, credit.CreditKind, credit.CreditPaymentID, credit.OccurredAt, credit.Note, credit.TransferID).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("id IN ?", []string{source.ID, credit.ID}).Order("wallet_id ASC").Find(&result).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (r *TransactionPostgresRepository) ListCreditStatement(ownerID, walletID string, from, to *time.Time) (entity.CreditStatement, error) {
+	statement := entity.CreditStatement{WalletID: walletID, Items: []entity.Transaction{}}
+	var wallet entity.Wallet
+	if err := r.db.Where("id = ? AND owner_id = ?", walletID, ownerID).First(&wallet).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return statement, transactionrepo.ErrCreditWalletInvalid
+		}
+		return statement, err
+	}
+	if wallet.Type != entity.WalletTypeCredit || wallet.CreditLimit == nil {
+		return statement, transactionrepo.ErrCreditWalletInvalid
+	}
+	statement.CreditLimit = *wallet.CreditLimit
+	statement.Balance = wallet.OpeningBalance
+	query := r.db.Where("owner_id = ? AND wallet_id = ? AND credit_kind IS NOT NULL", ownerID, walletID)
+	if from != nil {
+		query = query.Where("occurred_at >= ?", from.UTC())
+	}
+	if to != nil {
+		query = query.Where("occurred_at < ?", to.UTC())
+	}
+	if err := query.Order("occurred_at DESC, created_at DESC").Find(&statement.Items).Error; err != nil {
+		return statement, err
+	}
+	var all []entity.Transaction
+	if err := r.db.Where("owner_id = ? AND wallet_id = ?", ownerID, walletID).Order("occurred_at ASC, created_at ASC").Find(&all).Error; err != nil {
+		return statement, err
+	}
+	for _, row := range all {
+		if row.Type == entity.TransactionTypeIncome {
+			statement.Balance += row.Amount
+		} else if row.Type == entity.TransactionTypeExpense {
+			statement.Balance -= row.Amount
+		}
+	}
+	statement.AvailableCredit = statement.CreditLimit + statement.Balance
+	return statement, nil
+}
+
 func (r *TransactionPostgresRepository) BulkDelete(ownerID string, ids []string) error {
 	if ownerID == "" || len(ids) == 0 || len(ids) > 100 {
 		return transactionrepo.ErrBulkDeleteInvalid
@@ -135,6 +287,9 @@ func (r *TransactionPostgresRepository) BulkDelete(ownerID string, ids []string)
 			}
 			if row.Type == entity.TransactionTypeAdjustment {
 				return transactionrepo.ErrBulkDeleteAdjustment
+			}
+			if row.CreditKind != nil {
+				return transactionrepo.ErrBulkDeleteCredit
 			}
 		}
 		result := tx.Where("owner_id = ? AND id IN ?", ownerID, ids).Delete(&entity.Transaction{})

@@ -481,6 +481,8 @@ func (h *TransactionHandler) BulkDeleteTransactions(c *gin.Context) {
 			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Không thể xóa hàng loạt giao dịch chuyển ví; hãy xóa theo cặp."})
 		case errors.Is(err, transactionrepo.ErrBulkDeleteAdjustment):
 			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Điều chỉnh số dư là bất biến; hãy tạo điều chỉnh bù trừ."})
+		case errors.Is(err, transactionrepo.ErrBulkDeleteCredit):
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Giao dịch tín dụng phải được sửa hoặc xóa trong luồng tín dụng riêng."})
 		case errors.Is(err, transactionrepo.ErrBulkDeleteInvalid):
 			transactionBadRequest(c, "Danh sách giao dịch không hợp lệ.")
 		default:
@@ -517,6 +519,10 @@ func (h *TransactionHandler) UpdateTransaction(c *gin.Context) {
 	}
 	if existing.TransferID != nil {
 		transactionBadRequest(c, "Giao dịch chuyển ví phải được sửa theo cặp.")
+		return
+	}
+	if existing.CreditKind != nil {
+		transactionBadRequest(c, transactionCreditWalletMessage)
 		return
 	}
 	if existing.Type == entity.TransactionTypeAdjustment {
@@ -557,6 +563,10 @@ func (h *TransactionHandler) DeleteTransaction(c *gin.Context) {
 	if existing, err := h.Transactions.Find(owner, c.Param("id")); err == nil && existing != nil {
 		if existing.TransferID != nil {
 			transactionBadRequest(c, "Giao dịch chuyển ví phải được xóa theo cặp.")
+			return
+		}
+		if existing.CreditKind != nil {
+			transactionBadRequest(c, transactionCreditWalletMessage)
 			return
 		}
 		if existing.Type == entity.TransactionTypeAdjustment {

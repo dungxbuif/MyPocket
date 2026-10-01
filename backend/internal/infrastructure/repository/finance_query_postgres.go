@@ -360,6 +360,8 @@ type financeWalletView struct {
 	OpeningBalance  int64  `json:"opening_balance"`
 	TargetAmount    *int64 `json:"target_amount,omitempty"`
 	TargetRemaining *int64 `json:"target_remaining,omitempty"`
+	CreditLimit     *int64 `json:"credit_limit,omitempty"`
+	AvailableCredit *int64 `json:"available_credit,omitempty"`
 }
 
 func (r *FinanceQueryPostgresRepository) readWalletBalances(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery) (entity.FinanceResult, error) {
@@ -397,7 +399,11 @@ func (r *FinanceQueryPostgresRepository) readWalletBalances(ctx context.Context,
 	}
 	items := make([]financeWalletView, 0, len(wallets))
 	for _, wallet := range wallets {
-		item := financeWalletView{ID: wallet.ID, Name: wallet.Name, Type: wallet.Type, Currency: wallet.Currency, CurrentBalance: balances[wallet.ID], OpeningBalance: wallet.OpeningBalance, TargetAmount: wallet.TargetAmount}
+		item := financeWalletView{ID: wallet.ID, Name: wallet.Name, Type: wallet.Type, Currency: wallet.Currency, CurrentBalance: balances[wallet.ID], OpeningBalance: wallet.OpeningBalance, TargetAmount: wallet.TargetAmount, CreditLimit: wallet.CreditLimit}
+		if wallet.CreditLimit != nil {
+			available := *wallet.CreditLimit + item.CurrentBalance
+			item.AvailableCredit = &available
+		}
 		if wallet.TargetAmount != nil {
 			remaining := *wallet.TargetAmount - item.CurrentBalance
 			if remaining < 0 {

@@ -18,6 +18,10 @@ var (
 	ErrBulkDeleteNotFound      = errors.New("bulk deletion transaction not found")
 	ErrBulkDeleteLinked        = errors.New("bulk deletion includes linked transfer")
 	ErrBulkDeleteAdjustment    = errors.New("bulk deletion includes immutable adjustment")
+	ErrBulkDeleteCredit        = errors.New("bulk deletion includes credit ledger row")
+	ErrCreditInvalid           = errors.New("invalid credit operation")
+	ErrCreditWalletInvalid     = errors.New("invalid credit wallet")
+	ErrCreditPaymentInvalid    = errors.New("invalid credit payment")
 )
 
 type TransferUpdate struct {
@@ -34,4 +38,19 @@ type TransactionRepository interface {
 	BulkDelete(ownerID string, ids []string) error
 	Update(ownerID, id string, updates map[string]any) (*entity.Transaction, error)
 	Delete(ownerID, id string) error
+}
+
+type CreditEntryInput struct {
+	WalletID   string
+	Kind       string
+	CategoryID *string
+	Amount     int64
+	OccurredAt time.Time
+	Note       *string
+}
+
+type CreditRepository interface {
+	CreateCreditEntry(ownerID string, input CreditEntryInput) (*entity.Transaction, error)
+	CreateCreditPayment(ownerID, creditWalletID, sourceWalletID string, amount int64, occurredAt time.Time, note *string) ([]entity.Transaction, error)
+	ListCreditStatement(ownerID, walletID string, from, to *time.Time) (entity.CreditStatement, error)
 }
