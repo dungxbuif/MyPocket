@@ -34,3 +34,17 @@ report-included rows only; no model call or fabricated narrative is required.
 - PostgreSQL tests cover portfolio persistence and report exclusion.
 - Frontend checks cover the shared Portfolio and Insider panels, then full
   design/type/build suites.
+
+## Delivered
+
+- Portfolio is implemented by migration `000027_portfolio_ledger.up.sql`,
+  owner-scoped Go repository/handlers, generated Swagger, and the Account
+  Portfolio panel. Quantity uses eight fixed-point decimal places; prices and
+  fees are integer VND and API validation rejects null/negative values.
+- `GET /api/v1/reports/insider` now reads account-local report rows with
+  optional wallet/category filters and powers the Money Insider card. The
+  report excludes transfers/adjustments, keeps zero-income ratios unknown, and
+  exposes an explicit `estimated` flag.
+- The web release gate covers AI entry browser behavior and PWA manifest,
+  service-worker registration, and user-triggered install prompting. The
+  verified commands are documented in `docs/operations/LOCAL_RELEASE_GATE.md`.
