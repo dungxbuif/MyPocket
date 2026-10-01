@@ -154,3 +154,17 @@ func TestTravelLinkStubKeepsClearSemantics(t *testing.T) {
 		t.Fatalf("expected clear link, err=%v linked=%v", err, repo.linked)
 	}
 }
+
+func TestUpdateTransactionTravelClearsOrdinaryLink(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	travel := &travelRepositoryStub{events: map[string]entity.TravelEvent{}}
+	handler := NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{})
+	handler.Travel = travel
+	request := httptest.NewRequest(http.MethodPatch, "/transactions/tx-1/travel", bytes.NewBufferString(`{"event_id":null}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	transactionTestRouter(handler).ServeHTTP(response, request)
+	if response.Code != http.StatusOK || travel.linked != nil {
+		t.Fatalf("expected cleared travel link: status=%d body=%s linked=%v", response.Code, response.Body.String(), travel.linked)
+	}
+}

@@ -171,6 +171,7 @@ func transactionTestRouter(handler *TransactionHandler) *gin.Engine {
 	router.PATCH("/transactions/transfer/:transfer_id", handler.UpdateTransfer)
 	router.DELETE("/transactions/transfer/:transfer_id", handler.DeleteTransfer)
 	router.PATCH("/transactions/:id", handler.UpdateTransaction)
+	router.PATCH("/transactions/:id/travel", handler.UpdateTransactionTravel)
 	router.DELETE("/transactions/:id", handler.DeleteTransaction)
 	return router
 }
