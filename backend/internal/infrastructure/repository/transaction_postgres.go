@@ -143,6 +143,19 @@ func (r *TransactionPostgresRepository) CreateCreditEntry(ownerID string, input 
 			if category.Kind != txnType {
 				return transactionrepo.ErrCreditInvalid
 			}
+			var restricted int64
+			if err := tx.Model(&entity.CategoryWallet{}).Where("category_id = ?", category.ID).Count(&restricted).Error; err != nil {
+				return err
+			}
+			if restricted > 0 {
+				var applicable int64
+				if err := tx.Model(&entity.CategoryWallet{}).Where("category_id = ? AND wallet_id = ?", category.ID, input.WalletID).Count(&applicable).Error; err != nil {
+					return err
+				}
+				if applicable == 0 {
+					return transactionrepo.ErrCreditInvalid
+				}
+			}
 		}
 		insert := `INSERT INTO transactions (id, owner_id, wallet_id, category_id, type, amount, credit_kind, occurred_at, note, included_in_reports) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, true)`
 		if err := tx.Exec(insert, created.ID, created.OwnerID, created.WalletID, created.CategoryID, created.Type, created.Amount, created.CreditKind, created.OccurredAt, created.Note).Error; err != nil {

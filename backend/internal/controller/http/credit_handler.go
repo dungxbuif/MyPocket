@@ -80,6 +80,10 @@ func (h *CreditHandler) CreateEntry(c *gin.Context) {
 		creditWalletNotFound(c)
 		return
 	}
+	if input.CategoryID != nil && !h.creditCategoryValid(owner, *input.CategoryID, creditEntryTransactionType(input.Kind), wallet.ID) {
+		transactionBadRequest(c, transactionCategoryMessage)
+		return
+	}
 	occurredAt, valid := parseCreditDate(input.OccurredAt)
 	if !valid {
 		transactionBadRequest(c, transactionDateMessage)
@@ -182,6 +186,38 @@ func (h *CreditHandler) Statement(c *gin.Context) {
 
 func validCreditEntryKind(kind string) bool {
 	return kind == entity.CreditKindPurchase || kind == entity.CreditKindRefund || kind == entity.CreditKindFee || kind == entity.CreditKindInterest
+}
+
+func creditEntryTransactionType(kind string) string {
+	if kind == entity.CreditKindRefund {
+		return entity.TransactionTypeIncome
+	}
+	return entity.TransactionTypeExpense
+}
+
+func (h *CreditHandler) creditCategoryValid(owner, categoryID, transactionType, walletID string) bool {
+	if h.Categories == nil {
+		return false
+	}
+	categories, err := h.Categories.ListVisible(owner)
+	if err != nil {
+		return false
+	}
+	for _, category := range categories {
+		if category.ID != categoryID || category.Kind != transactionType {
+			continue
+		}
+		if len(category.WalletIDs) == 0 {
+			return true
+		}
+		for _, applicableWalletID := range category.WalletIDs {
+			if applicableWalletID == walletID {
+				return true
+			}
+		}
+		return false
+	}
+	return false
 }
 
 func parseCreditDate(raw string) (time.Time, bool) {

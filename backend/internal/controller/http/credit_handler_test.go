@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -18,6 +19,36 @@ type creditRepositoryStub struct {
 	status     entity.CreditStatement
 	entryErr   error
 	paymentErr error
+}
+
+type creditCategoryRepositoryStub struct {
+	categories []entity.Category
+}
+
+func (s *creditCategoryRepositoryStub) EnsurePersonalDefaults(string) error { return nil }
+func (s *creditCategoryRepositoryStub) ListVisible(string) ([]entity.Category, error) {
+	return s.categories, nil
+}
+func (s *creditCategoryRepositoryStub) FindVisible(string, string) (*entity.Category, error) {
+	return nil, errors.New("not implemented")
+}
+func (s *creditCategoryRepositoryStub) FindPersonal(string, string) (*entity.Category, error) {
+	return nil, errors.New("not implemented")
+}
+func (s *creditCategoryRepositoryStub) Create(string, *entity.Category) error {
+	return errors.New("not implemented")
+}
+func (s *creditCategoryRepositoryStub) Update(string, *entity.Category) error {
+	return errors.New("not implemented")
+}
+func (s *creditCategoryRepositoryStub) Delete(string, string) error {
+	return errors.New("not implemented")
+}
+func (s *creditCategoryRepositoryStub) ReplaceWallets(string, *entity.Category, []string) error {
+	return errors.New("not implemented")
+}
+func (s *creditCategoryRepositoryStub) ValidateWallets(string, []string) error {
+	return errors.New("not implemented")
 }
 
 func (s *creditRepositoryStub) CreateCreditEntry(_ string, input repository.CreditEntryInput) (*entity.Transaction, error) {
@@ -73,6 +104,19 @@ func TestCreateCreditPaymentRequiresCreditWallet(t *testing.T) {
 	creditTestRouter(&CreditHandler{Credits: repo, Wallets: wallets}).ServeHTTP(response, request)
 	if response.Code != http.StatusNotFound {
 		t.Fatalf("expected credit wallet rejection: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCreateCreditEntryRejectsInapplicableCategory(t *testing.T) {
+	repo := &creditRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"credit-1": {ID: "credit-1", OwnerID: "owner-1", Type: entity.WalletTypeCredit, CreditLimit: int64Ptr(10000000)}}}
+	categories := &creditCategoryRepositoryStub{categories: []entity.Category{{ID: "food", Kind: entity.TransactionTypeExpense, WalletIDs: []string{"other-wallet"}}}}
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/credit/wallets/credit-1/entries", bytes.NewBufferString(`{"kind":"purchase","category_id":"food","amount":125000}`))
+	request.Header.Set("Content-Type", "application/json")
+	creditTestRouter(&CreditHandler{Credits: repo, Wallets: wallets, Categories: categories}).ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || repo.entry != nil {
+		t.Fatalf("expected category scope rejection: status=%d body=%s entry=%#v", response.Code, response.Body.String(), repo.entry)
 	}
 }
 
