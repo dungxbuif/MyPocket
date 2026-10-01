@@ -124,6 +124,8 @@ func main() {
 	router.RegisterTravelRoutes(&httpapi.TravelHandler{Events: travelRepository})
 	portfolioRepository := repo.NewPortfolioPostgresRepository(database)
 	router.RegisterPortfolioRoutes(&httpapi.PortfolioHandler{Portfolio: portfolioRepository})
+	insiderRepository := repo.NewInsiderPostgresRepository(database)
+	router.RegisterInsiderRoutes(&httpapi.InsiderHandler{Reader: insiderRepository, Users: userRepo})
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
 	attachmentStorage, err := newAttachmentStorage(cfg)
 	if err != nil {
