@@ -32,6 +32,12 @@ as active release entries here.
 - Added a regression test covering five tool calls in one provider response;
   backend tests and the frontend release gate remain required before rollout.
 
+### Deployment
+
+- API image `registry.dungxbuif.com/mypocket-api:release-46c48f91`
+  (`sha256:2be9c9a189e7caee55f8b6fdd9e16a0a3dec1eaa4fff55f10501f65dcfded226`)
+  is running in production; the service is 1/1 and `/api/v1/health` returns 200.
+
 ## [1.0.7] - 2026-10-01
 
 ### Added
