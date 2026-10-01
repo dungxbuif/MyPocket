@@ -628,6 +628,11 @@ definitions:
       note:
         type: string
     type: object
+  httpapi.refreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
   httpapi.timezoneInput:
     properties:
       initialize_only:
@@ -667,6 +672,15 @@ definitions:
       source_wallet_id:
         type: string
     type: object
+  httpapi.transferUpdateInput:
+    properties:
+      amount:
+        type: integer
+      note:
+        type: string
+      occurred_at:
+        type: string
+    type: object
   httpapi.walletInput:
     properties:
       credit_limit:
@@ -703,6 +717,10 @@ definitions:
   usecase.LoginOutput:
     properties:
       expires_at:
+        type: string
+      refresh_expires_at:
+        type: string
+      refresh_token:
         type: string
       token:
         type: string
@@ -1237,6 +1255,33 @@ paths:
       summary: Set the authenticated account timezone
       tags:
       - Account
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Rotate a refresh token and issue a new login session
+      tags:
+      - Authentication
   /api/v1/budgets:
     get:
       produces:
@@ -1524,6 +1569,7 @@ paths:
       - Changelog
   /api/v1/feedback:
     get:
+      description: Accepts a normal JWT/session or a user API key with feedback:read.
       produces:
       - application/json
       responses:
@@ -1541,6 +1587,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: Accepts a normal JWT/session or a user API key with feedback:write.
       parameters:
       - description: Feedback
         in: body
@@ -1562,6 +1609,7 @@ paths:
       - Feedback
   /api/v1/feedback/{id}:
     get:
+      description: Accepts a normal JWT/session or a user API key with feedback:read.
       parameters:
       - description: Feedback ID
         in: path
@@ -1582,6 +1630,7 @@ paths:
       - Feedback
   /api/v1/feedback/{id}/screenshot:
     get:
+      description: Accepts a normal JWT/session or a user API key with feedback:read.
       parameters:
       - description: Feedback ID
         in: path
@@ -2075,6 +2124,85 @@ paths:
       security:
       - BearerAuth: []
       summary: Create an atomic internal wallet transfer
+      tags:
+      - Transactions
+  /api/v1/transactions/transfer/{transfer_id}:
+    delete:
+      parameters:
+      - description: Transfer ID
+        in: path
+        name: transfer_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete both rows of an internal wallet transfer
+      tags:
+      - Transactions
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transfer ID
+        in: path
+        name: transfer_id
+        required: true
+        type: string
+      - description: Transfer update
+        in: body
+        name: transfer
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.transferUpdateInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Transaction'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update both rows of an internal wallet transfer
       tags:
       - Transactions
   /api/v1/wallets:

@@ -833,6 +833,48 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/auth/refresh": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Rotate a refresh token and issue a new login session",
+                "parameters": [
+                    {
+                        "description": "Refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.refreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/usecase.LoginOutput"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/budgets": {
             "get": {
                 "security": [
@@ -1296,6 +1338,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Accepts a normal JWT/session or a user API key with feedback:read.",
                 "produces": [
                     "application/json"
                 ],
@@ -1321,6 +1364,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Accepts a normal JWT/session or a user API key with feedback:write.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1359,6 +1403,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Accepts a normal JWT/session or a user API key with feedback:read.",
                 "produces": [
                     "application/json"
                 ],
@@ -1392,6 +1437,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Accepts a normal JWT/session or a user API key with feedback:read.",
                 "produces": [
                     "application/json"
                 ],
@@ -2033,6 +2079,130 @@ const docTemplate = `{
                     },
                     "501": {
                         "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/transactions/transfer/{transfer_id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Delete both rows of an internal wallet transfer",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transfer ID",
+                        "name": "transfer_id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Update both rows of an internal wallet transfer",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transfer ID",
+                        "name": "transfer_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Transfer update",
+                        "name": "transfer",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.transferUpdateInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Transaction"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/httpapi.Problem"
                         }
@@ -3326,6 +3496,14 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.refreshRequest": {
+            "type": "object",
+            "properties": {
+                "refresh_token": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.timezoneInput": {
             "type": "object",
             "properties": {
@@ -3386,6 +3564,20 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.transferUpdateInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.walletInput": {
             "type": "object",
             "properties": {
@@ -3441,6 +3633,12 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "expires_at": {
+                    "type": "string"
+                },
+                "refresh_expires_at": {
+                    "type": "string"
+                },
+                "refresh_token": {
                     "type": "string"
                 },
                 "token": {

@@ -1,9 +1,11 @@
 package repository
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mypocket/backend/internal/entity"
 	transactionrepo "github.com/mypocket/backend/internal/repository"
 	"gorm.io/gorm"
@@ -134,33 +136,9 @@ func (r *TransactionPostgresRepository) UpdateTransfer(ownerID, transferID strin
 	}
 	var result []entity.Transaction
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		rows, source, destination, err := r.lockTransferPair(tx, ownerID, transferID)
-		if err != nil {
-			return err
-		}
-		if err := r.validateTransferWallets(tx, ownerID, source, destination); err != nil {
-			return err
-		}
-		if source.Amount != destination.Amount || source.Type != entity.TransactionTypeExpense || destination.Type != entity.TransactionTypeIncome || source.IncludedInReports || destination.IncludedInReports || source.JarID != nil || destination.JarID != nil {
-			return transactionrepo.ErrTransferPairInvalid
-		}
-		update := map[string]any{"amount": updates.Amount, "occurred_at": updates.OccurredAt, "note": updates.Note}
-		updated := tx.Model(&entity.Transaction{}).Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Updates(update)
-		if updated.Error != nil {
-			return updated.Error
-		}
-		if updated.RowsAffected != int64(len(rows)) {
-			return transactionrepo.ErrTransferPairInvalid
-		}
-		for i := range rows {
-			rows[i].Amount = updates.Amount
-			rows[i].OccurredAt = updates.OccurredAt
-			rows[i].Note = updates.Note
-		}
-		result = []entity.Transaction{*source, *destination}
-		result[0].Amount, result[0].OccurredAt, result[0].Note = updates.Amount, updates.OccurredAt, updates.Note
-		result[1].Amount, result[1].OccurredAt, result[1].Note = updates.Amount, updates.OccurredAt, updates.Note
-		return nil
+		var err error
+		result, err = r.updateTransferPair(tx, ownerID, transferID, updates)
+		return err
 	})
 	if err != nil {
 		return nil, err
@@ -173,25 +151,147 @@ func (r *TransactionPostgresRepository) DeleteTransfer(ownerID, transferID strin
 		return transactionrepo.ErrTransferInvalid
 	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
-		rows, source, destination, err := r.lockTransferPair(tx, ownerID, transferID)
+		return r.deleteTransferPair(tx, ownerID, transferID)
+	})
+}
+
+func (r *TransactionPostgresRepository) UpdateTransferIdempotent(ownerID, transferID string, updates transactionrepo.TransferUpdate, idempotencyKey, requestHash string) ([]entity.Transaction, bool, error) {
+	if idempotencyKey == "" || requestHash == "" {
+		return nil, false, transactionrepo.ErrTransferInvalid
+	}
+	var result []entity.Transaction
+	replayed := false
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		mutation, created, err := r.reserveMutation(tx, ownerID, "transfer.patch", idempotencyKey, requestHash)
 		if err != nil {
 			return err
 		}
-		if err := r.validateTransferWallets(tx, ownerID, source, destination); err != nil {
+		if !created {
+			if err := json.Unmarshal([]byte(mutation.ResponseJSON), &result); err != nil {
+				return err
+			}
+			replayed = true
+			return nil
+		}
+		result, err = r.updateTransferPair(tx, ownerID, transferID, updates)
+		if err != nil {
 			return err
 		}
-		if source.Amount != destination.Amount || source.Type != entity.TransactionTypeExpense || destination.Type != entity.TransactionTypeIncome || source.IncludedInReports || destination.IncludedInReports || source.JarID != nil || destination.JarID != nil {
-			return transactionrepo.ErrTransferPairInvalid
-		}
-		deleted := tx.Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Delete(&entity.Transaction{})
-		if deleted.Error != nil {
-			return deleted.Error
-		}
-		if deleted.RowsAffected != int64(len(rows)) {
-			return transactionrepo.ErrTransferPairInvalid
-		}
-		return nil
+		return r.completeMutation(tx, mutation.ID, result)
 	})
+	return result, replayed, err
+}
+
+func (r *TransactionPostgresRepository) DeleteTransferIdempotent(ownerID, transferID, idempotencyKey, requestHash string) (bool, error) {
+	if idempotencyKey == "" || requestHash == "" {
+		return false, transactionrepo.ErrTransferInvalid
+	}
+	replayed := false
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		mutation, created, err := r.reserveMutation(tx, ownerID, "transfer.delete", idempotencyKey, requestHash)
+		if err != nil {
+			return err
+		}
+		if !created {
+			replayed = true
+			return nil
+		}
+		if err := r.deleteTransferPair(tx, ownerID, transferID); err != nil {
+			return err
+		}
+		return r.completeMutation(tx, mutation.ID, []entity.Transaction{})
+	})
+	return replayed, err
+}
+
+func (r *TransactionPostgresRepository) updateTransferPair(tx *gorm.DB, ownerID, transferID string, updates transactionrepo.TransferUpdate) ([]entity.Transaction, error) {
+	if ownerID == "" || transferID == "" || updates.Amount <= 0 || updates.OccurredAt.IsZero() {
+		return nil, transactionrepo.ErrTransferInvalid
+	}
+	rows, source, destination, err := r.lockTransferPair(tx, ownerID, transferID)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.validateTransferWallets(tx, ownerID, source, destination); err != nil {
+		return nil, err
+	}
+	if source.Amount != destination.Amount || source.Type != entity.TransactionTypeExpense || destination.Type != entity.TransactionTypeIncome || source.IncludedInReports || destination.IncludedInReports || source.JarID != nil || destination.JarID != nil {
+		return nil, transactionrepo.ErrTransferPairInvalid
+	}
+	updated := tx.Model(&entity.Transaction{}).Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Updates(map[string]any{"amount": updates.Amount, "occurred_at": updates.OccurredAt, "note": updates.Note})
+	if updated.Error != nil {
+		return nil, updated.Error
+	}
+	if updated.RowsAffected != int64(len(rows)) {
+		return nil, transactionrepo.ErrTransferPairInvalid
+	}
+	result := []entity.Transaction{*source, *destination}
+	for i := range result {
+		result[i].Amount = updates.Amount
+		result[i].OccurredAt = updates.OccurredAt
+		result[i].Note = updates.Note
+	}
+	return result, nil
+}
+
+func (r *TransactionPostgresRepository) deleteTransferPair(tx *gorm.DB, ownerID, transferID string) error {
+	if ownerID == "" || transferID == "" {
+		return transactionrepo.ErrTransferInvalid
+	}
+	rows, source, destination, err := r.lockTransferPair(tx, ownerID, transferID)
+	if err != nil {
+		return err
+	}
+	if err := r.validateTransferWallets(tx, ownerID, source, destination); err != nil {
+		return err
+	}
+	if source.Amount != destination.Amount || source.Type != entity.TransactionTypeExpense || destination.Type != entity.TransactionTypeIncome || source.IncludedInReports || destination.IncludedInReports || source.JarID != nil || destination.JarID != nil {
+		return transactionrepo.ErrTransferPairInvalid
+	}
+	deleted := tx.Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Delete(&entity.Transaction{})
+	if deleted.Error != nil {
+		return deleted.Error
+	}
+	if deleted.RowsAffected != int64(len(rows)) {
+		return transactionrepo.ErrTransferPairInvalid
+	}
+	return nil
+}
+
+func (r *TransactionPostgresRepository) reserveMutation(tx *gorm.DB, ownerID, operation, key, requestHash string) (entity.TransactionMutation, bool, error) {
+	mutation := entity.TransactionMutation{ID: uuid.NewString(), OwnerID: ownerID, Operation: operation, IdempotencyKey: key, RequestHash: requestHash, Status: "pending", ResponseJSON: "{}"}
+	result := tx.Exec(`INSERT INTO transaction_mutations (id, owner_id, operation, idempotency_key, request_hash, status, response_json) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb) ON CONFLICT (owner_id, operation, idempotency_key) DO NOTHING`, mutation.ID, mutation.OwnerID, mutation.Operation, mutation.IdempotencyKey, mutation.RequestHash, mutation.Status, mutation.ResponseJSON)
+	if result.Error != nil {
+		return entity.TransactionMutation{}, false, result.Error
+	}
+	if result.RowsAffected == 1 {
+		return mutation, true, nil
+	}
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND operation = ? AND idempotency_key = ?", ownerID, operation, key).First(&mutation).Error; err != nil {
+		return entity.TransactionMutation{}, false, err
+	}
+	if mutation.RequestHash != requestHash {
+		return entity.TransactionMutation{}, false, transactionrepo.ErrMutationConflict
+	}
+	if mutation.Status != transactionrepo.TransactionMutationCompleted {
+		return entity.TransactionMutation{}, false, transactionrepo.ErrMutationPending
+	}
+	return mutation, false, nil
+}
+
+func (r *TransactionPostgresRepository) completeMutation(tx *gorm.DB, id string, response any) error {
+	encoded, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+	result := tx.Model(&entity.TransactionMutation{}).Where("id = ?", id).Updates(map[string]any{"status": transactionrepo.TransactionMutationCompleted, "response_json": string(encoded)})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return transactionrepo.ErrMutationPending
+	}
+	return nil
 }
 
 func (r *TransactionPostgresRepository) lockTransferPair(tx *gorm.DB, ownerID, transferID string) ([]entity.Transaction, *entity.Transaction, *entity.Transaction, error) {

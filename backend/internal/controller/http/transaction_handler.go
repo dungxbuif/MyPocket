@@ -1,6 +1,9 @@
 package httpapi
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -184,6 +187,16 @@ func (h *TransactionHandler) UpdateTransfer(c *gin.Context) {
 		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "luồng chuyển ví chưa được cấu hình"})
 		return
 	}
+	mutator, ok := h.Transfers.(transactionrepo.TransferMutationRepository)
+	if !ok {
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "luồng chuyển ví chưa hỗ trợ chống gửi lại"})
+		return
+	}
+	idempotencyKey := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
+	if idempotencyKey == "" {
+		transactionBadRequest(c, "Thiếu Idempotency-Key cho thao tác chuyển ví.")
+		return
+	}
 	var input transferUpdateInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
@@ -204,9 +217,14 @@ func (h *TransactionHandler) UpdateTransfer(c *gin.Context) {
 		return
 	}
 	occurredAt = parsed.UTC()
-	rows, err := h.Transfers.UpdateTransfer(owner, strings.TrimSpace(c.Param("transfer_id")), transactionrepo.TransferUpdate{Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note)})
+	update := transactionrepo.TransferUpdate{Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note)}
+	transferID := strings.TrimSpace(c.Param("transfer_id"))
+	requestHash := hashMutationInput(map[string]any{"transfer_id": transferID, "update": update})
+	rows, replayed, err := mutator.UpdateTransferIdempotent(owner, transferID, update, idempotencyKey, requestHash)
 	if err != nil {
 		switch {
+		case errors.Is(err, transactionrepo.ErrMutationConflict):
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Idempotency-Key đã được dùng cho nội dung khác."})
 		case errors.Is(err, transactionrepo.ErrTransferNotFound):
 			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
 		case errors.Is(err, transactionrepo.ErrTransferInvalid), errors.Is(err, transactionrepo.ErrTransferWalletInvalid):
@@ -217,6 +235,9 @@ func (h *TransactionHandler) UpdateTransfer(c *gin.Context) {
 			Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
 		}
 		return
+	}
+	if replayed {
+		c.Header("Idempotent-Replayed", "true")
 	}
 	OK(c, rows)
 }
@@ -243,9 +264,23 @@ func (h *TransactionHandler) DeleteTransfer(c *gin.Context) {
 		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "luồng chuyển ví chưa được cấu hình"})
 		return
 	}
-	err := h.Transfers.DeleteTransfer(owner, strings.TrimSpace(c.Param("transfer_id")))
+	mutator, ok := h.Transfers.(transactionrepo.TransferMutationRepository)
+	if !ok {
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "luồng chuyển ví chưa hỗ trợ chống gửi lại"})
+		return
+	}
+	idempotencyKey := strings.TrimSpace(c.GetHeader("Idempotency-Key"))
+	if idempotencyKey == "" {
+		transactionBadRequest(c, "Thiếu Idempotency-Key cho thao tác chuyển ví.")
+		return
+	}
+	transferID := strings.TrimSpace(c.Param("transfer_id"))
+	err := error(nil)
+	replayed, err := mutator.DeleteTransferIdempotent(owner, transferID, idempotencyKey, hashMutationInput(map[string]string{"transfer_id": transferID}))
 	if err != nil {
 		switch {
+		case errors.Is(err, transactionrepo.ErrMutationConflict):
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Idempotency-Key đã được dùng cho nội dung khác."})
 		case errors.Is(err, transactionrepo.ErrTransferNotFound):
 			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
 		case errors.Is(err, transactionrepo.ErrTransferInvalid), errors.Is(err, transactionrepo.ErrTransferWalletInvalid):
@@ -256,6 +291,9 @@ func (h *TransactionHandler) DeleteTransfer(c *gin.Context) {
 			Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
 		}
 		return
+	}
+	if replayed {
+		c.Header("Idempotent-Replayed", "true")
 	}
 	NoContent(c)
 }
@@ -508,4 +546,10 @@ func normalizeOptional(value *string) *string {
 		return nil
 	}
 	return &normalized
+}
+
+func hashMutationInput(value any) string {
+	bytes, _ := json.Marshal(value)
+	hash := sha256.Sum256(bytes)
+	return hex.EncodeToString(hash[:])
 }

@@ -23,6 +23,9 @@ type transactionRepositoryStub struct {
 	transferUpdated     []entity.Transaction
 	transferDeleted     string
 	transferErr         error
+	mutationCalls       int
+	mutationReplay      bool
+	mutationErr         error
 }
 
 func (s *transactionRepositoryStub) List(string) ([]entity.Transaction, error) { return nil, nil }
@@ -53,6 +56,21 @@ func (s *transactionRepositoryStub) DeleteTransfer(_ string, transferID string) 
 	}
 	s.transferDeleted = transferID
 	return nil
+}
+func (s *transactionRepositoryStub) UpdateTransferIdempotent(_ string, _ string, _ repository.TransferUpdate, _, _ string) ([]entity.Transaction, bool, error) {
+	s.mutationCalls++
+	if s.mutationErr != nil {
+		return nil, false, s.mutationErr
+	}
+	return s.transferUpdated, s.mutationReplay, nil
+}
+func (s *transactionRepositoryStub) DeleteTransferIdempotent(_ string, transferID, _, _ string) (bool, error) {
+	s.mutationCalls++
+	if s.mutationErr != nil {
+		return false, s.mutationErr
+	}
+	s.transferDeleted = transferID
+	return s.mutationReplay, nil
 }
 
 type transactionUserRepositoryStub struct{ user entity.User }
@@ -194,6 +212,7 @@ func TestUpdateTransferReturnsBothRows(t *testing.T) {
 	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
 	request := httptest.NewRequest(http.MethodPatch, "/transactions/transfer/transfer-1", bytes.NewBufferString(`{"amount":90000,"occurred_at":"2026-09-22T10:00:00Z","note":"updated"}`))
 	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "transfer-update-1")
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	if response.Code != http.StatusOK {
@@ -208,6 +227,7 @@ func TestDeleteTransferDeletesBothRowsAtomically(t *testing.T) {
 	transactions := &transactionRepositoryStub{}
 	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
 	request := httptest.NewRequest(http.MethodDelete, "/transactions/transfer/transfer-1", nil)
+	request.Header.Set("Idempotency-Key", "transfer-delete-1")
 	response := httptest.NewRecorder()
 	router.ServeHTTP(response, request)
 	if response.Code != http.StatusNoContent {
@@ -215,6 +235,44 @@ func TestDeleteTransferDeletesBothRowsAtomically(t *testing.T) {
 	}
 	if transactions.transferDeleted != "transfer-1" {
 		t.Fatalf("expected transfer deletion, got %q", transactions.transferDeleted)
+	}
+}
+
+func TestTransferMutationRequiresIdempotencyKey(t *testing.T) {
+	transactions := &transactionRepositoryStub{transferUpdated: []entity.Transaction{{ID: "source"}, {ID: "destination"}}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPatch, "/transactions/transfer/transfer-1", bytes.NewBufferString(`{"amount":90000,"occurred_at":"2026-09-22T10:00:00Z"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || transactions.mutationCalls != 0 {
+		t.Fatalf("missing idempotency key should reject without mutation: status=%d calls=%d body=%s", response.Code, transactions.mutationCalls, response.Body.String())
+	}
+}
+
+func TestTransferMutationChangedReplayReturnsConflict(t *testing.T) {
+	transactions := &transactionRepositoryStub{mutationErr: repository.ErrMutationConflict}
+	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPatch, "/transactions/transfer/transfer-1", bytes.NewBufferString(`{"amount":90001,"occurred_at":"2026-09-22T10:00:00Z"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "transfer-update-1")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("changed replay should return conflict: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestTransferMutationReplayMarksResponse(t *testing.T) {
+	transactions := &transactionRepositoryStub{transferUpdated: []entity.Transaction{{ID: "source"}, {ID: "destination"}}, mutationReplay: true}
+	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPatch, "/transactions/transfer/transfer-1", bytes.NewBufferString(`{"amount":90000,"occurred_at":"2026-09-22T10:00:00Z"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "transfer-update-1")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || response.Header().Get("Idempotent-Replayed") != "true" {
+		t.Fatalf("replay should return the stored response marker: status=%d replay=%q body=%s", response.Code, response.Header().Get("Idempotent-Replayed"), response.Body.String())
 	}
 }
 
