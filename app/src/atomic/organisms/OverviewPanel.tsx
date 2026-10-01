@@ -14,7 +14,7 @@ import { fetchCategories, type Category } from "../../services/categories";
 import { fetchTransactions, signedTransactionAmount, type Transaction } from "../../services/transactions";
 import { fetchWallets, type Wallet } from "../../services/wallets";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
-import { accountMonthKey } from "../../services/accountTime";
+import { accountMonthKey, formatAccountDateTime } from "../../services/accountTime";
 import { fetchMonthSummary, type MonthSummary } from "../../services/months";
 import { monthLabel } from "../../services/monthJarLogic";
 import { formatVND } from "../utils/format";
@@ -90,7 +90,7 @@ export function OverviewPanel({ masked, refreshKey = 0 }: { masked: boolean; ref
         {transactions.length === 0 ? <StatusMessage variant="plain">Chưa có giao dịch.</StatusMessage> : <div className="mt-3 space-y-2">{transactions.slice(0, 4).map((transaction) => {
           const category = transaction.category_id ? categoryByID.get(transaction.category_id) : undefined;
           const presentation = category ? categoryPresentationFor(category.system_key ?? category.icon_key) : { icon: Tags, tone: "categorySlate" as const };
-          return <TransactionItem key={transaction.id} item={{ title: category?.name ?? (transaction.type === "income" ? "Khoản thu" : "Khoản chi"), metadata: [walletNames.get(transaction.wallet_id) ?? "Ví đã xóa", transaction.note].filter(Boolean).join(" · "), amount: signedTransactionAmount(transaction), kind: transaction.type, icon: presentation.icon, tone: presentation.tone }} onActivate={() => void navigate({ to: "/transactions" })} />;
+          return <TransactionItem key={transaction.id} item={{ title: category?.name ?? (transaction.type === "income" ? "Khoản thu" : "Khoản chi"), metadata: [formatAccountDateTime(transaction.occurred_at, timezone), walletNames.get(transaction.wallet_id) ?? "Ví đã xóa", transaction.note].filter(Boolean).join(" · "), amount: signedTransactionAmount(transaction), kind: transaction.type, icon: presentation.icon, tone: presentation.tone }} onActivate={() => void navigate({ to: "/transactions" })} />;
         })}</div>}
       </SurfaceCard>
     </>

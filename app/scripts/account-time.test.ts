@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { accountMonthKey, instantFromLocalDateTime, isIanaTimezone, localDateTimeAt, dateKeyAt, resolveClientTimezone, weekDateRange } from "../src/services/accountTime.ts";
+import { accountMonthKey, formatAccountDateTime, instantFromLocalDateTime, isIanaTimezone, localDateTimeAt, dateKeyAt, resolveClientTimezone, weekDateRange } from "../src/services/accountTime.ts";
 
 test("calendar grouping follows the account timezone, not the browser timezone", () => {
   const instant = "2026-09-30T17:30:00.000Z";
@@ -17,6 +17,10 @@ test("local datetime conversion handles a DST gap and chooses the earlier fold",
 
 test("formatting an instant for a datetime field uses account wall time", () => {
   assert.equal(localDateTimeAt("2026-10-01T01:23:00Z", "Asia/Ho_Chi_Minh"), "2026-10-01T08:23");
+});
+
+test("formatting an instant for overview metadata includes the account date and time", () => {
+  assert.equal(formatAccountDateTime("2026-10-01T01:23:00Z", "Asia/Ho_Chi_Minh"), "01/10/2026 08:23");
 });
 
 test("ledger weeks start Monday and cross month and year boundaries", () => {

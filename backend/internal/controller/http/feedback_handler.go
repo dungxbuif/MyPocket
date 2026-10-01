@@ -30,6 +30,7 @@ type feedbackStatusInput struct {
 
 // ListFeedback godoc
 // @Summary List the authenticated user's feedback
+// @Description Accepts a normal JWT/session or a user API key with feedback:read.
 // @Tags Feedback
 // @Produce json
 // @Security BearerAuth
@@ -55,6 +56,7 @@ func (h *FeedbackHandler) List(c *gin.Context) {
 
 // CreateFeedback godoc
 // @Summary Create owner-scoped feedback
+// @Description Accepts a normal JWT/session or a user API key with feedback:write.
 // @Tags Feedback
 // @Accept json
 // @Produce json
@@ -121,6 +123,7 @@ func parseFeedbackInput(c *gin.Context) (usecase.FeedbackInput, error) {
 
 // GetFeedback godoc
 // @Summary Get one feedback item owned by the authenticated user
+// @Description Accepts a normal JWT/session or a user API key with feedback:read.
 // @Tags Feedback
 // @Produce json
 // @Security BearerAuth
@@ -147,6 +150,7 @@ func (h *FeedbackHandler) Get(c *gin.Context) {
 
 // GetFeedbackScreenshot godoc
 // @Summary Get a short-lived private feedback screenshot URL
+// @Description Accepts a normal JWT/session or a user API key with feedback:read.
 // @Tags Feedback
 // @Produce json
 // @Security BearerAuth

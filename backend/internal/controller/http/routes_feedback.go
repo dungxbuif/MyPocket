@@ -6,11 +6,10 @@ func (r *Router) RegisterFeedbackRoutes(feedback *FeedbackHandler, changelog *Ch
 	publicChangelog.GET("/:id", changelog.Get)
 
 	userFeedback := r.Engine.Group("/api/v1/feedback")
-	userFeedback.Use(r.AuthMiddleware.RequireAuth)
-	userFeedback.GET("", feedback.List)
-	userFeedback.POST("", feedback.Create)
-	userFeedback.GET("/:id", feedback.Get)
-	userFeedback.GET("/:id/screenshot", feedback.Screenshot)
+	userFeedback.GET("", r.AuthMiddleware.RequireFeedbackReadAuth, feedback.List)
+	userFeedback.POST("", r.AuthMiddleware.RequireFeedbackWriteAuth, feedback.Create)
+	userFeedback.GET("/:id", r.AuthMiddleware.RequireFeedbackReadAuth, feedback.Get)
+	userFeedback.GET("/:id/screenshot", r.AuthMiddleware.RequireFeedbackReadAuth, feedback.Screenshot)
 
 	agentFeedback := r.Engine.Group("/api/v1/agent")
 	agentFeedback.Use(agent.RequireFeedbackAgent)

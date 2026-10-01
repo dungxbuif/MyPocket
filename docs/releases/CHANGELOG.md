@@ -19,6 +19,111 @@ This file is the first-release baseline for the current MyPocket snapshot. Earli
 development notes remain available in Git history and are intentionally not presented
 as active release entries here.
 
+## [1.0.7] - 2026-10-01
+
+### Added
+
+- Travel Mode now has owner-scoped event CRUD, one active event per account,
+  ordinary transaction auto-linking, and explicit transaction link/unlink.
+  Deleting an event clears links without deleting ledger rows or changing
+  report inclusion. Recurring, transfer, adjustment and AI approval paths do
+  not auto-attach events.
+- Credit entry categories now enforce applicable-wallet scope in both the
+  handler and repository transaction.
+
+### Verification
+
+- `go test ./...`, `go generate ./cmd/api`, `npm run check:design`,
+  `npm run typecheck`, `npm run test:design`, `npm run test:transactions`,
+  `npm run test:calendar`, `npm run test:transaction-jars`, and `npm run build`
+  pass locally. PostgreSQL integration tests remain environment-gated by
+  `TEST_DATABASE_URL`.
+
+### Deployment
+
+- No production deployment is claimed by this local implementation commit.
+
+## [1.0.6] - 2026-09-30
+
+### Fixed
+
+- Transaction ledger wallet scope now follows the supplied wallet-selector reference:
+  the compact wallet capsule opens the shared `Chọn Ví` sheet with aggregate,
+  included/excluded wallets, real balances, add-wallet and disabled-link states.
+  Selecting a wallet keeps the existing account-local week/custom ledger behavior.
+
+### Verification
+
+- `npm run test:wallet-scope`, `npm run check:design`, `npm run typecheck`,
+  `npm run test:design`, `npm run test:transactions`, `npm run test:calendar`,
+  `npm run test:transaction-jars`, and `npm run build` pass locally.
+
+### Deployment
+
+- Production web service converged on
+  `registry.dungxbuif.com/mypocket-web:feedback-ui-wallet-design-20260930-0700`
+  (`sha256:933dd62630e3ee5ae7917c6ddaab36b3d858bc58f2fdb0abb87cc2dd5e36d80e`).
+  Public HTML serves the new bundle and `/api/v1/health` returns 200.
+
+## [1.0.4] - 2026-09-30
+
+### Fixed
+
+- AI transaction-entry proposals now normalize date-only model output (`dd/MM/yyyy`,
+  `dd-MM-yyyy`, or `yyyy-MM-dd`) in the account timezone instead of silently replacing
+  a recognized date with today; the missing-time assumption is shown for review.
+- Exact duplicate proposals within one OCR/text submission are merged while preserving
+  review questions from the duplicate rows.
+
+### Deployment
+
+- API image `registry.dungxbuif.com/mypocket-api:feedback-api-ai-date-20260930-0011`
+  was rolled out to production and verified healthy.
+
+## [1.0.5] - 2026-09-30
+
+### Added
+
+- Login and Google OAuth responses now include rotating refresh credentials;
+  `POST /api/v1/auth/refresh` consumes a refresh token once and issues a new
+  access/refresh pair.
+- The web client retries one expired-session request through the refresh route
+  and keeps API-key requests out of the refresh flow.
+
+### Deployment
+
+- API `feedback-api-refresh-20260930-0041` and web
+  `feedback-ui-refresh-20260930-0032` were rolled out and their public health
+  and invalid-refresh checks passed.
+
+## [1.0.2] - 2026-09-30
+
+### Fixed
+
+- Increased the frontend API proxy read/send timeouts to 240 seconds so the
+  bounded OCR/model processing window does not turn into an HTML 504 response.
+
+## [1.0.3] - 2026-09-30
+
+### Fixed
+
+- Category search now promotes a parent group when the query matches a child
+  category, so matching groups are visible at the top of the result.
+
+## [1.0.1] - 2026-09-29
+
+### Fixed
+
+- Recent transactions on the overview now show the account-local date and time
+  before wallet and note metadata.
+- Feedback routes accept owner-scoped API keys with `feedback:read` and
+  `feedback:write` scopes.
+
+### Deployment
+
+- Production API and web services were rolled out to the verified registry
+  images after the backend and frontend checks passed.
+
 ## [1.0.0] - 2026-09-24
 
 ### Deployment note

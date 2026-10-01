@@ -9,6 +9,7 @@ const (
 	routeAuthPath           = "/auth"
 	routeGooglePath         = "/google"
 	routeGoogleCallbackPath = "/google/callback"
+	routeRefreshPath        = "/refresh"
 	routeProfilePath        = "/profile"
 	routeHomePath           = "/home"
 	routeCategoriesPath     = "/categories"

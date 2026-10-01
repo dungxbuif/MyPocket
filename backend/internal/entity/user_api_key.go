@@ -7,9 +7,11 @@ import (
 )
 
 const (
-	APIKeyScopeFinanceRead = "finance:read"
-	APIKeyScopeAdvisorRead = "advisor:read"
-	APIKeyScopeAdvisorChat = "advisor:chat"
+	APIKeyScopeFinanceRead   = "finance:read"
+	APIKeyScopeAdvisorRead   = "advisor:read"
+	APIKeyScopeAdvisorChat   = "advisor:chat"
+	APIKeyScopeFeedbackRead  = "feedback:read"
+	APIKeyScopeFeedbackWrite = "feedback:write"
 )
 
 var ErrAPIKeyInvalid = errors.New("api key is invalid")
@@ -39,7 +41,7 @@ func NormalizeAPIKeyScopes(scopes []string) ([]string, error) {
 			continue
 		}
 		switch scope {
-		case APIKeyScopeFinanceRead, APIKeyScopeAdvisorRead, APIKeyScopeAdvisorChat:
+		case APIKeyScopeFinanceRead, APIKeyScopeAdvisorRead, APIKeyScopeAdvisorChat, APIKeyScopeFeedbackRead, APIKeyScopeFeedbackWrite:
 		default:
 			return nil, ErrAPIKeyInvalid
 		}
@@ -55,6 +57,11 @@ func NormalizeAPIKeyScopes(scopes []string) ([]string, error) {
 		}
 		if _, ok := seen[APIKeyScopeFinanceRead]; !ok {
 			result = append(result, APIKeyScopeFinanceRead)
+		}
+	}
+	if containsScope(result, APIKeyScopeFeedbackWrite) {
+		if _, ok := seen[APIKeyScopeFeedbackRead]; !ok {
+			result = append(result, APIKeyScopeFeedbackRead)
 		}
 	}
 	if len(result) == 0 {

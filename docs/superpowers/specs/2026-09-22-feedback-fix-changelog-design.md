@@ -69,7 +69,7 @@ Indexes cover `(user_id, created_at desc)` and `(status, created_at asc)` for ow
 
 ### User routes
 
-Existing JWT bearer authentication is required. All reads are owner-scoped by the authenticated user ID. A user cannot read, update, or delete another user's feedback.
+Amendment (2026-09-29): user feedback endpoints accept either the existing JWT bearer session or an owner-scoped user API key. `feedback:read` is required for reads/screenshots and `feedback:write` for creation; write implies read. All operations remain owner-scoped by the authenticated user ID. A user cannot read, update, or delete another user's feedback. The dedicated service token remains the only credential for agent/internal lifecycle routes.
 
 ### Agent/internal routes
 

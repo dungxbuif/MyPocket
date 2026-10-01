@@ -7,7 +7,7 @@
 | 1 | Top bar | PageBackHeader, AppHeader | implemented; screen specifies actions |
 | 2 | Bottom navigation | BottomNavigation + BaseNavigationItem/BaseFab | implemented; central action depends on transaction slice |
 | 3 | Segmented control | SegmentedControl | implemented; click, arrow, Home/End |
-| 4 | Scope selector | LedgerPeriodSelector + BaseSelect | implemented for transaction ledger; reuse remains page-owned |
+| 4 | Scope selector | WalletScopeSelector + WalletSelectionList + BaseBottomSheet + LedgerPeriodSelector | implemented for transaction ledger; wallet scope opens the shared picker, period remains page-owned |
 | 5 | Amount input | QuickAddSheet preview | partial; [keypad](atoms/amount-keypad/README.md) |
 | 6 | Selector row | FormSelectorRow, InlineControlRow | partial; explicit callbacks needed per selector |
 | 7 | Date selector | BaseCalendar + DateField | implemented for configured date/range flows |
@@ -29,7 +29,7 @@
 | 23 | Action/bottom sheet | BaseBottomSheet | implemented; focus, close, scroll lock |
 | 24 | Calendar picker | absent | planned |
 | 25 | Context menu/popover | absent | planned |
-| 26 | Wallet selection sheet | ApplicableWalletsCard + checkbox only | partial; sheet flow needs contract |
+| 26 | Wallet selection sheet | WalletSelectionList + WalletScopeSelector | implemented for transaction scope and wallet management; add/edit routes remain page-owned |
 | 27 | Percentage/status badge | Text/StatusMessage only | partial; visual badge needs named base |
 | 28 | Category icon badge | IconBadge + categoryPresentation | implemented; shared tone catalog |
 

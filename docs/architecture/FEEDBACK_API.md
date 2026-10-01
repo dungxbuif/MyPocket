@@ -15,7 +15,7 @@ This reference describes the implemented local API surface. All endpoints are un
 
 ## Authentication boundaries
 
-User endpoints require `Authorization: Bearer <JWT>` from the normal MyPocket session. They are owner-scoped: a user can only read their own feedback.
+User endpoints accept either the normal MyPocket session (`Authorization: Bearer <JWT>`) or an owner-scoped user API key (`Authorization: Bearer mpk_...`). API keys are scoped per operation: `feedback:read` is required for listing/reading feedback and screenshots; `feedback:write` is required to create feedback. A `feedback:write` key automatically includes `feedback:read`. They are owner-scoped: a user can only read or create feedback under the key owner's account. JWT session behavior remains unchanged.
 
 Agent and internal endpoints require the dedicated `FEEDBACK_AGENT_TOKEN` as `Authorization: Bearer <service-token>`. This token is for the local/dev fix agent only. It is not a user API key and has no access to finance endpoints. The server compares the token in constant time and emits redacted Redis audit metadata.
 
@@ -26,6 +26,8 @@ Public changelog endpoints do not expose raw feedback, user IDs, email addresses
 ### `POST /feedback`
 
 Create an owner-scoped feedback item.
+
+Authentication: JWT session or API key with `feedback:write`.
 
 ```json
 {
@@ -41,9 +43,13 @@ Create an owner-scoped feedback item.
 
 List the authenticated user's feedback, newest first. No other user's rows are returned.
 
+Authentication: JWT session or API key with `feedback:read`.
+
 ### `GET /feedback/{id}`
 
 Read one feedback item owned by the authenticated user. A foreign or missing ID returns the shared not-found problem without disclosing whether another owner has it.
+
+Authentication: JWT session or API key with `feedback:read`.
 
 ## Agent/internal endpoints
 

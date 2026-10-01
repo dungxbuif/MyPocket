@@ -6,6 +6,7 @@ import { StatusMessage } from "../atoms/StatusMessage";
 import { categoryPresentationFor } from "../atoms/categoryPresentation";
 import { BaseCategoryTree, type BaseCategoryTreeItem } from "./BaseCategoryTree";
 import type { Category } from "../../services/categories";
+import { categoryMatchRank } from "../../services/categorySearch";
 
 export function CategoryTreeSelector({ categories, selectableIDs, selectedID, onSelect, clearLabel = "Không chọn nhóm" }: {
   categories: Category[]; selectableIDs?: string[]; selectedID?: string; onSelect: (id: string) => void; clearLabel?: string;
@@ -16,7 +17,7 @@ export function CategoryTreeSelector({ categories, selectableIDs, selectedID, on
     const normalized = query.toLocaleLowerCase("vi").trim();
     const byID = new Map(categories.map(category => [category.id, category]));
     const roots = categories.filter(category => !category.parent_id || !byID.has(category.parent_id));
-    const result: { root: BaseCategoryTreeItem; children: BaseCategoryTreeItem[] }[] = [];
+    const result: { root: BaseCategoryTreeItem; children: BaseCategoryTreeItem[]; rank: number }[] = [];
 
     for (const category of roots) {
       const children = categories.filter(item => item.parent_id === category.id && selectable.has(item.id));
@@ -32,13 +33,14 @@ export function CategoryTreeSelector({ categories, selectableIDs, selectedID, on
           subtitle: selectable.has(category.id) ? category.is_system ? "Nhóm mặc định" : "Nhóm cá nhân" : "Không áp dụng cho lựa chọn này",
           isSystem: category.is_system, isSelectable: selectable.has(category.id), ...presentation,
         },
+        rank: categoryMatchRank(category.name, matchingChildren.map((item) => item.name), query),
         children: matchingChildren.map(child => {
           const childPresentation = categoryPresentationFor(child.system_key ?? child.icon_key);
           return { id: child.id, name: child.name, subtitle: child.is_system ? "Nhóm mặc định" : "Nhóm cá nhân", isSystem: child.is_system, isSelectable: true, ...childPresentation };
         }),
       });
     }
-    return result;
+    return result.sort((left, right) => left.rank - right.rank);
   }, [categories, query, selectableIDs]);
 
   return <div className="space-y-3">

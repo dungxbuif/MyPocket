@@ -29,6 +29,7 @@ type Config struct {
 	FeedbackAgentToken string
 	JWTSecret          string
 	JWTTTL             time.Duration
+	RefreshTTL         time.Duration
 	OAuthFixtureMode   bool
 	GoogleClientID     string
 	GoogleClientSecret string
@@ -62,6 +63,7 @@ func Load() Config {
 		FeedbackAgentToken: getenv("FEEDBACK_AGENT_TOKEN", ""),
 		JWTSecret:          getenv("JWT_SECRET", "change-this-development-jwt-secret-32-bytes"),
 		JWTTTL:             getDuration("JWT_TTL_SECONDS", 3600),
+		RefreshTTL:         getDuration("REFRESH_TOKEN_TTL_SECONDS", 30*24*60*60),
 		OAuthFixtureMode:   getenvBool("OAUTH_FIXTURE_MODE", false),
 		GoogleClientID:     getenv("GOOGLE_CLIENT_ID", ""),
 		GoogleClientSecret: getenv("GOOGLE_CLIENT_SECRET", ""),

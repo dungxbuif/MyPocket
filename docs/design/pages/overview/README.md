@@ -8,7 +8,7 @@ Route `/`; implements the non-AI part of [CORE-03](../../../work/tickets/CORE-03
 | --- | --- | --- |
 | Current month summary | `SurfaceCard`, `SectionTitle`, `Text`, `BaseButton`, `StatusMessage` | Shows the account-local month, included income/expense totals, completion label, and the user's saved note when non-empty. It is a navigation summary, not an AI narrative or frozen close record. |
 | Jar shortcut | `BaseButton` inside the month card | Opens `/jars` for the same account-local month. |
-| Wallets and recent transactions | Existing `SurfaceCard`, `SectionTitle`, `WalletCard`, `TransactionItem`, `StatusMessage` | Preserve the live API behavior and existing borderless empty states. |
+| Wallets and recent transactions | Existing `SurfaceCard`, `SectionTitle`, `WalletCard`, `TransactionItem`, `StatusMessage` | Preserve the live API behavior and existing borderless empty states. Recent transaction metadata includes the account-local date and time before wallet/note context. |
 
 The screen composes only existing bases. `className` values may position content; colors, typography, card shape, and controls remain base-owned.
 
@@ -34,6 +34,10 @@ The screen composes only existing bases. `className` values may position content
 ## Copy and source of truth
 
 Use Vietnamese labels `Tổng kết tháng`, `Thu`, `Chi`, `Đang diễn ra`, `Đã hoàn tất`, and `Xem chi tiết`. Money uses the shared integer-VND formatter. The note is previewed verbatim and is edited only on the detail route. Completion never blocks edits or backdated transactions.
+
+Recent transaction timestamps use the saved account timezone and the stable
+`dd/MM/yyyy HH:mm` display format; they must not be derived from the browser's
+timezone.
 
 API: `GET /api/v1/months/{YYYY-MM}`. No AI text, fixture data, or manual close action is shown.
 

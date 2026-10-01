@@ -14,6 +14,8 @@ export type UserProfile = {
 export type LoginOutput = {
   token: string;
   expires_at: string;
+  refresh_token: string;
+  refresh_expires_at: string;
   user: UserProfile;
 };
 
@@ -30,6 +32,8 @@ export type AuthSession = {
   token: string;
   user: UserProfile;
   expiresAt: string;
+  refreshToken: string;
+  refreshExpiresAt: string;
 };
 
 export function readSession(): AuthSession | null {
@@ -44,6 +48,8 @@ export function readSession(): AuthSession | null {
       token: parsed.token,
       user: parsed.user as UserProfile,
       expiresAt: typeof parsed.expiresAt === "string" ? parsed.expiresAt : "",
+      refreshToken: typeof parsed.refreshToken === "string" ? parsed.refreshToken : "",
+      refreshExpiresAt: typeof parsed.refreshExpiresAt === "string" ? parsed.refreshExpiresAt : "",
     };
   } catch {
     localStorage.removeItem(STORAGE_KEYS.AUTH_SESSION);
@@ -79,6 +85,8 @@ export async function startGoogleLogin(): Promise<LoginOutput | null> {
   return {
     token: candidate.token,
     expires_at: typeof candidate.expires_at === "string" ? candidate.expires_at : "",
+    refresh_token: typeof candidate.refresh_token === "string" ? candidate.refresh_token : "",
+    refresh_expires_at: typeof candidate.refresh_expires_at === "string" ? candidate.refresh_expires_at : "",
     user: {
       id: String(candidate.user.id ?? ""),
       name: String(candidate.user.name ?? ""),
@@ -134,6 +142,8 @@ export function extractFixtureLoginFromQueryParams(query: URLSearchParams): Logi
   return {
     token,
     expires_at: query.get("expires_at")?.trim() ?? "",
+    refresh_token: query.get("refresh_token")?.trim() ?? "",
+    refresh_expires_at: query.get("refresh_expires_at")?.trim() ?? "",
     user,
   };
 }

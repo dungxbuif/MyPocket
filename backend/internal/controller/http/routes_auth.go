@@ -5,6 +5,7 @@ import "github.com/gin-gonic/gin"
 func registerPublicRoutes(api *gin.RouterGroup, authHandler *AuthHandler) {
 	api.POST(routeLoginPath, authHandler.Login)
 	authRoutes := api.Group(routeAuthPath)
+	authRoutes.POST(routeRefreshPath, authHandler.Refresh)
 	authRoutes.GET(routeGooglePath, authHandler.StartGoogleAuth)
 	authRoutes.GET(routeGoogleCallbackPath, authHandler.GoogleCallback)
 	api.GET(routeHealthPath, healthCheck)

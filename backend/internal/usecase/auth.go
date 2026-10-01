@@ -17,9 +17,11 @@ type UserProfile struct {
 }
 
 type LoginOutput struct {
-	Token     string      `json:"token"`
-	ExpiresAt time.Time   `json:"expires_at"`
-	User      UserProfile `json:"user"`
+	Token            string      `json:"token"`
+	ExpiresAt        time.Time   `json:"expires_at"`
+	RefreshToken     string      `json:"refresh_token"`
+	RefreshExpiresAt time.Time   `json:"refresh_expires_at"`
+	User             UserProfile `json:"user"`
 }
 
 type HomeOutput struct {

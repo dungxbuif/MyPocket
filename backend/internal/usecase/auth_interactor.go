@@ -2,6 +2,9 @@ package usecase
 
 import (
 	"context"
+	"crypto/rand"
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +18,7 @@ import (
 
 var ErrInvalidCredentials = errors.New("email hoặc mật khẩu không đúng")
 var ErrInvalidGoogleProfile = errors.New("thông tin Google không hợp lệ")
+var ErrInvalidRefreshToken = errors.New("refresh token không hợp lệ hoặc đã hết hạn")
 var ErrInvalidTimezone = errors.New("múi giờ IANA không hợp lệ")
 
 type AuthInteractor struct {
@@ -24,6 +28,7 @@ type AuthInteractor struct {
 	CacheRepo     repository.CacheRepository
 	SessionPrefix string
 	GoogleOAuth   GoogleOAuthProvider
+	RefreshTTL    time.Duration
 }
 
 func NewAuthInteractor(
@@ -39,6 +44,7 @@ func NewAuthInteractor(
 		TokenSvc:      tokenSvc,
 		CacheRepo:     cacheRepo,
 		SessionPrefix: sessionCachePrefix,
+		RefreshTTL:    30 * 24 * time.Hour,
 		GoogleOAuth:   googleOAuth,
 	}
 }
@@ -89,6 +95,29 @@ func (a *AuthInteractor) LoginWithGoogleCode(ctx context.Context, code string) (
 	return a.LoginWithGoogle(ctx, profile)
 }
 
+func (a *AuthInteractor) Refresh(ctx context.Context, rawToken string) (*LoginOutput, error) {
+	rawToken = strings.TrimSpace(rawToken)
+	if rawToken == "" || a.CacheRepo == nil {
+		return nil, ErrInvalidRefreshToken
+	}
+	key := refreshTokenKey(rawToken)
+	value, ok, err := consumeRefreshToken(a.CacheRepo, key)
+	if err != nil || !ok {
+		return nil, ErrInvalidRefreshToken
+	}
+	var record struct {
+		UserID string `json:"user_id"`
+	}
+	if json.Unmarshal([]byte(value), &record) != nil || strings.TrimSpace(record.UserID) == "" {
+		return nil, ErrInvalidRefreshToken
+	}
+	user, err := a.UserRepo.FindByID(record.UserID)
+	if err != nil {
+		return nil, ErrInvalidRefreshToken
+	}
+	return a.buildLoginOutput(ctx, user)
+}
+
 func (a *AuthInteractor) buildLoginOutput(ctx context.Context, user *entity.User) (*LoginOutput, error) {
 	_ = ctx
 	sessionID := uuid.NewString()
@@ -100,9 +129,15 @@ func (a *AuthInteractor) buildLoginOutput(ctx context.Context, user *entity.User
 	if err := a.CacheRepo.Set(key, user.ID, time.Until(exp)); err != nil {
 		return nil, fmt.Errorf("set session cache: %w", err)
 	}
+	refreshToken, refreshExp, err := a.issueRefreshToken(user.ID)
+	if err != nil {
+		return nil, fmt.Errorf("set refresh token: %w", err)
+	}
 	return &LoginOutput{
-		Token:     token,
-		ExpiresAt: exp,
+		Token:            token,
+		ExpiresAt:        exp,
+		RefreshToken:     refreshToken,
+		RefreshExpiresAt: refreshExp,
 		User: UserProfile{
 			ID:                user.ID,
 			Name:              user.Name,
@@ -112,6 +147,48 @@ func (a *AuthInteractor) buildLoginOutput(ctx context.Context, user *entity.User
 			CreatedAt:         user.CreatedAt,
 		},
 	}, nil
+}
+
+func (a *AuthInteractor) issueRefreshToken(userID string) (string, time.Time, error) {
+	refreshTTL := a.RefreshTTL
+	if refreshTTL <= 0 {
+		refreshTTL = 30 * 24 * time.Hour
+	}
+	raw := make([]byte, 32)
+	if _, err := rand.Read(raw); err != nil {
+		return "", time.Time{}, err
+	}
+	token := "mpr_" + base64.RawURLEncoding.EncodeToString(raw)
+	expiresAt := time.Now().Add(refreshTTL)
+	record, err := json.Marshal(struct {
+		UserID string `json:"user_id"`
+	}{UserID: userID})
+	if err != nil {
+		return "", time.Time{}, err
+	}
+	if err := a.CacheRepo.Set(refreshTokenKey(token), string(record), refreshTTL); err != nil {
+		return "", time.Time{}, err
+	}
+	return token, expiresAt, nil
+}
+
+func refreshTokenKey(rawToken string) string {
+	digest := sha256.Sum256([]byte(rawToken))
+	return refreshTokenPrefix + fmt.Sprintf("%x", digest[:])
+}
+
+func consumeRefreshToken(cache repository.CacheRepository, key string) (string, bool, error) {
+	if atomic, ok := cache.(repository.AtomicCacheRepository); ok {
+		return atomic.GetAndDelete(key)
+	}
+	value, found, err := cache.Get(key)
+	if err != nil || !found {
+		return value, found, err
+	}
+	if err := cache.Delete(key); err != nil {
+		return "", false, err
+	}
+	return value, true, nil
 }
 
 func (a *AuthInteractor) Profile(ctx context.Context, userID string) (*UserProfile, error) {

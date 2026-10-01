@@ -85,3 +85,59 @@ func TestRequireAdvisorAuthAcceptsUserAPIKeyWithoutJWTFallback(t *testing.T) {
 		t.Fatalf("invalid-key audit mismatch: %+v", audit.events)
 	}
 }
+
+func TestRequireFeedbackAuthAcceptsScopedUserAPIKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &middlewareAPIKeyRepo{}
+	service := usecase.NewUserAPIKeyService(repo)
+	created, err := service.Create(context.Background(), usecase.APIKeyCreateInput{OwnerID: "owner-1", Name: "Feedback", Scopes: []string{entity.APIKeyScopeFeedbackWrite}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	middleware := &AuthMiddleware{APIKeys: service}
+	engine := gin.New()
+	engine.GET("/read", middleware.RequireFeedbackReadAuth, func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+	engine.POST("/write", middleware.RequireFeedbackWriteAuth, func(c *gin.Context) {
+		c.Status(http.StatusNoContent)
+	})
+	for _, request := range []*http.Request{
+		func() *http.Request {
+			r := httptest.NewRequest(http.MethodGet, "/read", nil)
+			r.Header.Set("Authorization", "Bearer "+created.Secret)
+			return r
+		}(),
+		func() *http.Request {
+			r := httptest.NewRequest(http.MethodPost, "/write", nil)
+			r.Header.Set("Authorization", "Bearer "+created.Secret)
+			return r
+		}(),
+	} {
+		recorder := httptest.NewRecorder()
+		engine.ServeHTTP(recorder, request)
+		if recorder.Code != http.StatusNoContent {
+			t.Fatalf("feedback API key should authenticate: %d %s", recorder.Code, recorder.Body.String())
+		}
+	}
+}
+
+func TestRequireFeedbackWriteAuthRejectsReadOnlyKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &middlewareAPIKeyRepo{}
+	service := usecase.NewUserAPIKeyService(repo)
+	created, err := service.Create(context.Background(), usecase.APIKeyCreateInput{OwnerID: "owner-1", Name: "Feedback read", Scopes: []string{entity.APIKeyScopeFeedbackRead}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	middleware := &AuthMiddleware{APIKeys: service}
+	engine := gin.New()
+	engine.POST("/write", middleware.RequireFeedbackWriteAuth, func(c *gin.Context) { c.Status(http.StatusNoContent) })
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/write", nil)
+	request.Header.Set("Authorization", "Bearer "+created.Secret)
+	engine.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusForbidden {
+		t.Fatalf("read-only feedback key must be denied for writes: %d %s", recorder.Code, recorder.Body.String())
+	}
+}

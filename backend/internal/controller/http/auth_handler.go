@@ -51,6 +51,10 @@ type loginRequest struct {
 	Password string `json:"password"`
 }
 
+type refreshRequest struct {
+	RefreshToken string `json:"refresh_token"`
+}
+
 // Login godoc
 // @Summary Login with email and password
 // @Tags Authentication
@@ -73,6 +77,29 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	})
 	if err != nil {
 		FailError(c, http.StatusUnauthorized, problemCodeLoginFailed, problemTitleUnauthorized, err)
+		return
+	}
+	OK(c, out)
+}
+
+// Refresh godoc
+// @Summary Rotate a refresh token and issue a new login session
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body refreshRequest true "Refresh token"
+// @Success 200 {object} usecase.LoginOutput
+// @Failure 401 {object} map[string]string
+// @Router /api/v1/auth/refresh [post]
+func (h *AuthHandler) Refresh(c *gin.Context) {
+	var req refreshRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: "Bad Request", Detail: httpStatusMessageBadRequest})
+		return
+	}
+	out, err := h.Auth.Refresh(c.Request.Context(), req.RefreshToken)
+	if err != nil {
+		FailError(c, http.StatusUnauthorized, problemCodeTokenInvalid, problemTitleUnauthorized, err)
 		return
 	}
 	OK(c, out)
@@ -206,11 +233,13 @@ func (h *AuthHandler) GoogleCallback(c *gin.Context) {
 		if err == nil {
 			query := target.Query()
 			query.Set("token", out.Token)
+			query.Set("refresh_token", out.RefreshToken)
 			query.Set("user_id", out.User.ID)
 			query.Set("name", out.User.Name)
 			query.Set("email", out.User.Email)
 			query.Set("created_at", out.User.CreatedAt.Format(time.RFC3339Nano))
 			query.Set("expires_at", out.ExpiresAt.Format(time.RFC3339Nano))
+			query.Set("refresh_expires_at", out.RefreshExpiresAt.Format(time.RFC3339Nano))
 			target.RawQuery = query.Encode()
 			c.SetCookie(authCookieFrontendCallbackName, "", -1, "/", "", false, true)
 			c.Redirect(http.StatusFound, target.String())

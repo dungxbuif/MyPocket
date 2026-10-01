@@ -56,6 +56,19 @@ func (r *Redis) Delete(key string) error {
 	return r.client.Del(ctx, key).Err()
 }
 
+func (r *Redis) GetAndDelete(key string) (string, bool, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	result, err := r.client.GetDel(ctx, key).Result()
+	if err == redis.Nil {
+		return "", false, nil
+	}
+	if err != nil {
+		return "", false, err
+	}
+	return result, true, nil
+}
+
 func (r *Redis) Close() error {
 	return r.client.Close()
 }

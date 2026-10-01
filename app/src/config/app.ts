@@ -9,6 +9,7 @@ export const APP_ROUTES = {
 export const API_ROUTES = {
   START_GOOGLE_AUTH: "/api/v1/auth/google",
   GOOGLE_CALLBACK: "/api/v1/auth/google/callback",
+  REFRESH: "/api/v1/auth/refresh",
   PROFILE: "/api/v1/auth/profile",
   HOME: "/api/v1/home",
 } as const;

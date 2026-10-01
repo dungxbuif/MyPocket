@@ -7,7 +7,7 @@ RUN CGO_ENABLED=0 go build -o /out/api ./cmd/api && \
     CGO_ENABLED=0 go build -o /out/migrate ./cmd/migrate
 
 FROM alpine:3.22
-RUN adduser -D -H app
+RUN apk add --no-cache tzdata && adduser -D -H app
 WORKDIR /app
 COPY --from=build /out/api /app/api
 COPY --from=build /out/migrate /app/migrate

@@ -4,7 +4,7 @@
 
 **Goal:** Ship an owner-scoped feedback workflow that a narrow local/dev agent can triage and finalize into a versioned changelog without exposing raw feedback publicly or touching financial APIs.
 
-**Architecture:** Add additive PostgreSQL `feedback` and `changelog` tables with repository/use-case boundaries. User routes use the existing JWT middleware; agent/internal routes use a dedicated constant-time service-token middleware and a Redis audit sink. A single transaction creates a changelog and marks all referenced feedback fixed. The frontend adds an Account → Feedback route using shared form/status/card components.
+**Architecture:** Add additive PostgreSQL `feedback` and `changelog` tables with repository/use-case boundaries. User routes use JWT/session or owner-scoped API keys (`feedback:read`/`feedback:write`); agent/internal routes use a dedicated constant-time service-token middleware and a Redis audit sink. A single transaction creates a changelog and marks all referenced feedback fixed. The frontend adds an Account → Feedback route using shared form/status/card components.
 
 **Tech Stack:** Go, Gin, GORM, PostgreSQL migrations, Redis Streams, generated Swagger, React/TypeScript, TanStack Router, Node test scripts, real Chromium CDP E2E.
 
@@ -12,7 +12,7 @@
 
 ## Global Constraints
 
-- No public raw-feedback endpoint; only owner JWT routes and the scoped agent service token may read descriptions.
+- No public raw-feedback endpoint; only owner JWT/API-key routes and the scoped agent service token may read descriptions.
 - Agent responses omit `user_id`, email, and account identifiers; audit payloads omit descriptions, credentials, JWTs, and financial records.
 - Lifecycle is `open → triaged → in_progress → fixed|rejected`; direct `fixed` status updates are rejected and changelog publication is the only finalization path.
 - Changelog publication locks feedback IDs in sorted order, creates the unique version, updates all feedback rows, then emits one post-commit Redis audit event.

@@ -110,6 +110,14 @@ export function localDateTimeAt(instant: string | Date, timezone: string): strin
   return `${dateKeyAt(instant, timezone)}T${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`;
 }
 
+export function formatAccountDateTime(instant: string | Date, timezone: string): string {
+  const local = localDateTimeAt(instant, timezone);
+  const [date, time] = local.split("T");
+  if (!date || !time) return "";
+  const [year, month, day] = date.split("-");
+  return `${day}/${month}/${year} ${time}`;
+}
+
 export function instantFromLocalDateTime(value: string, timezone: string): string {
   const desired = parseLocal(value);
   const naiveMs = Date.UTC(desired.year, desired.month - 1, desired.day, desired.hour, desired.minute, desired.second);

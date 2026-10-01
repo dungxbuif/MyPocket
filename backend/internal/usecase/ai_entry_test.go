@@ -90,6 +90,42 @@ func TestAIEntryDefaultsMissingDateToAccountToday(t *testing.T) {
 	}
 }
 
+func TestAIEntryNormalizesDateOnlyOutputWithoutReplacingItWithToday(t *testing.T) {
+	r := &entryRepoStub{}
+	s := &AIEntryService{Entries: r, Wallets: entryWallets{}, Categories: entryCategories{}, Extractor: entryExtractor{configured: true, out: entity.AIExtractOutput{Drafts: []entity.AIExtractDraft{{AIEntryDraft: entity.AIEntryDraft{Type: "expense", Amount: 45000, WalletID: "w", OccurredAt: "20/09/2026"}}}}}}
+	if _, err := s.Send(context.Background(), "owner", "session", AIEntryMessageInput{RequestID: "00000000-0000-0000-0000-000000000012", Text: "cà phê", Timezone: "Asia/Ho_Chi_Minh"}); err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := time.Parse(time.RFC3339, r.output.Drafts[0].OccurredAt)
+	if err != nil || parsed.In(mustLocation(t, "Asia/Ho_Chi_Minh")).Format("2006-01-02") != "2026-09-20" {
+		t.Fatalf("date-only output was not normalized: %q", r.output.Drafts[0].OccurredAt)
+	}
+	if !strings.Contains(strings.Join(r.output.Drafts[0].Questions, " "), "không có giờ") {
+		t.Fatalf("date-only normalization should be disclosed for review: %#v", r.output.Drafts[0].Questions)
+	}
+}
+
+func TestAIEntryMergesExactDuplicateDrafts(t *testing.T) {
+	r := &entryRepoStub{}
+	draft := entity.AIEntryDraft{Type: "expense", Amount: 45000, WalletID: "w", OccurredAt: "2026-09-20T08:00:00+07:00", Note: "Highlands"}
+	s := &AIEntryService{Entries: r, Wallets: entryWallets{}, Categories: entryCategories{}, Extractor: entryExtractor{configured: true, out: entity.AIExtractOutput{Drafts: []entity.AIExtractDraft{{AIEntryDraft: draft}, {AIEntryDraft: draft, Questions: []string{"Bản sao từ ảnh chồng lấn."}}}}}}
+	if _, err := s.Send(context.Background(), "owner", "session", AIEntryMessageInput{RequestID: "00000000-0000-0000-0000-000000000013", Text: "cà phê", Timezone: "Asia/Ho_Chi_Minh"}); err != nil {
+		t.Fatal(err)
+	}
+	if len(r.output.Drafts) != 1 || !strings.Contains(strings.Join(r.output.Drafts[0].Questions, " "), "Bản sao") {
+		t.Fatalf("exact duplicate drafts were not merged: %#v", r.output.Drafts)
+	}
+}
+
+func mustLocation(t *testing.T, name string) *time.Location {
+	t.Helper()
+	location, err := time.LoadLocation(name)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return location
+}
+
 func TestAIEntryKeepsOCRSourceWhenModelFails(t *testing.T) {
 	r := &entryRepoStub{}
 	s := &AIEntryService{Entries: r, Wallets: entryWallets{}, Categories: entryCategories{}, Extractor: entryExtractor{configured: true, err: errors.New("model unavailable"), out: entity.AIExtractOutput{SourceText: "OCR total 35000"}}}

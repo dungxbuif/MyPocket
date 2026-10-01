@@ -23,6 +23,16 @@ func TestNormalizeAPIKeyScopesAddsAdvisorPrerequisites(t *testing.T) {
 	}
 }
 
+func TestNormalizeAPIKeyScopesAddsFeedbackReadForWrite(t *testing.T) {
+	scopes, err := NormalizeAPIKeyScopes([]string{APIKeyScopeFeedbackWrite})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !containsScope(scopes, APIKeyScopeFeedbackWrite) || !containsScope(scopes, APIKeyScopeFeedbackRead) {
+		t.Fatalf("feedback write key must include feedback read: %v", scopes)
+	}
+}
+
 func TestNormalizeAPIKeyScopesRejectsUnknownAndEmpty(t *testing.T) {
 	if _, err := NormalizeAPIKeyScopes(nil); err == nil {
 		t.Fatal("empty scopes must be rejected")

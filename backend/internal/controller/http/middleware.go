@@ -113,6 +113,54 @@ func (m *AuthMiddleware) RequireAdvisorAuth(c *gin.Context) {
 	m.RequireAuth(c)
 }
 
+// RequireFeedbackReadAuth accepts the normal JWT/session or a user API key
+// with the feedback:read scope. API keys remain owner-scoped through the
+// authenticated principal stored in contextUserIDKey.
+func (m *AuthMiddleware) RequireFeedbackReadAuth(c *gin.Context) {
+	m.requireUserAPIOrSession(c, entity.APIKeyScopeFeedbackRead)
+}
+
+// RequireFeedbackWriteAuth accepts the normal JWT/session or a user API key
+// with the feedback:write scope.
+func (m *AuthMiddleware) RequireFeedbackWriteAuth(c *gin.Context) {
+	m.requireUserAPIOrSession(c, entity.APIKeyScopeFeedbackWrite)
+}
+
+func (m *AuthMiddleware) requireUserAPIOrSession(c *gin.Context, scope string) {
+	header := strings.TrimSpace(c.GetHeader(authHeader))
+	parts := strings.SplitN(header, " ", 2)
+	if len(parts) != 2 || parts[0] != authScheme || strings.TrimSpace(parts[1]) == "" {
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthInvalidFormat, Title: problemTitleUnauthorized, Detail: invalidAuthFormatMsg})
+		c.Abort()
+		return
+	}
+	token := strings.TrimSpace(parts[1])
+	if !strings.HasPrefix(token, "mpk_") {
+		m.RequireAuth(c)
+		return
+	}
+	if m == nil || m.APIKeys == nil {
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeTokenInvalid, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
+		c.Abort()
+		return
+	}
+	principal, err := m.APIKeys.Authenticate(c.Request.Context(), token, []string{scope})
+	if err != nil {
+		status := http.StatusUnauthorized
+		code := problemCodeTokenInvalid
+		if errors.Is(err, usecase.ErrAPIKeyScopeDenied) {
+			status = http.StatusForbidden
+			code = "api_key_scope_denied"
+		}
+		Fail(c, status, Problem{Code: code, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
+		c.Abort()
+		return
+	}
+	c.Set(contextUserIDKey, principal.OwnerID)
+	c.Set(contextAdvisorPrincipalKey, principal)
+	c.Next()
+}
+
 func (m *AuthMiddleware) recordAdvisorAudit(c *gin.Context, startedAt time.Time) {
 	if m == nil || m.Audit == nil || c == nil || !strings.HasPrefix(c.FullPath(), advisorRoute) {
 		return

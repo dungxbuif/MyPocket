@@ -131,6 +131,7 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		s.fail(owner, id, token, "")
 		return nil, ErrAIProvider
 	}
+	out.Drafts = mergeExactAIDrafts(out.Drafts)
 	for i := range out.Drafts {
 		d := &out.Drafts[i]
 		var wallet entity.Wallet
@@ -173,9 +174,12 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		if d.Amount < 0 || d.Amount > 9007199254740991 {
 			d.Amount = 0
 		}
-		if _, e := time.Parse(time.RFC3339, d.OccurredAt); e != nil {
-			d.OccurredAt = accountNow.Format(time.RFC3339)
+		normalizedOccurredAt, parsedOccurredAt, dateOnly := normalizeAIEntryOccurredAt(d.OccurredAt, accountNow)
+		d.OccurredAt = normalizedOccurredAt
+		if !parsedOccurredAt {
 			appendAIQuestion(d, "Ngày trên chứng từ chưa rõ; đã tự điền ngày hiện tại, hãy kiểm tra lại.")
+		} else if dateOnly {
+			appendAIQuestion(d, "Ngày trên chứng từ không có giờ; đã điền 00:00, hãy kiểm tra lại.")
 		}
 		if d.Questions == nil {
 			d.Questions = []string{}
@@ -205,6 +209,44 @@ func appendAIQuestion(d *entity.AIExtractDraft, question string) {
 		}
 	}
 	d.Questions = append(d.Questions, question)
+}
+
+func normalizeAIEntryOccurredAt(raw string, accountNow time.Time) (string, bool, bool) {
+	raw = strings.TrimSpace(raw)
+	if parsed, err := time.Parse(time.RFC3339, raw); err == nil {
+		return parsed.Format(time.RFC3339), true, false
+	}
+	for _, layout := range []string{"2006-01-02", "02/01/2006", "02-01-2006"} {
+		if parsed, err := time.ParseInLocation(layout, raw, accountNow.Location()); err == nil {
+			return parsed.Format(time.RFC3339), true, true
+		}
+	}
+	return accountNow.Format(time.RFC3339), false, false
+}
+
+func mergeExactAIDrafts(drafts []entity.AIExtractDraft) []entity.AIExtractDraft {
+	result := make([]entity.AIExtractDraft, 0, len(drafts))
+	seen := make(map[string]int, len(drafts))
+	for _, draft := range drafts {
+		categoryID := ""
+		if draft.CategoryID != nil {
+			categoryID = *draft.CategoryID
+		}
+		jarID := ""
+		if draft.JarID != nil {
+			jarID = *draft.JarID
+		}
+		key := fmt.Sprintf("%s|%d|%s|%s|%s|%s|%s|%t", draft.Type, draft.Amount, draft.WalletID, categoryID, jarID, draft.OccurredAt, draft.Note, draft.IncludedInReports)
+		if existing, ok := seen[key]; ok {
+			for _, question := range draft.Questions {
+				appendAIQuestion(&result[existing], question)
+			}
+			continue
+		}
+		seen[key] = len(result)
+		result = append(result, draft)
+	}
+	return result
 }
 
 func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string, files []entity.AIImage) ([]entity.AIImage, []entity.AIEntryAttachment, error) {
