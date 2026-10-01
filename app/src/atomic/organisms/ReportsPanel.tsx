@@ -9,6 +9,7 @@ import { fetchAdvisorOverview } from "../../services/aiAdvisor";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
 import { accountMonthKey } from "../../services/accountTime";
 import { formatVND } from "../utils/format";
+import { fetchMonthSummary, type MonthCategoryTotal } from "../../services/months";
 
 type Summary = { income: number; expense: number; net: number; count: number };
 
@@ -23,6 +24,7 @@ export function ReportsPanel({ masked }: { masked: boolean }) {
   const timezone = useAccountTimezone();
   const month = accountMonthKey(new Date(), timezone);
   const [summary, setSummary] = useState<Summary | null>(null);
+  const [categories, setCategories] = useState<MonthCategoryTotal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [retry, setRetry] = useState(0);
@@ -31,13 +33,14 @@ export function ReportsPanel({ masked }: { masked: boolean }) {
     let cancelled = false;
     setLoading(true);
     setError(false);
-    fetchAdvisorOverview(month).then(result => {
-      const next = readSummary(result.view);
+    Promise.allSettled([fetchAdvisorOverview(month), fetchMonthSummary(month)]).then(([overviewResult, monthResult]) => {
+      const next = overviewResult.status === "fulfilled" ? readSummary(overviewResult.value.view) : null;
       if (!cancelled) {
         setSummary(next);
+        setCategories(monthResult.status === "fulfilled" ? monthResult.value.categories : []);
         setError(!next);
       }
-    }).catch(() => { if (!cancelled) setError(true); }).finally(() => { if (!cancelled) setLoading(false); });
+    }).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [month, retry]);
 
@@ -56,9 +59,13 @@ export function ReportsPanel({ masked }: { masked: boolean }) {
       </div>
     </SurfaceCard>
     <SurfaceCard padding="md">
+      <SectionTitle title="Theo nhóm" />
+      {categories.length === 0 ? <StatusMessage variant="plain">Chưa có giao dịch được tính vào báo cáo.</StatusMessage> : <div className="mt-3 space-y-3">{categories.map(category => <div key={`${category.type}:${category.category_id ?? category.name}`} className="flex items-center justify-between gap-3"><div className="min-w-0"><Text>{category.name}</Text><Text size="xs" tone="secondary">{category.type === "income" ? "Thu" : "Chi"} · {category.count} giao dịch</Text></div><Text numeric weight="semibold" tone={category.type === "expense" ? "danger" : "action"}>{masked ? "••••••" : formatVND(category.amount)}</Text></div>)}</div>}
+    </SurfaceCard>
+    <SurfaceCard padding="md">
       <SectionTitle title="Hoạt động trong tháng" />
       <Text size="sm" tone="secondary">{summary.count} giao dịch được tính vào báo cáo. Chuyển ví và điều chỉnh số dư không làm tăng thu/chi.</Text>
-      <Text size="xs" tone="secondary" className="mt-3">Báo cáo danh mục chi tiết sẽ dùng cùng finance query layer khi endpoint drill-down được bật; không hiển thị dữ liệu mẫu.</Text>
+      <Text size="xs" tone="secondary" className="mt-3">Số liệu được tính lại từ ledger theo múi giờ tài khoản; giao dịch chuyển ví và điều chỉnh số dư luôn bị loại khỏi tổng.</Text>
     </SurfaceCard>
   </>;
 }
