@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -46,12 +47,15 @@ func runRecurringPass(database *gorm.DB, runner interface {
 	if err := database.Model(&entity.RecurringSchedule{}).Where("active = true").Distinct("owner_id").Pluck("owner_id", &owners).Error; err != nil {
 		return err
 	}
+	var firstErr error
 	for _, ownerID := range owners {
 		if _, err := runner.RunDue(ownerID, now); err != nil {
-			return err
+			if firstErr == nil {
+				firstErr = fmt.Errorf("one or more owner schedules failed: %w", err)
+			}
 		}
 	}
-	return nil
+	return firstErr
 }
 
 func workerInterval() time.Duration {
