@@ -161,7 +161,7 @@ Tên bảng tài khoản được owner chốt là `user`; `owner_id` tham chi�
 - `description` nullable string
 - `created_at`, `updated_at`
 
-Indexes: `(owner_id)`, `(owner_id, name)` non-unique nếu cần lookup. Cho phép trùng tên đã được owner xác nhận. Danh sách fields trên mới là phần chung; fields riêng goal/credit và ledger trong đề xuất phía trên chưa có migration/API được phê duyệt.
+Indexes: `(owner_id)`, `(owner_id, name)` non-unique nếu cần lookup. Cho phép trùng tên đã được owner xác nhận. Goal/credit fields are implemented in the wallet baseline; credit ledger columns and operations are documented separately in `docs/superpowers/specs/2026-10-01-credit-ledger-design.md` and `docs/architecture/API.md`.
 
 ## 6. Security & authorization
 

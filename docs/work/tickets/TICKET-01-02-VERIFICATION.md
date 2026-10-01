@@ -18,7 +18,7 @@ Verified 2026-09-13 for the implemented core wallet slice.
 
 - Owner-scoped create, list, edit and permanent delete for `basic`, `goal` and `credit` wallets.
 - Duplicate names remain allowed; IDs own all relationships.
-- Goal requires a positive target amount; credit requires a positive credit limit. Statement-cycle metadata remains in the later credit slice.
+- Goal requires a positive target amount; credit requires a positive credit limit. Credit statement/payment ledger behavior is now implemented separately and keeps statement-cycle metadata as follow-up.
 - `current_balance` is derived from opening balance plus income minus expense for the wallet ledger. Only wallets with `is_in_total=true` contribute to the header total.
 - Editing wallet metadata cannot overwrite opening balance; balance adjustment remains a separate ledger slice.
 - Wallet type is immutable after creation so an existing ordinary ledger cannot be reinterpreted as credit debt (or the reverse).
@@ -36,4 +36,4 @@ Verified 2026-09-13 for the implemented core wallet slice.
 
 ## Residual scope
 
-Target date, credit statement/payment fields, balance adjustment and the credit purchase/payment ledger remain separate design work. They are not claimed by this verification.
+Target date is covered by the core wallet slice. Credit statement/payment fields by cycle, balance adjustment, and the credit purchase/payment ledger are separate follow-up verification slices; the credit ledger itself is covered by `feat: add credit wallet ledger` tests and docs.
