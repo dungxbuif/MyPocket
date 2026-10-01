@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"testing"
 
 	"github.com/mypocket/backend/internal/entity"
@@ -71,6 +72,26 @@ func TestAdvisorOrchestratorAllowsFinalAnswerAfterFourToolCalls(t *testing.T) {
 	}
 	if answer.Text != "Đây là câu trả lời cuối." || provider.calls != 5 {
 		t.Fatalf("expected final answer after four tool calls, answer=%+v calls=%d", answer, provider.calls)
+	}
+}
+
+func TestAdvisorOrchestratorAllowsFiveToolCallsInOneProviderResponse(t *testing.T) {
+	calls := make([]AdvisorToolCall, 0, 5)
+	for index := 1; index <= 5; index++ {
+		calls = append(calls, AdvisorToolCall{ID: fmt.Sprintf("call-%d", index), Name: "get_wallet_balances", Arguments: json.RawMessage(`{"wallet_ids":[]}`)})
+	}
+	provider := &advisorProviderStub{responses: []AdvisorResponse{
+		{ToolCalls: calls},
+		{Text: "Đây là câu trả lời cuối."},
+	}}
+	reader := &financeReaderStub{bundle: entity.FactBundle{Results: []entity.FinanceResult{{QueryKey: "q1", ViewKind: "wallet_balances", View: json.RawMessage(`{"items":[]}`)}}}}
+	orchestrator := NewAdvisorOrchestrator(provider, NewAdvisorToolRegistry(NewFinanceQueryService(reader)))
+	answer, err := orchestrator.Answer(context.Background(), Principal{OwnerID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}, []AdvisorChatMessage{{Role: "user", Content: "Tóm tắt ví"}})
+	if err != nil {
+		t.Fatalf("five tool calls returned an error: %v", err)
+	}
+	if answer.Text != "Đây là câu trả lời cuối." || provider.calls != 2 {
+		t.Fatalf("expected final answer after five tool calls, answer=%+v calls=%d", answer, provider.calls)
 	}
 }
 

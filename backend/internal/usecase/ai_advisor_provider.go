@@ -17,6 +17,8 @@ var (
 	ErrAdvisorPrincipalInvalid    = errors.New("advisor principal is no longer valid")
 )
 
+const advisorMaxToolCalls = 8
+
 type AdvisorPrincipalValidator interface {
 	Validate(context.Context, Principal) error
 }
@@ -114,7 +116,7 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 			}
 		}
 		availableTools := definitions
-		if toolCalls >= 4 {
+		if toolCalls >= advisorMaxToolCalls {
 			availableTools = nil
 		}
 		response, err := o.Provider.Chat(ctx, AdvisorRequest{Messages: working, Tools: availableTools})
@@ -141,12 +143,12 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 		if response.Usage != nil {
 			usageSeen = true
 		}
-		if toolCalls >= 4 {
+		if toolCalls >= advisorMaxToolCalls {
 			return AdvisorAnswer{}, ErrAdvisorLoopLimit
 		}
 		working = append(working, AdvisorChatMessage{Role: "assistant", ToolCalls: response.ToolCalls})
 		for _, call := range response.ToolCalls {
-			if toolCalls >= 4 || strings.TrimSpace(call.Name) == "" {
+			if toolCalls >= advisorMaxToolCalls || strings.TrimSpace(call.Name) == "" {
 				return AdvisorAnswer{}, ErrAdvisorLoopLimit
 			}
 			tool, ok := o.Tools.Lookup(call.Name)

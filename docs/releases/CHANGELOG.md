@@ -19,6 +19,19 @@ This file is the first-release baseline for the current MyPocket snapshot. Earli
 development notes remain available in Git history and are intentionally not presented
 as active release entries here.
 
+## [1.0.8] - 2026-10-01
+
+### Fixed
+
+- Finance Assistant now accepts a bounded batch of up to eight read-only tool
+  calls from one model response. This prevents valid multi-query answers from
+  failing when the provider returns five or more parallel finance lookups.
+
+### Verification
+
+- Added a regression test covering five tool calls in one provider response;
+  backend tests and the frontend release gate remain required before rollout.
+
 ## [1.0.7] - 2026-10-01
 
 ### Added
