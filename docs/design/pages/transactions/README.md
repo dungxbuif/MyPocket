@@ -39,6 +39,7 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 | Activate global add | Open a clean ordinary editor with `expense`, current local date/time, report inclusion enabled, and the first available wallet. It does not offer transfer mode. |
 | Choose “Chuyển tiền đến ví khác” from the three-dot options menu | Open a transfer-only sheet with source/destination wallet selects; submit calls the atomic transfer endpoint and refreshes both wallet balances and the ledger. |
 | Choose “Điều chỉnh số dư” from the three-dot options menu | Open the shared form sheet, choose an eligible wallet and increase/decrease direction, then call the adjustment endpoint; refresh balances and ledger without changing report totals. |
+| Choose “Xóa nhiều giao dịch” from the three-dot options menu | Enter selection mode for the current ledger scope. The UI excludes transfer/adjustment rows, requires confirmation, sends at most 100 unique IDs, and keeps selection/error state when the atomic request fails. |
 | Hold global add for 500ms | Open [AI entry chat](../assistant/README.md) with persistent prefilled review proposals. Release does not also open the manual editor; moving/cancelling cancels hold. Manual create offers keyboard-accessible “Nhập bằng AI”. |
 | Change wallet | Keep the selected group only if it applies to the new wallet; otherwise clear the group. |
 | Change type | Keep the selected group only if its kind matches; otherwise clear the group. |
@@ -74,7 +75,7 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 - `jar_id` is optional and may reference one active owner/month configuration only for ordinary expenses; income and transfer-out rows cannot be assigned. Clearing the selection sends null.
 - Wallet current balance is derived from ledger rows: opening balance plus income minus expense, with adjustments adding or subtracting by direction. Editing/deleting an ordinary row changes the derived balance; an adjustment is immutable and must be compensated by an opposite adjustment.
 
-APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/transfer/{transfer_id}`, `POST /api/v1/transactions/adjustment`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options.
+APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/transfer/{transfer_id}`, `POST /api/v1/transactions/adjustment`, `POST /api/v1/transactions/bulk-delete`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options.
 
 ## Copy and formatting
 

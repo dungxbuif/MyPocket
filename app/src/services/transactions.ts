@@ -51,6 +51,8 @@ export type AdjustmentInput = {
   note?: string;
 };
 
+export type BulkDeleteInput = { transaction_ids: string[] };
+
 const TRANSACTION_API_PATH = "/api/v1/transactions";
 
 export function fetchTransactions(): Promise<Transaction[]> {
@@ -75,4 +77,8 @@ export function createTransfer(input: TransferInput): Promise<Transaction[]> {
 
 export function createAdjustment(input: AdjustmentInput): Promise<Transaction> {
   return apiRequest<Transaction>(`${TRANSACTION_API_PATH}/adjustment`, { method: "POST", body: JSON.stringify(input) }, getStoredToken());
+}
+
+export function deleteTransactions(input: BulkDeleteInput): Promise<void> {
+  return apiRequest<void>(`${TRANSACTION_API_PATH}/bulk-delete`, { method: "POST", body: JSON.stringify(input) }, getStoredToken());
 }

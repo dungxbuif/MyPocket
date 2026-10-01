@@ -569,6 +569,13 @@ definitions:
       wallet_id:
         type: string
     type: object
+  httpapi.bulkDeleteInput:
+    properties:
+      transaction_ids:
+        items:
+          type: string
+        type: array
+    type: object
   httpapi.categoryInput:
     properties:
       icon_key:
@@ -2133,6 +2140,41 @@ paths:
       security:
       - BearerAuth: []
       summary: Record an explicit wallet balance adjustment
+      tags:
+      - Transactions
+  /api/v1/transactions/bulk-delete:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction IDs
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.bulkDeleteInput'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete multiple ordinary transactions atomically
       tags:
       - Transactions
   /api/v1/transactions/transfer:

@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -102,6 +103,48 @@ func (r *TransactionPostgresRepository) CreateAdjustment(transaction *entity.Tra
 			return err
 		}
 		return tx.Where("id = ?", transaction.ID).First(transaction).Error
+	})
+}
+
+func (r *TransactionPostgresRepository) BulkDelete(ownerID string, ids []string) error {
+	if ownerID == "" || len(ids) == 0 || len(ids) > 100 {
+		return transactionrepo.ErrBulkDeleteInvalid
+	}
+	seen := make(map[string]struct{}, len(ids))
+	for _, rawID := range ids {
+		id := strings.TrimSpace(rawID)
+		if id == "" {
+			return transactionrepo.ErrBulkDeleteInvalid
+		}
+		if _, exists := seen[id]; exists {
+			return transactionrepo.ErrBulkDeleteInvalid
+		}
+		seen[id] = struct{}{}
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var rows []entity.Transaction
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND id IN ?", ownerID, ids).Find(&rows).Error; err != nil {
+			return err
+		}
+		if len(rows) != len(ids) {
+			return transactionrepo.ErrBulkDeleteNotFound
+		}
+		for _, row := range rows {
+			if row.TransferID != nil {
+				return transactionrepo.ErrBulkDeleteLinked
+			}
+			if row.Type == entity.TransactionTypeAdjustment {
+				return transactionrepo.ErrBulkDeleteAdjustment
+			}
+		}
+		result := tx.Where("owner_id = ? AND id IN ?", ownerID, ids).Delete(&entity.Transaction{})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected != int64(len(ids)) {
+			return transactionrepo.ErrBulkDeleteNotFound
+		}
+		return nil
 	})
 }
 

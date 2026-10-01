@@ -29,6 +29,7 @@ const (
 	transactionLoadMessage                = "không đọc được giao dịch"
 	transactionSaveMessage                = "không lưu được giao dịch"
 	transactionAdjustmentDirectionMessage = "hướng điều chỉnh số dư không hợp lệ"
+	transactionBulkDeleteLimit            = 100
 )
 
 type TransactionHandler struct {
@@ -79,6 +80,10 @@ type adjustmentInput struct {
 	Direction  string  `json:"direction"`
 	OccurredAt string  `json:"occurred_at"`
 	Note       *string `json:"note"`
+}
+
+type bulkDeleteInput struct {
+	TransactionIDs []string `json:"transaction_ids"`
 }
 
 // CreateTransfer godoc
@@ -424,6 +429,66 @@ func (h *TransactionHandler) CreateAdjustment(c *gin.Context) {
 		return
 	}
 	Created(c, transaction)
+}
+
+// BulkDeleteTransactions godoc
+// @Summary Delete multiple ordinary transactions atomically
+// @Tags Transactions
+// @Accept json
+// @Security BearerAuth
+// @Param input body bulkDeleteInput true "Transaction IDs"
+// @Success 204
+// @Failure 400 {object} Problem
+// @Failure 401 {object} Problem
+// @Failure 404 {object} Problem
+// @Failure 409 {object} Problem
+// @Router /api/v1/transactions/bulk-delete [post]
+func (h *TransactionHandler) BulkDeleteTransactions(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	var input bulkDeleteInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	if len(input.TransactionIDs) == 0 || len(input.TransactionIDs) > transactionBulkDeleteLimit {
+		transactionBadRequest(c, "Danh sách giao dịch phải có từ 1 đến 100 dòng.")
+		return
+	}
+	ids := make([]string, 0, len(input.TransactionIDs))
+	seen := make(map[string]struct{}, len(input.TransactionIDs))
+	for _, rawID := range input.TransactionIDs {
+		id := strings.TrimSpace(rawID)
+		if id == "" {
+			transactionBadRequest(c, "Danh sách giao dịch chứa mã trống.")
+			return
+		}
+		if _, exists := seen[id]; exists {
+			transactionBadRequest(c, "Danh sách giao dịch không được trùng mã.")
+			return
+		}
+		seen[id] = struct{}{}
+		ids = append(ids, id)
+	}
+	if err := h.Transactions.BulkDelete(owner, ids); err != nil {
+		switch {
+		case errors.Is(err, transactionrepo.ErrBulkDeleteNotFound):
+			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
+		case errors.Is(err, transactionrepo.ErrBulkDeleteLinked):
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Không thể xóa hàng loạt giao dịch chuyển ví; hãy xóa theo cặp."})
+		case errors.Is(err, transactionrepo.ErrBulkDeleteAdjustment):
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Điều chỉnh số dư là bất biến; hãy tạo điều chỉnh bù trừ."})
+		case errors.Is(err, transactionrepo.ErrBulkDeleteInvalid):
+			transactionBadRequest(c, "Danh sách giao dịch không hợp lệ.")
+		default:
+			Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		}
+		return
+	}
+	NoContent(c)
 }
 
 // UpdateTransaction godoc

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -27,6 +29,8 @@ type transactionRepositoryStub struct {
 	mutationCalls       int
 	mutationReplay      bool
 	mutationErr         error
+	bulkDeleted         []string
+	bulkErr             error
 }
 
 func (s *transactionRepositoryStub) List(string) ([]entity.Transaction, error) { return nil, nil }
@@ -45,6 +49,13 @@ func (s *transactionRepositoryStub) Update(string, string, map[string]any) (*ent
 	return s.updated, nil
 }
 func (s *transactionRepositoryStub) Delete(string, string) error { return nil }
+func (s *transactionRepositoryStub) BulkDelete(_ string, ids []string) error {
+	if s.bulkErr != nil {
+		return s.bulkErr
+	}
+	s.bulkDeleted = append([]string(nil), ids...)
+	return nil
+}
 func (s *transactionRepositoryStub) CreateTransfer(_ string, source, destination *entity.Transaction) error {
 	s.transferSource, s.transferDestination = source, destination
 	return nil
@@ -155,12 +166,66 @@ func transactionTestRouter(handler *TransactionHandler) *gin.Engine {
 	router.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
 	router.POST("/transactions", handler.CreateTransaction)
 	router.POST("/transactions/adjustment", handler.CreateAdjustment)
+	router.POST("/transactions/bulk-delete", handler.BulkDeleteTransactions)
 	router.POST("/transactions/transfer", handler.CreateTransfer)
 	router.PATCH("/transactions/transfer/:transfer_id", handler.UpdateTransfer)
 	router.DELETE("/transactions/transfer/:transfer_id", handler.DeleteTransfer)
 	router.PATCH("/transactions/:id", handler.UpdateTransaction)
 	router.DELETE("/transactions/:id", handler.DeleteTransaction)
 	return router
+}
+
+func TestBulkDeleteRejectsEmptyAndOversizedLists(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
+	oversizedIDs := make([]string, 101)
+	for index := range oversizedIDs {
+		oversizedIDs[index] = fmt.Sprintf("%q", fmt.Sprintf("id-%d", index))
+	}
+	for _, body := range []string{`{"transaction_ids":[]}`, `{"transaction_ids":[` + strings.Join(oversizedIDs, ",") + `]}`} {
+		request := httptest.NewRequest(http.MethodPost, "/transactions/bulk-delete", bytes.NewBufferString(body))
+		request.Header.Set("Content-Type", "application/json")
+		response := httptest.NewRecorder()
+		router.ServeHTTP(response, request)
+		if response.Code != http.StatusBadRequest || transactions.bulkDeleted != nil {
+			t.Fatalf("invalid bulk delete should be rejected: status=%d body=%s", response.Code, response.Body.String())
+		}
+	}
+}
+
+func TestBulkDeleteRejectsLinkedAndCrossOwnerRows(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		err  error
+		want int
+	}{
+		{name: "linked", err: repository.ErrBulkDeleteLinked, want: http.StatusConflict},
+		{name: "not found", err: repository.ErrBulkDeleteNotFound, want: http.StatusNotFound},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			transactions := &transactionRepositoryStub{bulkErr: tc.err}
+			router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
+			request := httptest.NewRequest(http.MethodPost, "/transactions/bulk-delete", bytes.NewBufferString(`{"transaction_ids":["tx-1","tx-2"]}`))
+			request.Header.Set("Content-Type", "application/json")
+			response := httptest.NewRecorder()
+			router.ServeHTTP(response, request)
+			if response.Code != tc.want {
+				t.Fatalf("status=%d want=%d body=%s", response.Code, tc.want, response.Body.String())
+			}
+		})
+	}
+}
+
+func TestBulkDeleteReturnsNoContentAfterAtomicRepositoryDelete(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPost, "/transactions/bulk-delete", bytes.NewBufferString(`{"transaction_ids":["tx-1","tx-2"]}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent || !reflect.DeepEqual(transactions.bulkDeleted, []string{"tx-1", "tx-2"}) {
+		t.Fatalf("expected successful bulk deletion: status=%d deleted=%v body=%s", response.Code, transactions.bulkDeleted, response.Body.String())
+	}
 }
 
 func TestCreateAdjustmentPersistsExplicitBalanceChange(t *testing.T) {

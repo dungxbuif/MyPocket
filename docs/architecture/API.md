@@ -34,6 +34,8 @@ Goal transaction categories, when explicitly selected, must use real catalog key
 
 `POST /api/v1/transactions/adjustment` records an explicit balance correction for an owned basic or goal wallet. The body is `{wallet_id, amount, direction, occurred_at?, note?}`, where `amount` is a positive integer and `direction` is `increase` or `decrease`. The server stores `type=adjustment`, always sets `included_in_reports=false`, and excludes the row from income/expense reports while applying its signed effect to wallet balances. Adjustment rows are immutable through ordinary transaction edit/delete routes; create a compensating adjustment instead.
 
+`POST /api/v1/transactions/bulk-delete` accepts `{transaction_ids: string[]}` with 1–100 unique IDs. The owner-scoped repository locks and validates every requested row before deleting any row. If an ID is missing/not owned, a transfer pair is included, or an immutable adjustment is included, the entire request is rejected and no row is deleted. The endpoint returns `204` only after all rows are deleted.
+
 2026-09-21 ownership correction: system category wallet applicability is read/replaced within the authenticated owner's wallets. Changing a shared category's selection preserves other owners' assignments. AI catalog and confirmation use the same scope.
 
 ## Account timezone and calendar dates — Stage v1 baseline
@@ -74,6 +76,7 @@ Document HTTP endpoints, RPC methods, events, CLI commands, or any other public 
 | `/api/v1/transactions` | HTTP REST | JWT bearer | implemented; basic ledger UAT verified | Create/list/update/delete owner-scoped income and expense entries for basic/goal wallets. Optional category must match kind and applicable-wallet scope; credit uses a later dedicated ledger. Adjustment rows are read through this collection but cannot be edited/deleted here. |
 | `/api/v1/transactions/transfer` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | Atomically create paired source-expense/destination-income rows for an internal transfer; pair edit/delete require an idempotency key. Transfers are excluded from reports and jars. |
 | `/api/v1/transactions/adjustment` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | Record a signed increase/decrease correction for a basic or goal wallet. Corrections affect wallet balance but never report totals and are immutable. |
+| `/api/v1/transactions/bulk-delete` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | All-or-nothing deletion of 1–100 ordinary owner-scoped transactions. Transfer pairs and adjustments are rejected explicitly. |
 | `/api/v1/auth/profile` | HTTP REST | JWT bearer | implemented | Reads/updates account IANA timezone; initial browser-zone adoption is initialize-only. |
 | `/api/v1/jars` and `/api/v1/jars/{id}/...` | HTTP REST | JWT bearer | implemented; owner UAT pending | Stable jar IDs, month snapshots, optional ordinary-expense assignment and cumulative live report. Config removal does not delete transactions or historic snapshots. |
 | `/api/v1/months/{YYYY-MM}` | HTTP REST | JWT bearer | implemented; owner UAT pending | Live account-local totals and independent note CRUD; completion is derived, not a close operation. |

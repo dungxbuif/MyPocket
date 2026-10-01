@@ -1,4 +1,5 @@
 import { MoreHorizontal } from "lucide-react";
+import { BaseCheckbox } from "../atoms/BaseCheckbox";
 import { BaseModal } from "../atoms/BaseModal";
 import { Divider } from "../atoms/Divider";
 import { DateField } from "../molecules/DateField";
@@ -14,7 +15,7 @@ import { QuickAddSheet } from "./QuickAddSheet";
 import { categoryPresentationFor } from "../atoms/categoryPresentation";
 import { Tags } from "lucide-react";
 import { fetchCategories, type Category } from "../../services/categories";
-import { fetchTransactions, signedTransactionAmount, type Transaction } from "../../services/transactions";
+import { deleteTransactions, fetchTransactions, signedTransactionAmount, type Transaction } from "../../services/transactions";
 import { fetchWallets, type Wallet } from "../../services/wallets";
 import { dateKeyAt, todayDateKey, weekDateRange } from "../../services/accountTime";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
@@ -56,6 +57,10 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [creatingTransfer, setCreatingTransfer] = useState(false);
   const [creatingAdjustment, setCreatingAdjustment] = useState(false);
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIDs, setSelectedIDs] = useState<string[]>([]);
+  const [bulkDeleting, setBulkDeleting] = useState(false);
+  const [bulkError, setBulkError] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [localRefresh, setLocalRefresh] = useState(0);
@@ -90,6 +95,21 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
     setPeriodMode("week");
   };
   const selectWallet = (id: string) => { setWalletFilter(id); setWeekOffset(0); setPeriodMode("week"); };
+  const toggleSelected = (id: string) => setSelectedIDs(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
+  const leaveSelectionMode = () => { setSelectionMode(false); setSelectedIDs([]); setBulkError(""); };
+  const bulkDelete = async () => {
+    if (bulkDeleting || selectedIDs.length === 0 || selectedIDs.length > 100 || !window.confirm(`Xóa ${selectedIDs.length} giao dịch đã chọn?`)) return;
+    try {
+      setBulkDeleting(true);
+      setBulkError("");
+      await deleteTransactions({ transaction_ids: selectedIDs });
+      leaveSelectionMode();
+      setLocalRefresh(value => value + 1);
+      onChanged();
+    } catch {
+      setBulkError("Không thể xóa các giao dịch đã chọn. Không dòng nào bị xóa.");
+    } finally { setBulkDeleting(false); }
+  };
   const groups = useMemo<TransactionGroup[]>(() => {
     const byDate = new Map<string, Transaction[]>();
     visible.forEach((transaction) => {
@@ -104,6 +124,7 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
       <ScreenHeader title={COPY.title} action={<BaseButton variant="chip" size="sm" aria-label="Tùy chọn giao dịch" onClick={() => setMenu(true)}><MoreHorizontal size={20} /></BaseButton>} />
       <WalletScopeSelector wallets={wallets} selectedID={walletFilter || null} onSelect={id => selectWallet(id ?? "")} onAdd={() => void navigate({ to: "/account/wallets" })} onEdit={() => void navigate({ to: "/account/wallets" })} />
       {!isGoalWallet ? <LedgerPeriodSelector mode={periodMode} range={periodRange} weekOffset={weekOffset} onModeChange={selectPeriodMode} onPreviousWeek={() => setWeekOffset(value => value - 1)} onNextWeek={() => setWeekOffset(value => Math.min(value + 1, 0))} onEditCustom={openCustomPeriod} /> : null}
+      {selectionMode ? <SurfaceCard tone="form" padding="sm"><div className="flex items-center justify-between gap-3"><Text size="sm">Đã chọn {selectedIDs.length}/100</Text><div className="flex gap-2"><BaseButton variant="ghost" size="sm" disabled={bulkDeleting} onClick={leaveSelectionMode}>Hủy</BaseButton><BaseButton size="sm" loading={bulkDeleting} disabled={selectedIDs.length === 0 || selectedIDs.length > 100} onClick={() => void bulkDelete()}>Xóa</BaseButton></div></div>{bulkError ? <StatusMessage tone="danger">{bulkError}</StatusMessage> : <Text size="xs" tone="secondary" className="mt-1">Không thể chọn giao dịch chuyển ví hoặc điều chỉnh số dư.</Text>}</SurfaceCard> : null}
       {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
       {error ? <StatusMessage tone="danger">{COPY.error}</StatusMessage> : null}
       {isGoalWallet && !loading && !error && selectedWallet ? <WalletDetailPanel embedded wallet={selectedWallet} transactions={transactions} categories={categories} onBack={() => selectWallet("")} onChanged={() => { setLocalRefresh(value => value + 1); onChanged(); }} /> : null}
@@ -115,10 +136,12 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
           const category = transaction.category_id ? categoryByID.get(transaction.category_id) : undefined;
           const presentation = category ? categoryPresentationFor(category.system_key ?? category.icon_key) : { icon: Tags, tone: "categorySlate" as const };
           const title = category?.name ?? (transaction.type === "income" ? "Khoản thu" : transaction.type === "adjustment" ? "Điều chỉnh số dư" : "Khoản chi");
-          return <TransactionItem key={transaction.id} item={{ title, metadata: [walletNames.get(transaction.wallet_id) ?? "Ví đã xóa", transaction.note].filter(Boolean).join(" · "), amount: signedTransactionAmount(transaction), kind: transaction.type, icon: presentation.icon, tone: presentation.tone }} onActivate={selectedWallet?.type === "credit" ? undefined : () => setEditing(transaction)} />;
+          const immutable = transaction.transfer_id != null || transaction.type === "adjustment";
+          const row = <TransactionItem item={{ title, metadata: [walletNames.get(transaction.wallet_id) ?? "Ví đã xóa", transaction.note].filter(Boolean).join(" · "), amount: signedTransactionAmount(transaction), kind: transaction.type, icon: presentation.icon, tone: presentation.tone }} onActivate={selectionMode || selectedWallet?.type === "credit" ? undefined : () => setEditing(transaction)} />;
+          return selectionMode ? <div key={transaction.id} className="flex items-center gap-2"><BaseCheckbox label={`Chọn ${title}`} checked={selectedIDs.includes(transaction.id)} disabled={immutable || bulkDeleting} onChange={() => toggleSelected(transaction.id)}><span className="sr-only">{title}</span></BaseCheckbox><div className="min-w-0 flex-1">{row}</div></div> : <div key={transaction.id}>{row}</div>;
         })}</div></SurfaceCard>;
       }) : null}
-      {menu ? <BaseModal label="Tùy chọn giao dịch" onClose={() => setMenu(false)}><div className="space-y-2">{!isGoalWallet ? <><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); openCustomPeriod(); }}>Khoảng thời gian</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setByCategory(!byCategory); setMenu(false); }}>{byCategory ? "Xem theo ngày" : "Xem theo nhóm"}</BaseButton></> : null}<BaseButton className="w-full" variant="chip" onClick={() => { setLocalRefresh(v => v + 1); setMenu(false); }}>Tải lại giao dịch</BaseButton><BaseButton className="w-full" variant="chip" disabled>Xóa nhiều giao dịch</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); setCreatingTransfer(true); }}>Chuyển tiền đến ví khác</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); setCreatingAdjustment(true); }}>Điều chỉnh số dư</BaseButton><BaseButton className="w-full" variant="chip" disabled>Đồng bộ ví</BaseButton><Text size="xs" tone="secondary">Xóa nhiều giao dịch và đồng bộ ví sẽ được mở ở các slice tiếp theo.</Text><BaseButton variant="ghost" onClick={() => setMenu(false)}>Đóng</BaseButton></div></BaseModal> : null}
+      {menu ? <BaseModal label="Tùy chọn giao dịch" onClose={() => setMenu(false)}><div className="space-y-2">{!isGoalWallet ? <><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); openCustomPeriod(); }}>Khoảng thời gian</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setByCategory(!byCategory); setMenu(false); }}>{byCategory ? "Xem theo ngày" : "Xem theo nhóm"}</BaseButton></> : null}<BaseButton className="w-full" variant="chip" onClick={() => { setLocalRefresh(v => v + 1); setMenu(false); }}>Tải lại giao dịch</BaseButton><BaseButton className="w-full" variant="chip" disabled={visible.length === 0} onClick={() => { setMenu(false); setSelectionMode(true); setSelectedIDs([]); setBulkError(""); }}>Xóa nhiều giao dịch</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); setCreatingTransfer(true); }}>Chuyển tiền đến ví khác</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); setCreatingAdjustment(true); }}>Điều chỉnh số dư</BaseButton><BaseButton className="w-full" variant="chip" disabled>Đồng bộ ví</BaseButton><Text size="xs" tone="secondary">Giao dịch chuyển ví và điều chỉnh số dư cần thao tác riêng để bảo toàn số dư.</Text><BaseButton variant="ghost" onClick={() => setMenu(false)}>Đóng</BaseButton></div></BaseModal> : null}
       {period ? <BaseModal label="Khoảng thời gian" onClose={() => setPeriod(false)}><DateField label="Từ ngày" value={draftFrom} stepper={false} onChange={setDraftFrom} /><DateField label="Đến ngày" value={draftTo} stepper={false} onChange={setDraftTo} />{draftFrom && draftTo && draftTo < draftFrom ? <StatusMessage tone="danger">Ngày kết thúc phải sau ngày bắt đầu.</StatusMessage> : null}<div className="flex gap-2"><BaseButton variant="ghost" onClick={() => { setFrom(""); setTo(""); setWeekOffset(0); setPeriodMode("week"); setPeriod(false); }}>Tuần này</BaseButton><BaseButton disabled={!!(draftFrom && draftTo && draftTo < draftFrom)} onClick={() => { setFrom(draftFrom); setTo(draftTo); setPeriodMode(draftFrom || draftTo ? "custom" : "week"); if (!draftFrom && !draftTo) setWeekOffset(0); setPeriod(false); }}>Xong</BaseButton></div></BaseModal> : null}
       {editing ? <QuickAddSheet transaction={editing} onClose={() => setEditing(null)} onSaved={() => { setLocalRefresh((value) => value + 1); onChanged(); }} /> : null}
       {creatingTransfer ? <QuickAddSheet transferOnly onClose={() => setCreatingTransfer(false)} onSaved={() => { setCreatingTransfer(false); setLocalRefresh((value) => value + 1); onChanged(); }} /> : null}

@@ -14,6 +14,10 @@ var (
 	ErrTransferPairInvalid     = errors.New("invalid transfer pair")
 	ErrAdjustmentInvalid       = errors.New("invalid balance adjustment")
 	ErrAdjustmentWalletInvalid = errors.New("invalid adjustment wallet")
+	ErrBulkDeleteInvalid       = errors.New("invalid bulk deletion")
+	ErrBulkDeleteNotFound      = errors.New("bulk deletion transaction not found")
+	ErrBulkDeleteLinked        = errors.New("bulk deletion includes linked transfer")
+	ErrBulkDeleteAdjustment    = errors.New("bulk deletion includes immutable adjustment")
 )
 
 type TransferUpdate struct {
@@ -27,6 +31,7 @@ type TransactionRepository interface {
 	Find(ownerID, id string) (*entity.Transaction, error)
 	Create(transaction *entity.Transaction) error
 	CreateAdjustment(transaction *entity.Transaction) error
+	BulkDelete(ownerID string, ids []string) error
 	Update(ownerID, id string, updates map[string]any) (*entity.Transaction, error)
 	Delete(ownerID, id string) error
 }

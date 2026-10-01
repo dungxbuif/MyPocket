@@ -7,6 +7,7 @@ func registerTransactionRoutes(protected *gin.RouterGroup, handler *TransactionH
 	routes.GET(routeCollectionPath, handler.ListTransactions)
 	routes.POST(routeCollectionPath, handler.CreateTransaction)
 	routes.POST("/adjustment", handler.CreateAdjustment)
+	routes.POST("/bulk-delete", handler.BulkDeleteTransactions)
 	routes.POST("/transfer", handler.CreateTransfer)
 	routes.PATCH("/transfer/:transfer_id", handler.UpdateTransfer)
 	routes.DELETE("/transfer/:transfer_id", handler.DeleteTransfer)
