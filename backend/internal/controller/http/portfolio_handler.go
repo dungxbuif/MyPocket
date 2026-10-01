@@ -27,8 +27,8 @@ type portfolioPriceInput struct {
 type portfolioTradeInput struct {
 	Side       string  `json:"side"`
 	Quantity   string  `json:"quantity"`
-	UnitPrice  int64   `json:"unit_price"`
-	Fee        int64   `json:"fee"`
+	UnitPrice  *int64  `json:"unit_price"`
+	Fee        *int64  `json:"fee"`
 	OccurredAt string  `json:"occurred_at"`
 	Note       *string `json:"note"`
 }
@@ -221,6 +221,10 @@ func (h *PortfolioHandler) CreateTrade(c *gin.Context) {
 		portfolioBadRequest(c, "Khối lượng phải là số thập phân dương, tối đa 8 chữ số sau dấu phẩy.")
 		return
 	}
+	if input.UnitPrice == nil || *input.UnitPrice < 0 || (input.Fee != nil && *input.Fee < 0) {
+		portfolioBadRequest(c, "Giá và phí phải là số nguyên VND không âm.")
+		return
+	}
 	occurredAt := time.Now().UTC()
 	if strings.TrimSpace(input.OccurredAt) != "" {
 		parsed, parseErr := time.Parse(time.RFC3339, input.OccurredAt)
@@ -230,7 +234,11 @@ func (h *PortfolioHandler) CreateTrade(c *gin.Context) {
 		}
 		occurredAt = parsed.UTC()
 	}
-	trade, err := h.Portfolio.CreateTrade(owner, strings.TrimSpace(c.Param("id")), portfoliorepo.PortfolioTradeInput{Side: strings.TrimSpace(input.Side), QuantityScaled: quantity, UnitPrice: input.UnitPrice, Fee: input.Fee, OccurredAt: occurredAt, Note: normalizeOptional(input.Note)})
+	fee := int64(0)
+	if input.Fee != nil {
+		fee = *input.Fee
+	}
+	trade, err := h.Portfolio.CreateTrade(owner, strings.TrimSpace(c.Param("id")), portfoliorepo.PortfolioTradeInput{Side: strings.TrimSpace(input.Side), QuantityScaled: quantity, UnitPrice: *input.UnitPrice, Fee: fee, OccurredAt: occurredAt, Note: normalizeOptional(input.Note)})
 	if err != nil {
 		portfolioMapError(c, err)
 		return

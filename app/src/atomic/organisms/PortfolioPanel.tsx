@@ -53,9 +53,15 @@ export function PortfolioPanel({ refreshKey = 0 }: { refreshKey?: number }) {
 
   const addTrade = async () => {
     if (saving || !tradeForm.assetID || !tradeForm.quantity || !tradeForm.unitPrice || !tradeForm.occurredAt) return;
+    const unitPrice = Number(tradeForm.unitPrice);
+    const fee = Number(tradeForm.fee || 0);
+    if (!Number.isSafeInteger(unitPrice) || unitPrice < 0 || !Number.isSafeInteger(fee) || fee < 0) {
+      setError("Giá và phí phải là số nguyên VND không âm.");
+      return;
+    }
     try {
       setSaving(true);
-      await createPortfolioTrade(tradeForm.assetID, { side: tradeForm.side, quantity: tradeForm.quantity.trim(), unit_price: Number(tradeForm.unitPrice), fee: Number(tradeForm.fee || 0), occurred_at: new Date(`${tradeForm.occurredAt}T12:00:00`).toISOString() });
+      await createPortfolioTrade(tradeForm.assetID, { side: tradeForm.side, quantity: tradeForm.quantity.trim(), unit_price: unitPrice, fee, occurred_at: new Date(`${tradeForm.occurredAt}T12:00:00`).toISOString() });
       setTradeForm(form => ({ ...form, quantity: "", unitPrice: "", fee: "0" }));
       await load();
     } catch (nextError) {
@@ -68,6 +74,10 @@ export function PortfolioPanel({ refreshKey = 0 }: { refreshKey?: number }) {
   const savePrice = async (asset: PortfolioAsset) => {
     if (saving) return;
     const value = priceDrafts[asset.id]?.trim() ?? "";
+    if (value !== "" && (!Number.isSafeInteger(Number(value)) || Number(value) < 0)) {
+      setError("Giá hiện tại phải là số nguyên VND không âm.");
+      return;
+    }
     try {
       setSaving(true);
       await updatePortfolioPrice(asset.id, value === "" ? null : Number(value));

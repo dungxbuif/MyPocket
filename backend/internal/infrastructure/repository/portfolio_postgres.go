@@ -61,6 +61,9 @@ func (r *PortfolioPostgresRepository) UpdateAssetPrice(ownerID, assetID string, 
 	}
 	row.LatestPrice = update.LatestPrice
 	row.LatestPriceAt = update.LatestPriceAt
+	if update.LatestPrice == nil {
+		row.LatestPriceAt = nil
+	}
 	if err := r.db.Model(&row).Updates(map[string]any{"latest_price": row.LatestPrice, "latest_price_at": row.LatestPriceAt}).Error; err != nil {
 		return nil, err
 	}
