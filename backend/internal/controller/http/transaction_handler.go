@@ -63,6 +63,12 @@ type transferInput struct {
 	Note                *string `json:"note"`
 }
 
+type transferUpdateInput struct {
+	Amount     int64   `json:"amount"`
+	OccurredAt string  `json:"occurred_at"`
+	Note       *string `json:"note"`
+}
+
 // CreateTransfer godoc
 // @Summary Create an atomic internal wallet transfer
 // @Tags Transactions
@@ -154,6 +160,106 @@ func (h *TransactionHandler) CreateTransfer(c *gin.Context) {
 	Created(c, []*entity.Transaction{source, destination})
 }
 
+// UpdateTransfer godoc
+// @Summary Update both rows of an internal wallet transfer
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param transfer_id path string true "Transfer ID"
+// @Param transfer body transferUpdateInput true "Transfer update"
+// @Success 200 {array} entity.Transaction
+// @Failure 400 {object} Problem
+// @Failure 401 {object} Problem
+// @Failure 404 {object} Problem
+// @Failure 409 {object} Problem
+// @Router /api/v1/transactions/transfer/{transfer_id} [patch]
+func (h *TransactionHandler) UpdateTransfer(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h.Transfers == nil {
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "luồng chuyển ví chưa được cấu hình"})
+		return
+	}
+	var input transferUpdateInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	if input.Amount <= 0 {
+		transactionBadRequest(c, transactionAmountMessage)
+		return
+	}
+	occurredAt := time.Now().UTC()
+	if strings.TrimSpace(input.OccurredAt) == "" {
+		transactionBadRequest(c, transactionDateMessage)
+		return
+	}
+	parsed, err := time.Parse(time.RFC3339, input.OccurredAt)
+	if err != nil {
+		transactionBadRequest(c, transactionDateMessage)
+		return
+	}
+	occurredAt = parsed.UTC()
+	rows, err := h.Transfers.UpdateTransfer(owner, strings.TrimSpace(c.Param("transfer_id")), transactionrepo.TransferUpdate{Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note)})
+	if err != nil {
+		switch {
+		case errors.Is(err, transactionrepo.ErrTransferNotFound):
+			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
+		case errors.Is(err, transactionrepo.ErrTransferInvalid), errors.Is(err, transactionrepo.ErrTransferWalletInvalid):
+			transactionBadRequest(c, "Chuyển ví không hợp lệ.")
+		case errors.Is(err, transactionrepo.ErrTransferPairInvalid):
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Cặp giao dịch chuyển ví không hợp lệ hoặc đã thay đổi."})
+		default:
+			Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		}
+		return
+	}
+	OK(c, rows)
+}
+
+// DeleteTransfer godoc
+// @Summary Delete both rows of an internal wallet transfer
+// @Tags Transactions
+// @Produce json
+// @Security BearerAuth
+// @Param transfer_id path string true "Transfer ID"
+// @Success 204
+// @Failure 400 {object} Problem
+// @Failure 401 {object} Problem
+// @Failure 404 {object} Problem
+// @Failure 409 {object} Problem
+// @Router /api/v1/transactions/transfer/{transfer_id} [delete]
+func (h *TransactionHandler) DeleteTransfer(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h.Transfers == nil {
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "luồng chuyển ví chưa được cấu hình"})
+		return
+	}
+	err := h.Transfers.DeleteTransfer(owner, strings.TrimSpace(c.Param("transfer_id")))
+	if err != nil {
+		switch {
+		case errors.Is(err, transactionrepo.ErrTransferNotFound):
+			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
+		case errors.Is(err, transactionrepo.ErrTransferInvalid), errors.Is(err, transactionrepo.ErrTransferWalletInvalid):
+			transactionBadRequest(c, "Chuyển ví không hợp lệ.")
+		case errors.Is(err, transactionrepo.ErrTransferPairInvalid):
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Cặp giao dịch chuyển ví không hợp lệ hoặc đã thay đổi."})
+		default:
+			Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		}
+		return
+	}
+	NoContent(c)
+}
+
 // ListTransactions godoc
 // @Summary List transactions
 // @Tags Transactions
@@ -234,6 +340,10 @@ func (h *TransactionHandler) UpdateTransaction(c *gin.Context) {
 		Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
 		return
 	}
+	if existing.TransferID != nil {
+		transactionBadRequest(c, "Giao dịch chuyển ví phải được sửa theo cặp.")
+		return
+	}
 	input, occurredAt, valid := h.bindAndValidate(c, owner, existing)
 	if !valid {
 		return
@@ -263,6 +373,10 @@ func (h *TransactionHandler) DeleteTransaction(c *gin.Context) {
 	owner, ok := transactionOwner(c)
 	if !ok {
 		transactionUnauthorized(c)
+		return
+	}
+	if existing, err := h.Transactions.Find(owner, c.Param("id")); err == nil && existing != nil && existing.TransferID != nil {
+		transactionBadRequest(c, "Giao dịch chuyển ví phải được xóa theo cặp.")
 		return
 	}
 	if err := h.Transactions.Delete(owner, c.Param("id")); err != nil {

@@ -20,6 +20,9 @@ type transactionRepositoryStub struct {
 	updated             *entity.Transaction
 	transferSource      *entity.Transaction
 	transferDestination *entity.Transaction
+	transferUpdated     []entity.Transaction
+	transferDeleted     string
+	transferErr         error
 }
 
 func (s *transactionRepositoryStub) List(string) ([]entity.Transaction, error) { return nil, nil }
@@ -36,6 +39,19 @@ func (s *transactionRepositoryStub) Update(string, string, map[string]any) (*ent
 func (s *transactionRepositoryStub) Delete(string, string) error { return nil }
 func (s *transactionRepositoryStub) CreateTransfer(_ string, source, destination *entity.Transaction) error {
 	s.transferSource, s.transferDestination = source, destination
+	return nil
+}
+func (s *transactionRepositoryStub) UpdateTransfer(_ string, _ string, _ repository.TransferUpdate) ([]entity.Transaction, error) {
+	if s.transferErr != nil {
+		return nil, s.transferErr
+	}
+	return s.transferUpdated, nil
+}
+func (s *transactionRepositoryStub) DeleteTransfer(_ string, transferID string) error {
+	if s.transferErr != nil {
+		return s.transferErr
+	}
+	s.transferDeleted = transferID
 	return nil
 }
 
@@ -116,7 +132,10 @@ func transactionTestRouter(handler *TransactionHandler) *gin.Engine {
 	router.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
 	router.POST("/transactions", handler.CreateTransaction)
 	router.POST("/transactions/transfer", handler.CreateTransfer)
+	router.PATCH("/transactions/transfer/:transfer_id", handler.UpdateTransfer)
+	router.DELETE("/transactions/transfer/:transfer_id", handler.DeleteTransfer)
 	router.PATCH("/transactions/:id", handler.UpdateTransaction)
+	router.DELETE("/transactions/:id", handler.DeleteTransaction)
 	return router
 }
 
@@ -162,6 +181,55 @@ func TestCreateTransferRejectsSameWallet(t *testing.T) {
 	router.ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest || transactions.transferSource != nil {
 		t.Fatalf("same-wallet transfer should be rejected: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestUpdateTransferReturnsBothRows(t *testing.T) {
+	when := time.Date(2026, time.September, 22, 3, 0, 0, 0, time.UTC)
+	rows := []entity.Transaction{
+		{ID: "source", OwnerID: "owner-1", Type: entity.TransactionTypeExpense, Amount: 90000, OccurredAt: when},
+		{ID: "destination", OwnerID: "owner-1", Type: entity.TransactionTypeIncome, Amount: 90000, OccurredAt: when},
+	}
+	transactions := &transactionRepositoryStub{transferUpdated: rows}
+	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPatch, "/transactions/transfer/transfer-1", bytes.NewBufferString(`{"amount":90000,"occurred_at":"2026-09-22T10:00:00Z","note":"updated"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if len(transactions.transferUpdated) != 2 {
+		t.Fatalf("expected both transfer rows, got %#v", transactions.transferUpdated)
+	}
+}
+
+func TestDeleteTransferDeletesBothRowsAtomically(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	router := transactionTestRouter(NewTransactionHandler(transactions, &transactionWalletRepositoryStub{}, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodDelete, "/transactions/transfer/transfer-1", nil)
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if transactions.transferDeleted != "transfer-1" {
+		t.Fatalf("expected transfer deletion, got %q", transactions.transferDeleted)
+	}
+}
+
+func TestSingleRowUpdateRejectsLinkedTransfer(t *testing.T) {
+	transferID := "transfer-1"
+	existing := &entity.Transaction{ID: "source", OwnerID: "owner-1", WalletID: "wallet-1", Type: entity.TransactionTypeExpense, Amount: 90000, OccurredAt: time.Now().UTC(), TransferID: &transferID}
+	transactions := &transactionRepositoryStub{existing: existing, updated: existing}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic}}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPatch, "/transactions/source", bytes.NewBufferString(`{"wallet_id":"wallet-1","type":"expense","amount":90000}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("linked row should require pair mutation, status=%d body=%s", response.Code, response.Body.String())
 	}
 }
 

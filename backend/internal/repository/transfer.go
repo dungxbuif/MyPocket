@@ -7,4 +7,6 @@ import "github.com/mypocket/backend/internal/entity"
 // existing balance and report calculations stay correct.
 type TransferRepository interface {
 	CreateTransfer(ownerID string, source, destination *entity.Transaction) error
+	UpdateTransfer(ownerID, transferID string, updates TransferUpdate) ([]entity.Transaction, error)
+	DeleteTransfer(ownerID, transferID string) error
 }

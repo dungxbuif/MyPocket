@@ -2,6 +2,7 @@ package repository
 
 import (
 	"errors"
+	"time"
 
 	"github.com/mypocket/backend/internal/entity"
 )
@@ -9,7 +10,15 @@ import (
 var (
 	ErrTransferInvalid       = errors.New("invalid internal transfer")
 	ErrTransferWalletInvalid = errors.New("invalid transfer wallet")
+	ErrTransferNotFound      = errors.New("transfer not found")
+	ErrTransferPairInvalid   = errors.New("invalid transfer pair")
 )
+
+type TransferUpdate struct {
+	Amount     int64
+	OccurredAt time.Time
+	Note       *string
+}
 
 type TransactionRepository interface {
 	List(ownerID string) ([]entity.Transaction, error)

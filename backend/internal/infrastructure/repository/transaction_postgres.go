@@ -128,6 +128,140 @@ func (r *TransactionPostgresRepository) CreateTransfer(ownerID string, source, d
 	})
 }
 
+func (r *TransactionPostgresRepository) UpdateTransfer(ownerID, transferID string, updates transactionrepo.TransferUpdate) ([]entity.Transaction, error) {
+	if ownerID == "" || transferID == "" || updates.Amount <= 0 || updates.OccurredAt.IsZero() {
+		return nil, transactionrepo.ErrTransferInvalid
+	}
+	var result []entity.Transaction
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		rows, source, destination, err := r.lockTransferPair(tx, ownerID, transferID)
+		if err != nil {
+			return err
+		}
+		if err := r.validateTransferWallets(tx, ownerID, source, destination); err != nil {
+			return err
+		}
+		if source.Amount != destination.Amount || source.Type != entity.TransactionTypeExpense || destination.Type != entity.TransactionTypeIncome || source.IncludedInReports || destination.IncludedInReports || source.JarID != nil || destination.JarID != nil {
+			return transactionrepo.ErrTransferPairInvalid
+		}
+		update := map[string]any{"amount": updates.Amount, "occurred_at": updates.OccurredAt, "note": updates.Note}
+		updated := tx.Model(&entity.Transaction{}).Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Updates(update)
+		if updated.Error != nil {
+			return updated.Error
+		}
+		if updated.RowsAffected != int64(len(rows)) {
+			return transactionrepo.ErrTransferPairInvalid
+		}
+		for i := range rows {
+			rows[i].Amount = updates.Amount
+			rows[i].OccurredAt = updates.OccurredAt
+			rows[i].Note = updates.Note
+		}
+		result = []entity.Transaction{*source, *destination}
+		result[0].Amount, result[0].OccurredAt, result[0].Note = updates.Amount, updates.OccurredAt, updates.Note
+		result[1].Amount, result[1].OccurredAt, result[1].Note = updates.Amount, updates.OccurredAt, updates.Note
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (r *TransactionPostgresRepository) DeleteTransfer(ownerID, transferID string) error {
+	if ownerID == "" || transferID == "" {
+		return transactionrepo.ErrTransferInvalid
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		rows, source, destination, err := r.lockTransferPair(tx, ownerID, transferID)
+		if err != nil {
+			return err
+		}
+		if err := r.validateTransferWallets(tx, ownerID, source, destination); err != nil {
+			return err
+		}
+		if source.Amount != destination.Amount || source.Type != entity.TransactionTypeExpense || destination.Type != entity.TransactionTypeIncome || source.IncludedInReports || destination.IncludedInReports || source.JarID != nil || destination.JarID != nil {
+			return transactionrepo.ErrTransferPairInvalid
+		}
+		deleted := tx.Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Delete(&entity.Transaction{})
+		if deleted.Error != nil {
+			return deleted.Error
+		}
+		if deleted.RowsAffected != int64(len(rows)) {
+			return transactionrepo.ErrTransferPairInvalid
+		}
+		return nil
+	})
+}
+
+func (r *TransactionPostgresRepository) lockTransferPair(tx *gorm.DB, ownerID, transferID string) ([]entity.Transaction, *entity.Transaction, *entity.Transaction, error) {
+	var rows []entity.Transaction
+	query := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Order("type ASC, id ASC")
+	if err := query.Find(&rows).Error; err != nil {
+		return nil, nil, nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil, nil, transactionrepo.ErrTransferNotFound
+	}
+	if len(rows) != 2 {
+		return nil, nil, nil, transactionrepo.ErrTransferPairInvalid
+	}
+	var source, destination *entity.Transaction
+	for i := range rows {
+		row := rows[i]
+		switch row.Type {
+		case entity.TransactionTypeExpense:
+			if source != nil {
+				return nil, nil, nil, transactionrepo.ErrTransferPairInvalid
+			}
+			source = &row
+		case entity.TransactionTypeIncome:
+			if destination != nil {
+				return nil, nil, nil, transactionrepo.ErrTransferPairInvalid
+			}
+			destination = &row
+		default:
+			return nil, nil, nil, transactionrepo.ErrTransferPairInvalid
+		}
+	}
+	if source == nil || destination == nil || source.TransferID == nil || destination.TransferID == nil || *source.TransferID != transferID || *destination.TransferID != transferID {
+		return nil, nil, nil, transactionrepo.ErrTransferPairInvalid
+	}
+	return rows, source, destination, nil
+}
+
+func (r *TransactionPostgresRepository) validateTransferWallets(tx *gorm.DB, ownerID string, source, destination *entity.Transaction) error {
+	if source.WalletID == destination.WalletID {
+		return transactionrepo.ErrTransferWalletInvalid
+	}
+	var wallets []entity.Wallet
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND id IN ?", ownerID, []string{source.WalletID, destination.WalletID}).Find(&wallets).Error; err != nil {
+		return err
+	}
+	if len(wallets) != 2 {
+		return transactionrepo.ErrTransferWalletInvalid
+	}
+	for _, wallet := range wallets {
+		if wallet.Type == entity.WalletTypeCredit {
+			return transactionrepo.ErrTransferWalletInvalid
+		}
+	}
+	var categories []entity.Category
+	if err := tx.Where("is_system = true AND system_key IN ?", []string{"expense_transfer_out", "income_transfer_in"}).Find(&categories).Error; err != nil {
+		return err
+	}
+	categoryIDs := map[string]string{}
+	for _, category := range categories {
+		if category.SystemKey != nil {
+			categoryIDs[*category.SystemKey] = category.ID
+		}
+	}
+	if source.CategoryID == nil || destination.CategoryID == nil || categoryIDs["expense_transfer_out"] != *source.CategoryID || categoryIDs["income_transfer_in"] != *destination.CategoryID {
+		return transactionrepo.ErrTransferPairInvalid
+	}
+	return nil
+}
+
 func (r *TransactionPostgresRepository) Update(ownerID, id string, updates map[string]any) (*entity.Transaction, error) {
 	var updated entity.Transaction
 	err := r.db.Transaction(func(tx *gorm.DB) error {
