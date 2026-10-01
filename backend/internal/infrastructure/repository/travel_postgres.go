@@ -18,7 +18,7 @@ func NewTravelPostgresRepository(db *gorm.DB) travelrepo.TravelRepository {
 }
 
 func (r *TravelPostgresRepository) List(ownerID string) ([]entity.TravelEvent, error) {
-	var rows []entity.TravelEvent
+	rows := []entity.TravelEvent{}
 	if err := r.db.Where("owner_id = ?", ownerID).Order("active DESC, starts_on NULLS LAST, created_at DESC").Find(&rows).Error; err != nil {
 		return nil, err
 	}
