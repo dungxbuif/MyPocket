@@ -2120,6 +2120,253 @@
                 }
             }
         },
+        "/api/v1/portfolio/assets": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "List owner-scoped portfolio assets",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.PortfolioAsset"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Create a portfolio asset",
+                "parameters": [
+                    {
+                        "description": "Portfolio asset",
+                        "name": "asset",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.portfolioAssetInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PortfolioAsset"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/assets/{id}/price": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Update or clear the latest manual portfolio price",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Latest price; null clears it",
+                        "name": "price",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.portfolioPriceInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PortfolioAsset"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/assets/{id}/trades": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "List immutable portfolio trades for an asset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.PortfolioTrade"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Append a buy or sell trade to a portfolio asset",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Portfolio trade",
+                        "name": "trade",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.portfolioTradeInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PortfolioTrade"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/summary": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Read owner-scoped portfolio positions and valuation",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PortfolioSummary"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/recurring": {
             "get": {
                 "security": [
@@ -2281,6 +2528,68 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/entity.RecurringSchedule"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/insider": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Read the deterministic Money Insider report",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Calendar month YYYY-MM; defaults to account-local current month",
+                        "name": "month",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Optional owner wallet filter",
+                        "name": "wallet_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Optional owner category filter",
+                        "name": "category_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.InsiderSummary"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
                         }
                     }
                 }
@@ -3662,6 +3971,120 @@
                 }
             }
         },
+        "entity.InsiderCategoryTotal": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "count": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.InsiderExpenseRow": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "category_name": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "string"
+                },
+                "wallet_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.InsiderSummary": {
+            "type": "object",
+            "properties": {
+                "average_daily_expense": {
+                    "type": "integer"
+                },
+                "category_filter": {
+                    "type": "string"
+                },
+                "days_considered": {
+                    "type": "integer"
+                },
+                "estimated": {
+                    "type": "boolean"
+                },
+                "expense": {
+                    "type": "integer"
+                },
+                "expense_change_bps": {
+                    "type": "integer"
+                },
+                "expense_delta": {
+                    "type": "integer"
+                },
+                "income": {
+                    "type": "integer"
+                },
+                "is_current": {
+                    "type": "boolean"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "net": {
+                    "type": "integer"
+                },
+                "next_start_at": {
+                    "type": "string"
+                },
+                "previous_expense": {
+                    "type": "integer"
+                },
+                "spending_income_ratio_bps": {
+                    "type": "integer"
+                },
+                "start_at": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "top_categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.InsiderCategoryTotal"
+                    }
+                },
+                "top_expenses": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.InsiderExpenseRow"
+                    }
+                },
+                "wallet_filter": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.JarCumulativeMonth": {
             "type": "object",
             "properties": {
@@ -3899,6 +4322,140 @@
                     "type": "string"
                 },
                 "transaction_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.PortfolioAsset": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "latest_price": {
+                    "type": "integer"
+                },
+                "latest_price_at": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.PortfolioPosition": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "string"
+                },
+                "average_cost": {
+                    "type": "integer"
+                },
+                "cost_basis": {
+                    "type": "integer"
+                },
+                "latest_price": {
+                    "type": "integer"
+                },
+                "latest_price_at": {
+                    "type": "string"
+                },
+                "market_value": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "string"
+                },
+                "realized_pnl": {
+                    "type": "integer"
+                },
+                "symbol": {
+                    "type": "string"
+                },
+                "unrealized_pnl": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.PortfolioSummary": {
+            "type": "object",
+            "properties": {
+                "assets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.PortfolioAsset"
+                    }
+                },
+                "positions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.PortfolioPosition"
+                    }
+                },
+                "total_cost_basis": {
+                    "type": "integer"
+                },
+                "total_market_value": {
+                    "type": "integer"
+                },
+                "total_unrealized_pnl": {
+                    "type": "integer"
+                },
+                "trades": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.PortfolioTrade"
+                    }
+                }
+            }
+        },
+        "entity.PortfolioTrade": {
+            "type": "object",
+            "properties": {
+                "asset_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "fee": {
+                    "type": "integer"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "string"
+                },
+                "side": {
+                    "type": "string"
+                },
+                "unit_price": {
                     "type": "integer"
                 }
             }
@@ -4467,6 +5024,48 @@
             "properties": {
                 "note": {
                     "type": "string"
+                }
+            }
+        },
+        "httpapi.portfolioAssetInput": {
+            "type": "object",
+            "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.portfolioPriceInput": {
+            "type": "object",
+            "properties": {
+                "latest_price": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httpapi.portfolioTradeInput": {
+            "type": "object",
+            "properties": {
+                "fee": {
+                    "type": "integer"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "string"
+                },
+                "side": {
+                    "type": "string"
+                },
+                "unit_price": {
+                    "type": "integer"
                 }
             }
         },

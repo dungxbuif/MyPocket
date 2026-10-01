@@ -239,6 +239,81 @@ definitions:
       updated_at:
         type: string
     type: object
+  entity.InsiderCategoryTotal:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      count:
+        type: integer
+      name:
+        type: string
+    type: object
+  entity.InsiderExpenseRow:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      category_name:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      wallet_id:
+        type: string
+      wallet_name:
+        type: string
+    type: object
+  entity.InsiderSummary:
+    properties:
+      average_daily_expense:
+        type: integer
+      category_filter:
+        type: string
+      days_considered:
+        type: integer
+      estimated:
+        type: boolean
+      expense:
+        type: integer
+      expense_change_bps:
+        type: integer
+      expense_delta:
+        type: integer
+      income:
+        type: integer
+      is_current:
+        type: boolean
+      month:
+        type: string
+      net:
+        type: integer
+      next_start_at:
+        type: string
+      previous_expense:
+        type: integer
+      spending_income_ratio_bps:
+        type: integer
+      start_at:
+        type: string
+      timezone:
+        type: string
+      top_categories:
+        items:
+          $ref: '#/definitions/entity.InsiderCategoryTotal'
+        type: array
+      top_expenses:
+        items:
+          $ref: '#/definitions/entity.InsiderExpenseRow'
+        type: array
+      wallet_filter:
+        type: string
+    type: object
   entity.JarCumulativeMonth:
     properties:
       allocation_covered:
@@ -395,6 +470,94 @@ definitions:
       timezone:
         type: string
       transaction_count:
+        type: integer
+    type: object
+  entity.PortfolioAsset:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      latest_price:
+        type: integer
+      latest_price_at:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      symbol:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.PortfolioPosition:
+    properties:
+      asset_id:
+        type: string
+      average_cost:
+        type: integer
+      cost_basis:
+        type: integer
+      latest_price:
+        type: integer
+      latest_price_at:
+        type: string
+      market_value:
+        type: integer
+      name:
+        type: string
+      quantity:
+        type: string
+      realized_pnl:
+        type: integer
+      symbol:
+        type: string
+      unrealized_pnl:
+        type: integer
+    type: object
+  entity.PortfolioSummary:
+    properties:
+      assets:
+        items:
+          $ref: '#/definitions/entity.PortfolioAsset'
+        type: array
+      positions:
+        items:
+          $ref: '#/definitions/entity.PortfolioPosition'
+        type: array
+      total_cost_basis:
+        type: integer
+      total_market_value:
+        type: integer
+      total_unrealized_pnl:
+        type: integer
+      trades:
+        items:
+          $ref: '#/definitions/entity.PortfolioTrade'
+        type: array
+    type: object
+  entity.PortfolioTrade:
+    properties:
+      asset_id:
+        type: string
+      created_at:
+        type: string
+      fee:
+        type: integer
+      id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      owner_id:
+        type: string
+      quantity:
+        type: string
+      side:
+        type: string
+      unit_price:
         type: integer
     type: object
   entity.RecurringSchedule:
@@ -766,6 +929,33 @@ definitions:
     properties:
       note:
         type: string
+    type: object
+  httpapi.portfolioAssetInput:
+    properties:
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
+  httpapi.portfolioPriceInput:
+    properties:
+      latest_price:
+        type: integer
+    type: object
+  httpapi.portfolioTradeInput:
+    properties:
+      fee:
+        type: integer
+      note:
+        type: string
+      occurred_at:
+        type: string
+      quantity:
+        type: string
+      side:
+        type: string
+      unit_price:
+        type: integer
     type: object
   httpapi.recurringInput:
     properties:
@@ -2253,6 +2443,159 @@ paths:
       summary: Save the user's independent note for an account month
       tags:
       - Months
+  /api/v1/portfolio/assets:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.PortfolioAsset'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List owner-scoped portfolio assets
+      tags:
+      - Portfolio
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Portfolio asset
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioAssetInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.PortfolioAsset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a portfolio asset
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/price:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Latest price; null clears it
+        in: body
+        name: price
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioPriceInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PortfolioAsset'
+      security:
+      - BearerAuth: []
+      summary: Update or clear the latest manual portfolio price
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/trades:
+    get:
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.PortfolioTrade'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List immutable portfolio trades for an asset
+      tags:
+      - Portfolio
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Portfolio trade
+        in: body
+        name: trade
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioTradeInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.PortfolioTrade'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Append a buy or sell trade to a portfolio asset
+      tags:
+      - Portfolio
+  /api/v1/portfolio/summary:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PortfolioSummary'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Read owner-scoped portfolio positions and valuation
+      tags:
+      - Portfolio
   /api/v1/recurring:
     get:
       produces:
@@ -2354,6 +2697,45 @@ paths:
       summary: Materialize due recurring transaction occurrences
       tags:
       - Recurring
+  /api/v1/reports/insider:
+    get:
+      parameters:
+      - description: Calendar month YYYY-MM; defaults to account-local current month
+        in: query
+        name: month
+        type: string
+      - description: Optional owner wallet filter
+        in: query
+        name: wallet_id
+        type: string
+      - description: Optional owner category filter
+        in: query
+        name: category_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.InsiderSummary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Read the deterministic Money Insider report
+      tags:
+      - Reports
   /api/v1/transactions:
     get:
       produces:
