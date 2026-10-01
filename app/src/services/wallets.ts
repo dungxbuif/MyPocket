@@ -22,6 +22,9 @@ export type Wallet = {
   target_date?: string | null;
   credit_limit?: number | null;
   available_credit?: number;
+  last_statement_balance?: number | null;
+  statement_day?: number | null;
+  payment_due_day?: number | null;
 };
 
 export type WalletInput = {
@@ -33,6 +36,9 @@ export type WalletInput = {
   target_amount?: number;
   target_date?: string;
   credit_limit?: number;
+  last_statement_balance?: number;
+  statement_day?: number;
+  payment_due_day?: number;
 };
 
 const WALLET_API_PATH = "/api/v1/wallets";

@@ -89,9 +89,15 @@ type Transaction struct {
 // Balance is the signed outstanding debt (expense rows reduce it, payment/refund
 // rows increase it), so available credit is credit limit plus balance.
 type CreditStatement struct {
-	WalletID        string        `json:"wallet_id"`
-	CreditLimit     int64         `json:"credit_limit"`
-	Balance         int64         `json:"balance"`
-	AvailableCredit int64         `json:"available_credit"`
-	Items           []Transaction `json:"items"`
+	WalletID             string        `json:"wallet_id"`
+	CreditLimit          int64         `json:"credit_limit"`
+	Balance              int64         `json:"balance"`
+	AvailableCredit      int64         `json:"available_credit"`
+	LastStatementBalance *int64        `json:"last_statement_balance,omitempty"`
+	StatementDay         *int          `json:"statement_day,omitempty"`
+	PaymentDueDay        *int          `json:"payment_due_day,omitempty"`
+	AmountDue            int64         `json:"amount_due"`
+	PaymentStatus        string        `json:"payment_status"`
+	PaymentDueAt         *time.Time    `json:"payment_due_at,omitempty"`
+	Items                []Transaction `json:"items"`
 }

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { WalletSelectionList } from "../molecules/WalletSelectionList";
 import { WalletDetailPanel } from "./SavingsWalletPanel";
+import { CreditWalletPanel } from "./CreditWalletPanel";
 import { ArrowLeft, CreditCard, Landmark, PiggyBank, Plus, Trash2, WalletCards } from "lucide-react";
 
 import { BaseButton } from "../atoms/BaseButton";
@@ -22,7 +23,7 @@ const COPY = { title: "Ví của tôi", subtitle: "Tạo, sửa hoặc xóa ví"
 const WALLET_ICONS = { [WALLET_TYPES.basic]: WalletCards, [WALLET_TYPES.goal]: PiggyBank, [WALLET_TYPES.credit]: CreditCard } as const;
 
 function toForm(wallet: Wallet): WalletFormState {
-  return { name: wallet.name, type: wallet.type, openingBalance: String(wallet.opening_balance), isInTotal: wallet.is_in_total, description: wallet.description ?? "", targetAmount: wallet.target_amount ? String(wallet.target_amount) : "", targetDate: wallet.target_date?.slice(0,10) ?? "", creditLimit: wallet.credit_limit ? String(wallet.credit_limit) : "" };
+  return { name: wallet.name, type: wallet.type, openingBalance: String(wallet.opening_balance), isInTotal: wallet.is_in_total, description: wallet.description ?? "", targetAmount: wallet.target_amount ? String(wallet.target_amount) : "", targetDate: wallet.target_date?.slice(0,10) ?? "", creditLimit: wallet.credit_limit ? String(wallet.credit_limit) : "", lastStatementBalance: wallet.last_statement_balance != null ? String(wallet.last_statement_balance) : "", statementDay: wallet.statement_day != null ? String(wallet.statement_day) : "", paymentDueDay: wallet.payment_due_day != null ? String(wallet.payment_due_day) : "" };
 }
 
 function deleteWarning(transactionCount: number): string {
@@ -98,7 +99,7 @@ export function WalletManagementPanel({ onChanged, refreshKey = 0 }: { onChanged
   };
 
   const selectedWallet = wallets.find(wallet => wallet.id === selectedID);
-  if (selectedWallet && !editingList) return <div className="space-y-3">{error ? <StatusMessage tone="danger">{error}<BaseButton variant="ghost" onClick={() => void load()}>Thử lại</BaseButton></StatusMessage> : null}{loading ? <StatusMessage>Đang cập nhật số dư...</StatusMessage> : null}<WalletDetailPanel wallet={selectedWallet} transactions={transactions} categories={categories} onBack={() => setSelectedID(null)} onChanged={onChanged} /></div>;
+  if (selectedWallet && !editingList) return <div className="space-y-3">{error ? <StatusMessage tone="danger">{error}<BaseButton variant="ghost" onClick={() => void load()}>Thử lại</BaseButton></StatusMessage> : null}{loading ? <StatusMessage>Đang cập nhật số dư...</StatusMessage> : null}{selectedWallet.type === "credit" ? <><BaseButton variant="ghost" onClick={() => setSelectedID(null)}>← Ví của tôi</BaseButton><CreditWalletPanel wallet={selectedWallet} wallets={wallets} categories={categories} onChanged={() => { void load(); onChanged(); }} /></> : <WalletDetailPanel wallet={selectedWallet} transactions={transactions} categories={categories} onBack={() => setSelectedID(null)} onChanged={onChanged} />}</div>;
 
   return (
     <section className="space-y-3">

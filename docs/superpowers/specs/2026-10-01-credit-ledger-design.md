@@ -25,6 +25,11 @@ of truth.
 - A credit operation may use an applicable visible category matching its
   derived income/expense direction. Payment categories are system transfer
   categories and are excluded from reports.
+- Credit wallets may store an optional positive `last_statement_balance` and
+  statement/due days from 1–31. The statement read model derives `amount_due`
+  and a bounded status (`not_configured`, `due`, `partial`, `paid`, `overdue`)
+  without pretending to close an external bank statement. Cycle fields are
+  metadata; ledger rows remain the source of truth.
 
 ## Verification
 

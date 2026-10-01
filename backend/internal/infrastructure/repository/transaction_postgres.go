@@ -232,6 +232,10 @@ func (r *TransactionPostgresRepository) ListCreditStatement(ownerID, walletID st
 		return statement, transactionrepo.ErrCreditWalletInvalid
 	}
 	statement.CreditLimit = *wallet.CreditLimit
+	statement.LastStatementBalance = wallet.LastStatementBalance
+	statement.StatementDay = wallet.StatementDay
+	statement.PaymentDueDay = wallet.PaymentDueDay
+	statement.PaymentStatus = "not_configured"
 	statement.Balance = wallet.OpeningBalance
 	query := r.db.Where("owner_id = ? AND wallet_id = ? AND credit_kind IS NOT NULL", ownerID, walletID)
 	if from != nil {
@@ -255,7 +259,55 @@ func (r *TransactionPostgresRepository) ListCreditStatement(ownerID, walletID st
 		}
 	}
 	statement.AvailableCredit = statement.CreditLimit + statement.Balance
+	statement.AmountDue, statement.PaymentStatus, statement.PaymentDueAt = creditPaymentSummary(wallet, statement.Balance, time.Now().UTC(), r.db)
 	return statement, nil
+}
+
+func creditPaymentSummary(wallet entity.Wallet, balance int64, now time.Time, db *gorm.DB) (int64, string, *time.Time) {
+	if wallet.LastStatementBalance == nil || *wallet.LastStatementBalance <= 0 {
+		return 0, "not_configured", nil
+	}
+	amountDue := *wallet.LastStatementBalance
+	outstanding := -balance
+	if outstanding < 0 {
+		outstanding = 0
+	}
+	if outstanding < amountDue {
+		amountDue = outstanding
+	}
+	if outstanding == 0 {
+		return 0, "paid", nil
+	}
+	location := time.UTC
+	var user entity.User
+	if db != nil && db.Where("id = ?", wallet.OwnerID).First(&user).Error == nil {
+		if loaded, err := time.LoadLocation(user.Timezone); err == nil && user.Timezone != "Local" {
+			location = loaded
+		}
+	}
+	localNow := now.In(location)
+	dueDay := 0
+	if wallet.PaymentDueDay != nil {
+		dueDay = *wallet.PaymentDueDay
+	}
+	var dueAt *time.Time
+	status := "due"
+	if dueDay > 0 {
+		lastDay := time.Date(localNow.Year(), localNow.Month()+1, 0, 0, 0, 0, 0, location).Day()
+		if dueDay > lastDay {
+			dueDay = lastDay
+		}
+		due := time.Date(localNow.Year(), localNow.Month(), dueDay, 23, 59, 59, 0, location)
+		utc := due.UTC()
+		dueAt = &utc
+		if localNow.After(due) {
+			status = "overdue"
+		}
+	}
+	if amountDue < *wallet.LastStatementBalance {
+		status = "partial"
+	}
+	return amountDue, status, dueAt
 }
 
 func (r *TransactionPostgresRepository) BulkDelete(ownerID string, ids []string) error {

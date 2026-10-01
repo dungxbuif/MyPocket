@@ -191,6 +191,8 @@ definitions:
     type: object
   entity.CreditStatement:
     properties:
+      amount_due:
+        type: integer
       available_credit:
         type: integer
       balance:
@@ -201,6 +203,16 @@ definitions:
         items:
           $ref: '#/definitions/entity.Transaction'
         type: array
+      last_statement_balance:
+        type: integer
+      payment_due_at:
+        type: string
+      payment_due_day:
+        type: integer
+      payment_status:
+        type: string
+      statement_day:
+        type: integer
       wallet_id:
         type: string
     type: object
@@ -818,9 +830,15 @@ definitions:
         type: string
       is_in_total:
         type: boolean
+      last_statement_balance:
+        type: integer
       name:
         type: string
       opening_balance:
+        type: integer
+      payment_due_day:
+        type: integer
+      statement_day:
         type: integer
       target_amount:
         type: integer

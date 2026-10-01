@@ -29,11 +29,11 @@ Màu, font, bo góc theo [tokens](../../system/TOKENS.md) và [base contracts](.
 | --- | --- | --- | --- |
 | Thường | Tên, VND, số dư đầu, tính vào tổng | Số dư và lịch sử thu/chi; chuyển ví/điều chỉnh là luồng riêng | CRUD, màn chi tiết và thu/chi có |
 | Tiết kiệm | Trường chung, mục tiêu > 0, hạn tùy chọn | Đã có, còn thiếu, tiến độ theo số dư thật; nạp/rút cập nhật tiến độ; không tự tính lãi ngân hàng | Có target/ngày mục tiêu trong form/API, tiến độ và lịch sử thực trong chi tiết; visual UAT còn thiếu |
-| Tín dụng | Tên, VND, hạn mức > 0 | Dư nợ, hạn mức khả dụng, mua/hoàn tiền/phí/lãi, thanh toán và sổ tín dụng; không dùng ledger thu/chi thường | API, migration, atomic payment pair và CreditWalletPanel đã triển khai; ngày sao kê/hạn trả/phân bổ kỳ vẫn là follow-up |
+| Tín dụng | Tên, VND, hạn mức > 0; tùy chọn dư nợ sao kê/ngày sao kê/ngày đến hạn | Dư nợ, hạn mức khả dụng, mua/hoàn tiền/phí/lãi, thanh toán và sổ tín dụng; không dùng ledger thu/chi thường | API, cycle metadata, status, migration, atomic payment pair và CreditWalletPanel đã triển khai; phân bổ kỳ với ngân hàng thật vẫn là follow-up |
 
 Không suy diễn số dư sao kê bằng dư nợ hiện tại. Màn chi tiết theo loại cần contract và proof riêng trước khi coi hoàn thành; các trường dữ liệu mới cần detail design API/schema.
 
-Ví tín dụng hiện đã có sổ nợ và API ghi mua/hoàn/phí/lãi, thanh toán cặp nguyên tử, hạn mức khả dụng và danh sách statement. Kỳ sao kê, ngày hạn trả và phân bổ thanh toán theo kỳ chưa được triển khai; không gắn nhãn các trường đó vào UI hiện tại.
+Ví tín dụng hiện đã có sổ nợ và API ghi mua/hoàn/phí/lãi, thanh toán cặp nguyên tử, hạn mức khả dụng, metadata kỳ sao kê/ngày đến hạn, amount due/status và danh sách statement. Phân bổ thanh toán với dữ liệu sao kê ngân hàng thật chưa được triển khai; UI chỉ dùng metadata người dùng cung cấp.
 
 Du lịch hiện là `Travel Mode`/sự kiện gắn giao dịch theo [TICKET-05-03](../../../work/tickets/TICKET-05-03-su-kien-travel-mode.md), không phải loại ví thứ tư. Chưa có màn/contract UI riêng cho chuyến đi được phê duyệt và chưa có runtime Travel Mode; không hiển thị nhãn “ví du lịch” hoặc hứa rằng số dư ví thuộc riêng chuyến đi. Khi thiết kế màn chuyến đi, cần phân biệt tổng thu/chi của giao dịch liên kết với số dư của các ví nguồn.
 

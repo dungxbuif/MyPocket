@@ -127,6 +127,32 @@ func TestCreateCreditWalletRequiresPositiveLimit(t *testing.T) {
 	}
 }
 
+func TestCreateCreditWalletPersistsStatementCycle(t *testing.T) {
+	stub := &walletRepositoryStub{}
+	router := walletTestRouter(NewWalletHandler(stub))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Thẻ tín dụng","type":"credit","credit_limit":1000000,"last_statement_balance":250000,"statement_day":15,"payment_due_day":5}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || stub.created == nil {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if stub.created.LastStatementBalance == nil || *stub.created.LastStatementBalance != 250000 || stub.created.StatementDay == nil || *stub.created.StatementDay != 15 || stub.created.PaymentDueDay == nil || *stub.created.PaymentDueDay != 5 {
+		t.Fatalf("cycle fields not persisted: %#v", stub.created)
+	}
+}
+
+func TestCreateCreditWalletRejectsInvalidStatementDay(t *testing.T) {
+	router := walletTestRouter(NewWalletHandler(&walletRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Thẻ tín dụng","type":"credit","credit_limit":1000000,"statement_day":32}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+}
+
 func TestDeleteWalletUsesOwnerScopedRepository(t *testing.T) {
 	stub := &walletRepositoryStub{}
 	router := walletTestRouter(NewWalletHandler(stub))

@@ -24,6 +24,24 @@ func TestValidateJarAssignmentPreservesUnchangedHistoricalLink(t *testing.T) {
 	}
 }
 
+func TestCreditPaymentSummaryTracksDuePartialAndOverdue(t *testing.T) {
+	statementBalance := int64(250000)
+	dueDay := 5
+	wallet := entity.Wallet{OwnerID: "owner", LastStatementBalance: &statementBalance, PaymentDueDay: &dueDay}
+	_, status, dueAt := creditPaymentSummary(wallet, -250000, time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC), nil)
+	if status != "due" || dueAt == nil {
+		t.Fatalf("expected due status, got %q at=%v", status, dueAt)
+	}
+	amount, status, _ := creditPaymentSummary(wallet, -100000, time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC), nil)
+	if amount != 100000 || status != "partial" {
+		t.Fatalf("expected partial amount/status, got %d/%q", amount, status)
+	}
+	_, status, _ = creditPaymentSummary(wallet, -250000, time.Date(2026, 10, 6, 12, 0, 0, 0, time.UTC), nil)
+	if status != "overdue" {
+		t.Fatalf("expected overdue status, got %q", status)
+	}
+}
+
 func TestCreditLedgerKeepsSignedBalanceAndAtomicPaymentPair(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {

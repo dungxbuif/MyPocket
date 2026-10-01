@@ -3297,6 +3297,9 @@ const docTemplate = `{
         "entity.CreditStatement": {
             "type": "object",
             "properties": {
+                "amount_due": {
+                    "type": "integer"
+                },
                 "available_credit": {
                     "type": "integer"
                 },
@@ -3311,6 +3314,21 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/entity.Transaction"
                     }
+                },
+                "last_statement_balance": {
+                    "type": "integer"
+                },
+                "payment_due_at": {
+                    "type": "string"
+                },
+                "payment_due_day": {
+                    "type": "integer"
+                },
+                "payment_status": {
+                    "type": "string"
+                },
+                "statement_day": {
+                    "type": "integer"
                 },
                 "wallet_id": {
                     "type": "string"
@@ -4257,10 +4275,19 @@ const docTemplate = `{
                 "is_in_total": {
                     "type": "boolean"
                 },
+                "last_statement_balance": {
+                    "type": "integer"
+                },
                 "name": {
                     "type": "string"
                 },
                 "opening_balance": {
+                    "type": "integer"
+                },
+                "payment_due_day": {
+                    "type": "integer"
+                },
+                "statement_day": {
                     "type": "integer"
                 },
                 "target_amount": {

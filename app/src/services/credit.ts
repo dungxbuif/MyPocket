@@ -5,7 +5,7 @@ import type { Transaction } from "./transactions";
 export type CreditKind = "purchase" | "refund" | "fee" | "interest";
 export type CreditEntryInput = { kind: CreditKind; category_id?: string; amount: number; occurred_at?: string; note?: string };
 export type CreditPaymentInput = { source_wallet_id: string; amount: number; occurred_at?: string; note?: string };
-export type CreditStatement = { wallet_id: string; credit_limit: number; balance: number; available_credit: number; items: Transaction[] };
+export type CreditStatement = { wallet_id: string; credit_limit: number; balance: number; available_credit: number; last_statement_balance?: number | null; statement_day?: number | null; payment_due_day?: number | null; amount_due: number; payment_status: "not_configured" | "due" | "partial" | "paid" | "overdue"; payment_due_at?: string | null; items: Transaction[] };
 
 function path(walletID: string, suffix: string) { return `/api/v1/credit/wallets/${walletID}/${suffix}`; }
 

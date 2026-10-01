@@ -25,6 +25,9 @@ export type WalletFormState = {
   targetAmount: string;
   targetDate: string;
   creditLimit: string;
+  lastStatementBalance: string;
+  statementDay: string;
+  paymentDueDay: string;
 };
 
 export const EMPTY_WALLET_FORM: WalletFormState = {
@@ -36,6 +39,9 @@ export const EMPTY_WALLET_FORM: WalletFormState = {
   targetAmount: "",
   targetDate: "",
   creditLimit: "",
+  lastStatementBalance: "",
+  statementDay: "",
+  paymentDueDay: "",
 };
 
 const TYPE_LABELS: Record<WalletType, string> = {
@@ -54,6 +60,9 @@ export function walletFormToInput(state: WalletFormState): WalletInput {
     target_amount: state.type === WALLET_TYPES.goal ? Number(state.targetAmount) : undefined,
     target_date: state.type === WALLET_TYPES.goal ? state.targetDate : undefined,
     credit_limit: state.type === WALLET_TYPES.credit ? Number(state.creditLimit) : undefined,
+    last_statement_balance: state.type === WALLET_TYPES.credit && state.lastStatementBalance ? Number(state.lastStatementBalance) : undefined,
+    statement_day: state.type === WALLET_TYPES.credit && state.statementDay ? Number(state.statementDay) : undefined,
+    payment_due_day: state.type === WALLET_TYPES.credit && state.paymentDueDay ? Number(state.paymentDueDay) : undefined,
   };
 }
 
@@ -64,6 +73,7 @@ export function WalletEditorForm({ state, onChange, onSubmit, onCancel, saving, 
     <FormField label={editing ? "Số dư đầu kỳ (không đổi khi sửa)" : COPY.openingBalance}><BaseTextInput disabled={saving || editing} inputMode="numeric" value={state.openingBalance} onChange={(event) => onChange({ ...state, openingBalance: event.target.value.replace(/[^0-9-]/g, "") })} /></FormField>
     {state.type === WALLET_TYPES.goal ? <FormField label="Mục tiêu tiết kiệm (VND)"><BaseTextInput required disabled={saving} inputMode="numeric" value={state.targetAmount} onChange={(event) => onChange({ ...state, targetAmount: event.target.value.replace(/\D/g, "") })} /></FormField> : null}
     {state.type === WALLET_TYPES.credit ? <FormField label="Hạn mức tín dụng (VND)"><BaseTextInput required disabled={saving} inputMode="numeric" value={state.creditLimit} onChange={(event) => onChange({ ...state, creditLimit: event.target.value.replace(/\D/g, "") })} /></FormField> : null}
+    {state.type === WALLET_TYPES.credit ? <><FormField label="Dư nợ sao kê (VND)"><BaseTextInput disabled={saving} inputMode="numeric" value={state.lastStatementBalance} onChange={(event) => onChange({ ...state, lastStatementBalance: event.target.value.replace(/\D/g, "") })} /></FormField><div className="grid grid-cols-2 gap-3"><FormField label="Ngày sao kê"><BaseTextInput type="number" min="1" max="31" disabled={saving} value={state.statementDay} onChange={(event) => onChange({ ...state, statementDay: event.target.value.replace(/\D/g, "") })} /></FormField><FormField label="Ngày đến hạn"><BaseTextInput type="number" min="1" max="31" disabled={saving} value={state.paymentDueDay} onChange={(event) => onChange({ ...state, paymentDueDay: event.target.value.replace(/\D/g, "") })} /></FormField></div></> : null}
     {state.type === WALLET_TYPES.goal ? <FormField label="Ngày kết thúc"><BaseTextInput type="date" disabled={saving} value={state.targetDate} onChange={(event) => onChange({ ...state, targetDate: event.target.value })} /></FormField> : null}
     <BaseCheckbox label={COPY.includeTotal} disabled={saving} checked={state.isInTotal} onChange={(event) => onChange({ ...state, isInTotal: event.target.checked })}>{COPY.includeTotal}</BaseCheckbox>
     {editing ? <FormField label={COPY.description}><BaseTextInput disabled={saving} value={state.description} onChange={(event) => onChange({ ...state, description: event.target.value })} /></FormField> : null}
