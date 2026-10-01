@@ -103,6 +103,8 @@ func main() {
 	transactionHandler := httpapi.NewTransactionHandler(transactionRepository, walletRepository, categoryRepository)
 	transactionHandler.Users = userRepo
 	transactionHandler.Jars = jarRepository
+	travelRepository := repo.NewTravelPostgresRepository(database)
+	transactionHandler.Travel = travelRepository
 	verifySession := func(sessionID string) (string, error) {
 		return authUc.VerifySession(context.Background(), sessionID)
 	}
@@ -119,6 +121,7 @@ func main() {
 	router.RegisterRecurringRoutes(&httpapi.RecurringHandler{Schedules: recurringRepository, Wallets: walletRepository, Categories: categoryRepository, Users: userRepo})
 	creditRepository, _ := transactionRepository.(transactionrepo.CreditRepository)
 	router.RegisterCreditRoutes(&httpapi.CreditHandler{Credits: creditRepository, Wallets: walletRepository, Categories: categoryRepository})
+	router.RegisterTravelRoutes(&httpapi.TravelHandler{Events: travelRepository})
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
 	attachmentStorage, err := newAttachmentStorage(cfg)
 	if err != nil {

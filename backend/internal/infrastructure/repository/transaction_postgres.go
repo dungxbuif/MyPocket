@@ -72,6 +72,12 @@ func (r *TransactionPostgresRepository) Find(ownerID, id string) (*entity.Transa
 
 func (r *TransactionPostgresRepository) Create(transaction *entity.Transaction) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if transaction != nil && transaction.TravelEventID != nil {
+			var event entity.TravelEvent
+			if err := tx.Where("id = ? AND owner_id = ?", *transaction.TravelEventID, transaction.OwnerID).First(&event).Error; err != nil {
+				return transactionrepo.ErrTravelNotFound
+			}
+		}
 		if err := validateJarAssignment(tx, transaction.OwnerID, transaction.JarID, transaction.OccurredAt, nil); err != nil {
 			return err
 		}

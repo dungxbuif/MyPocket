@@ -18,6 +18,7 @@ export type Transaction = {
   adjustment_direction?: AdjustmentDirection | null;
   credit_kind?: "purchase" | "refund" | "fee" | "interest" | "payment" | null;
   credit_payment_id?: string | null;
+  travel_event_id?: string | null;
   occurred_at: string;
   note?: string | null;
   included_in_reports: boolean;
@@ -35,6 +36,7 @@ export type TransactionInput = {
   occurred_at: string;
   note?: string;
   included_in_reports: boolean;
+  travel_event_id?: string | null;
 };
 
 export type TransferInput = {

@@ -77,12 +77,25 @@ type Transaction struct {
 	AdjustmentDirection *string   `json:"adjustment_direction,omitempty" gorm:"column:adjustment_direction"`
 	CreditKind          *string   `json:"credit_kind,omitempty" gorm:"column:credit_kind"`
 	CreditPaymentID     *string   `json:"credit_payment_id,omitempty" gorm:"column:credit_payment_id;index"`
+	TravelEventID       *string   `json:"travel_event_id,omitempty" gorm:"column:travel_event_id;index"`
 	OccurredAt          time.Time `json:"occurred_at" gorm:"index;not null"`
 	Note                *string   `json:"note,omitempty"`
 	IncludedInReports   bool      `json:"included_in_reports" gorm:"not null;default:true"`
 	TransferID          *string   `json:"transfer_id,omitempty" gorm:"column:transfer_id;index"`
 	CreatedAt           time.Time `json:"created_at"`
 	UpdatedAt           time.Time `json:"updated_at"`
+}
+
+type TravelEvent struct {
+	ID        string        `json:"id" gorm:"primaryKey"`
+	OwnerID   string        `json:"owner_id" gorm:"index;not null"`
+	Name      string        `json:"name" gorm:"not null"`
+	Context   *string       `json:"context,omitempty"`
+	StartsOn  *CalendarDate `json:"starts_on,omitempty" gorm:"column:starts_on;type:date"`
+	EndsOn    *CalendarDate `json:"ends_on,omitempty" gorm:"column:ends_on;type:date"`
+	Active    bool          `json:"active" gorm:"not null;default:false"`
+	CreatedAt time.Time     `json:"created_at"`
+	UpdatedAt time.Time     `json:"updated_at"`
 }
 
 // CreditStatement is the read model for a credit wallet's debt ledger.

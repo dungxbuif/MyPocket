@@ -464,11 +464,34 @@ definitions:
         type: string
       transfer_id:
         type: string
+      travel_event_id:
+        type: string
       type:
         type: string
       updated_at:
         type: string
       wallet_id:
+        type: string
+    type: object
+  entity.TravelEvent:
+    properties:
+      active:
+        type: boolean
+      context:
+        type: string
+      created_at:
+        type: string
+      ends_on:
+        $ref: '#/definitions/entity.CalendarDate'
+      id:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      starts_on:
+        $ref: '#/definitions/entity.CalendarDate'
+      updated_at:
         type: string
     type: object
   entity.UserAPIKey:
@@ -795,6 +818,8 @@ definitions:
         type: string
       occurred_at:
         type: string
+      travel_event_id:
+        type: string
       type:
         type: string
       wallet_id:
@@ -820,6 +845,24 @@ definitions:
       note:
         type: string
       occurred_at:
+        type: string
+    type: object
+  httpapi.travelEventInput:
+    properties:
+      active:
+        type: boolean
+      context:
+        type: string
+      ends_on:
+        type: string
+      name:
+        type: string
+      starts_on:
+        type: string
+    type: object
+  httpapi.travelTransactionInput:
+    properties:
+      event_id:
         type: string
     type: object
   httpapi.walletInput:
@@ -2455,6 +2498,46 @@ paths:
       summary: Download a private attachment linked to an owned transaction
       tags:
       - Transactions
+  /api/v1/transactions/{id}/travel:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Travel event link; null clears the link
+        in: body
+        name: link
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.travelTransactionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Link or unlink an ordinary transaction to a travel event
+      tags:
+      - Transactions
   /api/v1/transactions/adjustment:
     post:
       consumes:
@@ -2645,6 +2728,151 @@ paths:
       summary: Update both rows of an internal wallet transfer
       tags:
       - Transactions
+  /api/v1/travel/events:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.TravelEvent'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List travel events
+      tags:
+      - Travel
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Travel event
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.travelEventInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.TravelEvent'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a travel event
+      tags:
+      - Travel
+  /api/v1/travel/events/{id}:
+    delete:
+      parameters:
+      - description: Travel event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete a travel event and clear its transaction links
+      tags:
+      - Travel
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Travel event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Travel event
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.travelEventInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.TravelEvent'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update a travel event
+      tags:
+      - Travel
+  /api/v1/travel/events/{id}/activate:
+    post:
+      parameters:
+      - description: Travel event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.TravelEvent'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Activate one travel event
+      tags:
+      - Travel
+  /api/v1/travel/events/{id}/deactivate:
+    post:
+      parameters:
+      - description: Travel event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.TravelEvent'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Deactivate a travel event
+      tags:
+      - Travel
   /api/v1/wallets:
     get:
       produces:

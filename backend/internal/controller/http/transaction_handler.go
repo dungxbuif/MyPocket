@@ -39,6 +39,7 @@ type TransactionHandler struct {
 	Users        categoryrepo.UserRepository
 	Jars         categoryrepo.JarRepository
 	Transfers    transactionrepo.TransferRepository
+	Travel       transactionrepo.TravelRepository
 }
 
 type transactionInput struct {
@@ -50,6 +51,7 @@ type transactionInput struct {
 	OccurredAt        string  `json:"occurred_at"`
 	Note              *string `json:"note"`
 	IncludedInReports *bool   `json:"included_in_reports"`
+	TravelEventID     *string `json:"travel_event_id"`
 }
 
 func NewTransactionHandler(transactions transactionrepo.TransactionRepository, wallets walletrepo.WalletRepository, categories categoryrepo.CategoryRepository) *TransactionHandler {
@@ -84,6 +86,10 @@ type adjustmentInput struct {
 
 type bulkDeleteInput struct {
 	TransactionIDs []string `json:"transaction_ids"`
+}
+
+type travelTransactionInput struct {
+	EventID *string `json:"event_id"`
 }
 
 // CreateTransfer godoc
@@ -360,7 +366,13 @@ func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 	if input.IncludedInReports != nil {
 		included = *input.IncludedInReports
 	}
-	transaction := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: input.WalletID, CategoryID: input.CategoryID, JarID: input.JarID, Type: input.Type, Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: included}
+	travelEventID := input.TravelEventID
+	if travelEventID == nil && h.Travel != nil {
+		if active, activeErr := h.Travel.Active(owner); activeErr == nil && active != nil {
+			travelEventID = &active.ID
+		}
+	}
+	transaction := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: input.WalletID, CategoryID: input.CategoryID, JarID: input.JarID, Type: input.Type, Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: included, TravelEventID: travelEventID}
 	if err := h.Transactions.Create(transaction); err != nil {
 		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
 		return
@@ -581,6 +593,57 @@ func (h *TransactionHandler) DeleteTransaction(c *gin.Context) {
 	NoContent(c)
 }
 
+// UpdateTransactionTravel godoc
+// @Summary Link or unlink an ordinary transaction to a travel event
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Transaction ID"
+// @Param link body travelTransactionInput true "Travel event link; null clears the link"
+// @Success 200 {object} entity.Transaction
+// @Failure 400 {object} Problem
+// @Failure 401 {object} Problem
+// @Failure 404 {object} Problem
+// @Router /api/v1/transactions/{id}/travel [patch]
+func (h *TransactionHandler) UpdateTransactionTravel(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h.Travel == nil {
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: "Travel Mode chưa được cấu hình."})
+		return
+	}
+	var input travelTransactionInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	if input.EventID != nil {
+		value := strings.TrimSpace(*input.EventID)
+		if value == "" {
+			input.EventID = nil
+		} else {
+			input.EventID = &value
+		}
+	}
+	row, err := h.Travel.LinkTransaction(owner, strings.TrimSpace(c.Param("id")), input.EventID)
+	if err != nil {
+		switch {
+		case errors.Is(err, transactionrepo.ErrTravelNotFound):
+			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: "Chuyến hoặc giao dịch không tồn tại."})
+		case errors.Is(err, transactionrepo.ErrTravelTransaction):
+			transactionBadRequest(c, "Chỉ giao dịch thu/chi thường mới có thể gắn chuyến.")
+		default:
+			Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		}
+		return
+	}
+	OK(c, row)
+}
+
 func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string, existing *entity.Transaction) (transactionInput, time.Time, bool) {
 	var input transactionInput
 	if err := c.ShouldBindJSON(&input); err != nil {
@@ -609,6 +672,17 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string, exist
 	if input.CategoryID != nil && !h.categoryValid(owner, *input.CategoryID, input.Type, input.WalletID, wallet.Type) {
 		transactionBadRequest(c, transactionCategoryMessage)
 		return transactionInput{}, time.Time{}, false
+	}
+	input.TravelEventID = normalizeOptional(input.TravelEventID)
+	if input.TravelEventID != nil {
+		if h.Travel == nil {
+			transactionBadRequest(c, "Travel Mode chưa được cấu hình.")
+			return transactionInput{}, time.Time{}, false
+		}
+		if _, travelErr := h.Travel.Find(owner, *input.TravelEventID); travelErr != nil {
+			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: "Chuyến không tồn tại hoặc không thuộc tài khoản."})
+			return transactionInput{}, time.Time{}, false
+		}
 	}
 	occurredAt := time.Now().UTC()
 	if strings.TrimSpace(input.OccurredAt) != "" {

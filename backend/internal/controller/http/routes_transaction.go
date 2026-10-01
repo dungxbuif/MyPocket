@@ -12,5 +12,6 @@ func registerTransactionRoutes(protected *gin.RouterGroup, handler *TransactionH
 	routes.PATCH("/transfer/:transfer_id", handler.UpdateTransfer)
 	routes.DELETE("/transfer/:transfer_id", handler.DeleteTransfer)
 	routes.PATCH(routeIDPath, handler.UpdateTransaction)
+	routes.PATCH(routeIDPath+"/travel", handler.UpdateTransactionTravel)
 	routes.DELETE(routeIDPath, handler.DeleteTransaction)
 }

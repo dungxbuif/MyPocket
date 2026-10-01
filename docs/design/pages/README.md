@@ -8,5 +8,8 @@ copy, API dependencies, proof, and known gaps. Runtime page entry points live in
 Use the [page contract template](README.md) when adding a new route. Shared visual
 evidence is stored separately under [references](../references/README.md).
 
+Implemented route contracts include [Travel Mode](travel/README.md), which is an
+event dimension on ordinary transactions rather than a wallet type.
+
 [Design gateway](../README.md) · [Templates](../templates/README.md) ·
 [System contracts](../system/DESIGN.md)
