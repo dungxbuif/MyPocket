@@ -37,8 +37,8 @@ window.fetch = async (url, options = {}) => {
   if(path.endsWith("/wallets")) return response([{id:"w",name:"Tiền mặt",type:"basic",currency:"VND",current_balance:100000,opening_balance:100000,is_in_total:true}]);
   if(path.endsWith("/categories")) return response(categoryFixture);
   if(path.endsWith("/transactions")) return method === "POST" ? response({ id:"manual-tx", ...body }) : response([
-    { id:"tx1", type:"expense", amount:35000, wallet_id:"w", note:"Lunch", occurred_at:"2026-09-20T05:00:00Z", included_in_reports:true },
-    { id:"tx2", type:"income", amount:100000, wallet_id:"w", note:"Refund", occurred_at:"2026-09-21T05:00:00Z", included_in_reports:true },
+    { id:"tx1", type:"expense", amount:35000, wallet_id:"w", note:"Lunch", occurred_at:"2026-09-30T05:00:00Z", included_in_reports:true },
+    { id:"tx2", type:"income", amount:100000, wallet_id:"w", note:"Refund", occurred_at:"2026-10-01T05:00:00Z", included_in_reports:true },
   ]);
   if(path.endsWith("/budgets")) return method === "POST" ? response({ id:"budget1", ...body }) : response({ items:[], spent:0, limit_amount:0 });
   if(path.endsWith("/process") && method === "POST") {

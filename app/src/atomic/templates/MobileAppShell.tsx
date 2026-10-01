@@ -4,6 +4,7 @@ import { AppHeader } from "../organisms/AppHeader";
 import { BottomNavigation } from "../organisms/BottomNavigation";
 import type { PrototypeTab } from "../pages/FinancePrototypePage";
 import { FeedbackFloatingBubble } from "../organisms/FeedbackFloatingBubble";
+import { PwaInstallPrompt } from "../organisms/PwaInstallPrompt";
 
 export function MobileAppShell({
   tab,
@@ -36,6 +37,7 @@ export function MobileAppShell({
         <section className="space-y-3 px-4">{children}</section>
         <BottomNavigation tab={tab} onTabChange={onTabChange} onAdd={onAdd} onAiAdd={onAiAdd} />
         <FeedbackFloatingBubble captureRoot={captureRoot} onSubmitted={onFeedbackSubmitted} />
+        <PwaInstallPrompt />
       </div>
     </main>
   );

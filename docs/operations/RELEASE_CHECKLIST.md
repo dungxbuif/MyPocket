@@ -18,6 +18,7 @@ shared_fields: [status]
 ## Pre-Release
 
 - [ ] Tests passed
+- [ ] Local web gate passed (`docs/operations/LOCAL_RELEASE_GATE.md`)
 - [ ] Master docs reconciled
 - [ ] ADRs updated
 - [ ] Release notes prepared

@@ -5,6 +5,10 @@ import { RouterProvider } from "@tanstack/react-router";
 import { router } from "./router";
 import "./styles.css";
 
+if (typeof navigator !== "undefined" && "serviceWorker" in navigator) {
+  void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+}
+
 createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <RouterProvider router={router} />
