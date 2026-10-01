@@ -8,7 +8,7 @@ import { BudgetsPanel } from "../organisms/BudgetsPanel";
 import { OverviewPanel } from "../organisms/OverviewPanel";
 import { QuickAddSheet } from "../organisms/QuickAddSheet";
 import { AiEntrySheet } from "../organisms/AiEntrySheet";
-// import { ReportsPanel } from "../organisms/ReportsPanel";
+import { ReportsPanel } from "../organisms/ReportsPanel";
 import { TransactionsPanel } from "../organisms/TransactionsPanel";
 import { GroupManagementPanel } from "../organisms/GroupManagementPanel";
 import { GroupEditorPage } from "../organisms/GroupEditorPage";
@@ -37,7 +37,7 @@ import {
   type UserProfile,
 } from "../../services/auth";
 
-export type PrototypeTab = "overview" | "transactions" | "budgets" | "assistant" | "account";
+export type PrototypeTab = "overview" | "transactions" | "budgets" | "reports" | "assistant" | "account";
 
 type AuthPhase = "checking" | "authenticated" | "unauthenticated";
 
@@ -131,6 +131,8 @@ export function FinancePrototypePage() {
       token: loginOutput.token,
       user: loginOutput.user,
       expiresAt: loginOutput.expires_at,
+      refreshToken: loginOutput.refresh_token,
+      refreshExpiresAt: loginOutput.refresh_expires_at,
     });
     const token = loginOutput.token;
     const rawProfile = await fetchProfile(token);
@@ -192,7 +194,7 @@ export function FinancePrototypePage() {
         {tab === "transactions" ? <TransactionsPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : null}
         {tab === "budgets" ? <BudgetsPanel masked={masked} refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh(value=>value+1)} /> : null}
         {tab === "assistant" ? <FinanceAssistantPanel ownerID={auth.user?.id ?? ""} masked={masked} /> : null}
-        {/* ReportsPanel awaits its real reporting API. */}
+        {tab === "reports" ? <ReportsPanel masked={masked} /> : null}
         {tab === "account" ? (location.pathname === "/account/budgets" ? <BudgetsPanel masked={masked} refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh(value=>value+1)} /> : location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : location.pathname.startsWith("/account/feedback") ? <FeedbackPanel refreshKey={feedbackRefresh} /> : <AccountPanel user={auth.user} onLogout={handleLogout} onTimezoneChange={user => setAuth(current => ({ ...current, user }))} />) : null}
       </MobileAppShell>
       {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} onAiEntry={() => { setQuickAddOpen(false); setAiEntryOpen(true); }} onSaved={() => setTransactionRefresh((value) => value + 1)} /> : null}
@@ -205,17 +207,19 @@ export function FinancePrototypePage() {
 function tabFromPath(pathname: string): PrototypeTab {
   if (pathname.startsWith("/transactions")) return "transactions";
   if (pathname.startsWith("/budgets")) return "budgets";
+  if (pathname.startsWith("/reports")) return "reports";
   if (pathname.startsWith("/assistant")) return "assistant";
   if (pathname.startsWith("/account")) return "account";
   return "overview";
 }
 
-function pathFromTab(tab: PrototypeTab): "/" | "/transactions" | "/budgets" | "/assistant" | "/account" {
-  const paths: Record<PrototypeTab, "/" | "/transactions" | "/budgets" | "/assistant" | "/account"> = {
-    overview: "/",
-    transactions: "/transactions",
-    budgets: "/budgets",
-    assistant: "/assistant",
+function pathFromTab(tab: PrototypeTab): "/" | "/transactions" | "/budgets" | "/reports" | "/assistant" | "/account" {
+  const paths: Record<PrototypeTab, "/" | "/transactions" | "/budgets" | "/reports" | "/assistant" | "/account"> = {
+	 overview: "/",
+	 transactions: "/transactions",
+	 budgets: "/budgets",
+	 reports: "/reports",
+	 assistant: "/assistant",
     account: "/account",
   };
   return paths[tab];

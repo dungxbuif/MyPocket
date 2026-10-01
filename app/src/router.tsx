@@ -16,8 +16,7 @@ const jarsRoute = createRoute({
   validateSearch: (search: Record<string, unknown>) => ({ month: typeof search.month === "string" ? search.month : undefined }),
 });
 const monthDetailRoute = createRoute({ getParentRoute: () => rootRoute, path: "months/$month" });
-// Reports stay deliberately out of the active route tree until the reporting API is implemented.
-// const reportsRoute = createRoute({ getParentRoute: () => rootRoute, path: "reports" });
+const reportsRoute = createRoute({ getParentRoute: () => rootRoute, path: "reports" });
 const accountRoute = createRoute({ getParentRoute: () => rootRoute, path: "account" });
 const groupsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups" });
 const groupNewRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups/new" });
@@ -33,6 +32,7 @@ const routeTree = rootRoute.addChildren([
   budgetsRoute,
   accountBudgetsRoute,
   assistantRoute,
+  reportsRoute,
   jarsRoute,
   monthDetailRoute,
   // reportsRoute,
