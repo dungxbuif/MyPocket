@@ -2021,6 +2021,62 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/transactions/adjustment": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Record an explicit wallet balance adjustment",
+                "parameters": [
+                    {
+                        "description": "Balance adjustment input",
+                        "name": "adjustment",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.adjustmentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Transaction"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/transactions/transfer": {
             "post": {
                 "security": [
@@ -3103,6 +3159,9 @@ const docTemplate = `{
         "entity.Transaction": {
             "type": "object",
             "properties": {
+                "adjustment_direction": {
+                    "type": "string"
+                },
                 "amount": {
                     "type": "integer"
                 },
@@ -3269,6 +3328,26 @@ const docTemplate = `{
             "properties": {
                 "data": {},
                 "meta": {}
+            }
+        },
+        "httpapi.adjustmentInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "direction": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
             }
         },
         "httpapi.advisorMessageInput": {

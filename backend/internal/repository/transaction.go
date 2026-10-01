@@ -8,10 +8,12 @@ import (
 )
 
 var (
-	ErrTransferInvalid       = errors.New("invalid internal transfer")
-	ErrTransferWalletInvalid = errors.New("invalid transfer wallet")
-	ErrTransferNotFound      = errors.New("transfer not found")
-	ErrTransferPairInvalid   = errors.New("invalid transfer pair")
+	ErrTransferInvalid         = errors.New("invalid internal transfer")
+	ErrTransferWalletInvalid   = errors.New("invalid transfer wallet")
+	ErrTransferNotFound        = errors.New("transfer not found")
+	ErrTransferPairInvalid     = errors.New("invalid transfer pair")
+	ErrAdjustmentInvalid       = errors.New("invalid balance adjustment")
+	ErrAdjustmentWalletInvalid = errors.New("invalid adjustment wallet")
 )
 
 type TransferUpdate struct {
@@ -24,6 +26,7 @@ type TransactionRepository interface {
 	List(ownerID string) ([]entity.Transaction, error)
 	Find(ownerID, id string) (*entity.Transaction, error)
 	Create(transaction *entity.Transaction) error
+	CreateAdjustment(transaction *entity.Transaction) error
 	Update(ownerID, id string, updates map[string]any) (*entity.Transaction, error)
 	Delete(ownerID, id string) error
 }

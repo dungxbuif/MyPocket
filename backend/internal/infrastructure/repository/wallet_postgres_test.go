@@ -27,13 +27,18 @@ func TestCalculateCurrentBalancesAppliesIncomeAndExpensePerWallet(t *testing.T) 
 	}
 }
 
-func TestCalculateCurrentBalancesIgnoresUnsupportedLedgerKinds(t *testing.T) {
+func TestCalculateCurrentBalancesAppliesExplicitAdjustments(t *testing.T) {
 	wallets := []entity.Wallet{{ID: "wallet-1", OpeningBalance: 100000}}
-	transactions := []entity.Transaction{{WalletID: "wallet-1", Type: "adjustment", Amount: 90000}}
+	increase := entity.AdjustmentDirectionIncrease
+	decrease := entity.AdjustmentDirectionDecrease
+	transactions := []entity.Transaction{
+		{WalletID: "wallet-1", Type: entity.TransactionTypeAdjustment, Amount: 90000, AdjustmentDirection: &increase},
+		{WalletID: "wallet-1", Type: entity.TransactionTypeAdjustment, Amount: 10000, AdjustmentDirection: &decrease},
+	}
 
 	calculateCurrentBalances(wallets, transactions)
 
-	if wallets[0].CurrentBalance != 100000 {
+	if wallets[0].CurrentBalance != 180000 {
 		t.Fatalf("current balance = %d", wallets[0].CurrentBalance)
 	}
 }

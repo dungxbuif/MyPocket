@@ -43,6 +43,12 @@ func calculateCurrentBalances(wallets []entity.Wallet, transactions []entity.Tra
 			wallets[index].CurrentBalance += transaction.Amount
 		case entity.TransactionTypeExpense:
 			wallets[index].CurrentBalance -= transaction.Amount
+		case entity.TransactionTypeAdjustment:
+			if transaction.AdjustmentDirection != nil && *transaction.AdjustmentDirection == entity.AdjustmentDirectionIncrease {
+				wallets[index].CurrentBalance += transaction.Amount
+			} else if transaction.AdjustmentDirection != nil && *transaction.AdjustmentDirection == entity.AdjustmentDirectionDecrease {
+				wallets[index].CurrentBalance -= transaction.Amount
+			}
 		}
 	}
 }

@@ -1,5 +1,7 @@
 # Transactions — list and basic income/expense editor
 
+The transaction options menu also exposes explicit balance adjustments. A user records a positive amount as either `Tăng số dư` or `Giảm số dư`; the row remains visible in the ledger and changes the wallet balance, but never changes income/expense report totals. Adjustment rows are immutable so a correction is made by recording the opposite adjustment.
+
 Status: implementation contract for [TICKET-02-01](../../../work/tickets/TICKET-02-01-ghi-thu-chi.md) and its [detail design](../../../work/tickets/TICKET-02-01-DETAIL_DESIGN.md). Route: `/transactions`; the global add action opens the same editor from every primary tab.
 
 ## Composition
@@ -12,10 +14,10 @@ The page header uses the shared `ScreenHeader` molecule so title/action spacing 
 
 | Region | Base implementation | Contract |
 | --- | --- | --- |
-| Wallet scope filter | `FormField` + `BaseSelect` | Always visible below the header. `Tổng cộng` is the aggregate wallet scope, not an All-time period. Switching a goal wallet selects its specialized ledger body; other scopes use the same selector. |
+| Wallet scope filter | `WalletScopeSelector` + `WalletSelectionList` + `BaseBottomSheet` | Always visible below the header as a compact wallet capsule. Opening it shows the shared `Chọn Ví` sheet with `Tổng cộng`, included/excluded wallet groups, real balances, add-wallet and disabled-link states. `Tổng cộng` is the aggregate wallet scope, not an All-time period. Switching a goal wallet selects its specialized ledger body; other scopes use the same selector. |
 | Period and week navigation | `SegmentedControl`, `BaseButton`, `Text` | Aggregate/basic/credit: current week by default, previous/next week and custom range; no All-time tab. Goal: hide period control and show full goal history. |
 | Date group | `SurfaceCard`, `Text` | Groups real API rows by the user's local calendar date and displays the signed group total. |
-| Transaction row | `TransactionItem` | Category icon/title, wallet and optional note, signed VND amount; activation opens edit mode. |
+| Transaction row | `TransactionItem` | Category icon/title, wallet and optional note, signed VND amount; activation opens edit mode. Adjustment rows use a neutral tone and cannot be edited or deleted through the ordinary editor. |
 | Editor shell | `BaseBottomSheet` | Modal focus trap, Escape/backdrop cancel, and return focus follow the shared sheet contract. |
 | Type, amount and metadata | `AmountField`, `DateField`, `FormSelectorRow`, `CategoryTreeSelector` → `BaseCategoryTree` selection mode, `FormField`/`BaseSelect` for optional jar, `BaseTextInput`, `BaseSwitch` | The global add sheet is ordinary `expense`/`income` only. Transfer uses a separate transfer-only sheet opened from the transactions screen's three-dot options menu; it uses the same amount/date/note bases plus two wallet selects and never shows category, jar, or report controls. |
 | Feedback/actions | `StatusMessage`, `BaseButton` | Save has loading/disabled behavior; delete exists only in edit mode and requires confirmation. |
@@ -36,6 +38,7 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 | Open an expense editor | Load jar choices for the transaction's account-local month; show only active monthly configurations, plus the existing historical assignment when editing. |
 | Activate global add | Open a clean ordinary editor with `expense`, current local date/time, report inclusion enabled, and the first available wallet. It does not offer transfer mode. |
 | Choose “Chuyển tiền đến ví khác” from the three-dot options menu | Open a transfer-only sheet with source/destination wallet selects; submit calls the atomic transfer endpoint and refreshes both wallet balances and the ledger. |
+| Choose “Điều chỉnh số dư” from the three-dot options menu | Open the shared form sheet, choose an eligible wallet and increase/decrease direction, then call the adjustment endpoint; refresh balances and ledger without changing report totals. |
 | Hold global add for 500ms | Open [AI entry chat](../assistant/README.md) with persistent prefilled review proposals. Release does not also open the manual editor; moving/cancelling cancels hold. Manual create offers keyboard-accessible “Nhập bằng AI”. |
 | Change wallet | Keep the selected group only if it applies to the new wallet; otherwise clear the group. |
 | Change type | Keep the selected group only if its kind matches; otherwise clear the group. |
@@ -69,9 +72,9 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 - `occurred_at` is sent as an RFC3339 timestamp. Note is trimmed and omitted when empty.
 - `included_in_reports` defaults to true.
 - `jar_id` is optional and may reference one active owner/month configuration only for ordinary expenses; income and transfer-out rows cannot be assigned. Clearing the selection sends null.
-- Wallet current balance is derived from ledger rows: opening balance plus income minus expense. Editing/deleting a row changes the derived balance; it does not mutate opening balance.
+- Wallet current balance is derived from ledger rows: opening balance plus income minus expense, with adjustments adding or subtracting by direction. Editing/deleting an ordinary row changes the derived balance; an adjustment is immutable and must be compensated by an opposite adjustment.
 
-APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options.
+APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/transfer/{transfer_id}`, `POST /api/v1/transactions/adjustment`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options.
 
 ## Copy and formatting
 

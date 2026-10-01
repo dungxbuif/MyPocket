@@ -10,8 +10,12 @@ const (
 )
 
 const (
-	TransactionTypeIncome  = "income"
-	TransactionTypeExpense = "expense"
+	TransactionTypeIncome     = "income"
+	TransactionTypeExpense    = "expense"
+	TransactionTypeAdjustment = "adjustment"
+
+	AdjustmentDirectionIncrease = "increase"
+	AdjustmentDirectionDecrease = "decrease"
 )
 
 type Wallet struct {
@@ -55,18 +59,19 @@ type CategoryWallet struct {
 }
 
 type Transaction struct {
-	ID                string    `json:"id" gorm:"primaryKey"`
-	OwnerID           string    `json:"owner_id" gorm:"index;not null"`
-	WalletID          string    `json:"wallet_id" gorm:"index;not null"`
-	CategoryID        *string   `json:"category_id,omitempty" gorm:"index"`
-	JarID             *string   `json:"jar_id,omitempty" gorm:"column:jar_id;index"`
-	JarName           string    `json:"jar_name,omitempty" gorm:"-"`
-	Type              string    `json:"type" gorm:"not null"`
-	Amount            int64     `json:"amount" gorm:"not null"`
-	OccurredAt        time.Time `json:"occurred_at" gorm:"index;not null"`
-	Note              *string   `json:"note,omitempty"`
-	IncludedInReports bool      `json:"included_in_reports" gorm:"not null;default:true"`
-	TransferID        *string   `json:"transfer_id,omitempty" gorm:"column:transfer_id;index"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                  string    `json:"id" gorm:"primaryKey"`
+	OwnerID             string    `json:"owner_id" gorm:"index;not null"`
+	WalletID            string    `json:"wallet_id" gorm:"index;not null"`
+	CategoryID          *string   `json:"category_id,omitempty" gorm:"index"`
+	JarID               *string   `json:"jar_id,omitempty" gorm:"column:jar_id;index"`
+	JarName             string    `json:"jar_name,omitempty" gorm:"-"`
+	Type                string    `json:"type" gorm:"not null"`
+	Amount              int64     `json:"amount" gorm:"not null"`
+	AdjustmentDirection *string   `json:"adjustment_direction,omitempty" gorm:"column:adjustment_direction"`
+	OccurredAt          time.Time `json:"occurred_at" gorm:"index;not null"`
+	Note                *string   `json:"note,omitempty"`
+	IncludedInReports   bool      `json:"included_in_reports" gorm:"not null;default:true"`
+	TransferID          *string   `json:"transfer_id,omitempty" gorm:"column:transfer_id;index"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
 }

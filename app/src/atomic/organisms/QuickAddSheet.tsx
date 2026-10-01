@@ -62,7 +62,7 @@ function initialState(transaction:Transaction|undefined,timezone:string): Editor
     return { type: "expense", amount: "", walletID: "", categoryID: "", jarID: "", occurredAt: localDateTimeValue(new Date(),timezone), note: "", includedInReports: true };
   }
   return {
-    type: transaction.type,
+    type: transaction.type === "income" || transaction.type === "expense" ? transaction.type : "expense",
     amount: String(transaction.amount),
     walletID: transaction.wallet_id,
     categoryID: transaction.category_id ?? "",

@@ -18,16 +18,17 @@ import (
 )
 
 const (
-	transactionUnauthorizedMessage = "chưa đăng nhập"
-	transactionAmountMessage       = "số tiền phải lớn hơn 0"
-	transactionTypeMessage         = "loại giao dịch không hợp lệ"
-	transactionWalletMessage       = "ví không tồn tại hoặc không thuộc tài khoản"
-	transactionCreditWalletMessage = "ví tín dụng cần luồng giao dịch tín dụng riêng"
-	transactionCategoryMessage     = "nhóm không phù hợp với loại giao dịch"
-	transactionDateMessage         = "thời điểm giao dịch không hợp lệ"
-	transactionNotFoundMessage     = "không tìm thấy giao dịch"
-	transactionLoadMessage         = "không đọc được giao dịch"
-	transactionSaveMessage         = "không lưu được giao dịch"
+	transactionUnauthorizedMessage        = "chưa đăng nhập"
+	transactionAmountMessage              = "số tiền phải lớn hơn 0"
+	transactionTypeMessage                = "loại giao dịch không hợp lệ"
+	transactionWalletMessage              = "ví không tồn tại hoặc không thuộc tài khoản"
+	transactionCreditWalletMessage        = "ví tín dụng cần luồng giao dịch tín dụng riêng"
+	transactionCategoryMessage            = "nhóm không phù hợp với loại giao dịch"
+	transactionDateMessage                = "thời điểm giao dịch không hợp lệ"
+	transactionNotFoundMessage            = "không tìm thấy giao dịch"
+	transactionLoadMessage                = "không đọc được giao dịch"
+	transactionSaveMessage                = "không lưu được giao dịch"
+	transactionAdjustmentDirectionMessage = "hướng điều chỉnh số dư không hợp lệ"
 )
 
 type TransactionHandler struct {
@@ -68,6 +69,14 @@ type transferInput struct {
 
 type transferUpdateInput struct {
 	Amount     int64   `json:"amount"`
+	OccurredAt string  `json:"occurred_at"`
+	Note       *string `json:"note"`
+}
+
+type adjustmentInput struct {
+	WalletID   string  `json:"wallet_id"`
+	Amount     int64   `json:"amount"`
+	Direction  string  `json:"direction"`
 	OccurredAt string  `json:"occurred_at"`
 	Note       *string `json:"note"`
 }
@@ -354,6 +363,69 @@ func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 	Created(c, transaction)
 }
 
+// CreateAdjustment godoc
+// @Summary Record an explicit wallet balance adjustment
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param adjustment body adjustmentInput true "Balance adjustment input"
+// @Success 201 {object} entity.Transaction
+// @Failure 400 {object} Problem
+// @Failure 401 {object} Problem
+// @Failure 404 {object} Problem
+// @Router /api/v1/transactions/adjustment [post]
+func (h *TransactionHandler) CreateAdjustment(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	var input adjustmentInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	input.WalletID, input.Direction = strings.TrimSpace(input.WalletID), strings.TrimSpace(input.Direction)
+	if input.Amount <= 0 {
+		transactionBadRequest(c, transactionAmountMessage)
+		return
+	}
+	if input.Direction != entity.AdjustmentDirectionIncrease && input.Direction != entity.AdjustmentDirectionDecrease {
+		transactionBadRequest(c, transactionAdjustmentDirectionMessage)
+		return
+	}
+	wallet, err := h.Wallets.Find(owner, input.WalletID)
+	if err != nil {
+		Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionWalletNotFound, Title: problemTitleNotFound, Detail: transactionWalletMessage})
+		return
+	}
+	if wallet.Type == entity.WalletTypeCredit {
+		transactionBadRequest(c, transactionCreditWalletMessage)
+		return
+	}
+	occurredAt := time.Now().UTC()
+	if strings.TrimSpace(input.OccurredAt) != "" {
+		parsed, parseErr := time.Parse(time.RFC3339, input.OccurredAt)
+		if parseErr != nil {
+			transactionBadRequest(c, transactionDateMessage)
+			return
+		}
+		occurredAt = parsed.UTC()
+	}
+	direction := input.Direction
+	transaction := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: wallet.ID, Type: entity.TransactionTypeAdjustment, Amount: input.Amount, AdjustmentDirection: &direction, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: false}
+	if err := h.Transactions.CreateAdjustment(transaction); err != nil {
+		if errors.Is(err, transactionrepo.ErrAdjustmentInvalid) || errors.Is(err, transactionrepo.ErrAdjustmentWalletInvalid) {
+			transactionBadRequest(c, "Điều chỉnh số dư không hợp lệ.")
+			return
+		}
+		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		return
+	}
+	Created(c, transaction)
+}
+
 // UpdateTransaction godoc
 // @Summary Update an income or expense transaction
 // @Tags Transactions
@@ -380,6 +452,10 @@ func (h *TransactionHandler) UpdateTransaction(c *gin.Context) {
 	}
 	if existing.TransferID != nil {
 		transactionBadRequest(c, "Giao dịch chuyển ví phải được sửa theo cặp.")
+		return
+	}
+	if existing.Type == entity.TransactionTypeAdjustment {
+		transactionBadRequest(c, "Điều chỉnh số dư là bất biến; hãy tạo một điều chỉnh mới để bù trừ.")
 		return
 	}
 	input, occurredAt, valid := h.bindAndValidate(c, owner, existing)
@@ -413,9 +489,15 @@ func (h *TransactionHandler) DeleteTransaction(c *gin.Context) {
 		transactionUnauthorized(c)
 		return
 	}
-	if existing, err := h.Transactions.Find(owner, c.Param("id")); err == nil && existing != nil && existing.TransferID != nil {
-		transactionBadRequest(c, "Giao dịch chuyển ví phải được xóa theo cặp.")
-		return
+	if existing, err := h.Transactions.Find(owner, c.Param("id")); err == nil && existing != nil {
+		if existing.TransferID != nil {
+			transactionBadRequest(c, "Giao dịch chuyển ví phải được xóa theo cặp.")
+			return
+		}
+		if existing.Type == entity.TransactionTypeAdjustment {
+			transactionBadRequest(c, "Điều chỉnh số dư là bất biến; hãy tạo một điều chỉnh mới để bù trừ.")
+			return
+		}
 	}
 	if err := h.Transactions.Delete(owner, c.Param("id")); err != nil {
 		Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})

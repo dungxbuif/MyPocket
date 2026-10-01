@@ -19,10 +19,12 @@ import { fetchWallets, type Wallet } from "../../services/wallets";
 import { dateKeyAt, todayDateKey, weekDateRange } from "../../services/accountTime";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
 import { ScreenHeader } from "../molecules/ScreenHeader";
-import { BaseSelect, FormField } from "../atoms/FormField";
 import { LedgerPeriodSelector, type LedgerPeriodMode } from "../molecules/LedgerPeriodSelector";
 import { filterLedgerTransactions, ledgerRangeForWallet } from "../../services/transactionLedger";
 import { WalletDetailPanel } from "./SavingsWalletPanel";
+import { WalletAdjustmentSheet } from "./WalletAdjustmentSheet";
+import { WalletScopeSelector } from "../molecules/WalletScopeSelector";
+import { useNavigate } from "@tanstack/react-router";
 
 const COPY = { title: "Giao dịch", loading: "Đang tải giao dịch...", empty: "Chưa có giao dịch. Dùng nút + để ghi khoản thu hoặc chi đầu tiên.", noMatch: "Không có giao dịch trong phạm vi đã chọn.", error: "Không thể tải giao dịch.", retry: "Thử lại" } as const;
 
@@ -40,6 +42,7 @@ function groupLabel(key: string, timezone:string): string {
 }
 
 export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: number; onChanged: () => void }) {
+  const navigate = useNavigate();
   const timezone=useAccountTimezone();
   const [menu, setMenu] = useState(false), [period, setPeriod] = useState(false), [byCategory, setByCategory] = useState(false);
   const [from, setFrom] = useState(""), [to, setTo] = useState("");
@@ -52,6 +55,7 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
   const [categories, setCategories] = useState<Category[]>([]);
   const [editing, setEditing] = useState<Transaction | null>(null);
   const [creatingTransfer, setCreatingTransfer] = useState(false);
+  const [creatingAdjustment, setCreatingAdjustment] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [localRefresh, setLocalRefresh] = useState(0);
@@ -98,7 +102,7 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
   return (
     <section className="space-y-3">
       <ScreenHeader title={COPY.title} action={<BaseButton variant="chip" size="sm" aria-label="Tùy chọn giao dịch" onClick={() => setMenu(true)}><MoreHorizontal size={20} /></BaseButton>} />
-      <FormField label="Ví"><BaseSelect aria-label="Chọn ví giao dịch" value={walletFilter} onChange={event => selectWallet(event.target.value)}><option value="">Tổng cộng</option>{wallets.map(wallet => <option key={wallet.id} value={wallet.id}>{wallet.name}</option>)}</BaseSelect></FormField>
+      <WalletScopeSelector wallets={wallets} selectedID={walletFilter || null} onSelect={id => selectWallet(id ?? "")} onAdd={() => void navigate({ to: "/account/wallets" })} onEdit={() => void navigate({ to: "/account/wallets" })} />
       {!isGoalWallet ? <LedgerPeriodSelector mode={periodMode} range={periodRange} weekOffset={weekOffset} onModeChange={selectPeriodMode} onPreviousWeek={() => setWeekOffset(value => value - 1)} onNextWeek={() => setWeekOffset(value => Math.min(value + 1, 0))} onEditCustom={openCustomPeriod} /> : null}
       {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
       {error ? <StatusMessage tone="danger">{COPY.error}</StatusMessage> : null}
@@ -110,13 +114,15 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
         return <SurfaceCard key={group.key} tone="form" padding="md"><div className="mb-3 flex items-center justify-between gap-2"><div className="flex items-center gap-3">{!byCategory ? <Text size="4xl" weight="bold">{Number(group.key.slice(8))}</Text> : null}<div><Text size="sm" tone="secondary">{byCategory ? group.label : new Intl.DateTimeFormat("vi-VN", { weekday: "long", timeZone:"UTC" }).format(new Date(`${group.key}T12:00:00Z`))}</Text><Text size="xs" tone="secondary">{byCategory ? `${group.rows.length} giao dịch` : new Intl.DateTimeFormat("vi-VN", { month: "long", year: "numeric", timeZone:"UTC" }).format(new Date(`${group.key}T12:00:00Z`))}</Text></div></div><Text numeric weight="bold">{formatVND(total)}</Text></div><Divider /><div className="mt-3 space-y-2">{group.rows.map((transaction) => {
           const category = transaction.category_id ? categoryByID.get(transaction.category_id) : undefined;
           const presentation = category ? categoryPresentationFor(category.system_key ?? category.icon_key) : { icon: Tags, tone: "categorySlate" as const };
-          return <TransactionItem key={transaction.id} item={{ title: category?.name ?? (transaction.type === "income" ? "Khoản thu" : "Khoản chi"), metadata: [walletNames.get(transaction.wallet_id) ?? "Ví đã xóa", transaction.note].filter(Boolean).join(" · "), amount: signedTransactionAmount(transaction), kind: transaction.type, icon: presentation.icon, tone: presentation.tone }} onActivate={selectedWallet?.type === "credit" ? undefined : () => setEditing(transaction)} />;
+          const title = category?.name ?? (transaction.type === "income" ? "Khoản thu" : transaction.type === "adjustment" ? "Điều chỉnh số dư" : "Khoản chi");
+          return <TransactionItem key={transaction.id} item={{ title, metadata: [walletNames.get(transaction.wallet_id) ?? "Ví đã xóa", transaction.note].filter(Boolean).join(" · "), amount: signedTransactionAmount(transaction), kind: transaction.type, icon: presentation.icon, tone: presentation.tone }} onActivate={selectedWallet?.type === "credit" ? undefined : () => setEditing(transaction)} />;
         })}</div></SurfaceCard>;
       }) : null}
-      {menu ? <BaseModal label="Tùy chọn giao dịch" onClose={() => setMenu(false)}><div className="space-y-2">{!isGoalWallet ? <><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); openCustomPeriod(); }}>Khoảng thời gian</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setByCategory(!byCategory); setMenu(false); }}>{byCategory ? "Xem theo ngày" : "Xem theo nhóm"}</BaseButton></> : null}<BaseButton className="w-full" variant="chip" onClick={() => { setLocalRefresh(v => v + 1); setMenu(false); }}>Tải lại giao dịch</BaseButton><BaseButton className="w-full" variant="chip" disabled>Xóa nhiều giao dịch</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); setCreatingTransfer(true); }}>Chuyển tiền đến ví khác</BaseButton><BaseButton className="w-full" variant="chip" disabled>Điều chỉnh số dư</BaseButton><BaseButton className="w-full" variant="chip" disabled>Đồng bộ ví</BaseButton><Text size="xs" tone="secondary">Các thao tác bị vô hiệu hóa chưa được hỗ trợ.</Text><BaseButton variant="ghost" onClick={() => setMenu(false)}>Đóng</BaseButton></div></BaseModal> : null}
+      {menu ? <BaseModal label="Tùy chọn giao dịch" onClose={() => setMenu(false)}><div className="space-y-2">{!isGoalWallet ? <><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); openCustomPeriod(); }}>Khoảng thời gian</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setByCategory(!byCategory); setMenu(false); }}>{byCategory ? "Xem theo ngày" : "Xem theo nhóm"}</BaseButton></> : null}<BaseButton className="w-full" variant="chip" onClick={() => { setLocalRefresh(v => v + 1); setMenu(false); }}>Tải lại giao dịch</BaseButton><BaseButton className="w-full" variant="chip" disabled>Xóa nhiều giao dịch</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); setCreatingTransfer(true); }}>Chuyển tiền đến ví khác</BaseButton><BaseButton className="w-full" variant="chip" onClick={() => { setMenu(false); setCreatingAdjustment(true); }}>Điều chỉnh số dư</BaseButton><BaseButton className="w-full" variant="chip" disabled>Đồng bộ ví</BaseButton><Text size="xs" tone="secondary">Xóa nhiều giao dịch và đồng bộ ví sẽ được mở ở các slice tiếp theo.</Text><BaseButton variant="ghost" onClick={() => setMenu(false)}>Đóng</BaseButton></div></BaseModal> : null}
       {period ? <BaseModal label="Khoảng thời gian" onClose={() => setPeriod(false)}><DateField label="Từ ngày" value={draftFrom} stepper={false} onChange={setDraftFrom} /><DateField label="Đến ngày" value={draftTo} stepper={false} onChange={setDraftTo} />{draftFrom && draftTo && draftTo < draftFrom ? <StatusMessage tone="danger">Ngày kết thúc phải sau ngày bắt đầu.</StatusMessage> : null}<div className="flex gap-2"><BaseButton variant="ghost" onClick={() => { setFrom(""); setTo(""); setWeekOffset(0); setPeriodMode("week"); setPeriod(false); }}>Tuần này</BaseButton><BaseButton disabled={!!(draftFrom && draftTo && draftTo < draftFrom)} onClick={() => { setFrom(draftFrom); setTo(draftTo); setPeriodMode(draftFrom || draftTo ? "custom" : "week"); if (!draftFrom && !draftTo) setWeekOffset(0); setPeriod(false); }}>Xong</BaseButton></div></BaseModal> : null}
       {editing ? <QuickAddSheet transaction={editing} onClose={() => setEditing(null)} onSaved={() => { setLocalRefresh((value) => value + 1); onChanged(); }} /> : null}
       {creatingTransfer ? <QuickAddSheet transferOnly onClose={() => setCreatingTransfer(false)} onSaved={() => { setCreatingTransfer(false); setLocalRefresh((value) => value + 1); onChanged(); }} /> : null}
+      {creatingAdjustment ? <WalletAdjustmentSheet wallets={wallets} onClose={() => setCreatingAdjustment(false)} onSaved={() => { setCreatingAdjustment(false); setLocalRefresh((value) => value + 1); onChanged(); }} /> : null}
     </section>
   );
 }

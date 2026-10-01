@@ -20,6 +20,8 @@ test("a category without wallet restrictions applies to every wallet", () => {
 test("signed transaction amount follows ledger direction", () => {
   assert.equal(signedTransactionAmount({ type: "income", amount: 125000 }), 125000);
   assert.equal(signedTransactionAmount({ type: "expense", amount: 125000 }), -125000);
+  assert.equal(signedTransactionAmount({ type: "adjustment", adjustment_direction: "increase", amount: 125000 }), 125000);
+  assert.equal(signedTransactionAmount({ type: "adjustment", adjustment_direction: "decrease", amount: 125000 }), -125000);
 });
 
 test("goal picker accepts only real savings catalog keys with matching kind and wallet scope", () => {

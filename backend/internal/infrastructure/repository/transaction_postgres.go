@@ -78,6 +78,33 @@ func (r *TransactionPostgresRepository) Create(transaction *entity.Transaction) 
 	})
 }
 
+func (r *TransactionPostgresRepository) CreateAdjustment(transaction *entity.Transaction) error {
+	if transaction == nil || transaction.OwnerID == "" || transaction.WalletID == "" || transaction.Amount <= 0 || transaction.Type != entity.TransactionTypeAdjustment || transaction.AdjustmentDirection == nil || (*transaction.AdjustmentDirection != entity.AdjustmentDirectionIncrease && *transaction.AdjustmentDirection != entity.AdjustmentDirectionDecrease) {
+		return transactionrepo.ErrAdjustmentInvalid
+	}
+	transaction.CategoryID = nil
+	transaction.JarID = nil
+	transaction.TransferID = nil
+	transaction.IncludedInReports = false
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var wallet entity.Wallet
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ?", transaction.WalletID, transaction.OwnerID).First(&wallet).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return transactionrepo.ErrAdjustmentWalletInvalid
+			}
+			return err
+		}
+		if wallet.Type == entity.WalletTypeCredit {
+			return transactionrepo.ErrAdjustmentWalletInvalid
+		}
+		insert := `INSERT INTO transactions (id, owner_id, wallet_id, type, amount, adjustment_direction, occurred_at, note, included_in_reports) VALUES (?, ?, ?, ?, ?, ?, ?, ?, false)`
+		if err := tx.Exec(insert, transaction.ID, transaction.OwnerID, transaction.WalletID, transaction.Type, transaction.Amount, transaction.AdjustmentDirection, transaction.OccurredAt, transaction.Note).Error; err != nil {
+			return err
+		}
+		return tx.Where("id = ?", transaction.ID).First(transaction).Error
+	})
+}
+
 func (r *TransactionPostgresRepository) CreateTransfer(ownerID string, source, destination *entity.Transaction) error {
 	if source == nil || destination == nil || source.TransferID == nil || destination.TransferID == nil || *source.TransferID != *destination.TransferID {
 		return transactionrepo.ErrTransferInvalid

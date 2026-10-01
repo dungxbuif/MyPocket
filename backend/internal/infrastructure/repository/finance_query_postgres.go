@@ -230,13 +230,14 @@ func (r *FinanceQueryPostgresRepository) readCompare(ctx context.Context, tx *go
 }
 
 type financeTransactionView struct {
-	ID         string    `json:"id"`
-	WalletID   string    `json:"wallet_id"`
-	CategoryID *string   `json:"category_id,omitempty"`
-	Type       string    `json:"type"`
-	Amount     int64     `json:"amount"`
-	OccurredAt time.Time `json:"occurred_at"`
-	Note       *string   `json:"note,omitempty"`
+	ID                  string    `json:"id"`
+	WalletID            string    `json:"wallet_id"`
+	CategoryID          *string   `json:"category_id,omitempty"`
+	Type                string    `json:"type"`
+	Amount              int64     `json:"amount"`
+	AdjustmentDirection *string   `json:"adjustment_direction,omitempty"`
+	OccurredAt          time.Time `json:"occurred_at"`
+	Note                *string   `json:"note,omitempty"`
 }
 
 type financeSearchView struct {
@@ -246,18 +247,19 @@ type financeSearchView struct {
 }
 
 type financeTransactionDetailView struct {
-	ID                string    `json:"id"`
-	WalletID          string    `json:"wallet_id"`
-	WalletName        string    `json:"wallet_name,omitempty"`
-	CategoryID        *string   `json:"category_id,omitempty"`
-	CategoryName      string    `json:"category_name,omitempty"`
-	JarID             *string   `json:"jar_id,omitempty"`
-	Type              string    `json:"type"`
-	Amount            int64     `json:"amount"`
-	OccurredAt        time.Time `json:"occurred_at"`
-	Note              *string   `json:"note,omitempty"`
-	IncludedInReports bool      `json:"included_in_reports"`
-	TransferID        *string   `json:"transfer_id,omitempty"`
+	ID                  string    `json:"id"`
+	WalletID            string    `json:"wallet_id"`
+	WalletName          string    `json:"wallet_name,omitempty"`
+	CategoryID          *string   `json:"category_id,omitempty"`
+	CategoryName        string    `json:"category_name,omitempty"`
+	JarID               *string   `json:"jar_id,omitempty"`
+	Type                string    `json:"type"`
+	Amount              int64     `json:"amount"`
+	AdjustmentDirection *string   `json:"adjustment_direction,omitempty"`
+	OccurredAt          time.Time `json:"occurred_at"`
+	Note                *string   `json:"note,omitempty"`
+	IncludedInReports   bool      `json:"included_in_reports"`
+	TransferID          *string   `json:"transfer_id,omitempty"`
 }
 
 func (r *FinanceQueryPostgresRepository) readTransaction(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery) (entity.FinanceResult, error) {
@@ -275,7 +277,7 @@ func (r *FinanceQueryPostgresRepository) readTransaction(ctx context.Context, tx
 		}
 		return entity.FinanceResult{}, err
 	}
-	view := financeTransactionDetailView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, JarID: row.JarID, Type: row.Type, Amount: row.Amount, OccurredAt: row.OccurredAt, Note: row.Note, IncludedInReports: row.IncludedInReports, TransferID: row.TransferID}
+	view := financeTransactionDetailView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, JarID: row.JarID, Type: row.Type, Amount: row.Amount, AdjustmentDirection: row.AdjustmentDirection, OccurredAt: row.OccurredAt, Note: row.Note, IncludedInReports: row.IncludedInReports, TransferID: row.TransferID}
 	var wallet entity.Wallet
 	if err := tx.WithContext(ctx).Where("id = ? AND owner_id = ?", row.WalletID, ownerID).First(&wallet).Error; err == nil {
 		view.WalletName = wallet.Name
@@ -332,7 +334,7 @@ func (r *FinanceQueryPostgresRepository) readSearch(ctx context.Context, tx *gor
 		rows = rows[:filter.Limit]
 	}
 	for _, row := range rows {
-		view.Items = append(view.Items, financeTransactionView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, Type: row.Type, Amount: row.Amount, OccurredAt: row.OccurredAt, Note: row.Note})
+		view.Items = append(view.Items, financeTransactionView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, Type: row.Type, Amount: row.Amount, AdjustmentDirection: row.AdjustmentDirection, OccurredAt: row.OccurredAt, Note: row.Note})
 	}
 	encoded, err := json.Marshal(view)
 	if err != nil {
@@ -385,6 +387,12 @@ func (r *FinanceQueryPostgresRepository) readWalletBalances(ctx context.Context,
 			balances[row.WalletID] += row.Amount
 		} else if row.Type == entity.TransactionTypeExpense {
 			balances[row.WalletID] -= row.Amount
+		} else if row.Type == entity.TransactionTypeAdjustment && row.AdjustmentDirection != nil {
+			if *row.AdjustmentDirection == entity.AdjustmentDirectionIncrease {
+				balances[row.WalletID] += row.Amount
+			} else if *row.AdjustmentDirection == entity.AdjustmentDirectionDecrease {
+				balances[row.WalletID] -= row.Amount
+			}
 		}
 	}
 	items := make([]financeWalletView, 0, len(wallets))

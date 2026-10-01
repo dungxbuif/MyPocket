@@ -16,6 +16,7 @@ import (
 
 type transactionRepositoryStub struct {
 	created             *entity.Transaction
+	adjustmentCreated   *entity.Transaction
 	existing            *entity.Transaction
 	updated             *entity.Transaction
 	transferSource      *entity.Transaction
@@ -34,6 +35,10 @@ func (s *transactionRepositoryStub) Find(string, string) (*entity.Transaction, e
 }
 func (s *transactionRepositoryStub) Create(item *entity.Transaction) error {
 	s.created = item
+	return nil
+}
+func (s *transactionRepositoryStub) CreateAdjustment(item *entity.Transaction) error {
+	s.adjustmentCreated = item
 	return nil
 }
 func (s *transactionRepositoryStub) Update(string, string, map[string]any) (*entity.Transaction, error) {
@@ -149,12 +154,72 @@ func transactionTestRouter(handler *TransactionHandler) *gin.Engine {
 	router := gin.New()
 	router.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
 	router.POST("/transactions", handler.CreateTransaction)
+	router.POST("/transactions/adjustment", handler.CreateAdjustment)
 	router.POST("/transactions/transfer", handler.CreateTransfer)
 	router.PATCH("/transactions/transfer/:transfer_id", handler.UpdateTransfer)
 	router.DELETE("/transactions/transfer/:transfer_id", handler.DeleteTransfer)
 	router.PATCH("/transactions/:id", handler.UpdateTransaction)
 	router.DELETE("/transactions/:id", handler.DeleteTransaction)
 	return router
+}
+
+func TestCreateAdjustmentPersistsExplicitBalanceChange(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
+		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
+	}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPost, "/transactions/adjustment", bytes.NewBufferString(`{"wallet_id":"wallet-1","amount":5000,"direction":"increase","occurred_at":"2026-09-22T10:00:00+07:00","note":"cash count"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated {
+		t.Fatalf("status = %d, body = %s", response.Code, response.Body.String())
+	}
+	if transactions.adjustmentCreated == nil || transactions.adjustmentCreated.Type != entity.TransactionTypeAdjustment || transactions.adjustmentCreated.Amount != 5000 || transactions.adjustmentCreated.IncludedInReports {
+		t.Fatalf("unexpected adjustment: %#v", transactions.adjustmentCreated)
+	}
+	if transactions.adjustmentCreated.AdjustmentDirection == nil || *transactions.adjustmentCreated.AdjustmentDirection != entity.AdjustmentDirectionIncrease {
+		t.Fatalf("unexpected adjustment direction: %#v", transactions.adjustmentCreated)
+	}
+}
+
+func TestCreateAdjustmentRejectsCreditWallet(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
+		"credit-1": {ID: "credit-1", OwnerID: "owner-1", Type: entity.WalletTypeCredit},
+	}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPost, "/transactions/adjustment", bytes.NewBufferString(`{"wallet_id":"credit-1","amount":5000,"direction":"increase"}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || transactions.adjustmentCreated != nil {
+		t.Fatalf("credit adjustment should be rejected: status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestAdjustmentCannotBeEditedOrDeletedThroughOrdinaryRoutes(t *testing.T) {
+	direction := entity.AdjustmentDirectionIncrease
+	existing := &entity.Transaction{ID: "adjustment-1", OwnerID: "owner-1", WalletID: "wallet-1", Type: entity.TransactionTypeAdjustment, Amount: 5000, AdjustmentDirection: &direction}
+	transactions := &transactionRepositoryStub{existing: existing}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
+		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
+	}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{}))
+	update := httptest.NewRequest(http.MethodPatch, "/transactions/adjustment-1", bytes.NewBufferString(`{"wallet_id":"wallet-1","type":"expense","amount":5000}`))
+	update.Header.Set("Content-Type", "application/json")
+	updateResponse := httptest.NewRecorder()
+	router.ServeHTTP(updateResponse, update)
+	if updateResponse.Code != http.StatusBadRequest {
+		t.Fatalf("adjustment update should be rejected: status=%d body=%s", updateResponse.Code, updateResponse.Body.String())
+	}
+	delete := httptest.NewRequest(http.MethodDelete, "/transactions/adjustment-1", nil)
+	deleteResponse := httptest.NewRecorder()
+	router.ServeHTTP(deleteResponse, delete)
+	if deleteResponse.Code != http.StatusBadRequest {
+		t.Fatalf("adjustment delete should be rejected: status=%d body=%s", deleteResponse.Code, deleteResponse.Body.String())
+	}
 }
 
 func TestCreateTransferPersistsAtomicPairedRows(t *testing.T) {

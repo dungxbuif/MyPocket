@@ -372,6 +372,8 @@ definitions:
     type: object
   entity.Transaction:
     properties:
+      adjustment_direction:
+        type: string
       amount:
         type: integer
       category_id:
@@ -482,6 +484,19 @@ definitions:
     properties:
       data: {}
       meta: {}
+    type: object
+  httpapi.adjustmentInput:
+    properties:
+      amount:
+        type: integer
+      direction:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      wallet_id:
+        type: string
     type: object
   httpapi.advisorMessageInput:
     properties:
@@ -2083,6 +2098,41 @@ paths:
       security:
       - BearerAuth: []
       summary: Download a private attachment linked to an owned transaction
+      tags:
+      - Transactions
+  /api/v1/transactions/adjustment:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Balance adjustment input
+        in: body
+        name: adjustment
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.adjustmentInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Record an explicit wallet balance adjustment
       tags:
       - Transactions
   /api/v1/transactions/transfer:

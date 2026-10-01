@@ -1,5 +1,6 @@
 import { apiRequest } from "./api";
 import { getStoredToken } from "./auth";
+import type { AdjustmentDirection } from "./transactionLogic";
 
 export { categoryAppliesToTransaction, signedTransactionAmount } from "./transactionLogic";
 
@@ -12,8 +13,9 @@ export type Transaction = {
   category_id?: string | null;
   jar_id?: string | null;
   jar_name?: string;
-  type: TransactionType;
+  type: TransactionType | "adjustment";
   amount: number;
+  adjustment_direction?: AdjustmentDirection | null;
   occurred_at: string;
   note?: string | null;
   included_in_reports: boolean;
@@ -41,6 +43,14 @@ export type TransferInput = {
   note?: string;
 };
 
+export type AdjustmentInput = {
+  wallet_id: string;
+  amount: number;
+  direction: AdjustmentDirection;
+  occurred_at?: string;
+  note?: string;
+};
+
 const TRANSACTION_API_PATH = "/api/v1/transactions";
 
 export function fetchTransactions(): Promise<Transaction[]> {
@@ -61,4 +71,8 @@ export function deleteTransaction(id: string): Promise<void> {
 
 export function createTransfer(input: TransferInput): Promise<Transaction[]> {
   return apiRequest<Transaction[]>(`${TRANSACTION_API_PATH}/transfer`, { method: "POST", body: JSON.stringify(input) }, getStoredToken());
+}
+
+export function createAdjustment(input: AdjustmentInput): Promise<Transaction> {
+  return apiRequest<Transaction>(`${TRANSACTION_API_PATH}/adjustment`, { method: "POST", body: JSON.stringify(input) }, getStoredToken());
 }

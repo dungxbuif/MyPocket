@@ -10,7 +10,7 @@ export type TransactionItemModel = {
   title: string;
   metadata: string;
   amount: number;
-  kind: "income" | "expense" | "transfer" | "debt";
+  kind: "income" | "expense" | "adjustment" | "transfer" | "debt";
   icon: LucideIcon;
   tone: BadgeTone;
 };
@@ -23,7 +23,7 @@ export function TransactionItem({ item, onActivate }: { item: TransactionItemMod
         <Text weight="semibold" className="truncate">{item.title}</Text>
         <Text size="xs" tone="secondary" className="truncate">{item.metadata}</Text>
       </div>
-      <Text numeric weight="bold" tone={item.kind === "income" ? "action" : item.kind === "transfer" ? "secondary" : "danger"} className="tracking-tight">{formatVND(item.amount)}</Text>
+      <Text numeric weight="bold" tone={item.kind === "income" ? "action" : item.kind === "adjustment" || item.kind === "transfer" ? "secondary" : "danger"} className="tracking-tight">{formatVND(item.amount)}</Text>
     </BaseButton>
   );
 }
