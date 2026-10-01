@@ -6,7 +6,7 @@ import { StatusMessage } from "../atoms/StatusMessage";
 import { Text } from "../atoms/Text";
 import { updateAccountTimezone, type UserProfile } from "../../services/auth";
 import { ProfileHeroCard } from "../molecules/ProfileHeroCard";
-import { Wallet, Layers3, MessageSquareText, PieChart, BarChart3 } from "lucide-react";
+import { Wallet, Layers3, MessageSquareText, PieChart, BarChart3, Repeat2 } from "lucide-react";
 import { AccountMenuRow } from "../molecules/AccountMenuRow";
 import { SurfaceCard } from "../atoms/SurfaceCard";
 
@@ -59,6 +59,8 @@ export function AccountPanel({
         <AccountMenuRow to="/account/groups" icon={Layers3} label="Nhóm" />
         <Divider className="mx-4" />
         <AccountMenuRow to="/account/budgets" icon={PieChart} label="Ngân sách" />
+        <Divider className="mx-4" />
+        <AccountMenuRow to="/account/recurring" icon={Repeat2} label="Giao dịch định kỳ" />
         <Divider className="mx-4" />
         <AccountMenuRow to="/reports" icon={BarChart3} label="Báo cáo" />
         <Divider className="mx-4" />

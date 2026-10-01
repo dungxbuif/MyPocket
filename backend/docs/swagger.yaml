@@ -370,6 +370,43 @@ definitions:
       transaction_count:
         type: integer
     type: object
+  entity.RecurringSchedule:
+    properties:
+      active:
+        type: boolean
+      amount:
+        type: integer
+      anchor_day:
+        type: integer
+      anchor_month:
+        type: integer
+      category_id:
+        type: string
+      created_at:
+        type: string
+      ends_at:
+        type: string
+      frequency:
+        type: string
+      id:
+        type: string
+      interval:
+        type: integer
+      name:
+        type: string
+      next_run_at:
+        type: string
+      note:
+        type: string
+      owner_id:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+      wallet_id:
+        type: string
+    type: object
   entity.Transaction:
     properties:
       adjustment_direction:
@@ -648,6 +685,31 @@ definitions:
   httpapi.monthNoteInput:
     properties:
       note:
+        type: string
+    type: object
+  httpapi.recurringInput:
+    properties:
+      active:
+        type: boolean
+      amount:
+        type: integer
+      category_id:
+        type: string
+      ends_at:
+        type: string
+      frequency:
+        type: string
+      interval:
+        type: integer
+      name:
+        type: string
+      next_run_at:
+        type: string
+      note:
+        type: string
+      type:
+        type: string
+      wallet_id:
         type: string
     type: object
   httpapi.refreshRequest:
@@ -1963,6 +2025,107 @@ paths:
       summary: Save the user's independent note for an account month
       tags:
       - Months
+  /api/v1/recurring:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.RecurringSchedule'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List recurring transaction schedules
+      tags:
+      - Recurring
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Recurring schedule
+        in: body
+        name: schedule
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.recurringInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.RecurringSchedule'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a recurring transaction schedule
+      tags:
+      - Recurring
+  /api/v1/recurring/{id}:
+    delete:
+      parameters:
+      - description: Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete a recurring transaction schedule
+      tags:
+      - Recurring
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Recurring schedule
+        in: body
+        name: schedule
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.recurringInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.RecurringSchedule'
+      security:
+      - BearerAuth: []
+      summary: Update a recurring transaction schedule
+      tags:
+      - Recurring
+  /api/v1/recurring/run-due:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Materialize due recurring transaction occurrences
+      tags:
+      - Recurring
   /api/v1/transactions:
     get:
       produces:

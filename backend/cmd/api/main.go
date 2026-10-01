@@ -85,6 +85,7 @@ func main() {
 		RedirectURL:  cfg.GoogleRedirectURL,
 	})
 	authUc := usecase.NewAuthInteractor(userRepo, passwordSvc, jwtSvc, cacheRepo, googleOAuth)
+	authUc.RefreshTTL = cfg.RefreshTTL
 
 	authHandler := httpapi.NewAuthHandler(
 		authUc,
@@ -113,6 +114,8 @@ func main() {
 	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: repo.NewBudgetPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Transactions: repo.NewTransactionPostgresRepository(database), Users: userRepo})
 	router.RegisterJarRoutes(&httpapi.JarHandler{Jars: jarRepository, Users: userRepo})
 	router.RegisterMonthRoutes(&httpapi.MonthHandler{Users: userRepo, Transactions: transactionRepository, Categories: categoryRepository, Jars: jarRepository, Notes: monthNotes})
+	recurringRepository := repo.NewRecurringPostgresRepository(database)
+	router.RegisterRecurringRoutes(&httpapi.RecurringHandler{Schedules: recurringRepository, Wallets: walletRepository, Categories: categoryRepository, Users: userRepo})
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
 	attachmentStorage, err := newAttachmentStorage(cfg)
 	if err != nil {

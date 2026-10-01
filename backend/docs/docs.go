@@ -1934,6 +1934,172 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/recurring": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recurring"
+                ],
+                "summary": "List recurring transaction schedules",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.RecurringSchedule"
+                            }
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recurring"
+                ],
+                "summary": "Create a recurring transaction schedule",
+                "parameters": [
+                    {
+                        "description": "Recurring schedule",
+                        "name": "schedule",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.recurringInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.RecurringSchedule"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/recurring/run-due": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recurring"
+                ],
+                "summary": "Materialize due recurring transaction occurrences",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "integer"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/recurring/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Recurring"
+                ],
+                "summary": "Delete a recurring transaction schedule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Schedule ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Recurring"
+                ],
+                "summary": "Update a recurring transaction schedule",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Schedule ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Recurring schedule",
+                        "name": "schedule",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.recurringInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.RecurringSchedule"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/transactions": {
             "get": {
                 "security": [
@@ -3212,6 +3378,62 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.RecurringSchedule": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "amount": {
+                    "type": "integer"
+                },
+                "anchor_day": {
+                    "type": "integer"
+                },
+                "anchor_month": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "ends_at": {
+                    "type": "string"
+                },
+                "frequency": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interval": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "next_run_at": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.Transaction": {
             "type": "object",
             "properties": {
@@ -3638,6 +3860,44 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "note": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.recurringInput": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "amount": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "ends_at": {
+                    "type": "string"
+                },
+                "frequency": {
+                    "type": "string"
+                },
+                "interval": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "next_run_at": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "wallet_id": {
                     "type": "string"
                 }
             }

@@ -23,6 +23,7 @@ const groupNewRoute = createRoute({ getParentRoute: () => rootRoute, path: "acco
 const groupEditRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/groups/$categoryId/edit" });
 const walletsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/wallets" });
 const feedbackRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/feedback" });
+const recurringRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/recurring" });
 const authRoute = createRoute({ getParentRoute: () => rootRoute, path: "auth/google" });
 const authCallbackRoute = createRoute({ getParentRoute: () => rootRoute, path: "auth/callback" });
 
@@ -42,6 +43,7 @@ const routeTree = rootRoute.addChildren([
   groupEditRoute,
   walletsRoute,
   feedbackRoute,
+  recurringRoute,
   authRoute,
   authCallbackRoute,
 ]);

@@ -36,6 +36,8 @@ Goal transaction categories, when explicitly selected, must use real catalog key
 
 `POST /api/v1/transactions/bulk-delete` accepts `{transaction_ids: string[]}` with 1–100 unique IDs. The owner-scoped repository locks and validates every requested row before deleting any row. If an ID is missing/not owned, a transfer pair is included, or an immutable adjustment is included, the entire request is rejected and no row is deleted. The endpoint returns `204` only after all rows are deleted.
 
+Recurring schedules are exposed at `GET/POST /api/v1/recurring`, `PATCH/DELETE /api/v1/recurring/{id}`, and `POST /api/v1/recurring/run-due`. Schedules are owner-scoped ordinary income/expense templates with a positive amount, frequency (`daily|weekly|monthly|yearly`), interval, next local-time occurrence and optional end. `run-due` is bounded to 100 occurrences and records a unique `(schedule_id, due_at)` marker in the same transaction as the generated row; retries do not duplicate transactions. Pausing/deleting a schedule leaves generated rows intact, and generated notes default to `Giao dịch định kỳ — {name}`.
+
 2026-09-21 ownership correction: system category wallet applicability is read/replaced within the authenticated owner's wallets. Changing a shared category's selection preserves other owners' assignments. AI catalog and confirmation use the same scope.
 
 ## Account timezone and calendar dates — Stage v1 baseline
@@ -77,6 +79,7 @@ Document HTTP endpoints, RPC methods, events, CLI commands, or any other public 
 | `/api/v1/transactions/transfer` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | Atomically create paired source-expense/destination-income rows for an internal transfer; pair edit/delete require an idempotency key. Transfers are excluded from reports and jars. |
 | `/api/v1/transactions/adjustment` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | Record a signed increase/decrease correction for a basic or goal wallet. Corrections affect wallet balance but never report totals and are immutable. |
 | `/api/v1/transactions/bulk-delete` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | All-or-nothing deletion of 1–100 ordinary owner-scoped transactions. Transfer pairs and adjustments are rejected explicitly. |
+| `/api/v1/recurring` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | CRUD recurring ordinary income/expense schedules and bounded idempotent due materialization. Generated rows remain normal ledger transactions. |
 | `/api/v1/auth/profile` | HTTP REST | JWT bearer | implemented | Reads/updates account IANA timezone; initial browser-zone adoption is initialize-only. |
 | `/api/v1/jars` and `/api/v1/jars/{id}/...` | HTTP REST | JWT bearer | implemented; owner UAT pending | Stable jar IDs, month snapshots, optional ordinary-expense assignment and cumulative live report. Config removal does not delete transactions or historic snapshots. |
 | `/api/v1/months/{YYYY-MM}` | HTTP REST | JWT bearer | implemented; owner UAT pending | Live account-local totals and independent note CRUD; completion is derived, not a close operation. |

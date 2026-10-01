@@ -75,7 +75,7 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 - `jar_id` is optional and may reference one active owner/month configuration only for ordinary expenses; income and transfer-out rows cannot be assigned. Clearing the selection sends null.
 - Wallet current balance is derived from ledger rows: opening balance plus income minus expense, with adjustments adding or subtracting by direction. Editing/deleting an ordinary row changes the derived balance; an adjustment is immutable and must be compensated by an opposite adjustment.
 
-APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/transfer/{transfer_id}`, `POST /api/v1/transactions/adjustment`, `POST /api/v1/transactions/bulk-delete`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options.
+APIs: `GET/POST /api/v1/transactions`, `POST /api/v1/transactions/transfer`, `PATCH/DELETE /api/v1/transactions/transfer/{transfer_id}`, `POST /api/v1/transactions/adjustment`, `POST /api/v1/transactions/bulk-delete`, `PATCH/DELETE /api/v1/transactions/{id}`, `GET /api/v1/wallets`, `GET /api/v1/categories`, and `GET /api/v1/jars?month=YYYY-MM` for active jar options. Recurring schedules are managed separately from this editor at `/account/recurring`.
 
 ## Copy and formatting
 
