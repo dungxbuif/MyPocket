@@ -52,6 +52,8 @@ Wallet create/update accepts optional `target_date` as `YYYY-MM-DD` for goal wal
 
 `POST /api/v1/transactions` and transaction edits accept optional `jar_id` (null clears it). A jar is valid only for an ordinary expense and an active configuration for that owner's transaction month. Income and transfer-out categories cannot be assigned.
 
+Portfolio routes are owner-scoped and intentionally separate from wallet ledger balances: `GET /api/v1/portfolio/summary`, `GET/POST /api/v1/portfolio/assets`, `PATCH /api/v1/portfolio/assets/{id}/price`, and `GET/POST /api/v1/portfolio/assets/{id}/trades`. Assets hold an optional manual latest-price snapshot. Trades are immutable `buy`/`sell` events with decimal-string quantity (up to eight fractional places), integer VND unit price and fee. The server stores fixed-point quantity, applies weighted-average cost before every sale, rejects sales above the available position with `409 PORTFOLIO_INSUFFICIENT_QUANTITY`, and never mutates wallet balances or ordinary reports. Clearing a price returns valuation to an explicit unknown state; it is not treated as zero. Corrections use compensating trades rather than editing history.
+
 Authenticated jar routes: `GET/POST /api/v1/jars`, `PUT/DELETE /api/v1/jars/{jar_id}/months/{month}`, and `GET /api/v1/jars/{jar_id}/report?from=YYYY-MM&to=YYYY-MM`. Month routes: `GET /api/v1/months/{month}`, `PUT /api/v1/months/{month}/note`, and `DELETE /api/v1/months/{month}/note`. Month figures are live ledger calculations; completion is derived from the current account-local month, and the note is independently user-authored. There is no scheduled or immutable close/report snapshot in CORE-03.
 
 ## Field Ownership
@@ -89,6 +91,7 @@ Document HTTP endpoints, RPC methods, events, CLI commands, or any other public 
 | `/api/v1/credit/wallets/{id}/statement` | HTTP REST | JWT bearer | implemented; automated backend checks | Owner-scoped credit statement with debt balance and available limit. |
 | `/api/v1/travel/events` | HTTP REST | JWT bearer | implemented; automated backend checks | Owner-scoped event CRUD with one active event; deleting an event clears transaction links without deleting ledger rows. |
 | `/api/v1/transactions/{id}/travel` | HTTP REST | JWT bearer | implemented; automated backend checks | Link or clear one ordinary income/expense transaction; transfers, adjustments and credit rows are rejected. |
+| `/api/v1/portfolio/*` | HTTP REST | JWT bearer | implemented; unit/API contract checks | Owner-scoped assets, append-only buy/sell trades, weighted-average positions and optional manual valuation. Portfolio rows never mutate wallet/report ledger. |
 | `/api/v1/auth/profile` | HTTP REST | JWT bearer | implemented | Reads/updates account IANA timezone; initial browser-zone adoption is initialize-only. |
 | `/api/v1/jars` and `/api/v1/jars/{id}/...` | HTTP REST | JWT bearer | implemented; owner UAT pending | Stable jar IDs, month snapshots, optional ordinary-expense assignment and cumulative live report. Config removal does not delete transactions or historic snapshots. |
 | `/api/v1/months/{YYYY-MM}` | HTTP REST | JWT bearer | implemented; owner UAT pending | Live account-local totals and independent note CRUD; completion is derived, not a close operation. |

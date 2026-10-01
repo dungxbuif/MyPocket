@@ -122,6 +122,8 @@ func main() {
 	creditRepository, _ := transactionRepository.(transactionrepo.CreditRepository)
 	router.RegisterCreditRoutes(&httpapi.CreditHandler{Credits: creditRepository, Wallets: walletRepository, Categories: categoryRepository})
 	router.RegisterTravelRoutes(&httpapi.TravelHandler{Events: travelRepository})
+	portfolioRepository := repo.NewPortfolioPostgresRepository(database)
+	router.RegisterPortfolioRoutes(&httpapi.PortfolioHandler{Portfolio: portfolioRepository})
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
 	attachmentStorage, err := newAttachmentStorage(cfg)
 	if err != nil {
