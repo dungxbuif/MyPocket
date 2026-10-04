@@ -22,6 +22,8 @@ shared_fields: [status]
 - [ ] Master docs reconciled
 - [ ] ADRs updated
 - [ ] Release notes prepared
+- [ ] Release note links to the matching changelog entry, commit, image digest,
+      tests, and known issues
 - [ ] Rollback plan confirmed
 
 ## Post-Release
@@ -30,3 +32,5 @@ shared_fields: [status]
 - [ ] Monitoring checked
 - [ ] Incidents recorded if any
 - [ ] `docs/CONTEXT.md` updated
+- [ ] Release note status is `verified`; human approval is recorded before
+      changing it to `done`
