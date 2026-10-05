@@ -54,6 +54,16 @@ final class FinanceModelTests: XCTestCase {
         }
     }
 
+    func testCreditEntryCategoriesRespectKindAndWalletScope() {
+        let creditWalletID = "credit-wallet"
+        let purchaseCategory = CategoryModel(id: "purchase", ownerID: nil, parentID: nil, kind: "expense", name: "Mua sắm", systemKey: nil, iconKey: "tag", isSystem: false, walletIDs: [creditWalletID])
+        let refundCategory = CategoryModel(id: "refund", ownerID: nil, parentID: nil, kind: "income", name: "Hoàn tiền", systemKey: nil, iconKey: "tag", isSystem: false, walletIDs: [creditWalletID])
+        XCTAssertTrue(purchaseCategory.applies(to: "expense", walletID: creditWalletID, walletType: "credit"))
+        XCTAssertFalse(purchaseCategory.applies(to: "income", walletID: creditWalletID, walletType: "credit"))
+        XCTAssertTrue(refundCategory.applies(to: "income", walletID: creditWalletID, walletType: "credit"))
+        XCTAssertFalse(refundCategory.applies(to: "income", walletID: "other-wallet", walletType: "credit"))
+    }
+
     func testNativeGoogleFixtureExchangeEncodesIOSPKCEContract() throws {
         let request = MobileGoogleExchangeRequest(
             code: "fixture",

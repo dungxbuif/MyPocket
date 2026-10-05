@@ -43,6 +43,7 @@ updated: 2026-10-06
 2026-10-06 native simulator fixture: Debug launch argument `-UITestAuthenticatedAPI` now exchanges against the disposable local OAuth fixture, stores the real JWT in Keychain and renders the overview through live URLSession/API requests. Manual iPhone 16 screenshot `/tmp/mypocket-ios-simulator-api-auth.png` shows the authenticated empty-owner state; this is local validation only and does not certify production OAuth.
 2026-10-06 native transaction parity: bulk-delete now matches the web contract (base selection, no transfer/credit/adjustment rows, max 100 IDs, atomic confirmation and retained error state). The typed API client now handles backend `204 No Content` responses for all empty mutations; native XCTest count is 28/28 and UI smoke remains 4/4.
 2026-10-06 native Assistant parity: Finance Assistant now restores one owner-keyed opaque conversation ID, reloads the latest 50 messages and read-only monthly overview on entry, pages older messages, and keeps message text out of UserDefaults. The iPhone 16 API-backed UI smoke passed against the disposable local API with the capability-disabled/overview-200 contract; native XCTest count is 29/29 and standard UI smoke remains 4/4.
+2026-10-06 native credit parity: the credit ledger entry/payment form now preserves entry kind, applicable category, source wallet, amount and optional note through the native base selectors/inputs. Category kind/wallet filtering is covered by XCTest; native XCTest count is 30/30.
 
 ## Field Ownership
 

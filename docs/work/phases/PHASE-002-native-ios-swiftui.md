@@ -119,6 +119,11 @@ category when creating or editing a child. Recurring schedules must preserve
 note text and submit account-local date/time as RFC3339 instants; date-only
 strings are not a valid backend schedule input.
 
+Credit entry/payment forms must preserve the web contract: an entry chooses its
+kind and an applicable category, while a payment chooses a non-credit source
+wallet; both actions accept amount and optional note. The native screen must not
+silently drop category or note fields when calling the credit APIs.
+
 AI entry accepts either a text instruction or one or more validated image/PDF
 attachments, uses the account timezone for extraction context, and keeps every
 proposal in review until an explicit approve/reject decision.
@@ -221,7 +226,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (29 unit/contract tests and 4 UI smoke tests). The same pass
+Both commands pass (30 unit/contract tests and 4 UI smoke tests). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical

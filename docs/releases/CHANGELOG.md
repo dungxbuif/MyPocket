@@ -50,10 +50,13 @@ as active release entries here.
   messages, and renders structured overview/source data without storing message
   text in UserDefaults. The API-backed simulator smoke covers the disabled
   capability response and the live overview contract.
+- Native credit ledger entry/payment forms now match the web fields: entry kind,
+  applicable category, payment source wallet, amount and optional note are all
+  preserved in the credit API payload.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 29 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 30 unit/contract tests and
   4 authenticated UI smoke tests, with base-component and Xcode project guards.
 - The opt-in API-backed Assistant UI smoke passed on the same iPhone 16 using
   `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI`, the disposable local

@@ -609,24 +609,91 @@ struct CreditView: View {
     let onBack: () -> Void
     @State private var wallets: [WalletModel] = []
     @State private var sourceWallets: [WalletModel] = []
+    @State private var categories: [CategoryModel] = []
     @State private var selectedID = ""
     @State private var statement: CreditStatementModel?
     @State private var error: String?
+    @State private var action: String?
     @State private var entryKind = "purchase"
+    @State private var categoryID = ""
     @State private var entryAmount = ""
     @State private var sourceWalletID = ""
+    @State private var note = ""
     @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
             MPScreenHeader(title: "Sổ tín dụng", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
             if wallets.isEmpty { MPEmptyView(title: "Chưa có ví tín dụng", detail: "Tạo ví loại tín dụng trong mục Ví.") }
-            else { MPOptionSelector(title: "Ví tín dụng", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: Binding(get: { selectedID }, set: { selectedID = $0; Task { await loadStatement() } })); if let statement { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) { MPMetricCard(title: "Dư nợ", value: MPFormat.money(statement.balance)); MPMetricCard(title: "Khả dụng", value: MPFormat.money(statement.availableCredit)); MPMetricCard(title: "Đến hạn", value: MPFormat.money(statement.amountDue)); MPMetricCard(title: "Trạng thái", value: statement.paymentStatus) }; MPAssistantCard(title: "Giao dịch tín dụng") { ForEach(statement.items) { item in MPTransactionRow(title: item.creditKind ?? "Giao dịch", subtitle: MPFormat.shortDate(item.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current), amount: MPFormat.money(item.amount), isIncome: item.creditKind == "refund" || item.creditKind == "payment") } }; MPOptionSelector(title: "Nguồn thanh toán", options: sourceWallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $sourceWalletID); MPWalletSelector(title: "Loại bút toán", options: ["purchase", "refund", "fee", "interest"], selection: $entryKind); MPAmountField(title: "Số tiền", text: $entryAmount); HStack { MPButton("Ghi nhận", style: .secondary) { Task { await addEntry() } }; MPButton("Thanh toán") { Task { await pay() } } } } }
+            else {
+                MPOptionSelector(title: "Ví tín dụng", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: Binding(get: { selectedID }, set: { selectedID = $0; categoryID = ""; Task { await loadStatement() } }))
+                if let statement {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        MPMetricCard(title: "Dư nợ", value: MPFormat.money(statement.balance))
+                        MPMetricCard(title: "Khả dụng", value: MPFormat.money(statement.availableCredit))
+                        MPMetricCard(title: "Đến hạn", value: MPFormat.money(statement.amountDue))
+                        MPMetricCard(title: "Trạng thái", value: statement.paymentStatus)
+                    }
+                    MPAssistantCard(title: "Giao dịch tín dụng") {
+                        ForEach(statement.items) { item in
+                            MPTransactionRow(title: item.creditKind ?? "Giao dịch", subtitle: MPFormat.shortDate(item.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current), amount: MPFormat.money(item.amount), isIncome: item.creditKind == "refund" || item.creditKind == "payment")
+                        }
+                    }
+                    HStack {
+                        MPButton("Thêm giao dịch", style: .secondary) { beginAction("entry") }
+                        MPButton("Thanh toán") { beginAction("payment") }
+                    }
+                    if let action {
+                        MPSurfaceCard {
+                            VStack(alignment: .leading, spacing: 10) {
+                                MPText(action == "payment" ? "Thanh toán thẻ" : "Thêm giao dịch tín dụng", style: .title)
+                                if action == "entry" {
+                                    MPWalletSelector(title: "Loại giao dịch", options: ["purchase", "refund", "fee", "interest"], selection: $entryKind)
+                                    MPOptionSelector(title: "Nhóm", options: [MPSelectionOption(id: "", label: "Không chọn nhóm")] + categoriesForEntry.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryID, emptyLabel: "Không chọn nhóm")
+                                } else {
+                                    MPOptionSelector(title: "Ví thanh toán", options: sourceWallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $sourceWalletID, emptyLabel: "Chọn ví thanh toán")
+                                }
+                                MPAmountField(title: "Số tiền", text: $entryAmount)
+                                MPTextField(title: "Ghi chú", text: $note, placeholder: "Không bắt buộc")
+                                HStack {
+                                    MPButton("Hủy", style: .secondary) { cancelAction() }
+                                    MPButton("Lưu") { Task { await saveAction() } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             if let error { MPStatusMessage(text: error, tone: .danger) }
-        }.padding(MPMetrics.pagePadding) }.background(MPColor.canvas.ignoresSafeArea()).environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current).task { await loadWallets() }.accessibilityIdentifier("credit-screen")
+        }.padding(MPMetrics.pagePadding) }.background(MPColor.canvas.ignoresSafeArea()).environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current).task { await loadWallets() }.onChange(of: entryKind) { _, _ in
+            if !categoriesForEntry.contains(where: { $0.id == categoryID }) { categoryID = categoriesForEntry.first?.id ?? "" }
+        }.accessibilityIdentifier("credit-screen")
     }
-    private func loadWallets() async { do { let all = try await api.wallets(); wallets = all.filter { $0.type == "credit" }; sourceWallets = all.filter { $0.type != "credit" }; sourceWalletID = sourceWallets.first?.id ?? ""; selectedID = wallets.first?.id ?? ""; if let profile = try? await api.profile() { accountTimezone = profile.timezone }; await loadStatement() } catch { self.error = "Không thể tải ví tín dụng." } }
+    private var categoriesForEntry: [CategoryModel] {
+        let transactionType = entryKind == "refund" ? "income" : "expense"
+        return categories.filter { $0.applies(to: transactionType, walletID: selectedID, walletType: "credit") }
+    }
+
+    private func beginAction(_ value: String) {
+        action = value
+        entryAmount = ""
+        note = ""
+        if value == "entry" { categoryID = categoriesForEntry.first?.id ?? "" }
+    }
+
+    private func cancelAction() {
+        action = nil
+        entryAmount = ""
+        note = ""
+        categoryID = ""
+    }
+
+    private func loadWallets() async { do { async let walletResult = api.wallets(); async let categoryResult = api.categories(); let all = try await walletResult; wallets = all.filter { $0.type == "credit" }; sourceWallets = all.filter { $0.type != "credit" }; categories = try await categoryResult; sourceWalletID = sourceWallets.first?.id ?? ""; selectedID = wallets.first?.id ?? ""; if let profile = try? await api.profile() { accountTimezone = profile.timezone }; await loadStatement() } catch { self.error = "Không thể tải ví tín dụng." } }
     private func loadStatement() async { guard !selectedID.isEmpty else { return }; do { statement = try await api.creditStatement(walletID: selectedID); self.error = nil } catch { self.error = "Không thể tải sổ tín dụng." } }
-    private func addEntry() async { guard !selectedID.isEmpty, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0 else { error = "Chọn ví tín dụng và nhập số tiền."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: nil, amount: amount, occurredAt: MPFormat.instantString(Date()), note: nil)); entryAmount = ""; await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
-    private func pay() async { guard !selectedID.isEmpty, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0, !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: nil)); entryAmount = ""; await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
+    private func saveAction() async {
+        guard action != nil else { return }
+        if action == "entry" { await addEntry() } else { await pay() }
+    }
+    private func addEntry() async { guard !selectedID.isEmpty, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0 else { error = "Chọn ví tín dụng và nhập số tiền."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: categoryID.isEmpty ? nil : categoryID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
+    private func pay() async { guard !selectedID.isEmpty, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0, !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
 }
