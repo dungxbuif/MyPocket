@@ -71,6 +71,9 @@ as active release entries here.
 - Native ledger loading now keeps valid rows visible when optional category or
   profile metadata fails; only the required transaction/wallet payload blocks
   the screen.
+- Native portfolio now shows current/unrealized metrics, keeps price drafts
+  independent per asset, allows clearing an unknown price, and preserves the
+  selected trade date.
 
 ### Verification
 

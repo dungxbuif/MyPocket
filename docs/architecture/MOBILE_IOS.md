@@ -55,6 +55,9 @@ loads category labels and account timezone as optional metadata. A metadata
 request failure therefore leaves the ledger usable instead of replacing valid
 rows with a generic load error.
 
+Portfolio UI keeps current-price drafts keyed by asset ID, mirrors the nullable
+price contract, and sends the selected trade date through the existing API.
+
 Finance Assistant history uses one UserDefaults conversation ID keyed by the
 authenticated owner ID. The native screen reloads that conversation's latest
 50 messages and the read-only monthly overview on entry; a later request can

@@ -150,6 +150,11 @@ Ledger loading treats the transaction and wallet lists as the required core
 payload while category labels and profile timezone are optional metadata. A
 metadata failure must not make a valid transaction list unusable.
 
+Portfolio parity requires the summary to expose cost basis, current market value
+and unrealized P/L when the API provides them. Current-price drafts are keyed
+per asset and may be cleared to `nil`; portfolio trades must preserve the user
+selected trade date rather than silently replacing it with the current instant.
+
 AI entry accepts either a text instruction or one or more validated image/PDF
 attachments, uses the account timezone for extraction context, and keeps every
 proposal in review until an explicit approve/reject decision.

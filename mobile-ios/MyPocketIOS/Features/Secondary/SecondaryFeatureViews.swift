@@ -521,20 +521,24 @@ struct PortfolioView: View {
     @State private var adding = false
     @State private var symbol = ""
     @State private var assetName = ""
-    @State private var price = ""
     @State private var tradeAsset: PortfolioAssetModel?
     @State private var tradeSide = "buy"
     @State private var tradeQuantity = ""
     @State private var tradePrice = ""
     @State private var tradeFee = ""
+    @State private var tradeDate = Date()
+    @State private var priceByAsset: [String: String] = [:]
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Danh mục đầu tư", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm tài sản") { adding = true } })
                 if let summary {
-                    MPMetricCard(title: "Giá vốn", value: MPFormat.money(summary.totalCostBasis))
-                    if let market = summary.totalMarketValue { MPMetricCard(title: "Giá trị thị trường", value: MPFormat.money(market)) }
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        MPMetricCard(title: "Giá vốn", value: MPFormat.money(summary.totalCostBasis))
+                        MPMetricCard(title: "Giá trị hiện tại", value: summary.totalMarketValue.map(MPFormat.money) ?? "Chưa có giá")
+                        MPMetricCard(title: "Lãi/lỗ chưa thực hiện", value: summary.totalUnrealizedPnL.map(MPFormat.signedMoney) ?? "Chưa có giá")
+                    }
                     ForEach(summary.positions) { position in
                         MPSurfaceCard {
                             VStack(alignment: .leading) {
@@ -551,9 +555,9 @@ struct PortfolioView: View {
                                     MPText(asset.latestPrice.map { MPFormat.money($0) } ?? "Chưa có giá", style: .secondary)
                                 }
                                 Spacer()
-                                MPButton("Giao dịch", style: .secondary) { tradeAsset = asset; tradeSide = "buy"; tradeQuantity = ""; tradePrice = asset.latestPrice.map(String.init) ?? ""; tradeFee = "" }
+                                MPButton("Giao dịch", style: .secondary) { tradeAsset = asset; tradeSide = "buy"; tradeQuantity = ""; tradePrice = asset.latestPrice.map(String.init) ?? ""; tradeFee = ""; tradeDate = Date() }
                             }
-                            MPAmountField(title: "Giá mới", text: Binding(get: { price }, set: { price = $0 }))
+                            MPAmountField(title: "Giá hiện tại", text: Binding(get: { priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "" }, set: { priceByAsset[asset.id] = $0 }))
                             MPButton("Cập nhật giá", style: .secondary) { Task { await updatePrice(asset) } }
                         }
                     }
@@ -580,6 +584,7 @@ struct PortfolioView: View {
                             MPTextField(title: "Khối lượng", text: $tradeQuantity, placeholder: "0.25")
                             MPAmountField(title: "Giá mỗi đơn vị", text: $tradePrice)
                             MPAmountField(title: "Phí", text: $tradeFee)
+                            MPDateField(title: "Ngày giao dịch", date: $tradeDate)
                             HStack { MPButton("Hủy", style: .secondary) { self.tradeAsset = nil }; MPButton("Lưu") { Task { await saveTrade(tradeAsset) } } }
                         }
                     }
@@ -593,11 +598,24 @@ struct PortfolioView: View {
     }
     private func load() async { do { summary = try await api.portfolioSummary(); self.error = nil } catch { self.error = "Không thể tải danh mục đầu tư." } }
     private func createAsset() async { guard !symbol.isEmpty, !assetName.isEmpty else { error = "Nhập mã và tên tài sản."; return }; do { _ = try await api.createPortfolioAsset(symbol: symbol, name: assetName); adding = false; symbol = ""; assetName = ""; await load() } catch { self.error = "Không thể tạo tài sản." } }
-    private func updatePrice(_ asset: PortfolioAssetModel) async { guard let parsed = Int64(price.filter(\.isNumber)) else { error = "Nhập giá hợp lệ."; return }; do { _ = try await api.updatePortfolioPrice(assetID: asset.id, latestPrice: parsed); await load() } catch { self.error = "Không thể cập nhật giá." } }
+    private func updatePrice(_ asset: PortfolioAssetModel) async {
+        let draft = (priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        let parsed: Int64?
+        if draft.isEmpty {
+            parsed = nil
+        } else if let value = Int64(draft.filter(\.isNumber)), value >= 0 {
+            parsed = value
+        } else {
+            error = "Giá hiện tại phải là số nguyên không âm hoặc để trống."
+            return
+        }
+        do { _ = try await api.updatePortfolioPrice(assetID: asset.id, latestPrice: parsed); await load() }
+        catch { self.error = "Không thể cập nhật giá." }
+    }
     private func saveTrade(_ asset: PortfolioAssetModel) async {
         guard !tradeQuantity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let parsedPrice = Int64(tradePrice.filter(\.isNumber)), parsedPrice >= 0 else { error = "Nhập khối lượng và giá hợp lệ."; return }
         do {
-            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: tradeQuantity, unitPrice: parsedPrice, fee: Int64(tradeFee.filter(\.isNumber)) ?? 0, occurredAt: ISO8601DateFormatter().string(from: Date()), note: nil))
+            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: tradeQuantity, unitPrice: parsedPrice, fee: Int64(tradeFee.filter(\.isNumber)) ?? 0, occurredAt: ISO8601DateFormatter().string(from: tradeDate), note: nil))
             tradeAsset = nil
             await load()
         } catch { self.error = "Không thể ghi nhận giao dịch danh mục." }
