@@ -106,7 +106,7 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 10 unit/contract tests and 3 UI smoke tests (auth launch,
+suite passed: 11 unit/contract tests and 3 UI smoke tests (auth launch,
 authenticated primary tabs, More route + floating feedback overlay).
 
 ```bash
