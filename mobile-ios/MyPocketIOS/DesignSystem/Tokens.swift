@@ -9,3 +9,10 @@ enum MPColor {
     static let action = Color(red: 0.020, green: 0.588, blue: 0.412)
     static let danger = Color(uiColor: .systemRed)
 }
+
+enum MPMetrics {
+    static let controlHeight: CGFloat = 48
+    static let hitTarget: CGFloat = 44
+    static let cornerRadius: CGFloat = 12
+    static let pagePadding: CGFloat = 20
+}
