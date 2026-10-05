@@ -82,3 +82,20 @@ static guard and Simulator tests remain passing. The remaining exit work is
 deep CRUD parity (edit/delete/link flows and file attachments), persisted
 assistant/feedback screenshot flows, and an authenticated end-to-end smoke run
 against a fixture/staging API.
+
+## Parity completion pass — 2026-10-05
+
+The next simulator-first pass closes the highest-risk interaction gaps before
+the native phase can exit:
+
+- transaction edit, travel-event link/unlink, and transfer-safe detail actions;
+- jar create/delete and cumulative report navigation;
+- portfolio buy/sell trade entry with quantity/price validation;
+- AI entry proposal editing before approve/reject;
+- authenticated UI fixtures for the primary routes and regression coverage for
+  the shared base-component contract.
+
+These changes preserve the existing API owner scope and do not add offline
+ledger writes. Verification is the full iOS Simulator XCTest suite, static
+base-component guard, project verification, and backend contract tests when
+shared API contracts are touched.

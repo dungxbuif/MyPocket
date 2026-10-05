@@ -9,19 +9,29 @@ final class TransactionsViewModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published var walletSelection = "__all__"
     @Published var periodSelection = "all"
+    @Published var customStart = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
+    @Published var customEnd = Date()
 
     private let api: FinanceAPI
     init(api: FinanceAPI) { self.api = api }
 
     var filteredTransactions: [TransactionModel] {
         let walletFiltered = walletSelection == "__all__" ? transactions : transactions.filter { $0.walletID == walletSelection }
-        guard periodSelection != "all" else { return walletFiltered.sorted { $0.occurredAt > $1.occurredAt } }
+        if periodSelection == "all" { return walletFiltered.sorted { $0.occurredAt > $1.occurredAt } }
         let calendar = Calendar.current
-        let start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+        let start: Date
+        let end: Date
+        if periodSelection == "week" {
+            start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+            end = Date()
+        } else {
+            start = calendar.startOfDay(for: customStart)
+            end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: customEnd)) ?? Date()
+        }
         let formatter = ISO8601DateFormatter()
         return walletFiltered.filter {
             guard let date = formatter.date(from: $0.occurredAt) else { return true }
-            return date >= start
+            return date >= start && date < end
         }.sorted { $0.occurredAt > $1.occurredAt }
     }
 
@@ -53,6 +63,16 @@ final class TransactionsViewModel: ObservableObject {
             errorMessage = "Không thể xóa giao dịch."
         }
     }
+
+    func deleteTransfer(_ transaction: TransactionModel) async {
+        guard let transferID = transaction.transferID else { return }
+        do {
+            try await api.deleteTransfer(id: transferID)
+            transactions.removeAll { $0.transferID == transferID }
+        } catch {
+            errorMessage = "Không thể xóa cặp giao dịch chuyển ví."
+        }
+    }
 }
 
 struct TransactionsView: View {
@@ -75,7 +95,10 @@ struct TransactionsView: View {
                         MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editorPresented = true }
                     }
                 })
-                MPSegmentedControl(options: [("all", "Tất cả"), ("week", "Tuần này")], selection: $model.periodSelection)
+                MPSegmentedControl(options: [("all", "Tất cả"), ("week", "Tuần này"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
+                if model.periodSelection == "custom" {
+                    MPDateRangePicker(start: $model.customStart, end: $model.customEnd)
+                }
                 MPWalletSelector(title: "Ví", options: ["Tổng cộng"] + model.wallets.map(\.name), selection: Binding(
                     get: { model.walletSelection == "__all__" ? "Tổng cộng" : model.wallets.first(where: { $0.id == model.walletSelection })?.name ?? "Tổng cộng" },
                     set: { name in model.walletSelection = model.wallets.first(where: { $0.name == name })?.id ?? "__all__" }
@@ -139,7 +162,13 @@ struct TransactionsView: View {
                 } onCancel: { adjustmentPresented = false }
                 .background(MPColor.canvas.ignoresSafeArea())
             } else if let selectedTransaction {
-                TransactionDetailView(transaction: selectedTransaction, onDelete: {
+                TransactionDetailView(api: modelAPI, transaction: selectedTransaction, allTransactions: model.transactions, onEdit: {
+                    editorPresented = true
+                    self.selectedTransaction = nil
+                }, onDelete: {
+                    deleteTarget = selectedTransaction
+                    self.selectedTransaction = nil
+                }, onDeleteTransfer: {
                     deleteTarget = selectedTransaction
                     self.selectedTransaction = nil
                 }, onClose: { self.selectedTransaction = nil })
@@ -147,7 +176,7 @@ struct TransactionsView: View {
             }
         }
         .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa giao dịch?", message: "Hành động này không thể hoàn tác.", confirmTitle: "Xóa") {
-            if let target = deleteTarget { Task { await model.delete(target) } }
+            if let target = deleteTarget { Task { if target.transferID != nil { await model.deleteTransfer(target) } else { await model.delete(target) } } }
             deleteTarget = nil
         }
         .accessibilityIdentifier("transactions-screen")
@@ -164,6 +193,7 @@ struct TransactionEditorView: View {
     let api: FinanceAPI
     let wallets: [WalletModel]
     let categories: [CategoryModel]
+    let transaction: TransactionModel?
     let onSaved: () -> Void
     let onCancel: () -> Void
     @State private var type = "expense"
@@ -175,10 +205,25 @@ struct TransactionEditorView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
+    init(api: FinanceAPI, wallets: [WalletModel], categories: [CategoryModel], transaction: TransactionModel? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+        self.api = api
+        self.wallets = wallets
+        self.categories = categories
+        self.transaction = transaction
+        self.onSaved = onSaved
+        self.onCancel = onCancel
+        _type = State(initialValue: transaction?.type ?? "expense")
+        _amount = State(initialValue: transaction.map { String($0.amount) } ?? "")
+        _note = State(initialValue: transaction?.note ?? "")
+        _walletName = State(initialValue: wallets.first(where: { $0.id == transaction?.walletID })?.name ?? "")
+        _categoryName = State(initialValue: categories.first(where: { $0.id == transaction?.categoryID })?.name ?? "Không chọn")
+        if let raw = transaction?.occurredAt, let date = ISO8601DateFormatter().date(from: raw) { _date = State(initialValue: date) }
+    }
+
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Thêm giao dịch", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
+                MPScreenHeader(title: transaction == nil ? "Thêm giao dịch" : "Sửa giao dịch", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
                 MPSegmentedControl(options: [("expense", "Chi tiêu"), ("income", "Thu nhập")], selection: $type)
                 MPWalletSelector(title: "Ví", options: wallets.map(\.name), selection: $walletName)
                 MPWalletSelector(title: "Danh mục", options: ["Không chọn"] + categories.map(\.name), selection: $categoryName)
@@ -186,7 +231,7 @@ struct TransactionEditorView: View {
                 MPDateField(title: "Ngày giao dịch", date: $date)
                 MPTextField(title: "Ghi chú", text: $note, placeholder: "Ví dụ: Ăn trưa")
                 if let errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
-                MPButton("Lưu giao dịch", isLoading: isSaving) { Task { await save() } }
+                MPButton(transaction == nil ? "Lưu giao dịch" : "Lưu thay đổi", isLoading: isSaving) { Task { await save() } }
             }
             .padding(MPMetrics.pagePadding)
         }
@@ -202,7 +247,8 @@ struct TransactionEditorView: View {
         defer { isSaving = false }
         do {
             let input = TransactionInputModel(walletID: wallet.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, type: type, amount: parsed, occurredAt: Self.dayString(from: date), note: note.isEmpty ? nil : note, includedInReports: true, travelEventID: nil)
-            _ = try await api.createTransaction(input)
+            if let transaction { _ = try await api.updateTransaction(id: transaction.id, input: input) }
+            else { _ = try await api.createTransaction(input) }
             onSaved()
         } catch {
             errorMessage = "Không thể lưu giao dịch."
@@ -218,9 +264,16 @@ struct TransactionEditorView: View {
 }
 
 struct TransactionDetailView: View {
+    let api: FinanceAPI
     let transaction: TransactionModel
+    let allTransactions: [TransactionModel]
+    let onEdit: () -> Void
     let onDelete: () -> Void
+    let onDeleteTransfer: () -> Void
     let onClose: () -> Void
+    @State private var travelEvents: [TravelEventModel] = []
+    @State private var travelEventName = "Không gắn chuyến"
+    @State private var travelError: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -230,13 +283,37 @@ struct TransactionDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     MPText("Ngày: \(MPFormat.shortDate(transaction.occurredAt))")
                     if let note = transaction.note, !note.isEmpty { MPText("Ghi chú: \(note)") }
+                    if transaction.transferID == nil {
+                        MPWalletSelector(title: "Travel Mode", options: ["Không gắn chuyến"] + travelEvents.map(\.name), selection: $travelEventName)
+                        MPButton("Lưu liên kết chuyến", style: .secondary) {
+                            Task {
+                                let event = travelEvents.first(where: { $0.name == travelEventName })
+                                do { _ = try await api.updateTransactionTravel(id: transaction.id, eventID: event?.id); travelError = nil }
+                                catch { travelError = "Không thể cập nhật liên kết chuyến." }
+                            }
+                        }
+                        if let travelError { MPStatusMessage(text: travelError, tone: .danger) }
+                    }
                     MPText(transaction.includedInReports ? "Được tính vào báo cáo" : "Không tính vào báo cáo", style: .secondary)
                 }
             }
-            MPButton("Xóa giao dịch", style: .destructive, action: onDelete)
+            if transaction.transferID == nil {
+                MPButton("Sửa giao dịch", style: .secondary, action: onEdit)
+                MPButton("Xóa giao dịch", style: .destructive, action: onDelete)
+            } else {
+                MPStatusMessage(text: "Đây là cặp chuyển ví; sửa/xóa phải áp dụng cho cả hai giao dịch.", tone: .info)
+                MPButton("Xóa cả cặp chuyển ví", style: .destructive, action: onDeleteTransfer)
+            }
             Spacer()
         }
         .padding(MPMetrics.pagePadding)
+        .task {
+            guard transaction.transferID == nil else { return }
+            do {
+                travelEvents = try await api.travelEvents()
+                travelEventName = travelEvents.first(where: { $0.id == transaction.travelEventID })?.name ?? "Không gắn chuyến"
+            } catch { travelError = "Không thể tải Travel Mode." }
+        }
     }
 }
 

@@ -71,6 +71,12 @@ struct TransferInputModel: Codable, Sendable {
     var note: String?
 }
 
+struct TransferUpdateInputModel: Codable, Sendable {
+    var amount: Int64
+    var occurredAt: String
+    var note: String?
+}
+
 struct AdjustmentInputModel: Codable, Sendable {
     var walletID: String
     var amount: Int64
@@ -220,6 +226,7 @@ struct PortfolioPositionModel: Codable, Identifiable, Sendable {
 struct PortfolioSummaryModel: Codable, Sendable {
     var assets: [PortfolioAssetModel]
     var positions: [PortfolioPositionModel]
+    var trades: [PortfolioTradeModel]
     var totalCostBasis: Int64
     var totalMarketValue: Int64?
     var totalUnrealizedPnL: Int64?
@@ -274,4 +281,62 @@ struct JarConfigInputModel: Codable, Sendable {
     var allocationMode: String
     var allocationAmount: Int64?
     var allocationPercent: Double?
+}
+
+struct JarConfigModel: Codable, Sendable {
+    var month: String
+    var jarID: String
+    var name: String
+    var allocationMode: String
+    var allocationAmount: Int64?
+    var allocationPercent: Double?
+    var active: Bool
+}
+
+struct JarCumulativeMonthModel: Codable, Sendable {
+    var month: String
+    var name: String?
+    var spent: Int64
+    var calculatedAllocation: Int64?
+    var allocationCovered: Bool
+}
+
+struct JarCumulativeSummaryModel: Codable, Sendable {
+    var jarID: String
+    var name: String
+    var fromMonth: String
+    var toMonth: String
+    var totalSpent: Int64
+    var totalAllocated: Int64
+    var allocationMonths: Int
+    var monthsInRange: Int
+    var allocationVariance: Int64?
+    var months: [JarCumulativeMonthModel]
+}
+
+struct ProfileModel: Codable, Sendable {
+    var id: String
+    var name: String
+    var email: String
+    var timezone: String
+    var timezoneConfirmed: Bool
+    var createdAt: String
+}
+
+struct APIKeyModel: Codable, Identifiable, Sendable {
+    let id: String
+    var name: String
+    var scopes: [String]
+    var expiresAt: String?
+    var revokedAt: String?
+    var lastUsedAt: String?
+    var createdAt: String
+}
+
+struct APIKeyCreatedModel: Codable, Sendable {
+    var id: String
+    var name: String
+    var scopes: [String]
+    var expiresAt: String?
+    var secret: String
 }

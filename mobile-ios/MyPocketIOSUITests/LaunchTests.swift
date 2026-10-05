@@ -9,4 +9,31 @@ final class LaunchTests: XCTestCase {
             "Auth screen should expose the Google sign-in action after launch."
         )
     }
+
+    func testAuthenticatedShellExposesPrimaryRoutes() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Tổng quan"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Giao dịch"].exists)
+        XCTAssertTrue(app.buttons["Ví"].exists)
+        app.buttons["Giao dịch"].tap()
+        XCTAssertTrue(app.staticTexts["Giao dịch"].firstMatch.waitForExistence(timeout: 5))
+        app.buttons["Ví"].tap()
+        XCTAssertTrue(app.staticTexts["Ví"].firstMatch.waitForExistence(timeout: 5))
+    }
+
+    func testAuthenticatedMoreRoutesAndFeedbackEntry() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 5))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Báo cáo"].waitForExistence(timeout: 5))
+        app.buttons["Báo cáo"].tap()
+        XCTAssertTrue(app.staticTexts["Báo cáo"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Gửi phản hồi"].waitForExistence(timeout: 5))
+        app.buttons["Gửi phản hồi"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Phản hồi"].firstMatch.waitForExistence(timeout: 5))
+    }
 }

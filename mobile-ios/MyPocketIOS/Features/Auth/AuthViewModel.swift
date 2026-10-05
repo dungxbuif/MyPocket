@@ -26,6 +26,20 @@ final class AuthViewModel: ObservableObject {
     }
 
     func restore() {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-UITestAuthenticated") {
+            phase = .authenticated(
+                AccessSession(
+                    token: "ui-test-token",
+                    expiresAt: "2099-01-01T00:00:00Z",
+                    refreshToken: "ui-test-refresh",
+                    refreshExpiresAt: "2099-01-02T00:00:00Z",
+                    user: AuthUser(id: "ui-test-user", name: "UI Test", email: "ui@example.com", timezone: "Asia/Ho_Chi_Minh")
+                )
+            )
+            return
+        }
+#endif
         if let session = store.load() {
             phase = .authenticated(session)
         } else {

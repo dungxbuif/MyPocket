@@ -193,20 +193,55 @@ struct JarsView: View {
     @State private var month = MPFormat.currentMonth
     @State private var loading = false
     @State private var error: String?
+    @State private var showEditor = false
+    @State private var editTarget: JarItemModel?
+    @State private var name = ""
+    @State private var mode = "none"
+    @State private var amount = ""
+    @State private var percent = ""
+    @State private var report: JarCumulativeSummaryModel?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Hũ chi tiêu", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+                MPScreenHeader(title: "Hũ chi tiêu", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm hũ") { editTarget = nil; resetEditor(); showEditor = true } })
                 MPTextField(title: "Tháng (YYYY-MM)", text: $month)
                 MPButton("Tải hũ", isLoading: loading) { Task { await load() } }
                 if let summary {
                     MPMetricCard(title: "Tổng đã phân bổ", value: MPFormat.money(summary.totalAllocated), detail: "Thu nhập: \(MPFormat.money(summary.actualIncome))")
                     ForEach(summary.items) { item in
-                        MPSurfaceCard { VStack(alignment: .leading, spacing: 6) { MPText(item.name); MPProgressBar(progress: Double(item.spent) / Double(max(1, item.calculatedAllocation ?? 1)), label: "Đã chi \(MPFormat.money(item.spent))") } }
+                        MPSurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                MPText(item.name)
+                                MPProgressBar(progress: Double(item.spent) / Double(max(1, item.calculatedAllocation ?? 1)), label: "Đã chi \(MPFormat.money(item.spent))")
+                                HStack {
+                                    MPButton("Sửa", style: .secondary) { beginEditing(item) }
+                                    MPButton("Báo cáo", style: .secondary) { Task { await loadReport(for: item) } }
+                                    MPButton("Gỡ tháng", style: .destructive) { Task { await remove(item) } }
+                                }
+                            }
+                        }
+                    }
+                    if let report {
+                        MPAssistantCard(title: "Lịch sử \(report.name)") {
+                            MPText("\(report.fromMonth) → \(report.toMonth) · Đã chi \(MPFormat.money(report.totalSpent))", style: .secondary)
+                            ForEach(report.months, id: \.month) { item in MPText("\(item.month): \(MPFormat.money(item.spent))", style: .secondary) }
+                        }
                     }
                 } else if let error { MPErrorView(title: "Không tải được hũ", detail: error) { Task { await load() } } }
                 else { MPEmptyView(title: "Chưa chọn tháng", detail: "Hũ là lớp ngân sách theo tháng và không thay đổi số dư ví.") }
+                if showEditor {
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            MPText(editTarget == nil ? "Tạo hũ" : "Sửa hũ", style: .title)
+                            MPTextField(title: "Tên", text: $name, placeholder: "Ăn uống")
+                            MPWalletSelector(title: "Cách phân bổ", options: ["none", "fixed", "percent"], selection: $mode)
+                            if mode == "fixed" { MPAmountField(title: "Số tiền mỗi tháng", text: $amount) }
+                            if mode == "percent" { MPTextField(title: "Tỷ lệ (%)", text: $percent, placeholder: "20") }
+                            HStack { MPButton("Hủy", style: .secondary) { showEditor = false }; MPButton("Lưu") { Task { await save() } } }
+                        }
+                    }
+                }
             }
             .padding(MPMetrics.pagePadding)
         }
@@ -216,6 +251,19 @@ struct JarsView: View {
     }
 
     private func load() async { loading = true; defer { loading = false }; do { summary = try await api.jarMonth(month: month); self.error = nil } catch { self.error = "Không thể tải hũ chi tiêu." } }
+    private func resetEditor() { name = ""; mode = "none"; amount = ""; percent = "" }
+    private func beginEditing(_ item: JarItemModel) { editTarget = item; name = item.name; mode = item.allocationMode; amount = item.allocationAmount.map { String($0) } ?? ""; percent = item.allocationPercent.map { String($0) } ?? ""; showEditor = true }
+    private func save() async {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập tên hũ."; return }
+        let parsedAmount = Int64(amount.filter(\.isNumber))
+        let parsedPercent = Double(percent.replacingOccurrences(of: ",", with: "."))
+        guard (mode == "none" && parsedAmount == nil && parsedPercent == nil) || (mode == "fixed" && (parsedAmount ?? 0) > 0 && parsedPercent == nil) || (mode == "percent" && (parsedPercent ?? -1) >= 0 && (parsedPercent ?? 101) <= 100 && parsedAmount == nil) else { error = "Cách phân bổ không hợp lệ."; return }
+        let input = JarConfigInputModel(month: month, name: name, allocationMode: mode, allocationAmount: mode == "fixed" ? parsedAmount : nil, allocationPercent: mode == "percent" ? parsedPercent : nil)
+        do { if let editTarget { _ = try await api.updateJarMonth(jarID: editTarget.jarID, month: month, input: input) } else { _ = try await api.createJar(input) }; showEditor = false; await load() }
+        catch { self.error = "Không thể lưu hũ." }
+    }
+    private func remove(_ item: JarItemModel) async { do { try await api.removeJarMonth(jarID: item.jarID, month: month); await load() } catch { self.error = "Không thể gỡ hũ khỏi tháng." } }
+    private func loadReport(for item: JarItemModel) async { do { report = try await api.jarReport(jarID: item.jarID, to: month); error = nil } catch { self.error = "Không thể tải báo cáo hũ." } }
 }
 
 struct MonthsView: View {
@@ -338,6 +386,11 @@ struct PortfolioView: View {
     @State private var symbol = ""
     @State private var assetName = ""
     @State private var price = ""
+    @State private var tradeAsset: PortfolioAssetModel?
+    @State private var tradeSide = "buy"
+    @State private var tradeQuantity = ""
+    @State private var tradePrice = ""
+    @State private var tradeFee = ""
 
     var body: some View {
         ScrollView {
@@ -362,11 +415,10 @@ struct PortfolioView: View {
                                     MPText(asset.latestPrice.map { MPFormat.money($0) } ?? "Chưa có giá", style: .secondary)
                                 }
                                 Spacer()
-                                MPButton("Cập nhật giá", style: .secondary) {
-                                    price = asset.latestPrice.map(String.init) ?? ""
-                                    Task { await updatePrice(asset) }
-                                }
+                                MPButton("Giao dịch", style: .secondary) { tradeAsset = asset; tradeSide = "buy"; tradeQuantity = ""; tradePrice = asset.latestPrice.map(String.init) ?? ""; tradeFee = "" }
                             }
+                            MPAmountField(title: "Giá mới", text: Binding(get: { price }, set: { price = $0 }))
+                            MPButton("Cập nhật giá", style: .secondary) { Task { await updatePrice(asset) } }
                         }
                     }
                 } else if let error {
@@ -384,6 +436,18 @@ struct PortfolioView: View {
                         }
                     }
                 }
+                if let tradeAsset {
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            MPText("Ghi nhận \(tradeAsset.symbol)", style: .title)
+                            MPWalletSelector(title: "Loại", options: ["buy", "sell"], selection: $tradeSide)
+                            MPTextField(title: "Khối lượng", text: $tradeQuantity, placeholder: "0.25")
+                            MPAmountField(title: "Giá mỗi đơn vị", text: $tradePrice)
+                            MPAmountField(title: "Phí", text: $tradeFee)
+                            HStack { MPButton("Hủy", style: .secondary) { self.tradeAsset = nil }; MPButton("Lưu") { Task { await saveTrade(tradeAsset) } } }
+                        }
+                    }
+                }
             }
             .padding(MPMetrics.pagePadding)
         }
@@ -394,6 +458,14 @@ struct PortfolioView: View {
     private func load() async { do { summary = try await api.portfolioSummary(); self.error = nil } catch { self.error = "Không thể tải danh mục đầu tư." } }
     private func createAsset() async { guard !symbol.isEmpty, !assetName.isEmpty else { error = "Nhập mã và tên tài sản."; return }; do { _ = try await api.createPortfolioAsset(symbol: symbol, name: assetName); adding = false; symbol = ""; assetName = ""; await load() } catch { self.error = "Không thể tạo tài sản." } }
     private func updatePrice(_ asset: PortfolioAssetModel) async { guard let parsed = Int64(price.filter(\.isNumber)) else { error = "Nhập giá hợp lệ."; return }; do { _ = try await api.updatePortfolioPrice(assetID: asset.id, latestPrice: parsed); await load() } catch { self.error = "Không thể cập nhật giá." } }
+    private func saveTrade(_ asset: PortfolioAssetModel) async {
+        guard !tradeQuantity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let parsedPrice = Int64(tradePrice.filter(\.isNumber)), parsedPrice >= 0 else { error = "Nhập khối lượng và giá hợp lệ."; return }
+        do {
+            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: tradeQuantity, unitPrice: parsedPrice, fee: Int64(tradeFee.filter(\.isNumber)) ?? 0, occurredAt: ISO8601DateFormatter().string(from: Date()), note: nil))
+            tradeAsset = nil
+            await load()
+        } catch { self.error = "Không thể ghi nhận giao dịch danh mục." }
+    }
 }
 
 struct CreditView: View {

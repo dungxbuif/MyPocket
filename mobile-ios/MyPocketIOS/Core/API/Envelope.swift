@@ -26,6 +26,17 @@ enum JSONValue: Decodable, Sendable {
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unsupported JSON value")
         }
     }
+
+    var prettyDescription: String {
+        switch self {
+        case .string(let value): return value
+        case .number(let value): return value.rounded() == value ? String(Int(value)) : String(value)
+        case .bool(let value): return value ? "Có" : "Không"
+        case .null: return "—"
+        case .array(let values): return values.map(\.prettyDescription).joined(separator: ", ")
+        case .object(let values): return values.sorted { $0.key < $1.key }.map { "\($0.key): \($0.value.prettyDescription)" }.joined(separator: " · ")
+        }
+    }
 }
 
 struct APIEnvelope<Payload: Decodable>: Decodable {

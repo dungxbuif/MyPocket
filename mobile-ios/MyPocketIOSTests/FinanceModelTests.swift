@@ -19,4 +19,19 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(json.contains("wallet_id"))
         XCTAssertTrue(json.contains("included_in_reports"))
     }
+
+    func testPortfolioSummaryDecodesTradesAndNullableValuation() throws {
+        let data = Data(#"{"assets":[{"id":"asset-1","symbol":"VNM","name":"Vinamilk","latest_price":null}],"positions":[],"trades":[{"id":"trade-1","asset_id":"asset-1","side":"buy","quantity":"1.25","unit_price":72000,"fee":1000,"occurred_at":"2026-10-05T10:00:00Z"}],"total_cost_basis":91000,"total_market_value":null,"total_unrealized_pnl":null}"#.utf8)
+        let summary = try JSONDecoder.mypocket.decode(PortfolioSummaryModel.self, from: data)
+        XCTAssertEqual(summary.trades.first?.quantity, "1.25")
+        XCTAssertNil(summary.totalMarketValue)
+    }
+
+    func testAIEntryDraftEncodesAllEditableFields() throws {
+        let draft = EntryDraftModel(type: "expense", amount: 50000, walletID: "wallet-1", categoryID: "category-1", jarID: nil, occurredAt: "2026-10-05T10:00:00Z", note: "Cà phê", includedInReports: true)
+        let json = String(decoding: try JSONEncoder.mypocket.encode(draft), as: UTF8.self)
+        XCTAssertTrue(json.contains("wallet_id"))
+        XCTAssertTrue(json.contains("included_in_reports"))
+        XCTAssertTrue(json.contains("Cà phê"))
+    }
 }

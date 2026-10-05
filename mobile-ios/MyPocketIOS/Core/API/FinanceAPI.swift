@@ -55,12 +55,24 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/transactions/\(id)", method: .patch, body: try body(input)))
     }
 
+    func updateTransactionTravel(id: String, eventID: String?) async throws -> TransactionModel {
+        try await client.send(APIRequest(path: "/transactions/\(id)/travel", method: .patch, body: try body(["event_id": eventID])))
+    }
+
     func deleteTransaction(id: String) async throws {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/transactions/\(id)", method: .delete))
     }
 
     func createTransfer(_ input: TransferInputModel) async throws -> [TransactionModel] {
         try await client.send(APIRequest(path: "/transactions/transfer", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
+    func updateTransfer(id: String, input: TransferUpdateInputModel) async throws -> [TransactionModel] {
+        try await client.send(APIRequest(path: "/transactions/transfer/\(id)", method: .patch, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
+    func deleteTransfer(id: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/transactions/transfer/\(id)", method: .delete, idempotencyKey: UUID().uuidString))
     }
 
     func createAdjustment(_ input: AdjustmentInputModel) async throws -> TransactionModel {
@@ -108,8 +120,26 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/jars?month=\(month)"))
     }
 
-    func createJar(_ input: JarConfigInputModel) async throws -> JarItemModel {
+    func createJar(_ input: JarConfigInputModel) async throws -> JarConfigModel {
         try await client.send(APIRequest(path: "/jars", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
+    func updateJarMonth(jarID: String, month: String, input: JarConfigInputModel) async throws -> JarConfigModel {
+        try await client.send(APIRequest(path: "/jars/\(jarID)/months/\(month)", method: .put, body: try body(input)))
+    }
+
+    func removeJarMonth(jarID: String, month: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/jars/\(jarID)/months/\(month)", method: .delete))
+    }
+
+    func jarReport(jarID: String, from: String? = nil, to: String? = nil) async throws -> JarCumulativeSummaryModel {
+        var components = URLComponents()
+        var items: [URLQueryItem] = []
+        if let from { items.append(URLQueryItem(name: "from", value: from)) }
+        if let to { items.append(URLQueryItem(name: "to", value: to)) }
+        components.queryItems = items
+        let suffix = components.percentEncodedQuery.map { "?\($0)" } ?? ""
+        return try await client.send(APIRequest(path: "/jars/\(jarID)/report\(suffix)"))
     }
 
     func recurring() async throws -> [RecurringModel] {
@@ -166,6 +196,10 @@ final class FinanceAPI: @unchecked Sendable {
 
     func createPortfolioTrade(assetID: String, input: PortfolioTradeInputModel) async throws -> PortfolioTradeModel {
         try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/trades", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
+    func portfolioTrades(assetID: String) async throws -> [PortfolioTradeModel] {
+        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/trades"))
     }
 
     func creditStatement(walletID: String, from: String? = nil, to: String? = nil) async throws -> CreditStatementModel {
@@ -234,9 +268,44 @@ final class FinanceAPI: @unchecked Sendable {
     func submitAdvisorMessage(_ input: AdvisorMessageInputModel) async throws -> AdvisorSubmitModel {
         try await client.send(APIRequest(path: "/ai/advisor/messages", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
     }
+
+    func editEntryProposal(id: String, version: Int, draft: EntryDraftModel) async throws -> EntryProposalModel {
+        try await client.send(APIRequest(path: "/ai/entry/proposals/\(id)", method: .patch, body: try body(EntryProposalEditBody(version: version, draft: draft))))
+    }
+
+    func profile() async throws -> ProfileModel {
+        try await client.send(APIRequest(path: "/auth/profile"))
+    }
+
+    func updateTimezone(_ timezone: String) async throws -> ProfileModel {
+        try await client.send(APIRequest(path: "/auth/profile", method: .patch, body: try body(["timezone": timezone])))
+    }
+
+    func apiKeys() async throws -> [APIKeyModel] {
+        try await client.send(APIRequest(path: "/api-keys"))
+    }
+
+    func createAPIKey(name: String, scopes: [String], expiresAt: String? = nil) async throws -> APIKeyCreatedModel {
+        try await client.send(APIRequest(path: "/api-keys", method: .post, body: try body(APIKeyCreateBody(name: name, scopes: scopes, expiresAt: expiresAt)), idempotencyKey: UUID().uuidString))
+    }
+
+    func revokeAPIKey(id: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/api-keys/\(id)", method: .delete))
+    }
 }
 
 struct EmptyResponse: Decodable, Sendable {}
+
+private struct EntryProposalEditBody: Encodable, Sendable {
+    var version: Int
+    var draft: EntryDraftModel
+}
+
+private struct APIKeyCreateBody: Encodable, Sendable {
+    var name: String
+    var scopes: [String]
+    var expiresAt: String?
+}
 
 struct WalletModelInput: Codable, Sendable {
     var name: String
