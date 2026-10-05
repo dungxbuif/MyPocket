@@ -285,8 +285,8 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (38 unit/contract tests and the full UI suite: 9 tests, 5
-passed and 4 explicit API-fixture skips). The same pass
+Both commands pass (41 unit/contract tests and the full UI suite: 10 tests, 5
+passed and 5 explicit API-fixture skips). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical
@@ -317,7 +317,7 @@ response after the run.
 The opt-in API-backed UI fixtures are now self-seeding: wallet-detail and
 credit-ledger tests exchange the local fixture session, create their own
 owner-scoped wallet through `POST /wallets`, and register async teardown via
-`DELETE /wallets/:id`. The full `LOCAL_API_UI` UI suite passed 9/9 with no
+`DELETE /wallets/:id`. The full `LOCAL_API_UI` UI suite passed 10/10 with no
 skips; a post-run local API check found zero `Fixture*` wallets. This remains
 local disposable proof, not production validation.
 
@@ -325,6 +325,12 @@ AI-entry capability parity is also covered: the shared document picker remains
 disabled until the API reports private OCR/storage readiness, while text-only
 entry remains enabled. The pure policy regression and the opt-in AI-entry UI
 test both pass against the capability-disabled local fixture.
+
+The native ledger week-period audit then removed the incorrect all-time tab and
+added the shared account-local Monday–Sunday week navigator, bounded at the
+current week, plus the web-matched `Tiền vào`/`Tiền ra` cashflow card. The pure
+filter/label tests and an opt-in iPhone 16 UI assertion pass; goal and credit
+scopes still route to their specialized bodies.
 
 ## Disposable local API smoke — 2026-10-05
 

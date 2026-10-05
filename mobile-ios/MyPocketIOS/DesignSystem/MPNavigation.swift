@@ -78,6 +78,30 @@ struct MPSegmentedControl: View {
     }
 }
 
+/// Account-local week navigation used by the ledger. The base owns hit targets
+/// and accessibility labels so feature screens do not create ad-hoc controls.
+struct MPWeekNavigator: View {
+    let rangeLabel: String
+    let isNextDisabled: Bool
+    let onPrevious: () -> Void
+    let onNext: () -> Void
+
+    var body: some View {
+        HStack(spacing: 12) {
+            MPIconButton(systemName: "chevron.left", label: "Tuần trước", action: onPrevious)
+            MPText(rangeLabel, style: .body)
+                .frame(maxWidth: .infinity)
+                .multilineTextAlignment(.center)
+                .accessibilityAddTraits(.updatesFrequently)
+            MPIconButton(systemName: "chevron.right", label: "Tuần sau", action: onNext)
+                .opacity(isNextDisabled ? 0.4 : 1)
+                .disabled(isNextDisabled)
+        }
+        .padding(.horizontal, 4)
+        .frame(minHeight: MPMetrics.hitTarget)
+    }
+}
+
 /// Shared overflow action trigger for screen-level secondary actions.
 /// Consumers provide semantic menu actions while this base owns the hit target
 /// and accessible label, keeping the three-dot affordance consistent.

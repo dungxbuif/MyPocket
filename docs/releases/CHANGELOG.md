@@ -25,13 +25,16 @@ as active release entries here.
 
 - Native UI smoke tests now start from a deterministic unauthenticated state
   with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
-  Keychain/biometric state. The iPhone 16 suite passes 9 tests (5 passed, 4
+  Keychain/biometric state. The iPhone 16 suite passes 10 tests (5 passed, 5
   explicit API-fixture skips).
 - Opt-in native API-backed UI tests now seed and tear down their own basic and
   credit wallet fixtures through the local API; the full `LOCAL_API_UI` suite
-  passes 9/9 without relying on leftover simulator or database state.
+  passes 10/10 without relying on leftover simulator or database state.
 - Native AI-entry attachment selection now stays disabled until private
   OCR/storage capability is configured; text-only input remains available.
+- Native aggregate/basic ledgers now match the approved Week/Custom contract:
+  Monday–Sunday account-local ranges, bounded previous/next week navigation,
+  no all-time tab, and shared `Tiền vào`/`Tiền ra` cashflow summary.
 - Native session restore now refreshes an expired access token before enabling the
   Face ID lock gate. If the refresh token is expired or rejected, Keychain state
   and the biometric preference are cleared instead of opening an invalid session.

@@ -43,6 +43,11 @@ detail month labels no longer expose interpolation source text, and Travel
 Mode validates trimmed names plus optional calendar ranges before submission.
 Both have regression tests and remain limited to the native client.
 
+2026-10-06 native ledger audit: removed the incorrect all-time period from the
+SwiftUI ledger, added account-local Monday–Sunday week navigation and matched
+the web `Tiền vào`/`Tiền ra` cashflow card. Goal and credit specialized scopes
+remain unchanged; owner visual UAT is still separate.
+
 ## Current Owner Direction
 
 2026-09-24 wallet/ledger UI follow-up: savings detail has an existing goal/progress spec; Travel Mode is still an event-linkage draft and not a new wallet type. [UI-LEDGER-WEEK](tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md) is in_review after owner correction: basic uses the same Week/Custom summary/list UI as `Tổng cộng`, filtered by wallet; goal shows complete savings history, and provisional credit remains read-only. Basic selection and week navigation were verified on the local Chrome page; goal selection/mobile visual UAT remain open. Credit has business rules, but its detailed statement/payment UI/API contract remains a separate design gap; do not mark credit complete. No deployment has been performed for this slice.

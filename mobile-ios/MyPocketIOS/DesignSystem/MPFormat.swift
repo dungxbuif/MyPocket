@@ -50,6 +50,15 @@ enum MPFormat {
         calendarDate.string(from: value)
     }
 
+    static func calendarDateString(_ value: Date, timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.string(from: value)
+    }
+
     static func parseInstant(_ raw: String?) -> Date? {
         guard let raw, !raw.isEmpty else { return nil }
         let fractional = ISO8601DateFormatter()
@@ -81,6 +90,32 @@ enum MPFormat {
         formatter.dateFormat = "yyyy-MM-dd"
         formatter.timeZone = timeZone
         return formatter.string(from: Date())
+    }
+
+    /// Returns the account-local Monday–Sunday week containing `now`.
+    /// `offset` is measured in whole weeks; zero is the current week, negative
+    /// values are previous weeks and positive values are future weeks.
+    static func weekRange(now: Date = Date(), offset: Int = 0, timeZone: TimeZone = .current) -> (start: Date, endExclusive: Date) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        calendar.firstWeekday = 2 // Monday, matching the web ledger contract.
+        calendar.minimumDaysInFirstWeek = 1
+        let currentStart = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? calendar.startOfDay(for: now)
+        let start = calendar.date(byAdding: .weekOfYear, value: offset, to: currentStart) ?? currentStart
+        let endExclusive = calendar.date(byAdding: .day, value: 7, to: start) ?? start
+        return (start, endExclusive)
+    }
+
+    static func weekRangeLabel(start: Date, endExclusive: Date, timeZone: TimeZone = .current) -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "dd/MM/yyyy"
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let endInclusive = calendar.date(byAdding: .day, value: -1, to: endExclusive) ?? endExclusive
+        return "\(formatter.string(from: start)) – \(formatter.string(from: endInclusive))"
     }
 
     static func currentMonth(timeZone: TimeZone = .current) -> String {

@@ -256,6 +256,25 @@ final class LaunchTests: XCTestCase {
 #endif
     }
 
+    func testAPIBackedLedgerUsesWeekModeAndCashflowCard() throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Giao dịch"].waitForExistence(timeout: 10))
+        app.buttons["Giao dịch"].tap()
+        XCTAssertTrue(app.staticTexts["Giao dịch"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Theo tuần"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Tùy chọn"].exists)
+        XCTAssertTrue(app.buttons["Tuần trước"].exists)
+        XCTAssertTrue(app.staticTexts["Tiền vào"].exists)
+        XCTAssertTrue(app.staticTexts["Tiền ra"].exists)
+        XCTAssertFalse(app.buttons["Tất cả"].exists)
+#endif
+    }
+
     func testAPIBackedWalletDetailExposesTransactionEditor() async throws {
 #if !LOCAL_API_UI
         throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable fixture wallet.")

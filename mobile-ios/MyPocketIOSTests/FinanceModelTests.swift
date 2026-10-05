@@ -196,6 +196,63 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(result.map(\.id), ["valid"])
     }
 
+    func testTransactionWeekFilterUsesAccountLocalMondayThroughSundayAndOffset() {
+        let now = MPFormat.parseInstant("2026-10-07T12:00:00Z")!
+        let inCurrentWeek = transaction(id: "current", occurredAt: "2026-10-05T01:00:00Z")
+        let inPreviousWeek = transaction(id: "previous", occurredAt: "2026-09-28T01:00:00Z")
+        let nextWeek = transaction(id: "next", occurredAt: "2026-10-12T01:00:00Z")
+
+        let current = TransactionsViewModel.applyFilters(
+            [inCurrentWeek, inPreviousWeek, nextWeek],
+            walletSelection: "__all__",
+            periodSelection: "week",
+            customStart: now,
+            customEnd: now,
+            accountTimezone: "Asia/Ho_Chi_Minh",
+            weekOffset: 0,
+            now: now
+        )
+        XCTAssertEqual(current.map(\.id), ["current"])
+
+        let previous = TransactionsViewModel.applyFilters(
+            [inCurrentWeek, inPreviousWeek, nextWeek],
+            walletSelection: "__all__",
+            periodSelection: "week",
+            customStart: now,
+            customEnd: now,
+            accountTimezone: "Asia/Ho_Chi_Minh",
+            weekOffset: -1,
+            now: now
+        )
+        XCTAssertEqual(previous.map(\.id), ["previous"])
+    }
+
+    func testWeekRangeLabelUsesAccountLocalMondayThroughSundayDates() {
+        let now = MPFormat.parseInstant("2026-10-07T12:00:00Z")!
+        let timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        let range = MPFormat.weekRange(now: now, timeZone: timeZone)
+
+        XCTAssertEqual(MPFormat.calendarDateString(range.start, timeZone: timeZone), "2026-10-05")
+        XCTAssertEqual(MPFormat.calendarDateString(range.endExclusive, timeZone: timeZone), "2026-10-12")
+        XCTAssertEqual(MPFormat.weekRangeLabel(start: range.start, endExclusive: range.endExclusive, timeZone: timeZone), "05/10/2026 – 11/10/2026")
+    }
+
+    func testTransactionCustomPeriodRejectsReversedDateRange() {
+        let start = MPFormat.parseCalendarDate("2026-10-10")!
+        let end = MPFormat.parseCalendarDate("2026-10-01")!
+        let row = transaction(id: "row", occurredAt: "2026-10-05T01:00:00Z")
+
+        let result = TransactionsViewModel.applyFilters(
+            [row],
+            walletSelection: "__all__",
+            periodSelection: "custom",
+            customStart: start,
+            customEnd: end,
+            accountTimezone: "Asia/Ho_Chi_Minh"
+        )
+        XCTAssertTrue(result.isEmpty)
+    }
+
     private func transaction(id: String, occurredAt: String) -> TransactionModel {
         TransactionModel(
             id: id,

@@ -10,7 +10,8 @@ final class TransactionsViewModel: ObservableObject {
     @Published private(set) var bulkDeleteErrorMessage: String?
     @Published private(set) var errorMessage: String?
     @Published var walletSelection = "__all__"
-    @Published var periodSelection = "all"
+    @Published var periodSelection = "week"
+    @Published var weekOffset = 0
     @Published var groupByCategory = false
     @Published var customStart = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @Published var customEnd = Date()
@@ -26,7 +27,8 @@ final class TransactionsViewModel: ObservableObject {
             periodSelection: periodSelection,
             customStart: customStart,
             customEnd: customEnd,
-            accountTimezone: accountTimezone
+            accountTimezone: accountTimezone,
+            weekOffset: weekOffset
         )
     }
 
@@ -37,21 +39,25 @@ final class TransactionsViewModel: ObservableObject {
         customStart: Date,
         customEnd: Date,
         accountTimezone: String,
+        weekOffset: Int = 0,
         now: Date = Date()
     ) -> [TransactionModel] {
         let walletFiltered = walletSelection == "__all__" ? transactions : transactions.filter { $0.walletID == walletSelection }
         if periodSelection == "all" { return walletFiltered.sorted { $0.occurredAt > $1.occurredAt } }
+        let timeZone = TimeZone(identifier: accountTimezone) ?? .current
         var calendar = Calendar(identifier: .gregorian)
-        calendar.timeZone = TimeZone(identifier: accountTimezone) ?? .current
+        calendar.timeZone = timeZone
         let start: Date
         let end: Date
         if periodSelection == "week" {
-            start = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
-            end = calendar.date(byAdding: .weekOfYear, value: 1, to: start) ?? Date()
+            let range = MPFormat.weekRange(now: now, offset: weekOffset, timeZone: timeZone)
+            start = range.start
+            end = range.endExclusive
         } else {
             start = calendar.startOfDay(for: customStart)
             end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: customEnd)) ?? Date()
         }
+        guard end > start else { return [] }
         return walletFiltered.filter {
             guard let date = MPFormat.parseInstant($0.occurredAt) else { return false }
             return date >= start && date < end
@@ -60,6 +66,12 @@ final class TransactionsViewModel: ObservableObject {
 
     var totalExpense: Int64 { filteredTransactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
     var totalIncome: Int64 { filteredTransactions.filter { $0.type == "income" }.reduce(0) { $0 + $1.amount } }
+    var weekRangeLabel: String {
+        let timeZone = TimeZone(identifier: accountTimezone) ?? .current
+        let range = MPFormat.weekRange(offset: weekOffset, timeZone: timeZone)
+        return MPFormat.weekRangeLabel(start: range.start, endExclusive: range.endExclusive, timeZone: timeZone)
+    }
+    var customRangeIsInvalid: Bool { customEnd < customStart }
     var selectedWalletType: String? {
         guard walletSelection != "__all__" else { return nil }
         return wallets.first(where: { $0.id == walletSelection })?.type
@@ -221,10 +233,21 @@ struct TransactionsView: View {
                     }
                 })
                 if model.selectedWalletType != "goal", model.selectedWalletType != "credit" {
-                    MPSegmentedControl(options: [("all", "Tất cả"), ("week", "Tuần này"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
+                    MPSegmentedControl(options: [("week", "Theo tuần"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
+                    if model.periodSelection == "week" {
+                        MPWeekNavigator(
+                            rangeLabel: model.weekRangeLabel,
+                            isNextDisabled: model.weekOffset >= 0,
+                            onPrevious: { model.weekOffset -= 1 },
+                            onNext: { model.weekOffset = min(model.weekOffset + 1, 0) }
+                        )
+                    }
                 }
                 if model.selectedWalletType != "goal", model.selectedWalletType != "credit", model.periodSelection == "custom" {
                     MPDateRangePicker(start: $model.customStart, end: $model.customEnd)
+                    if model.customRangeIsInvalid {
+                        MPStatusMessage(text: "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.", tone: .danger)
+                    }
                 }
                 MPOptionSelector(title: "Ví", options: [MPSelectionOption(id: "__all__", label: "Tổng cộng")] + model.wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $model.walletSelection, emptyLabel: "Tổng cộng")
                 if let selectedWallet = model.wallets.first(where: { $0.id == model.walletSelection }), selectedWallet.type == "credit" {
@@ -256,9 +279,19 @@ struct TransactionsView: View {
                     } else if let errorMessage = model.errorMessage, model.transactions.isEmpty {
                     MPErrorView(title: "Không tải được giao dịch", detail: errorMessage) { Task { await model.load() } }
                     } else {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        MPMetricCard(title: "Chi tiêu", value: MPFormat.money(model.totalExpense))
-                        MPMetricCard(title: "Thu nhập", value: MPFormat.money(model.totalIncome))
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                MPText("Tiền vào")
+                                Spacer()
+                                MPText(MPFormat.money(model.totalIncome), style: .title)
+                            }
+                            HStack {
+                                MPText("Tiền ra")
+                                Spacer()
+                                MPText(MPFormat.money(model.totalExpense), style: .title)
+                            }
+                        }
                     }
                     if model.filteredTransactions.isEmpty {
                         MPEmptyView(title: "Không có giao dịch", detail: "Thử đổi khoảng thời gian hoặc thêm giao dịch mới.")
@@ -289,8 +322,12 @@ struct TransactionsView: View {
         .task { await model.load() }
         .onChange(of: model.walletSelection) { _, newValue in
             model.periodSelection = model.wallets.first(where: { $0.id == newValue })?.type == "goal" || model.wallets.first(where: { $0.id == newValue })?.type == "credit" ? "all" : "week"
+            model.weekOffset = 0
             model.groupByCategory = false
             selectedIDs.removeAll()
+        }
+        .onChange(of: model.periodSelection) { _, newValue in
+            if newValue == "week" { model.weekOffset = 0 }
         }
         .refreshable { await model.load() }
         .overlay {
