@@ -79,8 +79,8 @@ struct BudgetsView: View {
             async let categoryResult = api.categories()
             async let profile = api.profile()
             summary = try await summaryResult
-            wallets = try await walletResult
-            categories = try await categoryResult
+            wallets = (try await walletResult).filter { $0.type != "credit" }
+            categories = (try await categoryResult).filter { $0.kind == "expense" }
             if let profile = try? await profile {
                 accountTimezone = profile.timezone
                 if firstLoad {

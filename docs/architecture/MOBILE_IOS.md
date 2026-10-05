@@ -76,6 +76,10 @@ and changing wallet or income/expense type clears a category that no longer
 applies. Credit-ledger rows remain read-only in aggregate transaction detail;
 credit mutations go through the dedicated statement actions.
 
+Budget category scope is expense-only and budget/adjustment wallet selectors
+exclude credit wallets, matching the web restrictions for those ordinary ledger
+operations.
+
 Finance Assistant history uses one UserDefaults conversation ID keyed by the
 authenticated owner ID. The native screen reloads that conversation's latest
 50 messages and the read-only monthly overview on entry; a later request can

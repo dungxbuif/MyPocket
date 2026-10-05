@@ -650,14 +650,15 @@ struct AdjustmentEditorView: View {
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
             MPScreenHeader(title: "Điều chỉnh số dư", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
-            MPOptionSelector(title: "Ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
+            MPOptionSelector(title: "Ví", options: ledgerWallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
             MPWalletSelector(title: "Hướng", options: ["increase", "decrease"], selection: $direction)
             MPAmountField(title: "Số tiền", text: $amount)
             MPTextField(title: "Lý do", text: $note)
             if let error { MPStatusMessage(text: error, tone: .danger) }
             MPButton("Lưu điều chỉnh", isLoading: saving) { Task { await save() } }
         }.padding(MPMetrics.pagePadding) }
-        .task { if walletID.isEmpty { walletID = wallets.first?.id ?? "" } }
+        .task { if walletID.isEmpty { walletID = ledgerWallets.first?.id ?? "" } }
     }
-    private func save() async { guard let selected = wallets.first(where: { $0.id == walletID }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: ISO8601DateFormatter().string(from: Date()), note: note.isEmpty ? nil : note)); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
+    private var ledgerWallets: [WalletModel] { wallets.filter { $0.type != "credit" } }
+    private func save() async { guard let selected = ledgerWallets.first(where: { $0.id == walletID }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: ISO8601DateFormatter().string(from: Date()), note: note.isEmpty ? nil : note)); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
 }

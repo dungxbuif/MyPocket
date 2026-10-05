@@ -83,6 +83,8 @@ as active release entries here.
 - Native ordinary transaction and AI proposal editors now exclude credit
   wallets and clear incompatible categories on wallet/type changes; aggregate
   credit rows remain read-only and route mutations through the credit ledger.
+- Native budget and balance-adjustment selectors now exclude credit wallets, and
+  budgets only offer expense categories, matching the web scope rules.
 
 ### Verification
 

@@ -139,6 +139,9 @@ Changing the wallet or income/expense type clears an incompatible category, and
 credit rows opened from aggregate ledger detail are read-only; entry/payment
 changes use the dedicated credit statement flow.
 
+Budget editors expose only expense categories and non-credit wallets; balance
+adjustments use the same non-credit wallet boundary.
+
 Selecting a credit wallet from the main wallet list must route to the same
 statement plus entry/payment surface as the dedicated credit route; a read-only
 credit detail is not sufficient for parity.

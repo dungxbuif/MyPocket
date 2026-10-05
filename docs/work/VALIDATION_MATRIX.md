@@ -39,6 +39,7 @@ updated: 2026-10-06
 | Native recurring wallet/category parity | PASS: recurring schedules exclude credit wallets and category options follow the selected expense/income type; changing type clears an incompatible category selection |
 | Native selector and jar validation parity | PASS: shared selectors localize API enum values without changing payloads; jar mode changes clear stale drafts and reject 0% while accepting only 0 < percent ≤ 100 |
 | Native ordinary transaction/credit boundary parity | PASS: ordinary and AI proposal editors exclude credit wallets, invalid categories clear when wallet/type changes, and aggregate credit rows do not expose ordinary edit/delete actions |
+| Native budget/adjustment wallet scope parity | PASS: budget categories are expense-only and both budget and adjustment wallet selectors exclude credit wallets |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
 | Simulator API-backed authenticated smoke fixture | PASS: DEBUG-only `-UITestAuthenticatedAPI` exchanged fixture PKCE fields against local `:8080`, persisted the disposable JWT, and rendered the authenticated overview with live empty wallets/ledger; screenshot `/tmp/mypocket-ios-simulator-api-auth.png` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |
