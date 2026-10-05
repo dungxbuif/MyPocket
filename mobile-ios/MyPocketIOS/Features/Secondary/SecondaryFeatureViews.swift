@@ -744,9 +744,14 @@ struct PortfolioView: View {
         catch { self.error = "Không thể cập nhật giá." }
     }
     private func saveTrade(_ asset: PortfolioAssetModel) async {
-        guard !tradeQuantity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let parsedPrice = Int64(tradePrice.filter(\.isNumber)), parsedPrice >= 0 else { error = "Nhập khối lượng và giá hợp lệ."; return }
+        guard PortfolioTradeDraftValidator.isValid(side: tradeSide, quantity: tradeQuantity, unitPrice: tradePrice, fee: tradeFee),
+              let parsedPrice = PortfolioTradeDraftValidator.nonNegativeInteger(tradePrice),
+              let parsedFee = PortfolioTradeDraftValidator.nonNegativeInteger(tradeFee, allowingEmpty: true) else {
+            error = "Nhập loại, khối lượng, giá và phí hợp lệ. Khối lượng tối đa 8 chữ số thập phân."
+            return
+        }
         do {
-            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: tradeQuantity, unitPrice: parsedPrice, fee: Int64(tradeFee.filter(\.isNumber)) ?? 0, occurredAt: Self.accountLocalNoonTimestamp(tradeDate, timezone: accountTimezone), note: nil))
+            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: tradeQuantity.trimmingCharacters(in: .whitespacesAndNewlines), unitPrice: parsedPrice, fee: parsedFee, occurredAt: Self.accountLocalNoonTimestamp(tradeDate, timezone: accountTimezone), note: nil))
             tradeAsset = nil
             await load()
         } catch { self.error = "Không thể ghi nhận giao dịch danh mục." }
@@ -759,6 +764,36 @@ struct PortfolioView: View {
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         let localNoon = calendar.date(from: DateComponents(year: components.year, month: components.month, day: components.day, hour: 12)) ?? date
         return MPFormat.instantString(localNoon)
+    }
+}
+
+enum PortfolioTradeDraftValidator {
+    static func nonNegativeInteger(_ raw: String, allowingEmpty: Bool = false) -> Int64? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty { return allowingEmpty ? 0 : nil }
+        guard value.allSatisfy(\.isNumber) else { return nil }
+        guard let parsed = Int64(value), parsed >= 0 else { return nil }
+        return parsed
+    }
+
+    static func isValid(side: String, quantity: String, unitPrice: String, fee: String) -> Bool {
+        guard side == "buy" || side == "sell" else { return false }
+        guard isPositiveQuantity(quantity), nonNegativeInteger(unitPrice) != nil,
+              nonNegativeInteger(fee, allowingEmpty: true) != nil else { return false }
+        return true
+    }
+
+    private static func isPositiveQuantity(_ raw: String) -> Bool {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty, !value.contains("+") && !value.contains("-") && !value.contains("e") && !value.contains("E") else { return false }
+        let parts = value.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count <= 2, let whole = parts.first, !whole.isEmpty,
+              whole.allSatisfy(\.isNumber) else { return false }
+        if parts.count == 2 {
+            let fraction = parts[1]
+            guard !fraction.isEmpty, fraction.count <= 8, fraction.allSatisfy(\.isNumber) else { return false }
+        }
+        return value.filter(\.isNumber).contains(where: { $0 != "0" })
     }
 }
 

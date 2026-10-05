@@ -23,17 +23,21 @@ as active release entries here.
 
 ### Fixed
 
-- Re-ran the native iPhone 16 simulator regression after the goal target-date
-  timezone fix: 42/42 unit tests and 10/10 API-backed UI tests pass, with no
+- Re-ran the native iPhone 16 simulator regression after the goal target-date,
+  recurring, jar-allocation and portfolio-trade validation fixes: 45/45 unit
+  tests and 10/10 API-backed UI tests pass, with no
   disposable `Fixture*` wallets left behind. API-backed UI tests retain normal
   simulator ad-hoc signing so Keychain fixture sessions can be persisted;
   `CODE_SIGNING_ALLOWED=NO` remains for pure unit/build checks only.
 - Native recurring editors now reject non-positive amount/interval values and
   unsupported type/frequency or reversed end-date drafts before sending an API
-  request; the contract suite is now 44/44.
+  request; the contract suite now passes 45/45 with the portfolio validator.
 - Native jar allocation drafts now mirror the backend contract: fixed values
   stop at the JavaScript-safe integer ceiling and percentage values must be
   finite, positive, at most 100% and no more precise than two decimals.
+- Native portfolio trade drafts now validate buy/sell, positive quantity
+  precision and non-negative integer VND price/fee values locally, avoiding
+  silent digit stripping before the API request.
 - Native UI smoke tests now start from a deterministic unauthenticated state
   with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
   Keychain/biometric state. The iPhone 16 suite passes 10 tests (5 passed, 5
@@ -120,7 +124,7 @@ as active release entries here.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 37 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 45 unit/contract tests and
   5 standard authenticated UI smoke tests, with base-component and Xcode project
   guards. The Release simulator build also passed with warnings treated as
   errors, and the installed app launched successfully.

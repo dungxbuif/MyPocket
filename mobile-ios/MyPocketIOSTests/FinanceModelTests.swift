@@ -120,6 +120,18 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertNil(summary.totalMarketValue)
     }
 
+    func testPortfolioTradeDraftValidatorMirrorsBackendNumericContract() {
+        XCTAssertTrue(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "1.25000000", unitPrice: "72000", fee: "1000"))
+        XCTAssertTrue(PortfolioTradeDraftValidator.isValid(side: "sell", quantity: "0.25", unitPrice: "0", fee: ""))
+        XCTAssertEqual(PortfolioTradeDraftValidator.nonNegativeInteger(" 72000 "), 72000)
+        XCTAssertFalse(PortfolioTradeDraftValidator.isValid(side: "transfer", quantity: "1", unitPrice: "1", fee: "0"))
+        XCTAssertFalse(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "0", unitPrice: "1", fee: "0"))
+        XCTAssertFalse(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "1.000000001", unitPrice: "1", fee: "0"))
+        XCTAssertFalse(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "1e2", unitPrice: "1", fee: "0"))
+        XCTAssertFalse(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "1", unitPrice: "12.5", fee: "0"))
+        XCTAssertFalse(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "1", unitPrice: "1", fee: "-1"))
+    }
+
     func testAIEntryDraftEncodesAllEditableFields() throws {
         let draft = EntryDraftModel(type: "expense", amount: 50000, walletID: "wallet-1", categoryID: "category-1", jarID: nil, occurredAt: "2026-10-05T10:00:00Z", note: "Cà phê", includedInReports: true)
         let json = String(decoding: try JSONEncoder.mypocket.encode(draft), as: UTF8.self)

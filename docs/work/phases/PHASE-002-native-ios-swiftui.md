@@ -379,13 +379,15 @@ API defect.
 ## Simulator rerun — 2026-10-06
 
 The iPhone 16 simulator run was repeated after the goal target-date timezone,
-recurring draft-validation and jar allocation contract fixes. Unit/contract XCTest passed 44/44. The opt-in API-backed UI suite passed
+recurring draft-validation, jar allocation contract and portfolio trade
+validation fixes. Unit/contract XCTest passed 45/45. The opt-in API-backed UI suite passed
 10/10 in 199.996 seconds, including the AI-entry capability gate, Assistant
 overview, credit ledger, week/cashflow ledger, wallet transaction editor, all
 13 secondary destinations, feedback entry, primary tabs and transfer/adjustment
 overflow actions. The recurring editor's zero/invalid amount, interval,
-metadata and reversed end-date guards, plus jar safe-integer/finite-precision
-guards, are covered by the pure tests. The
+metadata and reversed end-date guards, jar safe-integer/finite-precision
+guards, and portfolio trade numeric/side guards, are covered by the pure tests.
+The
 disposable fixture check returned zero `Fixture*` wallets.
 
 The first diagnostic invocation incorrectly added `CODE_SIGNING_ALLOWED=NO` to
