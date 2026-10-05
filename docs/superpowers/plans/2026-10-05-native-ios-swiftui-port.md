@@ -401,8 +401,10 @@ bash -lc 'set -o pipefail; xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj 
 xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS -configuration Release -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' build
 ```
 
-The latest XCTest run passed 17 unit/contract tests and 3 UI smoke tests; the
+The latest XCTest run passed 19 unit/contract tests and 3 UI smoke tests; the
 Release build passed. The simulator app was relaunched after the test run.
+The latest parity fixes also cover stable-ID selectors for duplicate wallet or
+category names and account-timezone boundary formatting.
 The plan's original red/green checkbox history is retained as authoring
 history; release readiness is not claimed until an iOS OAuth client ID is
 configured, provider-backed AI/OCR is exercised, and authenticated staging or

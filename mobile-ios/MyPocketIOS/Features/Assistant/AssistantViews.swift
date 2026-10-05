@@ -185,6 +185,7 @@ struct AIEntryView: View {
     @State private var categories: [CategoryModel] = []
     @State private var editProposal: EntryProposalModel?
     @State private var accountTimezone = TimeZone.current.identifier
+    @State private var requestID: String?
 
     var body: some View {
         ScrollView {
@@ -201,16 +202,20 @@ struct AIEntryView: View {
                 ForEach(Array(files.enumerated()), id: \.offset) { index, file in
                     MPAttachmentThumb(name: file.fileName, data: file.data) { files.remove(at: index) }
                 }
-                MPButton("Phân tích đề xuất", isLoading: processing) { Task { await processEntry() } }
+                MPButton("Phân tích đề xuất", isLoading: processing, isDisabled: process?.processing == true) { Task { await processEntry() } }
                 if let error { MPStatusMessage(text: error, tone: .danger) }
                 if let process {
+                    if let processError = process.error { MPStatusMessage(text: processError, tone: .danger) }
+                    if process.processing && !processing {
+                        MPButton("Tải lại kết quả", style: .secondary) { Task { await refreshResult() } }
+                    }
                     if let reply = process.reply { MPAssistantCard(title: "Phản hồi của AI") { MPText(reply) } }
-                    if process.proposals.isEmpty { MPEmptyView(title: "Chưa có đề xuất", detail: "Hãy thêm mô tả rõ hơn hoặc đính kèm chứng từ.") }
+                    if !process.processing && process.proposals.isEmpty && process.reply == nil && process.error == nil { MPEmptyView(title: "Chưa có đề xuất", detail: "Hãy thêm mô tả rõ hơn hoặc đính kèm chứng từ.") }
                     ForEach(process.proposals) { proposal in
                         MPSurfaceCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 MPText(proposal.draft.type == "income" ? "Thu nhập" : "Chi tiêu")
-                                MPText("\(MPFormat.money(proposal.draft.amount)) · \(MPFormat.shortDate(proposal.draft.occurredAt))", style: .secondary)
+                                MPText("\(MPFormat.money(proposal.draft.amount)) · \(MPFormat.shortDate(proposal.draft.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
                                 if !proposal.draft.note.isEmpty { MPText(proposal.draft.note, style: .secondary) }
                                 if proposal.status == "pending" {
                                     HStack { MPButton("Sửa", style: .secondary) { editProposal = proposal }; MPButton("Bỏ qua", style: .secondary) { Task { await decide(proposal, as: "reject") } }; MPButton("Lưu giao dịch") { Task { await decide(proposal, as: "approve") } } }
@@ -218,6 +223,9 @@ struct AIEntryView: View {
                             }
                         }
                     }
+                }
+                if requestID != nil, !processing, process?.processing != true, process?.proposals.isEmpty != false {
+                    MPButton("Soạn nội dung mới", style: .secondary) { requestID = nil; process = nil; text = ""; files = [] }
                 }
             }
             .padding(MPMetrics.pagePadding)
@@ -241,10 +249,58 @@ struct AIEntryView: View {
     private func loadReferenceData() async { do { async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); wallets = try await walletList; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone } } catch { self.error = "Không thể tải danh sách ví và danh mục." } }
     private func processEntry() async {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty else { error = "Nhập mô tả hoặc đính kèm chứng từ trước khi phân tích."; return }
+        guard capabilities?.aiConfigured != false else { error = "AI chưa được cấu hình trên máy chủ."; return }
+        guard files.isEmpty || capabilities?.filesConfigured == true else { error = "OCR hoặc nơi lưu chứng từ chưa được cấu hình."; return }
+        let id = UUID().uuidString
         processing = true; error = nil; defer { processing = false }
-        do { process = try await api.processEntry(requestID: UUID().uuidString, text: text, timezone: accountTimezone, files: files) }
-        catch let error as APIError { self.error = "\(error.userMessage) Không có giao dịch nào được lưu." }
-        catch { self.error = "Không thể xử lý yêu cầu. Không có giao dịch nào được lưu." }
+        requestID = id
+        do {
+            process = try await api.processEntry(requestID: id, text: text, timezone: accountTimezone, files: files)
+            if process?.processing == true { await waitForResult(id: id) }
+            if process?.processing != true {
+                text = ""
+                files = []
+                requestID = nil
+            }
+        } catch let error as APIError {
+            self.error = "\(error.userMessage) Không có giao dịch nào được lưu."
+        } catch { self.error = "Không thể xử lý yêu cầu. Không có giao dịch nào được lưu." }
+    }
+
+    private func waitForResult(id: String) async {
+        for _ in 0..<105 {
+            do { try await Task.sleep(for: .seconds(2)) } catch { return }
+            do {
+                let next = try await api.entryRequest(id: id)
+                process = next
+                if !next.processing { return }
+            } catch let error as APIError {
+                self.error = error.userMessage
+                return
+            } catch {
+                self.error = "Không thể tải trạng thái xử lý AI."
+                return
+            }
+        }
+        error = "Yêu cầu vẫn đang xử lý. Bạn có thể tải lại kết quả; không gửi lại nội dung."
+    }
+
+    private func refreshResult() async {
+        guard let requestID, !processing else { return }
+        do {
+            let next = try await api.entryRequest(id: requestID)
+            process = next
+            error = nil
+            if !next.processing {
+                text = ""
+                files = []
+                self.requestID = nil
+            }
+        } catch let error as APIError {
+            self.error = error.userMessage
+        } catch {
+            self.error = "Không thể tải lại kết quả AI."
+        }
     }
     private func decide(_ proposal: EntryProposalModel, as decision: String) async {
         do { let updated = try await api.decideEntryProposal(id: proposal.id, version: proposal.version, decision: decision); process?.proposals = process?.proposals.map { $0.id == updated.id ? updated : $0 } ?? [] }
@@ -260,7 +316,20 @@ struct AIEntryView: View {
                 error = "Mỗi tệp phải nhỏ hơn 5 MiB."
                 continue
             }
-            let mime = url.pathExtension.lowercased() == "pdf" ? "application/pdf" : "image/\(url.pathExtension.lowercased() == "jpg" ? "jpeg" : url.pathExtension.lowercased())"
+            let extensionName = url.pathExtension.lowercased()
+            let mime: String
+            switch extensionName {
+            case "jpg", "jpeg": mime = "image/jpeg"
+            case "png": mime = "image/png"
+            case "pdf": mime = "application/pdf"
+            default:
+                error = "Chỉ hỗ trợ JPEG, PNG hoặc PDF."
+                continue
+            }
+            if files.contains(where: { $0.fileName == url.lastPathComponent }) {
+                error = "Không thể chọn tệp trùng nhau."
+                continue
+            }
             files.append(MultipartFile(fieldName: "files", fileName: url.lastPathComponent, mimeType: mime, data: data))
         }
     }
@@ -274,20 +343,21 @@ struct EntryProposalEditor: View {
     let onSaved: (EntryProposalModel) -> Void
     let onCancel: () -> Void
     @State private var amount: String
-    @State private var walletName: String
-    @State private var categoryName: String
+    @State private var walletID: String
+    @State private var categoryID: String
     @State private var note: String
     @State private var date: Date
     @State private var saving = false
     @State private var error: String?
+    @Environment(\.timeZone) private var timeZone
 
     init(api: FinanceAPI, proposal: EntryProposalModel, wallets: [WalletModel], categories: [CategoryModel], onSaved: @escaping (EntryProposalModel) -> Void, onCancel: @escaping () -> Void) {
         self.api = api; self.proposal = proposal; self.wallets = wallets; self.categories = categories; self.onSaved = onSaved; self.onCancel = onCancel
         _amount = State(initialValue: String(proposal.draft.amount))
-        _walletName = State(initialValue: wallets.first(where: { $0.id == proposal.draft.walletID })?.name ?? wallets.first?.name ?? "")
-        _categoryName = State(initialValue: categories.first(where: { $0.id == proposal.draft.categoryID })?.name ?? "Không chọn")
+        _walletID = State(initialValue: proposal.draft.walletID.isEmpty ? (wallets.first?.id ?? "") : proposal.draft.walletID)
+        _categoryID = State(initialValue: proposal.draft.categoryID ?? "")
         _note = State(initialValue: proposal.draft.note)
-        _date = State(initialValue: ISO8601DateFormatter().date(from: proposal.draft.occurredAt) ?? Date())
+        _date = State(initialValue: MPFormat.parseInstant(proposal.draft.occurredAt) ?? Date())
     }
 
     var body: some View {
@@ -295,8 +365,8 @@ struct EntryProposalEditor: View {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Sửa đề xuất", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
                 MPAmountField(title: "Số tiền", text: $amount)
-                MPWalletSelector(title: "Ví", options: wallets.map(\.name), selection: $walletName)
-                MPWalletSelector(title: "Danh mục", options: ["Không chọn"] + categories.map(\.name), selection: $categoryName)
+                MPOptionSelector(title: "Ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
+                MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID, emptyLabel: "Không chọn")
                 MPDateField(title: "Ngày giao dịch", date: $date)
                 MPTextEditor(title: "Ghi chú", text: $note)
                 if let error { MPStatusMessage(text: error, tone: .danger) }
@@ -307,11 +377,24 @@ struct EntryProposalEditor: View {
     }
 
     private func save() async {
-        guard let parsed = Int64(amount.filter(\.isNumber)), parsed > 0, let wallet = wallets.first(where: { $0.name == walletName }) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }
+        guard let parsed = Int64(amount.filter(\.isNumber)), parsed > 0, let wallet = wallets.first(where: { $0.id == walletID }) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }
+        let selectedCategory = categories.first(where: { $0.id == categoryID })
+        if let selectedCategory, !selectedCategory.applies(to: proposal.draft.type, walletID: wallet.id, walletType: wallet.type) { error = "Danh mục không phù hợp với loại giao dịch hoặc ví đã chọn."; return }
         saving = true; defer { saving = false }
-        let draft = EntryDraftModel(type: proposal.draft.type, amount: parsed, walletID: wallet.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, jarID: proposal.draft.jarID, occurredAt: ISO8601DateFormatter().string(from: date), note: note, includedInReports: proposal.draft.includedInReports)
+        let draft = EntryDraftModel(type: proposal.draft.type, amount: parsed, walletID: wallet.id, categoryID: selectedCategory?.id, jarID: proposal.draft.jarID, occurredAt: MPFormat.instantString(date), note: note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: proposal.draft.includedInReports)
         do { onSaved(try await api.editEntryProposal(id: proposal.id, version: proposal.version, draft: draft)) }
         catch { self.error = "Không thể cập nhật đề xuất." }
+    }
+
+    private var selectedWallet: WalletModel? { wallets.first(where: { $0.id == walletID }) }
+    private var categoryOptions: [MPSelectionOption] {
+        let valid = categories.filter { $0.applies(to: proposal.draft.type, walletID: selectedWallet?.id ?? "", walletType: selectedWallet?.type ?? "basic") }
+        var options = [MPSelectionOption(id: "", label: "Không chọn")]
+        options += valid.map { MPSelectionOption(id: $0.id, label: $0.name) }
+        if !categoryID.isEmpty, !options.contains(where: { $0.id == categoryID }), let current = categories.first(where: { $0.id == categoryID }) {
+            options.append(MPSelectionOption(id: current.id, label: current.name))
+        }
+        return options
     }
 }
 

@@ -61,4 +61,22 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(json.contains("2026-10-05T02:30:00Z"))
         XCTAssertTrue(json.contains("Hợp đồng"))
     }
+
+    func testCategoryApplicabilityRespectsKindGoalWalletAndScope() {
+        let food = CategoryModel(id: "food", ownerID: "u", parentID: nil, kind: "expense", name: "Ăn uống", systemKey: nil, iconKey: "fork.knife", isSystem: false, walletIDs: [])
+        XCTAssertTrue(food.applies(to: "expense", walletID: "basic", walletType: "basic"))
+        XCTAssertFalse(food.applies(to: "income", walletID: "basic", walletType: "basic"))
+        XCTAssertFalse(food.applies(to: "expense", walletID: "goal", walletType: "goal"))
+
+        let scoped = CategoryModel(id: "scoped", ownerID: "u", parentID: nil, kind: "expense", name: "Ví riêng", systemKey: nil, iconKey: "tag", isSystem: false, walletIDs: ["wallet-1"])
+        XCTAssertTrue(scoped.applies(to: "expense", walletID: "wallet-1", walletType: "basic"))
+        XCTAssertFalse(scoped.applies(to: "expense", walletID: "wallet-2", walletType: "basic"))
+    }
+
+    func testInstantFormatSupportsFractionalSecondsAndAccountTimezone() {
+        let instant = "2026-10-01T00:30:00.123Z"
+        XCTAssertNotNil(MPFormat.parseInstant(instant))
+        XCTAssertEqual(MPFormat.accountMonth(of: instant, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!), "2026-10")
+        XCTAssertEqual(MPFormat.accountMonth(of: instant, timeZone: TimeZone(identifier: "America/Los_Angeles")!), "2026-09")
+    }
 }

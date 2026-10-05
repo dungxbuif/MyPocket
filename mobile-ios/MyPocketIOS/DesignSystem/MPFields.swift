@@ -127,3 +127,43 @@ struct MPWalletSelector: View {
         .accessibilityLabel("\(title): \(selection)")
     }
 }
+
+struct MPSelectionOption: Identifiable, Hashable {
+    let id: String
+    let label: String
+}
+
+/// Selector dành cho dữ liệu có identity thật. Không dùng label làm khóa vì
+/// người dùng có thể tạo hai ví hoặc danh mục trùng tên.
+struct MPOptionSelector: View {
+    let title: String
+    let options: [MPSelectionOption]
+    @Binding var selectionID: String
+    var emptyLabel: String = "Chưa chọn"
+
+    private var selectedLabel: String {
+        options.first(where: { $0.id == selectionID })?.label ?? emptyLabel
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(options) { option in
+                Button(option.label) { selectionID = option.id }
+            }
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(selectedLabel)
+                    .foregroundStyle(MPColor.secondary)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.caption)
+            }
+            .frame(minHeight: MPMetrics.controlHeight)
+            .padding(.horizontal, 12)
+            .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
+        }
+        .foregroundStyle(MPColor.ink)
+        .accessibilityLabel("\(title): \(selectedLabel)")
+    }
+}

@@ -12,11 +12,12 @@ struct BudgetsView: View {
     @State private var end = MPFormat.currentMonth + "-28"
     @State private var wallets: [WalletModel] = []
     @State private var categories: [CategoryModel] = []
-    @State private var walletName = "Tất cả ví"
-    @State private var categoryName = "Tất cả danh mục"
+    @State private var walletScopeID = "__all__"
+    @State private var categoryScopeID = "__all__"
     @State private var showEditor = false
     @State private var editTarget: BudgetModel?
     @State private var deleteTarget: BudgetModel?
+    @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView {
@@ -49,8 +50,8 @@ struct BudgetsView: View {
                             MPAmountField(title: "Giới hạn", text: $limit)
                             MPTextField(title: "Ngày bắt đầu (YYYY-MM-DD)", text: $start)
                             MPTextField(title: "Ngày kết thúc (YYYY-MM-DD)", text: $end)
-                            MPWalletSelector(title: "Phạm vi ví", options: ["Tất cả ví"] + wallets.map(\.name), selection: $walletName)
-                            MPWalletSelector(title: "Phạm vi danh mục", options: ["Tất cả danh mục"] + categories.map(\.name), selection: $categoryName)
+                            MPOptionSelector(title: "Phạm vi ví", options: [MPSelectionOption(id: "__all__", label: "Tất cả ví")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletScopeID, emptyLabel: "Tất cả ví")
+                            MPOptionSelector(title: "Phạm vi danh mục", options: [MPSelectionOption(id: "__all__", label: "Tất cả danh mục")] + categories.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryScopeID, emptyLabel: "Tất cả danh mục")
                             HStack { MPButton("Hủy", style: .secondary) { showEditor = false; editTarget = nil }; MPButton("Lưu") { Task { await create() } } }
                         }
                     }
@@ -59,6 +60,7 @@ struct BudgetsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa ngân sách?", message: "Các giao dịch không bị xóa.", confirmTitle: "Xóa") {
             if let target = deleteTarget { Task { do { try await api.deleteBudget(id: target.id); await load() } catch { self.error = "Không thể xóa ngân sách." } } }
@@ -69,22 +71,35 @@ struct BudgetsView: View {
 
     private func load() async {
         guard !loading else { return }
+        let firstLoad = summary == nil
         loading = true; defer { loading = false }
         do {
             async let summaryResult = api.budgets()
             async let walletResult = api.wallets()
             async let categoryResult = api.categories()
+            async let profile = api.profile()
             summary = try await summaryResult
             wallets = try await walletResult
             categories = try await categoryResult
+            if let profile = try? await profile {
+                accountTimezone = profile.timezone
+                if firstLoad {
+                    let currentMonth = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current)
+                    if let range = MPFormat.monthRange(month: currentMonth, timeZone: TimeZone(identifier: accountTimezone) ?? .current) {
+                        start = range.start
+                        end = range.end
+                    }
+                }
+            }
             self.error = nil
         } catch { self.error = "Không thể tải ngân sách." }
     }
 
     private func create() async {
-        guard let parsed = Int64(limit.filter(\.isNumber)), !name.isEmpty else { error = "Nhập tên và giới hạn hợp lệ."; return }
+        guard let parsed = Int64(limit.filter(\.isNumber)), parsed > 0, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập tên và giới hạn hợp lệ."; return }
+        guard let startDate = MPFormat.parseCalendarDate(start), let endDate = MPFormat.parseCalendarDate(end), startDate <= endDate else { error = "Khoảng thời gian ngân sách không hợp lệ."; return }
         do {
-            let input = BudgetInputModel(name: name, limitAmount: parsed, walletID: wallets.first(where: { $0.name == walletName })?.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, startDate: start, endDate: end)
+            let input = BudgetInputModel(name: name.trimmingCharacters(in: .whitespacesAndNewlines), limitAmount: parsed, walletID: walletScopeID == "__all__" ? nil : walletScopeID, categoryID: categoryScopeID == "__all__" ? nil : categoryScopeID, startDate: start, endDate: end)
             if let editTarget { _ = try await api.updateBudget(id: editTarget.id, input: input) } else { _ = try await api.createBudget(input) }
             showEditor = false; self.editTarget = nil; await load()
         }
@@ -97,8 +112,8 @@ struct BudgetsView: View {
         limit = String(budget.limitAmount)
         start = budget.startDate
         end = budget.endDate
-        walletName = wallets.first(where: { $0.id == budget.walletID })?.name ?? "Tất cả ví"
-        categoryName = categories.first(where: { $0.id == budget.categoryID })?.name ?? "Tất cả danh mục"
+        walletScopeID = budget.walletID ?? "__all__"
+        categoryScopeID = budget.categoryID ?? "__all__"
         showEditor = true
     }
 }
@@ -110,6 +125,7 @@ struct ReportsView: View {
     @State private var summary: InsiderSummaryModel?
     @State private var loading = false
     @State private var error: String?
+    @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView {
@@ -139,7 +155,7 @@ struct ReportsView: View {
                         ForEach(summary.topCategories, id: \.name) { item in MPText("\(item.name): \(MPFormat.money(item.amount))", style: .secondary) }
                     }
                     MPAssistantCard(title: "Khoản chi lớn") {
-                        ForEach(summary.topExpenses) { item in MPTransactionRow(title: item.categoryName ?? "Chi tiêu", subtitle: MPFormat.shortDate(item.occurredAt), amount: MPFormat.money(item.amount), isIncome: false) }
+                        ForEach(summary.topExpenses) { item in MPTransactionRow(title: item.categoryName ?? "Chi tiêu", subtitle: MPFormat.shortDate(item.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current), amount: MPFormat.money(item.amount), isIncome: false) }
                     }
                 } else if let error { MPErrorView(title: "Không tải được báo cáo", detail: error) { Task { await load() } } }
                 else { MPEmptyView(title: "Chọn tháng để xem báo cáo", detail: "Số liệu luôn được tính theo timezone tài khoản.") }
@@ -147,6 +163,7 @@ struct ReportsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .accessibilityIdentifier("reports-screen")
     }
@@ -154,7 +171,14 @@ struct ReportsView: View {
     private func load() async {
         guard !loading else { return }
         loading = true; defer { loading = false }
-        do { summary = try await api.insider(month: month); self.error = nil } catch { self.error = "Không thể tải báo cáo." }
+        do {
+            if let profile = try? await api.profile() {
+                accountTimezone = profile.timezone
+                if summary == nil { month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current) }
+            }
+            summary = try await api.insider(month: month)
+            self.error = nil
+        } catch { self.error = "Không thể tải báo cáo." }
     }
 }
 
@@ -170,8 +194,8 @@ struct CategoriesView: View {
     @State private var editTarget: CategoryModel?
     @State private var deleteTarget: CategoryModel?
     @State private var wallets: [WalletModel] = []
-    @State private var walletScope = "Tất cả ví"
-    @State private var parentName = "Không có danh mục cha"
+    @State private var walletScopeID = "__all__"
+    @State private var parentID = ""
 
     var body: some View {
         ScrollView {
@@ -192,8 +216,8 @@ struct CategoriesView: View {
                             MPText(editTarget == nil ? "Danh mục mới" : "Sửa danh mục", style: .title)
                             MPTextField(title: "Tên", text: $name)
                             MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $kind)
-                            MPWalletSelector(title: "Danh mục cha", options: availableParentNames, selection: $parentName)
-                            MPWalletSelector(title: "Áp dụng cho ví", options: ["Tất cả ví"] + wallets.map(\.name), selection: $walletScope)
+                            MPOptionSelector(title: "Danh mục cha", options: availableParentOptions, selectionID: $parentID, emptyLabel: "Không có danh mục cha")
+                            MPOptionSelector(title: "Áp dụng cho ví", options: [MPSelectionOption(id: "__all__", label: "Tất cả ví")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletScopeID, emptyLabel: "Tất cả ví")
                             HStack { MPButton("Hủy", style: .secondary) { adding = false; editTarget = nil }; MPButton("Lưu") { Task { await create() } } }
                         }
                     }
@@ -229,9 +253,9 @@ struct CategoriesView: View {
             categoryTree(parentID: item.id, depth: depth + 1)
         })
     }
-    private var availableParentNames: [String] {
+    private var availableParentOptions: [MPSelectionOption] {
         let excluded = excludedParentIDs()
-        return ["Không có danh mục cha"] + items.filter { !excluded.contains($0.id) }.map(\.name)
+        return [MPSelectionOption(id: "", label: "Không có danh mục cha")] + items.filter { !excluded.contains($0.id) }.map { MPSelectionOption(id: $0.id, label: $0.name) }
     }
     private func excludedParentIDs() -> Set<String> {
         guard let editTarget else { return [] }
@@ -245,8 +269,8 @@ struct CategoriesView: View {
         return excluded
     }
     private func load() async { loading = true; defer { loading = false }; do { async let categoryResult = api.categories(); async let walletResult = api.wallets(); items = try await categoryResult; wallets = try await walletResult; self.error = nil } catch { self.error = "Không thể tải danh mục." } }
-    private func create() async { guard !name.isEmpty else { self.error = "Nhập tên danh mục."; return }; do { let walletIDs = walletScope == "Tất cả ví" ? [] : wallets.filter { $0.name == walletScope }.map(\.id); let parentID = parentName == "Không có danh mục cha" ? nil : items.first(where: { $0.name == parentName && $0.id != editTarget?.id })?.id; let input = CategoryModelInput(name: name, kind: kind, parentID: parentID, walletIDs: walletIDs, iconKey: editTarget?.iconKey ?? "tag"); if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }; adding = false; name = ""; parentName = "Không có danh mục cha"; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu danh mục." } }
-    private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; parentName = items.first(where: { $0.id == item.parentID })?.name ?? "Không có danh mục cha"; walletScope = wallets.first(where: { item.walletIDs.contains($0.id) })?.name ?? "Tất cả ví"; adding = true }
+    private func create() async { guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập tên danh mục."; return }; do { let walletIDs = walletScopeID == "__all__" ? [] : [walletScopeID]; let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: walletIDs, iconKey: editTarget?.iconKey ?? "tag"); if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }; adding = false; name = ""; parentID = ""; walletScopeID = "__all__"; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu danh mục." } }
+    private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; parentID = item.parentID ?? ""; walletScopeID = item.walletIDs.first ?? "__all__"; adding = true }
 }
 
 struct JarsView: View {
@@ -263,6 +287,7 @@ struct JarsView: View {
     @State private var amount = ""
     @State private var percent = ""
     @State private var report: JarCumulativeSummaryModel?
+    @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView {
@@ -309,11 +334,23 @@ struct JarsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .accessibilityIdentifier("jars-screen")
     }
 
-    private func load() async { loading = true; defer { loading = false }; do { summary = try await api.jarMonth(month: month); self.error = nil } catch { self.error = "Không thể tải hũ chi tiêu." } }
+    private func load() async {
+        loading = true; defer { loading = false }
+        do {
+            let firstLoad = summary == nil
+            if let profile = try? await api.profile() {
+                accountTimezone = profile.timezone
+                if firstLoad { month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current) }
+            }
+            summary = try await api.jarMonth(month: month)
+            self.error = nil
+        } catch { self.error = "Không thể tải hũ chi tiêu." }
+    }
     private func resetEditor() { name = ""; mode = "none"; amount = ""; percent = "" }
     private func beginEditing(_ item: JarItemModel) { editTarget = item; name = item.name; mode = item.allocationMode; amount = item.allocationAmount.map { String($0) } ?? ""; percent = item.allocationPercent.map { String($0) } ?? ""; showEditor = true }
     private func save() async {
@@ -336,6 +373,7 @@ struct MonthsView: View {
     @State private var summary: MonthSummaryModel?
     @State private var note = ""
     @State private var error: String?
+    @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView {
@@ -357,11 +395,23 @@ struct MonthsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .accessibilityIdentifier("months-screen")
     }
 
-    private func load() async { do { summary = try await api.monthSummary(month: month); note = summary?.note ?? ""; self.error = nil } catch { self.error = "Không thể tải tháng." } }
+    private func load() async {
+        do {
+            let firstLoad = summary == nil
+            if let profile = try? await api.profile() {
+                accountTimezone = profile.timezone
+                if firstLoad { month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current) }
+            }
+            summary = try await api.monthSummary(month: month)
+            note = summary?.note ?? ""
+            self.error = nil
+        } catch { self.error = "Không thể tải tháng." }
+    }
 }
 
 struct RecurringView: View {
@@ -374,10 +424,10 @@ struct RecurringView: View {
     @State private var editTarget: RecurringModel?
     @State private var name = ""
     @State private var amount = ""
-    @State private var walletName = ""
+    @State private var walletID = ""
     @State private var frequency = "monthly"
     @State private var type = "expense"
-    @State private var categoryName = "Không chọn"
+    @State private var categoryID = ""
     @State private var interval = "1"
     @State private var active = "Có"
     @State private var note = ""
@@ -402,9 +452,9 @@ struct RecurringView: View {
                         MPText(editTarget == nil ? "Tạo lịch" : "Sửa lịch", style: .title)
                         MPTextField(title: "Tên", text: $name)
                         MPAmountField(title: "Số tiền", text: $amount)
-                        MPWalletSelector(title: "Ví", options: wallets.map(\.name), selection: $walletName)
+                        MPOptionSelector(title: "Ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
                         MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $type)
-                        MPWalletSelector(title: "Danh mục", options: ["Không chọn"] + categories.map(\.name), selection: $categoryName)
+                        MPOptionSelector(title: "Danh mục", options: [MPSelectionOption(id: "", label: "Không chọn")] + categories.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryID, emptyLabel: "Không chọn")
                         MPWalletSelector(title: "Tần suất", options: ["daily", "weekly", "monthly", "yearly"], selection: $frequency)
                         MPAmountField(title: "Mỗi bao nhiêu kỳ", text: $interval)
                         MPDateTimeField(title: "Lần chạy kế tiếp", date: $nextRunDate)
@@ -424,11 +474,11 @@ struct RecurringView: View {
         .accessibilityIdentifier("recurring-screen")
     }
 
-    private func load() async { do { async let schedules = api.recurring(); async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); items = try await schedules; wallets = try await walletList; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone }; if walletName.isEmpty { walletName = wallets.first?.name ?? "" }; self.error = nil } catch { self.error = "Không thể tải lịch định kỳ." } }
+    private func load() async { do { async let schedules = api.recurring(); async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); items = try await schedules; wallets = try await walletList; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone }; if walletID.isEmpty { walletID = wallets.first?.id ?? "" }; self.error = nil } catch { self.error = "Không thể tải lịch định kỳ." } }
     private func runDue() async { do { let response = try await api.runDueRecurring(); result = "Đã tạo \(response.created) giao dịch."; await load() } catch { self.error = "Không thể chạy giao dịch đến hạn." } }
-    private func resetEditor() { name = ""; amount = ""; walletName = wallets.first?.name ?? ""; frequency = "monthly"; type = "expense"; categoryName = "Không chọn"; interval = "1"; note = ""; nextRunDate = Date(); endsAtDate = Date(); endsAtEnabled = "Không"; active = "Có" }
-    private func beginEditing(_ item: RecurringModel) { editTarget = item; name = item.name; amount = String(item.amount); note = item.note ?? ""; walletName = wallets.first(where: { $0.id == item.walletID })?.name ?? wallets.first?.name ?? ""; type = item.type; categoryName = categories.first(where: { $0.id == item.categoryID })?.name ?? "Không chọn"; frequency = item.frequency; interval = String(item.interval); nextRunDate = MPFormat.parseInstant(item.nextRunAt) ?? Date(); if let endsAt = item.endsAt, let parsed = MPFormat.parseInstant(endsAt) { endsAtDate = parsed; endsAtEnabled = "Có" } else { endsAtDate = Date(); endsAtEnabled = "Không" }; active = item.active ? "Có" : "Không"; showEditor = true }
-    private func save() async { guard let wallet = wallets.first(where: { $0.name == walletName }), let parsed = Int64(amount.filter(\.isNumber)), let parsedInterval = Int(interval.filter(\.isNumber)), parsedInterval > 0, !name.isEmpty else { self.error = "Nhập đủ tên, ví, chu kỳ và số tiền."; return }; if endsAtEnabled == "Có", endsAtDate < nextRunDate { self.error = "Ngày kết thúc phải sau lần chạy kế tiếp."; return }; let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines); let input = RecurringInputModel(name: name.trimmingCharacters(in: .whitespacesAndNewlines), walletID: wallet.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, type: type, amount: parsed, note: trimmedNote.isEmpty ? nil : trimmedNote, frequency: frequency, interval: parsedInterval, nextRunAt: MPFormat.instantString(nextRunDate), endsAt: endsAtEnabled == "Có" ? MPFormat.instantString(endsAtDate) : nil, active: active == "Có"); do { if let editTarget { _ = try await api.updateRecurring(id: editTarget.id, input: input) } else { _ = try await api.createRecurring(input) }; showEditor = false; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu lịch định kỳ." } }
+    private func resetEditor() { name = ""; amount = ""; walletID = wallets.first?.id ?? ""; frequency = "monthly"; type = "expense"; categoryID = ""; interval = "1"; note = ""; nextRunDate = Date(); endsAtDate = Date(); endsAtEnabled = "Không"; active = "Có" }
+    private func beginEditing(_ item: RecurringModel) { editTarget = item; name = item.name; amount = String(item.amount); note = item.note ?? ""; walletID = item.walletID; type = item.type; categoryID = item.categoryID ?? ""; frequency = item.frequency; interval = String(item.interval); nextRunDate = MPFormat.parseInstant(item.nextRunAt) ?? Date(); if let endsAt = item.endsAt, let parsed = MPFormat.parseInstant(endsAt) { endsAtDate = parsed; endsAtEnabled = "Có" } else { endsAtDate = Date(); endsAtEnabled = "Không" }; active = item.active ? "Có" : "Không"; showEditor = true }
+    private func save() async { guard let wallet = wallets.first(where: { $0.id == walletID }), let parsed = Int64(amount.filter(\.isNumber)), let parsedInterval = Int(interval.filter(\.isNumber)), parsedInterval > 0, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập đủ tên, ví, chu kỳ và số tiền."; return }; if endsAtEnabled == "Có", endsAtDate < nextRunDate { self.error = "Ngày kết thúc phải sau lần chạy kế tiếp."; return }; let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines); let input = RecurringInputModel(name: name.trimmingCharacters(in: .whitespacesAndNewlines), walletID: wallet.id, categoryID: categoryID.isEmpty ? nil : categoryID, type: type, amount: parsed, note: trimmedNote.isEmpty ? nil : trimmedNote, frequency: frequency, interval: parsedInterval, nextRunAt: MPFormat.instantString(nextRunDate), endsAt: endsAtEnabled == "Có" ? MPFormat.instantString(endsAtDate) : nil, active: active == "Có"); do { if let editTarget { _ = try await api.updateRecurring(id: editTarget.id, input: input) } else { _ = try await api.createRecurring(input) }; showEditor = false; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu lịch định kỳ." } }
     private func delete(_ item: RecurringModel) async { do { try await api.deleteRecurring(id: item.id); await load() } catch { self.error = "Không thể xóa lịch định kỳ." } }
 }
 
@@ -559,23 +609,24 @@ struct CreditView: View {
     let onBack: () -> Void
     @State private var wallets: [WalletModel] = []
     @State private var sourceWallets: [WalletModel] = []
-    @State private var selected: WalletModel?
+    @State private var selectedID = ""
     @State private var statement: CreditStatementModel?
     @State private var error: String?
     @State private var entryKind = "purchase"
     @State private var entryAmount = ""
-    @State private var sourceWalletName = ""
+    @State private var sourceWalletID = ""
+    @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
             MPScreenHeader(title: "Sổ tín dụng", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
             if wallets.isEmpty { MPEmptyView(title: "Chưa có ví tín dụng", detail: "Tạo ví loại tín dụng trong mục Ví.") }
-            else { MPWalletSelector(title: "Ví tín dụng", options: wallets.map(\.name), selection: Binding(get: { selected?.name ?? wallets.first?.name ?? "" }, set: { name in selected = wallets.first(where: { $0.name == name }); Task { await loadStatement() } })); if let statement { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) { MPMetricCard(title: "Dư nợ", value: MPFormat.money(statement.balance)); MPMetricCard(title: "Khả dụng", value: MPFormat.money(statement.availableCredit)); MPMetricCard(title: "Đến hạn", value: MPFormat.money(statement.amountDue)); MPMetricCard(title: "Trạng thái", value: statement.paymentStatus) }; MPAssistantCard(title: "Giao dịch tín dụng") { ForEach(statement.items) { item in MPTransactionRow(title: item.creditKind ?? "Giao dịch", subtitle: MPFormat.shortDate(item.occurredAt), amount: MPFormat.money(item.amount), isIncome: item.creditKind == "refund" || item.creditKind == "payment") } }; MPWalletSelector(title: "Nguồn thanh toán", options: sourceWallets.map(\.name), selection: $sourceWalletName); MPWalletSelector(title: "Loại bút toán", options: ["purchase", "refund", "fee", "interest"], selection: $entryKind); MPAmountField(title: "Số tiền", text: $entryAmount); HStack { MPButton("Ghi nhận", style: .secondary) { Task { await addEntry() } }; MPButton("Thanh toán") { Task { await pay() } } } } }
+            else { MPOptionSelector(title: "Ví tín dụng", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: Binding(get: { selectedID }, set: { selectedID = $0; Task { await loadStatement() } })); if let statement { LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) { MPMetricCard(title: "Dư nợ", value: MPFormat.money(statement.balance)); MPMetricCard(title: "Khả dụng", value: MPFormat.money(statement.availableCredit)); MPMetricCard(title: "Đến hạn", value: MPFormat.money(statement.amountDue)); MPMetricCard(title: "Trạng thái", value: statement.paymentStatus) }; MPAssistantCard(title: "Giao dịch tín dụng") { ForEach(statement.items) { item in MPTransactionRow(title: item.creditKind ?? "Giao dịch", subtitle: MPFormat.shortDate(item.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current), amount: MPFormat.money(item.amount), isIncome: item.creditKind == "refund" || item.creditKind == "payment") } }; MPOptionSelector(title: "Nguồn thanh toán", options: sourceWallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $sourceWalletID); MPWalletSelector(title: "Loại bút toán", options: ["purchase", "refund", "fee", "interest"], selection: $entryKind); MPAmountField(title: "Số tiền", text: $entryAmount); HStack { MPButton("Ghi nhận", style: .secondary) { Task { await addEntry() } }; MPButton("Thanh toán") { Task { await pay() } } } } }
             if let error { MPStatusMessage(text: error, tone: .danger) }
-        }.padding(MPMetrics.pagePadding) }.background(MPColor.canvas.ignoresSafeArea()).task { await loadWallets() }.accessibilityIdentifier("credit-screen")
+        }.padding(MPMetrics.pagePadding) }.background(MPColor.canvas.ignoresSafeArea()).environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current).task { await loadWallets() }.accessibilityIdentifier("credit-screen")
     }
-    private func loadWallets() async { do { let all = try await api.wallets(); wallets = all.filter { $0.type == "credit" }; sourceWallets = all.filter { $0.type != "credit" }; sourceWalletName = sourceWallets.first?.name ?? ""; selected = wallets.first; await loadStatement() } catch { self.error = "Không thể tải ví tín dụng." } }
-    private func loadStatement() async { guard let selected else { return }; do { statement = try await api.creditStatement(walletID: selected.id); self.error = nil } catch { self.error = "Không thể tải sổ tín dụng." } }
-    private func addEntry() async { guard let selected, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0 else { error = "Chọn ví tín dụng và nhập số tiền."; return }; do { _ = try await api.createCreditEntry(walletID: selected.id, input: CreditEntryInputModel(kind: entryKind, categoryID: nil, amount: amount, occurredAt: ISO8601DateFormatter().string(from: Date()), note: nil)); entryAmount = ""; await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
-    private func pay() async { guard let selected, let source = sourceWallets.first(where: { $0.name == sourceWalletName }), let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0 else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selected.id, input: CreditPaymentInputModel(sourceWalletID: source.id, amount: amount, occurredAt: ISO8601DateFormatter().string(from: Date()), note: nil)); entryAmount = ""; await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
+    private func loadWallets() async { do { let all = try await api.wallets(); wallets = all.filter { $0.type == "credit" }; sourceWallets = all.filter { $0.type != "credit" }; sourceWalletID = sourceWallets.first?.id ?? ""; selectedID = wallets.first?.id ?? ""; if let profile = try? await api.profile() { accountTimezone = profile.timezone }; await loadStatement() } catch { self.error = "Không thể tải ví tín dụng." } }
+    private func loadStatement() async { guard !selectedID.isEmpty else { return }; do { statement = try await api.creditStatement(walletID: selectedID); self.error = nil } catch { self.error = "Không thể tải sổ tín dụng." } }
+    private func addEntry() async { guard !selectedID.isEmpty, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0 else { error = "Chọn ví tín dụng và nhập số tiền."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: nil, amount: amount, occurredAt: MPFormat.instantString(Date()), note: nil)); entryAmount = ""; await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
+    private func pay() async { guard !selectedID.isEmpty, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0, !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: nil)); entryAmount = ""; await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
 }

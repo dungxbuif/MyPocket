@@ -30,9 +30,8 @@ final class TransactionsViewModel: ObservableObject {
             start = calendar.startOfDay(for: customStart)
             end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: customEnd)) ?? Date()
         }
-        let formatter = ISO8601DateFormatter()
         return walletFiltered.filter {
-            guard let date = formatter.date(from: $0.occurredAt) else { return true }
+            guard let date = MPFormat.parseInstant($0.occurredAt) else { return true }
             return date >= start && date < end
         }.sorted { $0.occurredAt > $1.occurredAt }
     }
@@ -48,7 +47,7 @@ final class TransactionsViewModel: ObservableObject {
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
         return Dictionary(grouping: filteredTransactions) {
-            guard let date = ISO8601DateFormatter().date(from: $0.occurredAt) else { return String($0.occurredAt.prefix(10)) }
+            guard let date = MPFormat.parseInstant($0.occurredAt) else { return String($0.occurredAt.prefix(10)) }
             return formatter.string(from: date)
         }
             .sorted { $0.key > $1.key }
@@ -119,10 +118,7 @@ struct TransactionsView: View {
                 if model.periodSelection == "custom" {
                     MPDateRangePicker(start: $model.customStart, end: $model.customEnd)
                 }
-                MPWalletSelector(title: "Ví", options: ["Tổng cộng"] + model.wallets.map(\.name), selection: Binding(
-                    get: { model.walletSelection == "__all__" ? "Tổng cộng" : model.wallets.first(where: { $0.id == model.walletSelection })?.name ?? "Tổng cộng" },
-                    set: { name in model.walletSelection = model.wallets.first(where: { $0.name == name })?.id ?? "__all__" }
-                ))
+                MPOptionSelector(title: "Ví", options: [MPSelectionOption(id: "__all__", label: "Tổng cộng")] + model.wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $model.walletSelection, emptyLabel: "Tổng cộng")
                 if model.isLoading && model.transactions.isEmpty {
                     MPLoadingView(label: "Đang tải giao dịch...")
                 } else if let errorMessage = model.errorMessage, model.transactions.isEmpty {
@@ -146,7 +142,7 @@ struct TransactionsView: View {
                                         } label: {
                                             MPTransactionRow(
                                                 title: transaction.note?.isEmpty == false ? transaction.note! : (transaction.type == "income" ? "Thu nhập" : "Chi tiêu"),
-                                                subtitle: MPFormat.shortDate(transaction.occurredAt),
+                                                subtitle: MPFormat.shortDate(transaction.occurredAt, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current),
                                                 amount: MPFormat.money(transaction.amount),
                                                 isIncome: transaction.type == "income"
                                             )
@@ -236,8 +232,8 @@ struct TransactionEditorView: View {
     @State private var type = "expense"
     @State private var amount = ""
     @State private var note = ""
-    @State private var walletName = ""
-    @State private var categoryName = "Không chọn"
+    @State private var walletID = ""
+    @State private var categoryID = ""
     @State private var date = Date()
     @State private var isSaving = false
     @State private var errorMessage: String?
@@ -253,9 +249,9 @@ struct TransactionEditorView: View {
         _type = State(initialValue: transaction?.type ?? "expense")
         _amount = State(initialValue: transaction.map { String($0.amount) } ?? "")
         _note = State(initialValue: transaction?.note ?? "")
-        _walletName = State(initialValue: wallets.first(where: { $0.id == transaction?.walletID })?.name ?? "")
-        _categoryName = State(initialValue: categories.first(where: { $0.id == transaction?.categoryID })?.name ?? "Không chọn")
-        if let raw = transaction?.occurredAt, let date = ISO8601DateFormatter().date(from: raw) { _date = State(initialValue: date) }
+        _walletID = State(initialValue: transaction?.walletID ?? wallets.first?.id ?? "")
+        _categoryID = State(initialValue: transaction?.categoryID ?? "")
+        if let raw = transaction?.occurredAt, let date = MPFormat.parseInstant(raw) { _date = State(initialValue: date) }
     }
 
     var body: some View {
@@ -263,8 +259,8 @@ struct TransactionEditorView: View {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: transaction == nil ? "Thêm giao dịch" : "Sửa giao dịch", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
                 MPSegmentedControl(options: [("expense", "Chi tiêu"), ("income", "Thu nhập")], selection: $type)
-                MPWalletSelector(title: "Ví", options: wallets.map(\.name), selection: $walletName)
-                MPWalletSelector(title: "Danh mục", options: ["Không chọn"] + categories.map(\.name), selection: $categoryName)
+                MPOptionSelector(title: "Ví", options: walletOptions, selectionID: $walletID)
+                MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID, emptyLabel: "Không chọn")
                 MPAmountField(title: "Số tiền", text: $amount)
                 MPDateField(title: "Ngày giao dịch", date: $date)
                 MPTextField(title: "Ghi chú", text: $note, placeholder: "Ví dụ: Ăn trưa")
@@ -274,18 +270,23 @@ struct TransactionEditorView: View {
             .padding(MPMetrics.pagePadding)
         }
         .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
-        .task { if walletName.isEmpty { walletName = wallets.first?.name ?? "" } }
+        .task { if walletID.isEmpty { walletID = wallets.first?.id ?? "" } }
     }
 
     private func save() async {
-        guard let wallet = wallets.first(where: { $0.name == walletName }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else {
+        guard let wallet = wallets.first(where: { $0.id == walletID }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else {
             errorMessage = "Chọn ví và nhập số tiền hợp lệ."
+            return
+        }
+        let selectedCategory = categories.first(where: { $0.id == categoryID })
+        if let selectedCategory, !selectedCategory.applies(to: type, walletID: wallet.id, walletType: wallet.type) {
+            errorMessage = "Danh mục không phù hợp với loại giao dịch hoặc ví đã chọn."
             return
         }
         isSaving = true
         defer { isSaving = false }
         do {
-            let input = TransactionInputModel(walletID: wallet.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, type: type, amount: parsed, occurredAt: Self.dayString(from: date, timezone: timezone), note: note.isEmpty ? nil : note, includedInReports: true, travelEventID: nil)
+            let input = TransactionInputModel(walletID: wallet.id, categoryID: selectedCategory?.id, type: type, amount: parsed, occurredAt: Self.dayString(from: date, timezone: timezone), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: true, travelEventID: transaction?.travelEventID)
             if let transaction { _ = try await api.updateTransaction(id: transaction.id, input: input) }
             else { _ = try await api.createTransaction(input) }
             onSaved()
@@ -301,6 +302,18 @@ struct TransactionEditorView: View {
         formatter.timeZone = TimeZone(identifier: timezone) ?? .current
         return formatter.string(from: date)
     }
+
+    private var selectedWallet: WalletModel? { wallets.first(where: { $0.id == walletID }) }
+    private var walletOptions: [MPSelectionOption] { wallets.map { MPSelectionOption(id: $0.id, label: $0.name) } }
+    private var categoryOptions: [MPSelectionOption] {
+        let valid = categories.filter { $0.applies(to: type, walletID: selectedWallet?.id ?? "", walletType: selectedWallet?.type ?? "basic") }
+        var options = [MPSelectionOption(id: "", label: "Không chọn")]
+        options += valid.map { MPSelectionOption(id: $0.id, label: $0.name) }
+        if !categoryID.isEmpty, !options.contains(where: { $0.id == categoryID }), let current = categories.first(where: { $0.id == categoryID }) {
+            options.append(MPSelectionOption(id: current.id, label: current.name))
+        }
+        return options
+    }
 }
 
 struct TransactionDetailView: View {
@@ -315,6 +328,7 @@ struct TransactionDetailView: View {
     @State private var travelEvents: [TravelEventModel] = []
     @State private var travelEventName = "Không gắn chuyến"
     @State private var travelError: String?
+    @Environment(\.timeZone) private var timeZone
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -322,7 +336,7 @@ struct TransactionDetailView: View {
             MPMetricCard(title: transaction.type == "income" ? "Thu nhập" : "Chi tiêu", value: MPFormat.money(transaction.amount))
             MPSurfaceCard {
                 VStack(alignment: .leading, spacing: 8) {
-                    MPText("Ngày: \(MPFormat.shortDate(transaction.occurredAt))")
+                    MPText("Ngày: \(MPFormat.shortDate(transaction.occurredAt, timeZone: timeZone))")
                     if let note = transaction.note, !note.isEmpty { MPText("Ghi chú: \(note)") }
                     if transaction.transferID == nil {
                         MPWalletSelector(title: "Travel Mode", options: ["Không gắn chuyến"] + travelEvents.map(\.name), selection: $travelEventName)
@@ -366,8 +380,8 @@ struct TransferEditorView: View {
     let existingTransferID: String?
     let onSaved: () -> Void
     let onCancel: () -> Void
-    @State private var source = ""
-    @State private var destination = ""
+    @State private var sourceID = ""
+    @State private var destinationID = ""
     @State private var amount = ""
     @State private var note = ""
     @State private var date = Date()
@@ -383,30 +397,30 @@ struct TransferEditorView: View {
         self.onCancel = onCancel
         let source = transactions.first(where: { $0.transferID == existingTransferID && $0.type == "expense" })
         let destination = transactions.first(where: { $0.transferID == existingTransferID && $0.type == "income" })
-        _source = State(initialValue: wallets.first(where: { $0.id == source?.walletID })?.name ?? "")
-        _destination = State(initialValue: wallets.first(where: { $0.id == destination?.walletID })?.name ?? "")
+        _sourceID = State(initialValue: source?.walletID ?? wallets.first?.id ?? "")
+        _destinationID = State(initialValue: destination?.walletID ?? wallets.dropFirst().first?.id ?? wallets.first?.id ?? "")
         _amount = State(initialValue: source.map { String($0.amount) } ?? "")
         _note = State(initialValue: source?.note ?? "")
-        _date = State(initialValue: source.flatMap { ISO8601DateFormatter().date(from: $0.occurredAt) } ?? Date())
+        _date = State(initialValue: source.flatMap { MPFormat.parseInstant($0.occurredAt) } ?? Date())
     }
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
             MPScreenHeader(title: existingTransferID == nil ? "Chuyển tiền" : "Sửa chuyển tiền", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
             MPText("Chuyển tiền tạo cặp giao dịch nguyên tử giữa hai ví; không tính vào báo cáo.", style: .secondary)
-            MPWalletSelector(title: "Từ ví", options: wallets.map(\.name), selection: $source)
-            MPWalletSelector(title: "Đến ví", options: wallets.map(\.name), selection: $destination)
+            MPOptionSelector(title: "Từ ví", options: walletOptions, selectionID: $sourceID)
+            MPOptionSelector(title: "Đến ví", options: walletOptions, selectionID: $destinationID)
             MPAmountField(title: "Số tiền", text: $amount)
             MPDateField(title: "Ngày chuyển", date: $date)
             MPTextField(title: "Ghi chú", text: $note)
             if let error { MPStatusMessage(text: error, tone: .danger) }
             MPButton(existingTransferID == nil ? "Xác nhận chuyển" : "Lưu thay đổi", isLoading: saving) { Task { await save() } }
         }.padding(MPMetrics.pagePadding) }
-        .task { if source.isEmpty { source = wallets.first?.name ?? "" }; if destination.isEmpty { destination = wallets.dropFirst().first?.name ?? wallets.first?.name ?? "" } }
+        .task { if sourceID.isEmpty { sourceID = wallets.first?.id ?? "" }; if destinationID.isEmpty { destinationID = wallets.dropFirst().first?.id ?? wallets.first?.id ?? "" } }
     }
 
     private func save() async {
-        guard let from = wallets.first(where: { $0.name == source }), let to = wallets.first(where: { $0.name == destination }), from.id != to.id, let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn hai ví khác nhau và nhập số tiền hợp lệ."; return }
+        guard let from = wallets.first(where: { $0.id == sourceID }), let to = wallets.first(where: { $0.id == destinationID }), from.id != to.id, let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn hai ví khác nhau và nhập số tiền hợp lệ."; return }
         saving = true; defer { saving = false }
         do {
             if let existingTransferID { _ = try await api.updateTransfer(id: existingTransferID, input: TransferUpdateInputModel(amount: parsed, occurredAt: Self.timestamp(date), note: note.isEmpty ? nil : note)) }
@@ -415,6 +429,7 @@ struct TransferEditorView: View {
         }
         catch { self.error = "Không thể chuyển tiền. Số dư hoặc ví có thể không hợp lệ." }
     }
+    private var walletOptions: [MPSelectionOption] { wallets.map { MPSelectionOption(id: $0.id, label: $0.name) } }
     private static func timestamp(_ date: Date) -> String { let formatter = ISO8601DateFormatter(); return formatter.string(from: date) }
 }
 
@@ -423,7 +438,7 @@ struct AdjustmentEditorView: View {
     let wallets: [WalletModel]
     let onSaved: () -> Void
     let onCancel: () -> Void
-    @State private var wallet = ""
+    @State private var walletID = ""
     @State private var direction = "increase"
     @State private var amount = ""
     @State private var note = ""
@@ -433,14 +448,14 @@ struct AdjustmentEditorView: View {
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
             MPScreenHeader(title: "Điều chỉnh số dư", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
-            MPWalletSelector(title: "Ví", options: wallets.map(\.name), selection: $wallet)
+            MPOptionSelector(title: "Ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
             MPWalletSelector(title: "Hướng", options: ["increase", "decrease"], selection: $direction)
             MPAmountField(title: "Số tiền", text: $amount)
             MPTextField(title: "Lý do", text: $note)
             if let error { MPStatusMessage(text: error, tone: .danger) }
             MPButton("Lưu điều chỉnh", isLoading: saving) { Task { await save() } }
         }.padding(MPMetrics.pagePadding) }
-        .task { if wallet.isEmpty { wallet = wallets.first?.name ?? "" } }
+        .task { if walletID.isEmpty { walletID = wallets.first?.id ?? "" } }
     }
-    private func save() async { guard let selected = wallets.first(where: { $0.name == wallet }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: ISO8601DateFormatter().string(from: Date()), note: note.isEmpty ? nil : note)); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
+    private func save() async { guard let selected = wallets.first(where: { $0.id == walletID }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: ISO8601DateFormatter().string(from: Date()), note: note.isEmpty ? nil : note)); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
 }

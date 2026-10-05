@@ -10,17 +10,20 @@ enum MPButtonStyle {
 struct MPButton<Label: View>: View {
     private let style: MPButtonStyle
     private let isLoading: Bool
+    private let isDisabled: Bool
     private let action: () -> Void
     private let label: () -> Label
 
     init(
         style: MPButtonStyle = .primary,
         isLoading: Bool = false,
+        isDisabled: Bool = false,
         action: @escaping () -> Void,
         @ViewBuilder label: @escaping () -> Label
     ) {
         self.style = style
         self.isLoading = isLoading
+        self.isDisabled = isDisabled
         self.action = action
         self.label = label
     }
@@ -42,7 +45,7 @@ struct MPButton<Label: View>: View {
             .foregroundStyle(foreground)
         }
         .buttonStyle(.plain)
-        .disabled(isLoading)
+        .disabled(isLoading || isDisabled)
         .accessibilityAddTraits(.isButton)
     }
 
@@ -68,9 +71,10 @@ extension MPButton where Label == Text {
         _ title: String,
         style: MPButtonStyle = .primary,
         isLoading: Bool = false,
+        isDisabled: Bool = false,
         action: @escaping () -> Void
     ) {
-        self.init(style: style, isLoading: isLoading, action: action) {
+        self.init(style: style, isLoading: isLoading, isDisabled: isDisabled, action: action) {
             Text(title).font(.body.weight(.semibold))
         }
     }

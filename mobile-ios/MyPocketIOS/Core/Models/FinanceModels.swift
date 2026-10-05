@@ -30,6 +30,17 @@ struct CategoryModel: Codable, Identifiable, Equatable, Sendable {
     var walletIDs: [String]
 }
 
+extension CategoryModel {
+    func applies(to transactionType: String, walletID: String, walletType: String) -> Bool {
+        let savingsTransfer = transactionType == "income"
+            ? systemKey == "income_transfer_in" || systemKey == "income_interest"
+            : systemKey == "expense_transfer_out"
+        return kind == transactionType
+            && (walletType != "goal" || savingsTransfer)
+            && (walletIDs.isEmpty || walletIDs.contains(walletID))
+    }
+}
+
 struct TransactionModel: Codable, Identifiable, Equatable, Sendable {
     let id: String
     let ownerID: String

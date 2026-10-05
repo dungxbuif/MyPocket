@@ -21,9 +21,11 @@ Finance Assistant, feedback/changelog and account settings.
 
 ## Verification
 
-- 17 unit/contract XCTest cases passed on iPhone 16 Simulator.
+- 19 unit/contract XCTest cases passed on iPhone 16 Simulator.
 - 3 UI smoke tests passed for auth launch, authenticated primary tabs, and the
   More route with the floating feedback entry.
+- Stable-ID wallet/category selectors, account-timezone date boundaries, and
+  credit statement rendering were covered by the latest parity pass.
 - Base-component guard and project/config verification passed.
 - Release configuration build passed and resolves the production API URL.
 

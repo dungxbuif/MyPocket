@@ -5,6 +5,7 @@ final class WalletsViewModel: ObservableObject {
     @Published private(set) var wallets: [WalletModel] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var accountTimezone = TimeZone.current.identifier
     private let api: FinanceAPI
 
     init(api: FinanceAPI) { self.api = api }
@@ -14,7 +15,12 @@ final class WalletsViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         defer { isLoading = false }
-        do { wallets = try await api.wallets() }
+        do {
+            async let walletResult = api.wallets()
+            async let profile = api.profile()
+            wallets = try await walletResult
+            if let profile = try? await profile { accountTimezone = profile.timezone }
+        }
         catch { errorMessage = "Không thể tải ví." }
     }
 
@@ -31,20 +37,21 @@ struct WalletsView: View {
     @State private var editorPresented = false
     @State private var editTarget: WalletModel?
     @State private var deleteTarget: WalletModel?
-    @State private var selectedWallet: WalletModel?
+    @State private var selectedWalletID: String?
 
     init(api: FinanceAPI) { _model = StateObject(wrappedValue: WalletsViewModel(api: api)) }
 
     var body: some View {
         Group {
-            if let selectedWallet {
-                WalletDetailView(api: model.apiForChild, wallet: selectedWallet) { self.selectedWallet = nil }
+            if let selectedWalletID, let selectedWallet = model.wallets.first(where: { $0.id == selectedWalletID }) {
+                WalletDetailView(api: model.apiForChild, wallet: selectedWallet) { self.selectedWalletID = nil }
             } else {
                 walletList
             }
         }
         .task { await model.load() }
         .refreshable { await model.load() }
+        .environment(\.timeZone, TimeZone(identifier: model.accountTimezone) ?? .current)
         .overlay {
             if editorPresented {
                 WalletEditorView(api: model.apiForChild, wallet: editTarget, onSaved: {
@@ -80,7 +87,7 @@ struct WalletsView: View {
                     ForEach(model.wallets) { wallet in
                         MPSurfaceCard {
                             VStack(alignment: .leading, spacing: 10) {
-                                MPButton(style: .plain, action: { selectedWallet = wallet }) {
+                                    MPButton(style: .plain, action: { selectedWalletID = wallet.id }) {
                                     VStack(alignment: .leading, spacing: 10) {
                                         MPWalletRow(name: wallet.name, type: wallet.type, balance: MPFormat.money(wallet.currentBalance))
                                         if wallet.type == "goal", let target = wallet.targetAmount {
@@ -118,6 +125,7 @@ struct WalletDetailView: View {
     @State private var statement: CreditStatementModel?
     @State private var loading = false
     @State private var error: String?
+    @Environment(\.timeZone) private var timeZone
 
     var body: some View {
         ScrollView {
@@ -167,7 +175,7 @@ struct WalletDetailView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(rows.prefix(50)) { row in
-                        MPTransactionRow(title: row.note?.isEmpty == false ? row.note! : (row.type == "income" ? "Thu nhập" : "Chi tiêu"), subtitle: MPFormat.shortDate(row.occurredAt), amount: MPFormat.money(row.amount), isIncome: row.type == "income")
+                        MPTransactionRow(title: row.note?.isEmpty == false ? row.note! : (row.type == "income" ? "Thu nhập" : "Chi tiêu"), subtitle: MPFormat.shortDate(row.occurredAt, timeZone: timeZone), amount: MPFormat.money(row.amount), isIncome: row.type == "income")
                     }
                 }
             }

@@ -119,6 +119,17 @@ proposal in review until an explicit approve/reject decision.
 Category parent selection must preserve a tree: editing a category cannot select
 itself or any descendant as its parent, preventing cycles before the API call.
 
+AI entry must preserve the one-shot request contract: a processing response is
+polled by its request ID, reload uses GET only, and the UI never submits the
+same multipart payload again automatically. Transaction/report dates displayed
+or filtered by native screens must use the account timezone rather than the
+simulator/device timezone.
+
+Identity-bearing selectors use the shared `MPOptionSelector` base component
+with stable wallet/category IDs; duplicate display names no longer select an
+arbitrary record. Credit statement dates use the account timezone, and wallet
+detail resolves the selected wallet by ID after refresh.
+
 ## Parity completion pass — 2026-10-05
 
 The simulator-first parity pass closed the highest-risk interaction gaps:
@@ -140,10 +151,11 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 17 unit/contract tests and 3 UI smoke tests (auth launch,
+suite passed: 19 unit/contract tests and 3 UI smoke tests (auth launch,
 authenticated primary tabs, More route + floating feedback overlay).
 
-The latest run also verified category-parent cycle prevention, recurring
+The latest run also verified category-parent cycle prevention, stable ID-based
+wallet/category selectors, account-timezone boundary formatting, recurring
 RFC3339/note payloads, typed API error presentation and release configuration
 changes. The app was relaunched after the test run with bundle
 `com.mypocket.ios` for manual simulator inspection.

@@ -6,6 +6,7 @@ final class OverviewViewModel: ObservableObject {
     @Published private(set) var transactions: [TransactionModel] = []
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var accountTimezone = TimeZone.current.identifier
     @Published var masked = false
 
     private let api: FinanceAPI
@@ -14,12 +15,12 @@ final class OverviewViewModel: ObservableObject {
 
     var totalBalance: Int64 { wallets.filter(\.isInTotal).reduce(0) { $0 + $1.currentBalance } }
     var monthExpense: Int64 {
-        let month = MPFormat.currentMonth
-        return transactions.filter { $0.type == "expense" && $0.includedInReports && $0.occurredAt.hasPrefix(month) }.reduce(0) { $0 + $1.amount }
+        let month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current)
+        return transactions.filter { $0.type == "expense" && $0.includedInReports && MPFormat.accountMonth(of: $0.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current) == month }.reduce(0) { $0 + $1.amount }
     }
     var monthIncome: Int64 {
-        let month = MPFormat.currentMonth
-        return transactions.filter { $0.type == "income" && $0.includedInReports && $0.occurredAt.hasPrefix(month) }.reduce(0) { $0 + $1.amount }
+        let month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current)
+        return transactions.filter { $0.type == "income" && $0.includedInReports && MPFormat.accountMonth(of: $0.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current) == month }.reduce(0) { $0 + $1.amount }
     }
 
     func load() async {
@@ -30,8 +31,10 @@ final class OverviewViewModel: ObservableObject {
         do {
             async let wallets = api.wallets()
             async let transactions = api.transactions()
+            async let profile = api.profile()
             self.wallets = try await wallets
             self.transactions = try await transactions.sorted { $0.occurredAt > $1.occurredAt }
+            if let profile = try? await profile { accountTimezone = profile.timezone }
         } catch {
             errorMessage = Self.message(for: error)
         }
@@ -96,7 +99,7 @@ struct OverviewView: View {
                             ForEach(model.transactions.prefix(5)) { transaction in
                                 MPTransactionRow(
                                     title: transaction.note?.isEmpty == false ? transaction.note! : (transaction.type == "income" ? "Thu nhập" : "Chi tiêu"),
-                                    subtitle: MPFormat.shortDate(transaction.occurredAt),
+                                    subtitle: MPFormat.shortDate(transaction.occurredAt, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current),
                                     amount: model.masked ? "••••••" : MPFormat.money(transaction.amount),
                                     isIncome: transaction.type == "income"
                                 )
@@ -109,6 +112,7 @@ struct OverviewView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: model.accountTimezone) ?? .current)
         .task { await model.load() }
         .refreshable { await model.load() }
         .accessibilityIdentifier("overview-screen")
