@@ -56,11 +56,16 @@ as active release entries here.
 - Native basic/goal wallet detail now matches the web detail flow with
   account-timezone monthly groups, category/note labels, income/expense totals,
   and shared transaction add/edit actions.
+- Native transaction ledger now uses the shared overflow menu for period,
+  grouping, transfer, adjustment and bulk actions; rows show category/wallet
+  context and signed amounts, while goal/credit scopes hide ordinary period
+  controls.
 
 ### Verification
 
 - Native iOS simulator regression passed on iPhone 16: 30 unit/contract tests and
-  4 authenticated UI smoke tests, with base-component and Xcode project guards.
+  5 standard authenticated UI smoke tests, with base-component and Xcode project
+  guards.
 - An opt-in API-backed wallet-detail UI smoke passed with a seeded disposable
   wallet, opened the transaction editor fields, and deleted the fixture with a
   204 response afterward.

@@ -24,6 +24,19 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ví"].firstMatch.waitForExistence(timeout: 5))
     }
 
+    func testTransactionOverflowMenuKeepsTransferAndAdjustmentActions() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Giao dịch"].waitForExistence(timeout: 5))
+        app.buttons["Giao dịch"].tap()
+        let menu = app.buttons["Tùy chọn giao dịch"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5))
+        menu.tap()
+        XCTAssertTrue(app.buttons["Chuyển tiền đến ví khác"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Điều chỉnh số dư"].exists)
+    }
+
     func testAuthenticatedMoreRoutesAndFeedbackEntry() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]

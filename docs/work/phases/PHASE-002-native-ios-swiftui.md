@@ -130,6 +130,11 @@ income/expense totals, and allow adding or editing ordinary transactions from
 the detail screen through the shared transaction editor. Credit remains on its
 dedicated statement/payment panel.
 
+The transaction ledger must keep transfer/adjustment actions behind one shared
+overflow menu, support switching date/category grouping, include wallet and
+category context in rows, and avoid showing ordinary week/custom controls for
+goal or credit selections.
+
 AI entry accepts either a text instruction or one or more validated image/PDF
 attachments, uses the account timezone for extraction context, and keeps every
 proposal in review until an explicit approve/reject decision.
@@ -232,7 +237,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (30 unit/contract tests and 4 UI smoke tests). The same pass
+Both commands pass (30 unit/contract tests and 5 UI smoke tests). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical

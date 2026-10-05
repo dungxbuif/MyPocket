@@ -11,6 +11,7 @@ final class TransactionsViewModel: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published var walletSelection = "__all__"
     @Published var periodSelection = "all"
+    @Published var groupByCategory = false
     @Published var customStart = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @Published var customEnd = Date()
     @Published private(set) var accountTimezone = TimeZone.current.identifier
@@ -59,6 +60,10 @@ final class TransactionsViewModel: ObservableObject {
 
     var totalExpense: Int64 { filteredTransactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
     var totalIncome: Int64 { filteredTransactions.filter { $0.type == "income" }.reduce(0) { $0 + $1.amount } }
+    var selectedWalletType: String? {
+        guard walletSelection != "__all__" else { return nil }
+        return wallets.first(where: { $0.id == walletSelection })?.type
+    }
     static func bulkDeleteSelectable(_ transaction: TransactionModel) -> Bool {
         transaction.transferID == nil && transaction.type != "adjustment" && transaction.creditKind == nil
     }
@@ -70,11 +75,52 @@ final class TransactionsViewModel: ObservableObject {
         formatter.timeZone = calendar.timeZone
         formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.dateFormat = "yyyy-MM-dd"
+        if groupByCategory {
+            return Dictionary(grouping: filteredTransactions) { transaction in
+                transaction.categoryID ?? transaction.type
+            }
+            .sorted { $0.key < $1.key }
+            .map { ($0.key, $0.value.sorted { $0.occurredAt > $1.occurredAt }) }
+        }
         return Dictionary(grouping: filteredTransactions) {
             guard let date = MPFormat.parseInstant($0.occurredAt) else { return String($0.occurredAt.prefix(10)) }
             return formatter.string(from: date)
         }
-            .sorted { $0.key > $1.key }
+        .sorted { $0.key > $1.key }
+        .map { ($0.key, $0.value.sorted { $0.occurredAt > $1.occurredAt }) }
+    }
+
+    func groupLabel(_ key: String) -> String {
+        if groupByCategory {
+            if let category = categories.first(where: { $0.id == key }) { return category.name }
+            switch key {
+            case "income": return "Khoản thu"
+            case "expense": return "Khoản chi"
+            case "adjustment": return "Điều chỉnh số dư"
+            default: return "Không phân loại"
+            }
+        }
+        let timeZone = TimeZone(identifier: accountTimezone) ?? .current
+        let today = MPFormat.todayISO(timeZone: timeZone)
+        if key == today { return "Hôm nay" }
+        if let todayDate = MPFormat.parseCalendarDate(today) {
+            var calendar = Calendar(identifier: .gregorian)
+            calendar.timeZone = timeZone
+            if let yesterday = calendar.date(byAdding: .day, value: -1, to: todayDate), MPFormat.calendarDateString(yesterday) == key { return "Hôm qua" }
+        }
+        return MPFormat.shortDate(key, timeZone: timeZone)
+    }
+
+    func categoryName(for transaction: TransactionModel) -> String? {
+        categories.first(where: { $0.id == transaction.categoryID })?.name
+    }
+
+    func walletName(for transaction: TransactionModel) -> String {
+        wallets.first(where: { $0.id == transaction.walletID })?.name ?? "Ví đã xóa"
+    }
+
+    func signedAmount(for transaction: TransactionModel) -> Int64 {
+        transaction.type == "income" ? transaction.amount : -transaction.amount
     }
 
     func load() async {
@@ -155,17 +201,14 @@ struct TransactionsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Giao dịch", leading: { EmptyView() }, trailing: {
                     HStack(spacing: 4) {
-                        MPIconButton(systemName: selectionMode ? "xmark" : "checklist", label: selectionMode ? "Hủy chọn" : "Chọn nhiều giao dịch") {
-                            selectionMode.toggle()
-                            if !selectionMode { selectedIDs.removeAll() }
-                        }
-                        MPIconButton(systemName: "arrow.left.arrow.right", label: "Chuyển tiền") { transferPresented = true }
-                        MPIconButton(systemName: "slider.horizontal.3", label: "Điều chỉnh số dư") { adjustmentPresented = true }
+                        MPOverflowMenu(label: "Tùy chọn giao dịch", actions: transactionMenuActions)
                         MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
                     }
                 })
-                MPSegmentedControl(options: [("all", "Tất cả"), ("week", "Tuần này"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
-                if model.periodSelection == "custom" {
+                if model.selectedWalletType != "goal", model.selectedWalletType != "credit" {
+                    MPSegmentedControl(options: [("all", "Tất cả"), ("week", "Tuần này"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
+                }
+                if model.selectedWalletType != "goal", model.selectedWalletType != "credit", model.periodSelection == "custom" {
                     MPDateRangePicker(start: $model.customStart, end: $model.customEnd)
                 }
                 MPOptionSelector(title: "Ví", options: [MPSelectionOption(id: "__all__", label: "Tổng cộng")] + model.wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $model.walletSelection, emptyLabel: "Tổng cộng")
@@ -204,7 +247,11 @@ struct TransactionsView: View {
                         ForEach(model.groupedTransactions, id: \.0) { day, transactions in
                             MPSurfaceCard {
                                 VStack(alignment: .leading, spacing: 0) {
-                                    MPText(day, style: .secondary)
+                                    HStack {
+                                        MPText(model.groupLabel(day), style: .secondary)
+                                        Spacer()
+                                        MPText(MPFormat.signedMoney(transactions.reduce(0) { $0 + model.signedAmount(for: $1) }), style: .secondary)
+                                    }
                                         .padding(.bottom, 4)
                                     ForEach(transactions) { transaction in
                                         transactionRow(transaction)
@@ -220,6 +267,11 @@ struct TransactionsView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, TimeZone(identifier: model.accountTimezone) ?? .current)
         .task { await model.load() }
+        .onChange(of: model.walletSelection) { _, newValue in
+            model.periodSelection = model.wallets.first(where: { $0.id == newValue })?.type == "goal" || model.wallets.first(where: { $0.id == newValue })?.type == "credit" ? "all" : "week"
+            model.groupByCategory = false
+            selectedIDs.removeAll()
+        }
         .refreshable { await model.load() }
         .overlay {
             if editorPresented {
@@ -282,14 +334,33 @@ struct TransactionsView: View {
 
     private var modelAPI: FinanceAPI { model.apiForChild }
 
+    private var transactionMenuActions: [MPOverflowAction] {
+        var actions: [MPOverflowAction] = []
+        if model.selectedWalletType != "goal", model.selectedWalletType != "credit" {
+            actions.append(MPOverflowAction(title: model.groupByCategory ? "Xem theo ngày" : "Xem theo nhóm") { model.groupByCategory.toggle() })
+            actions.append(MPOverflowAction(title: "Khoảng thời gian") { model.periodSelection = "custom" })
+        }
+        actions.append(MPOverflowAction(title: "Tải lại giao dịch") { Task { await model.load() } })
+        if model.selectedWalletType != "credit" {
+            actions.append(MPOverflowAction(title: selectionMode ? "Hủy chọn" : "Xóa nhiều giao dịch") {
+                selectionMode.toggle()
+                if !selectionMode { selectedIDs.removeAll() }
+            })
+            actions.append(MPOverflowAction(title: "Chuyển tiền đến ví khác") { transferPresented = true })
+            actions.append(MPOverflowAction(title: "Điều chỉnh số dư") { adjustmentPresented = true })
+        }
+        return actions
+    }
+
     @ViewBuilder
     private func transactionRow(_ transaction: TransactionModel) -> some View {
         let selectable = TransactionsViewModel.bulkDeleteSelectable(transaction)
-        let title = transaction.note?.isEmpty == false ? transaction.note! : (transaction.type == "income" ? "Thu nhập" : "Chi tiêu")
+        let title = model.categoryName(for: transaction) ?? (transaction.type == "income" ? "Khoản thu" : transaction.type == "adjustment" ? "Điều chỉnh số dư" : "Khoản chi")
+        let subtitle = [model.walletName(for: transaction), transaction.note].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
         let row = MPTransactionRow(
             title: title,
-            subtitle: MPFormat.shortDate(transaction.occurredAt, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current),
-            amount: MPFormat.money(transaction.amount),
+            subtitle: subtitle.isEmpty ? MPFormat.shortDate(transaction.occurredAt, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current) : subtitle,
+            amount: MPFormat.signedMoney(model.signedAmount(for: transaction)),
             isIncome: transaction.type == "income"
         )
         if selectionMode {

@@ -23,7 +23,7 @@ updated: 2026-10-06
 | Proof | Result |
 | --- | --- |
 | iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 29 tests, 0 failures; expired access tokens refresh before Face ID, invalid refresh sessions clear safely, malformed ledger timestamps are excluded from period filters, the iOS PKCE fixture contract encodes correctly, 204 mutation responses decode safely, immutable bulk-delete rows are excluded, and Advisor overview data remains structured JSON |
-| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: 4 UI tests, 0 failures; app installed and relaunched as `com.mypocket.ios` |
+| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: 5 standard UI tests, 0 failures; app installed and relaunched as `com.mypocket.ios` |
 | iPhone 16 Simulator: authenticated “Thêm” route sweep | PASS: all 13 secondary destinations opened and returned to the menu; the shared `MPButton` hit-shape fix keeps compact rows tappable |
 | Native category scope parity | PASS: category create/edit preserves multiple selected wallet IDs; empty selection remains the API's all-wallet scope; shared `MPMultiOptionSelector` owns the UI |
 | Native ledger/detail/assistant edge cases | PASS: malformed timestamps are excluded from period filters, wallet detail renders the complete API result, and assistant polling preserves a still-running run after the local wait budget |
@@ -32,6 +32,7 @@ updated: 2026-10-06
 | Native Finance Assistant history/overview parity | PASS: owner-keyed opaque conversation ID, latest 50 message reload, older-message pagination, read-only monthly overview card and structured source data are covered by API/model tests; the API-backed iPhone 16 UI smoke returned 200 from local `:8080` |
 | Native credit ledger form parity | PASS: credit entry/payment controls now preserve kind, applicable category, source wallet, amount and optional note through the same base selectors/inputs as the web contract; category wallet/kind filtering is covered by XCTest |
 | Native wallet detail parity | PASS: basic/goal detail now shows account-timezone monthly groups, category/note labels, income/expense totals and shared transaction add/edit; an API-backed iPhone 16 UI smoke opened the seeded fixture wallet and editor, then the fixture was deleted |
+| Native transaction ledger options parity | PASS: the base overflow menu owns period/grouping/transfer/adjustment/bulk actions; rows include category and wallet context with signed amounts; goal/credit selections suppress ordinary period controls; standard UI smoke opens the overflow actions |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
 | Simulator API-backed authenticated smoke fixture | PASS: DEBUG-only `-UITestAuthenticatedAPI` exchanged fixture PKCE fields against local `:8080`, persisted the disposable JWT, and rendered the authenticated overview with live empty wallets/ledger; screenshot `/tmp/mypocket-ios-simulator-api-auth.png` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |

@@ -78,6 +78,39 @@ struct MPSegmentedControl: View {
     }
 }
 
+/// Shared overflow action trigger for screen-level secondary actions.
+/// Consumers provide semantic menu actions while this base owns the hit target
+/// and accessible label, keeping the three-dot affordance consistent.
+struct MPOverflowAction: Identifiable {
+    let id = UUID()
+    let title: String
+    let action: () -> Void
+}
+
+struct MPOverflowMenu: View {
+    let label: String
+    let actions: [MPOverflowAction]
+
+    init(label: String, actions: [MPOverflowAction]) {
+        self.label = label
+        self.actions = actions
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(actions) { item in
+                Button(item.title, action: item.action)
+            }
+        } label: {
+            Image(systemName: "ellipsis")
+                .frame(width: MPMetrics.hitTarget, height: MPMetrics.hitTarget)
+                .contentShape(Rectangle())
+        }
+        .foregroundStyle(MPColor.ink)
+        .accessibilityLabel(label)
+    }
+}
+
 struct MPFeedbackBubble: View {
     let action: () -> Void
 
