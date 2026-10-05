@@ -151,7 +151,7 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 22 unit/contract tests and 3 UI smoke tests (auth launch,
+suite passed: 23 unit/contract tests and 3 UI smoke tests (auth launch,
 authenticated primary tabs, More route + floating feedback overlay).
 
 The latest run also verified category-parent cycle prevention, stable ID-based
@@ -186,6 +186,10 @@ Two audit findings were fixed before the simulator test pass:
   a category round-trips every `wallet_ids` value through the existing category
   API; an empty set continues to mean all owner wallets. This closes the native
   parity gap for categories shared by multiple wallets.
+- If a request receives `401` and the rotating refresh endpoint also rejects the
+  token, `APIClient` clears the Keychain session and notifies `AuthViewModel` so
+  the UI returns to the login gate instead of retaining a stale authenticated
+  shell.
 
 Verification on the same simulator:
 
@@ -198,7 +202,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (22 unit/contract tests and 3 UI smoke tests). Provider-backed
+Both commands pass (23 unit/contract tests and 3 UI smoke tests). Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical
 device checks remain external release gates.
 

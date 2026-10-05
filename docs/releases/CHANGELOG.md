@@ -35,8 +35,11 @@ as active release entries here.
 
 - Native iOS simulator regression passed on iPhone 16: 19 unit/contract tests and
   3 authenticated UI smoke tests, with base-component and Xcode project guards.
-- The follow-up simulator run passed 22 native unit/contract tests and the same 3
+- The follow-up simulator run passed 23 native unit/contract tests and the same 3
   UI smoke tests after the auth-restore and multi-wallet category fixes.
+- Refresh rejection during an authenticated request now clears the native
+  Keychain session and biometric preference through an auth invalidation hook;
+  the regression suite covers the 401 → refresh 401 path.
 - Backend race/integration verification passed against disposable PostgreSQL and
   Redis. Transfer browser/integration harnesses now cover linked update/delete
   semantics and idempotency-key cleanup.

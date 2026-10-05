@@ -14,6 +14,7 @@ final class APIClient: @unchecked Sendable {
     private let baseURL: URL
     private let transport: HTTPTransport
     private let sessionStore: SessionStore
+    var onSessionInvalidated: (@Sendable () -> Void)?
     private lazy var refreshCoordinator = RefreshCoordinator { [weak self] in
         guard let self else { throw APIError.missingSession }
         return try await self.refreshSession()
@@ -166,7 +167,7 @@ final class APIClient: @unchecked Sendable {
         }
     }
 
-    private func refreshSession() async throws -> AccessSession {
+    private func refreshSession(invalidateOnUnauthorized: Bool = true) async throws -> AccessSession {
         guard let current = sessionStore.load() else { throw APIError.missingSession }
         let requestBody = try JSONEncoder.mypocket.encode(RefreshRequest(refreshToken: current.refreshToken))
         let request = APIRequest<LoginOutput>(
@@ -175,14 +176,23 @@ final class APIClient: @unchecked Sendable {
             body: requestBody,
             auth: .none
         )
-        let output = try await execute(request, sessionOverride: nil)
+        let output: LoginOutput
+        do {
+            output = try await execute(request, sessionOverride: nil)
+        } catch APIError.unauthorized {
+            if invalidateOnUnauthorized {
+                sessionStore.clear()
+                onSessionInvalidated?()
+            }
+            throw APIError.unauthorized
+        }
         let session = output.session
         try sessionStore.save(session)
         return session
     }
 
     func refreshSessionForRestore() async throws -> AccessSession {
-        try await refreshSession()
+        try await refreshSession(invalidateOnUnauthorized: false)
     }
 }
 

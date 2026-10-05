@@ -98,6 +98,17 @@ private final class RestoreTransport: HTTPTransport, @unchecked Sendable {
     }
 }
 
+private final class InvalidatingTransport: HTTPTransport, @unchecked Sendable {
+    private(set) var requestCount = 0
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        requestCount += 1
+        return (Data(#"{"title":"Unauthorized","status":401,"detail":"expired","code":"TOKEN_INVALID"}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+private struct InvalidResponse: Decodable {}
+
 @MainActor
 final class AuthRestoreTests: XCTestCase {
     private let biometricKey = "mypocket.biometric.enabled"
@@ -136,6 +147,32 @@ final class AuthRestoreTests: XCTestCase {
         await auth.restore()
 
         XCTAssertEqual(transport.refreshRequests, 0)
+        XCTAssertNil(store.load())
+        XCTAssertEqual(auth.phase, .unauthenticated)
+        XCTAssertFalse(auth.biometricEnabled)
+    }
+
+    func testRefreshRejectionInvalidatesAuthenticatedSession() async throws {
+        let session = AccessSession(token: "access", expiresAt: "2099-01-01T00:00:00Z", refreshToken: "refresh", refreshExpiresAt: "2099-02-01T00:00:00Z", user: AuthUser(id: "u-1", name: nil, email: nil, timezone: nil))
+        let store = RestoreSessionStore(session: session)
+        let transport = InvalidatingTransport()
+        let client = APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: transport, sessionStore: store)
+        let auth = AuthViewModel(store: store, apiClient: client)
+        await auth.restore()
+        guard case .authenticated = auth.phase else {
+            return XCTFail("the valid access session should start authenticated")
+        }
+
+        do {
+            let _: InvalidResponse = try await client.send(APIRequest(path: "/auth/profile"))
+            XCTFail("an unauthorized request should not succeed")
+        } catch APIError.unauthorized {
+            // Expected: the refresh endpoint also returned 401.
+        } catch {
+            XCTFail("unexpected error: \(error)")
+        }
+        try await Task.sleep(for: .milliseconds(50))
+
         XCTAssertNil(store.load())
         XCTAssertEqual(auth.phase, .unauthenticated)
         XCTAssertFalse(auth.biometricEnabled)
