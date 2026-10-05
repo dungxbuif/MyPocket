@@ -45,6 +45,22 @@ final class APIClient: @unchecked Sendable {
         files: [MultipartFile] = [],
         auth: APIAuth = .session
     ) async throws -> Response {
+        do {
+            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, sessionOverride: nil)
+        } catch APIError.unauthorized {
+            guard case .session = auth else { throw APIError.unauthorized }
+            let refreshed = try await refreshCoordinator.refreshIfNeeded()
+            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, sessionOverride: refreshed)
+        }
+    }
+
+    private func executeMultipart<Response: Decodable & Sendable>(
+        path: String,
+        fields: [String: String],
+        files: [MultipartFile],
+        auth: APIAuth,
+        sessionOverride: AccessSession?
+    ) async throws -> Response {
         let relativePath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { throw APIError.invalidURL }
         let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -59,7 +75,7 @@ final class APIClient: @unchecked Sendable {
         case .none: break
         case .apiKey(let key): request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
         case .session:
-            guard let session = sessionStore.load() else { throw APIError.missingSession }
+            guard let session = sessionOverride ?? sessionStore.load() else { throw APIError.missingSession }
             request.setValue("Bearer \(session.token)", forHTTPHeaderField: "Authorization")
         }
         var payload = Data()
