@@ -402,3 +402,16 @@ Finance Assistant local vertical slice — 2026-09-22:
 | Assistant cards | `npm run typecheck && npm run check:design && npm run build` | PASS: normalized summary/comparison/search/budget plus wallet/goal/jar cards compile and satisfy base/design guards |
 
 The above is local regression proof. Configured-provider browser chat, SSE/reconnect, durable Redis audit delivery/alerting and production deployment remain unverified release gates.
+
+### Native simulator mutation smoke — 2026-10-06
+
+- PASS: `testAPIBackedWalletDetailCreatesAndUpdatesTransaction` created an
+  expense through the signed SwiftUI editor, observed the persisted row in
+  Wallet Detail, edited its note, and observed the updated row.
+- PASS: focused test completed in 18.348 seconds against fresh disposable
+  `mypocket_stage_v1` PostgreSQL with fixture wallet teardown.
+- PASS: the complete signed API-backed iPhone 16 UI suite passed 11/11 in
+  218.318 seconds. This extends the existing 47/47 native XCTest proof with a
+  real create/update UI mutation assertion.
+- NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and
+  authenticated staging/production gates remain external checks.

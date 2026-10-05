@@ -116,6 +116,16 @@ private enum LocalAPIFixture {
 }
 
 private struct EmptyFixtureResponse: Decodable {}
+
+private extension XCUIElement {
+    func clearAndType(_ text: String) {
+        tap()
+        if let value = value as? String, !value.isEmpty {
+            typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count))
+        }
+        typeText(text)
+    }
+}
 #endif
 
 @MainActor
@@ -293,6 +303,47 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Thêm giao dịch"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Danh mục"].exists)
         XCTAssertTrue(app.staticTexts["Ghi chú"].exists)
+#endif
+    }
+
+    func testAPIBackedWalletDetailCreatesAndUpdatesTransaction() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable fixture wallet.")
+#else
+        let fixture = try await LocalAPIFixture.wallet(name: "Fixture Mutation Wallet", type: "basic")
+        addTeardownBlock { try? await LocalAPIFixture.delete(fixture) }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Ví"].waitForExistence(timeout: 10))
+        app.buttons["Ví"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture Mutation Wallet"].waitForExistence(timeout: 10))
+        app.staticTexts["Fixture Mutation Wallet"].tap()
+
+        XCTAssertTrue(app.buttons["Thêm giao dịch"].waitForExistence(timeout: 10))
+        app.buttons["Thêm giao dịch"].tap()
+        XCTAssertTrue(app.staticTexts["Thêm giao dịch"].waitForExistence(timeout: 10))
+
+        let amount = app.textFields["Số tiền"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 10))
+        amount.clearAndType("25000")
+        app.buttons["Lưu giao dịch"].tap()
+
+        let createdRow = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Khoản chi")).firstMatch
+        XCTAssertTrue(createdRow.waitForExistence(timeout: 15), "Created transaction should be visible in wallet detail.")
+        createdRow.tap()
+        XCTAssertTrue(app.staticTexts["Sửa giao dịch"].waitForExistence(timeout: 10))
+
+        let editableNote = app.textFields["Ghi chú"]
+        XCTAssertTrue(editableNote.waitForExistence(timeout: 10))
+        for _ in 0..<4 where !editableNote.isHittable { app.swipeUp() }
+        XCTAssertTrue(editableNote.isHittable)
+        editableNote.clearAndType("UI Fixture Expense Updated")
+        app.buttons["Lưu thay đổi"].tap()
+
+        let updatedRow = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "UI Fixture Expense Updated")).firstMatch
+        XCTAssertTrue(updatedRow.waitForExistence(timeout: 15), "Updated transaction should be visible after saving.")
 #endif
     }
 

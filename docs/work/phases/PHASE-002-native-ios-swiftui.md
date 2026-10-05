@@ -402,8 +402,9 @@ simulator test runner because they persist the disposable session in Keychain.
 The rerun also hardened numeric draft parsing. The shared parser rejects
 malformed integer input instead of silently filtering characters across
 transaction, transfer, adjustment, wallet, credit, jar, budget, assistant
-proposal and portfolio price/trade editors. Native XCTest passed 47/47 and the
-signed API-backed UI suite passed 10/10 in 200.110 seconds. The app launched
-successfully on the iPhone 16 simulator; physical-device, real Google OAuth,
-provider-backed AI/OCR and authenticated staging/production gates remain
-external checks.
+proposal and portfolio price/trade editors. Native XCTest passed 47/47. A
+focused signed mutation smoke created and updated a transaction through Wallet
+Detail in 18.348 seconds, and the complete signed API-backed UI suite passed
+11/11 in 218.318 seconds. The app launched successfully on the iPhone 16
+simulator; physical-device, real Google OAuth, provider-backed AI/OCR and
+authenticated staging/production gates remain external checks.

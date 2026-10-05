@@ -23,6 +23,10 @@ as active release entries here.
 
 ### Fixed
 
+- Native Wallet Detail now has a signed simulator mutation smoke that creates a
+  real expense through the API, verifies the persisted row, edits its note, and
+  verifies the updated row. The complete API-backed iPhone 16 UI suite is now
+  11/11; the disposable fixture wallet is removed in teardown.
 - Native financial draft fields now reject malformed integer input instead of
   silently stripping non-digit characters. A shared strict parser covers
   transaction, transfer, adjustment, wallet, credit, jar, budget, assistant
