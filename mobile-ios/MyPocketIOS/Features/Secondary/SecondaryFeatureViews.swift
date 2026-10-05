@@ -10,6 +10,10 @@ struct BudgetsView: View {
     @State private var limit = ""
     @State private var start = MPFormat.currentMonth + "-01"
     @State private var end = MPFormat.currentMonth + "-28"
+    @State private var wallets: [WalletModel] = []
+    @State private var categories: [CategoryModel] = []
+    @State private var walletName = "Tất cả ví"
+    @State private var categoryName = "Tất cả danh mục"
     @State private var showEditor = false
     @State private var editTarget: BudgetModel?
     @State private var deleteTarget: BudgetModel?
@@ -45,6 +49,8 @@ struct BudgetsView: View {
                             MPAmountField(title: "Giới hạn", text: $limit)
                             MPTextField(title: "Ngày bắt đầu (YYYY-MM-DD)", text: $start)
                             MPTextField(title: "Ngày kết thúc (YYYY-MM-DD)", text: $end)
+                            MPWalletSelector(title: "Phạm vi ví", options: ["Tất cả ví"] + wallets.map(\.name), selection: $walletName)
+                            MPWalletSelector(title: "Phạm vi danh mục", options: ["Tất cả danh mục"] + categories.map(\.name), selection: $categoryName)
                             HStack { MPButton("Hủy", style: .secondary) { showEditor = false; editTarget = nil }; MPButton("Lưu") { Task { await create() } } }
                         }
                     }
@@ -64,13 +70,21 @@ struct BudgetsView: View {
     private func load() async {
         guard !loading else { return }
         loading = true; defer { loading = false }
-        do { summary = try await api.budgets(); self.error = nil } catch { self.error = "Không thể tải ngân sách." }
+        do {
+            async let summaryResult = api.budgets()
+            async let walletResult = api.wallets()
+            async let categoryResult = api.categories()
+            summary = try await summaryResult
+            wallets = try await walletResult
+            categories = try await categoryResult
+            self.error = nil
+        } catch { self.error = "Không thể tải ngân sách." }
     }
 
     private func create() async {
         guard let parsed = Int64(limit.filter(\.isNumber)), !name.isEmpty else { error = "Nhập tên và giới hạn hợp lệ."; return }
         do {
-            let input = BudgetInputModel(name: name, limitAmount: parsed, walletID: nil, categoryID: nil, startDate: start, endDate: end)
+            let input = BudgetInputModel(name: name, limitAmount: parsed, walletID: wallets.first(where: { $0.name == walletName })?.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, startDate: start, endDate: end)
             if let editTarget { _ = try await api.updateBudget(id: editTarget.id, input: input) } else { _ = try await api.createBudget(input) }
             showEditor = false; self.editTarget = nil; await load()
         }
@@ -83,6 +97,8 @@ struct BudgetsView: View {
         limit = String(budget.limitAmount)
         start = budget.startDate
         end = budget.endDate
+        walletName = wallets.first(where: { $0.id == budget.walletID })?.name ?? "Tất cả ví"
+        categoryName = categories.first(where: { $0.id == budget.categoryID })?.name ?? "Tất cả danh mục"
         showEditor = true
     }
 }
@@ -143,6 +159,8 @@ struct CategoriesView: View {
     @State private var adding = false
     @State private var editTarget: CategoryModel?
     @State private var deleteTarget: CategoryModel?
+    @State private var wallets: [WalletModel] = []
+    @State private var walletScope = "Tất cả ví"
 
     var body: some View {
         ScrollView {
@@ -153,8 +171,9 @@ struct CategoriesView: View {
                 else {
                     MPSurfaceCard {
                         VStack(spacing: 0) {
-                            ForEach(items) { item in
-                                HStack { Image(systemName: "tag.fill").foregroundStyle(MPColor.action); MPText(item.name); Spacer(); MPText(item.kind, style: .secondary); MPIconButton(systemName: "pencil", label: "Sửa \(item.name)") { beginEditing(item) }; MPIconButton(systemName: "trash", label: "Xóa \(item.name)") { deleteTarget = item } }.padding(.vertical, 8)
+                            ForEach(items.filter { $0.parentID == nil }) { item in
+                                categoryRow(item, depth: 0)
+                                ForEach(items.filter { $0.parentID == item.id }) { child in categoryRow(child, depth: 1) }
                             }
                         }
                     }
@@ -165,6 +184,7 @@ struct CategoriesView: View {
                             MPText(editTarget == nil ? "Danh mục mới" : "Sửa danh mục", style: .title)
                             MPTextField(title: "Tên", text: $name)
                             MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $kind)
+                            MPWalletSelector(title: "Áp dụng cho ví", options: ["Tất cả ví"] + wallets.map(\.name), selection: $walletScope)
                             HStack { MPButton("Hủy", style: .secondary) { adding = false; editTarget = nil }; MPButton("Lưu") { Task { await create() } } }
                         }
                     }
@@ -181,9 +201,22 @@ struct CategoriesView: View {
         .accessibilityIdentifier("categories-screen")
     }
 
-    private func load() async { loading = true; defer { loading = false }; do { items = try await api.categories(); self.error = nil } catch { self.error = "Không thể tải danh mục." } }
-    private func create() async { guard !name.isEmpty else { self.error = "Nhập tên danh mục."; return }; do { let input = CategoryModelInput(name: name, kind: kind, parentID: editTarget?.parentID, walletIDs: editTarget?.walletIDs ?? [], iconKey: editTarget?.iconKey ?? "tag"); if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }; adding = false; name = ""; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu danh mục." } }
-    private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; adding = true }
+    private func categoryRow(_ item: CategoryModel, depth: Int) -> some View {
+        HStack {
+            Image(systemName: depth == 0 ? "folder.fill" : "arrow.turn.down.right")
+                .foregroundStyle(MPColor.action)
+            MPText(item.name)
+            Spacer()
+            MPText(item.kind, style: .secondary)
+            MPIconButton(systemName: "pencil", label: "Sửa \(item.name)") { beginEditing(item) }
+            MPIconButton(systemName: "trash", label: "Xóa \(item.name)") { deleteTarget = item }
+        }
+        .padding(.leading, CGFloat(depth * 20))
+        .padding(.vertical, 8)
+    }
+    private func load() async { loading = true; defer { loading = false }; do { async let categoryResult = api.categories(); async let walletResult = api.wallets(); items = try await categoryResult; wallets = try await walletResult; self.error = nil } catch { self.error = "Không thể tải danh mục." } }
+    private func create() async { guard !name.isEmpty else { self.error = "Nhập tên danh mục."; return }; do { let walletIDs = walletScope == "Tất cả ví" ? [] : wallets.filter { $0.name == walletScope }.map(\.id); let input = CategoryModelInput(name: name, kind: kind, parentID: editTarget?.parentID, walletIDs: walletIDs, iconKey: editTarget?.iconKey ?? "tag"); if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }; adding = false; name = ""; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu danh mục." } }
+    private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; walletScope = wallets.first(where: { item.walletIDs.contains($0.id) })?.name ?? "Tất cả ví"; adding = true }
 }
 
 struct JarsView: View {
@@ -359,21 +392,26 @@ struct TravelView: View {
     @State private var name = ""
     @State private var context = ""
     @State private var adding = false
+    @State private var editTarget: TravelEventModel?
+    @State private var startsOn = ""
+    @State private var endsOn = ""
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
-            MPScreenHeader(title: "Travel Mode", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm chuyến đi") { adding = true } })
+            MPScreenHeader(title: "Travel Mode", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm chuyến đi") { editTarget = nil; resetEditor(); adding = true } })
             if let error { MPErrorView(title: "Không tải được Travel Mode", detail: error) { Task { await load() } } }
             if events.isEmpty { MPEmptyView(title: "Chưa có chuyến đi", detail: "Tạo một sự kiện để gắn giao dịch du lịch.") }
             ForEach(events) { event in
-                MPSurfaceCard { HStack { VStack(alignment: .leading) { MPText(event.name); if let context = event.context { MPText(context, style: .secondary) } }; Spacer(); MPButton(event.active ? "Tắt" : "Bật", style: event.active ? .destructive : .secondary) { Task { await toggle(event) } }; MPButton("Xóa", style: .destructive) { Task { await remove(event) } } } }
+                MPSurfaceCard { HStack { VStack(alignment: .leading) { MPText(event.name); if let context = event.context { MPText(context, style: .secondary) }; if let startsOn = event.startsOn { MPText("Từ \(startsOn)", style: .secondary) }; if let endsOn = event.endsOn { MPText("Đến \(endsOn)", style: .secondary) } }; Spacer(); MPButton("Sửa", style: .secondary) { beginEditing(event) }; MPButton(event.active ? "Tắt" : "Bật", style: event.active ? .destructive : .secondary) { Task { await toggle(event) } }; MPButton("Xóa", style: .destructive) { Task { await remove(event) } } } }
             }
-            if adding { MPSurfaceCard { VStack(alignment: .leading, spacing: 10) { MPText("Chuyến đi mới", style: .title); MPTextField(title: "Tên", text: $name); MPTextEditor(title: "Mô tả", text: $context); HStack { MPButton("Hủy", style: .secondary) { adding = false }; MPButton("Tạo") { Task { await create() } } } } } }
+            if adding { MPSurfaceCard { VStack(alignment: .leading, spacing: 10) { MPText(editTarget == nil ? "Chuyến đi mới" : "Sửa chuyến đi", style: .title); MPTextField(title: "Tên", text: $name); MPTextEditor(title: "Mô tả", text: $context); MPTextField(title: "Ngày bắt đầu (YYYY-MM-DD)", text: $startsOn); MPTextField(title: "Ngày kết thúc (YYYY-MM-DD)", text: $endsOn); HStack { MPButton("Hủy", style: .secondary) { adding = false }; MPButton("Lưu") { Task { await save() } } } } } }
         }.padding(MPMetrics.pagePadding) }.background(MPColor.canvas.ignoresSafeArea()).task { await load() }.accessibilityIdentifier("travel-screen")
     }
     private func load() async { do { events = try await api.travelEvents(); self.error = nil } catch { self.error = "Không thể tải sự kiện du lịch." } }
     private func toggle(_ event: TravelEventModel) async { do { _ = try await api.setTravelEventActive(id: event.id, active: !event.active); await load() } catch { self.error = "Không thể cập nhật Travel Mode." } }
-    private func create() async { guard !name.isEmpty else { self.error = "Nhập tên chuyến đi."; return }; do { _ = try await api.createTravelEvent(TravelEventInputModel(name: name, context: context.isEmpty ? nil : context, startsOn: nil, endsOn: nil, active: false)); name = ""; context = ""; adding = false; await load() } catch { self.error = "Không thể tạo chuyến đi." } }
+    private func resetEditor() { name = ""; context = ""; startsOn = ""; endsOn = "" }
+    private func beginEditing(_ event: TravelEventModel) { editTarget = event; name = event.name; context = event.context ?? ""; startsOn = event.startsOn ?? ""; endsOn = event.endsOn ?? ""; adding = true }
+    private func save() async { guard !name.isEmpty else { self.error = "Nhập tên chuyến đi."; return }; let input = TravelEventInputModel(name: name, context: context.isEmpty ? nil : context, startsOn: startsOn.isEmpty ? nil : startsOn, endsOn: endsOn.isEmpty ? nil : endsOn, active: editTarget?.active ?? false); do { if let editTarget { _ = try await api.updateTravelEvent(id: editTarget.id, input: input) } else { _ = try await api.createTravelEvent(input) }; resetEditor(); adding = false; await load() } catch { self.error = "Không thể lưu chuyến đi." } }
     private func remove(_ event: TravelEventModel) async { do { try await api.deleteTravelEvent(id: event.id); await load() } catch { self.error = "Không thể xóa chuyến đi." } }
 }
 
