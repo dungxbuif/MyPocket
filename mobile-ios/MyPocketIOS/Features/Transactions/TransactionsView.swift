@@ -79,6 +79,7 @@ struct TransactionsView: View {
     @StateObject private var model: TransactionsViewModel
     @State private var editorPresented = false
     @State private var transferPresented = false
+    @State private var transferEditID: String?
     @State private var adjustmentPresented = false
     @State private var selectedTransaction: TransactionModel?
     @State private var deleteTarget: TransactionModel?
@@ -161,9 +162,18 @@ struct TransactionsView: View {
                     Task { await model.load() }
                 } onCancel: { adjustmentPresented = false }
                 .background(MPColor.canvas.ignoresSafeArea())
+            } else if let transferEditID {
+                TransferEditorView(api: modelAPI, wallets: model.wallets, transactions: model.transactions, existingTransferID: transferEditID) {
+                    self.transferEditID = nil
+                    Task { await model.load() }
+                } onCancel: { self.transferEditID = nil }
+                .background(MPColor.canvas.ignoresSafeArea())
             } else if let selectedTransaction {
                 TransactionDetailView(api: modelAPI, transaction: selectedTransaction, allTransactions: model.transactions, onEdit: {
                     editorPresented = true
+                    self.selectedTransaction = nil
+                }, onEditTransfer: {
+                    transferEditID = selectedTransaction.transferID
                     self.selectedTransaction = nil
                 }, onDelete: {
                     deleteTarget = selectedTransaction
@@ -268,6 +278,7 @@ struct TransactionDetailView: View {
     let transaction: TransactionModel
     let allTransactions: [TransactionModel]
     let onEdit: () -> Void
+    let onEditTransfer: () -> Void
     let onDelete: () -> Void
     let onDeleteTransfer: () -> Void
     let onClose: () -> Void
@@ -302,6 +313,7 @@ struct TransactionDetailView: View {
                 MPButton("Xóa giao dịch", style: .destructive, action: onDelete)
             } else {
                 MPStatusMessage(text: "Đây là cặp chuyển ví; sửa/xóa phải áp dụng cho cả hai giao dịch.", tone: .info)
+                MPButton("Sửa cả cặp chuyển ví", style: .secondary, action: onEditTransfer)
                 MPButton("Xóa cả cặp chuyển ví", style: .destructive, action: onDeleteTransfer)
             }
             Spacer()
@@ -320,6 +332,8 @@ struct TransactionDetailView: View {
 struct TransferEditorView: View {
     let api: FinanceAPI
     let wallets: [WalletModel]
+    let transactions: [TransactionModel]
+    let existingTransferID: String?
     let onSaved: () -> Void
     let onCancel: () -> Void
     @State private var source = ""
@@ -330,9 +344,25 @@ struct TransferEditorView: View {
     @State private var saving = false
     @State private var error: String?
 
+    init(api: FinanceAPI, wallets: [WalletModel], transactions: [TransactionModel] = [], existingTransferID: String? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+        self.api = api
+        self.wallets = wallets
+        self.transactions = transactions
+        self.existingTransferID = existingTransferID
+        self.onSaved = onSaved
+        self.onCancel = onCancel
+        let source = transactions.first(where: { $0.transferID == existingTransferID && $0.type == "expense" })
+        let destination = transactions.first(where: { $0.transferID == existingTransferID && $0.type == "income" })
+        _source = State(initialValue: wallets.first(where: { $0.id == source?.walletID })?.name ?? "")
+        _destination = State(initialValue: wallets.first(where: { $0.id == destination?.walletID })?.name ?? "")
+        _amount = State(initialValue: source.map { String($0.amount) } ?? "")
+        _note = State(initialValue: source?.note ?? "")
+        _date = State(initialValue: source.flatMap { ISO8601DateFormatter().date(from: $0.occurredAt) } ?? Date())
+    }
+
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
-            MPScreenHeader(title: "Chuyển tiền", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
+            MPScreenHeader(title: existingTransferID == nil ? "Chuyển tiền" : "Sửa chuyển tiền", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
             MPText("Chuyển tiền tạo cặp giao dịch nguyên tử giữa hai ví; không tính vào báo cáo.", style: .secondary)
             MPWalletSelector(title: "Từ ví", options: wallets.map(\.name), selection: $source)
             MPWalletSelector(title: "Đến ví", options: wallets.map(\.name), selection: $destination)
@@ -340,7 +370,7 @@ struct TransferEditorView: View {
             MPDateField(title: "Ngày chuyển", date: $date)
             MPTextField(title: "Ghi chú", text: $note)
             if let error { MPStatusMessage(text: error, tone: .danger) }
-            MPButton("Xác nhận chuyển", isLoading: saving) { Task { await save() } }
+            MPButton(existingTransferID == nil ? "Xác nhận chuyển" : "Lưu thay đổi", isLoading: saving) { Task { await save() } }
         }.padding(MPMetrics.pagePadding) }
         .task { if source.isEmpty { source = wallets.first?.name ?? "" }; if destination.isEmpty { destination = wallets.dropFirst().first?.name ?? wallets.first?.name ?? "" } }
     }
@@ -348,7 +378,11 @@ struct TransferEditorView: View {
     private func save() async {
         guard let from = wallets.first(where: { $0.name == source }), let to = wallets.first(where: { $0.name == destination }), from.id != to.id, let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn hai ví khác nhau và nhập số tiền hợp lệ."; return }
         saving = true; defer { saving = false }
-        do { _ = try await api.createTransfer(TransferInputModel(sourceWalletID: from.id, destinationWalletID: to.id, amount: parsed, occurredAt: Self.timestamp(date), note: note.isEmpty ? nil : note)); onSaved() }
+        do {
+            if let existingTransferID { _ = try await api.updateTransfer(id: existingTransferID, input: TransferUpdateInputModel(amount: parsed, occurredAt: Self.timestamp(date), note: note.isEmpty ? nil : note)) }
+            else { _ = try await api.createTransfer(TransferInputModel(sourceWalletID: from.id, destinationWalletID: to.id, amount: parsed, occurredAt: Self.timestamp(date), note: note.isEmpty ? nil : note)) }
+            onSaved()
+        }
         catch { self.error = "Không thể chuyển tiền. Số dư hoặc ví có thể không hợp lệ." }
     }
     private static func timestamp(_ date: Date) -> String { let formatter = ISO8601DateFormatter(); return formatter.string(from: date) }
