@@ -5,6 +5,7 @@ import SwiftUI
 enum AuthPhase: Equatable {
     case checking
     case unauthenticated
+    case locked(AccessSession)
     case authenticated(AccessSession)
 }
 
@@ -18,11 +19,13 @@ final class AuthViewModel: ObservableObject {
     private let store: KeychainSessionStore
     private let google: GooglePKCEClient
     let financeAPI: FinanceAPI
+    private let biometricPreferenceKey = "mypocket.biometric.enabled"
 
     init(store: KeychainSessionStore = KeychainSessionStore(), apiClient: APIClient = APIClient()) {
         self.store = store
         self.google = GooglePKCEClient(apiClient: apiClient)
         self.financeAPI = FinanceAPI(client: apiClient)
+        self.biometricEnabled = UserDefaults.standard.bool(forKey: biometricPreferenceKey)
     }
 
     func restore() {
@@ -41,7 +44,7 @@ final class AuthViewModel: ObservableObject {
         }
 #endif
         if let session = store.load() {
-            phase = .authenticated(session)
+            phase = biometricEnabled ? .locked(session) : .authenticated(session)
         } else {
             phase = .unauthenticated
         }
@@ -66,11 +69,17 @@ final class AuthViewModel: ObservableObject {
     func logout() {
         store.clear()
         biometricEnabled = false
+        UserDefaults.standard.set(false, forKey: biometricPreferenceKey)
         phase = .unauthenticated
     }
 
     func toggleBiometric() async {
         guard case .authenticated = phase else { return }
+        if biometricEnabled {
+            biometricEnabled = false
+            UserDefaults.standard.set(false, forKey: biometricPreferenceKey)
+            return
+        }
         let context = LAContext()
         var error: NSError?
         guard context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: &error) else {
@@ -83,10 +92,25 @@ final class AuthViewModel: ObservableObject {
                 .deviceOwnerAuthenticationWithBiometrics,
                 localizedReason: "Mở khóa MyPocket"
             )
+            UserDefaults.standard.set(biometricEnabled, forKey: biometricPreferenceKey)
             if !biometricEnabled { errorMessage = "Không xác thực được Face ID." }
         } catch {
             biometricEnabled = false
             errorMessage = "Không xác thực được Face ID."
         }
+    }
+
+    func unlock() async {
+        guard case .locked(let session) = phase else { return }
+        let context = LAContext()
+        var error: NSError?
+        guard context.canEvaluatePolicy(.deviceOwnerAuthentication, error: &error) else {
+            errorMessage = "Thiết bị chưa sẵn sàng xác thực."
+            return
+        }
+        do {
+            let success = try await context.evaluatePolicy(.deviceOwnerAuthentication, localizedReason: "Mở khóa MyPocket")
+            if success { phase = .authenticated(session) }
+        } catch { errorMessage = "Không xác thực được Face ID hoặc mã khóa." }
     }
 }

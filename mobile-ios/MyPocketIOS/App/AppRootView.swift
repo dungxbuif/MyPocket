@@ -14,6 +14,8 @@ struct AppRootView: View {
                 MPLoadingView(label: "Đang kiểm tra phiên...")
             case .unauthenticated:
                 AuthView(model: auth)
+            case .locked:
+                BiometricUnlockView(model: auth)
             case .authenticated:
                 MainTabView(auth: auth)
             }

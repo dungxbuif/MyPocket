@@ -5,12 +5,20 @@ struct BiometricUnlockView: View {
 
     var body: some View {
         VStack(spacing: 16) {
-            MPText("Bảo mật phiên", style: .title)
-            MPText("Bật Face ID để mở nhanh phiên đang còn hiệu lực.", style: .secondary)
-            MPButton(model.biometricEnabled ? "Đã bật Face ID" : "Bật Face ID", style: .secondary) {
-                Task { await model.toggleBiometric() }
+            Spacer()
+            MPSurfaceCard {
+                VStack(alignment: .leading, spacing: 10) {
+                    MPText("Mở khóa MyPocket", style: .title)
+                    MPText("Phiên đăng nhập vẫn còn lưu an toàn. Xác thực Face ID hoặc mã khóa để tiếp tục.", style: .secondary)
+                }
             }
+            if let errorMessage = model.errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
+            MPButton("Xác thực để mở khóa") { Task { await model.unlock() } }
+            MPButton("Đăng xuất", style: .secondary, action: model.logout)
+            Spacer()
         }
         .padding(MPMetrics.pagePadding)
+        .background(MPColor.canvas.ignoresSafeArea())
+        .accessibilityIdentifier("biometric-unlock-screen")
     }
 }
