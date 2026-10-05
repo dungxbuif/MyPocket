@@ -64,11 +64,7 @@ final class APIClient: @unchecked Sendable {
         idempotencyKey: String?,
         sessionOverride: AccessSession?
     ) async throws -> Response {
-        let relativePath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else { throw APIError.invalidURL }
-        let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        components.path = "/" + [basePath, relativePath].filter { !$0.isEmpty }.joined(separator: "/")
-        guard let url = components.url else { throw APIError.invalidURL }
+        let url = try makeURL(path: path)
         let boundary = "Boundary-\(UUID().uuidString)"
         var request = URLRequest(url: url)
         request.httpMethod = HTTPMethod.post.rawValue
@@ -119,13 +115,7 @@ final class APIClient: @unchecked Sendable {
         _ request: APIRequest<Response>,
         sessionOverride: AccessSession?
     ) async throws -> Response {
-        let relativePath = request.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
-            throw APIError.invalidURL
-        }
-        let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        components.path = "/" + [basePath, relativePath].filter { !$0.isEmpty }.joined(separator: "/")
-        guard let url = components.url else { throw APIError.invalidURL }
+        let url = try makeURL(path: request.path)
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
@@ -177,6 +167,21 @@ final class APIClient: @unchecked Sendable {
         } catch {
             throw APIError.transport(error.localizedDescription)
         }
+    }
+
+    private func makeURL(path: String) throws -> URL {
+        let pathParts = path.split(separator: "?", maxSplits: 1, omittingEmptySubsequences: false)
+        let relativePath = String(pathParts[0]).trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
+            throw APIError.invalidURL
+        }
+        let basePath = components.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        components.path = "/" + [basePath, relativePath].filter { !$0.isEmpty }.joined(separator: "/")
+        if pathParts.count == 2, !pathParts[1].isEmpty {
+            components.percentEncodedQuery = String(pathParts[1])
+        }
+        guard let url = components.url else { throw APIError.invalidURL }
+        return url
     }
 
     private func refreshSession(invalidateOnUnauthorized: Bool = true) async throws -> AccessSession {

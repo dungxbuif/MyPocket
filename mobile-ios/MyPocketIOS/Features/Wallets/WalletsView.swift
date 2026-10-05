@@ -44,7 +44,11 @@ struct WalletsView: View {
     var body: some View {
         Group {
             if let selectedWalletID, let selectedWallet = model.wallets.first(where: { $0.id == selectedWalletID }) {
-                WalletDetailView(api: model.apiForChild, wallet: selectedWallet) { self.selectedWalletID = nil }
+                if selectedWallet.type == "credit" {
+                    CreditView(api: model.apiForChild, onBack: { self.selectedWalletID = nil }, preferredWalletID: selectedWallet.id)
+                } else {
+                    WalletDetailView(api: model.apiForChild, wallet: selectedWallet) { self.selectedWalletID = nil }
+                }
             } else {
                 walletList
             }

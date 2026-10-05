@@ -23,6 +23,29 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(problem.requestID, "req-1")
         XCTAssertEqual(problem.code, "INVALID")
     }
+
+    func testQueryInAPIRequestPathRemainsAQuery() async throws {
+        let transport = URLCaptureTransport()
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: TestSessionStore(session: AccessSession(token: "access", expiresAt: "2099-01-01T00:00:00Z", refreshToken: "refresh", refreshExpiresAt: "2099-02-01T00:00:00Z", user: AuthUser(id: "u", name: nil, email: nil, timezone: nil)))
+        )
+
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/credit/wallets/w-1/statement?from=2026-10-01&to=2026-11-01"))
+
+        XCTAssertEqual(transport.url?.path, "/api/v1/credit/wallets/w-1/statement")
+        XCTAssertEqual(transport.url?.query, "from=2026-10-01&to=2026-11-01")
+    }
+}
+
+private final class URLCaptureTransport: HTTPTransport, @unchecked Sendable {
+    private(set) var url: URL?
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        url = request.url
+        return (Data(#"{"data":{}}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    }
 }
 
 final class RefreshCoordinatorTests: XCTestCase {

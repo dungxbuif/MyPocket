@@ -60,10 +60,15 @@ as active release entries here.
   grouping, transfer, adjustment and bulk actions; rows show category/wallet
   context and signed amounts, while goal/credit scopes hide ordinary period
   controls.
+- Selecting a credit wallet from the main native wallet list now opens the same
+  credit statement, entry and payment actions as the dedicated credit route.
+- Fixed native API query construction so credit statements, reports, jar views
+  and Assistant history send query parameters as URL queries instead of
+  accidentally escaping the delimiter into the path.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 30 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 31 unit/contract tests and
   5 standard authenticated UI smoke tests, with base-component and Xcode project
   guards.
 - An opt-in API-backed wallet-detail UI smoke passed with a seeded disposable
@@ -78,6 +83,9 @@ as active release entries here.
   used.
 - The authenticated UI sweep opened and returned from all 13 destinations in the
   “Thêm” menu; this caught and fixed the compact-row hit-target regression.
+- The opt-in API-backed credit-wallet smoke passed on the iPhone 16 simulator,
+  including the statement action buttons. Its disposable credit fixture was
+  deleted with an HTTP 204 response after the run.
 - Refresh rejection during an authenticated request now clears the native
   Keychain session and biometric preference through an auth invalidation hook;
   the regression suite covers the 401 → refresh 401 path.

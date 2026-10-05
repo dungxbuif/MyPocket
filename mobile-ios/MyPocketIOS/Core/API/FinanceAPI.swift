@@ -148,7 +148,7 @@ final class FinanceAPI: @unchecked Sendable {
         if let from { items.append(URLQueryItem(name: "from", value: from)) }
         if let to { items.append(URLQueryItem(name: "to", value: to)) }
         components.queryItems = items
-        let suffix = components.percentEncodedQuery.map { "?\($0)" } ?? ""
+        let suffix = components.percentEncodedQuery.flatMap { $0.isEmpty ? nil : "?\($0)" } ?? ""
         return try await client.send(APIRequest(path: "/jars/\(jarID)/report\(suffix)"))
     }
 
@@ -218,7 +218,7 @@ final class FinanceAPI: @unchecked Sendable {
         if let from { items.append(URLQueryItem(name: "from", value: from)) }
         if let to { items.append(URLQueryItem(name: "to", value: to)) }
         components.queryItems = items
-        let suffix = components.percentEncodedQuery.map { "?\($0)" } ?? ""
+        let suffix = components.percentEncodedQuery.flatMap { $0.isEmpty ? nil : "?\($0)" } ?? ""
         return try await client.send(APIRequest(path: "/credit/wallets/\(walletID)/statement\(suffix)"))
     }
 

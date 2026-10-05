@@ -607,6 +607,7 @@ struct PortfolioView: View {
 struct CreditView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    let preferredWalletID: String?
     @State private var wallets: [WalletModel] = []
     @State private var sourceWallets: [WalletModel] = []
     @State private var categories: [CategoryModel] = []
@@ -620,6 +621,13 @@ struct CreditView: View {
     @State private var sourceWalletID = ""
     @State private var note = ""
     @State private var accountTimezone = TimeZone.current.identifier
+
+    init(api: FinanceAPI, onBack: @escaping () -> Void, preferredWalletID: String? = nil) {
+        self.api = api
+        self.onBack = onBack
+        self.preferredWalletID = preferredWalletID
+        _selectedID = State(initialValue: preferredWalletID ?? "")
+    }
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
@@ -688,8 +696,42 @@ struct CreditView: View {
         categoryID = ""
     }
 
-    private func loadWallets() async { do { async let walletResult = api.wallets(); async let categoryResult = api.categories(); let all = try await walletResult; wallets = all.filter { $0.type == "credit" }; sourceWallets = all.filter { $0.type != "credit" }; categories = try await categoryResult; sourceWalletID = sourceWallets.first?.id ?? ""; selectedID = wallets.first?.id ?? ""; if let profile = try? await api.profile() { accountTimezone = profile.timezone }; await loadStatement() } catch { self.error = "Không thể tải ví tín dụng." } }
-    private func loadStatement() async { guard !selectedID.isEmpty else { return }; do { statement = try await api.creditStatement(walletID: selectedID); self.error = nil } catch { self.error = "Không thể tải sổ tín dụng." } }
+    private func loadWallets() async {
+        do {
+            let all = try await api.wallets()
+            wallets = all.filter { $0.type == "credit" }
+            sourceWallets = all.filter { $0.type != "credit" }
+            sourceWalletID = sourceWallets.first?.id ?? ""
+            selectedID = preferredWalletID.flatMap { id in
+                wallets.contains(where: { $0.id == id }) ? id : nil
+            } ?? wallets.first?.id ?? ""
+        } catch {
+            self.error = "Không thể tải ví tín dụng."
+            return
+        }
+
+        do {
+            categories = try await api.categories()
+        } catch {
+            // Category metadata is optional for the ledger surface. Keep the
+            // entry/payment actions usable even if this secondary request fails.
+            categories = []
+        }
+
+        if let profile = try? await api.profile() {
+            accountTimezone = profile.timezone
+        }
+        await loadStatement()
+    }
+    private func loadStatement() async {
+        guard !selectedID.isEmpty else { return }
+        do {
+            statement = try await api.creditStatement(walletID: selectedID)
+            self.error = nil
+        } catch {
+            self.error = "Không thể tải sổ tín dụng."
+        }
+    }
     private func saveAction() async {
         guard action != nil else { return }
         if action == "entry" { await addEntry() } else { await pay() }

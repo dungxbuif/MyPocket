@@ -124,6 +124,15 @@ kind and an applicable category, while a payment chooses a non-credit source
 wallet; both actions accept amount and optional note. The native screen must not
 silently drop category or note fields when calling the credit APIs.
 
+Selecting a credit wallet from the main wallet list must route to the same
+statement plus entry/payment surface as the dedicated credit route; a read-only
+credit detail is not sufficient for parity.
+
+The shared native API client must preserve query strings when a feature builds
+an `APIRequest` path. A query delimiter belongs in `URLComponents`' query
+field, not in the escaped path; the contract is covered by an XCTest because
+credit statements, reports, jars and Assistant history all depend on it.
+
 Basic and goal wallet details must preserve the web detail behavior: show
 account-timezone monthly transaction groups with category/note labels and
 income/expense totals, and allow adding or editing ordinary transactions from
@@ -237,7 +246,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (30 unit/contract tests and 5 UI smoke tests). The same pass
+Both commands pass (31 unit/contract tests and 5 UI smoke tests). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical

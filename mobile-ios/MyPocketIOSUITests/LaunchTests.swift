@@ -136,4 +136,26 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ghi chú"].exists)
 #endif
     }
+
+    func testAPIBackedCreditWalletOpensLedgerActions() throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable credit wallet.")
+#else
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Ví"].waitForExistence(timeout: 10))
+        app.buttons["Ví"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture Credit"].waitForExistence(timeout: 10))
+        app.staticTexts["Fixture Credit"].tap()
+        XCTAssertTrue(app.staticTexts["Sổ tín dụng"].waitForExistence(timeout: 10))
+        let addEntry = app.buttons["Thêm giao dịch"]
+        if !addEntry.waitForExistence(timeout: 30) {
+            print(app.debugDescription)
+            XCTFail("Credit ledger actions did not render")
+            return
+        }
+        XCTAssertTrue(app.buttons["Thanh toán"].waitForExistence(timeout: 5))
+#endif
+    }
 }
