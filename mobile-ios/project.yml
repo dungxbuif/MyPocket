@@ -1,0 +1,53 @@
+name: MyPocketIOS
+options:
+  bundleIdPrefix: com.mypocket
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    TARGETED_DEVICE_FAMILY: "1"
+    DEVELOPMENT_TEAM: ""
+    MP_API_BASE_URL: http://127.0.0.1:8080/api/v1
+targets:
+  MyPocketIOS:
+    type: application
+    platform: iOS
+    sources:
+      - path: MyPocketIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mypocket.ios
+        INFOPLIST_FILE: MyPocketIOS/Resources/Info.plist
+        GENERATE_INFOPLIST_FILE: NO
+        CODE_SIGN_STYLE: Automatic
+        MP_API_BASE_URL: http://127.0.0.1:8080/api/v1
+    scheme:
+      testTargets:
+        - MyPocketIOSTests
+        - MyPocketIOSUITests
+      gatherCoverageData: true
+  MyPocketIOSTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: MyPocketIOSTests
+    dependencies:
+      - target: MyPocketIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mypocket.ios.tests
+        GENERATE_INFOPLIST_FILE: YES
+  MyPocketIOSUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: MyPocketIOSUITests
+    dependencies:
+      - target: MyPocketIOS
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mypocket.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
