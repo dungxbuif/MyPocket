@@ -94,7 +94,8 @@ as active release entries here.
 
 - Native iOS simulator regression passed on iPhone 16: 35 unit/contract tests and
   5 standard authenticated UI smoke tests, with base-component and Xcode project
-  guards.
+  guards. The Release simulator build also passed with warnings treated as
+  errors, and the installed app launched successfully.
 - An opt-in API-backed wallet-detail UI smoke passed with a seeded disposable
   wallet, opened the transaction editor fields, and deleted the fixture with a
   204 response afterward.

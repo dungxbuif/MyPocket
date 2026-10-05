@@ -43,6 +43,7 @@ updated: 2026-10-06
 | Native ended-budget mutation parity | PASS: ended budgets do not expose the edit/save action, while their history and delete path remain available |
 | Native portfolio account-date parity | PASS: portfolio loads the account timezone and serializes selected trade dates at account-local noon, preventing UTC/device-day drift |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
+| Native Release build | PASS: iPhone 16 simulator Release build with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`; app launched as `com.mypocket.ios` after the build |
 | Simulator API-backed authenticated smoke fixture | PASS: DEBUG-only `-UITestAuthenticatedAPI` exchanged fixture PKCE fields against local `:8080`, persisted the disposable JWT, and rendered the authenticated overview with live empty wallets/ledger; screenshot `/tmp/mypocket-ios-simulator-api-auth.png` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |
 | Go formatting/static quality | PASS: `gofmt -l backend` is clean; `go vet ./...` and Swift Debug build with warnings-as-errors pass |

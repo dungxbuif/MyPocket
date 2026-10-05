@@ -51,6 +51,7 @@ updated: 2026-10-06
 2026-10-06 native scope parity: budget categories are expense-only and budget/adjustment wallet selectors exclude credit wallets, matching the ordinary ledger boundary.
 2026-10-06 native budget parity: ended budgets are view/delete-only and no longer expose an edit/save path after their end date.
 2026-10-06 native portfolio date parity: trade date selection now follows the account timezone and serializes at local noon to avoid device-timezone drift.
+2026-10-06 native simulator release check: the Release simulator build passed with warnings treated as errors, project/base-component guards passed, and `com.mypocket.ios` launched on iPhone 16. The login screen is ready for manual simulator verification; no production OAuth claim is made.
 
 ## Field Ownership
 
