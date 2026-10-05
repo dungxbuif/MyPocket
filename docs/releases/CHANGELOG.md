@@ -44,7 +44,7 @@ as active release entries here.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 24 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 25 unit/contract tests and
   4 authenticated UI smoke tests, with base-component and Xcode project guards.
 - The API-backed simulator fixture rendered the authenticated overview against
   local `:8080` with empty owner data; no production credentials or data were
