@@ -169,6 +169,26 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(json.contains("Hợp đồng"))
     }
 
+    func testRecurringDraftValidatorRequiresPositiveAmountAndInterval() {
+        let nextRun = MPFormat.parseInstant("2026-10-06T02:30:00Z")!
+        let end = MPFormat.parseInstant("2026-11-06T02:30:00Z")!
+
+        XCTAssertTrue(RecurringDraftValidator.isValid(name: "Tiền nhà", amount: "5.000.000", interval: "1", type: "expense", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: true, endsAtDate: end))
+        XCTAssertEqual(RecurringDraftValidator.positiveInteger("5.000.000"), 5_000_000)
+        XCTAssertFalse(RecurringDraftValidator.isValid(name: "Tiền nhà", amount: "0", interval: "1", type: "expense", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: false, endsAtDate: nextRun))
+        XCTAssertFalse(RecurringDraftValidator.isValid(name: "Tiền nhà", amount: "5.000", interval: "0", type: "expense", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: false, endsAtDate: nextRun))
+    }
+
+    func testRecurringDraftValidatorRejectsUnsupportedMetadataAndReversedEndDate() {
+        let nextRun = MPFormat.parseInstant("2026-10-06T02:30:00Z")!
+        let end = MPFormat.parseInstant("2026-10-05T02:30:00Z")!
+
+        XCTAssertFalse(RecurringDraftValidator.isValid(name: " ", amount: "1", interval: "1", type: "expense", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: false, endsAtDate: nextRun))
+        XCTAssertFalse(RecurringDraftValidator.isValid(name: "Lương", amount: "1", interval: "1", type: "transfer", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: false, endsAtDate: nextRun))
+        XCTAssertFalse(RecurringDraftValidator.isValid(name: "Lương", amount: "1", interval: "1", type: "income", frequency: "quarterly", nextRunDate: nextRun, endsAtEnabled: false, endsAtDate: nextRun))
+        XCTAssertFalse(RecurringDraftValidator.isValid(name: "Lương", amount: "1", interval: "1", type: "income", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: true, endsAtDate: end))
+    }
+
     func testCategoryApplicabilityRespectsKindGoalWalletAndScope() {
         let food = CategoryModel(id: "food", ownerID: "u", parentID: nil, kind: "expense", name: "Ăn uống", systemKey: nil, iconKey: "fork.knife", isSystem: false, walletIDs: [])
         XCTAssertTrue(food.applies(to: "expense", walletID: "basic", walletType: "basic"))

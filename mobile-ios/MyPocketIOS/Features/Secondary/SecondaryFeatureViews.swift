@@ -448,6 +448,32 @@ struct MonthsView: View {
     }
 }
 
+enum RecurringDraftValidator {
+    static func positiveInteger(_ value: String) -> Int64? {
+        let digits = value.filter(\.isNumber)
+        guard !digits.isEmpty, let parsed = Int64(digits), parsed > 0 else { return nil }
+        return parsed
+    }
+
+    static func isValid(
+        name: String,
+        amount: String,
+        interval: String,
+        type: String,
+        frequency: String,
+        nextRunDate: Date,
+        endsAtEnabled: Bool,
+        endsAtDate: Date
+    ) -> Bool {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              positiveInteger(amount) != nil,
+              positiveInteger(interval) != nil,
+              type == "expense" || type == "income",
+              ["daily", "weekly", "monthly", "yearly"].contains(frequency) else { return false }
+        return !endsAtEnabled || endsAtDate >= nextRunDate
+    }
+}
+
 struct RecurringView: View {
     let api: FinanceAPI
     let onBack: () -> Void
@@ -518,7 +544,45 @@ struct RecurringView: View {
     private func runDue() async { do { let response = try await api.runDueRecurring(); result = "Đã tạo \(response.created) giao dịch."; await load() } catch { self.error = "Không thể chạy giao dịch đến hạn." } }
     private func resetEditor() { name = ""; amount = ""; walletID = wallets.first?.id ?? ""; frequency = "monthly"; type = "expense"; categoryID = ""; interval = "1"; note = ""; nextRunDate = Date(); endsAtDate = Date(); endsAtEnabled = "Không"; active = "Có" }
     private func beginEditing(_ item: RecurringModel) { editTarget = item; name = item.name; amount = String(item.amount); note = item.note ?? ""; walletID = item.walletID; type = item.type; categoryID = item.categoryID ?? ""; frequency = item.frequency; interval = String(item.interval); nextRunDate = MPFormat.parseInstant(item.nextRunAt) ?? Date(); if let endsAt = item.endsAt, let parsed = MPFormat.parseInstant(endsAt) { endsAtDate = parsed; endsAtEnabled = "Có" } else { endsAtDate = Date(); endsAtEnabled = "Không" }; active = item.active ? "Có" : "Không"; showEditor = true }
-    private func save() async { guard let wallet = wallets.first(where: { $0.id == walletID }), let parsed = Int64(amount.filter(\.isNumber)), let parsedInterval = Int(interval.filter(\.isNumber)), parsedInterval > 0, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập đủ tên, ví, chu kỳ và số tiền."; return }; if endsAtEnabled == "Có", endsAtDate < nextRunDate { self.error = "Ngày kết thúc phải sau lần chạy kế tiếp."; return }; let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines); let input = RecurringInputModel(name: name.trimmingCharacters(in: .whitespacesAndNewlines), walletID: wallet.id, categoryID: categoryID.isEmpty ? nil : categoryID, type: type, amount: parsed, note: trimmedNote.isEmpty ? nil : trimmedNote, frequency: frequency, interval: parsedInterval, nextRunAt: MPFormat.instantString(nextRunDate), endsAt: endsAtEnabled == "Có" ? MPFormat.instantString(endsAtDate) : nil, active: active == "Có"); do { if let editTarget { _ = try await api.updateRecurring(id: editTarget.id, input: input) } else { _ = try await api.createRecurring(input) }; showEditor = false; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu lịch định kỳ." } }
+    private func save() async {
+        guard let wallet = wallets.first(where: { $0.id == walletID }),
+              RecurringDraftValidator.isValid(
+                  name: name,
+                  amount: amount,
+                  interval: interval,
+                  type: type,
+                  frequency: frequency,
+                  nextRunDate: nextRunDate,
+                  endsAtEnabled: endsAtEnabled == "Có",
+                  endsAtDate: endsAtDate
+              ),
+              let parsed = RecurringDraftValidator.positiveInteger(amount),
+              let parsedInterval = RecurringDraftValidator.positiveInteger(interval).flatMap(Int.init) else {
+            self.error = "Nhập đủ tên, ví, chu kỳ và số tiền hợp lệ."
+            return
+        }
+        let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+        let input = RecurringInputModel(
+            name: name.trimmingCharacters(in: .whitespacesAndNewlines),
+            walletID: wallet.id,
+            categoryID: categoryID.isEmpty ? nil : categoryID,
+            type: type,
+            amount: parsed,
+            note: trimmedNote.isEmpty ? nil : trimmedNote,
+            frequency: frequency,
+            interval: parsedInterval,
+            nextRunAt: MPFormat.instantString(nextRunDate),
+            endsAt: endsAtEnabled == "Có" ? MPFormat.instantString(endsAtDate) : nil,
+            active: active == "Có"
+        )
+        do {
+            if let editTarget { _ = try await api.updateRecurring(id: editTarget.id, input: input) }
+            else { _ = try await api.createRecurring(input) }
+            showEditor = false
+            self.editTarget = nil
+            await load()
+        } catch { self.error = "Không thể lưu lịch định kỳ." }
+    }
     private func delete(_ item: RecurringModel) async { do { try await api.deleteRecurring(id: item.id); await load() } catch { self.error = "Không thể xóa lịch định kỳ." } }
 }
 
