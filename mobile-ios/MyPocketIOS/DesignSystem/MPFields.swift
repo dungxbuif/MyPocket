@@ -36,6 +36,34 @@ struct MPAmountField: View {
     }
 }
 
+struct MPTextEditor: View {
+    let title: String
+    @Binding var text: String
+    var placeholder: String = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(MPColor.ink)
+            ZStack(alignment: .topLeading) {
+                if text.isEmpty {
+                    Text(placeholder)
+                        .font(.body)
+                        .foregroundStyle(MPColor.secondary)
+                        .padding(12)
+                }
+                TextEditor(text: $text)
+                    .frame(minHeight: 110)
+                    .padding(8)
+                    .scrollContentBackground(.hidden)
+            }
+            .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
+            .accessibilityLabel(title)
+        }
+    }
+}
+
 struct MPDateField: View {
     let title: String
     @Binding var date: Date

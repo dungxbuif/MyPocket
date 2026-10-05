@@ -7,10 +7,16 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0E2E3E1E808B627B4A0C88C3 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C96CE6FEB55AEFDCA0AAEF8F /* MainTabView.swift */; };
+		15A3E38937D36684A0A972C1 /* FeedbackModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7CEF369D3890DBE74E6C77F0 /* FeedbackModels.swift */; };
 		1620E02EE24EA29140817C9C /* MPAsyncStates.swift in Sources */ = {isa = PBXBuildFile; fileRef = EF06226981996882999FEF3F /* MPAsyncStates.swift */; };
 		22BB6A2E48EB82D70C21860E /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD52BBEB98763E1968763956 /* RefreshCoordinator.swift */; };
 		24C787F114A1420FFAE253D3 /* BiometricUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E62438EBE24C18C8C893575 /* BiometricUnlockView.swift */; };
 		28D1DF6DCF8A45DB58B38EC0 /* GooglePKCEClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 55721D9700F85AACC4B1D476 /* GooglePKCEClient.swift */; };
+		294A3E2B0E3D97ACDA8AA605 /* AIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5538D1540DC36C708A32D692 /* AIModels.swift */; };
+		2AE426DFDBCDDBA89B1EE9D4 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 615C4A51829E4935FA4F94CF /* MoreView.swift */; };
+		358F88DFB1F38E5A9A01661A /* FinanceAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E237A1DE9AE939B13E17BF8A /* FinanceAPI.swift */; };
+		3C431D6AE2B0B17FFEE4A555 /* FinanceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB520CDEDE9521362E6396EB /* FinanceModels.swift */; };
 		3F3FC783AE1D164951E62668 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D28F77035681F30BD5C157 /* APIClient.swift */; };
 		5212CC79793A3FDBD52F9B4B /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F16A402CDCC8CC0958C9E728 /* AppRootView.swift */; };
 		526354268C4EC0F5EE60DEE8 /* MyPocketIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9723A8BA4562D535FB497660 /* MyPocketIOSApp.swift */; };
@@ -18,11 +24,13 @@
 		5E06C090E6962D3656A7A514 /* MPButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A54636EF0318CE0AE3B391CC /* MPButton.swift */; };
 		65D4614B446F5BEF88CDF414 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1C3F44815F0ACA384DE7FA1 /* Session.swift */; };
 		68B9E0F3E4EE03055CF21D1A /* MPNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B88B6E4C88F6F3AF1E7C7E0 /* MPNavigation.swift */; };
+		70554355FE8B5AE90E53193D /* FeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D20410826956CA45BC2729 /* FeedbackView.swift */; };
 		79B0ADD4F4D0023C8B5A2B3D /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B38B7196EEF914C165BF76DE /* AuthViewModel.swift */; };
 		7CA91D523F8FF4900070A614 /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C0D9FC2644AA2A6D2E8AC0 /* Tokens.swift */; };
 		8769C7AA9309C9BD4A6195FB /* MPSurfaces.swift in Sources */ = {isa = PBXBuildFile; fileRef = 147352154CAC3695022A44B9 /* MPSurfaces.swift */; };
 		8CBC1A84306C26FC416CDD78 /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10EBB7928461C6759805EF42 /* APIError.swift */; };
 		9C32FC80D819E0E7B0D33DF5 /* AuthView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 83C5D72DC4F43C1C2B504A02 /* AuthView.swift */; };
+		9C84A36C5218325E661E84AE /* WalletsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 45DBAC66B191D08A786C0923 /* WalletsView.swift */; };
 		9CE12A9D12A04E1AA5BB754F /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42613E8B37F2BA38C98F27A0 /* LaunchTests.swift */; };
 		9F4C3A8C99CF8A1300CA772A /* Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB39E134293E3AE9A08C8030 /* Environment.swift */; };
 		A35A86C7CEF1066F382D6CB1 /* MPFinanceCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5037ACF09441D0E5AD368D59 /* MPFinanceCards.swift */; };
@@ -30,6 +38,11 @@
 		BD9D18178C21F9D283883DA5 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4187C5B48B4E4102719E0E47 /* APIClientTests.swift */; };
 		C7585DBB11AE08A9A3C37AAE /* KeychainSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1FB6E104CF08872B05188BD /* KeychainSessionStore.swift */; };
 		D175FC61CDCB3A23785DE629 /* Envelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711B8F5EE726E4B38C0EDB1C /* Envelope.swift */; };
+		D5A07A2E66ADCF31F7D37489 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7622FCDB17D3632924D412A4 /* OverviewView.swift */; };
+		D7F3FB7B1F6E4FA047D542D1 /* TransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E553CBF0778DF943E05D4F9F /* TransactionsView.swift */; };
+		D8B0F589768ED47534D378D9 /* AssistantViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80112FF79FDF4111B8533AFE /* AssistantViews.swift */; };
+		F32CA0418336F225D59D0235 /* SecondaryFeatureViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 145BCBAD3573DA42B1E9AF81 /* SecondaryFeatureViews.swift */; };
+		F348769583358C628CEEF6AA /* MPFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 381BDBBD19AD4CD5F8F572DA /* MPFormat.swift */; };
 		F3E03A4838A7C5B416544FD6 /* MPFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2B831652B4462A6E4B510620 /* MPFields.swift */; };
 		F630BB6DFAA8AB209BE280E3 /* MPAttachmentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D83806CE062DD340921F8C7C /* MPAttachmentViews.swift */; };
 		FF89C3C262650A9C81311B2D /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C68B9CB3283E502E49DB649 /* DesignSystemTests.swift */; };
@@ -55,17 +68,26 @@
 /* Begin PBXFileReference section */
 		0B71F92D1A807AEA18B09C48 /* MPText.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPText.swift; sourceTree = "<group>"; };
 		10EBB7928461C6759805EF42 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
+		145BCBAD3573DA42B1E9AF81 /* SecondaryFeatureViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecondaryFeatureViews.swift; sourceTree = "<group>"; };
 		147352154CAC3695022A44B9 /* MPSurfaces.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPSurfaces.swift; sourceTree = "<group>"; };
 		1C68B9CB3283E502E49DB649 /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
 		2B831652B4462A6E4B510620 /* MPFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPFields.swift; sourceTree = "<group>"; };
+		381BDBBD19AD4CD5F8F572DA /* MPFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPFormat.swift; sourceTree = "<group>"; };
 		4187C5B48B4E4102719E0E47 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		42613E8B37F2BA38C98F27A0 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		4339F20DF12E511A5DD53D88 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		45DBAC66B191D08A786C0923 /* WalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletsView.swift; sourceTree = "<group>"; };
 		5037ACF09441D0E5AD368D59 /* MPFinanceCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPFinanceCards.swift; sourceTree = "<group>"; };
+		52D20410826956CA45BC2729 /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
+		5538D1540DC36C708A32D692 /* AIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModels.swift; sourceTree = "<group>"; };
 		55721D9700F85AACC4B1D476 /* GooglePKCEClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GooglePKCEClient.swift; sourceTree = "<group>"; };
 		5B88B6E4C88F6F3AF1E7C7E0 /* MPNavigation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPNavigation.swift; sourceTree = "<group>"; };
+		615C4A51829E4935FA4F94CF /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
 		711B8F5EE726E4B38C0EDB1C /* Envelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Envelope.swift; sourceTree = "<group>"; };
 		74C0D9FC2644AA2A6D2E8AC0 /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
+		7622FCDB17D3632924D412A4 /* OverviewView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewView.swift; sourceTree = "<group>"; };
+		7CEF369D3890DBE74E6C77F0 /* FeedbackModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackModels.swift; sourceTree = "<group>"; };
+		80112FF79FDF4111B8533AFE /* AssistantViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantViews.swift; sourceTree = "<group>"; };
 		8208510DDD2862B20EE3F111 /* MyPocketIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MyPocketIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		83C5D72DC4F43C1C2B504A02 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		863A1D951CDA51F951E3E8A1 /* MyPocketIOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MyPocketIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -74,10 +96,14 @@
 		A54636EF0318CE0AE3B391CC /* MPButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPButton.swift; sourceTree = "<group>"; };
 		B38B7196EEF914C165BF76DE /* AuthViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthViewModel.swift; sourceTree = "<group>"; };
 		B7D28F77035681F30BD5C157 /* APIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClient.swift; sourceTree = "<group>"; };
+		C96CE6FEB55AEFDCA0AAEF8F /* MainTabView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		D83806CE062DD340921F8C7C /* MPAttachmentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPAttachmentViews.swift; sourceTree = "<group>"; };
 		DB39E134293E3AE9A08C8030 /* Environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Environment.swift; sourceTree = "<group>"; };
 		E1FB6E104CF08872B05188BD /* KeychainSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSessionStore.swift; sourceTree = "<group>"; };
+		E237A1DE9AE939B13E17BF8A /* FinanceAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinanceAPI.swift; sourceTree = "<group>"; };
 		E4857264234927FC415152BC /* PlaceholderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
+		E553CBF0778DF943E05D4F9F /* TransactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionsView.swift; sourceTree = "<group>"; };
+		EB520CDEDE9521362E6396EB /* FinanceModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinanceModels.swift; sourceTree = "<group>"; };
 		EF06226981996882999FEF3F /* MPAsyncStates.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPAsyncStates.swift; sourceTree = "<group>"; };
 		F0935E16680170CD0D016257 /* MyPocketIOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MyPocketIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F16A402CDCC8CC0958C9E728 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
@@ -86,6 +112,22 @@
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
+		1208CC06B8E8208ACBA3F1C4 /* Assistant */ = {
+			isa = PBXGroup;
+			children = (
+				80112FF79FDF4111B8533AFE /* AssistantViews.swift */,
+			);
+			path = Assistant;
+			sourceTree = "<group>";
+		};
+		1E181BD94D4AA99A9DBA82B3 /* Secondary */ = {
+			isa = PBXGroup;
+			children = (
+				145BCBAD3573DA42B1E9AF81 /* SecondaryFeatureViews.swift */,
+			);
+			path = Secondary;
+			sourceTree = "<group>";
+		};
 		2539F40C0C367A0F9FAF2AAE = {
 			isa = PBXGroup;
 			children = (
@@ -101,8 +143,17 @@
 			children = (
 				513FB872A78A1846F163395B /* API */,
 				41C2ACA54BCB156F490A307C /* Auth */,
+				C71335EAD0C1444B3D71E042 /* Models */,
 			);
 			path = Core;
+			sourceTree = "<group>";
+		};
+		3FEAF31A8CB8BBC51E413698 /* More */ = {
+			isa = PBXGroup;
+			children = (
+				615C4A51829E4935FA4F94CF /* MoreView.swift */,
+			);
+			path = More;
 			sourceTree = "<group>";
 		};
 		41C2ACA54BCB156F490A307C /* Auth */ = {
@@ -122,6 +173,7 @@
 				B7D28F77035681F30BD5C157 /* APIClient.swift */,
 				10EBB7928461C6759805EF42 /* APIError.swift */,
 				711B8F5EE726E4B38C0EDB1C /* Envelope.swift */,
+				E237A1DE9AE939B13E17BF8A /* FinanceAPI.swift */,
 			);
 			path = API;
 			sourceTree = "<group>";
@@ -129,7 +181,15 @@
 		6B2C35720D22555A4DA2B3D0 /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				1208CC06B8E8208ACBA3F1C4 /* Assistant */,
 				C6B9175DC8AFF3A66DF825CA /* Auth */,
+				80D1A8EF7B935860B03A3A62 /* Feedback */,
+				3FEAF31A8CB8BBC51E413698 /* More */,
+				DA8EACDE24B2F4BFEDC31BC3 /* Overview */,
+				1E181BD94D4AA99A9DBA82B3 /* Secondary */,
+				CA3EECB21551CBB8CE9BF7C2 /* Shell */,
+				B3F7541623139BBCBB362B16 /* Transactions */,
+				CDDEA2078388D847A79AE36F /* Wallets */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -142,6 +202,14 @@
 				E4857264234927FC415152BC /* PlaceholderTests.swift */,
 			);
 			path = MyPocketIOSTests;
+			sourceTree = "<group>";
+		};
+		80D1A8EF7B935860B03A3A62 /* Feedback */ = {
+			isa = PBXGroup;
+			children = (
+				52D20410826956CA45BC2729 /* FeedbackView.swift */,
+			);
+			path = Feedback;
 			sourceTree = "<group>";
 		};
 		8A6187A86F1A02627764F69E /* Resources */ = {
@@ -191,6 +259,14 @@
 			path = MyPocketIOS;
 			sourceTree = "<group>";
 		};
+		B3F7541623139BBCBB362B16 /* Transactions */ = {
+			isa = PBXGroup;
+			children = (
+				E553CBF0778DF943E05D4F9F /* TransactionsView.swift */,
+			);
+			path = Transactions;
+			sourceTree = "<group>";
+		};
 		C6B9175DC8AFF3A66DF825CA /* Auth */ = {
 			isa = PBXGroup;
 			children = (
@@ -199,6 +275,32 @@
 				9E62438EBE24C18C8C893575 /* BiometricUnlockView.swift */,
 			);
 			path = Auth;
+			sourceTree = "<group>";
+		};
+		C71335EAD0C1444B3D71E042 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				5538D1540DC36C708A32D692 /* AIModels.swift */,
+				7CEF369D3890DBE74E6C77F0 /* FeedbackModels.swift */,
+				EB520CDEDE9521362E6396EB /* FinanceModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		CA3EECB21551CBB8CE9BF7C2 /* Shell */ = {
+			isa = PBXGroup;
+			children = (
+				C96CE6FEB55AEFDCA0AAEF8F /* MainTabView.swift */,
+			);
+			path = Shell;
+			sourceTree = "<group>";
+		};
+		CDDEA2078388D847A79AE36F /* Wallets */ = {
+			isa = PBXGroup;
+			children = (
+				45DBAC66B191D08A786C0923 /* WalletsView.swift */,
+			);
+			path = Wallets;
 			sourceTree = "<group>";
 		};
 		D3E1F211EA2E96C74BB36988 /* App */ = {
@@ -210,6 +312,14 @@
 			path = App;
 			sourceTree = "<group>";
 		};
+		DA8EACDE24B2F4BFEDC31BC3 /* Overview */ = {
+			isa = PBXGroup;
+			children = (
+				7622FCDB17D3632924D412A4 /* OverviewView.swift */,
+			);
+			path = Overview;
+			sourceTree = "<group>";
+		};
 		ED1B4746EAE334A86391AE88 /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
@@ -218,6 +328,7 @@
 				A54636EF0318CE0AE3B391CC /* MPButton.swift */,
 				2B831652B4462A6E4B510620 /* MPFields.swift */,
 				5037ACF09441D0E5AD368D59 /* MPFinanceCards.swift */,
+				381BDBBD19AD4CD5F8F572DA /* MPFormat.swift */,
 				5B88B6E4C88F6F3AF1E7C7E0 /* MPNavigation.swift */,
 				147352154CAC3695022A44B9 /* MPSurfaces.swift */,
 				0B71F92D1A807AEA18B09C48 /* MPText.swift */,
@@ -338,14 +449,20 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				294A3E2B0E3D97ACDA8AA605 /* AIModels.swift in Sources */,
 				3F3FC783AE1D164951E62668 /* APIClient.swift in Sources */,
 				8CBC1A84306C26FC416CDD78 /* APIError.swift in Sources */,
 				5212CC79793A3FDBD52F9B4B /* AppRootView.swift in Sources */,
+				D8B0F589768ED47534D378D9 /* AssistantViews.swift in Sources */,
 				9C32FC80D819E0E7B0D33DF5 /* AuthView.swift in Sources */,
 				79B0ADD4F4D0023C8B5A2B3D /* AuthViewModel.swift in Sources */,
 				24C787F114A1420FFAE253D3 /* BiometricUnlockView.swift in Sources */,
 				D175FC61CDCB3A23785DE629 /* Envelope.swift in Sources */,
 				9F4C3A8C99CF8A1300CA772A /* Environment.swift in Sources */,
+				15A3E38937D36684A0A972C1 /* FeedbackModels.swift in Sources */,
+				70554355FE8B5AE90E53193D /* FeedbackView.swift in Sources */,
+				358F88DFB1F38E5A9A01661A /* FinanceAPI.swift in Sources */,
+				3C431D6AE2B0B17FFEE4A555 /* FinanceModels.swift in Sources */,
 				28D1DF6DCF8A45DB58B38EC0 /* GooglePKCEClient.swift in Sources */,
 				C7585DBB11AE08A9A3C37AAE /* KeychainSessionStore.swift in Sources */,
 				1620E02EE24EA29140817C9C /* MPAsyncStates.swift in Sources */,
@@ -353,13 +470,20 @@
 				5E06C090E6962D3656A7A514 /* MPButton.swift in Sources */,
 				F3E03A4838A7C5B416544FD6 /* MPFields.swift in Sources */,
 				A35A86C7CEF1066F382D6CB1 /* MPFinanceCards.swift in Sources */,
+				F348769583358C628CEEF6AA /* MPFormat.swift in Sources */,
 				68B9E0F3E4EE03055CF21D1A /* MPNavigation.swift in Sources */,
 				8769C7AA9309C9BD4A6195FB /* MPSurfaces.swift in Sources */,
 				5403FFF0BB1B23CCAA54CFD5 /* MPText.swift in Sources */,
+				0E2E3E1E808B627B4A0C88C3 /* MainTabView.swift in Sources */,
+				2AE426DFDBCDDBA89B1EE9D4 /* MoreView.swift in Sources */,
 				526354268C4EC0F5EE60DEE8 /* MyPocketIOSApp.swift in Sources */,
+				D5A07A2E66ADCF31F7D37489 /* OverviewView.swift in Sources */,
 				22BB6A2E48EB82D70C21860E /* RefreshCoordinator.swift in Sources */,
+				F32CA0418336F225D59D0235 /* SecondaryFeatureViews.swift in Sources */,
 				65D4614B446F5BEF88CDF414 /* Session.swift in Sources */,
 				7CA91D523F8FF4900070A614 /* Tokens.swift in Sources */,
+				D7F3FB7B1F6E4FA047D542D1 /* TransactionsView.swift in Sources */,
+				9C84A36C5218325E661E84AE /* WalletsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

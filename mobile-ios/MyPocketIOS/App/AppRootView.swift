@@ -15,7 +15,7 @@ struct AppRootView: View {
             case .unauthenticated:
                 AuthView(model: auth)
             case .authenticated:
-                BiometricUnlockView(model: auth)
+                MainTabView(auth: auth)
             }
         }
         .task { auth.restore() }

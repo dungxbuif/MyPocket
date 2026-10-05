@@ -17,10 +17,12 @@ final class AuthViewModel: ObservableObject {
 
     private let store: KeychainSessionStore
     private let google: GooglePKCEClient
+    let financeAPI: FinanceAPI
 
     init(store: KeychainSessionStore = KeychainSessionStore(), apiClient: APIClient = APIClient()) {
         self.store = store
         self.google = GooglePKCEClient(apiClient: apiClient)
+        self.financeAPI = FinanceAPI(client: apiClient)
     }
 
     func restore() {

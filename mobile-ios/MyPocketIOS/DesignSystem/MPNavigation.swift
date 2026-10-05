@@ -55,6 +55,42 @@ struct MPBottomNavigation: View {
     }
 }
 
+struct MPSegmentedControl: View {
+    let options: [(id: String, title: String)]
+    @Binding var selection: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            ForEach(options, id: \.id) { option in
+                MPButton(style: selection == option.id ? .primary : .plain) {
+                    selection = option.id
+                } label: {
+                    Text(option.title)
+                        .font(.footnote.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                }
+                .accessibilityLabel(option.title)
+                .accessibilityAddTraits(selection == option.id ? .isSelected : [])
+            }
+        }
+        .padding(4)
+        .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
+    }
+}
+
+struct MPFeedbackBubble: View {
+    let action: () -> Void
+
+    var body: some View {
+        MPIconButton(systemName: "bubble.left.and.bubble.right.fill", label: "Gửi phản hồi", action: action)
+            .padding(8)
+            .background(MPColor.action, in: Circle())
+            .foregroundStyle(.white)
+            .shadow(radius: 6, y: 3)
+            .accessibilityIdentifier("feedback-bubble")
+    }
+}
+
 struct MPConfirmDialog: ViewModifier {
     @Binding var isPresented: Bool
     let title: String

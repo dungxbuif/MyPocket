@@ -14,14 +14,6 @@ struct LoginOutput: Codable, Equatable, Sendable {
     let refreshExpiresAt: String
     let user: AuthUser
 
-    enum CodingKeys: String, CodingKey {
-        case token
-        case expiresAt = "expires_at"
-        case refreshToken = "refresh_token"
-        case refreshExpiresAt = "refresh_expires_at"
-        case user
-    }
-
     var session: AccessSession {
         AccessSession(token: token, expiresAt: expiresAt, refreshToken: refreshToken, refreshExpiresAt: refreshExpiresAt, user: user)
     }
@@ -30,9 +22,6 @@ struct LoginOutput: Codable, Equatable, Sendable {
 struct RefreshRequest: Codable, Sendable {
     let refreshToken: String
 
-    enum CodingKeys: String, CodingKey {
-        case refreshToken = "refresh_token"
-    }
 }
 
 struct AccessSession: Codable, Equatable, Sendable {

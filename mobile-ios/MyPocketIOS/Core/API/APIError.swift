@@ -18,8 +18,4 @@ struct ProblemDetails: Codable, Equatable, Sendable {
     let code: String?
     let requestID: String?
 
-    enum CodingKeys: String, CodingKey {
-        case title, status, detail, instance, code
-        case requestID = "request_id"
-    }
 }

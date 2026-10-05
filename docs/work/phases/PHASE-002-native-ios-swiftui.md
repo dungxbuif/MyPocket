@@ -70,3 +70,15 @@ go generate ./cmd/api
 This is a checkpoint, not the phase exit gate: the feature-parity screens and
 their API-backed view models still need to be implemented before claiming the
 native port is complete.
+
+## Feature-slice checkpoint — 2026-10-05
+
+The native branch now contains API-backed SwiftUI routes for overview,
+transactions/manual entry, wallets, budgets, reports, categories, jars, month
+summary/notes, recurring schedules, Travel Mode, portfolio, credit statements,
+Finance Assistant, AI entry review, feedback/changelog and account settings.
+All user controls in these routes compose the project-owned DesignSystem; the
+static guard and Simulator tests remain passing. The remaining exit work is
+deep CRUD parity (edit/delete/link flows and file attachments), persisted
+assistant/feedback screenshot flows, and an authenticated end-to-end smoke run
+against a fixture/staging API.
