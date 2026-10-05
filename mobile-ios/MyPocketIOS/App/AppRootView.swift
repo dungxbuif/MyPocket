@@ -20,7 +20,7 @@ struct AppRootView: View {
                 MainTabView(auth: auth)
             }
         }
-        .task { auth.restore() }
+        .task { await auth.restore() }
         .accessibilityIdentifier("app-root")
     }
 }

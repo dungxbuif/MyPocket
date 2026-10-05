@@ -13,17 +13,18 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: 2026-10-05
+updated: 2026-10-06
 ---
 
 # Validation Matrix
 
-## Native simulator and local integration regression — 2026-10-05
+## Native simulator and local integration regression — 2026-10-06
 
 | Proof | Result |
 | --- | --- |
-| iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 19 tests, 0 failures |
+| iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 22 tests, 0 failures; expired access tokens refresh before Face ID and invalid refresh sessions clear safely |
 | iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: 3 UI tests, 0 failures; app installed and relaunched as `com.mypocket.ios` |
+| Native category scope parity | PASS: category create/edit preserves multiple selected wallet IDs; empty selection remains the API's all-wallet scope; shared `MPMultiOptionSelector` owns the UI |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |
 | Go formatting/static quality | PASS: `gofmt -l backend` is clean; `go vet ./...` and Swift Debug build with warnings-as-errors pass |

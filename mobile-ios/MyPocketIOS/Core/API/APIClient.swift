@@ -180,6 +180,10 @@ final class APIClient: @unchecked Sendable {
         try sessionStore.save(session)
         return session
     }
+
+    func refreshSessionForRestore() async throws -> AccessSession {
+        try await refreshSession()
+    }
 }
 
 struct MultipartFile: Sendable {

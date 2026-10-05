@@ -77,3 +77,67 @@ final class MultipartAPIClientTests: XCTestCase {
         XCTAssertEqual(store.session?.token, "new-access")
     }
 }
+
+private final class RestoreSessionStore: SessionStore, @unchecked Sendable {
+    var session: AccessSession?
+
+    init(session: AccessSession?) { self.session = session }
+    func load() -> AccessSession? { session }
+    func save(_ session: AccessSession) throws { self.session = session }
+    func clear() { session = nil }
+}
+
+private final class RestoreTransport: HTTPTransport, @unchecked Sendable {
+    private(set) var refreshRequests = 0
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        XCTAssertTrue(request.url?.path.hasSuffix("/auth/refresh") == true)
+        refreshRequests += 1
+        let payload = Data(#"{"data":{"token":"restored-access","expires_at":"2099-01-01T00:00:00Z","refresh_token":"restored-refresh","refresh_expires_at":"2099-02-01T00:00:00Z","user":{"id":"u-1","name":"Test","email":"test@example.com","timezone":"Asia/Ho_Chi_Minh"}}}"#.utf8)
+        return (payload, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+@MainActor
+final class AuthRestoreTests: XCTestCase {
+    private let biometricKey = "mypocket.biometric.enabled"
+
+    override func tearDown() {
+        UserDefaults.standard.removeObject(forKey: biometricKey)
+        super.tearDown()
+    }
+
+    func testExpiredAccessRefreshesBeforeBiometricGate() async throws {
+        UserDefaults.standard.set(true, forKey: biometricKey)
+        let initial = AccessSession(token: "expired", expiresAt: "2020-01-01T00:00:00Z", refreshToken: "refresh", refreshExpiresAt: "2099-01-01T00:00:00Z", user: AuthUser(id: "u-1", name: "Test", email: nil, timezone: "Asia/Ho_Chi_Minh"))
+        let store = RestoreSessionStore(session: initial)
+        let transport = RestoreTransport()
+        let apiClient = APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: transport, sessionStore: store)
+        let auth = AuthViewModel(store: store, apiClient: apiClient)
+
+        await auth.restore()
+
+        XCTAssertEqual(transport.refreshRequests, 1)
+        XCTAssertEqual(store.session?.token, "restored-access")
+        guard case .locked(let restored) = auth.phase else {
+            return XCTFail("an enabled biometric gate should use the refreshed session")
+        }
+        XCTAssertEqual(restored.token, "restored-access")
+    }
+
+    func testExpiredAccessAndRefreshClearsSessionWithoutShowingBiometricGate() async {
+        UserDefaults.standard.set(true, forKey: biometricKey)
+        let expired = AccessSession(token: "expired", expiresAt: "2020-01-01T00:00:00Z", refreshToken: "refresh", refreshExpiresAt: "2020-01-01T00:00:00Z", user: AuthUser(id: "u-1", name: nil, email: nil, timezone: nil))
+        let store = RestoreSessionStore(session: expired)
+        let transport = RestoreTransport()
+        let apiClient = APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: transport, sessionStore: store)
+        let auth = AuthViewModel(store: store, apiClient: apiClient)
+
+        await auth.restore()
+
+        XCTAssertEqual(transport.refreshRequests, 0)
+        XCTAssertNil(store.load())
+        XCTAssertEqual(auth.phase, .unauthenticated)
+        XCTAssertFalse(auth.biometricEnabled)
+    }
+}

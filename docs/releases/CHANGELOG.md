@@ -19,12 +19,24 @@ This file is the first-release baseline for the current MyPocket snapshot. Earli
 development notes remain available in Git history and are intentionally not presented
 as active release entries here.
 
-## [Unreleased] - 2026-10-05
+## [Unreleased] - 2026-10-06
+
+### Fixed
+
+- Native session restore now refreshes an expired access token before enabling the
+  Face ID lock gate. If the refresh token is expired or rejected, Keychain state
+  and the biometric preference are cleared instead of opening an invalid session.
+- Native category editing now preserves all applicable wallets. The shared
+  multi-select base uses an empty `wallet_ids` selection for the documented
+  all-wallet scope, so editing a multi-wallet category no longer silently keeps
+  only the first wallet.
 
 ### Verification
 
 - Native iOS simulator regression passed on iPhone 16: 19 unit/contract tests and
   3 authenticated UI smoke tests, with base-component and Xcode project guards.
+- The follow-up simulator run passed 22 native unit/contract tests and the same 3
+  UI smoke tests after the auth-restore and multi-wallet category fixes.
 - Backend race/integration verification passed against disposable PostgreSQL and
   Redis. Transfer browser/integration harnesses now cover linked update/delete
   semantics and idempotency-key cleanup.

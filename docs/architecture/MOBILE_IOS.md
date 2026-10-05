@@ -3,7 +3,7 @@ artifact_type: architecture_reference
 id: MOBILE_IOS
 status: design_approved_for_scaffold
 owner: shared
-updated: 2026-10-05
+updated: 2026-10-06
 trace:
   detail_design: ../superpowers/specs/2026-10-05-native-ios-swiftui-design.md
   plan: ../superpowers/plans/2026-10-05-native-ios-swiftui-port.md
@@ -14,10 +14,10 @@ trace:
 
 ## Current status
 
-The SwiftUI client is planned on the isolated `codex/native-ios-port` branch.
-It does not replace the web client or the historical Expo client. The first
-platform gate is an iOS Simulator build/test; physical-device signing and
-production OAuth are separate gates.
+The SwiftUI client is implemented on the isolated `codex/native-ios-port`
+branch. It does not replace the web client or the historical Expo client. The
+first platform gate is an iOS Simulator build/test; physical-device signing
+and production OAuth are separate gates.
 
 ## Repository boundary
 
@@ -56,9 +56,19 @@ The app uses `ASWebAuthenticationSession` and S256 PKCE. The callback includes
 an authorization code and state only. The app sends that code to
 `POST /api/v1/auth/mobile/google/exchange`; the Go API validates the exact
 platform/client/redirect allowlist and returns the normal short-lived JWT plus
-rotating opaque refresh token. Tokens are stored in Keychain. Face ID is an
-optional unlock gate for an existing valid session, not a replacement for
-server authentication.
+rotating opaque refresh token. Tokens are stored in Keychain. On restore, an
+expired access token is refreshed once when the rotating refresh token is still
+valid. Only the refreshed valid session can enter the optional Face ID unlock
+gate; an expired or rejected refresh token clears the Keychain session and
+biometric preference. Face ID is not a replacement for server authentication.
+
+## Native scope selectors
+
+Category applicability uses the same API contract as the web client: an empty
+`wallet_ids` array means all owner wallets, while a non-empty array may contain
+multiple wallet IDs. `MPMultiOptionSelector` owns this interaction in the
+DesignSystem. Category create/edit passes the complete selected set and never
+collapses an existing multi-wallet category to its first wallet.
 
 ## Simulator commands
 

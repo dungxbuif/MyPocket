@@ -194,7 +194,7 @@ struct CategoriesView: View {
     @State private var editTarget: CategoryModel?
     @State private var deleteTarget: CategoryModel?
     @State private var wallets: [WalletModel] = []
-    @State private var walletScopeID = "__all__"
+    @State private var selectedWalletIDs: Set<String> = []
     @State private var parentID = ""
 
     var body: some View {
@@ -217,7 +217,7 @@ struct CategoriesView: View {
                             MPTextField(title: "Tên", text: $name)
                             MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $kind)
                             MPOptionSelector(title: "Danh mục cha", options: availableParentOptions, selectionID: $parentID, emptyLabel: "Không có danh mục cha")
-                            MPOptionSelector(title: "Áp dụng cho ví", options: [MPSelectionOption(id: "__all__", label: "Tất cả ví")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletScopeID, emptyLabel: "Tất cả ví")
+                            MPMultiOptionSelector(title: "Áp dụng cho ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionIDs: $selectedWalletIDs, allLabel: "Tất cả ví")
                             HStack { MPButton("Hủy", style: .secondary) { adding = false; editTarget = nil }; MPButton("Lưu") { Task { await create() } } }
                         }
                     }
@@ -269,8 +269,8 @@ struct CategoriesView: View {
         return excluded
     }
     private func load() async { loading = true; defer { loading = false }; do { async let categoryResult = api.categories(); async let walletResult = api.wallets(); items = try await categoryResult; wallets = try await walletResult; self.error = nil } catch { self.error = "Không thể tải danh mục." } }
-    private func create() async { guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập tên danh mục."; return }; do { let walletIDs = walletScopeID == "__all__" ? [] : [walletScopeID]; let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: walletIDs, iconKey: editTarget?.iconKey ?? "tag"); if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }; adding = false; name = ""; parentID = ""; walletScopeID = "__all__"; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu danh mục." } }
-    private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; parentID = item.parentID ?? ""; walletScopeID = item.walletIDs.first ?? "__all__"; adding = true }
+    private func create() async { guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập tên danh mục."; return }; do { let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: Array(selectedWalletIDs).sorted(), iconKey: editTarget?.iconKey ?? "tag"); if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }; adding = false; name = ""; parentID = ""; selectedWalletIDs = []; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu danh mục." } }
+    private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; parentID = item.parentID ?? ""; selectedWalletIDs = Set(item.walletIDs); adding = true }
 }
 
 struct JarsView: View {

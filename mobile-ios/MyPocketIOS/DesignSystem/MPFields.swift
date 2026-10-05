@@ -167,3 +167,57 @@ struct MPOptionSelector: View {
         .accessibilityLabel("\(title): \(selectedLabel)")
     }
 }
+
+/// Multi-select selector for relationships that may apply to more than one
+/// wallet. An empty selection means "all wallets", matching the API contract.
+struct MPMultiOptionSelector: View {
+    let title: String
+    let options: [MPSelectionOption]
+    @Binding var selectionIDs: Set<String>
+    var allLabel: String = "Tất cả"
+
+    private var selectedLabel: String {
+        if selectionIDs.isEmpty { return allLabel }
+        return "Đã chọn \(selectionIDs.count)"
+    }
+
+    var body: some View {
+        Menu {
+            ForEach(options) { option in
+                Button {
+                    if selectionIDs.contains(option.id) {
+                        selectionIDs.remove(option.id)
+                    } else {
+                        selectionIDs.insert(option.id)
+                    }
+                } label: {
+                    HStack {
+                        Text(option.label)
+                        Spacer()
+                        if selectionIDs.contains(option.id) {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+            if !selectionIDs.isEmpty {
+                Divider()
+                Button("Bỏ chọn (tất cả ví)") { selectionIDs.removeAll() }
+            }
+        } label: {
+            HStack {
+                Text(title)
+                Spacer()
+                Text(selectedLabel)
+                    .foregroundStyle(MPColor.secondary)
+                Image(systemName: "checklist")
+                    .font(.caption)
+            }
+            .frame(minHeight: MPMetrics.controlHeight)
+            .padding(.horizontal, 12)
+            .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
+        }
+        .foregroundStyle(MPColor.ink)
+        .accessibilityLabel("\(title): \(selectedLabel)")
+    }
+}

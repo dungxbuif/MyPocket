@@ -4,7 +4,7 @@ id: PHASE-002-native-ios-swiftui
 status: in_progress
 owner: shared
 created: 2026-10-05
-updated: 2026-10-05
+updated: 2026-10-06
 trace:
   backlog: ../BACKLOG.md
   roadmap: ../ROADMAP.md
@@ -151,7 +151,7 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 19 unit/contract tests and 3 UI smoke tests (auth launch,
+suite passed: 22 unit/contract tests and 3 UI smoke tests (auth launch,
 authenticated primary tabs, More route + floating feedback overlay).
 
 The latest run also verified category-parent cycle prevention, stable ID-based
@@ -173,6 +173,34 @@ The authenticated UI run uses the DEBUG-only `-UITestAuthenticated` fixture;
 it proves native navigation, state rendering and feedback entry without
 placing a real JWT or API secret in the app. A staging/production authenticated
 API smoke test remains a release prerequisite.
+
+## Native parity follow-up — 2026-10-06
+
+Two audit findings were fixed before the simulator test pass:
+
+- `AuthViewModel.restore()` now checks access and refresh expiry. A valid refresh
+  token is consumed once through `POST /auth/refresh` before Face ID can lock the
+  refreshed session; an invalid refresh state clears Keychain and biometric
+  preference rather than presenting an authenticated shell.
+- Category management now composes the shared `MPMultiOptionSelector`. Editing
+  a category round-trips every `wallet_ids` value through the existing category
+  API; an empty set continues to mean all owner wallets. This closes the native
+  parity gap for categories shared by multiple wallets.
+
+Verification on the same simulator:
+
+```bash
+xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
+  -destination 'id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' \
+  -only-testing:MyPocketIOSTests -enableCodeCoverage NO
+xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
+  -destination 'id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' \
+  -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
+```
+
+Both commands pass (22 unit/contract tests and 3 UI smoke tests). Provider-backed
+AI/OCR, real Google iOS OAuth, authenticated staging/production and physical
+device checks remain external release gates.
 
 ## Disposable local API smoke — 2026-10-05
 

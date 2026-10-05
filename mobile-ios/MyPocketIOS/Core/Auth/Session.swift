@@ -30,6 +30,28 @@ struct AccessSession: Codable, Equatable, Sendable {
     let refreshToken: String
     let refreshExpiresAt: String
     let user: AuthUser
+
+    var accessTokenExpiry: Date? { Self.parseDate(expiresAt) }
+    var refreshTokenExpiry: Date? { Self.parseDate(refreshExpiresAt) }
+
+    func hasValidAccessToken(at date: Date = Date()) -> Bool {
+        guard let expiry = accessTokenExpiry else { return false }
+        return expiry > date
+    }
+
+    func hasValidRefreshToken(at date: Date = Date()) -> Bool {
+        guard let expiry = refreshTokenExpiry else { return false }
+        return expiry > date
+    }
+
+    private static func parseDate(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value) ?? {
+            formatter.formatOptions = [.withInternetDateTime]
+            return formatter.date(from: value)
+        }()
+    }
 }
 
 protocol SessionStore: Sendable {

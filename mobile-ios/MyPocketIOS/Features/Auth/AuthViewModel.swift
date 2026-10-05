@@ -16,19 +16,19 @@ final class AuthViewModel: ObservableObject {
     @Published var isBusy = false
     @Published var biometricEnabled = false
 
-    private let store: KeychainSessionStore
+    private let store: SessionStore
     private let google: GooglePKCEClient
     let financeAPI: FinanceAPI
     private let biometricPreferenceKey = "mypocket.biometric.enabled"
 
-    init(store: KeychainSessionStore = KeychainSessionStore(), apiClient: APIClient = APIClient()) {
+    init(store: SessionStore = KeychainSessionStore(), apiClient: APIClient = APIClient()) {
         self.store = store
         self.google = GooglePKCEClient(apiClient: apiClient)
         self.financeAPI = FinanceAPI(client: apiClient)
         self.biometricEnabled = UserDefaults.standard.bool(forKey: biometricPreferenceKey)
     }
 
-    func restore() {
+    func restore() async {
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-UITestAuthenticated") {
             phase = .authenticated(
@@ -43,11 +43,34 @@ final class AuthViewModel: ObservableObject {
             return
         }
 #endif
-        if let session = store.load() {
-            phase = biometricEnabled ? .locked(session) : .authenticated(session)
-        } else {
+        guard let session = store.load() else {
             phase = .unauthenticated
+            return
         }
+        if session.hasValidAccessToken() {
+            apply(session)
+            return
+        }
+        guard session.hasValidRefreshToken() else {
+            expireSession()
+            return
+        }
+        do {
+            apply(try await financeAPI.client.refreshSessionForRestore())
+        } catch {
+            expireSession()
+        }
+    }
+
+    private func apply(_ session: AccessSession) {
+        phase = biometricEnabled ? .locked(session) : .authenticated(session)
+    }
+
+    private func expireSession() {
+        store.clear()
+        biometricEnabled = false
+        UserDefaults.standard.set(false, forKey: biometricPreferenceKey)
+        phase = .unauthenticated
     }
 
     func signIn() async {

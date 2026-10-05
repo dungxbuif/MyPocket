@@ -55,6 +55,12 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(json.contains("\"parent_id\":\"food\""))
     }
 
+    func testCategoryInputPreservesMultipleWalletScopes() throws {
+        let input = CategoryModelInput(name: "Highlands", kind: "expense", parentID: "food", walletIDs: ["wallet-1", "wallet-2"], iconKey: "tag")
+        let decoded = try JSONDecoder.mypocket.decode(CategoryModelInput.self, from: JSONEncoder.mypocket.encode(input))
+        XCTAssertEqual(decoded.walletIDs, ["wallet-1", "wallet-2"])
+    }
+
     func testRecurringInputUsesRFC3339InstantAndNote() throws {
         let input = RecurringInputModel(name: "Tiền nhà", walletID: "wallet-1", categoryID: nil, type: "expense", amount: 5_000_000, note: "Hợp đồng", frequency: "monthly", interval: 1, nextRunAt: "2026-10-05T02:30:00Z", endsAt: nil, active: true)
         let json = String(decoding: try JSONEncoder.mypocket.encode(input), as: UTF8.self)
