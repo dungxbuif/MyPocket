@@ -122,9 +122,12 @@ struct WalletDetailView: View {
     let wallet: WalletModel
     let onBack: () -> Void
     @State private var transactions: [TransactionModel] = []
+    @State private var categories: [CategoryModel] = []
     @State private var statement: CreditStatementModel?
     @State private var loading = false
     @State private var error: String?
+    @State private var editorPresented = false
+    @State private var editTarget: TransactionModel?
     @Environment(\.timeZone) private var timeZone
 
     var body: some View {
@@ -154,8 +157,41 @@ struct WalletDetailView: View {
                         transactionCard(statement.items)
                     }
                 } else {
-                    MPText("Lịch sử giao dịch", style: .title)
-                    transactionCard(transactions)
+                    MPSurfaceCard {
+                        HStack(spacing: 12) {
+                            VStack(alignment: .leading, spacing: 4) {
+                                MPText("Tiền vào", style: .secondary)
+                                MPText(MPFormat.money(totalIncome), style: .title)
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 4) {
+                                MPText("Tiền ra", style: .secondary)
+                                MPText(MPFormat.money(totalExpense), style: .title)
+                            }
+                        }
+                    }
+                    MPText("TẤT CẢ CÁC GIAO DỊCH", style: .title)
+                    if groupedTransactions.isEmpty {
+                        MPSurfaceCard {
+                            MPEmptyView(title: "Chưa có giao dịch", detail: "Các giao dịch của ví sẽ xuất hiện ở đây.")
+                        }
+                    } else {
+                        ForEach(groupedTransactions, id: \.0) { month, rows in
+                            MPSurfaceCard {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    HStack {
+                                        MPText(monthLabel(month), style: .secondary)
+                                        Spacer()
+                                        MPText(MPFormat.signedMoney(rows.reduce(0) { $0 + signedAmount($1) }), style: .secondary)
+                                    }
+                                    ForEach(rows) { row in
+                                        walletTransactionRow(row)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    MPButton("Thêm giao dịch") { editTarget = nil; editorPresented = true }
                 }
                 if loading { MPLoadingView(label: "Đang tải chi tiết...") }
                 if let error { MPErrorView(title: "Không tải được chi tiết ví", detail: error) { Task { await load() } } }
@@ -164,6 +200,24 @@ struct WalletDetailView: View {
         }
         .background(MPColor.canvas.ignoresSafeArea())
         .task { await load() }
+        .overlay {
+            if wallet.type != "credit", editorPresented {
+                TransactionEditorView(
+                    api: api,
+                    wallets: [wallet],
+                    categories: categories,
+                    timezone: timeZone.identifier,
+                    transaction: editTarget,
+                    onSaved: {
+                        editorPresented = false
+                        editTarget = nil
+                        Task { await load() }
+                    },
+                    onCancel: { editorPresented = false; editTarget = nil }
+                )
+                .background(MPColor.canvas.ignoresSafeArea())
+            }
+        }
         .accessibilityIdentifier("wallet-detail-screen")
     }
 
@@ -182,6 +236,40 @@ struct WalletDetailView: View {
         }
     }
 
+    @ViewBuilder
+    private func walletTransactionRow(_ row: TransactionModel) -> some View {
+        let category = categories.first(where: { $0.id == row.categoryID })
+        let title = category?.name ?? (row.type == "income" ? "Khoản thu" : "Khoản chi")
+        let subtitle = [MPFormat.shortDate(row.occurredAt, timeZone: timeZone), row.note].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
+        MPButton(style: .plain) {
+            editTarget = row
+            editorPresented = true
+        } label: {
+            MPTransactionRow(title: title, subtitle: subtitle, amount: MPFormat.signedMoney(signedAmount(row)), isIncome: row.type == "income")
+        }
+    }
+
+    private var walletTransactions: [TransactionModel] { transactions.filter { $0.walletID == wallet.id } }
+    private var totalIncome: Int64 { walletTransactions.filter { $0.type == "income" }.reduce(0) { $0 + $1.amount } }
+    private var totalExpense: Int64 { walletTransactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
+    private var groupedTransactions: [(String, [TransactionModel])] {
+        let grouped = Dictionary(grouping: walletTransactions) { row in
+            MPFormat.accountMonth(of: row.occurredAt, timeZone: timeZone) ?? "unknown"
+        }
+        return grouped.map { ($0.key, $0.value.sorted { $0.occurredAt > $1.occurredAt }) }.sorted { $0.0 > $1.0 }
+    }
+
+    private func monthLabel(_ value: String) -> String {
+        guard value.count == 7 else { return "Không rõ thời gian" }
+        let parts = value.split(separator: "-")
+        guard parts.count == 2 else { return value }
+        return "Tháng (parts[1]) (parts[0])"
+    }
+
+    private func signedAmount(_ row: TransactionModel) -> Int64 {
+        row.type == "income" ? row.amount : -row.amount
+    }
+
     private func load() async {
         guard !loading else { return }
         loading = true
@@ -190,7 +278,10 @@ struct WalletDetailView: View {
             if wallet.type == "credit" {
                 statement = try await api.creditStatement(walletID: wallet.id)
             } else {
-                transactions = try await api.transactions().filter { $0.walletID == wallet.id }.sorted { $0.occurredAt > $1.occurredAt }
+                async let transactionResult = api.transactions()
+                async let categoryResult = api.categories()
+                transactions = try await transactionResult
+                categories = try await categoryResult
             }
             error = nil
         } catch {

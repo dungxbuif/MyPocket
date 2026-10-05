@@ -53,11 +53,17 @@ as active release entries here.
 - Native credit ledger entry/payment forms now match the web fields: entry kind,
   applicable category, payment source wallet, amount and optional note are all
   preserved in the credit API payload.
+- Native basic/goal wallet detail now matches the web detail flow with
+  account-timezone monthly groups, category/note labels, income/expense totals,
+  and shared transaction add/edit actions.
 
 ### Verification
 
 - Native iOS simulator regression passed on iPhone 16: 30 unit/contract tests and
   4 authenticated UI smoke tests, with base-component and Xcode project guards.
+- An opt-in API-backed wallet-detail UI smoke passed with a seeded disposable
+  wallet, opened the transaction editor fields, and deleted the fixture with a
+  204 response afterward.
 - The opt-in API-backed Assistant UI smoke passed on the same iPhone 16 using
   `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI`, the disposable local
   API, and the `-UITestAuthenticatedAPI` fixture; no production credentials or

@@ -104,4 +104,23 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Không thể tải tổng quan trợ lý tài chính."].exists)
 #endif
     }
+
+    func testAPIBackedWalletDetailExposesTransactionEditor() throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable fixture wallet.")
+#else
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Ví"].waitForExistence(timeout: 10))
+        app.buttons["Ví"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture Wallet"].waitForExistence(timeout: 10))
+        app.staticTexts["Fixture Wallet"].tap()
+        XCTAssertTrue(app.buttons["Thêm giao dịch"].waitForExistence(timeout: 10))
+        app.buttons["Thêm giao dịch"].tap()
+        XCTAssertTrue(app.staticTexts["Thêm giao dịch"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Danh mục"].exists)
+        XCTAssertTrue(app.staticTexts["Ghi chú"].exists)
+#endif
+    }
 }

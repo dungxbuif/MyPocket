@@ -124,6 +124,12 @@ kind and an applicable category, while a payment chooses a non-credit source
 wallet; both actions accept amount and optional note. The native screen must not
 silently drop category or note fields when calling the credit APIs.
 
+Basic and goal wallet details must preserve the web detail behavior: show
+account-timezone monthly transaction groups with category/note labels and
+income/expense totals, and allow adding or editing ordinary transactions from
+the detail screen through the shared transaction editor. Credit remains on its
+dedicated statement/payment panel.
+
 AI entry accepts either a text instruction or one or more validated image/PDF
 attachments, uses the account timezone for extraction context, and keeps every
 proposal in review until an explicit approve/reject decision.
@@ -247,6 +253,12 @@ DEBUG-only `-UITestAuthenticatedAPI` fixture, opens Finance Assistant, verifies
 the 200 overview/capability contract and asserts that no overview error is
 shown. The default UI suite keeps this opt-in test skipped unless the explicit
 `LOCAL_API_UI` compilation condition is supplied.
+
+The same opt-in configuration also ran
+`testAPIBackedWalletDetailExposesTransactionEditor` with a disposable basic
+wallet. The smoke opened the wallet detail, verified the add-transaction editor
+and its category/note controls, and removed the seeded wallet with a 204 API
+response after the run.
 
 ## Disposable local API smoke — 2026-10-05
 
