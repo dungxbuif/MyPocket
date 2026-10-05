@@ -2,6 +2,7 @@ import SwiftUI
 import XCTest
 @testable import MyPocketIOS
 
+@MainActor
 final class DesignSystemTests: XCTestCase {
     func testSemanticTokensAreStable() {
         XCTAssertEqual(MPMetrics.hitTarget, 44)
