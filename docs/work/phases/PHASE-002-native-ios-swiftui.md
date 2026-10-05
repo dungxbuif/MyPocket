@@ -375,3 +375,19 @@ The web AI-entry browser regression also passed after correcting its fixture to
 derive the current account-local week. The prior failure was calendar drift in
 the test data (rows dated outside the period selector), not a production UI or
 API defect.
+
+## Simulator rerun — 2026-10-06
+
+The iPhone 16 simulator run was repeated after the goal target-date timezone
+fix. Unit/contract XCTest passed 42/42. The opt-in API-backed UI suite passed
+10/10 in 199.996 seconds, including the AI-entry capability gate, Assistant
+overview, credit ledger, week/cashflow ledger, wallet transaction editor, all
+13 secondary destinations, feedback entry, primary tabs and transfer/adjustment
+overflow actions. The disposable fixture check returned zero `Fixture*` wallets.
+
+The first diagnostic invocation incorrectly added `CODE_SIGNING_ALLOWED=NO` to
+the UI test command. The local API returned 200, but Keychain persistence failed
+with `KeychainError` and the app stayed on the login gate. Re-running with the
+normal simulator ad-hoc signing path passed. Keep `CODE_SIGNING_ALLOWED=NO`
+limited to pure unit/build checks; API-backed UI tests require the signed
+simulator test runner because they persist the disposable session in Keychain.

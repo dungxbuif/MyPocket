@@ -23,6 +23,11 @@ as active release entries here.
 
 ### Fixed
 
+- Re-ran the native iPhone 16 simulator regression after the goal target-date
+  timezone fix: 42/42 unit tests and 10/10 API-backed UI tests pass, with no
+  disposable `Fixture*` wallets left behind. API-backed UI tests retain normal
+  simulator ad-hoc signing so Keychain fixture sessions can be persisted;
+  `CODE_SIGNING_ALLOWED=NO` remains for pure unit/build checks only.
 - Native UI smoke tests now start from a deterministic unauthenticated state
   with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
   Keychain/biometric state. The iPhone 16 suite passes 10 tests (5 passed, 5
