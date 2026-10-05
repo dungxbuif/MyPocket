@@ -925,6 +925,17 @@ definitions:
       password:
         type: string
     type: object
+  httpapi.mobileGoogleExchangeRequest:
+    properties:
+      code:
+        type: string
+      code_verifier:
+        type: string
+      platform:
+        type: string
+      redirect_uri:
+        type: string
+    type: object
   httpapi.monthNoteInput:
     properties:
       note:
@@ -1577,6 +1588,45 @@ paths:
               type: string
             type: object
       summary: Complete Google OAuth login
+      tags:
+      - Authentication
+  /api/v1/auth/mobile/google/exchange:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Native Google PKCE exchange
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.mobileGoogleExchangeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "501":
+          description: Not Implemented
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Exchange a native Google PKCE code for a MyPocket session
       tags:
       - Authentication
   /api/v1/auth/profile:

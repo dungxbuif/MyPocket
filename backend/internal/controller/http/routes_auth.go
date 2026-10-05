@@ -8,6 +8,7 @@ func registerPublicRoutes(api *gin.RouterGroup, authHandler *AuthHandler) {
 	authRoutes.POST(routeRefreshPath, authHandler.Refresh)
 	authRoutes.GET(routeGooglePath, authHandler.StartGoogleAuth)
 	authRoutes.GET(routeGoogleCallbackPath, authHandler.GoogleCallback)
+	authRoutes.POST(routeMobileGoogleExchangePath, authHandler.MobileGoogleExchange)
 	api.GET(routeHealthPath, healthCheck)
 }
 

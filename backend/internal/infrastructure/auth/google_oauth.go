@@ -7,12 +7,20 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/mypocket/backend/internal/entity"
 )
 
 type GoogleOAuth struct {
+	client       *http.Client
+	clientID     string
+	clientSecret string
+	redirectURL  string
+}
+
+type MobileGoogleOAuth struct {
 	client       *http.Client
 	clientID     string
 	clientSecret string
@@ -28,6 +36,12 @@ const (
 )
 
 type GoogleOAuthConfig struct {
+	ClientID     string
+	ClientSecret string
+	RedirectURL  string
+}
+
+type MobileGoogleOAuthConfig struct {
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string
@@ -52,6 +66,51 @@ func NewGoogleOAuth(cfg GoogleOAuthConfig) *GoogleOAuth {
 		clientSecret: cfg.ClientSecret,
 		redirectURL:  cfg.RedirectURL,
 	}
+}
+
+func NewMobileGoogleOAuth(cfg MobileGoogleOAuthConfig) *MobileGoogleOAuth {
+	return &MobileGoogleOAuth{
+		client:       &http.Client{Timeout: 10 * time.Second},
+		clientID:     cfg.ClientID,
+		clientSecret: cfg.ClientSecret,
+		redirectURL:  cfg.RedirectURL,
+	}
+}
+
+func (g *MobileGoogleOAuth) IsReady() bool {
+	return g != nil && g.clientID != "" && g.redirectURL != ""
+}
+
+func (g *MobileGoogleOAuth) ExchangeCodeWithPKCE(code, verifier, redirectURI string) (entity.GoogleProfile, error) {
+	if !g.IsReady() || strings.TrimSpace(code) == "" || strings.TrimSpace(verifier) == "" || strings.TrimSpace(redirectURI) == "" || redirectURI != g.redirectURL {
+		return entity.GoogleProfile{}, errors.New("mobile oauth request is invalid")
+	}
+	form := url.Values{
+		"code":          {code},
+		"client_id":     {g.clientID},
+		"redirect_uri":  {redirectURI},
+		"grant_type":    {googleOAuthGrantType},
+		"code_verifier": {verifier},
+	}
+	if g.clientSecret != "" {
+		form.Set("client_secret", g.clientSecret)
+	}
+	resp, err := g.client.PostForm(googleOAuthTokenURL, form)
+	if err != nil {
+		return entity.GoogleProfile{}, err
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return entity.GoogleProfile{}, fmt.Errorf("google mobile token exchange failed: status %d", resp.StatusCode)
+	}
+	var token googleTokenResponse
+	if err := json.NewDecoder(resp.Body).Decode(&token); err != nil {
+		return entity.GoogleProfile{}, err
+	}
+	if token.AccessToken == "" {
+		return entity.GoogleProfile{}, errors.New("google token response missing access_token")
+	}
+	return fetchGoogleProfile(g.client, token.AccessToken)
 }
 
 func (g *GoogleOAuth) IsReady() bool {
@@ -101,12 +160,16 @@ func (g *GoogleOAuth) ExchangeCode(code string) (entity.GoogleProfile, error) {
 		return entity.GoogleProfile{}, errors.New("google token response missing access_token")
 	}
 
+	return fetchGoogleProfile(g.client, token.AccessToken)
+}
+
+func fetchGoogleProfile(client *http.Client, accessToken string) (entity.GoogleProfile, error) {
 	request, err := http.NewRequest(http.MethodGet, googleUserInfoURL, nil)
 	if err != nil {
 		return entity.GoogleProfile{}, err
 	}
-	request.Header.Set("Authorization", "Bearer "+token.AccessToken)
-	userinfoResp, err := g.client.Do(request)
+	request.Header.Set("Authorization", "Bearer "+accessToken)
+	userinfoResp, err := client.Do(request)
 	if err != nil {
 		return entity.GoogleProfile{}, err
 	}
@@ -121,7 +184,6 @@ func (g *GoogleOAuth) ExchangeCode(code string) (entity.GoogleProfile, error) {
 	if err := json.NewDecoder(userinfoResp.Body).Decode(&profile); err != nil {
 		return entity.GoogleProfile{}, err
 	}
-
 	return entity.GoogleProfile{
 		Subject:       profile.Subject,
 		Email:         profile.Email,

@@ -38,6 +38,10 @@ The native client consumes the existing Go API and never opens PostgreSQL,
 Redis or S3 directly. Feature code is owner-scoped by the JWT issued by the
 backend. Provider secrets remain server-side.
 
+The only native-specific API addition is
+`POST /api/v1/auth/mobile/google/exchange`; it validates the iOS PKCE code and
+redirect allowlist before returning the existing login/refresh response.
+
 ## Environments
 
 `Debug.xcconfig` and `Release.xcconfig` contain non-secret API base URL and

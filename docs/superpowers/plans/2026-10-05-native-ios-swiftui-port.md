@@ -85,7 +85,7 @@
 - Create: `mobile-ios/MyPocketIOS/DesignSystem/MPAsyncStates.swift`
 - Create: `mobile-ios/MyPocketIOS/DesignSystem/MPFinanceCards.swift`
 - Create: `mobile-ios/MyPocketIOS/DesignSystem/MPAttachmentViews.swift`
-- Create: `mobile-ios/scripts/check-base-components.swift`
+- Create: `mobile-ios/scripts/check-base-components.sh`
 - Test: `mobile-ios/MyPocketIOSTests/DesignSystemTests.swift`, `mobile-ios/scripts/check-base-components.test.sh`
 - Docs: `docs/design/system/BASE_COMPONENTS.md`, `docs/design/platforms/ios.md`
 

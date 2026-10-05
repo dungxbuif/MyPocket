@@ -30,5 +30,7 @@ const (
 	problemCodeGoogleUnavailable         = "GOOGLE_LOGIN_UNAVAILABLE"
 	problemCodeGoogleStateInvalid        = "GOOGLE_STATE_INVALID"
 	problemCodeGoogleProfileInvalid      = "GOOGLE_PROFILE_INVALID"
+	problemCodeGoogleMobileUnavailable   = "GOOGLE_MOBILE_LOGIN_UNAVAILABLE"
+	problemCodeGoogleMobileInvalid       = "GOOGLE_MOBILE_LOGIN_INVALID"
 	problemCodeEmailNotAllowed           = "EMAIL_NOT_ALLOWED"
 )

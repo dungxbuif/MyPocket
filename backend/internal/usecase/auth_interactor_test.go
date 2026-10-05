@@ -52,6 +52,16 @@ type authTokenStub struct{ calls int }
 
 type authPasswordStub struct{}
 
+type mobileGoogleStub struct {
+	profile entity.GoogleProfile
+	err     error
+}
+
+func (s mobileGoogleStub) IsReady() bool { return true }
+func (s mobileGoogleStub) ExchangeCodeWithPKCE(string, string, string) (entity.GoogleProfile, error) {
+	return s.profile, s.err
+}
+
 func (authPasswordStub) Hash(string) (string, error) { return "hash", nil }
 func (authPasswordStub) Check(string, string) bool   { return true }
 
@@ -88,5 +98,20 @@ func TestAuthRefreshRotatesTokenAndRejectsReplay(t *testing.T) {
 	}
 	if _, err := service.Refresh(nil, first.RefreshToken); !errors.Is(err, ErrInvalidRefreshToken) {
 		t.Fatalf("replayed refresh token should be rejected, got %v", err)
+	}
+}
+
+func TestMobileGoogleLoginRequiresVerifiedEmail(t *testing.T) {
+	cache := &authCacheStub{values: map[string]string{}}
+	service := NewAuthInteractor(
+		authUserStub{user: &entity.User{ID: "user-1", Email: "user@example.com", Name: "User"}},
+		authPasswordStub{},
+		&authTokenStub{},
+		cache,
+		nil,
+	)
+	service.MobileGoogleOAuth = mobileGoogleStub{profile: entity.GoogleProfile{Subject: "sub", Email: "user@example.com", EmailVerified: false}}
+	if _, err := service.LoginWithMobileGoogleCode(nil, "code", "verifier", "mypocket://oauth/callback"); !errors.Is(err, ErrInvalidGoogleProfile) {
+		t.Fatalf("unverified native profile should be rejected, got %v", err)
 	}
 }

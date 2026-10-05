@@ -1,7 +1,7 @@
 ---
 artifact_type: phase
 id: PHASE-002-native-ios-swiftui
-status: ready
+status: in_progress
 owner: shared
 created: 2026-10-05
 updated: 2026-10-05
@@ -47,3 +47,26 @@ features, with base-component ownership and an iOS Simulator-first proof.
   backend/frontend regression suites pass, and a Simulator run is recorded. If
   no Simulator runtime is installed, phase remains `blocked` with the exact
   Xcode component prerequisite rather than being marked complete.
+
+## Verification checkpoint — 2026-10-05
+
+The simulator prerequisite is now available locally: iOS 18.4/18.5 runtimes
+were detected and an iPhone 16 device was created as
+`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`. The current auth/base-component slice
+was built, installed, launched, and screenshot-checked on that device.
+
+Passing commands:
+
+```bash
+xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
+  -destination 'id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' \
+  test CODE_SIGNING_ALLOWED=NO
+bash mobile-ios/scripts/check-base-components.test.sh
+bash mobile-ios/scripts/verify-project.sh
+go test ./...
+go generate ./cmd/api
+```
+
+This is a checkpoint, not the phase exit gate: the feature-parity screens and
+their API-backed view models still need to be implemented before claiming the
+native port is complete.

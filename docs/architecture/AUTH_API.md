@@ -19,3 +19,16 @@ JWTs and are never logged or returned after the initial login/refresh response.
 
 The frontend retries one failed authenticated request after refreshing, then
 clears the session if refresh is rejected. API-key requests are never refreshed.
+
+## Native iOS Google PKCE exchange
+
+`POST /api/v1/auth/mobile/google/exchange` is a mobile-only public auth route.
+The iOS client sends `{code, code_verifier, redirect_uri, platform:"ios"}`
+after an `ASWebAuthenticationSession` S256 PKCE flow. The backend exact-matches
+the configured iOS client/redirect pair, exchanges the code with Google, checks
+the verified Google email and returns the same `LoginOutput` shape as web login.
+The callback URL contains only the authorization code and state; access and
+refresh tokens are never placed in the deep-link URL. `GOOGLE_IOS_CLIENT_ID`,
+`GOOGLE_IOS_REDIRECT_URL` and the optional backend-only
+`GOOGLE_IOS_CLIENT_SECRET` are environment settings. The current browser
+Google callback remains unchanged.

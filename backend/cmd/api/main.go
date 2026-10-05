@@ -85,8 +85,14 @@ func main() {
 		ClientSecret: cfg.GoogleClientSecret,
 		RedirectURL:  cfg.GoogleRedirectURL,
 	})
+	mobileGoogleOAuth := auth.NewMobileGoogleOAuth(auth.MobileGoogleOAuthConfig{
+		ClientID:     cfg.GoogleMobileClientID,
+		ClientSecret: cfg.GoogleMobileClientSecret,
+		RedirectURL:  cfg.GoogleMobileRedirectURL,
+	})
 	authUc := usecase.NewAuthInteractor(userRepo, passwordSvc, jwtSvc, cacheRepo, googleOAuth)
 	authUc.RefreshTTL = cfg.RefreshTTL
+	authUc.MobileGoogleOAuth = mobileGoogleOAuth
 
 	authHandler := httpapi.NewAuthHandler(
 		authUc,

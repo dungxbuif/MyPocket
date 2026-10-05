@@ -55,6 +55,13 @@ type refreshRequest struct {
 	RefreshToken string `json:"refresh_token"`
 }
 
+type mobileGoogleExchangeRequest struct {
+	Code         string `json:"code"`
+	CodeVerifier string `json:"code_verifier"`
+	RedirectURI  string `json:"redirect_uri"`
+	Platform     string `json:"platform"`
+}
+
 // Login godoc
 // @Summary Login with email and password
 // @Tags Authentication
@@ -100,6 +107,55 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 	out, err := h.Auth.Refresh(c.Request.Context(), req.RefreshToken)
 	if err != nil {
 		FailError(c, http.StatusUnauthorized, problemCodeTokenInvalid, problemTitleUnauthorized, err)
+		return
+	}
+	OK(c, out)
+}
+
+// MobileGoogleExchange godoc
+// @Summary Exchange a native Google PKCE code for a MyPocket session
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param request body mobileGoogleExchangeRequest true "Native Google PKCE exchange"
+// @Success 200 {object} usecase.LoginOutput
+// @Failure 400 {object} map[string]string
+// @Failure 401 {object} map[string]string
+// @Failure 501 {object} map[string]string
+// @Router /api/v1/auth/mobile/google/exchange [post]
+func (h *AuthHandler) MobileGoogleExchange(c *gin.Context) {
+	var req mobileGoogleExchangeRequest
+	if err := c.ShouldBindJSON(&req); err != nil || strings.TrimSpace(req.Platform) != "ios" || strings.TrimSpace(req.Code) == "" || strings.TrimSpace(req.CodeVerifier) == "" || strings.TrimSpace(req.RedirectURI) == "" {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: "Bad Request", Detail: httpStatusMessageBadRequest})
+		return
+	}
+
+	if h.FixtureMode {
+		out, err := h.Auth.LoginWithGoogle(c.Request.Context(), entity.GoogleProfile{
+			Subject:       "fixture-ios-user",
+			Email:         googleAuthFixtureEmail,
+			EmailVerified: true,
+			DisplayName:   googleAuthFixtureName,
+		})
+		if err != nil {
+			FailError(c, http.StatusUnauthorized, problemCodeGoogleMobileInvalid, problemTitleUnauthorized, err)
+			return
+		}
+		OK(c, out)
+		return
+	}
+
+	if h.Auth == nil || h.Auth.MobileGoogleOAuth == nil || !h.Auth.MobileGoogleOAuth.IsReady() {
+		Fail(c, http.StatusNotImplemented, Problem{Code: problemCodeGoogleMobileUnavailable, Title: "Not Implemented", Detail: httpStatusMessageGoogleLoginUnavailable})
+		return
+	}
+	out, err := h.Auth.LoginWithMobileGoogleCode(c.Request.Context(), req.Code, req.CodeVerifier, req.RedirectURI)
+	if err != nil {
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeGoogleMobileInvalid, Title: problemTitleUnauthorized, Detail: httpStatusMessageGoogleProfileInvalid})
+		return
+	}
+	if !h.isEmailAllowed(out.User.Email) {
+		Fail(c, http.StatusForbidden, Problem{Code: problemCodeEmailNotAllowed, Title: "Forbidden", Detail: httpStatusMessageEmailNotAllowed})
 		return
 	}
 	OK(c, out)

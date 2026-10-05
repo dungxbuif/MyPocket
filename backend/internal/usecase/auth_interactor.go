@@ -22,13 +22,14 @@ var ErrInvalidRefreshToken = errors.New("refresh token không hợp lệ hoặc 
 var ErrInvalidTimezone = errors.New("múi giờ IANA không hợp lệ")
 
 type AuthInteractor struct {
-	UserRepo      repository.UserRepository
-	PasswordSvc   PasswordService
-	TokenSvc      TokenService
-	CacheRepo     repository.CacheRepository
-	SessionPrefix string
-	GoogleOAuth   GoogleOAuthProvider
-	RefreshTTL    time.Duration
+	UserRepo          repository.UserRepository
+	PasswordSvc       PasswordService
+	TokenSvc          TokenService
+	CacheRepo         repository.CacheRepository
+	SessionPrefix     string
+	GoogleOAuth       GoogleOAuthProvider
+	MobileGoogleOAuth MobileGoogleOAuthProvider
+	RefreshTTL        time.Duration
 }
 
 func NewAuthInteractor(
@@ -90,6 +91,17 @@ func (a *AuthInteractor) LoginWithGoogleCode(ctx context.Context, code string) (
 	}
 	profile, err := a.GoogleOAuth.ExchangeCode(code)
 	if err != nil {
+		return nil, ErrInvalidGoogleProfile
+	}
+	return a.LoginWithGoogle(ctx, profile)
+}
+
+func (a *AuthInteractor) LoginWithMobileGoogleCode(ctx context.Context, code, verifier, redirectURI string) (*LoginOutput, error) {
+	if a.MobileGoogleOAuth == nil || !a.MobileGoogleOAuth.IsReady() {
+		return nil, ErrInvalidGoogleProfile
+	}
+	profile, err := a.MobileGoogleOAuth.ExchangeCodeWithPKCE(strings.TrimSpace(code), strings.TrimSpace(verifier), strings.TrimSpace(redirectURI))
+	if err != nil || !profile.EmailVerified {
 		return nil, ErrInvalidGoogleProfile
 	}
 	return a.LoginWithGoogle(ctx, profile)
