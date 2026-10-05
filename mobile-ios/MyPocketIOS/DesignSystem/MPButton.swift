@@ -40,6 +40,7 @@ struct MPButton<Label: View>: View {
             }
             .frame(minWidth: MPMetrics.hitTarget, minHeight: MPMetrics.controlHeight)
             .frame(maxWidth: .infinity)
+            .contentShape(Rectangle())
             .padding(.horizontal, 16)
             .background(background, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
             .foregroundStyle(foreground)

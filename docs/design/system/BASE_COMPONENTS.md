@@ -14,6 +14,7 @@
 | Text / Heading | semantic tag, size, weight, tone; numeric | Manrope, type scale và màu chung; className chỉ layout |
 | FormField / BaseTextInput / BaseTextArea / BaseSelect | native props; default/inline/title/composer | label association; focus còn thấy; disabled forwarding; textarea hỗ trợ multiline composer theo token; select chevron không ăn click |
 | MPMultiOptionSelector (SwiftUI) | `options`, `Binding<Set<String>>`, `allLabel` | Shared menu selector for multi-wallet applicability; empty set means the API's all-wallet scope; stable IDs and checkmarks are owned by the base |
+| MPButton (SwiftUI) | primary/secondary/destructive/plain, loading | Shared controls expose their full rendered hit shape so compact rows remain tappable in simulator and on device |
 | BaseFileUpload | field/button | Chọn nhiều JPEG/PNG/PDF; giới hạn và xử lý tệp do consumer cung cấp; button variant kích hoạt input ẩn có nhãn truy cập được |
 | BaseCheckbox | checked/disabled/label/onChange | controlled boolean, native keyboard, hàng min 44px |
 | IconBadge | size xs/sm/md/lg; rounded/circle; tone | Một tone map, không chồng class màu. Icon visual size không đồng nghĩa hit target |

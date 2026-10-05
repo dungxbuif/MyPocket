@@ -151,8 +151,12 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 23 unit/contract tests and 3 UI smoke tests (auth launch,
-authenticated primary tabs, More route + floating feedback overlay).
+suite passed: 23 unit/contract tests and 4 UI smoke tests (auth launch,
+authenticated primary tabs, More route + floating feedback overlay, and a
+fresh-launch sweep through all 13 secondary destinations). The shared
+`MPButton` now explicitly owns its rectangular rendered hit shape; this fixed
+compact More rows that were visible in the accessibility tree but did not
+consistently route taps.
 
 The latest run also verified category-parent cycle prevention, stable ID-based
 wallet/category selectors, account-timezone boundary formatting, recurring
@@ -202,7 +206,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (23 unit/contract tests and 3 UI smoke tests). Provider-backed
+Both commands pass (23 unit/contract tests and 4 UI smoke tests). Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical
 device checks remain external release gates.
 

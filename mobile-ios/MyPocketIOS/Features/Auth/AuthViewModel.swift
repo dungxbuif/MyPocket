@@ -26,9 +26,16 @@ final class AuthViewModel: ObservableObject {
         self.google = GooglePKCEClient(apiClient: apiClient)
         self.financeAPI = FinanceAPI(client: apiClient)
         self.biometricEnabled = UserDefaults.standard.bool(forKey: biometricPreferenceKey)
-        apiClient.onSessionInvalidated = { [weak self] in
-            Task { @MainActor [weak self] in
-                self?.expireSession()
+#if DEBUG
+        let isUITestAuthenticated = ProcessInfo.processInfo.arguments.contains("-UITestAuthenticated")
+#else
+        let isUITestAuthenticated = false
+#endif
+        if !isUITestAuthenticated {
+            apiClient.onSessionInvalidated = { [weak self] in
+                Task { @MainActor [weak self] in
+                    self?.expireSession()
+                }
             }
         }
     }

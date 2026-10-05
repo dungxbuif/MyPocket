@@ -23,7 +23,8 @@ updated: 2026-10-06
 | Proof | Result |
 | --- | --- |
 | iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 23 tests, 0 failures; expired access tokens refresh before Face ID and invalid refresh sessions clear safely |
-| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: 3 UI tests, 0 failures; app installed and relaunched as `com.mypocket.ios` |
+| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: 4 UI tests, 0 failures; app installed and relaunched as `com.mypocket.ios` |
+| iPhone 16 Simulator: authenticated “Thêm” route sweep | PASS: all 13 secondary destinations opened and returned to the menu; the shared `MPButton` hit-shape fix keeps compact rows tappable |
 | Native category scope parity | PASS: category create/edit preserves multiple selected wallet IDs; empty selection remains the API's all-wallet scope; shared `MPMultiOptionSelector` owns the UI |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |

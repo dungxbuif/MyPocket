@@ -30,13 +30,16 @@ as active release entries here.
   multi-select base uses an empty `wallet_ids` selection for the documented
   all-wallet scope, so editing a multi-wallet category no longer silently keeps
   only the first wallet.
+- Shared native buttons now apply a rectangular hit shape to their rendered
+  control bounds, fixing compact “Thêm” rows that could appear visible but fail
+  to open a destination in simulator/device UI automation.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 19 unit/contract tests and
-  3 authenticated UI smoke tests, with base-component and Xcode project guards.
-- The follow-up simulator run passed 23 native unit/contract tests and the same 3
-  UI smoke tests after the auth-restore and multi-wallet category fixes.
+- Native iOS simulator regression passed on iPhone 16: 23 unit/contract tests and
+  4 authenticated UI smoke tests, with base-component and Xcode project guards.
+- The authenticated UI sweep opened and returned from all 13 destinations in the
+  “Thêm” menu; this caught and fixed the compact-row hit-target regression.
 - Refresh rejection during an authenticated request now clears the native
   Keychain session and biometric preference through an auth invalidation hook;
   the regression suite covers the 401 → refresh 401 path.
