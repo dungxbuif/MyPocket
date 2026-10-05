@@ -57,6 +57,13 @@ struct AdvisorCapabilitiesModel: Codable, Sendable {
     var tools: [String]
 }
 
+struct AdvisorOverviewModel: Decodable, Sendable {
+    var viewKind: String
+    var view: JSONValue?
+    var source: JSONValue?
+    var status: String
+}
+
 struct AdvisorSubmitModel: Codable, Sendable {
     var runID: String
     var conversationID: String

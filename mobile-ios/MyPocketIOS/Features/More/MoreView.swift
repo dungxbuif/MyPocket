@@ -96,10 +96,15 @@ struct SecondaryScreen: View {
         case .travel: TravelView(api: api, onBack: onBack)
         case .portfolio: PortfolioView(api: api, onBack: onBack)
         case .credit: CreditView(api: api, onBack: onBack)
-        case .assistant: AssistantView(api: api, onBack: onBack)
+        case .assistant: AssistantView(api: api, onBack: onBack, ownerID: assistantOwnerID)
         case .aiEntry: AIEntryView(api: api, onBack: onBack)
         case .feedback: FeedbackView(api: api, onBack: onBack)
         case .account: AccountView(auth: auth, onBack: onBack)
         }
+    }
+
+    private var assistantOwnerID: String {
+        if case .authenticated(let session) = auth.phase { return session.user.id }
+        return "unknown"
     }
 }

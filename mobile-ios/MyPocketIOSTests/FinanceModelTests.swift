@@ -42,6 +42,18 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertFalse(TransactionsViewModel.bulkDeleteSelectable(credit))
     }
 
+    func testAdvisorOverviewDecodesStructuredViewAndSource() throws {
+        let data = Data(#"{"view_kind":"metric_group","view":{"income":1200000,"expense":500000},"source":{"tool":"get_finance_summary"},"status":"ok"}"#.utf8)
+        let overview = try JSONDecoder.mypocket.decode(AdvisorOverviewModel.self, from: data)
+        XCTAssertEqual(overview.viewKind, "metric_group")
+        XCTAssertEqual(overview.status, "ok")
+        if case .object(let view)? = overview.view {
+            XCTAssertEqual(view["income"]?.prettyDescription, "1200000")
+        } else {
+            XCTFail("overview view should remain structured JSON")
+        }
+    }
+
     func testNativeGoogleFixtureExchangeEncodesIOSPKCEContract() throws {
         let request = MobileGoogleExchangeRequest(
             code: "fixture",

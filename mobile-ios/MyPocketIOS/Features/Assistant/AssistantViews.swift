@@ -3,22 +3,56 @@ import SwiftUI
 struct AssistantView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    let ownerID: String
     @State private var capabilities: AdvisorCapabilitiesModel?
+    @State private var overview: AdvisorOverviewModel?
     @State private var messages: [AdvisorMessageModel] = []
     @State private var conversationID = ""
     @State private var input = ""
     @State private var sending = false
+    @State private var historyLoading = true
+    @State private var loadingOlder = false
+    @State private var hasOlder = false
     @State private var activeRunID: String?
     @State private var error: String?
 
+    init(api: FinanceAPI, onBack: @escaping () -> Void, ownerID: String) {
+        self.api = api
+        self.onBack = onBack
+        self.ownerID = ownerID
+        let key = Self.conversationKey(ownerID: ownerID)
+        _conversationID = State(initialValue: UserDefaults.standard.string(forKey: key) ?? "")
+    }
+
+    private static func conversationKey(ownerID: String) -> String {
+        "mypocket.advisor.conversation.\(ownerID)"
+    }
+
     var body: some View {
         VStack(spacing: 0) {
-            MPScreenHeader(title: "Finance Assistant", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+            MPScreenHeader(title: "Finance Assistant", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
+                if !conversationID.isEmpty {
+                    MPIconButton(systemName: "arrow.clockwise", label: "Tải lại lịch sử") { Task { await reloadHistory() } }
+                }
+            })
                 .padding(.horizontal, MPMetrics.pagePadding)
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if let capabilities, !capabilities.enabled { MPStatusMessage(text: "Finance Assistant chưa được bật.", tone: .info) }
-                    if messages.isEmpty { MPEmptyView(title: "Hỏi về tài chính của bạn", detail: "Ví dụ: Tháng này tôi chi ăn uống bao nhiêu?") }
+                    if let overview {
+                        AssistantStructuredCard(
+                            type: overview.viewKind,
+                            data: .object(["view": overview.view ?? .null, "source": overview.source ?? .null])
+                        )
+                    }
+                    if historyLoading {
+                        MPLoadingView(label: "Đang tải lịch sử trợ lý...")
+                    } else if messages.isEmpty {
+                        MPEmptyView(title: "Hỏi về tài chính của bạn", detail: "Ví dụ: Tháng này tôi chi ăn uống bao nhiêu?")
+                    }
+                    if hasOlder {
+                        MPButton("Tải tin cũ", style: .secondary, isLoading: loadingOlder) { Task { await loadOlderMessages() } }
+                    }
                     ForEach(messages) { message in
                         MPSurfaceCard {
                             VStack(alignment: .leading, spacing: 8) {
@@ -50,14 +84,51 @@ struct AssistantView: View {
             .background(.bar)
         }
         .background(MPColor.canvas.ignoresSafeArea())
-        .task { await loadCapabilities() }
+        .task { await loadInitialState() }
         .accessibilityIdentifier("assistant-screen")
     }
 
-    private func loadCapabilities() async {
+    private func loadInitialState() async {
+        historyLoading = true
+        defer { historyLoading = false }
         do { capabilities = try await api.advisorCapabilities() }
         catch let error as APIError { self.error = error.userMessage }
         catch { self.error = "Không thể kết nối Finance Assistant." }
+        do { overview = try await api.advisorOverview() }
+        catch let error as APIError { self.error = error.userMessage }
+        catch { self.error = "Không thể tải tổng quan trợ lý tài chính." }
+        if !conversationID.isEmpty {
+            await reloadHistory()
+        }
+    }
+
+    private func reloadHistory() async {
+        guard !conversationID.isEmpty else { return }
+        do {
+            messages = try await api.advisorMessages(conversationID: conversationID)
+            hasOlder = messages.count == 50
+            error = nil
+        } catch let error as APIError { self.error = error.userMessage }
+        catch { self.error = "Không thể tải lại lịch sử trợ lý." }
+    }
+
+    private func loadOlderMessages() async {
+        guard !conversationID.isEmpty, let first = messages.first, !loadingOlder, hasOlder else { return }
+        loadingOlder = true
+        defer { loadingOlder = false }
+        do {
+            let older = try await api.advisorMessages(conversationID: conversationID, beforeSequence: first.seq)
+            messages = mergeMessages(messages, older)
+            hasOlder = older.count == 50
+            error = nil
+        } catch let error as APIError { self.error = error.userMessage }
+        catch { self.error = "Không thể tải tin cũ của trợ lý." }
+    }
+
+    private func mergeMessages(_ current: [AdvisorMessageModel], _ incoming: [AdvisorMessageModel]) -> [AdvisorMessageModel] {
+        var byID = Dictionary(uniqueKeysWithValues: current.map { ($0.id, $0) })
+        incoming.forEach { byID[$0.id] = $0 }
+        return byID.values.sorted { $0.seq < $1.seq }
     }
 
     private func send() async {
@@ -67,6 +138,7 @@ struct AssistantView: View {
         do {
             let result = try await api.submitAdvisorMessage(AdvisorMessageInputModel(clientRequestID: UUID().uuidString, text: text))
             conversationID = result.conversationID
+            UserDefaults.standard.set(result.conversationID, forKey: Self.conversationKey(ownerID: ownerID))
             activeRunID = result.runID
             input = ""
             if result.status == "queued" || result.status == "running" {
@@ -85,7 +157,7 @@ struct AssistantView: View {
                     return
                 }
             }
-            messages = try await api.advisorMessages(conversationID: conversationID)
+            await reloadHistory()
             activeRunID = nil
         } catch let error as APIError { self.error = error.userMessage }
         catch { self.error = "Không thể xử lý yêu cầu trợ lý tài chính." }

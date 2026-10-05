@@ -44,6 +44,12 @@ decode an empty body as an envelope. This is required by the existing wallet,
 transaction, transfer, category, budget, jar, recurring, travel, feedback and
 API-key revoke contracts.
 
+Finance Assistant history uses one UserDefaults conversation ID keyed by the
+authenticated owner ID. The native screen reloads that conversation's latest
+50 messages and the read-only monthly overview on entry; a later request can
+page older messages with `before_seq`. UserDefaults stores only the opaque
+conversation ID, never message text or financial data.
+
 The only native-specific API addition is
 `POST /api/v1/auth/mobile/google/exchange`; it validates the iOS PKCE code and
 redirect allowlist before returning the existing login/refresh response.

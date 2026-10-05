@@ -221,11 +221,27 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (28 unit/contract tests and 4 UI smoke tests). The same pass
+Both commands pass (29 unit/contract tests and 4 UI smoke tests). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical
 device checks remain external release gates.
+
+The Finance Assistant history/overview parity was then verified with an opt-in
+API-backed UI test on that simulator:
+
+```bash
+xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
+  -destination 'id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' \
+  SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG LOCAL_API_UI' \
+  -only-testing:MyPocketIOSUITests/LaunchTests/testAPIBackedAssistantLoadsOverview
+```
+
+The test passed against the disposable local `:8080` API. It launches with the
+DEBUG-only `-UITestAuthenticatedAPI` fixture, opens Finance Assistant, verifies
+the 200 overview/capability contract and asserts that no overview error is
+shown. The default UI suite keeps this opt-in test skipped unless the explicit
+`LOCAL_API_UI` compilation condition is supplied.
 
 ## Disposable local API smoke — 2026-10-05
 

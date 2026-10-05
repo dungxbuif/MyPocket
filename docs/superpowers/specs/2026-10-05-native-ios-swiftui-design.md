@@ -95,7 +95,7 @@ must enforce the same rule with SwiftUI views rather than reusing DOM/RN code.
 | Travel Mode | `Travel/TravelScreen` | one active event, activate/deactivate, transaction linkage |
 | Portfolio | `Portfolio/PortfolioScreen` | assets, prices, buy/sell validation, unknown valuation |
 | AI entry | `AIEntry/AIEntryScreen` | text/photo/PDF picker, up to 20 files, processing, proposal edit, approve/reject |
-| Finance Assistant | `Assistant/AssistantScreen` | one persistent conversation, read-only tools, structured cards, errors/cancel |
+| Finance Assistant | `Assistant/AssistantScreen` | one owner-keyed persistent conversation, reloadable history/older messages, read-only overview/tools, structured cards, errors/cancel |
 | Feedback | `Feedback/FeedbackBubble` + `FeedbackScreen` | floating access, silent screen snapshot, submit/list/status/changelog |
 | Account | `Account/AccountScreen` | profile/timezone, API-key links, feature links, logout |
 

@@ -45,11 +45,20 @@ as active release entries here.
   selection controls, 100-row/immutable-row guards, atomic confirmation and a
   visible error that preserves the selection. Typed `204 No Content` responses
   are accepted for delete mutations instead of being decoded as JSON.
+- Native Finance Assistant now restores one owner-keyed conversation, loads the
+  latest 50 messages and read-only monthly overview on entry, pages older
+  messages, and renders structured overview/source data without storing message
+  text in UserDefaults. The API-backed simulator smoke covers the disabled
+  capability response and the live overview contract.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 28 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 29 unit/contract tests and
   4 authenticated UI smoke tests, with base-component and Xcode project guards.
+- The opt-in API-backed Assistant UI smoke passed on the same iPhone 16 using
+  `SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI`, the disposable local
+  API, and the `-UITestAuthenticatedAPI` fixture; no production credentials or
+  data were used.
 - The API-backed simulator fixture rendered the authenticated overview against
   local `:8080` with empty owner data; no production credentials or data were
   used.

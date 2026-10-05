@@ -272,8 +272,25 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/advisor/capabilities"))
     }
 
-    func advisorMessages(conversationID: String) async throws -> [AdvisorMessageModel] {
-        try await client.send(APIRequest(path: "/ai/advisor/conversation/messages?conversation_id=\(conversationID)"))
+    func advisorOverview(month: String? = nil) async throws -> AdvisorOverviewModel {
+        var path = "/ai/advisor/overview"
+        if let month, !month.isEmpty {
+            var components = URLComponents()
+            components.queryItems = [URLQueryItem(name: "month", value: month)]
+            if let query = components.percentEncodedQuery { path += "?\(query)" }
+        }
+        return try await client.send(APIRequest(path: path))
+    }
+
+    func advisorMessages(conversationID: String, beforeSequence: Int? = nil) async throws -> [AdvisorMessageModel] {
+        var components = URLComponents()
+        components.queryItems = [URLQueryItem(name: "conversation_id", value: conversationID)]
+        if let beforeSequence, beforeSequence > 0 {
+            components.queryItems?.append(URLQueryItem(name: "before_seq", value: String(beforeSequence)))
+        }
+        let query = components.percentEncodedQuery ?? ""
+        let messages: [AdvisorMessageModel] = try await client.send(APIRequest(path: "/ai/advisor/conversation/messages?\(query)"))
+        return messages.sorted { $0.seq < $1.seq }
     }
 
     func advisorRun(id: String) async throws -> AdvisorRunModel {

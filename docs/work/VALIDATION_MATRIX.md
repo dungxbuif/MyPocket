@@ -29,6 +29,7 @@ updated: 2026-10-06
 | Native ledger/detail/assistant edge cases | PASS: malformed timestamps are excluded from period filters, wallet detail renders the complete API result, and assistant polling preserves a still-running run after the local wait budget |
 | Native transaction bulk-delete parity | PASS: selection mode uses base buttons, excludes transfer/credit/adjustment rows, enforces the 100-ID cap, confirms atomically, removes successful rows and keeps a visible error plus selection on failure |
 | Native empty mutation responses | PASS: APIClient contract test accepts `204 No Content` for the bulk-delete mutation without envelope decoding failures; the same path covers typed delete methods |
+| Native Finance Assistant history/overview parity | PASS: owner-keyed opaque conversation ID, latest 50 message reload, older-message pagination, read-only monthly overview card and structured source data are covered by API/model tests; the API-backed iPhone 16 UI smoke returned 200 from local `:8080` |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
 | Simulator API-backed authenticated smoke fixture | PASS: DEBUG-only `-UITestAuthenticatedAPI` exchanged fixture PKCE fields against local `:8080`, persisted the disposable JWT, and rendered the authenticated overview with live empty wallets/ledger; screenshot `/tmp/mypocket-ios-simulator-api-auth.png` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |

@@ -87,4 +87,21 @@ final class LaunchTests: XCTestCase {
             XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 5), "Could not return from: \(title)")
         }
     }
+
+    func testAPIBackedAssistantLoadsOverview() throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Finance Assistant"].waitForExistence(timeout: 10))
+        app.buttons["Finance Assistant"].tap()
+        XCTAssertTrue(app.staticTexts["Finance Assistant"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Finance Assistant chưa được bật."].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.staticTexts["Không thể tải tổng quan trợ lý tài chính."].exists)
+#endif
+    }
 }
