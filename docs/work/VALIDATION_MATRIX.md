@@ -13,10 +13,28 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: 2026-09-22
+updated: 2026-10-05
 ---
 
 # Validation Matrix
+
+## Native simulator and local integration regression — 2026-10-05
+
+| Proof | Result |
+| --- | --- |
+| iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 19 tests, 0 failures |
+| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: 3 UI tests, 0 failures; app installed and relaunched as `com.mypocket.ios` |
+| Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
+| Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |
+| FE-proxy transfer integration | PASS: paired creation, balance reconciliation, report/jar exclusion, transfer PATCH and pair DELETE with idempotency keys, auth guard |
+| Real Chromium 390×844 transfer flow | PASS: actual UI rendered both wallet options, saved, refreshed and matched persisted API state; stale fixture cleanup now deletes transfer pairs atomically |
+| Feedback JWT + scoped user API key + agent lifecycle | PASS: create/list/revoke, agent open → triaged → in_progress → changelog/fixed, owner-scoped reads, Redis `mypocket:audit:feedback` events observed |
+| Web design/typecheck/build/API roundtrips | PASS: latest local suite; Vite only reports the existing large-chunk warning |
+| Provider-backed AI/OCR, real Google iOS OAuth, authenticated staging/production and physical device | NOT RUN; external release gates remain explicit |
+
+The disposable database was `mypocket_ios_local`; generated feedback/changelog
+rows and transfer fixtures were removed after the probes. No production data or
+secrets were used.
 
 ## UI-LEDGER-WEEK — 2026-09-24
 

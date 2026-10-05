@@ -11,11 +11,12 @@ const api = `${origin}/api/v1`;
 let token = "";
 const createdWallets = [];
 const createdTransactions = [];
+const createdTransferIDs = new Set();
 
-async function request(pathname, method = "GET", body, expected = 200) {
+async function request(pathname, method = "GET", body, expected = 200, extraHeaders = {}) {
   const response = await fetch(`${api}${pathname}`, {
     method,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extraHeaders },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const payload = response.status === 204 ? null : await response.json();
@@ -116,10 +117,11 @@ try {
   await until(`!document.querySelector('[role="dialog"][aria-label="Chuyển tiền đến ví khác"]')`);
   await until(`document.body.textContent.includes('UI E2E transfer')`);
   const transactions = await request("/transactions");
-  const rows = transactions.filter(row => row.note === "UI E2E transfer");
+  const rows = transactions.filter(row => row.note === "UI E2E transfer" && [source.id, destination.id].includes(row.wallet_id));
+  rows.forEach(row => { if (row.transfer_id) createdTransferIDs.add(row.transfer_id); });
+  createdTransactions.push(...rows.map(row => row.id));
   assert.equal(rows.length, 2, "real UI save must persist two rows");
   assert.equal(rows[0].transfer_id, rows[1].transfer_id);
-  createdTransactions.push(...rows.map(row => row.id));
   const wallets = await request("/wallets");
   assert.equal(wallets.find(row => row.id === source.id).current_balance, 75000);
   assert.equal(wallets.find(row => row.id === destination.id).current_balance, 75000);
@@ -133,7 +135,14 @@ try {
     await new Promise(resolve => chrome.once("exit", resolve));
   }
   await rm(chromeProfile, { recursive: true, force: true });
-  for (const id of createdTransactions) await request(`/transactions/${id}`, "DELETE", undefined, 204);
+  for (const transferID of createdTransferIDs) await request(`/transactions/transfer/${transferID}`, "DELETE", undefined, 204, { "Idempotency-Key": `ui-e2e-transfer-delete-${transferID}` });
+  for (const id of createdTransactions) {
+    // The pair delete above is authoritative. This fallback only handles an
+    // interrupted response where a single row was persisted before the test
+    // could observe its transfer_id.
+    const response = await fetch(`${api}/transactions/${id}`, { method: "DELETE", headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) } });
+    if (![204, 400, 404].includes(response.status)) throw new Error(`cleanup ${id}: ${response.status} ${await response.text()}`);
+  }
   for (const id of createdWallets) await request(`/wallets/${id}`, "DELETE", undefined, 204);
   console.log("Cleanup: only UI E2E rows and wallets created by this run were removed.");
 }

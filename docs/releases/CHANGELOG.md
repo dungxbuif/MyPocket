@@ -19,6 +19,24 @@ This file is the first-release baseline for the current MyPocket snapshot. Earli
 development notes remain available in Git history and are intentionally not presented
 as active release entries here.
 
+## [Unreleased] - 2026-10-05
+
+### Verification
+
+- Native iOS simulator regression passed on iPhone 16: 19 unit/contract tests and
+  3 authenticated UI smoke tests, with base-component and Xcode project guards.
+- Backend race/integration verification passed against disposable PostgreSQL and
+  Redis. Transfer browser/integration harnesses now cover linked update/delete
+  semantics and idempotency-key cleanup.
+- Feedback was verified through JWT, scoped user API key, service-token agent
+  lifecycle and changelog publication; Redis feedback audit events were observed.
+
+### Release gates still open
+
+- Provider-backed AI/OCR, real Google iOS OAuth credentials, authenticated
+  staging/production smoke and physical-device validation remain required before
+  a production release claim.
+
 ## [1.0.8] - 2026-10-01
 
 ### Fixed

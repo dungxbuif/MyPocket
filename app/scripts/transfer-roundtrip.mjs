@@ -5,10 +5,10 @@ import assert from "node:assert/strict";
 const origin = process.env.TEST_API_ORIGIN ?? "http://127.0.0.1:4173";
 let token = "";
 
-async function request(path, method = "GET", body, expected = 200) {
+async function request(path, method = "GET", body, expected = 200, extraHeaders = {}) {
   const response = await fetch(`${origin}/api/v1${path}`, {
     method,
-    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+    headers: { "Content-Type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}), ...extraHeaders },
     ...(body ? { body: JSON.stringify(body) } : {}),
   });
   const payload = response.status === 204 ? null : await response.json();
@@ -24,6 +24,7 @@ token = login.token;
 
 const createdWallets = [];
 const createdTransactions = [];
+let createdTransferID = "";
 try {
   const suffix = Date.now().toString(36);
   const source = await request("/wallets", "POST", { name: `E2E nguồn ${suffix}`, type: "basic", currency: "VND", opening_balance: 100000, is_in_total: false }, 201);
@@ -43,6 +44,7 @@ try {
   }, 201);
   assert.equal(transfer.length, 2, "transfer response must contain source and destination rows");
   assert.equal(transfer[0].transfer_id, transfer[1].transfer_id, "paired rows must share transfer_id");
+  createdTransferID = transfer[0].transfer_id;
   assert.deepEqual(new Set(transfer.map(row => row.type)), new Set(["income", "expense"]));
   assert.equal(transfer.every(row => row.included_in_reports === false), true, "paired rows must be excluded from reports");
   assert.equal(transfer.every(row => row.jar_id == null), true, "paired rows must not carry a jar");
@@ -57,11 +59,24 @@ try {
   assert.equal(afterMonth.income, beforeMonth.income, "transfer must not change monthly income");
   assert.equal(afterMonth.expense, beforeMonth.expense, "transfer must not change monthly expense");
 
+  const updated = await request(`/transactions/transfer/${transfer[0].transfer_id}`, "PATCH", {
+    amount: 30000,
+    occurred_at: new Date().toISOString(),
+    note: "E2E transfer updated",
+  }, 200, { "Idempotency-Key": `e2e-transfer-update-${Date.now()}` });
+  assert.equal(updated.length, 2, "transfer update must return both linked rows");
+  assert.equal(updated.every(row => row.amount === 30000), true, "transfer update must update both amounts");
+  const updatedWallets = await request("/wallets");
+  assert.equal(updatedWallets.find(row => row.id === source.id).current_balance, 70000);
+  assert.equal(updatedWallets.find(row => row.id === destination.id).current_balance, 80000);
+
   const unauth = await fetch(`${origin}/api/v1/transactions/transfer`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source_wallet_id: source.id, destination_wallet_id: destination.id, amount: 1 }) });
   assert.equal(unauth.status, 401, "transfer endpoint must remain protected");
   console.log("PASS: integrated transfer state — paired rows, balances, report exclusion, jar exclusion and auth guard.");
 } finally {
-  for (const id of createdTransactions) await request(`/transactions/${id}`, "DELETE", undefined, 204);
+  if (createdTransactions.length) {
+    if (createdTransferID) await request(`/transactions/transfer/${createdTransferID}`, "DELETE", undefined, 204, { "Idempotency-Key": `e2e-transfer-delete-${Date.now()}` });
+  }
   for (const id of createdWallets) await request(`/wallets/${id}`, "DELETE", undefined, 204);
   console.log("Cleanup: only transfer E2E rows and wallets created by this run were removed.");
 }

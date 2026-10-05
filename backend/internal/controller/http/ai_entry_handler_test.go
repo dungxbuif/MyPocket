@@ -128,7 +128,8 @@ func TestAIEntryHTTPReviewEditApproveRejectWithRealDatabase(t *testing.T) {
 			t.Errorf("wrong path %s", r.URL.Path)
 		}
 		draft := map[string]any{"type": "expense", "amount": 35000, "wallet_id": wallet.ID, "category_id": nil, "occurred_at": "2026-09-21T10:00:00+07:00", "note": "ăn sáng", "included_in_reports": true, "questions": []string{}}
-		content, _ := json.Marshal(map[string]any{"reply": "Bạn kiểm tra các đề xuất trước khi duyệt nhé.", "drafts": []any{draft, draft}})
+		secondDraft := map[string]any{"type": "expense", "amount": 36000, "wallet_id": wallet.ID, "category_id": nil, "occurred_at": "2026-09-21T12:00:00+07:00", "note": "ăn trưa", "included_in_reports": true, "questions": []string{}}
+		content, _ := json.Marshal(map[string]any{"reply": "Bạn kiểm tra các đề xuất trước khi duyệt nhé.", "drafts": []any{draft, secondDraft}})
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": string(content)}, "finish_reason": "stop"}}})
 	}))
 	defer provider.Close()

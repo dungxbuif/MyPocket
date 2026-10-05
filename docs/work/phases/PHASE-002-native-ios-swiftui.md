@@ -191,3 +191,20 @@ disposable environment.
 
 This smoke is intentionally non-production and does not replace provider-backed
 AI/OCR verification or a real authenticated staging/production iOS run.
+
+## Latest cross-surface regression — 2026-10-05
+
+The simulator-first pass was followed by a fresh local integration run. The Go
+backend passed `go test -race ./... -count=1` against disposable PostgreSQL and
+Redis. The FE-proxy transfer harness now verifies the complete mutation surface:
+paired creation, balance/report invariants, idempotent PATCH, and atomic pair
+DELETE. The real Chromium 390×844 flow passed against the same API after its
+cleanup was corrected to remove linked transfer rows by `transfer_id` rather
+than attempting invalid single-row deletes.
+
+The feedback flow was exercised end to end with a JWT, a scoped user API key,
+the service-token agent routes, lifecycle transitions and changelog publication;
+the resulting Redis feedback audit stream entries were observed. The local test
+feedback/changelog records were removed afterwards. This closes local contract
+coverage but does not claim provider-backed AI/OCR, real Google OAuth, a
+physical-device run or authenticated staging/production validation.
