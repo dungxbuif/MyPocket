@@ -568,6 +568,7 @@ struct PortfolioView: View {
     @State private var tradeFee = ""
     @State private var tradeDate = Date()
     @State private var priceByAsset: [String: String] = [:]
+    @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView {
@@ -633,10 +634,19 @@ struct PortfolioView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .accessibilityIdentifier("portfolio-screen")
     }
-    private func load() async { do { summary = try await api.portfolioSummary(); self.error = nil } catch { self.error = "Không thể tải danh mục đầu tư." } }
+    private func load() async {
+        do {
+            async let summaryResult = api.portfolioSummary()
+            async let profile = api.profile()
+            summary = try await summaryResult
+            if let profile = try? await profile { accountTimezone = profile.timezone }
+            self.error = nil
+        } catch { self.error = "Không thể tải danh mục đầu tư." }
+    }
     private func createAsset() async { guard !symbol.isEmpty, !assetName.isEmpty else { error = "Nhập mã và tên tài sản."; return }; do { _ = try await api.createPortfolioAsset(symbol: symbol, name: assetName); adding = false; symbol = ""; assetName = ""; await load() } catch { self.error = "Không thể tạo tài sản." } }
     private func updatePrice(_ asset: PortfolioAssetModel) async {
         let draft = (priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
@@ -655,10 +665,19 @@ struct PortfolioView: View {
     private func saveTrade(_ asset: PortfolioAssetModel) async {
         guard !tradeQuantity.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, let parsedPrice = Int64(tradePrice.filter(\.isNumber)), parsedPrice >= 0 else { error = "Nhập khối lượng và giá hợp lệ."; return }
         do {
-            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: tradeQuantity, unitPrice: parsedPrice, fee: Int64(tradeFee.filter(\.isNumber)) ?? 0, occurredAt: ISO8601DateFormatter().string(from: tradeDate), note: nil))
+            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: tradeQuantity, unitPrice: parsedPrice, fee: Int64(tradeFee.filter(\.isNumber)) ?? 0, occurredAt: Self.accountLocalNoonTimestamp(tradeDate, timezone: accountTimezone), note: nil))
             tradeAsset = nil
             await load()
         } catch { self.error = "Không thể ghi nhận giao dịch danh mục." }
+    }
+
+    static func accountLocalNoonTimestamp(_ date: Date, timezone: String) -> String {
+        let zone = TimeZone(identifier: timezone) ?? .current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        let localNoon = calendar.date(from: DateComponents(year: components.year, month: components.month, day: components.day, hour: 12)) ?? date
+        return MPFormat.instantString(localNoon)
     }
 }
 

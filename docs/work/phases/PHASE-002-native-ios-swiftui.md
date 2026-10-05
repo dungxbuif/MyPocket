@@ -145,6 +145,9 @@ adjustments use the same non-credit wallet boundary.
 An ended budget may be viewed and deleted but cannot be edited or saved; active
 budgets retain the normal edit flow.
 
+Portfolio trade dates are account-local calendar dates: the selected day is
+serialized at local noon, not by blindly using the device's current instant.
+
 Selecting a credit wallet from the main wallet list must route to the same
 statement plus entry/payment surface as the dedicated credit route; a read-only
 credit detail is not sufficient for parity.
@@ -278,7 +281,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (34 unit/contract tests and 5 UI smoke tests). The same pass
+Both commands pass (35 unit/contract tests and 5 UI smoke tests). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical

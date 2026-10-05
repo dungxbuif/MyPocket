@@ -84,6 +84,10 @@ Ended budgets are immutable in the native editor: the screen keeps their
 history and delete action visible but does not offer a save/edit path, matching
 the web's view-or-delete behavior.
 
+Portfolio trade date pickers use the account timezone and serialize the selected
+calendar day at local noon before sending the instant, preventing a device
+timezone offset from moving a trade to the previous or next account day.
+
 Finance Assistant history uses one UserDefaults conversation ID keyed by the
 authenticated owner ID. The native screen reloads that conversation's latest
 50 messages and the read-only monthly overview on entry; a later request can

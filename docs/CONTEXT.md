@@ -46,10 +46,11 @@ updated: 2026-10-06
 2026-10-06 native credit parity: the credit ledger entry/payment form now preserves entry kind, applicable category, source wallet, amount and optional note through the native base selectors/inputs. Category kind/wallet filtering is covered by XCTest; native XCTest count is 30/30.
 2026-10-06 native wallet-detail parity: basic/goal wallet detail now loads categories, renders account-timezone monthly groups with signed amounts and labels, shows income/expense totals, and opens the shared transaction editor for add/edit. The API-backed simulator smoke seeded and removed a disposable wallet after opening the editor.
 2026-10-06 native transaction-ledger parity: the shared overflow menu now owns period/grouping/transfer/adjustment/bulk actions; rows include category and wallet context with signed amounts, and goal/credit wallet scopes suppress ordinary period controls. Standard simulator UI smoke now passes 5/5.
-2026-10-06 native selector/jar parity: API enum values now render localized labels through the shared selector base, jar mode changes clear stale drafts, and zero-percent allocations are rejected like the web editor. The clean iPhone 16 simulator run passes 34/34 native unit tests and 5/5 standard UI tests (3 API-backed tests also pass with disposable local fixtures; all fixtures were deleted with HTTP 204).
+2026-10-06 native selector/jar parity: API enum values now render localized labels through the shared selector base, jar mode changes clear stale drafts, and zero-percent allocations are rejected like the web editor. The clean iPhone 16 simulator run passes 35/35 native unit tests and 5/5 standard UI tests (3 API-backed tests also pass with disposable local fixtures; all fixtures were deleted with HTTP 204).
 2026-10-06 native transaction boundary parity: ordinary and AI proposal editors now exclude credit wallets, invalid categories clear when wallet/type changes, and aggregate credit rows remain read-only outside the dedicated credit ledger.
 2026-10-06 native scope parity: budget categories are expense-only and budget/adjustment wallet selectors exclude credit wallets, matching the ordinary ledger boundary.
 2026-10-06 native budget parity: ended budgets are view/delete-only and no longer expose an edit/save path after their end date.
+2026-10-06 native portfolio date parity: trade date selection now follows the account timezone and serializes at local noon to avoid device-timezone drift.
 
 ## Field Ownership
 

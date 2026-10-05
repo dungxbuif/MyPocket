@@ -50,6 +50,12 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(TransactionsViewModel.ordinaryTransactionWallets(wallets).map(\.id), ["basic"])
     }
 
+    func testPortfolioTradeDateUsesAccountLocalDay() {
+        let date = MPFormat.parseCalendarDate("2026-10-06")!
+        let timestamp = PortfolioView.accountLocalNoonTimestamp(date, timezone: "Asia/Ho_Chi_Minh")
+        XCTAssertEqual(MPFormat.shortDate(timestamp, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!), "06/10/2026")
+    }
+
     func testAdvisorOverviewDecodesStructuredViewAndSource() throws {
         let data = Data(#"{"view_kind":"metric_group","view":{"income":1200000,"expense":500000},"source":{"tool":"get_finance_summary"},"status":"ok"}"#.utf8)
         let overview = try JSONDecoder.mypocket.decode(AdvisorOverviewModel.self, from: data)

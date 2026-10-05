@@ -87,10 +87,12 @@ as active release entries here.
   budgets only offer expense categories, matching the web scope rules.
 - Native ended budgets are now view/delete-only; the editor no longer exposes a
   stale save path after the budget's end date.
+- Native portfolio trade dates now use the account timezone and local-noon
+  serialization, preventing device-timezone day shifts.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 34 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 35 unit/contract tests and
   5 standard authenticated UI smoke tests, with base-component and Xcode project
   guards.
 - An opt-in API-backed wallet-detail UI smoke passed with a seeded disposable
