@@ -76,6 +76,18 @@ struct MPDateField: View {
     }
 }
 
+struct MPDateTimeField: View {
+    let title: String
+    @Binding var date: Date
+
+    var body: some View {
+        DatePicker(title, selection: $date, displayedComponents: [.date, .hourAndMinute])
+            .datePickerStyle(.compact)
+            .frame(minHeight: MPMetrics.controlHeight)
+            .accessibilityLabel(title)
+    }
+}
+
 struct MPDateRangePicker: View {
     @Binding var start: Date
     @Binding var end: Date

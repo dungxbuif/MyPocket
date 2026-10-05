@@ -80,6 +80,7 @@
 		42613E8B37F2BA38C98F27A0 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		4339F20DF12E511A5DD53D88 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
 		45DBAC66B191D08A786C0923 /* WalletsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalletsView.swift; sourceTree = "<group>"; };
+		4D5073EA74743A7CB597290B /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		5037ACF09441D0E5AD368D59 /* MPFinanceCards.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPFinanceCards.swift; sourceTree = "<group>"; };
 		52D20410826956CA45BC2729 /* FeedbackView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackView.swift; sourceTree = "<group>"; };
 		5538D1540DC36C708A32D692 /* AIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AIModels.swift; sourceTree = "<group>"; };
@@ -112,6 +113,7 @@
 		F0935E16680170CD0D016257 /* MyPocketIOSTests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MyPocketIOSTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		F16A402CDCC8CC0958C9E728 /* AppRootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRootView.swift; sourceTree = "<group>"; };
 		F1C3F44815F0ACA384DE7FA1 /* Session.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Session.swift; sourceTree = "<group>"; };
+		FCDA24F9E7FEA60F0479FEF2 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		FD52BBEB98763E1968763956 /* RefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinator.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -135,6 +137,7 @@
 		2539F40C0C367A0F9FAF2AAE = {
 			isa = PBXGroup;
 			children = (
+				D139EFB2F8A1308BBB89172F /* Config */,
 				B1C66B0BEA1E18F58CD99E3E /* MyPocketIOS */,
 				73C24CBAB53F671435525411 /* MyPocketIOSTests */,
 				9F2982CB2B0A2764DCDD6928 /* MyPocketIOSUITests */,
@@ -315,6 +318,15 @@
 				45DBAC66B191D08A786C0923 /* WalletsView.swift */,
 			);
 			path = Wallets;
+			sourceTree = "<group>";
+		};
+		D139EFB2F8A1308BBB89172F /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				4D5073EA74743A7CB597290B /* Debug.xcconfig */,
+				FCDA24F9E7FEA60F0479FEF2 /* Release.xcconfig */,
+			);
+			path = Config;
 			sourceTree = "<group>";
 		};
 		D3E1F211EA2E96C74BB36988 /* App */ = {
@@ -558,7 +570,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MP_API_BASE_URL = "http://127.0.0.1:8080/api/v1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mypocket.ios;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -567,6 +578,7 @@
 		};
 		7EADC6A7133287D9AFA12B48 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4D5073EA74743A7CB597290B /* Debug.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -618,7 +630,6 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MP_API_BASE_URL = "http://127.0.0.1:8080/api/v1";
 				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
 				MTL_FAST_MATH = YES;
 				ONLY_ACTIVE_ARCH = YES;
@@ -661,7 +672,6 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MP_API_BASE_URL = "http://127.0.0.1:8080/api/v1";
 				PRODUCT_BUNDLE_IDENTIFIER = com.mypocket.ios;
 				SDKROOT = iphoneos;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -670,6 +680,7 @@
 		};
 		CB8E9344DAF0931622777931 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = FCDA24F9E7FEA60F0479FEF2 /* Release.xcconfig */;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				CLANG_ANALYZER_NONNULL = YES;
@@ -715,7 +726,6 @@
 				GCC_WARN_UNUSED_FUNCTION = YES;
 				GCC_WARN_UNUSED_VARIABLE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
-				MP_API_BASE_URL = "http://127.0.0.1:8080/api/v1";
 				MTL_ENABLE_DEBUG_INFO = NO;
 				MTL_FAST_MATH = YES;
 				PRODUCT_NAME = "$(TARGET_NAME)";

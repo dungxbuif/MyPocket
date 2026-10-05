@@ -68,7 +68,7 @@ final class GooglePKCEClient: NSObject, ASWebAuthenticationPresentationContextPr
     }
 
     func signIn() async throws -> LoginOutput {
-        guard !clientID.isEmpty, let callbackScheme = URL(string: redirectURI)?.scheme else {
+        guard Self.isConfigured(clientID: clientID, redirectURI: redirectURI), let callbackScheme = URL(string: redirectURI)?.scheme else {
             throw GooglePKCEError.invalidConfiguration
         }
         let challenge = PKCEChallenge.make()
@@ -118,5 +118,10 @@ final class GooglePKCEClient: NSObject, ASWebAuthenticationPresentationContextPr
             .compactMap { $0 as? UIWindowScene }
             .flatMap(\.windows)
             .first(where: \.isKeyWindow) ?? UIWindow()
+    }
+
+    nonisolated static func isConfigured(clientID: String, redirectURI: String) -> Bool {
+        !clientID.isEmpty && !clientID.hasPrefix("REPLACE_WITH_") &&
+            URL(string: redirectURI)?.scheme?.isEmpty == false
     }
 }

@@ -387,6 +387,27 @@
   git commit -m "feat: add native ios finance client parity"
   ```
 
+## Execution reconciliation — 2026-10-05
+
+The implementation is now in the native iOS worktree and the Simulator gate is
+green. The generated Xcode project, SwiftUI base-component guard, typed API
+client, auth/session flow, mounted finance routes, AI/feedback surfaces and
+release configuration are present. The current verification evidence is:
+
+```bash
+bash mobile-ios/scripts/check-base-components.test.sh
+bash mobile-ios/scripts/verify-project.sh
+bash -lc 'set -o pipefail; xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS -sdk iphonesimulator -destination "platform=iOS Simulator,id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D" test'
+xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS -configuration Release -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' build
+```
+
+The latest XCTest run passed 17 unit/contract tests and 3 UI smoke tests; the
+Release build passed. The simulator app was relaunched after the test run.
+The plan's original red/green checkbox history is retained as authoring
+history; release readiness is not claimed until an iOS OAuth client ID is
+configured, provider-backed AI/OCR is exercised, and authenticated staging or
+production API smoke is completed. No production mutation was performed.
+
 ## Self-review
 
 - **Spec coverage:** Auth/API is Tasks 3–5; all parity rows are Tasks 6–8; base ownership is Task 2; simulator proof and docs are Task 9.

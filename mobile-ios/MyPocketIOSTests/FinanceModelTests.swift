@@ -48,4 +48,17 @@ final class FinanceModelTests: XCTestCase {
         let date = MPFormat.parseCalendarDate("2026-12-31")
         XCTAssertEqual(date.map(MPFormat.calendarDateString), "2026-12-31")
     }
+
+    func testCategoryInputPreservesParentID() throws {
+        let input = CategoryModelInput(name: "Highlands", kind: "expense", parentID: "food", walletIDs: [], iconKey: "tag")
+        let json = String(decoding: try JSONEncoder.mypocket.encode(input), as: UTF8.self)
+        XCTAssertTrue(json.contains("\"parent_id\":\"food\""))
+    }
+
+    func testRecurringInputUsesRFC3339InstantAndNote() throws {
+        let input = RecurringInputModel(name: "Tiền nhà", walletID: "wallet-1", categoryID: nil, type: "expense", amount: 5_000_000, note: "Hợp đồng", frequency: "monthly", interval: 1, nextRunAt: "2026-10-05T02:30:00Z", endsAt: nil, active: true)
+        let json = String(decoding: try JSONEncoder.mypocket.encode(input), as: UTF8.self)
+        XCTAssertTrue(json.contains("2026-10-05T02:30:00Z"))
+        XCTAssertTrue(json.contains("Hợp đồng"))
+    }
 }

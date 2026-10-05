@@ -31,6 +31,10 @@
 	<string>Dùng Face ID để mở khóa phiên MyPocket đang còn hiệu lực.</string>
 	<key>MP_API_BASE_URL</key>
 	<string>$(MP_API_BASE_URL)</string>
+	<key>MP_GOOGLE_CLIENT_ID</key>
+	<string>$(MP_GOOGLE_CLIENT_ID)</string>
+	<key>MP_GOOGLE_REDIRECT_URI</key>
+	<string>$(MP_GOOGLE_REDIRECT_URI)</string>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

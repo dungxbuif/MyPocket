@@ -61,6 +61,8 @@ final class AuthViewModel: ObservableObject {
             phase = .authenticated(output.session)
         } catch GooglePKCEError.cancelled {
             errorMessage = "Đăng nhập đã được hủy."
+        } catch GooglePKCEError.invalidConfiguration {
+            errorMessage = "Google OAuth chưa được cấu hình cho bản build này."
         } catch {
             errorMessage = "Không thể đăng nhập. Vui lòng thử lại."
         }

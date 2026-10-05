@@ -3,6 +3,12 @@ import XCTest
 @testable import MyPocketIOS
 
 final class APIClientTests: XCTestCase {
+    func testGoogleConfigurationRejectsPlaceholderAndAcceptsCallbackScheme() {
+        XCTAssertFalse(GooglePKCEClient.isConfigured(clientID: "REPLACE_WITH_IOS_CLIENT_ID", redirectURI: "mypocket://oauth/callback"))
+        XCTAssertFalse(GooglePKCEClient.isConfigured(clientID: "client-id", redirectURI: "oauth/callback"))
+        XCTAssertTrue(GooglePKCEClient.isConfigured(clientID: "client-id", redirectURI: "mypocket://oauth/callback"))
+    }
+
     func testSessionRoundTripUsesCodableContract() throws {
         let user = AuthUser(id: "u1", name: "Test", email: "test@example.com", timezone: "Asia/Ho_Chi_Minh")
         let session = AccessSession(token: "access", expiresAt: "2026-10-05T00:00:00Z", refreshToken: "refresh", refreshExpiresAt: "2026-11-05T00:00:00Z", user: user)

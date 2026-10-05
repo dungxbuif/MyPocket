@@ -100,6 +100,25 @@ Transaction parity also requires account-timezone week/custom filtering and
 local-date grouping. Opening Edit from a transaction detail must retain the
 selected transaction and issue a PATCH, never silently create a new row.
 
+Release configuration is part of the parity gate: XcodeGen must attach the
+tracked Debug/Release xcconfig files, and the Google client ID plus callback
+URI must be exported into the app plist. A Release build must therefore use
+the production API base URL and fail visibly when an iOS OAuth client ID is
+still a placeholder, rather than silently falling back to localhost or an
+empty client configuration.
+
+Category editing must preserve the tree contract: a user can choose a parent
+category when creating or editing a child. Recurring schedules must preserve
+note text and submit account-local date/time as RFC3339 instants; date-only
+strings are not a valid backend schedule input.
+
+AI entry accepts either a text instruction or one or more validated image/PDF
+attachments, uses the account timezone for extraction context, and keeps every
+proposal in review until an explicit approve/reject decision.
+
+Category parent selection must preserve a tree: editing a category cannot select
+itself or any descendant as its parent, preventing cycles before the API call.
+
 ## Parity completion pass — 2026-10-05
 
 The simulator-first parity pass closed the highest-risk interaction gaps:
@@ -121,8 +140,13 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 14 unit/contract tests and 3 UI smoke tests (auth launch,
+suite passed: 17 unit/contract tests and 3 UI smoke tests (auth launch,
 authenticated primary tabs, More route + floating feedback overlay).
+
+The latest run also verified category-parent cycle prevention, recurring
+RFC3339/note payloads, typed API error presentation and release configuration
+changes. The app was relaunched after the test run with bundle
+`com.mypocket.ios` for manual simulator inspection.
 
 ```bash
 xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \

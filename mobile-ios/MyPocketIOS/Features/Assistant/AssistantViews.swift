@@ -56,6 +56,7 @@ struct AssistantView: View {
 
     private func loadCapabilities() async {
         do { capabilities = try await api.advisorCapabilities() }
+        catch let error as APIError { self.error = error.userMessage }
         catch { self.error = "Không thể kết nối Finance Assistant." }
     }
 
@@ -80,7 +81,8 @@ struct AssistantView: View {
             }
             messages = try await api.advisorMessages(conversationID: conversationID)
             activeRunID = nil
-        } catch { self.error = "Không thể xử lý yêu cầu trợ lý tài chính."; activeRunID = nil }
+        } catch let error as APIError { self.error = error.userMessage; activeRunID = nil }
+        catch { self.error = "Không thể xử lý yêu cầu trợ lý tài chính."; activeRunID = nil }
     }
 
     private func cancel(runID: String) async {
@@ -182,6 +184,7 @@ struct AIEntryView: View {
     @State private var wallets: [WalletModel] = []
     @State private var categories: [CategoryModel] = []
     @State private var editProposal: EntryProposalModel?
+    @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView {
@@ -220,6 +223,7 @@ struct AIEntryView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await loadCapabilities(); await loadReferenceData() }
         .overlay {
             if let editProposal {
@@ -234,11 +238,12 @@ struct AIEntryView: View {
     }
 
     private func loadCapabilities() async { do { capabilities = try await api.entryCapabilities() } catch { self.error = "Không thể tải trạng thái AI entry." } }
-    private func loadReferenceData() async { do { async let walletList = api.wallets(); async let categoryList = api.categories(); wallets = try await walletList; categories = try await categoryList } catch { self.error = "Không thể tải danh sách ví và danh mục." } }
+    private func loadReferenceData() async { do { async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); wallets = try await walletList; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone } } catch { self.error = "Không thể tải danh sách ví và danh mục." } }
     private func processEntry() async {
-        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập mô tả trước khi phân tích."; return }
+        guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty else { error = "Nhập mô tả hoặc đính kèm chứng từ trước khi phân tích."; return }
         processing = true; error = nil; defer { processing = false }
-        do { process = try await api.processEntry(requestID: UUID().uuidString, text: text, timezone: TimeZone.current.identifier, files: files) }
+        do { process = try await api.processEntry(requestID: UUID().uuidString, text: text, timezone: accountTimezone, files: files) }
+        catch let error as APIError { self.error = "\(error.userMessage) Không có giao dịch nào được lưu." }
         catch { self.error = "Không thể xử lý yêu cầu. Không có giao dịch nào được lưu." }
     }
     private func decide(_ proposal: EntryProposalModel, as decision: String) async {

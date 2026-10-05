@@ -50,6 +50,15 @@ enum MPFormat {
         calendarDate.string(from: value)
     }
 
+    static func parseInstant(_ raw: String?) -> Date? {
+        guard let raw, !raw.isEmpty else { return nil }
+        return ISO8601DateFormatter().date(from: raw) ?? calendarDate.date(from: raw)
+    }
+
+    static func instantString(_ value: Date) -> String {
+        ISO8601DateFormatter().string(from: value)
+    }
+
     static func shortDate(_ raw: String) -> String {
         if let date = ISO8601DateFormatter().date(from: raw) { return self.date.string(from: date) }
         if let date = self.date.date(from: raw) { return self.date.string(from: date) }
