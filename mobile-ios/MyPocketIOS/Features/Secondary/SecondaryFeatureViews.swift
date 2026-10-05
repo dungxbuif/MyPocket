@@ -123,6 +123,16 @@ struct ReportsView: View {
                         MPMetricCard(title: "Chi tiêu", value: MPFormat.money(summary.expense))
                         MPMetricCard(title: "Còn lại", value: MPFormat.money(summary.net))
                         MPMetricCard(title: "Trung bình/ngày", value: MPFormat.money(summary.averageDailyExpense))
+                        MPMetricCard(
+                            title: "So với tháng trước",
+                            value: MPFormat.signedMoney(summary.expenseDelta),
+                            detail: summary.expenseChangeBPS.map { MPFormat.percentageFromBPS($0) }
+                        )
+                        MPMetricCard(
+                            title: "Tỷ lệ chi / thu",
+                            value: MPFormat.percentageFromBPS(summary.spendingIncomeRatioBPS),
+                            detail: summary.spendingIncomeRatioBPS == nil ? "Chưa có thu nhập để tính tỷ lệ" : nil
+                        )
                     }
                     MPAssistantCard(title: "Theo danh mục") {
                         MPChart(values: summary.topCategories.map { ($0.name, min(180, max(4, Double($0.amount) / 100_000))) })

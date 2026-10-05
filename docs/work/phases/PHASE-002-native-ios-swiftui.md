@@ -85,6 +85,11 @@ now includes deep CRUD/link flows, replay-safe multipart auth, persisted
 assistant/feedback entry points, Face ID restore gating, and typed Finance
 Assistant cards.
 
+The report contract follows the mounted backend/web Money Insider payload:
+category totals, top expense rows, previous-period delta and spending/income
+ratio. Merchant/cashflow cards are not claimed because they are not part of
+that API contract.
+
 ## Parity completion pass — 2026-10-05
 
 The simulator-first parity pass closed the highest-risk interaction gaps:

@@ -13,4 +13,10 @@ final class DesignSystemTests: XCTestCase {
         let picker = MPAttachmentPicker(title: "Đính kèm", count: 20, maxCount: 20, add: {})
         XCTAssertNotNil(picker)
     }
+
+    func testReportFormattingHandlesDeltasAndMissingIncome() {
+        XCTAssertEqual(MPFormat.percentageFromBPS(1234), "12.3%")
+        XCTAssertEqual(MPFormat.percentageFromBPS(nil), "Chưa có dữ liệu")
+        XCTAssertTrue(MPFormat.signedMoney(-1).hasPrefix("−"))
+    }
 }

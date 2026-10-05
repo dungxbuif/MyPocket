@@ -22,6 +22,16 @@ enum MPFormat {
         currency.string(from: NSNumber(value: value)) ?? "(value) ₫"
     }
 
+    static func signedMoney(_ value: Int64) -> String {
+        if value == 0 { return money(0) }
+        return (value > 0 ? "+" : "−") + money(abs(value))
+    }
+
+    static func percentageFromBPS(_ value: Int64?) -> String {
+        guard let value else { return "Chưa có dữ liệu" }
+        return String(format: "%.1f%%", Double(value) / 100.0)
+    }
+
     static func shortDate(_ raw: String) -> String {
         if let date = ISO8601DateFormatter().date(from: raw) { return self.date.string(from: date) }
         if let date = self.date.date(from: raw) { return self.date.string(from: date) }

@@ -88,7 +88,7 @@ must enforce the same rule with SwiftUI views rather than reusing DOM/RN code.
 | Wallets | `Wallets/WalletsScreen` | basic/goal/credit list, derived balance, add/edit/delete, type-specific fields |
 | Credit ledger | `Wallets/CreditStatementScreen` | purchase/refund/fee/interest, payment pair, statement and due status |
 | Budgets | `Budgets/BudgetsScreen` | list/progress, create/edit/delete, date interval, wallet/category scope |
-| Reports | `Reports/ReportsScreen` | account-local month, category/merchant/cashflow cards, zero-safe states |
+| Reports | `Reports/ReportsScreen` | account-local month, category/top-expense cards, previous-period delta and spending/income ratio, zero-safe states |
 | Jars/months | `Jars/JarsScreen`, `Months/MonthDetailScreen` | month allocation, live totals, note CRUD, history |
 | Recurring | `Recurring/RecurringScreen` | schedule CRUD and run-due result; no silent background execution |
 | Categories/groups | `Categories/CategoryList`, `CategoryEditor` | tree, wallet applicability, create/edit/delete and validation |
