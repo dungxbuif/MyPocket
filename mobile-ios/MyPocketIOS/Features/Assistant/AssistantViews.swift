@@ -249,6 +249,12 @@ struct AssistantStructuredCard: View {
     private func money(_ value: JSONValue?) -> String { MPFormat.money(Int64(number(value) ?? 0)) }
 }
 
+enum AIEntryAttachmentPolicy {
+    static func canSelect(filesConfigured: Bool?, isProcessing: Bool) -> Bool {
+        filesConfigured == true && !isProcessing
+    }
+}
+
 struct AIEntryView: View {
     let api: FinanceAPI
     let onBack: () -> Void
@@ -277,6 +283,7 @@ struct AIEntryView: View {
                 MPDocumentPicker(title: "Đính kèm ảnh hoặc PDF", count: files.count, maxCount: 20, isPresented: $showFilePicker) { urls in
                     importFiles(urls)
                 }
+                .disabled(!AIEntryAttachmentPolicy.canSelect(filesConfigured: capabilities?.filesConfigured, isProcessing: processing))
                 ForEach(Array(files.enumerated()), id: \.offset) { index, file in
                     MPAttachmentThumb(name: file.fileName, data: file.data) { files.remove(at: index) }
                 }

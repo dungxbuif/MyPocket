@@ -237,6 +237,25 @@ final class LaunchTests: XCTestCase {
 #endif
     }
 
+    func testAPIBackedAIEntryDisablesAttachmentsWhenFilesUnavailable() throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Nhập giao dịch bằng AI"].waitForExistence(timeout: 10))
+        app.buttons["Nhập giao dịch bằng AI"].tap()
+        XCTAssertTrue(app.staticTexts["Nhập giao dịch bằng AI"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["OCR chưa được cấu hình."].waitForExistence(timeout: 10))
+        let attachmentPicker = app.buttons["Đính kèm ảnh hoặc PDF"]
+        XCTAssertTrue(attachmentPicker.waitForExistence(timeout: 10))
+        XCTAssertFalse(attachmentPicker.isEnabled)
+#endif
+    }
+
     func testAPIBackedWalletDetailExposesTransactionEditor() async throws {
 #if !LOCAL_API_UI
         throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable fixture wallet.")

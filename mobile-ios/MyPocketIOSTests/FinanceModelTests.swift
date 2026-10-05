@@ -70,6 +70,13 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertFalse(TravelEventDraftValidator.isValid(name: "Sai định dạng", startsOn: "2026/10/01", endsOn: "2026-10-10"))
     }
 
+    func testAIEntryAttachmentPolicyRequiresConfiguredFilesAndIdleRequest() {
+        XCTAssertFalse(AIEntryAttachmentPolicy.canSelect(filesConfigured: nil, isProcessing: false))
+        XCTAssertFalse(AIEntryAttachmentPolicy.canSelect(filesConfigured: false, isProcessing: false))
+        XCTAssertTrue(AIEntryAttachmentPolicy.canSelect(filesConfigured: true, isProcessing: false))
+        XCTAssertFalse(AIEntryAttachmentPolicy.canSelect(filesConfigured: true, isProcessing: true))
+    }
+
     func testAdvisorOverviewDecodesStructuredViewAndSource() throws {
         let data = Data(#"{"view_kind":"metric_group","view":{"income":1200000,"expense":500000},"source":{"tool":"get_finance_summary"},"status":"ok"}"#.utf8)
         let overview = try JSONDecoder.mypocket.decode(AdvisorOverviewModel.self, from: data)

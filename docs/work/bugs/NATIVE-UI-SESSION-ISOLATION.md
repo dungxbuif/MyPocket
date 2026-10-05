@@ -45,5 +45,6 @@ phase to `.unauthenticated`. `testAppLaunches` uses the argument, so it does
 not depend on whichever user session a previous simulator run left behind.
 
 Red proof: the test failed with the argument before the restore branch existed.
-Green proof: the targeted test passed, followed by the full UI suite (8 tests,
-5 passed, 3 explicitly skipped API-fixture tests, 0 failures) on iPhone 16.
+Green proof: the targeted test passed, followed by the full default UI suite
+(9 tests, 5 passed, 4 explicitly skipped API-fixture tests, 0 failures) on
+iPhone 16.

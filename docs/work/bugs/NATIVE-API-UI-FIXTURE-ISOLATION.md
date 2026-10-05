@@ -47,5 +47,5 @@ cannot seed production or alter the release app.
 
 Red proof: the wallet test failed with an empty owner wallet list before the
 seed path existed. Green proof: wallet detail, credit ledger and Assistant
-API-backed tests all pass; the full `LOCAL_API_UI` UI suite is 8/8 with zero
+API-backed tests all pass; the full `LOCAL_API_UI` UI suite is 9/9 with zero
 skips, and a post-run API check reports zero `Fixture*` wallets.
