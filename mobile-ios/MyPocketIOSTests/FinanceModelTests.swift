@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 @testable import MyPocketIOS
 
+@MainActor
 final class FinanceModelTests: XCTestCase {
     func testSnakeCaseFinancialPayloadDecodesAcronyms() throws {
         let data = Data(#"{"id":"tx-1","owner_id":"u-1","wallet_id":"w-1","category_id":"c-1","type":"expense","amount":50000,"occurred_at":"2026-10-05T10:00:00Z","included_in_reports":true,"created_at":"2026-10-05T10:00:00Z","updated_at":"2026-10-05T10:00:00Z"}"#.utf8)
@@ -84,5 +85,45 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertNotNil(MPFormat.parseInstant(instant))
         XCTAssertEqual(MPFormat.accountMonth(of: instant, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!), "2026-10")
         XCTAssertEqual(MPFormat.accountMonth(of: instant, timeZone: TimeZone(identifier: "America/Los_Angeles")!), "2026-09")
+    }
+
+    func testTransactionPeriodFilterExcludesMalformedTimestamps() {
+        let valid = transaction(id: "valid", occurredAt: "2026-10-06T03:00:00Z")
+        let malformed = transaction(id: "malformed", occurredAt: "not-a-timestamp")
+        let day = MPFormat.parseCalendarDate("2026-10-06")!
+
+        let result = TransactionsViewModel.applyFilters(
+            [valid, malformed],
+            walletSelection: "__all__",
+            periodSelection: "custom",
+            customStart: day,
+            customEnd: day,
+            accountTimezone: "Asia/Ho_Chi_Minh"
+        )
+
+        XCTAssertEqual(result.map(\.id), ["valid"])
+    }
+
+    private func transaction(id: String, occurredAt: String) -> TransactionModel {
+        TransactionModel(
+            id: id,
+            ownerID: "owner",
+            walletID: "wallet",
+            categoryID: nil,
+            jarID: nil,
+            jarName: nil,
+            type: "expense",
+            amount: 10_000,
+            adjustmentDirection: nil,
+            creditKind: nil,
+            creditPaymentID: nil,
+            travelEventID: nil,
+            occurredAt: occurredAt,
+            note: nil,
+            includedInReports: true,
+            transferID: nil,
+            createdAt: occurredAt,
+            updatedAt: occurredAt
+        )
     }
 }

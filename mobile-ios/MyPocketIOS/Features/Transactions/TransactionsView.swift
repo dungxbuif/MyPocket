@@ -17,6 +17,25 @@ final class TransactionsViewModel: ObservableObject {
     init(api: FinanceAPI) { self.api = api }
 
     var filteredTransactions: [TransactionModel] {
+        Self.applyFilters(
+            transactions,
+            walletSelection: walletSelection,
+            periodSelection: periodSelection,
+            customStart: customStart,
+            customEnd: customEnd,
+            accountTimezone: accountTimezone
+        )
+    }
+
+    static func applyFilters(
+        _ transactions: [TransactionModel],
+        walletSelection: String,
+        periodSelection: String,
+        customStart: Date,
+        customEnd: Date,
+        accountTimezone: String,
+        now: Date = Date()
+    ) -> [TransactionModel] {
         let walletFiltered = walletSelection == "__all__" ? transactions : transactions.filter { $0.walletID == walletSelection }
         if periodSelection == "all" { return walletFiltered.sorted { $0.occurredAt > $1.occurredAt } }
         var calendar = Calendar(identifier: .gregorian)
@@ -24,14 +43,14 @@ final class TransactionsViewModel: ObservableObject {
         let start: Date
         let end: Date
         if periodSelection == "week" {
-            start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
+            start = calendar.dateInterval(of: .weekOfYear, for: now)?.start ?? now
             end = calendar.date(byAdding: .weekOfYear, value: 1, to: start) ?? Date()
         } else {
             start = calendar.startOfDay(for: customStart)
             end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: customEnd)) ?? Date()
         }
         return walletFiltered.filter {
-            guard let date = MPFormat.parseInstant($0.occurredAt) else { return true }
+            guard let date = MPFormat.parseInstant($0.occurredAt) else { return false }
             return date >= start && date < end
         }.sorted { $0.occurredAt > $1.occurredAt }
     }

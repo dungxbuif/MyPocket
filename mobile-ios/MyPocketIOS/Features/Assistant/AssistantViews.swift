@@ -41,7 +41,7 @@ struct AssistantView: View {
                     .frame(minHeight: 90)
                 HStack {
                     MPButton("Gửi", isLoading: sending) { Task { await send() } }
-                    if sending, let activeRunID {
+                    if let activeRunID {
                         MPButton("Hủy", style: .destructive) { Task { await cancel(runID: activeRunID) } }
                     }
                 }
@@ -62,7 +62,7 @@ struct AssistantView: View {
 
     private func send() async {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty, activeRunID == nil else { return }
         sending = true; error = nil; defer { sending = false }
         do {
             let result = try await api.submitAdvisorMessage(AdvisorMessageInputModel(clientRequestID: UUID().uuidString, text: text))
@@ -70,19 +70,25 @@ struct AssistantView: View {
             activeRunID = result.runID
             input = ""
             if result.status == "queued" || result.status == "running" {
+                var completed = false
                 for _ in 0..<60 {
                     try await Task.sleep(for: .milliseconds(500))
                     let run = try await api.advisorRun(id: result.runID)
                     if ["completed", "failed", "cancelled", "interrupted", "purged"].contains(run.status) {
+                        completed = true
                         if run.status != "completed" { self.error = "Yêu cầu trợ lý kết thúc với trạng thái \(run.status)." }
                         break
                     }
                 }
+                guard completed else {
+                    self.error = "Yêu cầu vẫn đang xử lý. Bạn có thể bấm Hủy trước khi gửi yêu cầu khác."
+                    return
+                }
             }
             messages = try await api.advisorMessages(conversationID: conversationID)
             activeRunID = nil
-        } catch let error as APIError { self.error = error.userMessage; activeRunID = nil }
-        catch { self.error = "Không thể xử lý yêu cầu trợ lý tài chính."; activeRunID = nil }
+        } catch let error as APIError { self.error = error.userMessage }
+        catch { self.error = "Không thể xử lý yêu cầu trợ lý tài chính." }
     }
 
     private func cancel(runID: String) async {

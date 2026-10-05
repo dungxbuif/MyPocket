@@ -174,7 +174,7 @@ struct WalletDetailView: View {
                 MPEmptyView(title: "Chưa có giao dịch", detail: "Các giao dịch của ví sẽ xuất hiện ở đây.")
             } else {
                 VStack(spacing: 0) {
-                    ForEach(rows.prefix(50)) { row in
+                    ForEach(rows) { row in
                         MPTransactionRow(title: row.note?.isEmpty == false ? row.note! : (row.type == "income" ? "Thu nhập" : "Chi tiêu"), subtitle: MPFormat.shortDate(row.occurredAt, timeZone: timeZone), amount: MPFormat.money(row.amount), isIncome: row.type == "income")
                     }
                 }

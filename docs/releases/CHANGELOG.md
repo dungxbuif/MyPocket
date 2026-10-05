@@ -33,10 +33,14 @@ as active release entries here.
 - Shared native buttons now apply a rectangular hit shape to their rendered
   control bounds, fixing compact “Thêm” rows that could appear visible but fail
   to open a destination in simulator/device UI automation.
+- Native ledger period filters now exclude rows with malformed timestamps instead
+  of accidentally including them, wallet detail no longer truncates the API's
+  transaction history at 50 rows, and Finance Assistant keeps a still-running
+  run cancellable when its local polling window expires.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 23 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 24 unit/contract tests and
   4 authenticated UI smoke tests, with base-component and Xcode project guards.
 - The authenticated UI sweep opened and returned from all 13 destinations in the
   “Thêm” menu; this caught and fixed the compact-row hit-target regression.
