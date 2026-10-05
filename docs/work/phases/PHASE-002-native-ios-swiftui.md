@@ -99,3 +99,24 @@ These changes preserve the existing API owner scope and do not add offline
 ledger writes. Verification is the full iOS Simulator XCTest suite, static
 base-component guard, project verification, and backend contract tests when
 shared API contracts are touched.
+
+## Simulator verification — 2026-10-05 (latest)
+
+The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
+the latest native build was installed and launched successfully. The full
+suite passed: 10 unit/contract tests and 3 UI smoke tests (auth launch,
+authenticated primary tabs, More route + floating feedback overlay).
+
+```bash
+xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
+  -destination 'id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' \
+  CODE_SIGNING_ALLOWED=NO
+bash mobile-ios/scripts/check-base-components.test.sh
+bash mobile-ios/scripts/verify-project.sh
+cd backend && go test ./... && go generate ./cmd/api
+```
+
+The authenticated UI run uses the DEBUG-only `-UITestAuthenticated` fixture;
+it proves native navigation, state rendering and feedback entry without
+placing a real JWT or API secret in the app. A staging/production authenticated
+API smoke test remains a release prerequisite.
