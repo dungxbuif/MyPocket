@@ -122,3 +122,21 @@ The authenticated UI run uses the DEBUG-only `-UITestAuthenticated` fixture;
 it proves native navigation, state rendering and feedback entry without
 placing a real JWT or API secret in the app. A staging/production authenticated
 API smoke test remains a release prerequisite.
+
+## Disposable local API smoke — 2026-10-05
+
+Before any release decision, the typed client contracts were exercised against
+a fresh local PostgreSQL database (`mypocket_ios_test`) with the normal Go API
+and Redis running. The smoke covered password login/profile and refresh-token
+rotation, wallet variants (basic/goal/credit), category CRUD, transaction
+create/update/list, atomic transfer update/delete with idempotency keys,
+adjustments, budgets, jars and cumulative reports, recurring schedules,
+Travel Mode lifecycle, portfolio assets/prices/trades, credit entries and
+payments/statements, user feedback, changelog, API-key create/list/revoke and
+AI capability responses. Every asserted request returned the expected 2xx
+contract; unauthenticated wallet access returned 401. AI/OCR and Advisor were
+correctly reported disabled because no provider secrets were injected into the
+disposable environment.
+
+This smoke is intentionally non-production and does not replace provider-backed
+AI/OCR verification or a real authenticated staging/production iOS run.
