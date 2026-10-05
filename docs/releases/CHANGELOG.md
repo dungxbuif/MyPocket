@@ -31,6 +31,9 @@ as active release entries here.
 - Native recurring editors now reject non-positive amount/interval values and
   unsupported type/frequency or reversed end-date drafts before sending an API
   request; the contract suite is now 44/44.
+- Native jar allocation drafts now mirror the backend contract: fixed values
+  stop at the JavaScript-safe integer ceiling and percentage values must be
+  finite, positive, at most 100% and no more precise than two decimals.
 - Native UI smoke tests now start from a deterministic unauthenticated state
   with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
   Keychain/biometric state. The iPhone 16 suite passes 10 tests (5 passed, 5

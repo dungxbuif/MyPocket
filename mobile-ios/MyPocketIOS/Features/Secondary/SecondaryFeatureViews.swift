@@ -282,15 +282,17 @@ struct CategoriesView: View {
 }
 
 enum JarAllocationDraftValidator {
+    static let maximumFixedAmount: Int64 = 9_007_199_254_740_991
+
     static func isValid(mode: String, amount: Int64?, percent: Double?) -> Bool {
         switch mode {
         case "none":
             return amount == nil && percent == nil
         case "fixed":
-            return (amount ?? 0) > 0 && percent == nil
+            return (amount ?? 0) > 0 && (amount ?? 0) <= maximumFixedAmount && percent == nil
         case "percent":
             guard let percent else { return false }
-            return percent > 0 && percent <= 100 && amount == nil
+            return percent.isFinite && percent > 0 && percent <= 100 && (percent * 100).rounded() == percent * 100 && amount == nil
         default:
             return false
         }

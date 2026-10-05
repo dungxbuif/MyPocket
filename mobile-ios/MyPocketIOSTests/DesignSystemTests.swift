@@ -31,7 +31,12 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "fixed", amount: 1, percent: nil))
         XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 100))
         XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 0))
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 12.34))
+        XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 12.345))
+        XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: .infinity))
         XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "fixed", amount: 100, percent: 10))
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "fixed", amount: JarAllocationDraftValidator.maximumFixedAmount, percent: nil))
+        XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "fixed", amount: JarAllocationDraftValidator.maximumFixedAmount + 1, percent: nil))
         XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "none", amount: 100, percent: nil))
     }
 }
