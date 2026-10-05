@@ -56,6 +56,17 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(MPFormat.shortDate(timestamp, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!), "06/10/2026")
     }
 
+    func testTransferWalletsExcludeCreditWalletsAndPreserveAccountLocalDay() {
+        let wallets = [
+            WalletModel(id: "basic", name: "Tiền mặt", type: "basic", currency: "VND", openingBalance: 0, currentBalance: 0, availableCredit: nil, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil),
+            WalletModel(id: "credit", name: "Thẻ", type: "credit", currency: "VND", openingBalance: 0, currentBalance: 0, availableCredit: 0, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: 1_000_000, lastStatementBalance: 0, statementDay: 15, paymentDueDay: 5),
+            WalletModel(id: "goal", name: "Du lịch", type: "goal", currency: "VND", openingBalance: 0, currentBalance: 0, availableCredit: nil, isInTotal: true, description: nil, targetAmount: 1_000_000, targetDate: "2027-01-01", creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil)
+        ]
+        XCTAssertEqual(TransferEditorView.transferWallets(wallets).map(\.id), ["basic", "goal"])
+        let timestamp = TransferEditorView.timestamp(MPFormat.parseCalendarDate("2026-10-06")!, timezone: "Asia/Ho_Chi_Minh")
+        XCTAssertEqual(MPFormat.shortDate(timestamp, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!), "06/10/2026")
+    }
+
     func testWalletDetailMonthLabelUsesCalendarComponents() {
         XCTAssertEqual(MPFormat.monthLabel("2026-10"), "Tháng 10 năm 2026")
         XCTAssertEqual(MPFormat.monthLabel("invalid"), "Không rõ thời gian")

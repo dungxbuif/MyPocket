@@ -40,6 +40,8 @@ as active release entries here.
   silent digit stripping before the API request.
 - Native API requests now carry a UUID `X-Request-ID`; a JWT refresh retry
   keeps the same correlation ID so server errors can be traced end to end.
+- Native transfer forms now exclude credit wallets and serialize the selected
+  transfer day in the account timezone instead of the device timezone.
 - Native UI smoke tests now start from a deterministic unauthenticated state
   with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
   Keychain/biometric state. The iPhone 16 suite passes 10 tests (5 passed, 5

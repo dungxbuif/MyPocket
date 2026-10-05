@@ -339,7 +339,7 @@ struct TransactionsView: View {
                 } onCancel: { editorPresented = false; editTarget = nil }
                 .background(MPColor.canvas.ignoresSafeArea())
             } else if transferPresented {
-                TransferEditorView(api: modelAPI, wallets: model.wallets) {
+                TransferEditorView(api: modelAPI, wallets: model.wallets, timezone: model.accountTimezone) {
                     transferPresented = false
                     Task { await model.load() }
                 } onCancel: { transferPresented = false }
@@ -351,7 +351,7 @@ struct TransactionsView: View {
                 } onCancel: { adjustmentPresented = false }
                 .background(MPColor.canvas.ignoresSafeArea())
             } else if let transferEditID {
-                TransferEditorView(api: modelAPI, wallets: model.wallets, transactions: model.transactions, existingTransferID: transferEditID) {
+                TransferEditorView(api: modelAPI, wallets: model.wallets, timezone: model.accountTimezone, transactions: model.transactions, existingTransferID: transferEditID) {
                     self.transferEditID = nil
                     Task { await model.load() }
                 } onCancel: { self.transferEditID = nil }
@@ -615,6 +615,7 @@ struct TransactionDetailView: View {
 struct TransferEditorView: View {
     let api: FinanceAPI
     let wallets: [WalletModel]
+    let timezone: String
     let transactions: [TransactionModel]
     let existingTransferID: String?
     let onSaved: () -> Void
@@ -627,17 +628,19 @@ struct TransferEditorView: View {
     @State private var saving = false
     @State private var error: String?
 
-    init(api: FinanceAPI, wallets: [WalletModel], transactions: [TransactionModel] = [], existingTransferID: String? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    init(api: FinanceAPI, wallets: [WalletModel], timezone: String = TimeZone.current.identifier, transactions: [TransactionModel] = [], existingTransferID: String? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.api = api
         self.wallets = wallets
+        self.timezone = timezone
         self.transactions = transactions
         self.existingTransferID = existingTransferID
         self.onSaved = onSaved
         self.onCancel = onCancel
         let source = transactions.first(where: { $0.transferID == existingTransferID && $0.type == "expense" })
         let destination = transactions.first(where: { $0.transferID == existingTransferID && $0.type == "income" })
-        _sourceID = State(initialValue: source?.walletID ?? wallets.first?.id ?? "")
-        _destinationID = State(initialValue: destination?.walletID ?? wallets.dropFirst().first?.id ?? wallets.first?.id ?? "")
+        let eligibleWallets = Self.transferWallets(wallets)
+        _sourceID = State(initialValue: source?.walletID ?? eligibleWallets.first?.id ?? "")
+        _destinationID = State(initialValue: destination?.walletID ?? eligibleWallets.dropFirst().first?.id ?? eligibleWallets.first?.id ?? "")
         _amount = State(initialValue: source.map { String($0.amount) } ?? "")
         _note = State(initialValue: source?.note ?? "")
         _date = State(initialValue: source.flatMap { MPFormat.parseInstant($0.occurredAt) } ?? Date())
@@ -655,21 +658,36 @@ struct TransferEditorView: View {
             if let error { MPStatusMessage(text: error, tone: .danger) }
             MPButton(existingTransferID == nil ? "Xác nhận chuyển" : "Lưu thay đổi", isLoading: saving) { Task { await save() } }
         }.padding(MPMetrics.pagePadding) }
-        .task { if sourceID.isEmpty { sourceID = wallets.first?.id ?? "" }; if destinationID.isEmpty { destinationID = wallets.dropFirst().first?.id ?? wallets.first?.id ?? "" } }
+        .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
+        .task {
+            let eligibleWallets = Self.transferWallets(wallets)
+            if sourceID.isEmpty { sourceID = eligibleWallets.first?.id ?? "" }
+            if destinationID.isEmpty { destinationID = eligibleWallets.dropFirst().first?.id ?? eligibleWallets.first?.id ?? "" }
+        }
     }
 
     private func save() async {
         guard let from = wallets.first(where: { $0.id == sourceID }), let to = wallets.first(where: { $0.id == destinationID }), from.id != to.id, let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn hai ví khác nhau và nhập số tiền hợp lệ."; return }
         saving = true; defer { saving = false }
         do {
-            if let existingTransferID { _ = try await api.updateTransfer(id: existingTransferID, input: TransferUpdateInputModel(amount: parsed, occurredAt: Self.timestamp(date), note: note.isEmpty ? nil : note)) }
-            else { _ = try await api.createTransfer(TransferInputModel(sourceWalletID: from.id, destinationWalletID: to.id, amount: parsed, occurredAt: Self.timestamp(date), note: note.isEmpty ? nil : note)) }
+            let occurredAt = Self.timestamp(date, timezone: timezone)
+            let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
+            if let existingTransferID { _ = try await api.updateTransfer(id: existingTransferID, input: TransferUpdateInputModel(amount: parsed, occurredAt: occurredAt, note: trimmedNote.isEmpty ? nil : trimmedNote)) }
+            else { _ = try await api.createTransfer(TransferInputModel(sourceWalletID: from.id, destinationWalletID: to.id, amount: parsed, occurredAt: occurredAt, note: trimmedNote.isEmpty ? nil : trimmedNote)) }
             onSaved()
         }
         catch { self.error = "Không thể chuyển tiền. Số dư hoặc ví có thể không hợp lệ." }
     }
-    private var walletOptions: [MPSelectionOption] { wallets.map { MPSelectionOption(id: $0.id, label: $0.name) } }
-    private static func timestamp(_ date: Date) -> String { let formatter = ISO8601DateFormatter(); return formatter.string(from: date) }
+    private var walletOptions: [MPSelectionOption] { Self.transferWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) } }
+    static func transferWallets(_ wallets: [WalletModel]) -> [WalletModel] { wallets.filter { $0.type != "credit" } }
+    static func timestamp(_ date: Date, timezone: String) -> String {
+        let zone = TimeZone(identifier: timezone) ?? .current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        let localNoon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: calendar.date(from: components) ?? date) ?? date
+        return MPFormat.instantString(localNoon)
+    }
 }
 
 struct AdjustmentEditorView: View {
