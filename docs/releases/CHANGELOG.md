@@ -77,10 +77,13 @@ as active release entries here.
 - Native recurring schedules now exclude credit wallets and filter categories
   by expense/income type, clearing stale category selections when the type
   changes.
+- Native selectors now render localized semantic labels while preserving raw API
+  enum values, and jar allocation mode changes clear stale drafts and reject
+  zero-percent allocations to match the web validation contract.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 31 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 32 unit/contract tests and
   5 standard authenticated UI smoke tests, with base-component and Xcode project
   guards.
 - An opt-in API-backed wallet-detail UI smoke passed with a seeded disposable

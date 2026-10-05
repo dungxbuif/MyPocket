@@ -62,6 +62,15 @@ Recurring schedules exclude credit wallets and filter category choices by the
 selected expense/income type. Changing the schedule type clears an incompatible
 category before a create/update request is sent, matching the web form.
 
+`MPWalletSelector` keeps API enum values unchanged in bindings and payloads but
+renders the same Vietnamese semantic labels as the web UI (for example,
+`expense` → `Chi`, `credit` → `Tín dụng`, and `percent` → `Phần trăm thu
+nhập`). Unknown values remain visible rather than being discarded.
+
+Jar allocation validation matches the web contract: fixed amounts must be
+positive, percentage allocations must be greater than zero and at most 100, and
+switching allocation mode clears stale values from the previous mode.
+
 Finance Assistant history uses one UserDefaults conversation ID keyed by the
 authenticated owner ID. The native screen reloads that conversation's latest
 50 messages and the read-only monthly overview on entry; a later request can

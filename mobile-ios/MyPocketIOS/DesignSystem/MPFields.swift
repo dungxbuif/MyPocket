@@ -100,6 +100,45 @@ struct MPDateRangePicker: View {
     }
 }
 
+/// Keeps wire values stable while presenting the semantic labels used by the
+/// Vietnamese web UI. Unknown values intentionally fall back to the raw value
+/// so a newly-added backend enum is still visible and selectable.
+enum MPSelectionLabels {
+    static func display(for value: String) -> String {
+        switch value {
+        case "expense": return "Chi"
+        case "income": return "Thu"
+        case "basic": return "Thông thường"
+        case "goal": return "Tiết kiệm"
+        case "credit": return "Tín dụng"
+        case "none": return "Không đặt"
+        case "fixed": return "Số tiền cố định"
+        case "percent": return "Phần trăm thu nhập"
+        case "daily": return "Mỗi ngày"
+        case "weekly": return "Mỗi tuần"
+        case "monthly": return "Mỗi tháng"
+        case "yearly": return "Mỗi năm"
+        case "buy": return "Mua"
+        case "sell": return "Bán"
+        case "purchase": return "Mua hàng"
+        case "refund": return "Hoàn tiền"
+        case "fee": return "Phí"
+        case "interest": return "Lãi"
+        case "increase": return "Tăng"
+        case "decrease": return "Giảm"
+        case "bug": return "Lỗi"
+        case "feature": return "Tính năng"
+        case "improvement": return "Cải thiện"
+        case "finance:read": return "Đọc tài chính"
+        case "advisor:read": return "Đọc trợ lý"
+        case "advisor:chat": return "Chat trợ lý"
+        case "feedback:read": return "Đọc phản hồi"
+        case "feedback:write": return "Gửi phản hồi"
+        default: return value
+        }
+    }
+}
+
 struct MPWalletSelector: View {
     let title: String
     let options: [String]
@@ -108,13 +147,13 @@ struct MPWalletSelector: View {
     var body: some View {
         Menu {
             ForEach(options, id: \.self) { option in
-                Button(option) { selection = option }
+                Button(MPSelectionLabels.display(for: option)) { selection = option }
             }
         } label: {
             HStack {
                 Text(title)
                 Spacer()
-                Text(selection)
+                Text(MPSelectionLabels.display(for: selection))
                     .foregroundStyle(MPColor.secondary)
                 Image(systemName: "chevron.up.chevron.down")
                     .font(.caption)
@@ -124,7 +163,7 @@ struct MPWalletSelector: View {
             .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
         }
         .foregroundStyle(MPColor.ink)
-        .accessibilityLabel("\(title): \(selection)")
+        .accessibilityLabel("\(title): \(MPSelectionLabels.display(for: selection))")
     }
 }
 

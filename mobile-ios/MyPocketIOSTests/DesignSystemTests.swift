@@ -19,4 +19,10 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(MPFormat.percentageFromBPS(nil), "Chưa có dữ liệu")
         XCTAssertTrue(MPFormat.signedMoney(-1).hasPrefix("−"))
     }
+
+    func testSelectionLabelsPreserveUnknownValuesAndLocalizeEnums() {
+        XCTAssertEqual(MPSelectionLabels.display(for: "expense"), "Chi")
+        XCTAssertEqual(MPSelectionLabels.display(for: "percent"), "Phần trăm thu nhập")
+        XCTAssertEqual(MPSelectionLabels.display(for: "unknown-provider-value"), "unknown-provider-value")
+    }
 }

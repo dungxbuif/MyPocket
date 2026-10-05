@@ -129,6 +129,11 @@ not valid recurring sources, category options are filtered to the selected
 expense/income type, and switching type clears a category that no longer
 matches the selected type.
 
+Shared selectors must present localized semantic labels while retaining their
+raw API enum values for request payloads. Jar allocation mode changes must clear
+the previous mode's draft and reject a zero percentage; the valid percentage
+range is greater than zero through 100, matching the web editor.
+
 Selecting a credit wallet from the main wallet list must route to the same
 statement plus entry/payment surface as the dedicated credit route; a read-only
 credit detail is not sufficient for parity.
@@ -262,7 +267,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (31 unit/contract tests and 5 UI smoke tests). The same pass
+Both commands pass (32 unit/contract tests and 5 UI smoke tests). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical
