@@ -30,6 +30,9 @@ as active release entries here.
   semantics and idempotency-key cleanup.
 - Feedback was verified through JWT, scoped user API key, service-token agent
   lifecycle and changelog publication; Redis feedback audit events were observed.
+- AI-entry browser regression fixtures now generate ledger rows in the current
+  account-local week, preventing calendar drift from hiding the expected grouped
+  rows in future runs.
 
 ### Release gates still open
 

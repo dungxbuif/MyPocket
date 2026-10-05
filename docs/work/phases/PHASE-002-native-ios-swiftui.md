@@ -208,3 +208,8 @@ the resulting Redis feedback audit stream entries were observed. The local test
 feedback/changelog records were removed afterwards. This closes local contract
 coverage but does not claim provider-backed AI/OCR, real Google OAuth, a
 physical-device run or authenticated staging/production validation.
+
+The web AI-entry browser regression also passed after correcting its fixture to
+derive the current account-local week. The prior failure was calendar drift in
+the test data (rows dated outside the period selector), not a production UI or
+API defect.
