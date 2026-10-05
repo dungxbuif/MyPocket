@@ -38,6 +38,12 @@ The native client consumes the existing Go API and never opens PostgreSQL,
 Redis or S3 directly. Feature code is owner-scoped by the JWT issued by the
 backend. Provider secrets remain server-side.
 
+`APIClient` treats an HTTP `204 No Content` response as a successful
+`EmptyResponse` for typed delete/bulk-delete mutations; it never tries to
+decode an empty body as an envelope. This is required by the existing wallet,
+transaction, transfer, category, budget, jar, recurring, travel, feedback and
+API-key revoke contracts.
+
 The only native-specific API addition is
 `POST /api/v1/auth/mobile/google/exchange`; it validates the iOS PKCE code and
 redirect allowlist before returning the existing login/refresh response.

@@ -63,6 +63,16 @@ final class FinanceAPI: @unchecked Sendable {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/transactions/\(id)", method: .delete))
     }
 
+    func deleteTransactions(ids: [String]) async throws {
+        let _: EmptyResponse = try await client.send(
+            APIRequest(
+                path: "/transactions/bulk-delete",
+                method: .post,
+                body: try body(BulkDeleteInputModel(transactionIDs: ids))
+            )
+        )
+    }
+
     func createTransfer(_ input: TransferInputModel) async throws -> [TransactionModel] {
         try await client.send(APIRequest(path: "/transactions/transfer", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
     }

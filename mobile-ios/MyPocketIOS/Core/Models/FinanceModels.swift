@@ -74,6 +74,14 @@ struct TransactionInputModel: Codable, Sendable {
     var travelEventID: String?
 }
 
+struct BulkDeleteInputModel: Codable, Sendable {
+    var transactionIDs: [String]
+
+    enum CodingKeys: String, CodingKey {
+        case transactionIDs = "transaction_ids"
+    }
+}
+
 struct TransferInputModel: Codable, Sendable {
     var sourceWalletID: String
     var destinationWalletID: String

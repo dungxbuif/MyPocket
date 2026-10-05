@@ -41,10 +41,14 @@ as active release entries here.
   the local fixture OAuth payload and persists a disposable session so an
   authenticated overview smoke uses the real URLSession/API path instead of a
   fake token.
+- Native transactions now support the web parity bulk-delete flow with base
+  selection controls, 100-row/immutable-row guards, atomic confirmation and a
+  visible error that preserves the selection. Typed `204 No Content` responses
+  are accepted for delete mutations instead of being decoded as JSON.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 25 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 28 unit/contract tests and
   4 authenticated UI smoke tests, with base-component and Xcode project guards.
 - The API-backed simulator fixture rendered the authenticated overview against
   local `:8080` with empty owner data; no production credentials or data were

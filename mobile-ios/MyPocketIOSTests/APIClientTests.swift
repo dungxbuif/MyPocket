@@ -78,6 +78,23 @@ final class MultipartAPIClientTests: XCTestCase {
     }
 }
 
+private final class NoContentTransport: HTTPTransport, @unchecked Sendable {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        (Data(), HTTPURLResponse(url: request.url!, statusCode: 204, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+final class EmptyMutationResponseTests: XCTestCase {
+    func testNoContentMutationDoesNotAttemptEnvelopeDecoding() async throws {
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: NoContentTransport(),
+            sessionStore: TestSessionStore(session: AccessSession(token: "access", expiresAt: "2099-01-01T00:00:00Z", refreshToken: "refresh", refreshExpiresAt: "2099-02-01T00:00:00Z", user: AuthUser(id: "u", name: nil, email: nil, timezone: nil)))
+        )
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/transactions/bulk-delete", method: .post, body: Data(#"{"transaction_ids":["tx-1"]}"#.utf8)))
+    }
+}
+
 private final class RestoreSessionStore: SessionStore, @unchecked Sendable {
     var session: AccessSession?
 

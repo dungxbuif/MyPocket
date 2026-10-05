@@ -104,6 +104,12 @@ final class APIClient: @unchecked Sendable {
                 if let problem = try? JSONDecoder().decode(ProblemDetails.self, from: data) { throw APIError.problem(problem) }
                 throw APIError.http(status: http.statusCode)
             }
+            if http.statusCode == 204 {
+                guard let empty = EmptyResponse() as? Response else {
+                    throw APIError.decoding("Phản hồi 204 không phù hợp với kiểu dữ liệu yêu cầu")
+                }
+                return empty
+            }
             return try JSONDecoder.mypocket.decode(APIEnvelope<Response>.self, from: data).data
         } catch let error as APIError { throw error }
         catch { throw APIError.transport(error.localizedDescription) }
@@ -154,6 +160,12 @@ final class APIClient: @unchecked Sendable {
                     throw APIError.problem(problem)
                 }
                 throw APIError.http(status: http.statusCode)
+            }
+            if http.statusCode == 204 {
+                guard let empty = EmptyResponse() as? Response else {
+                    throw APIError.decoding("Phản hồi 204 không phù hợp với kiểu dữ liệu yêu cầu")
+                }
+                return empty
             }
             do {
                 return try JSONDecoder.mypocket.decode(APIEnvelope<Response>.self, from: data).data

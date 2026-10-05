@@ -6,6 +6,8 @@ final class TransactionsViewModel: ObservableObject {
     @Published private(set) var wallets: [WalletModel] = []
     @Published private(set) var categories: [CategoryModel] = []
     @Published private(set) var isLoading = false
+    @Published private(set) var isBulkDeleting = false
+    @Published private(set) var bulkDeleteErrorMessage: String?
     @Published private(set) var errorMessage: String?
     @Published var walletSelection = "__all__"
     @Published var periodSelection = "all"
@@ -57,6 +59,9 @@ final class TransactionsViewModel: ObservableObject {
 
     var totalExpense: Int64 { filteredTransactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
     var totalIncome: Int64 { filteredTransactions.filter { $0.type == "income" }.reduce(0) { $0 + $1.amount } }
+    static func bulkDeleteSelectable(_ transaction: TransactionModel) -> Bool {
+        transaction.transferID == nil && transaction.type != "adjustment" && transaction.creditKind == nil
+    }
     var groupedTransactions: [(String, [TransactionModel])] {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: accountTimezone) ?? .current
@@ -100,6 +105,25 @@ final class TransactionsViewModel: ObservableObject {
         }
     }
 
+    func deleteMany(_ ids: [String]) async -> Bool {
+        bulkDeleteErrorMessage = nil
+        let uniqueIDs = Array(Set(ids))
+        guard !uniqueIDs.isEmpty, uniqueIDs.count <= 100 else {
+            bulkDeleteErrorMessage = "Chỉ có thể chọn từ 1 đến 100 giao dịch."
+            return false
+        }
+        isBulkDeleting = true
+        defer { isBulkDeleting = false }
+        do {
+            try await api.deleteTransactions(ids: uniqueIDs)
+            transactions.removeAll { uniqueIDs.contains($0.id) }
+            return true
+        } catch {
+            bulkDeleteErrorMessage = "Không thể xóa hàng loạt. Không dòng nào bị xóa."
+            return false
+        }
+    }
+
     func deleteTransfer(_ transaction: TransactionModel) async {
         guard let transferID = transaction.transferID else { return }
         do {
@@ -120,6 +144,9 @@ struct TransactionsView: View {
     @State private var selectedTransaction: TransactionModel?
     @State private var editTarget: TransactionModel?
     @State private var deleteTarget: TransactionModel?
+    @State private var selectionMode = false
+    @State private var selectedIDs = Set<String>()
+    @State private var bulkDeleteConfirmation = false
 
     init(api: FinanceAPI) { _model = StateObject(wrappedValue: TransactionsViewModel(api: api)) }
 
@@ -128,6 +155,10 @@ struct TransactionsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Giao dịch", leading: { EmptyView() }, trailing: {
                     HStack(spacing: 4) {
+                        MPIconButton(systemName: selectionMode ? "xmark" : "checklist", label: selectionMode ? "Hủy chọn" : "Chọn nhiều giao dịch") {
+                            selectionMode.toggle()
+                            if !selectionMode { selectedIDs.removeAll() }
+                        }
                         MPIconButton(systemName: "arrow.left.arrow.right", label: "Chuyển tiền") { transferPresented = true }
                         MPIconButton(systemName: "slider.horizontal.3", label: "Điều chỉnh số dư") { adjustmentPresented = true }
                         MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
@@ -138,6 +169,26 @@ struct TransactionsView: View {
                     MPDateRangePicker(start: $model.customStart, end: $model.customEnd)
                 }
                 MPOptionSelector(title: "Ví", options: [MPSelectionOption(id: "__all__", label: "Tổng cộng")] + model.wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $model.walletSelection, emptyLabel: "Tổng cộng")
+                if selectionMode {
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                MPText("Đã chọn \(selectedIDs.count)/100")
+                                Spacer()
+                                MPButton("Xóa", style: .destructive, isLoading: model.isBulkDeleting, isDisabled: selectedIDs.isEmpty || selectedIDs.count > 100) {
+                                    bulkDeleteConfirmation = true
+                                }
+                            }
+                            MPText("Chỉ giao dịch thu/chi thường được chọn; chuyển ví, tín dụng và điều chỉnh số dư phải dùng luồng riêng.", style: .secondary)
+                            if let bulkDeleteErrorMessage = model.bulkDeleteErrorMessage {
+                                MPStatusMessage(text: bulkDeleteErrorMessage, tone: .danger)
+                            }
+                            if selectedIDs.count > 100 {
+                                MPStatusMessage(text: "Không thể chọn quá 100 giao dịch.", tone: .danger)
+                            }
+                        }
+                    }
+                }
                 if model.isLoading && model.transactions.isEmpty {
                     MPLoadingView(label: "Đang tải giao dịch...")
                 } else if let errorMessage = model.errorMessage, model.transactions.isEmpty {
@@ -156,19 +207,7 @@ struct TransactionsView: View {
                                     MPText(day, style: .secondary)
                                         .padding(.bottom, 4)
                                     ForEach(transactions) { transaction in
-                                        MPButton(style: .plain) {
-                                            selectedTransaction = transaction
-                                        } label: {
-                                            MPTransactionRow(
-                                                title: transaction.note?.isEmpty == false ? transaction.note! : (transaction.type == "income" ? "Thu nhập" : "Chi tiêu"),
-                                                subtitle: MPFormat.shortDate(transaction.occurredAt, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current),
-                                                amount: MPFormat.money(transaction.amount),
-                                                isIncome: transaction.type == "income"
-                                            )
-                                        }
-                                        .contextMenu {
-                                            MPButton("Xóa giao dịch", style: .destructive) { deleteTarget = transaction }
-                                        }
+                                        transactionRow(transaction)
                                     }
                                 }
                             }
@@ -230,10 +269,51 @@ struct TransactionsView: View {
             if let target = deleteTarget { Task { if target.transferID != nil { await model.deleteTransfer(target) } else { await model.delete(target) } } }
             deleteTarget = nil
         }
+        .mpConfirmDialog(isPresented: $bulkDeleteConfirmation, title: "Xóa giao dịch đã chọn?", message: "Các dòng hợp lệ sẽ bị xóa nguyên tử; nếu một dòng không hợp lệ, không dòng nào bị xóa.", confirmTitle: "Xóa tất cả") {
+            Task {
+                if await model.deleteMany(Array(selectedIDs)) {
+                    selectionMode = false
+                    selectedIDs.removeAll()
+                }
+            }
+        }
         .accessibilityIdentifier("transactions-screen")
     }
 
     private var modelAPI: FinanceAPI { model.apiForChild }
+
+    @ViewBuilder
+    private func transactionRow(_ transaction: TransactionModel) -> some View {
+        let selectable = TransactionsViewModel.bulkDeleteSelectable(transaction)
+        let title = transaction.note?.isEmpty == false ? transaction.note! : (transaction.type == "income" ? "Thu nhập" : "Chi tiêu")
+        let row = MPTransactionRow(
+            title: title,
+            subtitle: MPFormat.shortDate(transaction.occurredAt, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current),
+            amount: MPFormat.money(transaction.amount),
+            isIncome: transaction.type == "income"
+        )
+        if selectionMode {
+            MPButton(style: .plain, isDisabled: !selectable) {
+                if selectable {
+                    if selectedIDs.contains(transaction.id) { selectedIDs.remove(transaction.id) }
+                    else { selectedIDs.insert(transaction.id) }
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: selectedIDs.contains(transaction.id) ? "checkmark.circle.fill" : "circle")
+                        .foregroundStyle(selectable ? MPColor.action : MPColor.secondary)
+                    row
+                }
+            }
+        } else {
+            MPButton(style: .plain) {
+                selectedTransaction = transaction
+            } label: { row }
+                .contextMenu {
+                    MPButton("Xóa giao dịch", style: .destructive) { deleteTarget = transaction }
+                }
+        }
+    }
 }
 
 private extension TransactionsViewModel {

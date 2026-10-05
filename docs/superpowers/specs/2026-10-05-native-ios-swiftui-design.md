@@ -81,7 +81,7 @@ must enforce the same rule with SwiftUI views rather than reusing DOM/RN code.
 | Auth gate | `Auth/RootGate` | loading, Google sign-in, OAuth failure, logout, refresh rotation |
 | Face ID | `Auth/BiometricUnlock` | opt-in after first login; prompt only when session is valid; fallback to passcode/login |
 | Overview | `Overview/OverviewScreen` | owner home totals, mask/unmask, refresh, empty/error |
-| Transactions | `Transactions/TransactionsScreen` | `Tổng cộng`/wallet scope, account-timezone week/custom period, local-date grouped rows, loading/empty/error |
+| Transactions | `Transactions/TransactionsScreen` | `Tổng cộng`/wallet scope, account-timezone week/custom period, local-date grouped rows, loading/empty/error, and atomic bulk-delete selection capped at 100 IDs while excluding transfer/adjustment rows |
 | Manual entry | `Transactions/TransactionEditor` | income/expense, category, wallet, date, note, validation, create/edit save/cancel without losing the selected record |
 | Transfer | `Transactions/TransferEditor` | source/destination wallet, atomic API, confirmation and replay-safe error |
 | Transaction actions | `Transactions/TransactionDetail` | edit/delete, immutable adjustment/transfer rules, travel link |

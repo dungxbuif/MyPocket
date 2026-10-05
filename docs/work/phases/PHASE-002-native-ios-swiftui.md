@@ -158,7 +158,7 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 24 unit/contract tests and 4 UI smoke tests (auth launch,
+suite passed: 28 unit/contract tests and 4 UI smoke tests (auth launch,
 authenticated primary tabs, More route + floating feedback overlay, and a
 fresh-launch sweep through all 13 secondary destinations). The shared
 `MPButton` now explicitly owns its rectangular rendered hit shape; this fixed
@@ -188,6 +188,11 @@ it proves native navigation, state rendering and feedback entry without
 placing a real JWT or API secret in the app. A staging/production authenticated
 API smoke test remains a release prerequisite.
 
+The DEBUG-only `-UITestAuthenticatedAPI` launch argument was also exercised
+after resetting the simulator. It exchanged fixture PKCE fields against the
+local API, persisted the disposable JWT in Keychain and rendered the overview
+through live URLSession requests; no production credentials or data were used.
+
 ## Native parity follow-up — 2026-10-06
 
 Two audit findings were fixed before the simulator test pass:
@@ -216,7 +221,9 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (24 unit/contract tests and 4 UI smoke tests). Provider-backed
+Both commands pass (28 unit/contract tests and 4 UI smoke tests). The same pass
+also covers typed `204 No Content` mutation responses and native bulk-delete
+selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical
 device checks remain external release gates.
 

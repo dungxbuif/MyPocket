@@ -21,6 +21,27 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(json.contains("included_in_reports"))
     }
 
+    func testBulkDeleteInputEncodesUniqueIDContractShape() throws {
+        let input = BulkDeleteInputModel(transactionIDs: ["tx-1", "tx-2"])
+        let payload = try JSONSerialization.jsonObject(with: JSONEncoder.mypocket.encode(input)) as? [String: [String]]
+        XCTAssertEqual(payload?["transaction_ids"], ["tx-1", "tx-2"])
+    }
+
+    func testBulkDeleteSelectionExcludesImmutableRows() {
+        let ordinary = transaction(id: "ordinary", occurredAt: "2026-10-06T00:00:00Z")
+        var transfer = ordinary
+        transfer.transferID = "transfer-1"
+        var adjustment = ordinary
+        adjustment.type = "adjustment"
+        var credit = ordinary
+        credit.creditKind = "purchase"
+
+        XCTAssertTrue(TransactionsViewModel.bulkDeleteSelectable(ordinary))
+        XCTAssertFalse(TransactionsViewModel.bulkDeleteSelectable(transfer))
+        XCTAssertFalse(TransactionsViewModel.bulkDeleteSelectable(adjustment))
+        XCTAssertFalse(TransactionsViewModel.bulkDeleteSelectable(credit))
+    }
+
     func testNativeGoogleFixtureExchangeEncodesIOSPKCEContract() throws {
         let request = MobileGoogleExchangeRequest(
             code: "fixture",
