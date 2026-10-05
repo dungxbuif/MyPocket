@@ -124,6 +124,11 @@ kind and an applicable category, while a payment chooses a non-credit source
 wallet; both actions accept amount and optional note. The native screen must not
 silently drop category or note fields when calling the credit APIs.
 
+Recurring schedule parity also follows the web constraints: credit wallets are
+not valid recurring sources, category options are filtered to the selected
+expense/income type, and switching type clears a category that no longer
+matches the selected type.
+
 Selecting a credit wallet from the main wallet list must route to the same
 statement plus entry/payment surface as the dedicated credit route; a read-only
 credit detail is not sufficient for parity.

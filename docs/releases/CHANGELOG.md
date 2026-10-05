@@ -74,6 +74,9 @@ as active release entries here.
 - Native portfolio now shows current/unrealized metrics, keeps price drafts
   independent per asset, allows clearing an unknown price, and preserves the
   selected trade date.
+- Native recurring schedules now exclude credit wallets and filter categories
+  by expense/income type, clearing stale category selections when the type
+  changes.
 
 ### Verification
 

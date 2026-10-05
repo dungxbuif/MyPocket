@@ -58,6 +58,10 @@ rows with a generic load error.
 Portfolio UI keeps current-price drafts keyed by asset ID, mirrors the nullable
 price contract, and sends the selected trade date through the existing API.
 
+Recurring schedules exclude credit wallets and filter category choices by the
+selected expense/income type. Changing the schedule type clears an incompatible
+category before a create/update request is sent, matching the web form.
+
 Finance Assistant history uses one UserDefaults conversation ID keyed by the
 authenticated owner ID. The native screen reloads that conversation's latest
 50 messages and the read-only monthly overview on entry; a later request can
