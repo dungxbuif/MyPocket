@@ -27,7 +27,7 @@ final class FeedbackViewModel: ObservableObject {
         } catch { errorMessage = "Không thể tải phản hồi và changelog." }
     }
 
-    func submit() async -> Bool {
+    func submit(screenshot: Data? = nil) async -> Bool {
         guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             errorMessage = "Nhập tiêu đề và mô tả trước khi gửi."
             return false
@@ -35,7 +35,7 @@ final class FeedbackViewModel: ObservableObject {
         isSending = true
         defer { isSending = false }
         do {
-            let item = try await api.createFeedback(FeedbackInputModel(type: type, title: title, description: description))
+            let item = try await api.createFeedback(FeedbackInputModel(type: type, title: title, description: description), screenshot: screenshot)
             items.insert(item, at: 0)
             title = ""
             description = ""
@@ -49,11 +49,13 @@ final class FeedbackViewModel: ObservableObject {
 
 struct FeedbackOverlay: View {
     let api: FinanceAPI
+    let screenshot: Data?
     let onClose: () -> Void
     @StateObject private var model: FeedbackViewModel
 
-    init(api: FinanceAPI, onClose: @escaping () -> Void) {
+    init(api: FinanceAPI, screenshot: Data? = nil, onClose: @escaping () -> Void) {
         self.api = api
+        self.screenshot = screenshot
         self.onClose = onClose
         _model = StateObject(wrappedValue: FeedbackViewModel(api: api))
     }
@@ -66,7 +68,7 @@ struct FeedbackOverlay: View {
             MPTextEditor(title: "Chi tiết", text: $model.description, placeholder: "Điều gì đã xảy ra?")
             if let errorMessage = model.errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
             MPButton("Gửi phản hồi", isLoading: model.isSending) {
-                Task { if await model.submit() { onClose() } }
+                Task { if await model.submit(screenshot: screenshot) { onClose() } }
             }
         }
         .padding(16)

@@ -4,6 +4,7 @@ struct MainTabView: View {
     @ObservedObject var auth: AuthViewModel
     @State private var selection = "overview"
     @State private var feedbackPresented = false
+    @State private var feedbackScreenshot: Data?
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -19,11 +20,14 @@ struct MainTabView: View {
                     MoreView(api: auth.financeAPI, auth: auth)
                 }
             }
-            MPFeedbackBubble { feedbackPresented = true }
+            MPFeedbackBubble {
+                feedbackScreenshot = ScreenSnapshot.capture()
+                feedbackPresented = true
+            }
                 .padding(.trailing, 16)
                 .padding(.bottom, 82)
             if feedbackPresented {
-                FeedbackOverlay(api: auth.financeAPI) { feedbackPresented = false }
+                FeedbackOverlay(api: auth.financeAPI, screenshot: feedbackScreenshot) { feedbackPresented = false }
                     .padding(MPMetrics.pagePadding)
                     .background(.ultraThinMaterial)
                     .transition(.move(edge: .bottom).combined(with: .opacity))

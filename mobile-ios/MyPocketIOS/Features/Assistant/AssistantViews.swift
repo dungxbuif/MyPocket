@@ -72,6 +72,8 @@ struct AIEntryView: View {
     @State private var process: EntryProcessModel?
     @State private var processing = false
     @State private var error: String?
+    @State private var files: [MultipartFile] = []
+    @State private var showFilePicker = false
 
     var body: some View {
         ScrollView {
@@ -82,6 +84,12 @@ struct AIEntryView: View {
                     MPStatusMessage(text: capabilities.ocrConfigured ? "OCR đã sẵn sàng." : "OCR chưa được cấu hình.", tone: capabilities.ocrConfigured ? .success : .info)
                 }
                 MPTextEditor(title: "Mô tả", text: $text, placeholder: "Ví dụ: Chi 50.000 cho cà phê hôm nay")
+                MPDocumentPicker(title: "Đính kèm ảnh hoặc PDF", count: files.count, maxCount: 20, isPresented: $showFilePicker) { urls in
+                    importFiles(urls)
+                }
+                ForEach(Array(files.enumerated()), id: \.offset) { index, file in
+                    MPAttachmentThumb(name: file.fileName) { files.remove(at: index) }
+                }
                 MPButton("Phân tích đề xuất", isLoading: processing) { Task { await processEntry() } }
                 if let error { MPStatusMessage(text: error, tone: .danger) }
                 if let process {
@@ -112,12 +120,26 @@ struct AIEntryView: View {
     private func processEntry() async {
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập mô tả trước khi phân tích."; return }
         processing = true; error = nil; defer { processing = false }
-        do { process = try await api.processEntry(requestID: UUID().uuidString, text: text, timezone: TimeZone.current.identifier) }
+        do { process = try await api.processEntry(requestID: UUID().uuidString, text: text, timezone: TimeZone.current.identifier, files: files) }
         catch { self.error = "Không thể xử lý yêu cầu. Không có giao dịch nào được lưu." }
     }
     private func decide(_ proposal: EntryProposalModel, as decision: String) async {
         do { let updated = try await api.decideEntryProposal(id: proposal.id, version: proposal.version, decision: decision); process?.proposals = process?.proposals.map { $0.id == updated.id ? updated : $0 } ?? [] }
         catch { self.error = "Không thể cập nhật đề xuất. Tải lại để kiểm tra trạng thái." }
+    }
+
+    private func importFiles(_ urls: [URL]) {
+        for url in urls {
+            guard files.count < 20 else { break }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url), data.count <= 5 * 1024 * 1024 else {
+                error = "Mỗi tệp phải nhỏ hơn 5 MiB."
+                continue
+            }
+            let mime = url.pathExtension.lowercased() == "pdf" ? "application/pdf" : "image/\(url.pathExtension.lowercased() == "jpg" ? "jpeg" : url.pathExtension.lowercased())"
+            files.append(MultipartFile(fieldName: "files", fileName: url.lastPathComponent, mimeType: mime, data: data))
+        }
     }
 }
 

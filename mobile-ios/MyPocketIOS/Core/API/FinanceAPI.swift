@@ -91,6 +91,10 @@ final class FinanceAPI: @unchecked Sendable {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/months/\(month)/note", method: .put, body: try body(["note": note])))
     }
 
+    func deleteMonthNote(month: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/months/\(month)/note", method: .delete))
+    }
+
     func insider(month: String, walletID: String? = nil, categoryID: String? = nil) async throws -> InsiderSummaryModel {
         var query = URLComponents()
         var items = [URLQueryItem(name: "month", value: month)]
@@ -140,8 +144,28 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/travel/events/\(id)/\(active ? "activate" : "deactivate")", method: .post, idempotencyKey: UUID().uuidString))
     }
 
+    func updateTravelEvent(id: String, input: TravelEventInputModel) async throws -> TravelEventModel {
+        try await client.send(APIRequest(path: "/travel/events/\(id)", method: .patch, body: try body(input)))
+    }
+
+    func deleteTravelEvent(id: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/travel/events/\(id)", method: .delete))
+    }
+
     func portfolioSummary() async throws -> PortfolioSummaryModel {
         try await client.send(APIRequest(path: "/portfolio/summary"))
+    }
+
+    func createPortfolioAsset(symbol: String, name: String) async throws -> PortfolioAssetModel {
+        try await client.send(APIRequest(path: "/portfolio/assets", method: .post, body: try body(["symbol": symbol, "name": name]), idempotencyKey: UUID().uuidString))
+    }
+
+    func updatePortfolioPrice(assetID: String, latestPrice: Int64?) async throws -> PortfolioAssetModel {
+        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/price", method: .patch, body: try body(["latest_price": latestPrice])))
+    }
+
+    func createPortfolioTrade(assetID: String, input: PortfolioTradeInputModel) async throws -> PortfolioTradeModel {
+        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/trades", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
     }
 
     func creditStatement(walletID: String, from: String? = nil, to: String? = nil) async throws -> CreditStatementModel {
@@ -154,12 +178,29 @@ final class FinanceAPI: @unchecked Sendable {
         return try await client.send(APIRequest(path: "/credit/wallets/\(walletID)/statement\(suffix)"))
     }
 
+    func createCreditEntry(walletID: String, input: CreditEntryInputModel) async throws -> TransactionModel {
+        try await client.send(APIRequest(path: "/credit/wallets/\(walletID)/entries", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
+    func createCreditPayment(walletID: String, input: CreditPaymentInputModel) async throws -> [TransactionModel] {
+        try await client.send(APIRequest(path: "/credit/wallets/\(walletID)/payments", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
     func feedback() async throws -> [FeedbackModel] {
         try await client.send(APIRequest(path: "/feedback"))
     }
 
     func createFeedback(_ input: FeedbackInputModel) async throws -> FeedbackModel {
         try await client.send(APIRequest(path: "/feedback", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
+    func createFeedback(_ input: FeedbackInputModel, screenshot: Data?) async throws -> FeedbackModel {
+        guard let screenshot else { return try await createFeedback(input) }
+        return try await client.sendMultipart(
+            path: "/feedback",
+            fields: ["type": input.type, "title": input.title, "description": input.description],
+            files: [MultipartFile(fieldName: "screenshot", fileName: "screen.jpg", mimeType: "image/jpeg", data: screenshot)]
+        )
     }
 
     func changelog() async throws -> [ChangelogModel] {
@@ -243,6 +284,41 @@ struct TravelEventInputModel: Codable, Sendable {
     var startsOn: String?
     var endsOn: String?
     var active: Bool
+}
+
+struct PortfolioTradeInputModel: Codable, Sendable {
+    var side: String
+    var quantity: String
+    var unitPrice: Int64
+    var fee: Int64
+    var occurredAt: String
+    var note: String?
+}
+
+struct PortfolioTradeModel: Codable, Identifiable, Sendable {
+    let id: String
+    var assetID: String
+    var side: String
+    var quantity: String
+    var unitPrice: Int64
+    var fee: Int64
+    var occurredAt: String
+    var note: String?
+}
+
+struct CreditEntryInputModel: Codable, Sendable {
+    var kind: String
+    var categoryID: String?
+    var amount: Int64
+    var occurredAt: String?
+    var note: String?
+}
+
+struct CreditPaymentInputModel: Codable, Sendable {
+    var sourceWalletID: String
+    var amount: Int64
+    var occurredAt: String?
+    var note: String?
 }
 
 struct AdvisorMessageInputModel: Codable, Sendable {

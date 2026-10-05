@@ -18,12 +18,14 @@
 		358F88DFB1F38E5A9A01661A /* FinanceAPI.swift in Sources */ = {isa = PBXBuildFile; fileRef = E237A1DE9AE939B13E17BF8A /* FinanceAPI.swift */; };
 		3C431D6AE2B0B17FFEE4A555 /* FinanceModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = EB520CDEDE9521362E6396EB /* FinanceModels.swift */; };
 		3F3FC783AE1D164951E62668 /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = B7D28F77035681F30BD5C157 /* APIClient.swift */; };
+		5080A60AB4A01657C7679B28 /* FinanceModelTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88D769DADC37190893BC1354 /* FinanceModelTests.swift */; };
 		5212CC79793A3FDBD52F9B4B /* AppRootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F16A402CDCC8CC0958C9E728 /* AppRootView.swift */; };
 		526354268C4EC0F5EE60DEE8 /* MyPocketIOSApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9723A8BA4562D535FB497660 /* MyPocketIOSApp.swift */; };
 		5403FFF0BB1B23CCAA54CFD5 /* MPText.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0B71F92D1A807AEA18B09C48 /* MPText.swift */; };
 		5E06C090E6962D3656A7A514 /* MPButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = A54636EF0318CE0AE3B391CC /* MPButton.swift */; };
 		65D4614B446F5BEF88CDF414 /* Session.swift in Sources */ = {isa = PBXBuildFile; fileRef = F1C3F44815F0ACA384DE7FA1 /* Session.swift */; };
 		68B9E0F3E4EE03055CF21D1A /* MPNavigation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5B88B6E4C88F6F3AF1E7C7E0 /* MPNavigation.swift */; };
+		6B045E4A1F70C5EC9B1AECED /* ScreenSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 38DE098C0CA2A7712507EF13 /* ScreenSnapshot.swift */; };
 		70554355FE8B5AE90E53193D /* FeedbackView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 52D20410826956CA45BC2729 /* FeedbackView.swift */; };
 		79B0ADD4F4D0023C8B5A2B3D /* AuthViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = B38B7196EEF914C165BF76DE /* AuthViewModel.swift */; };
 		7CA91D523F8FF4900070A614 /* Tokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = 74C0D9FC2644AA2A6D2E8AC0 /* Tokens.swift */; };
@@ -73,6 +75,7 @@
 		1C68B9CB3283E502E49DB649 /* DesignSystemTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignSystemTests.swift; sourceTree = "<group>"; };
 		2B831652B4462A6E4B510620 /* MPFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPFields.swift; sourceTree = "<group>"; };
 		381BDBBD19AD4CD5F8F572DA /* MPFormat.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPFormat.swift; sourceTree = "<group>"; };
+		38DE098C0CA2A7712507EF13 /* ScreenSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScreenSnapshot.swift; sourceTree = "<group>"; };
 		4187C5B48B4E4102719E0E47 /* APIClientTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIClientTests.swift; sourceTree = "<group>"; };
 		42613E8B37F2BA38C98F27A0 /* LaunchTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LaunchTests.swift; sourceTree = "<group>"; };
 		4339F20DF12E511A5DD53D88 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
@@ -91,6 +94,7 @@
 		8208510DDD2862B20EE3F111 /* MyPocketIOS.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = MyPocketIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		83C5D72DC4F43C1C2B504A02 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		863A1D951CDA51F951E3E8A1 /* MyPocketIOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MyPocketIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		88D769DADC37190893BC1354 /* FinanceModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinanceModelTests.swift; sourceTree = "<group>"; };
 		9723A8BA4562D535FB497660 /* MyPocketIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyPocketIOSApp.swift; sourceTree = "<group>"; };
 		9E62438EBE24C18C8C893575 /* BiometricUnlockView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BiometricUnlockView.swift; sourceTree = "<group>"; };
 		A54636EF0318CE0AE3B391CC /* MPButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPButton.swift; sourceTree = "<group>"; };
@@ -143,6 +147,7 @@
 			children = (
 				513FB872A78A1846F163395B /* API */,
 				41C2ACA54BCB156F490A307C /* Auth */,
+				5F128A52F682B62D201F6426 /* Feedback */,
 				C71335EAD0C1444B3D71E042 /* Models */,
 			);
 			path = Core;
@@ -178,6 +183,14 @@
 			path = API;
 			sourceTree = "<group>";
 		};
+		5F128A52F682B62D201F6426 /* Feedback */ = {
+			isa = PBXGroup;
+			children = (
+				38DE098C0CA2A7712507EF13 /* ScreenSnapshot.swift */,
+			);
+			path = Feedback;
+			sourceTree = "<group>";
+		};
 		6B2C35720D22555A4DA2B3D0 /* Features */ = {
 			isa = PBXGroup;
 			children = (
@@ -199,6 +212,7 @@
 			children = (
 				4187C5B48B4E4102719E0E47 /* APIClientTests.swift */,
 				1C68B9CB3283E502E49DB649 /* DesignSystemTests.swift */,
+				88D769DADC37190893BC1354 /* FinanceModelTests.swift */,
 				E4857264234927FC415152BC /* PlaceholderTests.swift */,
 			);
 			path = MyPocketIOSTests;
@@ -479,6 +493,7 @@
 				526354268C4EC0F5EE60DEE8 /* MyPocketIOSApp.swift in Sources */,
 				D5A07A2E66ADCF31F7D37489 /* OverviewView.swift in Sources */,
 				22BB6A2E48EB82D70C21860E /* RefreshCoordinator.swift in Sources */,
+				6B045E4A1F70C5EC9B1AECED /* ScreenSnapshot.swift in Sources */,
 				F32CA0418336F225D59D0235 /* SecondaryFeatureViews.swift in Sources */,
 				65D4614B446F5BEF88CDF414 /* Session.swift in Sources */,
 				7CA91D523F8FF4900070A614 /* Tokens.swift in Sources */,
@@ -493,6 +508,7 @@
 			files = (
 				BD9D18178C21F9D283883DA5 /* APIClientTests.swift in Sources */,
 				FF89C3C262650A9C81311B2D /* DesignSystemTests.swift in Sources */,
+				5080A60AB4A01657C7679B28 /* FinanceModelTests.swift in Sources */,
 				A9E5AB47D879F8C44AA78475 /* PlaceholderTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

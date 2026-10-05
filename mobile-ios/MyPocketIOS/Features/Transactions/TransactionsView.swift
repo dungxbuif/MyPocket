@@ -58,6 +58,8 @@ final class TransactionsViewModel: ObservableObject {
 struct TransactionsView: View {
     @StateObject private var model: TransactionsViewModel
     @State private var editorPresented = false
+    @State private var transferPresented = false
+    @State private var adjustmentPresented = false
     @State private var selectedTransaction: TransactionModel?
     @State private var deleteTarget: TransactionModel?
 
@@ -67,7 +69,11 @@ struct TransactionsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Giao dịch", leading: { EmptyView() }, trailing: {
-                    MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editorPresented = true }
+                    HStack(spacing: 4) {
+                        MPIconButton(systemName: "arrow.left.arrow.right", label: "Chuyển tiền") { transferPresented = true }
+                        MPIconButton(systemName: "slider.horizontal.3", label: "Điều chỉnh số dư") { adjustmentPresented = true }
+                        MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editorPresented = true }
+                    }
                 })
                 MPSegmentedControl(options: [("all", "Tất cả"), ("week", "Tuần này")], selection: $model.periodSelection)
                 MPWalletSelector(title: "Ví", options: ["Tổng cộng"] + model.wallets.map(\.name), selection: Binding(
@@ -119,6 +125,18 @@ struct TransactionsView: View {
                     editorPresented = false
                     Task { await model.load() }
                 } onCancel: { editorPresented = false }
+                .background(MPColor.canvas.ignoresSafeArea())
+            } else if transferPresented {
+                TransferEditorView(api: modelAPI, wallets: model.wallets) {
+                    transferPresented = false
+                    Task { await model.load() }
+                } onCancel: { transferPresented = false }
+                .background(MPColor.canvas.ignoresSafeArea())
+            } else if adjustmentPresented {
+                AdjustmentEditorView(api: modelAPI, wallets: model.wallets) {
+                    adjustmentPresented = false
+                    Task { await model.load() }
+                } onCancel: { adjustmentPresented = false }
                 .background(MPColor.canvas.ignoresSafeArea())
             } else if let selectedTransaction {
                 TransactionDetailView(transaction: selectedTransaction, onDelete: {
@@ -220,4 +238,68 @@ struct TransactionDetailView: View {
         }
         .padding(MPMetrics.pagePadding)
     }
+}
+
+struct TransferEditorView: View {
+    let api: FinanceAPI
+    let wallets: [WalletModel]
+    let onSaved: () -> Void
+    let onCancel: () -> Void
+    @State private var source = ""
+    @State private var destination = ""
+    @State private var amount = ""
+    @State private var note = ""
+    @State private var date = Date()
+    @State private var saving = false
+    @State private var error: String?
+
+    var body: some View {
+        ScrollView { VStack(alignment: .leading, spacing: 16) {
+            MPScreenHeader(title: "Chuyển tiền", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
+            MPText("Chuyển tiền tạo cặp giao dịch nguyên tử giữa hai ví; không tính vào báo cáo.", style: .secondary)
+            MPWalletSelector(title: "Từ ví", options: wallets.map(\.name), selection: $source)
+            MPWalletSelector(title: "Đến ví", options: wallets.map(\.name), selection: $destination)
+            MPAmountField(title: "Số tiền", text: $amount)
+            MPDateField(title: "Ngày chuyển", date: $date)
+            MPTextField(title: "Ghi chú", text: $note)
+            if let error { MPStatusMessage(text: error, tone: .danger) }
+            MPButton("Xác nhận chuyển", isLoading: saving) { Task { await save() } }
+        }.padding(MPMetrics.pagePadding) }
+        .task { if source.isEmpty { source = wallets.first?.name ?? "" }; if destination.isEmpty { destination = wallets.dropFirst().first?.name ?? wallets.first?.name ?? "" } }
+    }
+
+    private func save() async {
+        guard let from = wallets.first(where: { $0.name == source }), let to = wallets.first(where: { $0.name == destination }), from.id != to.id, let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn hai ví khác nhau và nhập số tiền hợp lệ."; return }
+        saving = true; defer { saving = false }
+        do { _ = try await api.createTransfer(TransferInputModel(sourceWalletID: from.id, destinationWalletID: to.id, amount: parsed, occurredAt: Self.timestamp(date), note: note.isEmpty ? nil : note)); onSaved() }
+        catch { self.error = "Không thể chuyển tiền. Số dư hoặc ví có thể không hợp lệ." }
+    }
+    private static func timestamp(_ date: Date) -> String { let formatter = ISO8601DateFormatter(); return formatter.string(from: date) }
+}
+
+struct AdjustmentEditorView: View {
+    let api: FinanceAPI
+    let wallets: [WalletModel]
+    let onSaved: () -> Void
+    let onCancel: () -> Void
+    @State private var wallet = ""
+    @State private var direction = "increase"
+    @State private var amount = ""
+    @State private var note = ""
+    @State private var saving = false
+    @State private var error: String?
+
+    var body: some View {
+        ScrollView { VStack(alignment: .leading, spacing: 16) {
+            MPScreenHeader(title: "Điều chỉnh số dư", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
+            MPWalletSelector(title: "Ví", options: wallets.map(\.name), selection: $wallet)
+            MPWalletSelector(title: "Hướng", options: ["increase", "decrease"], selection: $direction)
+            MPAmountField(title: "Số tiền", text: $amount)
+            MPTextField(title: "Lý do", text: $note)
+            if let error { MPStatusMessage(text: error, tone: .danger) }
+            MPButton("Lưu điều chỉnh", isLoading: saving) { Task { await save() } }
+        }.padding(MPMetrics.pagePadding) }
+        .task { if wallet.isEmpty { wallet = wallets.first?.name ?? "" } }
+    }
+    private func save() async { guard let selected = wallets.first(where: { $0.name == wallet }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: ISO8601DateFormatter().string(from: Date()), note: note.isEmpty ? nil : note)); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
 }
