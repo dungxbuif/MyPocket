@@ -339,12 +339,15 @@ struct RecurringView: View {
     let onBack: () -> Void
     @State private var items: [RecurringModel] = []
     @State private var wallets: [WalletModel] = []
+    @State private var categories: [CategoryModel] = []
     @State private var showEditor = false
     @State private var editTarget: RecurringModel?
     @State private var name = ""
     @State private var amount = ""
     @State private var walletName = ""
     @State private var frequency = "monthly"
+    @State private var type = "expense"
+    @State private var categoryName = "Không chọn"
     @State private var nextRun = MPFormat.todayISO
     @State private var result: String?
     @State private var error: String?
@@ -364,6 +367,8 @@ struct RecurringView: View {
                         MPTextField(title: "Tên", text: $name)
                         MPAmountField(title: "Số tiền", text: $amount)
                         MPWalletSelector(title: "Ví", options: wallets.map(\.name), selection: $walletName)
+                        MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $type)
+                        MPWalletSelector(title: "Danh mục", options: ["Không chọn"] + categories.map(\.name), selection: $categoryName)
                         MPWalletSelector(title: "Tần suất", options: ["daily", "weekly", "monthly", "yearly"], selection: $frequency)
                         MPTextField(title: "Ngày chạy đầu tiên", text: $nextRun)
                         HStack { MPButton("Hủy", style: .secondary) { showEditor = false; editTarget = nil }; MPButton("Lưu") { Task { await save() } } }
@@ -377,10 +382,10 @@ struct RecurringView: View {
         .accessibilityIdentifier("recurring-screen")
     }
 
-    private func load() async { do { async let schedules = api.recurring(); async let walletList = api.wallets(); items = try await schedules; wallets = try await walletList; if walletName.isEmpty { walletName = wallets.first?.name ?? "" }; self.error = nil } catch { self.error = "Không thể tải lịch định kỳ." } }
+    private func load() async { do { async let schedules = api.recurring(); async let walletList = api.wallets(); async let categoryList = api.categories(); items = try await schedules; wallets = try await walletList; categories = try await categoryList; if walletName.isEmpty { walletName = wallets.first?.name ?? "" }; self.error = nil } catch { self.error = "Không thể tải lịch định kỳ." } }
     private func runDue() async { do { let response = try await api.runDueRecurring(); result = "Đã tạo \(response.created) giao dịch."; await load() } catch { self.error = "Không thể chạy giao dịch đến hạn." } }
-    private func beginEditing(_ item: RecurringModel) { editTarget = item; name = item.name; amount = String(item.amount); walletName = wallets.first(where: { $0.id == item.walletID })?.name ?? wallets.first?.name ?? ""; frequency = item.frequency; nextRun = item.nextRunAt; showEditor = true }
-    private func save() async { guard let wallet = wallets.first(where: { $0.name == walletName }), let parsed = Int64(amount.filter(\.isNumber)), !name.isEmpty else { self.error = "Nhập đủ tên, ví và số tiền."; return }; let input = RecurringInputModel(name: name, walletID: wallet.id, categoryID: nil, type: "expense", amount: parsed, note: nil, frequency: frequency, interval: 1, nextRunAt: nextRun, endsAt: nil, active: true); do { if let editTarget { _ = try await api.updateRecurring(id: editTarget.id, input: input) } else { _ = try await api.createRecurring(input) }; showEditor = false; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu lịch định kỳ." } }
+    private func beginEditing(_ item: RecurringModel) { editTarget = item; name = item.name; amount = String(item.amount); walletName = wallets.first(where: { $0.id == item.walletID })?.name ?? wallets.first?.name ?? ""; type = item.type; categoryName = categories.first(where: { $0.id == item.categoryID })?.name ?? "Không chọn"; frequency = item.frequency; nextRun = item.nextRunAt; showEditor = true }
+    private func save() async { guard let wallet = wallets.first(where: { $0.name == walletName }), let parsed = Int64(amount.filter(\.isNumber)), !name.isEmpty else { self.error = "Nhập đủ tên, ví và số tiền."; return }; let input = RecurringInputModel(name: name, walletID: wallet.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, type: type, amount: parsed, note: nil, frequency: frequency, interval: 1, nextRunAt: nextRun, endsAt: nil, active: true); do { if let editTarget { _ = try await api.updateRecurring(id: editTarget.id, input: input) } else { _ = try await api.createRecurring(input) }; showEditor = false; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu lịch định kỳ." } }
     private func delete(_ item: RecurringModel) async { do { try await api.deleteRecurring(id: item.id); await load() } catch { self.error = "Không thể xóa lịch định kỳ." } }
 }
 

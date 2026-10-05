@@ -63,3 +63,10 @@ struct AdvisorSubmitModel: Codable, Sendable {
     var text: String
     var status: String
 }
+
+struct AdvisorRunModel: Codable, Sendable {
+    var id: String
+    var conversationID: String
+    var status: String
+    var errorCode: String?
+}

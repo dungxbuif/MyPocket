@@ -8,6 +8,7 @@ struct AssistantView: View {
     @State private var conversationID = ""
     @State private var input = ""
     @State private var sending = false
+    @State private var activeRunID: String?
     @State private var error: String?
 
     var body: some View {
@@ -40,7 +41,12 @@ struct AssistantView: View {
             VStack(spacing: 8) {
                 MPTextEditor(title: "", text: $input, placeholder: "Hỏi về tiền của bạn...")
                     .frame(minHeight: 90)
-                MPButton("Gửi", isLoading: sending) { Task { await send() } }
+                HStack {
+                    MPButton("Gửi", isLoading: sending) { Task { await send() } }
+                    if sending, let activeRunID {
+                        MPButton("Hủy", style: .destructive) { Task { await cancel(runID: activeRunID) } }
+                    }
+                }
             }
             .padding(MPMetrics.pagePadding)
             .background(.bar)
@@ -62,9 +68,26 @@ struct AssistantView: View {
         do {
             let result = try await api.submitAdvisorMessage(AdvisorMessageInputModel(clientRequestID: UUID().uuidString, text: text))
             conversationID = result.conversationID
+            activeRunID = result.runID
             input = ""
+            if result.status == "queued" || result.status == "running" {
+                for _ in 0..<60 {
+                    try await Task.sleep(for: .milliseconds(500))
+                    let run = try await api.advisorRun(id: result.runID)
+                    if ["completed", "failed", "cancelled", "interrupted", "purged"].contains(run.status) {
+                        if run.status != "completed" { self.error = "Yêu cầu trợ lý kết thúc với trạng thái \(run.status)." }
+                        break
+                    }
+                }
+            }
             messages = try await api.advisorMessages(conversationID: conversationID)
-        } catch { self.error = "Không thể xử lý yêu cầu trợ lý tài chính." }
+            activeRunID = nil
+        } catch { self.error = "Không thể xử lý yêu cầu trợ lý tài chính."; activeRunID = nil }
+    }
+
+    private func cancel(runID: String) async {
+        do { try await api.cancelAdvisorRun(id: runID); sending = false; activeRunID = nil; error = "Đã hủy yêu cầu." }
+        catch { self.error = "Không thể hủy yêu cầu đang chạy." }
     }
 }
 
@@ -95,7 +118,7 @@ struct AIEntryView: View {
                     importFiles(urls)
                 }
                 ForEach(Array(files.enumerated()), id: \.offset) { index, file in
-                    MPAttachmentThumb(name: file.fileName) { files.remove(at: index) }
+                    MPAttachmentThumb(name: file.fileName, data: file.data) { files.remove(at: index) }
                 }
                 MPButton("Phân tích đề xuất", isLoading: processing) { Task { await processEntry() } }
                 if let error { MPStatusMessage(text: error, tone: .danger) }

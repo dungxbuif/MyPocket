@@ -265,8 +265,16 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/advisor/conversation/messages?conversation_id=\(conversationID)"))
     }
 
+    func advisorRun(id: String) async throws -> AdvisorRunModel {
+        try await client.send(APIRequest(path: "/ai/advisor/runs/\(id)"))
+    }
+
     func submitAdvisorMessage(_ input: AdvisorMessageInputModel) async throws -> AdvisorSubmitModel {
         try await client.send(APIRequest(path: "/ai/advisor/messages", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
+    func cancelAdvisorRun(id: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/ai/advisor/runs/\(id)/cancel", method: .post, idempotencyKey: UUID().uuidString))
     }
 
     func editEntryProposal(id: String, version: Int, draft: EntryDraftModel) async throws -> EntryProposalModel {

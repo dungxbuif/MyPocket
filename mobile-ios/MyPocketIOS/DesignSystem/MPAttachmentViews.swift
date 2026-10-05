@@ -1,14 +1,31 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct MPAttachmentThumb: View {
     let name: String
+    let data: Data?
     let remove: () -> Void
+
+    init(name: String, data: Data? = nil, remove: @escaping () -> Void) {
+        self.name = name
+        self.data = data
+        self.remove = remove
+    }
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: "doc.fill")
-                .foregroundStyle(MPColor.action)
+            if let data, let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: 44, height: 44)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            } else {
+                Image(systemName: "doc.fill")
+                    .foregroundStyle(MPColor.action)
+                    .frame(width: 44, height: 44)
+            }
             Text(name)
                 .font(.footnote)
                 .lineLimit(1)

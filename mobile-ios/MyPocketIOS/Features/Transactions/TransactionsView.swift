@@ -37,6 +37,10 @@ final class TransactionsViewModel: ObservableObject {
 
     var totalExpense: Int64 { filteredTransactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
     var totalIncome: Int64 { filteredTransactions.filter { $0.type == "income" }.reduce(0) { $0 + $1.amount } }
+    var groupedTransactions: [(String, [TransactionModel])] {
+        Dictionary(grouping: filteredTransactions) { String($0.occurredAt.prefix(10)) }
+            .sorted { $0.key > $1.key }
+    }
 
     func load() async {
         guard !isLoading else { return }
@@ -116,21 +120,25 @@ struct TransactionsView: View {
                     if model.filteredTransactions.isEmpty {
                         MPEmptyView(title: "Không có giao dịch", detail: "Thử đổi khoảng thời gian hoặc thêm giao dịch mới.")
                     } else {
-                        MPSurfaceCard {
-                            VStack(spacing: 0) {
-                                ForEach(model.filteredTransactions) { transaction in
-                                    MPButton(style: .plain) {
-                                        selectedTransaction = transaction
-                                    } label: {
-                                        MPTransactionRow(
-                                            title: transaction.note?.isEmpty == false ? transaction.note! : (transaction.type == "income" ? "Thu nhập" : "Chi tiêu"),
-                                            subtitle: MPFormat.shortDate(transaction.occurredAt),
-                                            amount: MPFormat.money(transaction.amount),
-                                            isIncome: transaction.type == "income"
-                                        )
-                                    }
-                                    .contextMenu {
-                                        MPButton("Xóa giao dịch", style: .destructive) { deleteTarget = transaction }
+                        ForEach(model.groupedTransactions, id: \.0) { day, transactions in
+                            MPSurfaceCard {
+                                VStack(alignment: .leading, spacing: 0) {
+                                    MPText(day, style: .secondary)
+                                        .padding(.bottom, 4)
+                                    ForEach(transactions) { transaction in
+                                        MPButton(style: .plain) {
+                                            selectedTransaction = transaction
+                                        } label: {
+                                            MPTransactionRow(
+                                                title: transaction.note?.isEmpty == false ? transaction.note! : (transaction.type == "income" ? "Thu nhập" : "Chi tiêu"),
+                                                subtitle: MPFormat.shortDate(transaction.occurredAt),
+                                                amount: MPFormat.money(transaction.amount),
+                                                isIncome: transaction.type == "income"
+                                            )
+                                        }
+                                        .contextMenu {
+                                            MPButton("Xóa giao dịch", style: .destructive) { deleteTarget = transaction }
+                                        }
                                     }
                                 }
                             }
