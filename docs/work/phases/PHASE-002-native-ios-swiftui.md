@@ -67,9 +67,10 @@ go test ./...
 go generate ./cmd/api
 ```
 
-This is a checkpoint, not the phase exit gate: the feature-parity screens and
-their API-backed view models still need to be implemented before claiming the
-native port is complete.
+This is a historical checkpoint, not the phase exit gate. The feature-slice
+checkpoint below records the API-backed screens added after this first smoke;
+the remaining exit work is the authenticated staging/production validation
+called out in the latest verification section.
 
 ## Feature-slice checkpoint — 2026-10-05
 
@@ -89,6 +90,15 @@ The report contract follows the mounted backend/web Money Insider payload:
 category totals, top expense rows, previous-period delta and spending/income
 ratio. Merchant/cashflow cards are not claimed because they are not part of
 that API contract.
+
+Wallet parity review requires the native editor to preserve goal target dates,
+expose credit statement balance/statement-day/due-day metadata, and keep wallet
+type plus opening balance immutable after creation. Selecting a wallet must
+open an owner-scoped detail view rather than only showing a list card.
+
+Transaction parity also requires account-timezone week/custom filtering and
+local-date grouping. Opening Edit from a transaction detail must retain the
+selected transaction and issue a PATCH, never silently create a new row.
 
 ## Parity completion pass — 2026-10-05
 
@@ -111,7 +121,7 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 11 unit/contract tests and 3 UI smoke tests (auth launch,
+suite passed: 14 unit/contract tests and 3 UI smoke tests (auth launch,
 authenticated primary tabs, More route + floating feedback overlay).
 
 ```bash

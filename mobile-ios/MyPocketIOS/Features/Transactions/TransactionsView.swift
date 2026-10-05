@@ -11,6 +11,7 @@ final class TransactionsViewModel: ObservableObject {
     @Published var periodSelection = "all"
     @Published var customStart = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
     @Published var customEnd = Date()
+    @Published private(set) var accountTimezone = TimeZone.current.identifier
 
     private let api: FinanceAPI
     init(api: FinanceAPI) { self.api = api }
@@ -18,12 +19,13 @@ final class TransactionsViewModel: ObservableObject {
     var filteredTransactions: [TransactionModel] {
         let walletFiltered = walletSelection == "__all__" ? transactions : transactions.filter { $0.walletID == walletSelection }
         if periodSelection == "all" { return walletFiltered.sorted { $0.occurredAt > $1.occurredAt } }
-        let calendar = Calendar.current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: accountTimezone) ?? .current
         let start: Date
         let end: Date
         if periodSelection == "week" {
             start = calendar.dateInterval(of: .weekOfYear, for: Date())?.start ?? Date()
-            end = Date()
+            end = calendar.date(byAdding: .weekOfYear, value: 1, to: start) ?? Date()
         } else {
             start = calendar.startOfDay(for: customStart)
             end = calendar.date(byAdding: .day, value: 1, to: calendar.startOfDay(for: customEnd)) ?? Date()
@@ -38,7 +40,17 @@ final class TransactionsViewModel: ObservableObject {
     var totalExpense: Int64 { filteredTransactions.filter { $0.type == "expense" }.reduce(0) { $0 + $1.amount } }
     var totalIncome: Int64 { filteredTransactions.filter { $0.type == "income" }.reduce(0) { $0 + $1.amount } }
     var groupedTransactions: [(String, [TransactionModel])] {
-        Dictionary(grouping: filteredTransactions) { String($0.occurredAt.prefix(10)) }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: accountTimezone) ?? .current
+        let formatter = DateFormatter()
+        formatter.calendar = calendar
+        formatter.timeZone = calendar.timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return Dictionary(grouping: filteredTransactions) {
+            guard let date = ISO8601DateFormatter().date(from: $0.occurredAt) else { return String($0.occurredAt.prefix(10)) }
+            return formatter.string(from: date)
+        }
             .sorted { $0.key > $1.key }
     }
 
@@ -51,9 +63,11 @@ final class TransactionsViewModel: ObservableObject {
             async let transactions = api.transactions()
             async let wallets = api.wallets()
             async let categories = api.categories()
+            async let profile = api.profile()
             self.transactions = try await transactions
             self.wallets = try await wallets
             self.categories = try await categories
+            if let profile = try? await profile { accountTimezone = profile.timezone }
         } catch {
             errorMessage = "Không thể tải giao dịch."
         }
@@ -86,6 +100,7 @@ struct TransactionsView: View {
     @State private var transferEditID: String?
     @State private var adjustmentPresented = false
     @State private var selectedTransaction: TransactionModel?
+    @State private var editTarget: TransactionModel?
     @State private var deleteTarget: TransactionModel?
 
     init(api: FinanceAPI) { _model = StateObject(wrappedValue: TransactionsViewModel(api: api)) }
@@ -97,7 +112,7 @@ struct TransactionsView: View {
                     HStack(spacing: 4) {
                         MPIconButton(systemName: "arrow.left.arrow.right", label: "Chuyển tiền") { transferPresented = true }
                         MPIconButton(systemName: "slider.horizontal.3", label: "Điều chỉnh số dư") { adjustmentPresented = true }
-                        MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editorPresented = true }
+                        MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
                     }
                 })
                 MPSegmentedControl(options: [("all", "Tất cả"), ("week", "Tuần này"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
@@ -149,14 +164,16 @@ struct TransactionsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: model.accountTimezone) ?? .current)
         .task { await model.load() }
         .refreshable { await model.load() }
         .overlay {
             if editorPresented {
-                TransactionEditorView(api: modelAPI, wallets: model.wallets, categories: model.categories) {
+                TransactionEditorView(api: modelAPI, wallets: model.wallets, categories: model.categories, timezone: model.accountTimezone, transaction: editTarget) {
                     editorPresented = false
+                    editTarget = nil
                     Task { await model.load() }
-                } onCancel: { editorPresented = false }
+                } onCancel: { editorPresented = false; editTarget = nil }
                 .background(MPColor.canvas.ignoresSafeArea())
             } else if transferPresented {
                 TransferEditorView(api: modelAPI, wallets: model.wallets) {
@@ -178,6 +195,7 @@ struct TransactionsView: View {
                 .background(MPColor.canvas.ignoresSafeArea())
             } else if let selectedTransaction {
                 TransactionDetailView(api: modelAPI, transaction: selectedTransaction, allTransactions: model.transactions, onEdit: {
+                    editTarget = selectedTransaction
                     editorPresented = true
                     self.selectedTransaction = nil
                 }, onEditTransfer: {
@@ -211,6 +229,7 @@ struct TransactionEditorView: View {
     let api: FinanceAPI
     let wallets: [WalletModel]
     let categories: [CategoryModel]
+    let timezone: String
     let transaction: TransactionModel?
     let onSaved: () -> Void
     let onCancel: () -> Void
@@ -223,10 +242,11 @@ struct TransactionEditorView: View {
     @State private var isSaving = false
     @State private var errorMessage: String?
 
-    init(api: FinanceAPI, wallets: [WalletModel], categories: [CategoryModel], transaction: TransactionModel? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    init(api: FinanceAPI, wallets: [WalletModel], categories: [CategoryModel], timezone: String = TimeZone.current.identifier, transaction: TransactionModel? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.api = api
         self.wallets = wallets
         self.categories = categories
+        self.timezone = timezone
         self.transaction = transaction
         self.onSaved = onSaved
         self.onCancel = onCancel
@@ -253,6 +273,7 @@ struct TransactionEditorView: View {
             }
             .padding(MPMetrics.pagePadding)
         }
+        .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
         .task { if walletName.isEmpty { walletName = wallets.first?.name ?? "" } }
     }
 
@@ -264,7 +285,7 @@ struct TransactionEditorView: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            let input = TransactionInputModel(walletID: wallet.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, type: type, amount: parsed, occurredAt: Self.dayString(from: date), note: note.isEmpty ? nil : note, includedInReports: true, travelEventID: nil)
+            let input = TransactionInputModel(walletID: wallet.id, categoryID: categories.first(where: { $0.name == categoryName })?.id, type: type, amount: parsed, occurredAt: Self.dayString(from: date, timezone: timezone), note: note.isEmpty ? nil : note, includedInReports: true, travelEventID: nil)
             if let transaction { _ = try await api.updateTransaction(id: transaction.id, input: input) }
             else { _ = try await api.createTransaction(input) }
             onSaved()
@@ -273,10 +294,11 @@ struct TransactionEditorView: View {
         }
     }
 
-    private static func dayString(from date: Date) -> String {
+    private static func dayString(from date: Date, timezone: String) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
         formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: timezone) ?? .current
         return formatter.string(from: date)
     }
 }

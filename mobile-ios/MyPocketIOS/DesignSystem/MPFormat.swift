@@ -18,6 +18,15 @@ enum MPFormat {
         return formatter
     }()
 
+    private static let calendarDate: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = TimeZone(secondsFromGMT: 0)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
     static func money(_ value: Int64) -> String {
         currency.string(from: NSNumber(value: value)) ?? "(value) ₫"
     }
@@ -30,6 +39,15 @@ enum MPFormat {
     static func percentageFromBPS(_ value: Int64?) -> String {
         guard let value else { return "Chưa có dữ liệu" }
         return String(format: "%.1f%%", Double(value) / 100.0)
+    }
+
+    static func parseCalendarDate(_ raw: String?) -> Date? {
+        guard let raw, !raw.isEmpty else { return nil }
+        return calendarDate.date(from: raw)
+    }
+
+    static func calendarDateString(_ value: Date) -> String {
+        calendarDate.string(from: value)
     }
 
     static func shortDate(_ raw: String) -> String {

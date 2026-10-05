@@ -34,4 +34,18 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(json.contains("included_in_reports"))
         XCTAssertTrue(json.contains("Cà phê"))
     }
+
+    func testWalletInputEncodesGoalAndCreditMetadata() throws {
+        let input = WalletModelInput(name: "Credit", type: "credit", openingBalance: 0, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: 3_000_000, lastStatementBalance: 250_000, statementDay: 15, paymentDueDay: 5)
+        let json = String(decoding: try JSONEncoder.mypocket.encode(input), as: UTF8.self)
+        XCTAssertTrue(json.contains("credit_limit"))
+        XCTAssertTrue(json.contains("last_statement_balance"))
+        XCTAssertTrue(json.contains("statement_day"))
+        XCTAssertTrue(json.contains("payment_due_day"))
+    }
+
+    func testCalendarDateRoundTripDoesNotUseDeviceTimezone() {
+        let date = MPFormat.parseCalendarDate("2026-12-31")
+        XCTAssertEqual(date.map(MPFormat.calendarDateString), "2026-12-31")
+    }
 }
