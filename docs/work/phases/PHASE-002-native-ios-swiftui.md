@@ -86,6 +86,13 @@ now includes deep CRUD/link flows, replay-safe multipart auth, persisted
 assistant/feedback entry points, Face ID restore gating, and typed Finance
 Assistant cards.
 
+The Debug-only `-UITestAuthenticatedAPI` launch argument now exchanges the
+local fixture OAuth payload, persists the returned session in Keychain and
+renders the authenticated overview through the real API client. This closes
+the simulator smoke gap caused by the older fake-token fixture without
+introducing a production bypass; the local validation screenshot is recorded
+in the validation matrix.
+
 The report contract follows the mounted backend/web Money Insider payload:
 category totals, top expense rows, previous-period delta and spending/income
 ratio. Merchant/cashflow cards are not claimed because they are not part of

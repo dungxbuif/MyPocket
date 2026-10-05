@@ -50,6 +50,13 @@ no `.xcconfig` containing a secret is committed. Simulator development should
 use a local or staging API with a fixture OAuth path when real Google OAuth is
 not configured.
 
+For API-backed simulator smoke, Debug builds expose the launch argument
+`-UITestAuthenticatedAPI`. It exchanges fixture PKCE fields against the local
+development endpoint, stores the returned disposable session in the Keychain,
+and then exercises the same authenticated URLSession path as the app. The
+argument is DEBUG-only and must not be enabled in Release builds or pointed at
+production.
+
 ## Native authentication
 
 The app uses `ASWebAuthenticationSession` and S256 PKCE. The callback includes

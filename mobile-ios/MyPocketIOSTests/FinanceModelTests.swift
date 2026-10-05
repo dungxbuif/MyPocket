@@ -21,6 +21,20 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(json.contains("included_in_reports"))
     }
 
+    func testNativeGoogleFixtureExchangeEncodesIOSPKCEContract() throws {
+        let request = MobileGoogleExchangeRequest(
+            code: "fixture",
+            codeVerifier: "fixture",
+            redirectURI: "mypocket://oauth/callback",
+            platform: "ios"
+        )
+        let payload = try JSONSerialization.jsonObject(with: JSONEncoder.mypocket.encode(request)) as? [String: String]
+        XCTAssertEqual(payload?["code"], "fixture")
+        XCTAssertEqual(payload?["code_verifier"], "fixture")
+        XCTAssertEqual(payload?["redirect_uri"], "mypocket://oauth/callback")
+        XCTAssertEqual(payload?["platform"], "ios")
+    }
+
     func testPortfolioSummaryDecodesTradesAndNullableValuation() throws {
         let data = Data(#"{"assets":[{"id":"asset-1","symbol":"VNM","name":"Vinamilk","latest_price":null}],"positions":[],"trades":[{"id":"trade-1","asset_id":"asset-1","side":"buy","quantity":"1.25","unit_price":72000,"fee":1000,"occurred_at":"2026-10-05T10:00:00Z"}],"total_cost_basis":91000,"total_market_value":null,"total_unrealized_pnl":null}"#.utf8)
         let summary = try JSONDecoder.mypocket.decode(PortfolioSummaryModel.self, from: data)

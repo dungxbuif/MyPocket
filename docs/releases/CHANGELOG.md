@@ -37,11 +37,18 @@ as active release entries here.
   of accidentally including them, wallet detail no longer truncates the API's
   transaction history at 50 rows, and Finance Assistant keeps a still-running
   run cancellable when its local polling window expires.
+- Debug simulator builds now expose `-UITestAuthenticatedAPI`, which exchanges
+  the local fixture OAuth payload and persists a disposable session so an
+  authenticated overview smoke uses the real URLSession/API path instead of a
+  fake token.
 
 ### Verification
 
 - Native iOS simulator regression passed on iPhone 16: 24 unit/contract tests and
   4 authenticated UI smoke tests, with base-component and Xcode project guards.
+- The API-backed simulator fixture rendered the authenticated overview against
+  local `:8080` with empty owner data; no production credentials or data were
+  used.
 - The authenticated UI sweep opened and returned from all 13 destinations in the
   “Thêm” menu; this caught and fixed the compact-row hit-target regression.
 - Refresh rejection during an authenticated request now clears the native

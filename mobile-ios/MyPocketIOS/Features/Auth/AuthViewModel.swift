@@ -42,6 +42,32 @@ final class AuthViewModel: ObservableObject {
 
     func restore() async {
 #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-UITestAuthenticatedAPI") {
+            do {
+                let requestBody = try JSONEncoder.mypocket.encode(
+                    MobileGoogleExchangeRequest(
+                        code: "fixture",
+                        codeVerifier: "fixture",
+                        redirectURI: "mypocket://oauth/callback",
+                        platform: "ios"
+                    )
+                )
+                let output = try await financeAPI.client.send(
+                    APIRequest<LoginOutput>(
+                        path: "/auth/mobile/google/exchange",
+                        method: .post,
+                        body: requestBody,
+                        auth: .none
+                    )
+                )
+                try store.save(output.session)
+                phase = .authenticated(output.session)
+            } catch {
+                errorMessage = "Không thể khởi tạo phiên simulator local."
+                phase = .unauthenticated
+            }
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("-UITestAuthenticated") {
             phase = .authenticated(
                 AccessSession(
