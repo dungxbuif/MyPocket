@@ -26,9 +26,7 @@ struct AssistantView: View {
                                 ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
                                     if let text = part.text { MPText(text) }
                                     else if let data = part.data {
-                                        MPAssistantCard(title: part.type.replacingOccurrences(of: "_", with: " ")) {
-                                            MPText(data.prettyDescription, style: .secondary)
-                                        }
+                                        AssistantStructuredCard(type: part.type, data: data)
                                     } else { MPText("Đã nhận thẻ dữ liệu tài chính.", style: .secondary) }
                                 }
                             }
@@ -89,6 +87,86 @@ struct AssistantView: View {
         do { try await api.cancelAdvisorRun(id: runID); sending = false; activeRunID = nil; error = "Đã hủy yêu cầu." }
         catch { self.error = "Không thể hủy yêu cầu đang chạy." }
     }
+}
+
+struct AssistantStructuredCard: View {
+    let type: String
+    let data: JSONValue
+
+    var body: some View {
+        MPAssistantCard(title: type.replacingOccurrences(of: "_", with: " ")) {
+            if let view = viewObject {
+                switch type {
+                case "metric_group": metricView(view)
+                case "period_comparison": comparisonView(view)
+                case "transaction_list": transactionListView(view)
+                case "wallet_balances", "goal_progress": walletListView(view)
+                case "budget_status", "jar_progress": progressListView(view)
+                default: MPText(data.prettyDescription, style: .secondary)
+                }
+            } else {
+                MPText(data.prettyDescription, style: .secondary)
+            }
+        }
+    }
+
+    private var viewObject: [String: JSONValue]? {
+        guard case .object(let root) = data, let view = root["view"], case .object(let object) = view else { return nil }
+        return object
+    }
+
+    @ViewBuilder private func metricView(_ view: [String: JSONValue]) -> some View {
+        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+            metric("Thu nhập", view["income"])
+            metric("Chi tiêu", view["expense"])
+            metric("Ròng", view["net"])
+            if let count = number(view["count"]) { MPMetricCard(title: "Giao dịch", value: String(Int(count))) }
+        }
+    }
+
+    @ViewBuilder private func comparisonView(_ view: [String: JSONValue]) -> some View {
+        metric("Hiện tại", view["current_expense"])
+        metric("Kỳ trước", view["previous_expense"])
+        metric("Chênh lệch", view["delta"])
+    }
+
+    @ViewBuilder private func transactionListView(_ view: [String: JSONValue]) -> some View {
+        if case .array(let values) = view["items"] {
+            ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+                if let item = object(value) {
+                    MPTransactionRow(title: string(item["note"]) ?? "Giao dịch", subtitle: string(item["occurred_at"]) ?? "", amount: money(item["amount"]), isIncome: string(item["type"]) == "income")
+                }
+            }
+        } else { MPText(data.prettyDescription, style: .secondary) }
+    }
+
+    @ViewBuilder private func walletListView(_ view: [String: JSONValue]) -> some View {
+        if case .array(let values) = view["items"] {
+            ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+                if let item = object(value) {
+                    MPWalletRow(name: string(item["name"]) ?? "Ví", type: string(item["type"]) ?? "", balance: money(item["current_balance"]))
+                }
+            }
+        } else { MPText(data.prettyDescription, style: .secondary) }
+    }
+
+    @ViewBuilder private func progressListView(_ view: [String: JSONValue]) -> some View {
+        if case .array(let values) = view["items"] {
+            ForEach(Array(values.enumerated()), id: \.offset) { _, value in
+                if let item = object(value) {
+                    let spent = number(item["spent"]) ?? 0
+                    let limit = number(item["limit_amount"] ?? item["calculated_allocation"]) ?? 1
+                    VStack(alignment: .leading, spacing: 4) { MPText(string(item["name"]) ?? "Mục tiêu"); MPProgressBar(progress: spent / max(1, limit), label: "\(money(item["spent"])) / \(money(item["limit_amount"] ?? item["calculated_allocation"]))") }
+                }
+            }
+        } else { MPText(data.prettyDescription, style: .secondary) }
+    }
+
+    private func metric(_ title: String, _ value: JSONValue?) -> some View { MPMetricCard(title: title, value: money(value)) }
+    private func object(_ value: JSONValue?) -> [String: JSONValue]? { guard let value, case .object(let object) = value else { return nil }; return object }
+    private func string(_ value: JSONValue?) -> String? { guard let value, case .string(let text) = value else { return nil }; return text }
+    private func number(_ value: JSONValue?) -> Double? { guard let value else { return nil }; if case .number(let number) = value { return number }; return nil }
+    private func money(_ value: JSONValue?) -> String { MPFormat.money(Int64(number(value) ?? 0)) }
 }
 
 struct AIEntryView: View {
