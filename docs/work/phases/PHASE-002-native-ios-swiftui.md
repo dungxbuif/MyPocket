@@ -79,21 +79,23 @@ summary/notes, recurring schedules, Travel Mode, portfolio, credit statements,
 Finance Assistant, AI entry review, feedback/changelog and account settings.
 All user controls in these routes compose the project-owned DesignSystem; the
 static guard and Simulator tests remain passing. The remaining exit work is
-deep CRUD parity (edit/delete/link flows and file attachments), persisted
-assistant/feedback screenshot flows, and an authenticated end-to-end smoke run
-against a fixture/staging API.
+an authenticated end-to-end smoke run against a fixture/staging API and a
+final manual review of backend-specific report payloads. Native UI coverage
+now includes deep CRUD/link flows, replay-safe multipart auth, persisted
+assistant/feedback entry points, Face ID restore gating, and typed Finance
+Assistant cards.
 
 ## Parity completion pass — 2026-10-05
 
-The next simulator-first pass closes the highest-risk interaction gaps before
-the native phase can exit:
+The simulator-first parity pass closed the highest-risk interaction gaps:
 
 - transaction edit, travel-event link/unlink, and transfer-safe detail actions;
-- jar create/delete and cumulative report navigation;
+- jar create/update/remove and cumulative report navigation;
 - portfolio buy/sell trade entry with quantity/price validation;
-- AI entry proposal editing before approve/reject;
-- authenticated UI fixtures for the primary routes and regression coverage for
-  the shared base-component contract.
+- AI entry proposal editing before approve/reject and image/PDF thumbnails;
+- authenticated UI fixtures for primary routes, feedback overlay and regression
+  coverage for the shared base-component contract;
+- Face ID preference persistence and lock/unlock after session restore.
 
 These changes preserve the existing API owner scope and do not add offline
 ledger writes. Verification is the full iOS Simulator XCTest suite, static
