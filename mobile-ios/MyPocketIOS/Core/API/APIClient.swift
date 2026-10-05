@@ -43,14 +43,15 @@ final class APIClient: @unchecked Sendable {
         path: String,
         fields: [String: String],
         files: [MultipartFile] = [],
-        auth: APIAuth = .session
+        auth: APIAuth = .session,
+        idempotencyKey: String? = nil
     ) async throws -> Response {
         do {
-            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, sessionOverride: nil)
+            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, idempotencyKey: idempotencyKey, sessionOverride: nil)
         } catch APIError.unauthorized {
             guard case .session = auth else { throw APIError.unauthorized }
             let refreshed = try await refreshCoordinator.refreshIfNeeded()
-            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, sessionOverride: refreshed)
+            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, idempotencyKey: idempotencyKey, sessionOverride: refreshed)
         }
     }
 
@@ -59,6 +60,7 @@ final class APIClient: @unchecked Sendable {
         fields: [String: String],
         files: [MultipartFile],
         auth: APIAuth,
+        idempotencyKey: String?,
         sessionOverride: AccessSession?
     ) async throws -> Response {
         let relativePath = path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
@@ -71,6 +73,7 @@ final class APIClient: @unchecked Sendable {
         request.httpMethod = HTTPMethod.post.rawValue
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        if let idempotencyKey { request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key") }
         switch auth {
         case .none: break
         case .apiKey(let key): request.setValue("Bearer \(key)", forHTTPHeaderField: "Authorization")
