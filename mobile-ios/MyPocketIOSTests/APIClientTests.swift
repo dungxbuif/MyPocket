@@ -36,14 +36,18 @@ final class APIClientTests: XCTestCase {
 
         XCTAssertEqual(transport.url?.path, "/api/v1/credit/wallets/w-1/statement")
         XCTAssertEqual(transport.url?.query, "from=2026-10-01&to=2026-11-01")
+        XCTAssertNotNil(transport.requestID)
+        XCTAssertFalse(transport.requestID?.isEmpty ?? true)
     }
 }
 
 private final class URLCaptureTransport: HTTPTransport, @unchecked Sendable {
     private(set) var url: URL?
+    private(set) var requestID: String?
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         url = request.url
+        requestID = request.value(forHTTPHeaderField: "X-Request-ID")
         return (Data(#"{"data":{}}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
     }
 }
@@ -70,6 +74,7 @@ private final class TestSessionStore: SessionStore, @unchecked Sendable {
 private final class MultipartRefreshTransport: HTTPTransport, @unchecked Sendable {
     private(set) var multipartRequests = 0
     private(set) var refreshRequests = 0
+    private(set) var multipartRequestIDs: [String] = []
 
     func data(for request: URLRequest) async throws -> (Data, URLResponse) {
         let isRefresh = request.url?.path.hasSuffix("/auth/refresh") == true
@@ -79,6 +84,7 @@ private final class MultipartRefreshTransport: HTTPTransport, @unchecked Sendabl
             return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
         multipartRequests += 1
+        multipartRequestIDs.append(request.value(forHTTPHeaderField: "X-Request-ID") ?? "")
         if multipartRequests == 1 {
             return (Data(), HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: nil)!)
         }
@@ -97,6 +103,9 @@ final class MultipartAPIClientTests: XCTestCase {
         XCTAssertEqual(result.id, "request-1")
         XCTAssertEqual(transport.multipartRequests, 2)
         XCTAssertEqual(transport.refreshRequests, 1)
+        XCTAssertEqual(transport.multipartRequestIDs.count, 2)
+        XCTAssertFalse(transport.multipartRequestIDs[0].isEmpty)
+        XCTAssertEqual(transport.multipartRequestIDs[0], transport.multipartRequestIDs[1])
         XCTAssertEqual(store.session?.token, "new-access")
     }
 }

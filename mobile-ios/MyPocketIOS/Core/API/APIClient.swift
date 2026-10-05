@@ -31,12 +31,13 @@ final class APIClient: @unchecked Sendable {
     }
 
     func send<Response: Decodable>(_ request: APIRequest<Response>) async throws -> Response {
+        let requestID = UUID().uuidString
         do {
-            return try await execute(request, sessionOverride: nil)
+            return try await execute(request, requestID: requestID, sessionOverride: nil)
         } catch APIError.unauthorized {
             guard case .session = request.auth else { throw APIError.unauthorized }
             let refreshed = try await refreshCoordinator.refreshIfNeeded()
-            return try await execute(request, sessionOverride: refreshed)
+            return try await execute(request, requestID: requestID, sessionOverride: refreshed)
         }
     }
 
@@ -47,12 +48,13 @@ final class APIClient: @unchecked Sendable {
         auth: APIAuth = .session,
         idempotencyKey: String? = nil
     ) async throws -> Response {
+        let requestID = UUID().uuidString
         do {
-            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, idempotencyKey: idempotencyKey, sessionOverride: nil)
+            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, idempotencyKey: idempotencyKey, requestID: requestID, sessionOverride: nil)
         } catch APIError.unauthorized {
             guard case .session = auth else { throw APIError.unauthorized }
             let refreshed = try await refreshCoordinator.refreshIfNeeded()
-            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, idempotencyKey: idempotencyKey, sessionOverride: refreshed)
+            return try await executeMultipart(path: path, fields: fields, files: files, auth: auth, idempotencyKey: idempotencyKey, requestID: requestID, sessionOverride: refreshed)
         }
     }
 
@@ -62,6 +64,7 @@ final class APIClient: @unchecked Sendable {
         files: [MultipartFile],
         auth: APIAuth,
         idempotencyKey: String?,
+        requestID: String,
         sessionOverride: AccessSession?
     ) async throws -> Response {
         let url = try makeURL(path: path)
@@ -70,6 +73,7 @@ final class APIClient: @unchecked Sendable {
         request.httpMethod = HTTPMethod.post.rawValue
         request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(requestID, forHTTPHeaderField: "X-Request-ID")
         if let idempotencyKey { request.setValue(idempotencyKey, forHTTPHeaderField: "Idempotency-Key") }
         switch auth {
         case .none: break
@@ -113,6 +117,7 @@ final class APIClient: @unchecked Sendable {
 
     private func execute<Response: Decodable>(
         _ request: APIRequest<Response>,
+        requestID: String,
         sessionOverride: AccessSession?
     ) async throws -> Response {
         let url = try makeURL(path: request.path)
@@ -120,6 +125,7 @@ final class APIClient: @unchecked Sendable {
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
         urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        urlRequest.setValue(requestID, forHTTPHeaderField: "X-Request-ID")
         if request.body != nil {
             urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
@@ -195,7 +201,7 @@ final class APIClient: @unchecked Sendable {
         )
         let output: LoginOutput
         do {
-            output = try await execute(request, sessionOverride: nil)
+            output = try await execute(request, requestID: UUID().uuidString, sessionOverride: nil)
         } catch APIError.unauthorized {
             if invalidateOnUnauthorized {
                 sessionStore.clear()

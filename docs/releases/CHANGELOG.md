@@ -38,6 +38,8 @@ as active release entries here.
 - Native portfolio trade drafts now validate buy/sell, positive quantity
   precision and non-negative integer VND price/fee values locally, avoiding
   silent digit stripping before the API request.
+- Native API requests now carry a UUID `X-Request-ID`; a JWT refresh retry
+  keeps the same correlation ID so server errors can be traced end to end.
 - Native UI smoke tests now start from a deterministic unauthenticated state
   with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
   Keychain/biometric state. The iPhone 16 suite passes 10 tests (5 passed, 5
