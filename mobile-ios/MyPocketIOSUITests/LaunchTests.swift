@@ -144,6 +144,17 @@ final class LaunchTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticatedAPI"]
         app.launch()
+        XCTAssertTrue(app.buttons["Giao dịch"].waitForExistence(timeout: 10))
+        app.buttons["Giao dịch"].tap()
+        let walletSelector = app.buttons["Ví: Tổng cộng"]
+        XCTAssertTrue(walletSelector.waitForExistence(timeout: 10))
+        walletSelector.tap()
+        XCTAssertTrue(app.buttons["Fixture Credit"].waitForExistence(timeout: 10))
+        app.buttons["Fixture Credit"].tap()
+        XCTAssertTrue(app.staticTexts["Sổ tín dụng"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Thêm giao dịch"].waitForExistence(timeout: 30))
+        XCTAssertTrue(app.buttons["Thanh toán"].waitForExistence(timeout: 5))
+        app.buttons["Quay lại"].tap()
         XCTAssertTrue(app.buttons["Ví"].waitForExistence(timeout: 10))
         app.buttons["Ví"].tap()
         XCTAssertTrue(app.staticTexts["Fixture Credit"].waitForExistence(timeout: 10))

@@ -65,6 +65,12 @@ as active release entries here.
 - Fixed native API query construction so credit statements, reports, jar views
   and Assistant history send query parameters as URL queries instead of
   accidentally escaping the delimiter into the path.
+- Native transaction filtering now switches selected goal and credit wallets to
+  their dedicated detail surfaces, so credit wallets no longer expose the
+  ordinary transaction editor from the ledger tab.
+- Native ledger loading now keeps valid rows visible when optional category or
+  profile metadata fails; only the required transaction/wallet payload blocks
+  the screen.
 
 ### Verification
 
@@ -84,8 +90,9 @@ as active release entries here.
 - The authenticated UI sweep opened and returned from all 13 destinations in the
   “Thêm” menu; this caught and fixed the compact-row hit-target regression.
 - The opt-in API-backed credit-wallet smoke passed on the iPhone 16 simulator,
-  including the statement action buttons. Its disposable credit fixture was
-  deleted with an HTTP 204 response after the run.
+  including the Giao dịch-tab and Ví-tab routes plus statement action buttons.
+  Its disposable credit fixture was deleted with an HTTP 204 response after
+  the run.
 - Refresh rejection during an authenticated request now clears the native
   Keychain session and biometric preference through an auth invalidation hook;
   the regression suite covers the 401 → refresh 401 path.

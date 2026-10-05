@@ -142,7 +142,13 @@ dedicated statement/payment panel.
 The transaction ledger must keep transfer/adjustment actions behind one shared
 overflow menu, support switching date/category grouping, include wallet and
 category context in rows, and avoid showing ordinary week/custom controls for
-goal or credit selections.
+goal or credit selections. Selecting a goal wallet opens its detail surface;
+selecting a credit wallet opens the statement with entry/payment actions rather
+than exposing the ordinary transaction editor.
+
+Ledger loading treats the transaction and wallet lists as the required core
+payload while category labels and profile timezone are optional metadata. A
+metadata failure must not make a valid transaction list unusable.
 
 AI entry accepts either a text instruction or one or more validated image/PDF
 attachments, uses the account timezone for extraction context, and keeps every

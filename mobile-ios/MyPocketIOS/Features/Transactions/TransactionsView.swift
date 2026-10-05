@@ -129,16 +129,25 @@ final class TransactionsViewModel: ObservableObject {
         errorMessage = nil
         defer { isLoading = false }
         do {
-            async let transactions = api.transactions()
-            async let wallets = api.wallets()
-            async let categories = api.categories()
-            async let profile = api.profile()
-            self.transactions = try await transactions
-            self.wallets = try await wallets
-            self.categories = try await categories
-            if let profile = try? await profile { accountTimezone = profile.timezone }
+            self.transactions = try await api.transactions()
         } catch {
             errorMessage = "Không thể tải giao dịch."
+            return
+        }
+        do {
+            self.wallets = try await api.wallets()
+        } catch {
+            errorMessage = "Không thể tải danh sách ví."
+            return
+        }
+        do {
+            self.categories = try await api.categories()
+        } catch {
+            // Category labels are optional for the ledger; rows remain usable.
+            self.categories = []
+        }
+        if let profile = try? await api.profile() {
+            accountTimezone = profile.timezone
         }
     }
 
@@ -201,8 +210,10 @@ struct TransactionsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Giao dịch", leading: { EmptyView() }, trailing: {
                     HStack(spacing: 4) {
-                        MPOverflowMenu(label: "Tùy chọn giao dịch", actions: transactionMenuActions)
-                        MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
+                        if model.selectedWalletType == nil {
+                            MPOverflowMenu(label: "Tùy chọn giao dịch", actions: transactionMenuActions)
+                            MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
+                        }
                     }
                 })
                 if model.selectedWalletType != "goal", model.selectedWalletType != "credit" {
@@ -212,7 +223,11 @@ struct TransactionsView: View {
                     MPDateRangePicker(start: $model.customStart, end: $model.customEnd)
                 }
                 MPOptionSelector(title: "Ví", options: [MPSelectionOption(id: "__all__", label: "Tổng cộng")] + model.wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $model.walletSelection, emptyLabel: "Tổng cộng")
-                if selectionMode {
+                if let selectedWallet = model.wallets.first(where: { $0.id == model.walletSelection }), selectedWallet.type == "credit" {
+                    CreditView(api: modelAPI, onBack: { model.walletSelection = "__all__" }, preferredWalletID: selectedWallet.id)
+                } else if let selectedWallet = model.wallets.first(where: { $0.id == model.walletSelection }), selectedWallet.type == "goal" {
+                    WalletDetailView(api: modelAPI, wallet: selectedWallet) { model.walletSelection = "__all__" }
+                } else if selectionMode {
                     MPSurfaceCard {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
@@ -231,12 +246,12 @@ struct TransactionsView: View {
                             }
                         }
                     }
-                }
-                if model.isLoading && model.transactions.isEmpty {
-                    MPLoadingView(label: "Đang tải giao dịch...")
-                } else if let errorMessage = model.errorMessage, model.transactions.isEmpty {
-                    MPErrorView(title: "Không tải được giao dịch", detail: errorMessage) { Task { await model.load() } }
                 } else {
+                    if model.isLoading && model.transactions.isEmpty {
+                    MPLoadingView(label: "Đang tải giao dịch...")
+                    } else if let errorMessage = model.errorMessage, model.transactions.isEmpty {
+                    MPErrorView(title: "Không tải được giao dịch", detail: errorMessage) { Task { await model.load() } }
+                    } else {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                         MPMetricCard(title: "Chi tiêu", value: MPFormat.money(model.totalExpense))
                         MPMetricCard(title: "Thu nhập", value: MPFormat.money(model.totalIncome))
@@ -260,6 +275,7 @@ struct TransactionsView: View {
                             }
                         }
                     }
+                }
                 }
             }
             .padding(MPMetrics.pagePadding)

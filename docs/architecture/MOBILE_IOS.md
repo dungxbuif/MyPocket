@@ -50,6 +50,11 @@ semantic paths such as `/credit/wallets/{id}/statement?from=...`; the client
 must never percent-encode the `?` into the resource path. The URL contract is
 covered by native XCTest.
 
+The transactions screen treats transactions and wallets as required data, but
+loads category labels and account timezone as optional metadata. A metadata
+request failure therefore leaves the ledger usable instead of replacing valid
+rows with a generic load error.
+
 Finance Assistant history uses one UserDefaults conversation ID keyed by the
 authenticated owner ID. The native screen reloads that conversation's latest
 50 messages and the read-only monthly overview on entry; a later request can
