@@ -385,11 +385,25 @@ struct WalletEditorView: View {
             errorMessage = "Tên ví không được để trống."
             return
         }
-        let parsedTarget = Int64(targetAmount.filter(\.isNumber))
-        let parsedCreditLimit = Int64(creditLimit.filter(\.isNumber))
-        let parsedStatementBalance = Int64(lastStatementBalance.filter(\.isNumber))
-        let parsedStatementDay = Int(statementDay.filter(\.isNumber))
-        let parsedPaymentDueDay = Int(paymentDueDay.filter(\.isNumber))
+        let trimmedTarget = targetAmount.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedCreditLimit = creditLimit.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedStatementBalance = lastStatementBalance.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedStatementDay = statementDay.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedPaymentDueDay = paymentDueDay.trimmingCharacters(in: .whitespacesAndNewlines)
+        let parsedOpeningBalance = MPFormat.parseNonNegativeInteger(openingBalance, allowingEmpty: true)
+        let parsedTarget = MPFormat.parseNonNegativeInteger(trimmedTarget)
+        let parsedCreditLimit = MPFormat.parseNonNegativeInteger(trimmedCreditLimit)
+        let parsedStatementBalance = MPFormat.parseNonNegativeInteger(trimmedStatementBalance)
+        let parsedStatementDay = trimmedStatementDay.isEmpty ? nil : MPFormat.parseNonNegativeInteger(trimmedStatementDay).flatMap(Int.init(exactly:))
+        let parsedPaymentDueDay = trimmedPaymentDueDay.isEmpty ? nil : MPFormat.parseNonNegativeInteger(trimmedPaymentDueDay).flatMap(Int.init(exactly:))
+        if wallet == nil, parsedOpeningBalance == nil {
+            errorMessage = "Số dư ban đầu phải là số nguyên không âm."
+            return
+        }
+        if (!trimmedTarget.isEmpty && parsedTarget == nil) || (!trimmedCreditLimit.isEmpty && parsedCreditLimit == nil) || (!trimmedStatementBalance.isEmpty && parsedStatementBalance == nil) || (!trimmedStatementDay.isEmpty && parsedStatementDay == nil) || (!trimmedPaymentDueDay.isEmpty && parsedPaymentDueDay == nil) {
+            errorMessage = "Các số tiền và ngày thanh toán phải là giá trị hợp lệ."
+            return
+        }
         if type == "goal", (parsedTarget ?? 0) <= 0 { errorMessage = "Mục tiêu phải lớn hơn 0."; return }
         if type == "credit", (parsedCreditLimit ?? 0) <= 0 { errorMessage = "Hạn mức tín dụng phải lớn hơn 0."; return }
         if type == "credit", (parsedStatementBalance ?? 0) < 0 { errorMessage = "Dư nợ sao kê không được âm."; return }
@@ -397,7 +411,7 @@ struct WalletEditorView: View {
         saving = true
         defer { saving = false }
         let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
-        let input = WalletModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), type: wallet?.type ?? type, openingBalance: wallet?.openingBalance ?? Int64(openingBalance.filter(\.isNumber)) ?? 0, isInTotal: isInTotal == "Có", description: trimmedDescription.isEmpty ? nil : trimmedDescription, targetAmount: type == "goal" ? parsedTarget : nil, targetDate: type == "goal" && targetDateEnabled == "Có" ? MPFormat.calendarDateString(targetDate, timeZone: TimeZone(identifier: timezone) ?? .current) : nil, creditLimit: type == "credit" ? parsedCreditLimit : nil, lastStatementBalance: type == "credit" ? parsedStatementBalance : nil, statementDay: type == "credit" ? parsedStatementDay : nil, paymentDueDay: type == "credit" ? parsedPaymentDueDay : nil)
+        let input = WalletModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), type: wallet?.type ?? type, openingBalance: wallet?.openingBalance ?? (parsedOpeningBalance ?? 0), isInTotal: isInTotal == "Có", description: trimmedDescription.isEmpty ? nil : trimmedDescription, targetAmount: type == "goal" ? parsedTarget : nil, targetDate: type == "goal" && targetDateEnabled == "Có" ? MPFormat.calendarDateString(targetDate, timeZone: TimeZone(identifier: timezone) ?? .current) : nil, creditLimit: type == "credit" ? parsedCreditLimit : nil, lastStatementBalance: type == "credit" ? parsedStatementBalance : nil, statementDay: type == "credit" ? parsedStatementDay : nil, paymentDueDay: type == "credit" ? parsedPaymentDueDay : nil)
         do {
             if let wallet { _ = try await api.updateWallet(id: wallet.id, input: input) }
             else { _ = try await api.createWallet(input) }

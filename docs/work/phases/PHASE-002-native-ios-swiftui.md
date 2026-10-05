@@ -381,8 +381,8 @@ API defect.
 The iPhone 16 simulator run was repeated after the goal target-date timezone,
 recurring draft-validation, jar allocation contract, portfolio trade
 validation, request-correlation, transfer wallet/date and wallet-detail state
-fixes. Unit/contract XCTest passed 46/46. The opt-in API-backed UI suite passed
-10/10 in 199.996 seconds, including the AI-entry capability gate, Assistant
+fixes. Unit/contract XCTest passed 47/47. The opt-in API-backed UI suite passed
+10/10 in 200.110 seconds, including the AI-entry capability gate, Assistant
 overview, credit ledger, week/cashflow ledger, wallet transaction editor, all
 13 secondary destinations, feedback entry, primary tabs and transfer/adjustment
 overflow actions. The recurring editor's zero/invalid amount, interval,
@@ -398,3 +398,12 @@ with `KeychainError` and the app stayed on the login gate. Re-running with the
 normal simulator ad-hoc signing path passed. Keep `CODE_SIGNING_ALLOWED=NO`
 limited to pure unit/build checks; API-backed UI tests require the signed
 simulator test runner because they persist the disposable session in Keychain.
+
+The rerun also hardened numeric draft parsing. The shared parser rejects
+malformed integer input instead of silently filtering characters across
+transaction, transfer, adjustment, wallet, credit, jar, budget, assistant
+proposal and portfolio price/trade editors. Native XCTest passed 47/47 and the
+signed API-backed UI suite passed 10/10 in 200.110 seconds. The app launched
+successfully on the iPhone 16 simulator; physical-device, real Google OAuth,
+provider-backed AI/OCR and authenticated staging/production gates remain
+external checks.

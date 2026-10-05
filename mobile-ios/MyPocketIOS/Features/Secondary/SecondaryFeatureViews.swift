@@ -103,7 +103,7 @@ struct BudgetsView: View {
     }
 
     private func create() async {
-        guard let parsed = Int64(limit.filter(\.isNumber)), parsed > 0, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập tên và giới hạn hợp lệ."; return }
+        guard let parsed = MPFormat.parsePositiveInteger(limit), !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập tên và giới hạn hợp lệ."; return }
         guard let startDate = MPFormat.parseCalendarDate(start), let endDate = MPFormat.parseCalendarDate(end), startDate <= endDate else { error = "Khoảng thời gian ngân sách không hợp lệ."; return }
         do {
             let input = BudgetInputModel(name: name.trimmingCharacters(in: .whitespacesAndNewlines), limitAmount: parsed, walletID: walletScopeID == "__all__" ? nil : walletScopeID, categoryID: categoryScopeID == "__all__" ? nil : categoryScopeID, startDate: start, endDate: end)
@@ -391,7 +391,7 @@ struct JarsView: View {
     private func beginEditing(_ item: JarItemModel) { editTarget = item; name = item.name; mode = item.allocationMode; amount = item.allocationAmount.map { String($0) } ?? ""; percent = item.allocationPercent.map { String($0) } ?? ""; showEditor = true }
     private func save() async {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập tên hũ."; return }
-        let parsedAmount = Int64(amount.filter(\.isNumber))
+        let parsedAmount = MPFormat.parseNonNegativeInteger(amount)
         let parsedPercent = Double(percent.replacingOccurrences(of: ",", with: "."))
         guard JarAllocationDraftValidator.isValid(mode: mode, amount: parsedAmount, percent: parsedPercent) else { error = "Cách phân bổ không hợp lệ."; return }
         let input = JarConfigInputModel(month: month, name: name, allocationMode: mode, allocationAmount: mode == "fixed" ? parsedAmount : nil, allocationPercent: mode == "percent" ? parsedPercent : nil)
@@ -734,7 +734,7 @@ struct PortfolioView: View {
         let parsed: Int64?
         if draft.isEmpty {
             parsed = nil
-        } else if let value = Int64(draft.filter(\.isNumber)), value >= 0 {
+        } else if let value = MPFormat.parseNonNegativeInteger(draft) {
             parsed = value
         } else {
             error = "Giá hiện tại phải là số nguyên không âm hoặc để trống."
@@ -769,11 +769,7 @@ struct PortfolioView: View {
 
 enum PortfolioTradeDraftValidator {
     static func nonNegativeInteger(_ raw: String, allowingEmpty: Bool = false) -> Int64? {
-        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        if value.isEmpty { return allowingEmpty ? 0 : nil }
-        guard value.allSatisfy(\.isNumber) else { return nil }
-        guard let parsed = Int64(value), parsed >= 0 else { return nil }
-        return parsed
+        MPFormat.parseNonNegativeInteger(raw, allowingEmpty: allowingEmpty)
     }
 
     static func isValid(side: String, quantity: String, unitPrice: String, fee: String) -> Bool {
@@ -929,6 +925,6 @@ struct CreditView: View {
         guard action != nil else { return }
         if action == "entry" { await addEntry() } else { await pay() }
     }
-    private func addEntry() async { guard !selectedID.isEmpty, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0 else { error = "Chọn ví tín dụng và nhập số tiền."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: categoryID.isEmpty ? nil : categoryID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
-    private func pay() async { guard !selectedID.isEmpty, let amount = Int64(entryAmount.filter(\.isNumber)), amount > 0, !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
+    private func addEntry() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount) else { error = "Chọn ví tín dụng và nhập số tiền."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: categoryID.isEmpty ? nil : categoryID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
+    private func pay() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount), !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
 }

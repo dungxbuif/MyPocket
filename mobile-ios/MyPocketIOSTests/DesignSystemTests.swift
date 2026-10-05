@@ -20,6 +20,18 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertTrue(MPFormat.signedMoney(-1).hasPrefix("−"))
     }
 
+    func testNumericDraftParserRejectsMalformedValuesWithoutFiltering() {
+        XCTAssertEqual(MPFormat.parseNonNegativeInteger(" 1000 "), 1000)
+        XCTAssertEqual(MPFormat.parseNonNegativeInteger(""), nil)
+        XCTAssertEqual(MPFormat.parseNonNegativeInteger("", allowingEmpty: true), 0)
+        XCTAssertEqual(MPFormat.parsePositiveInteger("0"), nil)
+        XCTAssertEqual(MPFormat.parsePositiveInteger("1000"), 1000)
+        XCTAssertNil(MPFormat.parseNonNegativeInteger("1_000"))
+        XCTAssertNil(MPFormat.parseNonNegativeInteger("12abc3"))
+        XCTAssertNil(MPFormat.parseNonNegativeInteger("١٢٣"))
+        XCTAssertNil(MPFormat.parseNonNegativeInteger("9223372036854775808"))
+    }
+
     func testSelectionLabelsPreserveUnknownValuesAndLocalizeEnums() {
         XCTAssertEqual(MPSelectionLabels.display(for: "expense"), "Chi")
         XCTAssertEqual(MPSelectionLabels.display(for: "percent"), "Phần trăm thu nhập")

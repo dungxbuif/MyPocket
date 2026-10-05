@@ -463,7 +463,7 @@ struct EntryProposalEditor: View {
     }
 
     private func save() async {
-        guard let parsed = Int64(amount.filter(\.isNumber)), parsed > 0, let wallet = wallets.first(where: { $0.id == walletID }) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }
+        guard let parsed = MPFormat.parsePositiveInteger(amount), let wallet = wallets.first(where: { $0.id == walletID }) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }
         let selectedCategory = categories.first(where: { $0.id == categoryID })
         if let selectedCategory, !selectedCategory.applies(to: proposal.draft.type, walletID: wallet.id, walletType: wallet.type) { error = "Danh mục không phù hợp với loại giao dịch hoặc ví đã chọn."; return }
         saving = true; defer { saving = false }

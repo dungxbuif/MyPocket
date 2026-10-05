@@ -23,6 +23,12 @@ as active release entries here.
 
 ### Fixed
 
+- Native financial draft fields now reject malformed integer input instead of
+  silently stripping non-digit characters. A shared strict parser covers
+  transaction, transfer, adjustment, wallet, credit, jar, budget, assistant
+  proposal and portfolio price/trade paths while preserving explicit recurring
+  display normalization. The regression suite is now 47/47 unit tests and
+  10/10 signed iPhone 16 API-backed UI tests.
 - Re-ran the native iPhone 16 simulator regression after the goal target-date,
   recurring, jar-allocation and portfolio-trade validation fixes: 45/45 unit
   tests and 10/10 API-backed UI tests pass, with no

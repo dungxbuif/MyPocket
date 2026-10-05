@@ -31,6 +31,22 @@ enum MPFormat {
         currency.string(from: NSNumber(value: value)) ?? "(value) ₫"
     }
 
+    /// Parses the integer contract used by money fields without mutating the
+    /// user's draft. Financial input must contain ASCII decimal digits only;
+    /// malformed characters are rejected instead of silently filtered out.
+    static func parseNonNegativeInteger(_ raw: String, allowingEmpty: Bool = false) -> Int64? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty { return allowingEmpty ? 0 : nil }
+        guard value.unicodeScalars.allSatisfy({ $0.value >= 48 && $0.value <= 57 }) else { return nil }
+        guard let parsed = Int64(value), parsed >= 0 else { return nil }
+        return parsed
+    }
+
+    static func parsePositiveInteger(_ raw: String) -> Int64? {
+        guard let parsed = parseNonNegativeInteger(raw), parsed > 0 else { return nil }
+        return parsed
+    }
+
     static func signedMoney(_ value: Int64) -> String {
         if value == 0 { return money(0) }
         return (value > 0 ? "+" : "−") + money(abs(value))

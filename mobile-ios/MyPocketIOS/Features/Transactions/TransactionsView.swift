@@ -503,7 +503,7 @@ struct TransactionEditorView: View {
     }
 
     private func save() async {
-        guard let wallet = wallets.first(where: { $0.id == walletID }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else {
+        guard let wallet = wallets.first(where: { $0.id == walletID }), let parsed = MPFormat.parsePositiveInteger(amount) else {
             errorMessage = "Chọn ví và nhập số tiền hợp lệ."
             return
         }
@@ -667,7 +667,7 @@ struct TransferEditorView: View {
     }
 
     private func save() async {
-        guard let from = wallets.first(where: { $0.id == sourceID }), let to = wallets.first(where: { $0.id == destinationID }), from.id != to.id, let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn hai ví khác nhau và nhập số tiền hợp lệ."; return }
+        guard let from = wallets.first(where: { $0.id == sourceID }), let to = wallets.first(where: { $0.id == destinationID }), from.id != to.id, let parsed = MPFormat.parsePositiveInteger(amount) else { error = "Chọn hai ví khác nhau và nhập số tiền hợp lệ."; return }
         saving = true; defer { saving = false }
         do {
             let occurredAt = Self.timestamp(date, timezone: timezone)
@@ -715,5 +715,5 @@ struct AdjustmentEditorView: View {
         .task { if walletID.isEmpty { walletID = ledgerWallets.first?.id ?? "" } }
     }
     private var ledgerWallets: [WalletModel] { wallets.filter { $0.type != "credit" } }
-    private func save() async { guard let selected = ledgerWallets.first(where: { $0.id == walletID }), let parsed = Int64(amount.filter(\.isNumber)), parsed > 0 else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: ISO8601DateFormatter().string(from: Date()), note: note.isEmpty ? nil : note)); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
+    private func save() async { guard let selected = ledgerWallets.first(where: { $0.id == walletID }), let parsed = MPFormat.parsePositiveInteger(amount) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: ISO8601DateFormatter().string(from: Date()), note: note.isEmpty ? nil : note)); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
 }
