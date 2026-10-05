@@ -27,6 +27,9 @@ as active release entries here.
   with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
   Keychain/biometric state. The iPhone 16 suite passes 8 tests (5 passed, 3
   explicit API-fixture skips).
+- Opt-in native API-backed UI tests now seed and tear down their own basic and
+  credit wallet fixtures through the local API; the full `LOCAL_API_UI` suite
+  passes 8/8 without relying on leftover simulator or database state.
 - Native session restore now refreshes an expired access token before enabling the
   Face ID lock gate. If the refresh token is expired or rejected, Keychain state
   and the biometric preference are cleared instead of opening an invalid session.

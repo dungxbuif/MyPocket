@@ -54,6 +54,7 @@ updated: 2026-10-06
 2026-10-06 native simulator release check: the Release simulator build passed with warnings treated as errors, project/base-component guards passed, and `com.mypocket.ios` launched on iPhone 16. The login screen is ready for manual simulator verification; no production OAuth claim is made.
 2026-10-06 native bug audit: wallet detail month headers now use validated calendar interpolation instead of literal placeholder text; Travel Mode trims required names and rejects malformed/reversed optional date ranges before API submission. The red-to-green regression tests and iPhone 16 run now pass 37/37 native unit tests and 5/5 standard UI tests.
 2026-10-06 native UI test isolation: `testAppLaunches` now starts with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator Keychain/biometric state so a prior local login cannot change the assertion. Targeted red-to-green proof and the full iPhone 16 UI suite pass 8/8 (5 passed, 3 explicit API-fixture skips).
+2026-10-06 native API UI fixture isolation: `LOCAL_API_UI` now creates/deletes its own basic and credit wallets through local `:8080` after fixture OAuth. Wallet detail, credit ledger and Assistant tests pass, the full opt-in UI suite is 8/8, and a post-run owner check finds zero leftover `Fixture*` wallets.
 
 ## Field Ownership
 

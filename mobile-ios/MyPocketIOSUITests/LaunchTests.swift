@@ -1,5 +1,123 @@
 import XCTest
 
+#if LOCAL_API_UI
+private struct FixtureEnvelope<Value: Decodable>: Decodable {
+    let data: Value
+}
+
+private struct FixtureLogin: Decodable {
+    let token: String
+}
+
+private struct FixtureWallet: Decodable, Sendable {
+    let id: String
+    let name: String
+}
+
+private struct FixtureWalletHandle: Sendable {
+    let token: String
+    let wallet: FixtureWallet
+}
+
+private enum LocalFixtureError: Error {
+    case invalidResponse
+    case http(Int, String)
+}
+
+private enum LocalAPIFixture {
+    private static let baseURL = URL(string: "http://127.0.0.1:8080/api/v1")!
+
+    static func wallet(name: String, type: String) async throws -> FixtureWalletHandle {
+        let token = try await loginToken()
+        let existing = try await request(
+            path: "/wallets",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<[FixtureWallet]>.self
+        ).data
+        for item in existing where item.name == name {
+            try await deleteWallet(id: item.id, token: token)
+        }
+
+        var payload: [String: Any] = [
+            "name": name,
+            "type": type,
+            "opening_balance": 100000,
+            "is_in_total": true,
+        ]
+        if type == "credit" {
+            payload["credit_limit"] = 5_000_000
+            payload["last_statement_balance"] = 0
+            payload["statement_day"] = 15
+            payload["payment_due_day"] = 25
+        }
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        let created = try await request(
+            path: "/wallets",
+            method: "POST",
+            token: token,
+            body: data,
+            decode: FixtureEnvelope<FixtureWallet>.self
+        ).data
+        return FixtureWalletHandle(token: token, wallet: created)
+    }
+
+    static func delete(_ fixture: FixtureWalletHandle) async throws {
+        try await deleteWallet(id: fixture.wallet.id, token: fixture.token)
+    }
+
+    private static func loginToken() async throws -> String {
+        let body = try JSONSerialization.data(withJSONObject: [
+            "code": "fixture",
+            "code_verifier": "fixture",
+            "redirect_uri": "mypocket://oauth/callback",
+            "platform": "ios",
+        ])
+        return try await request(
+            path: "/auth/mobile/google/exchange",
+            method: "POST",
+            token: nil,
+            body: body,
+            decode: FixtureEnvelope<FixtureLogin>.self
+        ).data.token
+    }
+
+    private static func deleteWallet(id: String, token: String) async throws {
+        _ = try await request(
+            path: "/wallets/\(id)",
+            method: "DELETE",
+            token: token,
+            body: nil,
+            decode: EmptyFixtureResponse.self
+        )
+    }
+
+    private static func request<Value: Decodable>(
+        path: String,
+        method: String,
+        token: String?,
+        body: Data?,
+        decode: Value.Type
+    ) async throws -> Value {
+        var request = URLRequest(url: baseURL.appendingPathComponent(String(path.dropFirst())))
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        request.httpBody = body
+        let (data, response) = try await URLSession.shared.data(for: request)
+        guard let response = response as? HTTPURLResponse else { throw LocalFixtureError.invalidResponse }
+        guard (200..<300).contains(response.statusCode) else {
+            throw LocalFixtureError.http(response.statusCode, String(data: data, encoding: .utf8) ?? "")
+        }
+        if response.statusCode == 204 { return try JSONDecoder().decode(Value.self, from: Data("{}".utf8)) }
+        return try JSONDecoder().decode(Value.self, from: data)
+    }
+}
+
+private struct EmptyFixtureResponse: Decodable {}
+#endif
+
 @MainActor
 final class LaunchTests: XCTestCase {
     func testAppLaunches() throws {
@@ -119,10 +237,12 @@ final class LaunchTests: XCTestCase {
 #endif
     }
 
-    func testAPIBackedWalletDetailExposesTransactionEditor() throws {
+    func testAPIBackedWalletDetailExposesTransactionEditor() async throws {
 #if !LOCAL_API_UI
         throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable fixture wallet.")
 #else
+        let fixture = try await LocalAPIFixture.wallet(name: "Fixture Wallet", type: "basic")
+        addTeardownBlock { try? await LocalAPIFixture.delete(fixture) }
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticatedAPI"]
         app.launch()
@@ -138,10 +258,12 @@ final class LaunchTests: XCTestCase {
 #endif
     }
 
-    func testAPIBackedCreditWalletOpensLedgerActions() throws {
+    func testAPIBackedCreditWalletOpensLedgerActions() async throws {
 #if !LOCAL_API_UI
         throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable credit wallet.")
 #else
+        let fixture = try await LocalAPIFixture.wallet(name: "Fixture Credit", type: "credit")
+        addTeardownBlock { try? await LocalAPIFixture.delete(fixture) }
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticatedAPI"]
         app.launch()

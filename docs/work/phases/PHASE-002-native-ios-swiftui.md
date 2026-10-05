@@ -314,6 +314,13 @@ wallet. The smoke opened the wallet detail, verified the add-transaction editor
 and its category/note controls, and removed the seeded wallet with a 204 API
 response after the run.
 
+The opt-in API-backed UI fixtures are now self-seeding: wallet-detail and
+credit-ledger tests exchange the local fixture session, create their own
+owner-scoped wallet through `POST /wallets`, and register async teardown via
+`DELETE /wallets/:id`. The full `LOCAL_API_UI` UI suite passed 8/8 with no
+skips; a post-run local API check found zero `Fixture*` wallets. This remains
+local disposable proof, not production validation.
+
 ## Disposable local API smoke — 2026-10-05
 
 Before any release decision, the typed client contracts were exercised against
