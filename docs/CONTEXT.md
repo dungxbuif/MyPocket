@@ -52,6 +52,7 @@ updated: 2026-10-06
 2026-10-06 native budget parity: ended budgets are view/delete-only and no longer expose an edit/save path after their end date.
 2026-10-06 native portfolio date parity: trade date selection now follows the account timezone and serializes at local noon to avoid device-timezone drift.
 2026-10-06 native simulator release check: the Release simulator build passed with warnings treated as errors, project/base-component guards passed, and `com.mypocket.ios` launched on iPhone 16. The login screen is ready for manual simulator verification; no production OAuth claim is made.
+2026-10-06 native bug audit: wallet detail month headers now use validated calendar interpolation instead of literal placeholder text; Travel Mode trims required names and rejects malformed/reversed optional date ranges before API submission. The red-to-green regression tests and iPhone 16 run now pass 37/37 native unit tests and 5/5 standard UI tests.
 
 ## Field Ownership
 

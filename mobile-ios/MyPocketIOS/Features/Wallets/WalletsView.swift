@@ -264,10 +264,7 @@ struct WalletDetailView: View {
     }
 
     private func monthLabel(_ value: String) -> String {
-        guard value.count == 7 else { return "Không rõ thời gian" }
-        let parts = value.split(separator: "-")
-        guard parts.count == 2 else { return value }
-        return "Tháng (parts[1]) (parts[0])"
+        MPFormat.monthLabel(value)
     }
 
     private func signedAmount(_ row: TransactionModel) -> Int64 {

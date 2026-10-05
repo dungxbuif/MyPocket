@@ -549,8 +549,23 @@ struct TravelView: View {
     private func toggle(_ event: TravelEventModel) async { do { _ = try await api.setTravelEventActive(id: event.id, active: !event.active); await load() } catch { self.error = "Không thể cập nhật Travel Mode." } }
     private func resetEditor() { name = ""; context = ""; startsOn = ""; endsOn = "" }
     private func beginEditing(_ event: TravelEventModel) { editTarget = event; name = event.name; context = event.context ?? ""; startsOn = event.startsOn ?? ""; endsOn = event.endsOn ?? ""; adding = true }
-    private func save() async { guard !name.isEmpty else { self.error = "Nhập tên chuyến đi."; return }; let input = TravelEventInputModel(name: name, context: context.isEmpty ? nil : context, startsOn: startsOn.isEmpty ? nil : startsOn, endsOn: endsOn.isEmpty ? nil : endsOn, active: editTarget?.active ?? false); do { if let editTarget { _ = try await api.updateTravelEvent(id: editTarget.id, input: input) } else { _ = try await api.createTravelEvent(input) }; resetEditor(); adding = false; await load() } catch { self.error = "Không thể lưu chuyến đi." } }
+    private func save() async { guard TravelEventDraftValidator.isValid(name: name, startsOn: startsOn, endsOn: endsOn) else { self.error = "Tên chuyến và khoảng ngày không hợp lệ."; return }; let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines); let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines); let input = TravelEventInputModel(name: trimmedName, context: trimmedContext.isEmpty ? nil : trimmedContext, startsOn: startsOn.isEmpty ? nil : startsOn, endsOn: endsOn.isEmpty ? nil : endsOn, active: editTarget?.active ?? false); do { if let editTarget { _ = try await api.updateTravelEvent(id: editTarget.id, input: input) } else { _ = try await api.createTravelEvent(input) }; resetEditor(); adding = false; await load() } catch { self.error = "Không thể lưu chuyến đi." } }
     private func remove(_ event: TravelEventModel) async { do { try await api.deleteTravelEvent(id: event.id); await load() } catch { self.error = "Không thể xóa chuyến đi." } }
+}
+
+enum TravelEventDraftValidator {
+    static func isValid(name: String, startsOn: String, endsOn: String) -> Bool {
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        func validDate(_ value: String) -> Bool {
+            guard value.isEmpty else {
+                guard let parsed = MPFormat.parseCalendarDate(value) else { return false }
+                return MPFormat.calendarDateString(parsed) == value
+            }
+            return true
+        }
+        guard validDate(startsOn), validDate(endsOn) else { return false }
+        return startsOn.isEmpty || endsOn.isEmpty || startsOn <= endsOn
+    }
 }
 
 struct PortfolioView: View {

@@ -38,6 +38,11 @@ migration branch unchanged. No production deployment or production database
 mutation is part of this phase. The first blocker to check is whether Xcode
 has an installed iOS Simulator runtime.
 
+2026-10-06 native parity audit fixed two presentation/input defects: wallet
+detail month labels no longer expose interpolation source text, and Travel
+Mode validates trimmed names plus optional calendar ranges before submission.
+Both have regression tests and remain limited to the native client.
+
 ## Current Owner Direction
 
 2026-09-24 wallet/ledger UI follow-up: savings detail has an existing goal/progress spec; Travel Mode is still an event-linkage draft and not a new wallet type. [UI-LEDGER-WEEK](tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md) is in_review after owner correction: basic uses the same Week/Custom summary/list UI as `Tổng cộng`, filtered by wallet; goal shows complete savings history, and provisional credit remains read-only. Basic selection and week navigation were verified on the local Chrome page; goal selection/mobile visual UAT remain open. Credit has business rules, but its detailed statement/payment UI/API contract remains a separate design gap; do not mark credit complete. No deployment has been performed for this slice.

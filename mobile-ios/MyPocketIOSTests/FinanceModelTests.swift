@@ -56,6 +56,20 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(MPFormat.shortDate(timestamp, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!), "06/10/2026")
     }
 
+    func testWalletDetailMonthLabelUsesCalendarComponents() {
+        XCTAssertEqual(MPFormat.monthLabel("2026-10"), "Tháng 10 năm 2026")
+        XCTAssertEqual(MPFormat.monthLabel("invalid"), "Không rõ thời gian")
+        XCTAssertEqual(MPFormat.monthLabel("2026-13"), "Không rõ thời gian")
+    }
+
+    func testTravelEventDraftValidatorRejectsWhitespaceMalformedAndReversedDates() {
+        XCTAssertTrue(TravelEventDraftValidator.isValid(name: "Nhật Bản", startsOn: "2026-10-01", endsOn: "2026-10-10"))
+        XCTAssertTrue(TravelEventDraftValidator.isValid(name: "Không giới hạn", startsOn: "", endsOn: ""))
+        XCTAssertFalse(TravelEventDraftValidator.isValid(name: "   ", startsOn: "2026-10-01", endsOn: "2026-10-10"))
+        XCTAssertFalse(TravelEventDraftValidator.isValid(name: "Sai ngày", startsOn: "2026-10-10", endsOn: "2026-10-01"))
+        XCTAssertFalse(TravelEventDraftValidator.isValid(name: "Sai định dạng", startsOn: "2026/10/01", endsOn: "2026-10-10"))
+    }
+
     func testAdvisorOverviewDecodesStructuredViewAndSource() throws {
         let data = Data(#"{"view_kind":"metric_group","view":{"income":1200000,"expense":500000},"source":{"tool":"get_finance_summary"},"status":"ok"}"#.utf8)
         let overview = try JSONDecoder.mypocket.decode(AdvisorOverviewModel.self, from: data)

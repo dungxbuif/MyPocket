@@ -87,6 +87,14 @@ enum MPFormat {
         String(todayISO(timeZone: timeZone).prefix(7))
     }
 
+    static func monthLabel(_ value: String) -> String {
+        guard value.count == 7 else { return "Không rõ thời gian" }
+        let parts = value.split(separator: "-")
+        guard parts.count == 2, parts[0].count == 4, parts[1].count == 2,
+              let month = Int(parts[1]), (1...12).contains(month) else { return "Không rõ thời gian" }
+        return "Tháng \(parts[1]) năm \(parts[0])"
+    }
+
     static func accountMonth(of raw: String, timeZone: TimeZone) -> String? {
         guard let parsed = parseInstant(raw) else { return nil }
         let formatter = DateFormatter()

@@ -269,6 +269,10 @@ Two audit findings were fixed before the simulator test pass:
   token, `APIClient` clears the Keychain session and notifies `AuthViewModel` so
   the UI returns to the login gate instead of retaining a stale authenticated
   shell.
+- Wallet detail month headers now use the shared `MPFormat.monthLabel`, with
+  shape/range validation instead of leaking interpolation source text.
+- Travel Mode drafts now trim required text and reject malformed or reversed
+  optional calendar ranges before an API request.
 
 Verification on the same simulator:
 
@@ -281,7 +285,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (35 unit/contract tests and 5 UI smoke tests). The same pass
+Both commands pass (37 unit/contract tests and 5 UI smoke tests). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical

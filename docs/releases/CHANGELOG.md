@@ -89,10 +89,13 @@ as active release entries here.
   stale save path after the budget's end date.
 - Native portfolio trade dates now use the account timezone and local-noon
   serialization, preventing device-timezone day shifts.
+- Native wallet detail month headers now render real calendar labels, and Travel
+  Mode rejects whitespace-only names, malformed dates and reversed date ranges
+  before submission.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 35 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 37 unit/contract tests and
   5 standard authenticated UI smoke tests, with base-component and Xcode project
   guards. The Release simulator build also passed with warnings treated as
   errors, and the installed app launched successfully.
