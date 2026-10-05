@@ -415,3 +415,22 @@ The above is local regression proof. Configured-provider browser chat, SSE/recon
   real create/update UI mutation assertion.
 - NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and
   authenticated staging/production gates remain external checks.
+
+### Native simulator rerun — 2026-10-06 06:26–06:30 ICT
+
+- PASS: signed `xcodebuild test` against iPhone 16 Simulator
+  `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` ran the API-backed
+  `MyPocketIOSUITests` suite with 11/11 tests passing in 219.468 seconds
+  (0 failures).
+- PASS: the suite exercised authenticated overview, AI entry capability,
+  Assistant overview, credit wallet ledger/actions, weekly ledger/cashflow,
+  wallet transaction create/update, all secondary routes, feedback entry,
+  primary tabs, and transfer/adjustment overflow actions.
+- PASS: the disposable Stage v1 API remained healthy (`GET /api/v1/health`
+  returned 200) and post-run fixture queries returned zero `Fixture*` wallets,
+  transactions, or feedback rows.
+- PASS: the signed debug app was reinstalled and launched with the local
+  authenticated fixture on the same simulator for manual testing; screenshot
+  evidence: `/tmp/mypocket-ios-simulator-ready.png`.
+- NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and
+  authenticated staging/production gates remain external checks.
