@@ -123,8 +123,8 @@ private extension WalletsViewModel {
 
 struct WalletDetailView: View {
     let api: FinanceAPI
-    let wallet: WalletModel
     let onBack: () -> Void
+    @State private var wallet: WalletModel
     @State private var transactions: [TransactionModel] = []
     @State private var categories: [CategoryModel] = []
     @State private var statement: CreditStatementModel?
@@ -133,6 +133,12 @@ struct WalletDetailView: View {
     @State private var editorPresented = false
     @State private var editTarget: TransactionModel?
     @Environment(\.timeZone) private var timeZone
+
+    init(api: FinanceAPI, wallet: WalletModel, onBack: @escaping () -> Void) {
+        self.api = api
+        self.onBack = onBack
+        _wallet = State(initialValue: wallet)
+    }
 
     var body: some View {
         ScrollView {
@@ -276,13 +282,18 @@ struct WalletDetailView: View {
         loading = true
         defer { loading = false }
         do {
+            async let walletResult = api.wallets()
             if wallet.type == "credit" {
                 statement = try await api.creditStatement(walletID: wallet.id)
             } else {
                 async let transactionResult = api.transactions()
                 async let categoryResult = api.categories()
                 transactions = try await transactionResult
-                categories = try await categoryResult
+                categories = (try? await categoryResult) ?? []
+            }
+            if let refreshedWallets = try? await walletResult,
+               let refreshed = refreshedWallets.first(where: { $0.id == wallet.id }) {
+                wallet = refreshed
             }
             error = nil
         } catch {

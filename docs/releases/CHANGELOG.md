@@ -42,6 +42,8 @@ as active release entries here.
   keeps the same correlation ID so server errors can be traced end to end.
 - Native transfer forms now exclude credit wallets and serialize the selected
   transfer day in the account timezone instead of the device timezone.
+- Native wallet detail now refreshes the wallet summary after loading and keeps
+  valid transaction rows visible when optional category metadata is unavailable.
 - Native UI smoke tests now start from a deterministic unauthenticated state
   with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
   Keychain/biometric state. The iPhone 16 suite passes 10 tests (5 passed, 5
