@@ -273,6 +273,22 @@ struct CategoriesView: View {
     private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; parentID = item.parentID ?? ""; selectedWalletIDs = Set(item.walletIDs); adding = true }
 }
 
+enum JarAllocationDraftValidator {
+    static func isValid(mode: String, amount: Int64?, percent: Double?) -> Bool {
+        switch mode {
+        case "none":
+            return amount == nil && percent == nil
+        case "fixed":
+            return (amount ?? 0) > 0 && percent == nil
+        case "percent":
+            guard let percent else { return false }
+            return percent > 0 && percent <= 100 && amount == nil
+        default:
+            return false
+        }
+    }
+}
+
 struct JarsView: View {
     let api: FinanceAPI
     let onBack: () -> Void
@@ -367,7 +383,7 @@ struct JarsView: View {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập tên hũ."; return }
         let parsedAmount = Int64(amount.filter(\.isNumber))
         let parsedPercent = Double(percent.replacingOccurrences(of: ",", with: "."))
-        guard (mode == "none" && parsedAmount == nil && parsedPercent == nil) || (mode == "fixed" && (parsedAmount ?? 0) > 0 && parsedPercent == nil) || (mode == "percent" && (parsedPercent ?? 0) > 0 && (parsedPercent ?? 101) <= 100 && parsedAmount == nil) else { error = "Cách phân bổ không hợp lệ."; return }
+        guard JarAllocationDraftValidator.isValid(mode: mode, amount: parsedAmount, percent: parsedPercent) else { error = "Cách phân bổ không hợp lệ."; return }
         let input = JarConfigInputModel(month: month, name: name, allocationMode: mode, allocationAmount: mode == "fixed" ? parsedAmount : nil, allocationPercent: mode == "percent" ? parsedPercent : nil)
         do { if let editTarget { _ = try await api.updateJarMonth(jarID: editTarget.jarID, month: month, input: input) } else { _ = try await api.createJar(input) }; showEditor = false; await load() }
         catch { self.error = "Không thể lưu hũ." }

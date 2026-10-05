@@ -83,7 +83,7 @@ as active release entries here.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 32 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 33 unit/contract tests and
   5 standard authenticated UI smoke tests, with base-component and Xcode project
   guards.
 - An opt-in API-backed wallet-detail UI smoke passed with a seeded disposable

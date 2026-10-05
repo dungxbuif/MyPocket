@@ -25,4 +25,13 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(MPSelectionLabels.display(for: "percent"), "Phần trăm thu nhập")
         XCTAssertEqual(MPSelectionLabels.display(for: "unknown-provider-value"), "unknown-provider-value")
     }
+
+    func testJarAllocationRejectsZeroPercentAndStaleModeValues() {
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "none", amount: nil, percent: nil))
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "fixed", amount: 1, percent: nil))
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 100))
+        XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 0))
+        XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "fixed", amount: 100, percent: 10))
+        XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "none", amount: 100, percent: nil))
+    }
 }
