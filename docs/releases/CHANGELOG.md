@@ -85,6 +85,8 @@ as active release entries here.
   credit rows remain read-only and route mutations through the credit ledger.
 - Native budget and balance-adjustment selectors now exclude credit wallets, and
   budgets only offer expense categories, matching the web scope rules.
+- Native ended budgets are now view/delete-only; the editor no longer exposes a
+  stale save path after the budget's end date.
 
 ### Verification
 

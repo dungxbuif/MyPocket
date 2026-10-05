@@ -142,6 +142,9 @@ changes use the dedicated credit statement flow.
 Budget editors expose only expense categories and non-credit wallets; balance
 adjustments use the same non-credit wallet boundary.
 
+An ended budget may be viewed and deleted but cannot be edited or saved; active
+budgets retain the normal edit flow.
+
 Selecting a credit wallet from the main wallet list must route to the same
 statement plus entry/payment surface as the dedicated credit route; a read-only
 credit detail is not sufficient for parity.

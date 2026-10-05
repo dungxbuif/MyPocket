@@ -80,6 +80,10 @@ Budget category scope is expense-only and budget/adjustment wallet selectors
 exclude credit wallets, matching the web restrictions for those ordinary ledger
 operations.
 
+Ended budgets are immutable in the native editor: the screen keeps their
+history and delete action visible but does not offer a save/edit path, matching
+the web's view-or-delete behavior.
+
 Finance Assistant history uses one UserDefaults conversation ID keyed by the
 authenticated owner ID. The native screen reloads that conversation's latest
 50 messages and the read-only monthly overview on entry; a later request can

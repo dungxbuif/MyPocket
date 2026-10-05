@@ -37,7 +37,14 @@ struct BudgetsView: View {
                                 MPText(budget.name)
                                 MPProgressBar(progress: Double(budget.spent) / Double(max(1, budget.limitAmount)), label: "\(MPFormat.money(budget.spent)) / \(MPFormat.money(budget.limitAmount))")
                                 MPText("\(budget.startDate) → \(budget.endDate)", style: .secondary)
-                                HStack { MPButton("Sửa", style: .secondary) { beginEditing(budget) }; MPButton("Xóa", style: .destructive) { deleteTarget = budget } }
+                                HStack {
+                                    if !budget.ended {
+                                        MPButton("Sửa", style: .secondary) { beginEditing(budget) }
+                                    } else {
+                                        MPText("Đã kết thúc", style: .secondary)
+                                    }
+                                    MPButton("Xóa", style: .destructive) { deleteTarget = budget }
+                                }
                             }
                         }
                     }
@@ -107,6 +114,7 @@ struct BudgetsView: View {
     }
 
     private func beginEditing(_ budget: BudgetModel) {
+        guard !budget.ended else { return }
         editTarget = budget
         name = budget.name
         limit = String(budget.limitAmount)
