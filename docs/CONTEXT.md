@@ -37,6 +37,7 @@ updated: 2026-10-05
 2026-09-30 wallet UI reconciliation: the transaction ledger scope control now uses a compact `WalletScopeSelector` trigger and the shared `WalletSelectionList` inside `BaseBottomSheet`, matching the supplied wallet-selector reference while preserving aggregate/basic/goal/credit filtering semantics. The selector can route to wallet management for add/edit; no API or schema change.
 2026-10-05 simulator/integration audit: iPhone 16 native unit/UI smoke (19 + 3) passed, the Go backend race suite passed against disposable PostgreSQL + Redis, transfer integration/browser probes now cover idempotent pair update/delete, and feedback was verified through JWT, scoped API key, service-token agent lifecycle and Redis audit events. Local fixtures were cleaned. Provider-backed AI/OCR, real Google iOS OAuth, physical-device and authenticated staging/production proof remain open release gates.
 2026-10-06 AI browser regression: a fixed September/October fixture date had drifted outside the current account-local week and caused a false browser failure. The fixture now derives today/yesterday in `Asia/Ho_Chi_Minh`; the complete AI contract + Chromium flow is green again.
+2026-10-06 quality gate: backend AI/feedback test fixtures were normalized with `gofmt`; `go vet ./...`, targeted Go tests and a Swift Debug simulator build with warnings-as-errors pass.
 
 ## Field Ownership
 

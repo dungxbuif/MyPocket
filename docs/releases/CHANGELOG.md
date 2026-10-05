@@ -33,6 +33,8 @@ as active release entries here.
 - AI-entry browser regression fixtures now generate ledger rows in the current
   account-local week, preventing calendar drift from hiding the expected grouped
   rows in future runs.
+- Backend test fixtures were normalized with `gofmt`; `go vet ./...` and the
+  warning-as-error Swift simulator build remain green.
 
 ### Release gates still open
 

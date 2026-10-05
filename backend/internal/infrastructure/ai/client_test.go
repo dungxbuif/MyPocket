@@ -131,9 +131,9 @@ func TestExtractionSeparatesUserInstructionAndStoresUsageWhenEnabled(t *testing.
 			t.Fatal("user instruction was not sent as a separate field")
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{
-			"id": "provider-request-1",
+			"id":      "provider-request-1",
 			"choices": []any{map[string]any{"message": map[string]any{"content": `{"reply":"Đã lọc theo tháng","drafts":[` + validDraft + `]}`}, "finish_reason": "stop"}},
-			"usage": map[string]any{"prompt_tokens": 101, "completion_tokens": 23, "total_tokens": 124, "prompt_tokens_details": map[string]any{"cached_tokens": 7}},
+			"usage":   map[string]any{"prompt_tokens": 101, "completion_tokens": 23, "total_tokens": 124, "prompt_tokens_details": map[string]any{"cached_tokens": 7}},
 		})
 	})
 	c.config.StoreUsage = true

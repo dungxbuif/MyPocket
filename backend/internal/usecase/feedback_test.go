@@ -12,7 +12,7 @@ import (
 )
 
 type feedbackRepoStub struct {
-	rows   map[string]entity.Feedback
+	rows      map[string]entity.Feedback
 	createErr error
 }
 
@@ -106,12 +106,12 @@ func (s *auditStub) Record(_ context.Context, event contract.AuditEvent) error {
 }
 
 type feedbackStorageStub struct {
-	key       string
-	putCount  int
+	key         string
+	putCount    int
 	deleteCount int
 	signedCount int
-	putErr    error
-	signedURL string
+	putErr      error
+	signedURL   string
 }
 
 func (s *feedbackStorageStub) Key(owner, batch, attachment, filename string) (string, error) {

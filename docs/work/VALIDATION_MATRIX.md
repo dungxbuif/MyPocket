@@ -26,6 +26,7 @@ updated: 2026-10-05
 | iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: 3 UI tests, 0 failures; app installed and relaunched as `com.mypocket.ios` |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |
+| Go formatting/static quality | PASS: `gofmt -l backend` is clean; `go vet ./...` and Swift Debug build with warnings-as-errors pass |
 | FE-proxy transfer integration | PASS: paired creation, balance reconciliation, report/jar exclusion, transfer PATCH and pair DELETE with idempotency keys, auth guard |
 | Real Chromium 390×844 transfer flow | PASS: actual UI rendered both wallet options, saved, refreshed and matched persisted API state; stale fixture cleanup now deletes transfer pairs atomically |
 | AI entry browser flow | PASS: contract + Chromium fixture; fixture transactions derive the current account-local week so the grouped-ledger assertion cannot expire with the calendar |
