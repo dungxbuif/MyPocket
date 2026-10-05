@@ -285,7 +285,8 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (37 unit/contract tests and 5 UI smoke tests). The same pass
+Both commands pass (37 unit/contract tests and the full UI suite: 8 tests, 5
+passed and 3 explicit API-fixture skips). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical

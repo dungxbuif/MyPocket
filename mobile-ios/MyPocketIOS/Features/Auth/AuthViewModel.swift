@@ -42,6 +42,13 @@ final class AuthViewModel: ObservableObject {
 
     func restore() async {
 #if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-UITestUnauthenticated") {
+            store.clear()
+            biometricEnabled = false
+            UserDefaults.standard.set(false, forKey: biometricPreferenceKey)
+            phase = .unauthenticated
+            return
+        }
         if ProcessInfo.processInfo.arguments.contains("-UITestAuthenticatedAPI") {
             do {
                 let requestBody = try JSONEncoder.mypocket.encode(

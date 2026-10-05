@@ -23,6 +23,10 @@ as active release entries here.
 
 ### Fixed
 
+- Native UI smoke tests now start from a deterministic unauthenticated state
+  with the DEBUG-only `-UITestUnauthenticated` fixture, clearing only simulator
+  Keychain/biometric state. The iPhone 16 suite passes 8 tests (5 passed, 3
+  explicit API-fixture skips).
 - Native session restore now refreshes an expired access token before enabling the
   Face ID lock gate. If the refresh token is expired or rejected, Keychain state
   and the biometric preference are cleared instead of opening an invalid session.

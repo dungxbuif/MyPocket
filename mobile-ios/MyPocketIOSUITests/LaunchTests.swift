@@ -4,6 +4,7 @@ import XCTest
 final class LaunchTests: XCTestCase {
     func testAppLaunches() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-UITestUnauthenticated"]
         app.launch()
         XCTAssertTrue(
             app.buttons["Đăng nhập bằng Google"].waitForExistence(timeout: 5),
