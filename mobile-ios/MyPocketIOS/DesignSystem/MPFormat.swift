@@ -46,6 +46,16 @@ enum MPFormat {
         return calendarDate.date(from: raw)
     }
 
+    static func parseCalendarDate(_ raw: String?, timeZone: TimeZone) -> Date? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.timeZone = timeZone
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter.date(from: raw)
+    }
+
     static func calendarDateString(_ value: Date) -> String {
         calendarDate.string(from: value)
     }

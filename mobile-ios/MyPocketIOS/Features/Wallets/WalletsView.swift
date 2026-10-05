@@ -58,7 +58,7 @@ struct WalletsView: View {
         .environment(\.timeZone, TimeZone(identifier: model.accountTimezone) ?? .current)
         .overlay {
             if editorPresented {
-                WalletEditorView(api: model.apiForChild, wallet: editTarget, onSaved: {
+                WalletEditorView(api: model.apiForChild, wallet: editTarget, timezone: model.accountTimezone, onSaved: {
                     editorPresented = false
                     Task { await model.load() }
                 }, onCancel: { editorPresented = false })
@@ -294,6 +294,7 @@ struct WalletDetailView: View {
 struct WalletEditorView: View {
     let api: FinanceAPI
     let wallet: WalletModel?
+    let timezone: String
     let onSaved: () -> Void
     let onCancel: () -> Void
     @State private var name: String
@@ -311,16 +312,17 @@ struct WalletEditorView: View {
     @State private var saving = false
     @State private var errorMessage: String?
 
-    init(api: FinanceAPI, wallet: WalletModel?, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    init(api: FinanceAPI, wallet: WalletModel?, timezone: String = TimeZone.current.identifier, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.api = api
         self.wallet = wallet
+        self.timezone = timezone
         self.onSaved = onSaved
         self.onCancel = onCancel
         _name = State(initialValue: wallet?.name ?? "")
         _type = State(initialValue: wallet?.type ?? "basic")
         _openingBalance = State(initialValue: wallet.map { String($0.openingBalance) } ?? "")
         _targetAmount = State(initialValue: wallet?.targetAmount.map(String.init) ?? "")
-        _targetDate = State(initialValue: MPFormat.parseCalendarDate(wallet?.targetDate) ?? Date())
+        _targetDate = State(initialValue: MPFormat.parseCalendarDate(wallet?.targetDate, timeZone: TimeZone(identifier: timezone) ?? .current) ?? Date())
         _targetDateEnabled = State(initialValue: wallet?.targetDate == nil ? "Không" : "Có")
         _creditLimit = State(initialValue: wallet?.creditLimit.map(String.init) ?? "")
         _lastStatementBalance = State(initialValue: wallet?.lastStatementBalance.map(String.init) ?? "")
@@ -364,6 +366,7 @@ struct WalletEditorView: View {
             }
             .padding(MPMetrics.pagePadding)
         }
+        .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
     }
 
     private func save() async {
@@ -383,7 +386,7 @@ struct WalletEditorView: View {
         saving = true
         defer { saving = false }
         let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
-        let input = WalletModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), type: wallet?.type ?? type, openingBalance: wallet?.openingBalance ?? Int64(openingBalance.filter(\.isNumber)) ?? 0, isInTotal: isInTotal == "Có", description: trimmedDescription.isEmpty ? nil : trimmedDescription, targetAmount: type == "goal" ? parsedTarget : nil, targetDate: type == "goal" && targetDateEnabled == "Có" ? MPFormat.calendarDateString(targetDate) : nil, creditLimit: type == "credit" ? parsedCreditLimit : nil, lastStatementBalance: type == "credit" ? parsedStatementBalance : nil, statementDay: type == "credit" ? parsedStatementDay : nil, paymentDueDay: type == "credit" ? parsedPaymentDueDay : nil)
+        let input = WalletModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), type: wallet?.type ?? type, openingBalance: wallet?.openingBalance ?? Int64(openingBalance.filter(\.isNumber)) ?? 0, isInTotal: isInTotal == "Có", description: trimmedDescription.isEmpty ? nil : trimmedDescription, targetAmount: type == "goal" ? parsedTarget : nil, targetDate: type == "goal" && targetDateEnabled == "Có" ? MPFormat.calendarDateString(targetDate, timeZone: TimeZone(identifier: timezone) ?? .current) : nil, creditLimit: type == "credit" ? parsedCreditLimit : nil, lastStatementBalance: type == "credit" ? parsedStatementBalance : nil, statementDay: type == "credit" ? parsedStatementDay : nil, paymentDueDay: type == "credit" ? parsedPaymentDueDay : nil)
         do {
             if let wallet { _ = try await api.updateWallet(id: wallet.id, input: input) }
             else { _ = try await api.createWallet(input) }

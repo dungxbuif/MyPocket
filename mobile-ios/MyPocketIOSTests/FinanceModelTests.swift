@@ -142,6 +142,14 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(date.map(MPFormat.calendarDateString), "2026-12-31")
     }
 
+    func testGoalTargetDateRoundTripUsesAccountTimezone() {
+        let timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        let date = MPFormat.parseCalendarDate("2026-10-06", timeZone: timeZone)
+
+        XCTAssertNotNil(date)
+        XCTAssertEqual(date.map { MPFormat.calendarDateString($0, timeZone: timeZone) }, "2026-10-06")
+    }
+
     func testCategoryInputPreservesParentID() throws {
         let input = CategoryModelInput(name: "Highlands", kind: "expense", parentID: "food", walletIDs: [], iconKey: "tag")
         let json = String(decoding: try JSONEncoder.mypocket.encode(input), as: UTF8.self)

@@ -35,6 +35,8 @@ as active release entries here.
 - Native aggregate/basic ledgers now match the approved Week/Custom contract:
   Monday–Sunday account-local ranges, bounded previous/next week navigation,
   no all-time tab, and shared `Tiền vào`/`Tiền ra` cashflow summary.
+- Native goal-wallet target dates now round-trip as account-local calendar dates,
+  avoiding UTC/device timezone day shifts in the editor.
 - Native session restore now refreshes an expired access token before enabling the
   Face ID lock gate. If the refresh token is expired or rejected, Keychain state
   and the biometric preference are cleared instead of opening an invalid session.

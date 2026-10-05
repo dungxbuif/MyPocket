@@ -332,6 +332,10 @@ current week, plus the web-matched `Tiền vào`/`Tiền ra` cashflow card. The 
 filter/label tests and an opt-in iPhone 16 UI assertion pass; goal and credit
 scopes still route to their specialized bodies.
 
+The goal-wallet target-date audit also corrected date-only parsing and
+serialization to use the account IANA timezone. The regression test confirms a
+goal date round-trips to the same calendar day independently of device timezone.
+
 ## Disposable local API smoke — 2026-10-05
 
 Before any release decision, the typed client contracts were exercised against

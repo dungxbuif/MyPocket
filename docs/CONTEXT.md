@@ -57,6 +57,7 @@ updated: 2026-10-06
 2026-10-06 native API UI fixture isolation: `LOCAL_API_UI` now creates/deletes its own basic and credit wallets through local `:8080` after fixture OAuth. Wallet detail, credit ledger, Assistant and AI-entry capability tests pass, the full opt-in UI suite is 9/9, and a post-run owner check finds zero leftover `Fixture*` wallets.
 2026-10-06 native AI-entry capability gate: the base document picker is disabled until `files_configured=true` and while processing; text-only entry remains usable when OCR/private storage is unavailable. Native unit tests are 38/38 and the local API-backed capability UI assertion passes.
 2026-10-06 native ledger week-period parity: aggregate/basic scopes now use account-local Monday–Sunday `Theo tuần` plus bounded previous/next navigation and `Tùy chọn`; the incorrect all-time tab was removed and the summary uses `Tiền vào`/`Tiền ra`. Native unit tests are 41/41 and the API-backed ledger UI assertion passes.
+2026-10-06 native goal target-date parity: wallet editor date-only parsing and serialization now use the account IANA timezone instead of UTC/device time. Native unit tests are 42/42.
 
 ## Field Ownership
 
