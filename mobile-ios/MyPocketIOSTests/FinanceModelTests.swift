@@ -42,6 +42,14 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertFalse(TransactionsViewModel.bulkDeleteSelectable(credit))
     }
 
+    func testOrdinaryTransactionWalletsExcludeCreditWallets() {
+        let wallets = [
+            WalletModel(id: "basic", name: "Tiền mặt", type: "basic", currency: "VND", openingBalance: 0, currentBalance: 0, availableCredit: nil, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil),
+            WalletModel(id: "credit", name: "Thẻ", type: "credit", currency: "VND", openingBalance: 0, currentBalance: 0, availableCredit: 10_000_000, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: 10_000_000, lastStatementBalance: nil, statementDay: 15, paymentDueDay: 5)
+        ]
+        XCTAssertEqual(TransactionsViewModel.ordinaryTransactionWallets(wallets).map(\.id), ["basic"])
+    }
+
     func testAdvisorOverviewDecodesStructuredViewAndSource() throws {
         let data = Data(#"{"view_kind":"metric_group","view":{"income":1200000,"expense":500000},"source":{"tool":"get_finance_summary"},"status":"ok"}"#.utf8)
         let overview = try JSONDecoder.mypocket.decode(AdvisorOverviewModel.self, from: data)

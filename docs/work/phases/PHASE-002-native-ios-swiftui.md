@@ -134,6 +134,11 @@ raw API enum values for request payloads. Jar allocation mode changes must clear
 the previous mode's draft and reject a zero percentage; the valid percentage
 range is greater than zero through 100, matching the web editor.
 
+Ordinary transaction and AI proposal editors must never offer credit wallets.
+Changing the wallet or income/expense type clears an incompatible category, and
+credit rows opened from aggregate ledger detail are read-only; entry/payment
+changes use the dedicated credit statement flow.
+
 Selecting a credit wallet from the main wallet list must route to the same
 statement plus entry/payment surface as the dedicated credit route; a read-only
 credit detail is not sufficient for parity.
@@ -267,7 +272,7 @@ xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -only-testing:MyPocketIOSUITests -enableCodeCoverage NO
 ```
 
-Both commands pass (33 unit/contract tests and 5 UI smoke tests). The same pass
+Both commands pass (34 unit/contract tests and 5 UI smoke tests). The same pass
 also covers typed `204 No Content` mutation responses and native bulk-delete
 selection/confirmation/error retention. Provider-backed
 AI/OCR, real Google iOS OAuth, authenticated staging/production and physical

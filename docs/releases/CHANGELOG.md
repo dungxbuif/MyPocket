@@ -80,10 +80,13 @@ as active release entries here.
 - Native selectors now render localized semantic labels while preserving raw API
   enum values, and jar allocation mode changes clear stale drafts and reject
   zero-percent allocations to match the web validation contract.
+- Native ordinary transaction and AI proposal editors now exclude credit
+  wallets and clear incompatible categories on wallet/type changes; aggregate
+  credit rows remain read-only and route mutations through the credit ledger.
 
 ### Verification
 
-- Native iOS simulator regression passed on iPhone 16: 33 unit/contract tests and
+- Native iOS simulator regression passed on iPhone 16: 34 unit/contract tests and
   5 standard authenticated UI smoke tests, with base-component and Xcode project
   guards.
 - An opt-in API-backed wallet-detail UI smoke passed with a seeded disposable

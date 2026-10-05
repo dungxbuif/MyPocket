@@ -22,7 +22,7 @@ updated: 2026-10-06
 
 | Proof | Result |
 | --- | --- |
-| iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 33 tests, 0 failures; expired access tokens refresh before Face ID, invalid refresh sessions clear safely, malformed ledger timestamps are excluded from period filters, the iOS PKCE fixture contract encodes correctly, 204 mutation responses decode safely, immutable bulk-delete rows are excluded, query paths preserve URL parameters, Advisor overview data remains structured JSON, selector enum labels stay localized without changing wire values, and jar allocations reject zero percent/stale mode values |
+| iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 34 tests, 0 failures; expired access tokens refresh before Face ID, invalid refresh sessions clear safely, malformed ledger timestamps are excluded from period filters, the iOS PKCE fixture contract encodes correctly, 204 mutation responses decode safely, immutable bulk-delete rows are excluded, query paths preserve URL parameters, Advisor overview data remains structured JSON, selector enum labels stay localized without changing wire values, jar allocations reject zero percent/stale mode values, and ordinary editors exclude credit wallets |
 | iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: 5 standard UI tests, 0 failures; app installed and relaunched as `com.mypocket.ios` |
 | iPhone 16 Simulator: authenticated “Thêm” route sweep | PASS: all 13 secondary destinations opened and returned to the menu; the shared `MPButton` hit-shape fix keeps compact rows tappable |
 | Native category scope parity | PASS: category create/edit preserves multiple selected wallet IDs; empty selection remains the API's all-wallet scope; shared `MPMultiOptionSelector` owns the UI |
@@ -38,6 +38,7 @@ updated: 2026-10-06
 | Native portfolio parity | PASS: native portfolio now exposes cost/current/unrealized metrics, per-asset current-price drafts that can be cleared, and an explicit trade date; values remain isolated per asset like the web panel |
 | Native recurring wallet/category parity | PASS: recurring schedules exclude credit wallets and category options follow the selected expense/income type; changing type clears an incompatible category selection |
 | Native selector and jar validation parity | PASS: shared selectors localize API enum values without changing payloads; jar mode changes clear stale drafts and reject 0% while accepting only 0 < percent ≤ 100 |
+| Native ordinary transaction/credit boundary parity | PASS: ordinary and AI proposal editors exclude credit wallets, invalid categories clear when wallet/type changes, and aggregate credit rows do not expose ordinary edit/delete actions |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
 | Simulator API-backed authenticated smoke fixture | PASS: DEBUG-only `-UITestAuthenticatedAPI` exchanged fixture PKCE fields against local `:8080`, persisted the disposable JWT, and rendered the authenticated overview with live empty wallets/ledger; screenshot `/tmp/mypocket-ios-simulator-api-auth.png` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |

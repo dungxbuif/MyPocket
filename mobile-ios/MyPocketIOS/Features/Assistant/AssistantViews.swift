@@ -432,7 +432,7 @@ struct EntryProposalEditor: View {
     init(api: FinanceAPI, proposal: EntryProposalModel, wallets: [WalletModel], categories: [CategoryModel], onSaved: @escaping (EntryProposalModel) -> Void, onCancel: @escaping () -> Void) {
         self.api = api; self.proposal = proposal; self.wallets = wallets; self.categories = categories; self.onSaved = onSaved; self.onCancel = onCancel
         _amount = State(initialValue: String(proposal.draft.amount))
-        _walletID = State(initialValue: proposal.draft.walletID.isEmpty ? (wallets.first?.id ?? "") : proposal.draft.walletID)
+        _walletID = State(initialValue: proposal.draft.walletID.isEmpty ? (TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "") : proposal.draft.walletID)
         _categoryID = State(initialValue: proposal.draft.categoryID ?? "")
         _note = State(initialValue: proposal.draft.note)
         _date = State(initialValue: MPFormat.parseInstant(proposal.draft.occurredAt) ?? Date())
@@ -443,7 +443,7 @@ struct EntryProposalEditor: View {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Sửa đề xuất", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
                 MPAmountField(title: "Số tiền", text: $amount)
-                MPOptionSelector(title: "Ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
+                MPOptionSelector(title: "Ví", options: TransactionsViewModel.ordinaryTransactionWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
                 MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID, emptyLabel: "Không chọn")
                 MPDateField(title: "Ngày giao dịch", date: $date)
                 MPTextEditor(title: "Ghi chú", text: $note)
@@ -452,6 +452,7 @@ struct EntryProposalEditor: View {
             }
             .padding(MPMetrics.pagePadding)
         }
+        .onChange(of: walletID) { _, _ in clearInvalidCategory() }
     }
 
     private func save() async {
@@ -473,6 +474,13 @@ struct EntryProposalEditor: View {
             options.append(MPSelectionOption(id: current.id, label: current.name))
         }
         return options
+    }
+
+    private func clearInvalidCategory() {
+        guard let selectedCategory = categories.first(where: { $0.id == categoryID }), let selectedWallet else { return }
+        if !selectedCategory.applies(to: proposal.draft.type, walletID: selectedWallet.id, walletType: selectedWallet.type) {
+            categoryID = ""
+        }
     }
 }
 

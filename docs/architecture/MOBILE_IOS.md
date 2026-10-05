@@ -71,6 +71,11 @@ Jar allocation validation matches the web contract: fixed amounts must be
 positive, percentage allocations must be greater than zero and at most 100, and
 switching allocation mode clears stale values from the previous mode.
 
+The ordinary transaction editor and AI proposal editor exclude credit wallets,
+and changing wallet or income/expense type clears a category that no longer
+applies. Credit-ledger rows remain read-only in aggregate transaction detail;
+credit mutations go through the dedicated statement actions.
+
 Finance Assistant history uses one UserDefaults conversation ID keyed by the
 authenticated owner ID. The native screen reloads that conversation's latest
 50 messages and the read-only monthly overview on entry; a later request can

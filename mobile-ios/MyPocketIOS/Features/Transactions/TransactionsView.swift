@@ -67,6 +67,10 @@ final class TransactionsViewModel: ObservableObject {
     static func bulkDeleteSelectable(_ transaction: TransactionModel) -> Bool {
         transaction.transferID == nil && transaction.type != "adjustment" && transaction.creditKind == nil
     }
+
+    static func ordinaryTransactionWallets(_ wallets: [WalletModel]) -> [WalletModel] {
+        wallets.filter { $0.type != "credit" }
+    }
     var groupedTransactions: [(String, [TransactionModel])] {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = TimeZone(identifier: accountTimezone) ?? .current
@@ -316,7 +320,7 @@ struct TransactionsView: View {
                 } onCancel: { self.transferEditID = nil }
                 .background(MPColor.canvas.ignoresSafeArea())
             } else if let selectedTransaction {
-                TransactionDetailView(api: modelAPI, transaction: selectedTransaction, allTransactions: model.transactions, onEdit: {
+                TransactionDetailView(api: modelAPI, transaction: selectedTransaction, allTransactions: model.transactions, isCreditWallet: model.wallets.first(where: { $0.id == selectedTransaction.walletID })?.type == "credit", onEdit: {
                     editTarget = selectedTransaction
                     editorPresented = true
                     self.selectedTransaction = nil
@@ -435,7 +439,7 @@ struct TransactionEditorView: View {
         _type = State(initialValue: transaction?.type ?? "expense")
         _amount = State(initialValue: transaction.map { String($0.amount) } ?? "")
         _note = State(initialValue: transaction?.note ?? "")
-        _walletID = State(initialValue: transaction?.walletID ?? wallets.first?.id ?? "")
+        _walletID = State(initialValue: transaction?.walletID ?? TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "")
         _categoryID = State(initialValue: transaction?.categoryID ?? "")
         if let raw = transaction?.occurredAt, let date = MPFormat.parseInstant(raw) { _date = State(initialValue: date) }
     }
@@ -456,7 +460,9 @@ struct TransactionEditorView: View {
             .padding(MPMetrics.pagePadding)
         }
         .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
-        .task { if walletID.isEmpty { walletID = wallets.first?.id ?? "" } }
+        .task { if walletID.isEmpty { walletID = TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "" } }
+        .onChange(of: type) { _, _ in clearInvalidCategory() }
+        .onChange(of: walletID) { _, _ in clearInvalidCategory() }
     }
 
     private func save() async {
@@ -490,7 +496,7 @@ struct TransactionEditorView: View {
     }
 
     private var selectedWallet: WalletModel? { wallets.first(where: { $0.id == walletID }) }
-    private var walletOptions: [MPSelectionOption] { wallets.map { MPSelectionOption(id: $0.id, label: $0.name) } }
+    private var walletOptions: [MPSelectionOption] { TransactionsViewModel.ordinaryTransactionWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) } }
     private var categoryOptions: [MPSelectionOption] {
         let valid = categories.filter { $0.applies(to: type, walletID: selectedWallet?.id ?? "", walletType: selectedWallet?.type ?? "basic") }
         var options = [MPSelectionOption(id: "", label: "Không chọn")]
@@ -500,12 +506,20 @@ struct TransactionEditorView: View {
         }
         return options
     }
+
+    private func clearInvalidCategory() {
+        guard let selectedCategory = categories.first(where: { $0.id == categoryID }), let selectedWallet else { return }
+        if !selectedCategory.applies(to: type, walletID: selectedWallet.id, walletType: selectedWallet.type) {
+            categoryID = ""
+        }
+    }
 }
 
 struct TransactionDetailView: View {
     let api: FinanceAPI
     let transaction: TransactionModel
     let allTransactions: [TransactionModel]
+    let isCreditWallet: Bool
     let onEdit: () -> Void
     let onEditTransfer: () -> Void
     let onDelete: () -> Void
@@ -524,7 +538,7 @@ struct TransactionDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     MPText("Ngày: \(MPFormat.shortDate(transaction.occurredAt, timeZone: timeZone))")
                     if let note = transaction.note, !note.isEmpty { MPText("Ghi chú: \(note)") }
-                    if transaction.transferID == nil {
+                    if transaction.transferID == nil && !isCreditWallet {
                         MPWalletSelector(title: "Travel Mode", options: ["Không gắn chuyến"] + travelEvents.map(\.name), selection: $travelEventName)
                         MPButton("Lưu liên kết chuyến", style: .secondary) {
                             Task {
@@ -538,9 +552,11 @@ struct TransactionDetailView: View {
                     MPText(transaction.includedInReports ? "Được tính vào báo cáo" : "Không tính vào báo cáo", style: .secondary)
                 }
             }
-            if transaction.transferID == nil {
+            if transaction.transferID == nil && !isCreditWallet {
                 MPButton("Sửa giao dịch", style: .secondary, action: onEdit)
                 MPButton("Xóa giao dịch", style: .destructive, action: onDelete)
+            } else if isCreditWallet {
+                MPStatusMessage(text: "Bút toán tín dụng chỉ được sửa hoặc hoàn tác trong Sổ tín dụng.", tone: .info)
             } else {
                 MPStatusMessage(text: "Đây là cặp chuyển ví; sửa/xóa phải áp dụng cho cả hai giao dịch.", tone: .info)
                 MPButton("Sửa cả cặp chuyển ví", style: .secondary, action: onEditTransfer)
@@ -550,7 +566,7 @@ struct TransactionDetailView: View {
         }
         .padding(MPMetrics.pagePadding)
         .task {
-            guard transaction.transferID == nil else { return }
+            guard transaction.transferID == nil, !isCreditWallet else { return }
             do {
                 travelEvents = try await api.travelEvents()
                 travelEventName = travelEvents.first(where: { $0.id == transaction.travelEventID })?.name ?? "Không gắn chuyến"
