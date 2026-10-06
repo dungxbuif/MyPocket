@@ -218,7 +218,7 @@ shared API contracts are touched.
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 47 unit/contract tests and 14 signed API-backed UI tests
+suite passed: 48 unit/contract tests and 14 signed API-backed UI tests
 (auth launch, authenticated primary tabs, all secondary destinations, AI and
 Assistant surfaces, feedback, wallet/transaction mutations, transfer pair
 deletion and credit entry/payment refresh). The shared
@@ -234,6 +234,14 @@ wallet/category selectors, account-timezone boundary formatting, recurring
 RFC3339/note payloads, typed API error presentation and release configuration
 changes. The app was relaunched after the test run with bundle
 `com.mypocket.ios` for manual simulator inspection.
+
+The post-commit rerun on 2026-10-06 07:13–07:23 ICT repeated the complete
+cross-surface gate: backend race tests, web design/type/build/API/AI/transfer
+checks, native 48/48 unit tests, signed `LOCAL_API_UI` UI 14/14 in 293.319s,
+the Release warnings-as-errors build, base-component/project guards, and a
+200 response from `/api/v1/health`. The local disposable fixture was empty
+after teardown. Provider-backed AI/OCR, real Google OAuth, authenticated
+staging/production and physical-device validation remain external gates.
 
 ```bash
 xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
