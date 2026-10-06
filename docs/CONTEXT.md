@@ -25,13 +25,12 @@ updated: 2026-10-06
 2026-10-06 production backend rollout: a validated pre-migration custom-format
 backup was retained on `vm100-prod`; the live database advanced from migration
 27 to 29 without reset/drop/truncate; and `mypocket-api` was rolled to the
-immutable candidate digest `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb`.
+immutable release `release-75f7f07` at digest `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb`.
 Public health and OpenAPI probes returned 200. Redis is now reached through
 the additive attachable overlay `mypocket-redis-net` and stable
 `redis-mypocket` alias, verified with `PONG` from `vm100-prod`; no Redis
-restart was needed. The candidate is deployed but the worktree remains
-uncommitted, so this is an operational rollout record rather than a release
-approval.
+restart was needed. Commit `75f7f07` on `codex/native-ios-port` is the source
+baseline for this deployed release.
 
 2026-10-06 clean simulator verification: a fresh DerivedData build on the
 booted iPhone 16 Simulator ran 68/68 native unit/contract tests and all 19/19

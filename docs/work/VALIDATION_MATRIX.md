@@ -22,7 +22,7 @@ updated: 2026-10-06
 | --- | --- |
 | Pre-migration backup | PASS: `pg_dump -Fc` completed on `vm100-prod` before migration; `pg_restore --list` validated `mypocket-20261006-pre-migration.dump` in the retained `mypocket-prod-backups` volume. |
 | Forward migration | PASS: production database advanced from migration version 27 to version 29; verification reported `dirty=false`. No reset, drop, truncate or destructive migration was used. |
-| API image rollout | PASS: `mypocket-api` now runs immutable candidate digest `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb` on `vm100-prod`; Swarm update completed and the task remained running after the monitor window. |
+| API image rollout | PASS: `mypocket-api` now runs immutable release tag `release-75f7f07` at digest `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb` on `vm100-prod`; Swarm update completed and the task remained running after the monitor window. |
 | Redis connectivity | PASS: created the attachable overlay `mypocket-redis-net`, connected `redis-prod` with the `redis-mypocket` alias, and verified `PONG` from a probe scheduled on `vm100-prod`. The API service now uses the alias instead of a container IP. |
 | Redis network lifecycle | PASS: the Redis container remains attached to its existing networks; the new overlay was additive and caused no Redis restart. Future Redis/API recreation must preserve `mypocket-redis-net` and the `redis-mypocket` alias. |
 | External health | PASS: `GET https://money.dungxbuif.com/api/v1/health` returned HTTP 200 after rollout; `GET /api/v1/docs/doc.json` returned HTTP 200 (171469 bytes). |

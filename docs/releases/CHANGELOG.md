@@ -10,14 +10,14 @@ shared_fields: [status]
 
 # Changelog
 
-## Production backend migration and rollout — 2026-10-06 (unreleased)
+## Production backend migration and rollout — 2026-10-06
 
 - Created and validated a pre-migration PostgreSQL custom-format backup on
   `vm100-prod` before applying the forward migrations.
 - Applied production migrations from version 27 through version 29 and
   verified the database is clean (`dirty=false`). No production data reset or
   destructive operation was used.
-- Rolled `mypocket-api` to immutable candidate image digest
+- Rolled `mypocket-api` to immutable release image `release-75f7f07` at digest
   `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb`.
   The rollout completed with automatic rollback enabled and the public health
   and OpenAPI endpoints returned HTTP 200.
@@ -25,8 +25,9 @@ shared_fields: [status]
   attachable overlay `mypocket-redis-net`, connected `redis-prod` with the
   stable `redis-mypocket` alias, verified `PONG` from `vm100-prod`, and
   switched the API service off the temporary container IP workaround.
-- This entry is an operational deployment record only; it is not a release
-  approval or a replacement for committing the dirty worktree.
+- Source for the deployed image is commit `75f7f07` on
+  `codex/native-ios-port`; this entry records the production rollout and its
+  verification evidence.
 
 ## Native email login slice — 2026-10-06
 
