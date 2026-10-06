@@ -215,6 +215,9 @@ func TestTextOnlyRequestAndUnverifiedIDs(t *testing.T) {
 		if !strings.Contains(messages[0].Content, "MUST return one or more drafts") || !strings.Contains(messages[0].Content, "forbidden to return drafts:[]") {
 			t.Errorf("system prompt must forbid empty results caused only by wallet labels")
 		}
+		if !strings.Contains(messages[0].Content, "paid invoices and receipts for goods/services are expenses") || !strings.Contains(messages[0].Content, "refund/return/reimbursement received") {
+			t.Errorf("system prompt must classify paid receipts as expenses unless they are explicit income")
+		}
 		modelResponse(w, `{"reply":"Please clarify","drafts":[`+validDraft+`]}`)
 	})
 	description := "Daily cash for food and transit"

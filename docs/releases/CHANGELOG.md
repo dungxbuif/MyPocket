@@ -28,6 +28,13 @@ as active release entries here.
   still carries a review question. DeepSeek-V4-Flash text, tool-call and
   strict-JSON-schema probes pass with synthetic data; no ledger writes occur.
 
+- OCR/AI live pipeline verification now follows the production image contract:
+  private S3 PUT/signed-readback, OCR `mode=wait` Base64 submission and
+  DeepSeek-V4-Flash extraction pass 5/5 cases with 24/24 semantic fields
+  (100.0%). Receipt images are classified as expenses unless the source
+  explicitly describes income, refund or reimbursement received; no ledger
+  writes occur in the probe.
+
 - Native AI-entry attachment regression coverage now verifies twenty valid PNG
   thumbnails, the picker cap, close/remove behavior and picker re-enable on the
   iPhone 16 Simulator; the signed UI suite passes 17/17.

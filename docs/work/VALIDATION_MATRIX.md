@@ -85,7 +85,8 @@ signed API-backed UI tests. No token values are written to logs.
 | AI entry browser flow | PASS: contract + Chromium fixture; fixture transactions derive the current account-local week so the grouped-ledger assertion cannot expire with the calendar |
 | Feedback JWT + scoped user API key + agent lifecycle | PASS: create/list/revoke, agent open → triaged → in_progress → changelog/fixed, owner-scoped reads, Redis `mypocket:audit:feedback` events observed; native screenshot regressions assert PNG bytes, `screen.png`/`image/png` multipart metadata and the 1 MiB bound |
 | Web design/typecheck/build/API roundtrips | PASS: final local design guard, base contracts, wallet-scope contract, TypeScript check and Vite build passed (1,791 modules); Vite only reports the existing large-chunk warning |
-| Provider-backed AI/OCR, real Google iOS OAuth, authenticated staging/production and physical device | NOT RUN; external release gates remain explicit |
+| Provider-backed AI/OCR | PASS: configured DeepSeek-V4-Flash text/tool/schema probes and a fresh S3 → OCR Base64 → LLM receipt pipeline pass; 5/5 cases, 24/24 semantic fields, 100.0%, no ledger writes |
+| Real Google iOS OAuth, authenticated staging/production and physical device | NOT RUN; these external release gates remain explicit because no iOS client credential, production auth credential or online physical device was supplied |
 
 The disposable database was `mypocket_ios_local`; generated feedback/changelog
 rows and transfer fixtures were removed after the probes. No production data or
@@ -223,20 +224,20 @@ This file maps accepted behavior and work items to proof.
 ### AI-ENTRY-02 current provider probe — 2026-10-06
 
 - Synthetic receipt generation and private S3 PUT/signed-readback: PASS
-  (`871,036` bytes); the object was scheduled for cleanup by the test.
-- OCR submission: BLOCKED by the configured remote service returning HTTP 404
-  for `POST /v1/documents`. The safe diagnostic is
-  `stage=ocr_submit`, `code=ocr_submit_request`, `provider_status=404`; no
-  OCR result, model call, proposal, or ledger write occurred.
-- Independent route probe confirms the domain serves the public capability
-  document at `GET /v1/ocr/capabilities` (HTTP 200) but returns HTTP 404 for
-  both `GET` and `POST /v1/documents`; this indicates a deployment/ingress
-  mismatch rather than an invalid receipt payload or client timeout.
-- The live harness now records only this bounded diagnostic (never keys, URLs,
-  receipt text or response bodies), so the deployment/API route mismatch can
-  be fixed without weakening error redaction. Historical 2026-09-22 OCR/LLM
-  success remains valid for that provider deployment but does not prove the
-  current endpoint is reachable.
+  (`731,920` bytes); the object was scheduled for cleanup by the test.
+- OCR submission: PASS against the configured remote service with
+  `mode=wait`, `waitTimeoutMs=15000`; the synthetic receipt total was
+  recognized in 1.496 s.
+- LLM extraction: PASS, 5/5 cases and 24/24 semantic fields (100.0%); the
+  receipt is classified as an expense, wallet prefilled, and transfer safety
+  retains a review question. Provider model: `DeepSeek-V4-Flash`.
+- End-to-end synthetic S3 → OCR → LLM pipeline: PASS in 2.656 s for the
+  receipt case. No proposal, transaction, or production row was written.
+- The harness deliberately sends validated image bytes as Base64 to OCR. The
+  private S3 signed-readback is a storage check only; provider-owned
+  `s3://` URLs remain reserved for the PDF private-presign contract. This
+  avoids sending an app-owned signed URL that the OCR service cannot
+  dereference.
 
 ### AI-ENTRY-01 current provider compatibility regression — 2026-10-06
 

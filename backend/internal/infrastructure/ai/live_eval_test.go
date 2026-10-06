@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"encoding/xml"
 	"errors"
@@ -122,7 +123,12 @@ func TestLiveQwenImageAndTransactionEval(t *testing.T) {
 	t.Logf("S3 put+signed-get: pass, bytes=%d, latency=%s", len(data), time.Since(getStart).Round(time.Millisecond))
 
 	ocrStart := time.Now()
-	ocrText, err := client.ocr(ctx, Image{Name: "mock-receipt.png", MIMEType: mime, SourceURL: signedURL})
+	// The MyPocket entry flow sends validated image bytes to OCR. The private
+	// S3 signed URL is only probed above to verify storage; it must not be sent
+	// to the OCR provider because the provider cannot dereference app-owned
+	// storage URLs. Provider-owned s3:// URLs are reserved for the PDF presign
+	// flow in uploadPrivatePDF.
+	ocrText, err := client.ocr(ctx, Image{Name: "mock-receipt.png", MIMEType: mime, Base64: base64.StdEncoding.EncodeToString(data)})
 	ocrLatency := time.Since(ocrStart)
 	if err != nil {
 		var diagnostic interface{ Diagnostic() (string, string, int) }
