@@ -29,6 +29,14 @@ After the correction the complete UI suite passed 17/17 on the booted iPhone
 16 Simulator. The latest rerun is 65/65 native unit/contract tests and 17/17
 signed API-backed UI tests. No token values are written to logs.
 
+After the wallet-scope web fix (`cfc170b7`), the same booted iPhone 16
+Simulator was rerun before continuing feedback work: native contracts passed
+65/65 and the default UI target passed 17/17 XCTest cases (11 intentionally
+skipped because they require `LOCAL_API_UI`, 0 failures). The isolated signed
+API-backed command list remains the authoritative local-data UI gate because a
+single multi-test `LOCAL_API_UI` invocation can trigger an Xcode 27 runner
+restart.
+
 | Proof | Result |
 | --- | --- |
 | Native simulator frame-warning regression | PASS: the shared UIKit-backed amount field exposes and executes `Xong`; wallet, wallet-detail transaction, transfer and credit mutation UI tests pass 4/4, and the latest iPhone 16 Simulator log contains no `Invalid frame dimension` fault. |
