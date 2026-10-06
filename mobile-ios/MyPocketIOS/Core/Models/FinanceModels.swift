@@ -233,6 +233,14 @@ struct PortfolioAssetModel: Codable, Identifiable, Sendable {
     var name: String
     var latestPrice: Int64?
     var latestPriceAt: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case symbol
+        case name
+        case latestPrice
+        case latestPriceAt
+    }
 }
 
 struct PortfolioPositionModel: Codable, Identifiable, Sendable {
@@ -247,6 +255,19 @@ struct PortfolioPositionModel: Codable, Identifiable, Sendable {
     var marketValue: Int64?
     var unrealizedPnL: Int64?
     var latestPrice: Int64?
+
+    enum CodingKeys: String, CodingKey {
+        case assetID
+        case symbol
+        case name
+        case quantity
+        case costBasis
+        case averageCost
+        case realizedPnL
+        case marketValue
+        case unrealizedPnL
+        case latestPrice
+    }
 }
 
 struct PortfolioSummaryModel: Codable, Sendable {
@@ -256,6 +277,15 @@ struct PortfolioSummaryModel: Codable, Sendable {
     var totalCostBasis: Int64
     var totalMarketValue: Int64?
     var totalUnrealizedPnL: Int64?
+
+    enum CodingKeys: String, CodingKey {
+        case assets
+        case positions
+        case trades
+        case totalCostBasis
+        case totalMarketValue
+        case totalUnrealizedPnL
+    }
 }
 
 struct CreditStatementModel: Codable, Sendable {

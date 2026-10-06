@@ -39,6 +39,7 @@ func (r *Router) RegisterPortfolioRoutes(h *PortfolioHandler) {
 	g.GET("/summary", h.Summary)
 	g.GET("/assets", h.ListAssets)
 	g.POST("/assets", h.CreateAsset)
+	g.DELETE("/assets/:id", h.DeleteAsset)
 	g.PATCH("/assets/:id/price", h.UpdatePrice)
 	g.GET("/assets/:id/trades", h.ListTrades)
 	g.POST("/assets/:id/trades", h.CreateTrade)
@@ -128,6 +129,42 @@ func (h *PortfolioHandler) CreateAsset(c *gin.Context) {
 		return
 	}
 	Created(c, asset)
+}
+
+// DeletePortfolioAsset godoc
+// @Summary Delete an unused portfolio asset
+// @Tags Portfolio
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Asset ID"
+// @Success 204
+// @Failure 404 {object} Problem
+// @Failure 409 {object} Problem
+// @Router /api/v1/portfolio/assets/{id} [delete]
+func (h *PortfolioHandler) DeleteAsset(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Portfolio == nil {
+		portfolioUnavailable(c)
+		return
+	}
+	if err := h.Portfolio.DeleteAsset(owner, strings.TrimSpace(c.Param("id"))); err != nil {
+		switch {
+		case errors.Is(err, portfoliorepo.ErrPortfolioAssetNotFound):
+			portfolioMapError(c, err)
+		case errors.Is(err, portfoliorepo.ErrPortfolioAssetHasTrades):
+			Fail(c, http.StatusConflict, Problem{Code: "portfolio_asset_has_trades", Title: "Conflict", Detail: "Không thể xóa tài sản đã có giao dịch; hãy dùng giao dịch bù trừ."})
+		case errors.Is(err, portfoliorepo.ErrPortfolioAssetInvalid):
+			transactionBadRequest(c, "tài sản đầu tư không hợp lệ")
+		default:
+			portfolioFailure(c)
+		}
+		return
+	}
+	c.Status(http.StatusNoContent)
 }
 
 // UpdatePortfolioPrice godoc
@@ -252,6 +289,8 @@ func portfolioMapError(c *gin.Context, err error) {
 		Fail(c, http.StatusNotFound, Problem{Code: "PORTFOLIO_NOT_FOUND", Title: problemTitleNotFound, Detail: "Không tìm thấy tài sản danh mục."})
 	case errors.Is(err, portfoliorepo.ErrPortfolioAssetConflict):
 		Fail(c, http.StatusConflict, Problem{Code: "PORTFOLIO_ASSET_CONFLICT", Title: problemTitleBadRequest, Detail: "Mã tài sản đã tồn tại trong danh mục."})
+	case errors.Is(err, portfoliorepo.ErrPortfolioAssetHasTrades):
+		Fail(c, http.StatusConflict, Problem{Code: "PORTFOLIO_ASSET_HAS_TRADES", Title: problemTitleBadRequest, Detail: "Không thể xóa tài sản đã có giao dịch; hãy dùng giao dịch bù trừ."})
 	case errors.Is(err, portfoliorepo.ErrPortfolioInsufficientQuantity):
 		Fail(c, http.StatusConflict, Problem{Code: "PORTFOLIO_INSUFFICIENT_QUANTITY", Title: problemTitleBadRequest, Detail: "Không thể bán vượt quá khối lượng đang nắm giữ."})
 	case errors.Is(err, portfoliorepo.ErrPortfolioAssetInvalid), errors.Is(err, portfoliorepo.ErrPortfolioTradeInvalid):

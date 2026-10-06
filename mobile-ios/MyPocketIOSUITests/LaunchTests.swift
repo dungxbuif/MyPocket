@@ -19,6 +19,17 @@ private struct FixtureWalletHandle: Sendable {
     let wallet: FixtureWallet
 }
 
+private struct FixturePortfolioAsset: Decodable, Sendable {
+    let id: String
+    let symbol: String
+    let name: String
+}
+
+private struct FixturePortfolioAssetHandle: Sendable {
+    let token: String
+    let asset: FixturePortfolioAsset
+}
+
 private enum LocalFixtureError: Error {
     case invalidResponse
     case http(Int, String)
@@ -79,6 +90,29 @@ private enum LocalAPIFixture {
         for item in existing where item.name == name {
             try await deleteWallet(id: item.id, token: token)
         }
+    }
+
+    static func portfolioAsset(symbol: String, name: String) async throws -> FixturePortfolioAssetHandle {
+        let token = try await loginToken()
+        let data = try JSONSerialization.data(withJSONObject: ["symbol": symbol, "name": name])
+        let created = try await request(
+            path: "/portfolio/assets",
+            method: "POST",
+            token: token,
+            body: data,
+            decode: FixtureEnvelope<FixturePortfolioAsset>.self
+        ).data
+        return FixturePortfolioAssetHandle(token: token, asset: created)
+    }
+
+    static func delete(_ fixture: FixturePortfolioAssetHandle) async throws {
+        _ = try await request(
+            path: "/portfolio/assets/\(fixture.asset.id)",
+            method: "DELETE",
+            token: fixture.token,
+            body: nil,
+            decode: EmptyFixtureResponse.self
+        )
     }
 
     private static func loginToken() async throws -> String {
@@ -404,6 +438,37 @@ final class LaunchTests: XCTestCase {
         walletRow.tap()
         XCTAssertTrue(app.staticTexts["Giao dịch"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.buttons["Ví: Fixture Scope Wallet"].waitForExistence(timeout: 10))
+#endif
+    }
+
+    func testAPIBackedPortfolioAssetCreateAndPriceRefresh() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable local API fixture.")
+#else
+        let fixture = try await LocalAPIFixture.portfolioAsset(symbol: "FXT", name: "Fixture Portfolio")
+        addTeardownBlock { try? await LocalAPIFixture.delete(fixture) }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Danh mục đầu tư"].waitForExistence(timeout: 10))
+        app.buttons["Danh mục đầu tư"].tap()
+        XCTAssertTrue(app.staticTexts["Danh mục đầu tư"].waitForExistence(timeout: 10))
+        // The asset cards and their controls are below the first viewport on a
+        // phone-sized simulator. Scroll the real screen before asserting the
+        // owner-scoped asset and interacting with its price field.
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["FXT · Fixture Portfolio"].waitForExistence(timeout: 10))
+
+        let price = app.textFields["Giá hiện tại"]
+        XCTAssertTrue(price.waitForExistence(timeout: 10))
+        price.clearAndType("120000")
+        app.buttons["Cập nhật giá"].tap()
+        XCTAssertTrue(app.staticTexts["Giá trị hiện tại"].waitForExistence(timeout: 15))
+        let refreshedValue = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "120.000")).firstMatch
+        XCTAssertTrue(refreshedValue.waitForExistence(timeout: 10))
 #endif
     }
 

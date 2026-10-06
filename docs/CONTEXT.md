@@ -23,12 +23,13 @@ updated: 2026-10-06
 ---
 
 2026-10-06 clean simulator verification: a fresh DerivedData build on the
-booted iPhone 16 Simulator ran 68/68 native unit/contract tests and all 18/18
-`LOCAL_API_UI` tests with zero skips or failures against the disposable local
-API. The run covered wallet/credit/transaction/transfer/AI-entry/Assistant/
-feedback/route flows, including wallet-row → scoped-ledger selection and the
-separate wallet detail/editor path. It left no `Fixture*` wallets behind. This
-is simulator-only evidence; production authentication/deployment and a
+booted iPhone 16 Simulator ran 68/68 native unit/contract tests and all 19/19
+`LOCAL_API_UI` tests with zero skips or failures against a disposable local
+API/database. The run covered wallet/credit/transaction/transfer/portfolio/
+AI-entry/Assistant/feedback/route flows, including wallet-row → scoped-ledger
+selection, the separate wallet detail/editor path, and API-backed portfolio
+asset price refresh. Portfolio and wallet fixtures were removed after the run.
+This is simulator-only evidence; production authentication/deployment and a
 physical device remain external gates.
 
 2026-10-06 wallet-scope reconciliation complete: web routes a wallet selection
@@ -36,6 +37,15 @@ to `/transactions?wallet_id=...`; native wallet management now uses the same
 primary action. A separate explicit “Chi tiết” action keeps the wallet/credit
 detail surfaces available without making the wallet picker and transaction
 scope disagree.
+
+2026-10-06 portfolio verification complete: native portfolio summary decoding
+now handles `asset_id`, `realized_pnl`, `unrealized_pnl` and total P/L keys
+without dropping the screen into an error state. The API-backed simulator
+fixture creates an owner-scoped asset, refreshes its manual price through the
+native UI and verifies the refreshed value; the unused fixture asset is
+deleted with HTTP 204. Trade math and sell-over-position rules remain covered
+by backend entity tests, while immutable trade fixtures are not deleted by the
+UI harness.
 
 # Project Context
 

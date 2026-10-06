@@ -48,6 +48,29 @@ func (r *PortfolioPostgresRepository) CreateAsset(ownerID string, input portfoli
 	return row, nil
 }
 
+func (r *PortfolioPostgresRepository) DeleteAsset(ownerID, assetID string) error {
+	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(assetID) == "" {
+		return portfoliorepo.ErrPortfolioAssetInvalid
+	}
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		var asset entity.PortfolioAsset
+		if err := tx.Where("owner_id = ? AND id = ?", ownerID, assetID).First(&asset).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return portfoliorepo.ErrPortfolioAssetNotFound
+			}
+			return err
+		}
+		var tradeCount int64
+		if err := tx.Model(&entity.PortfolioTrade{}).Where("owner_id = ? AND asset_id = ?", ownerID, assetID).Count(&tradeCount).Error; err != nil {
+			return err
+		}
+		if tradeCount > 0 {
+			return portfoliorepo.ErrPortfolioAssetHasTrades
+		}
+		return tx.Delete(&asset).Error
+	})
+}
+
 func (r *PortfolioPostgresRepository) UpdateAssetPrice(ownerID, assetID string, update portfoliorepo.PortfolioPriceUpdate) (*entity.PortfolioAsset, error) {
 	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(assetID) == "" || (update.LatestPrice != nil && *update.LatestPrice < 0) {
 		return nil, portfoliorepo.ErrPortfolioAssetInvalid

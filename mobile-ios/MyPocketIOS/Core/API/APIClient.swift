@@ -240,6 +240,7 @@ extension JSONDecoder {
                 case "ids": return result + "IDs"
                 case "url": return result + "URL"
                 case "bps": return result + "BPS"
+                case "pnl": return result + "PnL"
                 default: return result + part.prefix(1).uppercased() + part.dropFirst()
                 }
             }

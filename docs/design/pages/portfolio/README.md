@@ -21,3 +21,13 @@ wallet transactions. It uses the same mobile shell, `SurfaceCard`, `Text`,
 The page consumes `/api/v1/portfolio/*` only. Portfolio data never changes
 wallet balances, transaction reports, budgets, or jars. Quantity is a decimal
 string and the backend stores eight fixed-point decimal places.
+
+## Simulator/API verification contract
+
+The native gate must exercise the real owner-scoped API, not only render the
+route: create a disposable unused asset, load it in the native portfolio,
+set a manual price, reload the summary and assert the refreshed value card.
+The fixture is deleted through the owner-scoped asset delete route after the
+test; no portfolio fixture may remain in the local database. Append-only trade
+math and sell-over-position rules are covered by backend entity tests because a
+trade-bearing asset is intentionally not deletable by the cleanup route.

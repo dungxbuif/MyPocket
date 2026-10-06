@@ -16,14 +16,15 @@ shared_fields:
 updated: 2026-10-06
 ---
 
-## Clean iPhone 16 Simulator gate — 2026-10-06 15:07–15:24 ICT
+## Clean iPhone 16 Simulator gate — 2026-10-06 15:46–15:52 ICT
 
 | Proof | Result |
 | --- | --- |
 | Fresh Debug unit/contract XCTest | PASS: clean simulator test run executed 68 tests with 0 failures. |
-| Fresh API-backed UI XCTest | PASS: clean DerivedData build with `SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG LOCAL_API_UI'` executed all 18 UI tests with 0 failures and 0 skips against local `127.0.0.1:8080`; wallet, wallet-scope, credit, transaction, transfer, AI entry, Assistant, feedback and route flows all completed. |
-| Fixture isolation | PASS: post-run owner check found no `Fixture*` wallets remaining. |
+| Fresh API-backed UI XCTest | PASS: clean DerivedData build with `SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG LOCAL_API_UI'` executed all 19 UI tests with 0 failures and 0 skips against local `127.0.0.1:8080`; wallet, wallet-scope, credit, transaction, transfer, portfolio, AI entry, Assistant, feedback and route flows all completed. |
+| Fixture isolation | PASS: post-run disposable PostgreSQL check found no `Fixture*` wallets or `FXT`/`DBG`/`DEC` portfolio assets remaining. |
 | Wallet scope/detail contract | PASS: tapping a wallet row routes to `Giao dịch` with `Ví: <wallet>` selected; the explicit `Chi tiết` action still opens the wallet detail/editor surface. The API-backed fixture test passed. |
+| Portfolio API/UI contract | PASS: `testAPIBackedPortfolioAssetCreateAndPriceRefresh` created an owner-scoped `FXT` asset through the local API, loaded it in native `Danh mục đầu tư`, updated `Giá hiện tại` to 120.000 through the UI, observed the refreshed value, and deleted the unused fixture with HTTP 204. The native decoder regression for `asset_id`/P/L fields is covered by the 68-test contract run. |
 | Install/launch artifact | PASS: the clean Debug app was built by the same test gate and launched by the API-backed UI runner on `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` as `com.mypocket.ios`. |
 | External gates | NOT RUN: production deployment/authentication and physical-device verification remain separate from this simulator gate. |
 

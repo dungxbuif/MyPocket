@@ -210,6 +210,10 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/portfolio/assets", method: .post, body: try body(["symbol": symbol, "name": name]), idempotencyKey: UUID().uuidString))
     }
 
+    func deletePortfolioAsset(assetID: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)", method: .delete))
+    }
+
     func updatePortfolioPrice(assetID: String, latestPrice: Int64?) async throws -> PortfolioAssetModel {
         try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/price", method: .patch, body: try body(["latest_price": latestPrice])))
     }
@@ -419,6 +423,17 @@ struct PortfolioTradeModel: Codable, Identifiable, Sendable {
     var fee: Int64
     var occurredAt: String
     var note: String?
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case assetID
+        case side
+        case quantity
+        case unitPrice
+        case fee
+        case occurredAt
+        case note
+    }
 }
 
 struct CreditEntryInputModel: Codable, Sendable {

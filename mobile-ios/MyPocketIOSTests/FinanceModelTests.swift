@@ -212,10 +212,11 @@ final class FinanceModelTests: XCTestCase {
     }
 
     func testPortfolioSummaryDecodesTradesAndNullableValuation() throws {
-        let data = Data(#"{"assets":[{"id":"asset-1","symbol":"VNM","name":"Vinamilk","latest_price":null}],"positions":[],"trades":[{"id":"trade-1","asset_id":"asset-1","side":"buy","quantity":"1.25","unit_price":72000,"fee":1000,"occurred_at":"2026-10-05T10:00:00Z"}],"total_cost_basis":91000,"total_market_value":null,"total_unrealized_pnl":null}"#.utf8)
+        let data = Data(#"{"assets":[{"id":"asset-1","symbol":"VNM","name":"Vinamilk","latest_price":72000,"latest_price_at":"2026-10-05T10:00:00Z"}],"positions":[{"asset_id":"asset-1","symbol":"VNM","name":"Vinamilk","quantity":"1.25","cost_basis":90000,"average_cost":72000,"realized_pnl":1000,"market_value":95000,"unrealized_pnl":5000,"latest_price":76000}],"trades":[{"id":"trade-1","asset_id":"asset-1","side":"buy","quantity":"1.25","unit_price":72000,"fee":1000,"occurred_at":"2026-10-05T10:00:00Z"}],"total_cost_basis":91000,"total_market_value":95000,"total_unrealized_pnl":5000}"#.utf8)
         let summary = try JSONDecoder.mypocket.decode(PortfolioSummaryModel.self, from: data)
         XCTAssertEqual(summary.trades.first?.quantity, "1.25")
-        XCTAssertNil(summary.totalMarketValue)
+        XCTAssertEqual(summary.positions.first?.realizedPnL, 1000)
+        XCTAssertEqual(summary.totalUnrealizedPnL, 5000)
     }
 
     func testPortfolioTradeDraftValidatorMirrorsBackendNumericContract() {

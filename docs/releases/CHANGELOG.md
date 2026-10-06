@@ -27,8 +27,13 @@ as active release entries here.
   a wallet row opens the transaction ledger with that wallet selected, while an
   explicit `Chi tiết` action remains available for balances, progress, credit
   statements and transaction editing. Clean iPhone 16 Simulator verification
-  passed 68/68 native contracts and 18/18 API-backed UI tests with no leftover
+  passed 68/68 native contracts and 19/19 API-backed UI tests with no leftover
   fixture wallets.
+
+- Fixed native portfolio summary decoding for `asset_id`, `realized_pnl`,
+  `unrealized_pnl` and total P/L fields. The API-backed iPhone 16 Simulator
+  test now creates an owner-scoped asset, updates its manual price through the
+  native UI, verifies the refreshed value and removes the unused fixture.
 
 - Native Finance Assistant and AI-entry replies now use the shared
   `MPMarkdown` base renderer for headings, emphasis/code, lists, fenced code

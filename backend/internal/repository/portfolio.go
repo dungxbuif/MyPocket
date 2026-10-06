@@ -10,6 +10,7 @@ import (
 var (
 	ErrPortfolioAssetNotFound        = errors.New("portfolio asset not found")
 	ErrPortfolioAssetConflict        = errors.New("portfolio asset already exists")
+	ErrPortfolioAssetHasTrades       = errors.New("portfolio asset has trades")
 	ErrPortfolioAssetInvalid         = errors.New("portfolio asset is invalid")
 	ErrPortfolioTradeNotFound        = errors.New("portfolio trade not found")
 	ErrPortfolioTradeInvalid         = errors.New("portfolio trade is invalid")
@@ -38,6 +39,7 @@ type PortfolioTradeInput struct {
 type PortfolioRepository interface {
 	ListAssets(ownerID string) ([]entity.PortfolioAsset, error)
 	CreateAsset(ownerID string, input PortfolioAssetInput) (*entity.PortfolioAsset, error)
+	DeleteAsset(ownerID, assetID string) error
 	UpdateAssetPrice(ownerID, assetID string, update PortfolioPriceUpdate) (*entity.PortfolioAsset, error)
 	ListTrades(ownerID, assetID string) ([]entity.PortfolioTrade, error)
 	CreateTrade(ownerID, assetID string, input PortfolioTradeInput) (*entity.PortfolioTrade, error)
