@@ -480,3 +480,9 @@ type/count, and ledger-activity sections beside Insider metrics, preserving the
 Insider surface when that optional request fails. Native XCTest 55/55, Release
 warnings-as-errors, base/project guards, and the signed authenticated
 More-route smoke 1/1 in 124.287s pass.
+
+The credit statement parity follow-up then normalized positive debt, localized
+payment status and credit-entry kinds, due-date context and note-first row
+subtitles through shared base components. Native XCTest remains 55/55, the
+warnings-as-errors simulator build passes, base/project guards pass, and the
+signed authenticated More-route smoke passes 1/1 in 125.111s.

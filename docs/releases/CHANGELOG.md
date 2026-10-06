@@ -36,6 +36,10 @@ as active release entries here.
   the ledger activity explanation alongside Insider metrics, while keeping the
   Insider view usable when the optional month-summary request fails.
 
+- Native credit statements now show positive current debt, localized payment
+  status and credit-entry kinds, optional due-date context, and note-first row
+  subtitles through shared base components.
+
 - Native Tháng summary now decodes jar usage, uses bounded account-local month
   selection, shows period/status/category/jar details, protects dirty notes,
   and opens the selected month in Hũ chi tiêu.
