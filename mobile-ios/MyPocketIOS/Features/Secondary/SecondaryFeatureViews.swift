@@ -284,7 +284,7 @@ struct CategoriesView: View {
                 .foregroundStyle(MPColor.action)
             MPText(item.name)
             Spacer()
-            MPText(item.kind, style: .secondary)
+            MPText(MPSelectionLabels.display(for: item.kind), style: .secondary)
             MPIconButton(systemName: "pencil", label: "Sửa \(item.name)") { beginEditing(item) }
             if CategoryEditPolicy.canDelete(item) {
                 MPIconButton(systemName: "trash", label: "Xóa \(item.name)") { deleteTarget = item }
@@ -1208,13 +1208,13 @@ struct CreditView: View {
                         MPMetricCard(title: "Dư nợ", value: MPFormat.money(abs(statement.balance)))
                         MPMetricCard(title: "Khả dụng", value: MPFormat.money(statement.availableCredit))
                         MPMetricCard(title: "Đến hạn", value: MPFormat.money(statement.amountDue))
-                        MPMetricCard(title: "Trạng thái", value: creditPaymentStatusLabel(statement.paymentStatus))
+                        MPMetricCard(title: "Trạng thái", value: MPSelectionLabels.display(for: statement.paymentStatus))
                     }
                     if statement.paymentStatus == "not_configured" {
                         MPText("Chưa cấu hình dư nợ sao kê và ngày đến hạn.", style: .secondary)
                     } else {
                         VStack(alignment: .leading, spacing: 4) {
-                            MPText(creditPaymentStatusLabel(statement.paymentStatus), style: .secondary)
+                            MPText(MPSelectionLabels.display(for: statement.paymentStatus), style: .secondary)
                             if let paymentDueAt = statement.paymentDueAt {
                                 MPText("Hạn thanh toán: \(MPFormat.shortDate(paymentDueAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
                             }
@@ -1222,7 +1222,7 @@ struct CreditView: View {
                     }
                     MPAssistantCard(title: "Giao dịch tín dụng") {
                         ForEach(statement.items) { item in
-                            MPTransactionRow(title: creditKindLabel(item.creditKind), subtitle: creditItemSubtitle(item), amount: MPFormat.money(item.amount), isIncome: item.creditKind == "refund" || item.creditKind == "payment")
+                            MPTransactionRow(title: MPSelectionLabels.creditKind(item.creditKind), subtitle: creditItemSubtitle(item), amount: MPFormat.money(item.amount), isIncome: item.creditKind == "refund" || item.creditKind == "payment")
                         }
                     }
                     HStack {
@@ -1258,27 +1258,6 @@ struct CreditView: View {
     private var categoriesForEntry: [CategoryModel] {
         let transactionType = entryKind == "refund" ? "income" : "expense"
         return categories.filter { $0.applies(to: transactionType, walletID: selectedID, walletType: "credit") }
-    }
-
-    private func creditPaymentStatusLabel(_ value: String) -> String {
-        switch value {
-        case "paid": return "Đã thanh toán"
-        case "partial": return "Đã trả một phần"
-        case "overdue": return "Đã quá hạn"
-        case "due": return "Đang đến hạn"
-        default: return "Chưa cấu hình"
-        }
-    }
-
-    private func creditKindLabel(_ value: String?) -> String {
-        switch value {
-        case "purchase": return "Mua hàng"
-        case "refund": return "Hoàn tiền"
-        case "fee": return "Phí"
-        case "interest": return "Lãi"
-        case "payment": return "Thanh toán"
-        default: return "Giao dịch tín dụng"
-        }
     }
 
     private func creditItemSubtitle(_ item: TransactionModel) -> String {

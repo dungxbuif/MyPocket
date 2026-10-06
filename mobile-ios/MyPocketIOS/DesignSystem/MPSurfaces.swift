@@ -90,7 +90,7 @@ struct MPWalletRow: View {
         HStack {
             VStack(alignment: .leading, spacing: 4) {
                 Text(name).font(.body.weight(.semibold))
-                Text(type).font(.footnote).foregroundStyle(MPColor.secondary)
+                Text(MPSelectionLabels.display(for: type)).font(.footnote).foregroundStyle(MPColor.secondary)
             }
             Spacer()
             Text(balance).font(.body.monospacedDigit())

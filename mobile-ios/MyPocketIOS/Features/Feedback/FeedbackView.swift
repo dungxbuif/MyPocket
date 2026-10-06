@@ -105,7 +105,7 @@ struct FeedbackView: View {
                         MPSurfaceCard {
                             VStack(alignment: .leading, spacing: 6) {
                                 MPText(item.title)
-                                MPText("\(item.type) · \(item.status)", style: .secondary)
+                                MPText("\(MPSelectionLabels.display(for: item.type)) · \(MPSelectionLabels.feedbackStatus(item.status))", style: .secondary)
                                 if let fixedAt = item.fixedAt { MPText("Đã xử lý: \(MPFormat.shortDate(fixedAt))", style: .secondary) }
                             }
                         }

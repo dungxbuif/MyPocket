@@ -148,7 +148,7 @@ struct AssistantView: View {
                     let run = try await api.advisorRun(id: result.runID)
                     if ["completed", "failed", "cancelled", "interrupted", "purged"].contains(run.status) {
                         completed = true
-                        if run.status != "completed" { self.error = "Yêu cầu trợ lý kết thúc với trạng thái \(run.status)." }
+                        if run.status != "completed" { self.error = "Yêu cầu trợ lý kết thúc với trạng thái \(MPSelectionLabels.display(for: run.status))." }
                         break
                     }
                 }

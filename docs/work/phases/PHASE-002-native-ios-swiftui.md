@@ -497,3 +497,8 @@ The signed `LOCAL_API_UI` regression was rerun after both detail corrections:
 14/14 simulator UI tests pass in 293.119s. Credit UI assertions now verify the
 localized labels rendered by the native contract while the wire enums remain
 opaque to users.
+
+The enum-label parity follow-up then routed wallet/category/credit/feedback and
+Assistant status display through `MPSelectionLabels`, with no wire-contract
+change. Native XCTest 57/57, Release warnings-as-errors and guards pass; the
+signed credit-wallet and feedback/more targeted UI checks pass 1/1 each.

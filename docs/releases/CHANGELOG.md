@@ -44,6 +44,10 @@ as active release entries here.
   unrealized P/L, current value or explicit unknown pricing, plus account-timezone
   buy/sell history with quantity, price, fee and note context.
 
+- Native user-facing labels now translate wallet, category, credit, feedback and
+  Assistant status values through one shared vocabulary; API enum values remain
+  unchanged on the wire.
+
 - Native Tháng summary now decodes jar usage, uses bounded account-local month
   selection, shows period/status/category/jar details, protects dirty notes,
   and opens the selected month in Hũ chi tiêu.

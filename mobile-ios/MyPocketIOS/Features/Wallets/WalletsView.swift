@@ -183,10 +183,15 @@ struct WalletDetailView: View {
                 if wallet.type == "credit" {
                     if let statement {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            MPMetricCard(title: "Dư nợ", value: MPFormat.money(statement.balance))
+                            MPMetricCard(title: "Dư nợ", value: MPFormat.money(abs(statement.balance)))
                             MPMetricCard(title: "Khả dụng", value: MPFormat.money(statement.availableCredit))
                             MPMetricCard(title: "Đến hạn", value: MPFormat.money(statement.amountDue))
-                            MPMetricCard(title: "Trạng thái", value: statement.paymentStatus)
+                            MPMetricCard(title: "Trạng thái", value: MPSelectionLabels.display(for: statement.paymentStatus))
+                        }
+                        if statement.paymentStatus == "not_configured" {
+                            MPText("Chưa cấu hình dư nợ sao kê và ngày đến hạn.", style: .secondary)
+                        } else if let dueAt = statement.paymentDueAt {
+                            MPText("Hạn thanh toán: \(MPFormat.shortDate(dueAt, timeZone: timeZone))", style: .secondary)
                         }
                         MPText("Giao dịch tín dụng", style: .title)
                         transactionCard(statement.items)
@@ -264,7 +269,7 @@ struct WalletDetailView: View {
             } else {
                 VStack(spacing: 0) {
                     ForEach(rows) { row in
-                        MPTransactionRow(title: row.note?.isEmpty == false ? row.note! : (row.type == "income" ? "Thu nhập" : "Chi tiêu"), subtitle: MPFormat.shortDate(row.occurredAt, timeZone: timeZone), amount: MPFormat.money(row.amount), isIncome: row.type == "income")
+                        MPTransactionRow(title: row.creditKind.map(MPSelectionLabels.creditKind) ?? (row.note?.isEmpty == false ? row.note! : (row.type == "income" ? "Thu nhập" : "Chi tiêu")), subtitle: [row.note, MPFormat.shortDate(row.occurredAt, timeZone: timeZone)].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · "), amount: MPFormat.money(row.amount), isIncome: row.type == "income" || row.creditKind == "refund" || row.creditKind == "payment")
                     }
                 }
             }

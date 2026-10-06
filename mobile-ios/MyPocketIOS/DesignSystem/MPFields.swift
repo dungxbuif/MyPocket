@@ -133,6 +133,16 @@ enum MPSelectionLabels {
         case "refund": return "Hoàn tiền"
         case "fee": return "Phí"
         case "interest": return "Lãi"
+        case "payment": return "Thanh toán"
+        case "paid": return "Đã thanh toán"
+        case "partial": return "Đã trả một phần"
+        case "overdue": return "Đã quá hạn"
+        case "due": return "Đang đến hạn"
+        case "not_configured": return "Chưa cấu hình"
+        case "open": return "Mở"
+        case "triaged": return "Đã phân loại"
+        case "in_progress": return "Đang xử lý"
+        case "rejected": return "Từ chối"
         case "increase": return "Tăng"
         case "decrease": return "Giảm"
         case "bug": return "Lỗi"
@@ -143,6 +153,22 @@ enum MPSelectionLabels {
         case "advisor:chat": return "Chat trợ lý"
         case "feedback:read": return "Đọc phản hồi"
         case "feedback:write": return "Gửi phản hồi"
+        default: return value
+        }
+    }
+
+    static func creditKind(_ value: String?) -> String {
+        guard let value else { return "Giao dịch tín dụng" }
+        return display(for: value)
+    }
+
+    static func feedbackStatus(_ value: String) -> String {
+        switch value {
+        case "open": return "Mở"
+        case "triaged": return "Đã phân loại"
+        case "in_progress": return "Đang xử lý"
+        case "fixed": return "Đã xử lý"
+        case "rejected": return "Từ chối"
         default: return value
         }
     }

@@ -14,6 +14,14 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(CategoryEditPolicy.canDelete(personal))
     }
 
+    func testSharedEnumLabelsNeverExposeFinanceWireValues() {
+        XCTAssertEqual(MPSelectionLabels.display(for: "basic"), "Thông thường")
+        XCTAssertEqual(MPSelectionLabels.display(for: "expense"), "Chi")
+        XCTAssertEqual(MPSelectionLabels.feedbackStatus("in_progress"), "Đang xử lý")
+        XCTAssertEqual(MPSelectionLabels.display(for: "overdue"), "Đã quá hạn")
+        XCTAssertEqual(MPSelectionLabels.creditKind("payment"), "Thanh toán")
+    }
+
     func testMonthOptionsStayBoundedAndIncludeAnchor() {
         let options = MPFormat.monthOptions(around: "2026-10", past: 2, future: 1, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!)
         XCTAssertEqual(options, ["2026-08", "2026-09", "2026-10", "2026-11"])
