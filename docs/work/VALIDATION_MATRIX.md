@@ -25,15 +25,16 @@ defect rather than an app/API defect. The local OAuth exchange returned HTTP
 200, but Keychain rejected persistence with `errSecMissingEntitlement
 (-34018)`. A DEBUG-only in-memory session store is now used for
 `-UITestAuthenticatedAPI`; production and normal builds still use Keychain.
-After the correction the complete UI suite passed 15/15 on the booted iPhone
-16 Simulator. The latest rerun is 65/65 native unit/contract tests and 15/15
+After the correction the complete UI suite passed 16/16 on the booted iPhone
+16 Simulator. The latest rerun is 65/65 native unit/contract tests and 16/16
 signed API-backed UI tests. No token values are written to logs.
 
 | Proof | Result |
 | --- | --- |
 | Native simulator frame-warning regression | PASS: the shared UIKit-backed amount field exposes and executes `Xong`; wallet, wallet-detail transaction, transfer and credit mutation UI tests pass 4/4, and the latest iPhone 16 Simulator log contains no `Invalid frame dimension` fault. |
 | iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 65 tests, 0 failures; includes the bounded PNG screenshot regression alongside the immutable wallet-row action policy and adjustment-direction display, transaction-editor hũ eligibility, inactive-selection and report/date-time policy coverage, expired access-token refresh, invalid-session clearing, malformed ledger timestamp exclusion, iOS PKCE encoding, safe 204 mutation decoding, immutable bulk-delete boundaries, URL query preservation, structured Advisor data, localized selectors, jar/portfolio/recurring/Travel Mode/AI-entry validation and account-local period/date behavior |
-| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: the latest signed opt-in `LOCAL_API_UI` suite is 80/80 tests passed (65 unit/contract + 15 API-backed UI) with Assistant, AI-entry capability/review, ledger week/cashflow, wallet, credit-wallet, transfer and feedback fixtures seeded/removed through local API. The unsigned simulator test build uses the DEBUG-only in-memory fixture session store; normal and Release builds retain Keychain-backed sessions. |
+| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: the latest signed opt-in `LOCAL_API_UI` suite is 81/81 tests passed (65 unit/contract + 16 API-backed UI) with Assistant, AI-entry capability/review, ledger week/cashflow, wallet, credit-wallet, transfer and feedback fixtures seeded/removed through local API. The unsigned simulator test build uses the DEBUG-only in-memory fixture session store; normal and Release builds retain Keychain-backed sessions. |
+| Native feedback bubble screenshot context | PASS: the floating trigger is hidden for one rendered frame before capture; the dedicated UI regression confirms only the feedback-sheet action remains visible while the overlay is open, so the attached screenshot cannot include the trigger. |
 | Native business mutation smoke | PASS: signed UI created and renamed a basic wallet, created/deleted an atomic transfer pair, and created both a credit purchase and payment while observing refreshed rows. The shared numeric amount field now exposes a “Xong” keyboard action so credit notes remain reachable on iPhone. Post-run disposable counts: wallets=0, transactions=0, feedback=0. |
 | iPhone 16 Simulator: authenticated “Thêm” route sweep | PASS: all 13 secondary destinations opened and returned to the menu; the shared `MPButton` hit-shape fix keeps compact rows tappable |
 | Native category scope parity | PASS: category create/edit preserves multiple selected wallet IDs; empty selection remains the API's all-wallet scope; shared `MPMultiOptionSelector` owns the UI |

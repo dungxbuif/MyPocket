@@ -588,7 +588,14 @@ until they fit or safely falls back to text-only submission; a noisy
 high-resolution regression covers the bound.
 
 The final simulator verification after the size-bound fix passed 65/65 native
-unit tests, 15/15 signed `LOCAL_API_UI` tests, Release with
+unit tests, 16/16 signed `LOCAL_API_UI` tests, Release with
 `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`, base/project guards, the no-invalid-frame
 log check, and the disposable fixture cleanup probe. The Release app installed
 and launched successfully as `com.mypocket.ios`.
+
+The follow-up feedback-bubble redaction regression then made the floating
+trigger disappear for one rendered frame before `ScreenSnapshot.capture`, so
+feedback attachments contain the underlying screen rather than the trigger
+itself. Native XCTest passes 65/65, the complete signed `LOCAL_API_UI` suite
+passes 16/16, Release warnings-as-errors, base/project guards, the
+no-invalid-frame log check and the simulator launch all pass.

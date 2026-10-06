@@ -30,7 +30,7 @@ now uses a DEBUG-only in-memory session store when launched with
 run reached the disposable OAuth exchange with HTTP 200 but stayed on the login
 screen because Keychain returned `errSecMissingEntitlement (-34018)`. Production
 and normal app builds continue to use `KeychainSessionStore`; no token values
-are logged. The full iPhone 16 `LOCAL_API_UI` suite passes 15/15 after the
+are logged. The full iPhone 16 `LOCAL_API_UI` suite passes 16/16 after the
 correction.
 
 2026-10-06 native transaction editor parity: ordinary expense editing now
@@ -257,9 +257,16 @@ The native feedback screenshot follow-up now matches the backend attachment
 contract end to end: captures are PNG, named `screen.png`, sent as
 `image/png`, and progressively downscaled to stay at or below the 1 MiB limit;
 the existing text-only fallback remains available. The final iPhone 16
-Simulator gate passes 65/65 native unit tests and 15/15 signed
+Simulator gate passes 65/65 native unit tests and 16/16 signed
 `LOCAL_API_UI` tests, with Release warnings-as-errors, base/project guards,
 no invalid-frame fault, and zero disposable fixture wallets remaining.
+
+The feedback-bubble redaction follow-up now hides the floating trigger for one
+rendered frame before capturing the feedback screenshot, preventing the
+control from appearing in its own attachment. The same simulator gate remains
+green after the UI regression; physical device, real Google OAuth,
+provider-backed AI/OCR and authenticated staging/production remain external
+release gates.
 
 - Review the [dedicated advisor design](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md) and [V1 task sequence](superpowers/plans/2026-09-22-finance-assistant-v1.md). Feedback's browser round-trip/owner UAT and deployment checks remain separate. Finance Assistant has a local JWT/API-key synchronous JSON vertical slice with best-effort Redis access audit; next gates are typed fact cards, SSE/recovery, durable audit delivery/alerting and configured-provider browser proof.
 - Finance Assistant contract/lifecycle fixes are now locally verified: typed schemas, OpenAI-compatible tool history, bounded final-answer loop, credential revalidation, cancelled-run commit guard, and wallet/budget/goal/jar cards. Remaining gates are configured-provider browser proof, SSE/reconnect, durable audit delivery/alerting and owner UAT.

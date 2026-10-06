@@ -23,6 +23,11 @@ as active release entries here.
 
 ### Fixed
 
+- Native feedback capture now hides the floating feedback trigger for one
+  rendered frame before taking the attached screenshot, preventing the
+  feedback control from appearing in its own context. The signed simulator UI
+  regression passes 16/16.
+
 - Native feedback screenshots now use the backend's accepted bounded PNG
   contract; complex screen captures are downscaled to 1 MiB or less and sent
   as `screen.png`/`image/png` instead of rejected JPEG or oversized parts.

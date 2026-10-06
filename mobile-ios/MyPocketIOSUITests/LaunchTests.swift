@@ -167,6 +167,24 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Ví"].firstMatch.waitForExistence(timeout: 5))
     }
 
+    func testFeedbackBubbleHidesBeforeFeedbackOverlayCapture() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+
+        let feedbackButtons = app.buttons.matching(
+            NSPredicate(format: "label == %@", "Gửi phản hồi")
+        )
+        XCTAssertEqual(feedbackButtons.count, 1)
+        feedbackButtons.firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Phản hồi"].firstMatch.waitForExistence(timeout: 5))
+        XCTAssertEqual(
+            feedbackButtons.count,
+            1,
+            "The floating trigger must not be captured or remain over the feedback sheet."
+        )
+    }
+
     func testTransactionOverflowMenuKeepsTransferAndAdjustmentActions() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]

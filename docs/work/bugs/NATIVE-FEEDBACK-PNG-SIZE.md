@@ -31,6 +31,6 @@ bounded image, return `nil` so the existing text-only fallback can submit.
 The shared snapshot base now progressively downsizes complex captures and
 returns `nil` when a bounded PNG cannot be produced. A noisy 960×1600 image
 regression is green under the 1 MiB limit. The final simulator gate is green:
-65/65 native unit tests, 15/15 signed `LOCAL_API_UI` tests, Release with
+65/65 native unit tests, 16/16 signed `LOCAL_API_UI` tests, Release with
 warnings-as-errors, base/project guards, no invalid-frame log fault, and zero
 leftover `Fixture*` wallets after the local API probe.

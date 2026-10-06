@@ -401,8 +401,11 @@ bash -lc 'set -o pipefail; xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj 
 xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS -configuration Release -sdk iphonesimulator -destination 'platform=iOS Simulator,id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' build
 ```
 
-The latest XCTest run passed 19 unit/contract tests and 3 UI smoke tests; the
-Release build passed. The simulator app was relaunched after the test run.
+The latest completed simulator gate passes 65 native unit/contract tests and
+16 signed `LOCAL_API_UI` tests; the Release warnings-as-errors build passed,
+base/project guards passed, the no-invalid-frame log check passed, and the
+simulator app was relaunched after the test run. The feedback-bubble regression
+is covered by the 16-test UI suite.
 The latest parity fixes also cover stable-ID selectors for duplicate wallet or
 category names and account-timezone boundary formatting.
 The plan's original red/green checkbox history is retained as authoring

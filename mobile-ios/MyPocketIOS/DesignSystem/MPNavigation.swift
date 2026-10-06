@@ -144,7 +144,6 @@ struct MPFeedbackBubble: View {
             .background(MPColor.action, in: Circle())
             .foregroundStyle(.white)
             .shadow(radius: 6, y: 3)
-            .accessibilityIdentifier("feedback-bubble")
     }
 }
 

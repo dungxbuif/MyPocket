@@ -4,6 +4,7 @@ struct MainTabView: View {
     @ObservedObject var auth: AuthViewModel
     @State private var selection = "overview"
     @State private var feedbackPresented = false
+    @State private var feedbackCapturePending = false
     @State private var feedbackScreenshot: Data?
 
     var body: some View {
@@ -20,12 +21,23 @@ struct MainTabView: View {
                     MoreView(api: auth.financeAPI, auth: auth)
                 }
             }
-            MPFeedbackBubble {
-                feedbackScreenshot = ScreenSnapshot.capture()
-                feedbackPresented = true
-            }
+            if !feedbackPresented && !feedbackCapturePending {
+                MPFeedbackBubble {
+                    // Hide the trigger for a rendered frame before taking the
+                    // screenshot so the attached context is the underlying
+                    // screen, not the feedback control itself.
+                    feedbackCapturePending = true
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(100))
+                        guard feedbackCapturePending else { return }
+                        feedbackScreenshot = ScreenSnapshot.capture()
+                        feedbackCapturePending = false
+                        feedbackPresented = true
+                    }
+                }
                 .padding(.trailing, 16)
                 .padding(.bottom, 82)
+            }
             if feedbackPresented {
                 FeedbackOverlay(api: auth.financeAPI, screenshot: feedbackScreenshot) { feedbackPresented = false }
                     .padding(MPMetrics.pagePadding)
