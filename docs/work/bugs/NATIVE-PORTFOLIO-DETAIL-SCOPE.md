@@ -46,3 +46,5 @@ fee and date.
 - Release simulator build with Swift warnings treated as errors: passed.
 - Base/project guards and `git diff --check`: passed.
 - Signed iPhone 16 simulator More-route smoke: 1/1 in 121.948s.
+- Complete signed `LOCAL_API_UI` suite after this parity batch: 14/14 in
+  293.119s, with disposable fixtures cleaned up by teardown.

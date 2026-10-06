@@ -32,4 +32,7 @@ server accounting or wallet ownership rules.
 - The warnings-as-errors simulator build passes and the authenticated More-route
   sweep passes 1/1 in 125.111s on iPhone 16 Simulator
   `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`.
+- The complete signed `LOCAL_API_UI` suite passes 14/14 in 293.119s; its
+  credit mutation assertions use the localized display labels while the API
+  enum values remain unchanged.
 - Server accounting, credit wallet ownership and API enums were not changed.

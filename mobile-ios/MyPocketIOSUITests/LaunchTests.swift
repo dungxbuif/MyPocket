@@ -525,7 +525,7 @@ final class LaunchTests: XCTestCase {
         let entryReturn = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] 'return' OR label ==[c] 'done'" )).firstMatch
         if entryReturn.exists { entryReturn.tap() }
         app.buttons["Lưu"].tap()
-        XCTAssertTrue(app.staticTexts["purchase"].waitForExistence(timeout: 15), "Credit entry should refresh the statement.")
+        XCTAssertTrue(app.staticTexts["Mua hàng"].waitForExistence(timeout: 15), "Credit entry should refresh the statement.")
 
         app.buttons["Thanh toán"].tap()
         XCTAssertTrue(app.staticTexts["Thanh toán thẻ"].waitForExistence(timeout: 10))
@@ -541,7 +541,7 @@ final class LaunchTests: XCTestCase {
         let paymentReturn = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] 'return' OR label ==[c] 'done'" )).firstMatch
         if paymentReturn.exists { paymentReturn.tap() }
         app.buttons["Lưu"].tap()
-        XCTAssertTrue(app.staticTexts["payment"].waitForExistence(timeout: 15), "Credit payment should refresh the statement.")
+        XCTAssertTrue(app.staticTexts["Thanh toán"].waitForExistence(timeout: 15), "Credit payment should refresh the statement.")
 #endif
     }
 }

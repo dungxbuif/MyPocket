@@ -492,3 +492,8 @@ realized/unrealized P/L, explicit unknown pricing, and newest-first
 account-timezone buy/sell history with quantity, price, fee and optional note.
 Native XCTest 56/56, Release warnings-as-errors, base/project guards, and the
 signed authenticated More-route smoke 1/1 in 121.948s pass.
+
+The signed `LOCAL_API_UI` regression was rerun after both detail corrections:
+14/14 simulator UI tests pass in 293.119s. Credit UI assertions now verify the
+localized labels rendered by the native contract while the wire enums remain
+opaque to users.
