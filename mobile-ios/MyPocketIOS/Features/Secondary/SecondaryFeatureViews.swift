@@ -984,27 +984,8 @@ struct PortfolioView: View {
                         MPMetricCard(title: "Giá trị hiện tại", value: summary.totalMarketValue.map(MPFormat.money) ?? "Chưa có giá")
                         MPMetricCard(title: "Lãi/lỗ chưa thực hiện", value: summary.totalUnrealizedPnL.map(MPFormat.signedMoney) ?? "Chưa có giá")
                     }
-                    ForEach(summary.positions) { position in
-                        MPSurfaceCard {
-                            VStack(alignment: .leading) {
-                                MPText(position.symbol ?? position.name ?? "Tài sản")
-                                MPText("SL \(position.quantity) · Giá vốn \(MPFormat.money(position.costBasis))", style: .secondary)
-                            }
-                        }
-                    }
                     ForEach(summary.assets) { asset in
-                        MPSurfaceCard {
-                            HStack {
-                                VStack(alignment: .leading) {
-                                    MPText("\(asset.symbol) · \(asset.name)")
-                                    MPText(asset.latestPrice.map { MPFormat.money($0) } ?? "Chưa có giá", style: .secondary)
-                                }
-                                Spacer()
-                                MPButton("Giao dịch", style: .secondary) { tradeAsset = asset; tradeSide = "buy"; tradeQuantity = ""; tradePrice = asset.latestPrice.map(String.init) ?? ""; tradeFee = ""; tradeDate = Date() }
-                            }
-                            MPAmountField(title: "Giá hiện tại", text: Binding(get: { priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "" }, set: { priceByAsset[asset.id] = $0 }))
-                            MPButton("Cập nhật giá", style: .secondary) { Task { await updatePrice(asset) } }
-                        }
+                        portfolioAssetCard(asset, position: summary.positions.first(where: { $0.assetID == asset.id }), trades: summary.trades)
                     }
                 } else if let error {
                     MPErrorView(title: "Không tải được đầu tư", detail: error) { Task { await load() } }
@@ -1042,6 +1023,68 @@ struct PortfolioView: View {
         .task { await load() }
         .accessibilityIdentifier("portfolio-screen")
     }
+
+    @ViewBuilder
+    private func portfolioAssetCard(_ asset: PortfolioAssetModel, position: PortfolioPositionModel?, trades: [PortfolioTradeModel]) -> some View {
+        MPAssistantCard(title: "\(asset.symbol) · \(asset.name)") {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    MPText("Số lượng: \(position?.quantity ?? "0")")
+                    MPText(asset.latestPrice.map { "Giá hiện tại: \(MPFormat.money($0))" } ?? "Chưa có giá", style: .secondary)
+                }
+                Spacer()
+                MPButton("Giao dịch", style: .secondary) { tradeAsset = asset; tradeSide = "buy"; tradeQuantity = ""; tradePrice = asset.latestPrice.map(String.init) ?? ""; tradeFee = ""; tradeDate = Date() }
+            }
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
+                MPMetricCard(title: "Giá vốn", value: MPFormat.money(position?.costBasis ?? 0))
+                MPMetricCard(title: "Bình quân", value: MPFormat.money(position?.averageCost ?? 0))
+                MPMetricCard(title: "Đã thực hiện", value: MPFormat.signedMoney(position?.realizedPnL ?? 0))
+                MPMetricCard(title: "Giá trị hiện tại", value: position?.marketValue.map(MPFormat.money) ?? "Chưa có giá")
+                MPMetricCard(title: "Lãi/lỗ chưa thực hiện", value: position?.unrealizedPnL.map(MPFormat.signedMoney) ?? "Chưa có giá")
+            }
+            MPAmountField(title: "Giá hiện tại", text: Binding(get: { priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "" }, set: { priceByAsset[asset.id] = $0 }))
+            MPButton("Cập nhật giá", style: .secondary) { Task { await updatePrice(asset) } }
+            MPAssistantCard(title: "Lịch sử mua bán") {
+                let assetTrades = Self.tradesForAsset(trades, assetID: asset.id)
+                if assetTrades.isEmpty {
+                    MPText("Chưa có giao dịch mua bán.", style: .secondary)
+                } else {
+                    ForEach(assetTrades) { trade in
+                        MPTransactionRow(
+                            title: "\(Self.tradeSideLabel(trade.side)) · \(trade.quantity)",
+                            subtitle: Self.tradeSubtitle(trade, timeZone: TimeZone(identifier: accountTimezone) ?? .current),
+                            amount: MPFormat.money(trade.unitPrice),
+                            isIncome: trade.side == "sell"
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    static func tradesForAsset(_ trades: [PortfolioTradeModel], assetID: String) -> [PortfolioTradeModel] {
+        trades
+            .filter { $0.assetID == assetID }
+            .sorted { $0.occurredAt > $1.occurredAt }
+    }
+
+    static func tradeSideLabel(_ side: String) -> String {
+        switch side {
+        case "buy": return "Mua"
+        case "sell": return "Bán"
+        default: return "Giao dịch"
+        }
+    }
+
+    static func tradeSubtitle(_ trade: PortfolioTradeModel, timeZone: TimeZone) -> String {
+        let date = MPFormat.shortDateTime(trade.occurredAt, timeZone: timeZone)
+        let fee = MPFormat.money(trade.fee)
+        if let note = trade.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
+            return "Giá \(MPFormat.money(trade.unitPrice)) · Phí \(fee) · \(date) · \(note)"
+        }
+        return "Giá \(MPFormat.money(trade.unitPrice)) · Phí \(fee) · \(date)"
+    }
+
     private func load() async {
         do {
             async let summaryResult = api.portfolioSummary()

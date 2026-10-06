@@ -209,6 +209,12 @@ The existing credit accounting/API contract is unchanged. Native XCTest
 remains 55/55, the warnings-as-errors simulator build passes, and the signed
 More-route sweep passes 1/1 in 125.111s.
 
+Native portfolio detail parity was then restored: each asset now shows weighted
+average cost, realized/unrealized P/L, current value or explicit unknown
+pricing, and newest-first account-timezone buy/sell history with quantity,
+price, fee and note context. Native XCTest passes 56/56, Release/guards pass,
+and the signed More-route sweep passes 1/1 in 121.948s.
+
 - Review the [dedicated advisor design](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md) and [V1 task sequence](superpowers/plans/2026-09-22-finance-assistant-v1.md). Feedback's browser round-trip/owner UAT and deployment checks remain separate. Finance Assistant has a local JWT/API-key synchronous JSON vertical slice with best-effort Redis access audit; next gates are typed fact cards, SSE/recovery, durable audit delivery/alerting and configured-provider browser proof.
 - Finance Assistant contract/lifecycle fixes are now locally verified: typed schemas, OpenAI-compatible tool history, bounded final-answer loop, credential revalidation, cancelled-run commit guard, and wallet/budget/goal/jar cards. Remaining gates are configured-provider browser proof, SSE/reconnect, durable audit delivery/alerting and owner UAT.
 - Finance Assistant cancellation now interrupts provider work handled by the same backend process; the database lease guard remains the source of truth. Do not describe cross-process immediate cancellation as shipped until durable pub/sub or worker ownership is implemented.

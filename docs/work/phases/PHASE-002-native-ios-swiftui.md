@@ -486,3 +486,9 @@ payment status and credit-entry kinds, due-date context and note-first row
 subtitles through shared base components. Native XCTest remains 55/55, the
 warnings-as-errors simulator build passes, base/project guards pass, and the
 signed authenticated More-route smoke passes 1/1 in 125.111s.
+
+The portfolio detail parity follow-up then added weighted-average cost,
+realized/unrealized P/L, explicit unknown pricing, and newest-first
+account-timezone buy/sell history with quantity, price, fee and optional note.
+Native XCTest 56/56, Release warnings-as-errors, base/project guards, and the
+signed authenticated More-route smoke 1/1 in 121.948s pass.

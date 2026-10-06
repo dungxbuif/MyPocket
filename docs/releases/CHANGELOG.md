@@ -40,6 +40,10 @@ as active release entries here.
   status and credit-entry kinds, optional due-date context, and note-first row
   subtitles through shared base components.
 
+- Native portfolio asset cards now show weighted average cost, realized and
+  unrealized P/L, current value or explicit unknown pricing, plus account-timezone
+  buy/sell history with quantity, price, fee and note context.
+
 - Native Tháng summary now decodes jar usage, uses bounded account-local month
   selection, shows period/status/category/jar details, protects dirty notes,
   and opens the selected month in Hũ chi tiêu.

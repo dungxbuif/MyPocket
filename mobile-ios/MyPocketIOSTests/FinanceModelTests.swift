@@ -107,6 +107,17 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(MPFormat.shortDate(timestamp, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!), "06/10/2026")
     }
 
+    func testPortfolioDetailsFilterAndSortTradesWithLocalizedLabels() {
+        let older = PortfolioTradeModel(id: "older", assetID: "asset-1", side: "buy", quantity: "1.5", unitPrice: 100_000, fee: 500, occurredAt: "2026-10-01T03:00:00Z", note: nil)
+        let newer = PortfolioTradeModel(id: "newer", assetID: "asset-1", side: "sell", quantity: "0.5", unitPrice: 120_000, fee: 700, occurredAt: "2026-10-05T03:00:00Z", note: "Chốt một phần")
+        let unrelated = PortfolioTradeModel(id: "other", assetID: "asset-2", side: "buy", quantity: "2", unitPrice: 90_000, fee: 0, occurredAt: "2026-10-06T03:00:00Z", note: nil)
+
+        XCTAssertEqual(PortfolioView.tradesForAsset([older, unrelated, newer], assetID: "asset-1").map(\.id), ["newer", "older"])
+        XCTAssertEqual(PortfolioView.tradeSideLabel("buy"), "Mua")
+        XCTAssertEqual(PortfolioView.tradeSideLabel("sell"), "Bán")
+        XCTAssertTrue(PortfolioView.tradeSubtitle(newer, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!).contains("Chốt một phần"))
+    }
+
     func testTransferWalletsExcludeCreditWalletsAndPreserveAccountLocalDay() {
         let wallets = [
             WalletModel(id: "basic", name: "Tiền mặt", type: "basic", currency: "VND", openingBalance: 0, currentBalance: 0, availableCredit: nil, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil),
