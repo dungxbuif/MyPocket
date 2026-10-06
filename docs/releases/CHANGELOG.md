@@ -23,6 +23,12 @@ as active release entries here.
 
 ### Fixed
 
+- Native Hũ chi tiêu now uses a bounded account-local month selector and
+  shared summary metrics for actual income, actual spending, allocated and
+  unassigned spending. It warns (without blocking ledger writes) on
+  over-allocation, keeps historical month configurations read-only, and adds a
+  selected-jar cumulative report with stale-state clearing on month changes.
+
 - Native category management now matches the backend/web scope contract:
   system categories cannot be deleted or have metadata rewritten, while
   applicable wallet IDs can be updated through the dedicated wallet-scope

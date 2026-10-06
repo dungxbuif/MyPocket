@@ -14,6 +14,11 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(CategoryEditPolicy.canDelete(personal))
     }
 
+    func testMonthOptionsStayBoundedAndIncludeAnchor() {
+        let options = MPFormat.monthOptions(around: "2026-10", past: 2, future: 1, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!)
+        XCTAssertEqual(options, ["2026-08", "2026-09", "2026-10", "2026-11"])
+    }
+
     func testSnakeCaseFinancialPayloadDecodesAcronyms() throws {
         let data = Data(#"{"id":"tx-1","owner_id":"u-1","wallet_id":"w-1","category_id":"c-1","type":"expense","amount":50000,"occurred_at":"2026-10-05T10:00:00Z","included_in_reports":true,"created_at":"2026-10-05T10:00:00Z","updated_at":"2026-10-05T10:00:00Z"}"#.utf8)
         let transaction = try JSONDecoder.mypocket.decode(TransactionModel.self, from: data)

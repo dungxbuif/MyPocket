@@ -156,6 +156,22 @@ enum MPFormat {
         return "Tháng \(parts[1]) năm \(parts[0])"
     }
 
+    static func monthOptions(around month: String, past: Int = 24, future: Int = 1, timeZone: TimeZone = .current) -> [String] {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let anchor = formatter.date(from: "\(month)-01") else { return [currentMonth(timeZone: timeZone)] }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return (-past...future).compactMap { offset in
+            guard let date = calendar.date(byAdding: .month, value: offset, to: anchor) else { return nil }
+            formatter.dateFormat = "yyyy-MM"
+            return formatter.string(from: date)
+        }
+    }
+
     static func accountMonth(of raw: String, timeZone: TimeZone) -> String? {
         guard let parsed = parseInstant(raw) else { return nil }
         let formatter = DateFormatter()

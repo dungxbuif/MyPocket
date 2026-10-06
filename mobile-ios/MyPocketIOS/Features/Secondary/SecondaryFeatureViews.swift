@@ -343,37 +343,70 @@ struct JarsView: View {
     @State private var amount = ""
     @State private var percent = ""
     @State private var report: JarCumulativeSummaryModel?
+    @State private var reportJarID = ""
+    @State private var reportLoading = false
+    @State private var reportError: String?
     @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Hũ chi tiêu", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm hũ") { editTarget = nil; resetEditor(); showEditor = true } })
-                MPTextField(title: "Tháng (YYYY-MM)", text: $month)
-                MPButton("Tải hũ", isLoading: loading) { Task { await load() } }
+                MPOptionSelector(title: "Tháng", options: MPFormat.monthOptions(around: month, timeZone: TimeZone(identifier: accountTimezone) ?? .current).map { MPSelectionOption(id: $0, label: MPFormat.monthLabel($0)) }, selectionID: $month)
+                if loading { MPLoadingView(label: "Đang tải hũ tháng này...") }
                 if let summary {
-                    MPMetricCard(title: "Tổng đã phân bổ", value: MPFormat.money(summary.totalAllocated), detail: "Thu nhập: \(MPFormat.money(summary.actualIncome))")
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        MPMetricCard(title: "Thu thực tế", value: MPFormat.money(summary.actualIncome))
+                        MPMetricCard(title: "Chi thực tế", value: MPFormat.money(summary.totalSpent))
+                        MPMetricCard(title: "Đã phân bổ", value: MPFormat.money(summary.totalAllocated))
+                        MPMetricCard(title: "Chi chưa gắn hũ", value: MPFormat.money(summary.unassignedSpent))
+                    }
+                    if summary.overIncome || summary.overOneHundredPercent {
+                        MPStatusMessage(text: "Tổng phân bổ vượt thu thực tế. Đây là cảnh báo, không chặn giao dịch.", tone: .danger)
+                    }
+                    MPText("Hũ tháng", style: .title)
+                    if summary.items.isEmpty { MPEmptyView(title: "Chưa có hũ cho tháng này", detail: "Chi tiêu vẫn được ghi nhận bình thường.") }
                     ForEach(summary.items) { item in
                         MPSurfaceCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 MPText(item.name)
-                                MPProgressBar(progress: Double(item.spent) / Double(max(1, item.calculatedAllocation ?? 1)), label: "Đã chi \(MPFormat.money(item.spent))")
-                                HStack {
-                                    MPButton("Sửa", style: .secondary) { beginEditing(item) }
-                                    MPButton("Báo cáo", style: .secondary) { Task { await loadReport(for: item) } }
-                                    MPButton("Gỡ tháng", style: .destructive) { Task { await remove(item) } }
+                                if let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil) {
+                                    MPProgressBar(progress: Double(item.spent) / Double(max(1, allocation)), label: "Đã chi \(MPFormat.money(item.spent)) / \(MPFormat.money(allocation))")
+                                } else {
+                                    MPText("Chưa đặt phân bổ · Đã chi \(MPFormat.money(item.spent))", style: .secondary)
+                                }
+                                if item.active {
+                                    HStack {
+                                        MPButton("Sửa tháng này", style: .secondary) { beginEditing(item) }
+                                        MPButton("Gỡ khỏi tháng", style: .destructive) { Task { await remove(item) } }
+                                    }
+                                } else {
+                                    MPText("Cấu hình lịch sử; giao dịch vẫn được giữ.", style: .secondary)
                                 }
                             }
                         }
                     }
-                    if let report {
-                        MPAssistantCard(title: "Lịch sử \(report.name)") {
-                            MPText("\(report.fromMonth) → \(report.toMonth) · Đã chi \(MPFormat.money(report.totalSpent))", style: .secondary)
-                            ForEach(report.months, id: \.month) { item in MPText("\(item.month): \(MPFormat.money(item.spent))", style: .secondary) }
+                    MPAssistantCard(title: "Cộng dồn") {
+                        if summary.jars.isEmpty {
+                            MPEmptyView(title: "Chưa có hũ", detail: "Tạo hũ để xem chi tiêu cộng dồn.")
+                        } else {
+                            MPOptionSelector(title: "Chọn hũ", options: summary.jars.map { MPSelectionOption(id: $0.jarID, label: $0.name) }, selectionID: $reportJarID)
+                            if reportLoading { MPLoadingView(label: "Đang tải báo cáo cộng dồn...") }
+                            if let reportError { MPStatusMessage(text: reportError, tone: .info) }
+                            if let report {
+                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                    MPMetricCard(title: "Chi thực tế", value: MPFormat.money(report.totalSpent))
+                                    MPMetricCard(title: "Đã phân bổ", value: MPFormat.money(report.totalAllocated))
+                                }
+                                MPText("\(MPFormat.monthLabel(report.fromMonth)) → \(MPFormat.monthLabel(report.toMonth)) · Không cộng dồn số dư.", style: .secondary)
+                                ForEach(report.months, id: \.month) { item in
+                                    HStack { MPText(MPFormat.monthLabel(item.month)); Spacer(); MPText(MPFormat.money(item.spent), style: .secondary) }
+                                }
+                            }
                         }
                     }
                 } else if let error { MPErrorView(title: "Không tải được hũ", detail: error) { Task { await load() } } }
-                else { MPEmptyView(title: "Chưa chọn tháng", detail: "Hũ là lớp ngân sách theo tháng và không thay đổi số dư ví.") }
+                else if !loading { MPEmptyView(title: "Chưa chọn tháng", detail: "Hũ là lớp ngân sách theo tháng và không thay đổi số dư ví.") }
                 if showEditor {
                     MPSurfaceCard {
                         VStack(alignment: .leading, spacing: 10) {
@@ -392,6 +425,19 @@ struct JarsView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
+        .onChange(of: month) { _, _ in
+            report = nil
+            reportError = nil
+            Task { await load() }
+        }
+        .onChange(of: reportJarID) { _, value in
+            guard !value.isEmpty else {
+                report = nil
+                reportError = nil
+                return
+            }
+            Task { await loadReport(jarID: value) }
+        }
         .onChange(of: mode) { _, _ in
             if mode == "fixed" {
                 percent = ""
@@ -406,6 +452,7 @@ struct JarsView: View {
     }
 
     private func load() async {
+        guard !loading else { return }
         loading = true; defer { loading = false }
         do {
             let firstLoad = summary == nil
@@ -414,6 +461,16 @@ struct JarsView: View {
                 if firstLoad { month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current) }
             }
             summary = try await api.jarMonth(month: month)
+            if let summary {
+                if summary.jars.isEmpty {
+                    reportJarID = ""
+                    report = nil
+                    reportError = nil
+                } else {
+                    if !summary.jars.contains(where: { $0.jarID == reportJarID }) { reportJarID = summary.jars.first?.jarID ?? "" }
+                    if !reportJarID.isEmpty { await loadReport(jarID: reportJarID) }
+                }
+            }
             self.error = nil
         } catch { self.error = "Không thể tải hũ chi tiêu." }
     }
@@ -424,12 +481,17 @@ struct JarsView: View {
         let parsedAmount = MPFormat.parseNonNegativeInteger(amount)
         let parsedPercent = Double(percent.replacingOccurrences(of: ",", with: "."))
         guard JarAllocationDraftValidator.isValid(mode: mode, amount: parsedAmount, percent: parsedPercent) else { error = "Cách phân bổ không hợp lệ."; return }
-        let input = JarConfigInputModel(month: month, name: name, allocationMode: mode, allocationAmount: mode == "fixed" ? parsedAmount : nil, allocationPercent: mode == "percent" ? parsedPercent : nil)
+        let input = JarConfigInputModel(month: month, name: name.trimmingCharacters(in: .whitespacesAndNewlines), allocationMode: mode, allocationAmount: mode == "fixed" ? parsedAmount : nil, allocationPercent: mode == "percent" ? parsedPercent : nil)
         do { if let editTarget { _ = try await api.updateJarMonth(jarID: editTarget.jarID, month: month, input: input) } else { _ = try await api.createJar(input) }; showEditor = false; await load() }
         catch { self.error = "Không thể lưu hũ." }
     }
     private func remove(_ item: JarItemModel) async { do { try await api.removeJarMonth(jarID: item.jarID, month: month); await load() } catch { self.error = "Không thể gỡ hũ khỏi tháng." } }
-    private func loadReport(for item: JarItemModel) async { do { report = try await api.jarReport(jarID: item.jarID, to: month); error = nil } catch { self.error = "Không thể tải báo cáo hũ." } }
+    private func loadReport(jarID: String) async {
+        reportLoading = true; reportError = nil
+        defer { reportLoading = false }
+        do { report = try await api.jarReport(jarID: jarID, to: month) }
+        catch { report = nil; reportError = "Chưa có dữ liệu cộng dồn cho hũ này." }
+    }
 }
 
 struct MonthsView: View {

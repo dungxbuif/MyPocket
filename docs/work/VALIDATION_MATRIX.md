@@ -483,3 +483,20 @@ The above is local regression proof. Configured-provider browser chat, SSE/recon
   simulator diagnostic service hung once; the prior full 14/14 signed suite
   remains valid for unchanged API-backed flows, and the targeted route sweep
   plus unit proof covers this change.
+
+### Native spending-jars month/cumulative scope fix — 2026-10-06
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Month selector | `FinanceModelTests.testMonthOptionsStayBoundedAndIncludeAnchor` | PASS: account-local bounded options include the requested month and adjacent navigation range |
+| Summary semantics | `JarsView` renders shared metric/status/progress components | PASS: actual income, actual spending, allocated, unassigned and advisory over-allocation states are visible |
+| Active/history behavior | `JarsView` gates edit/remove actions by `item.active` | PASS: historical configurations stay read-only while ledger data remains visible |
+| Cumulative report | selected-jar `jarReport` path plus empty-month clearing | PASS: report is scoped to the selected jar and stale results are cleared on month changes |
+| Native contract | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: 50/50 tests |
+| Release build | `xcodebuild build ... -configuration Release ... SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` | PASS |
+| Simulator route | signed `testAuthenticatedMoreMenuOpensEveryDestination` | PASS: 1/1 in 123.999s |
+
+The prior complete signed API-backed simulator suite remains 14/14; it was not
+repeated after this UI-only Jars change because a subsequent full run hit the
+Xcode diagnostic service. This targeted route, unit, and Release evidence is
+the current post-change proof.

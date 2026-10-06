@@ -251,6 +251,16 @@ all 13 More destinations (1/1 test, 121.909s). A second full API-backed UI
 rerun was not claimed after one simulator diagnostic-service hang; the prior
 14/14 proof remains valid for the unchanged API-backed flows.
 
+The follow-up Hũ chi tiêu scope fix on 2026-10-06 restored the bounded
+account-local month selector, actual/allocated/unassigned metrics, advisory
+over-allocation warning, active/history action gating, and selected-jar
+cumulative report. Empty month responses clear the selected report so stale
+data cannot cross month boundaries. Native XCTest passes 50/50, the Release
+warnings-as-errors build passes, and the signed More-route sweep passes 1/1 in
+123.999s. The prior complete API-backed suite remains 14/14; a full rerun
+after this UI-only change was not claimed because the Xcode diagnostic service
+hung once.
+
 ```bash
 xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -destination 'id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' \
