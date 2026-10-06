@@ -220,6 +220,21 @@ This file maps accepted behavior and work items to proof.
 - Tests: `rtk proxy go test -race ./internal/infrastructure/ai -count=1` PASS; `rtk proxy go test ./... -count=1` PASS in `backend/`; `rtk proxy git diff --check` PASS. Synthetic-only; no proposal approval or ledger write. A five-case benchmark is not broad model certification; owner review and broader edge-case UAT remain required.
 - Wallet-description and future provider/pricing intent: [AI-ENTRY-01](tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [AI-ENTRY-03](tickets/AI-ENTRY-03-PROVIDER-SELECTION.md) and its draft design.
 
+### AI-ENTRY-01 current provider compatibility regression — 2026-10-06
+
+- Read-only live text extraction: PASS with the configured `DeepSeek-V4-Flash`
+  OpenAI-compatible endpoint; one synthetic expense returned HTTP 200-equivalent
+  extraction in 1.531 s with one valid draft and 1,726 reported tokens.
+- Tool-call capability probe: PASS; exactly one `propose_transactions` call was
+  returned, arguments passed the strict draft schema, and no tool was executed.
+- Strict JSON Schema probe: PASS, 5/5 synthetic cases and all semantic checks;
+  the unclear-wallet case now intentionally prefills the first supplied wallet
+  (`wallet-cash`) while retaining a review question, matching the approved
+  review-first/default-wallet contract. No ledger or proposal writes occurred.
+- Regression fixture correction: the previous expectation that an unclear
+  wallet must remain empty contradicted the shipped default-wallet policy; the
+  live test now asserts default prefill plus review question.
+
 ## AI plan review — 2026-09-21
 
 ### AI-ENTRY-01 implementation follow-up

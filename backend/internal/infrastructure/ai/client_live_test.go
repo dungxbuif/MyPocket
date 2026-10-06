@@ -186,7 +186,6 @@ func TestLiveJSONSchemaCompatibility(t *testing.T) {
 		name, text, wantType, wantWallet, wantCategory, datePrefix string
 		amounts                                                    []int64
 		needsQuestion                                              bool
-		walletMustBeEmpty                                          bool
 	}
 	caseWallets := []entity.Wallet{
 		{ID: "wallet-cash", Name: "Ví tiền mặt", Type: entity.WalletTypeBasic, Currency: "VND"},
@@ -202,7 +201,7 @@ func TestLiveJSONSchemaCompatibility(t *testing.T) {
 		{name: "two expenses yesterday", text: "Hôm qua ăn sáng 45.000đ và uống cà phê 30.000đ bằng Ví tiền mặt.", wantType: "expense", wantWallet: "wallet-cash", datePrefix: "2026-09-21", amounts: []int64{45000, 30000}},
 		{name: "income explicit date", text: "Ngày 20/09/2026 nhận lương 15.000.000đ vào Tài khoản ngân hàng.", wantType: "income", wantWallet: "wallet-bank", wantCategory: "category-salary", datePrefix: "2026-09-20", amounts: []int64{15000000}},
 		{name: "internal transfer safety", text: "Chuyển 500.000đ từ Tài khoản ngân hàng sang Ví tiền mặt.", wantType: "transfer", amounts: []int64{500000}, needsQuestion: true},
-		{name: "missing wallet clarification", text: "Hôm nay tôi ăn trưa hết 80.000đ nhưng quên mất dùng ví nào.", wantType: "expense", amounts: []int64{80000}, needsQuestion: true, walletMustBeEmpty: true},
+		{name: "missing wallet defaults for review", text: "Hôm nay tôi ăn trưa hết 80.000đ nhưng quên mất dùng ví nào.", wantType: "expense", wantWallet: "wallet-cash", amounts: []int64{80000}, needsQuestion: true},
 	}
 	now := time.Date(2026, 9, 22, 10, 0, 0, 0, time.FixedZone("ICT", 7*60*60))
 	for _, tc := range cases {
@@ -257,9 +256,6 @@ func TestLiveJSONSchemaCompatibility(t *testing.T) {
 			typeOK = typeOK && draft.Type == tc.wantType
 			if tc.wantWallet != "" {
 				walletOK = walletOK && draft.WalletID == tc.wantWallet
-			}
-			if tc.walletMustBeEmpty {
-				walletOK = walletOK && draft.WalletID == ""
 			}
 			if tc.wantCategory != "" {
 				categoryOK = categoryOK && draft.CategoryID != nil && *draft.CategoryID == tc.wantCategory

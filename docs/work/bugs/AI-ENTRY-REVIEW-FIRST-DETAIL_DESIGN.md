@@ -29,6 +29,20 @@ Reconcile [AI entry page](../../design/pages/assistant/README.md), [API](../../a
 - `go build ./cmd/api`: PASS. Generated tracked binary restored to its prior committed state; runtime restarted with `go run ./cmd/api` so the new embedded prompt is active.
 - Backend `/api/v1/health` and frontend `http://localhost:4173/`: HTTP 200 after restart. Browser upload/save UAT was not repeated; existing requests remain idempotent and retain their old outcome. Test the new prompt with a new submission.
 
+## Current provider regression — 2026-10-06
+
+- Read-only live extraction with the configured DeepSeek-V4-Flash endpoint
+  returned one valid synthetic draft in 1.531 s; the tool-call probe returned
+  exactly one schema-valid `propose_transactions` call without executing it.
+- The strict JSON Schema probe passed 5/5 synthetic cases. An unclear wallet
+  now intentionally receives the first supplied wallet as a reviewable
+  default and retains a question, matching this document's default-wallet
+  policy. The old live test expected an empty wallet and was corrected; no
+  production extraction behavior changed.
+- `go test -race ./internal/infrastructure/ai -count=1` passed after the
+  regression-fixture correction. No proposal, transaction, or production row
+  was written by these probes.
+
 ## Reconciliation and lessons
 
 Internal business rule AI-01, ADR-005 and integration runtime notes updated. Public/agent-readable Markdown API reference and review-screen behavior updated with partial drafts, within-batch dedup, default wallet and transport-only output limits. No API shape, schema, auth, OpenAPI or frontend component change in this correction, so no new schema generation or frontend build required. Changelog and validation/context/backlog updated. Public-site publishing and production deployment are not claimed.
