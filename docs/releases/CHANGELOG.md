@@ -23,6 +23,10 @@ as active release entries here.
 
 ### Fixed
 
+- Native goal-wallet detail now matches the savings summary contract: it shows
+  reached/remaining amount, account-local target-day status, bounded progress,
+  and the explicit target amount using shared base components.
+
 - Native Hũ chi tiêu now uses a bounded account-local month selector and
   shared summary metrics for actual income, actual spending, allocated and
   unassigned spending. It warns (without blocking ledger writes) on

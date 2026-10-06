@@ -19,6 +19,20 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(options, ["2026-08", "2026-09", "2026-10", "2026-11"])
     }
 
+    func testSavingsProgressClampsTargetAndBalanceSafely() {
+        XCTAssertEqual(MPFormat.savingsProgress(balance: 300, target: 1_000), MPSavingsProgress(remaining: 700, percentage: 0.3, reached: false))
+        XCTAssertEqual(MPFormat.savingsProgress(balance: 1_100, target: 1_000), MPSavingsProgress(remaining: 0, percentage: 1, reached: true))
+        XCTAssertEqual(MPFormat.savingsProgress(balance: -10, target: 0), MPSavingsProgress(remaining: 0, percentage: 0, reached: false))
+    }
+
+    func testSavingsTargetDayUsesAccountTimezoneAndCalendarDate() {
+        let timezone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        let now = ISO8601DateFormatter().date(from: "2026-10-05T16:30:00Z")!
+        XCTAssertEqual(MPFormat.calendarDayDifference(to: "2026-10-07", from: now, timeZone: timezone), 2)
+        XCTAssertEqual(MPFormat.calendarDayDifference(to: "2026-10-04", from: now, timeZone: timezone), -1)
+        XCTAssertNil(MPFormat.calendarDayDifference(to: nil, from: now, timeZone: timezone))
+    }
+
     func testSnakeCaseFinancialPayloadDecodesAcronyms() throws {
         let data = Data(#"{"id":"tx-1","owner_id":"u-1","wallet_id":"w-1","category_id":"c-1","type":"expense","amount":50000,"occurred_at":"2026-10-05T10:00:00Z","included_in_reports":true,"created_at":"2026-10-05T10:00:00Z","updated_at":"2026-10-05T10:00:00Z"}"#.utf8)
         let transaction = try JSONDecoder.mypocket.decode(TransactionModel.self, from: data)

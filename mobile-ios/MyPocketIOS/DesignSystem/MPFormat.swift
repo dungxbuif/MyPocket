@@ -1,5 +1,11 @@
 import Foundation
 
+struct MPSavingsProgress: Equatable, Sendable {
+    let remaining: Int64
+    let percentage: Double
+    let reached: Bool
+}
+
 enum MPFormat {
     static let currency: NumberFormatter = {
         let formatter = NumberFormatter()
@@ -50,6 +56,22 @@ enum MPFormat {
     static func signedMoney(_ value: Int64) -> String {
         if value == 0 { return money(0) }
         return (value > 0 ? "+" : "−") + money(abs(value))
+    }
+
+    static func savingsProgress(balance: Int64, target: Int64) -> MPSavingsProgress {
+        let safeTarget = max(0, target)
+        let safeBalance = max(0, balance)
+        let remaining = max(0, safeTarget - safeBalance)
+        let reached = safeTarget > 0 && safeBalance >= safeTarget
+        let percentage = safeTarget > 0 ? min(1, Double(safeBalance) / Double(safeTarget)) : 0
+        return MPSavingsProgress(remaining: remaining, percentage: percentage, reached: reached)
+    }
+
+    static func calendarDayDifference(to targetDate: String?, from now: Date = Date(), timeZone: TimeZone = .current) -> Int? {
+        guard let target = parseCalendarDate(targetDate, timeZone: timeZone) else { return nil }
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar.dateComponents([.day], from: calendar.startOfDay(for: now), to: calendar.startOfDay(for: target)).day
     }
 
     static func percentageFromBPS(_ value: Int64?) -> String {

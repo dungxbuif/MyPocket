@@ -500,3 +500,17 @@ The prior complete signed API-backed simulator suite remains 14/14; it was not
 repeated after this UI-only Jars change because a subsequent full run hit the
 Xcode diagnostic service. This targeted route, unit, and Release evidence is
 the current post-change proof.
+
+### Native goal-wallet savings summary fix — 2026-10-06
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Savings math | `FinanceModelTests.testSavingsProgressClampsTargetAndBalanceSafely` | PASS: negative/zero targets are safe; remaining and progress are clamped |
+| Target-day semantics | `FinanceModelTests.testSavingsTargetDayUsesAccountTimezoneAndCalendarDate` | PASS: date-only deadline uses the account timezone across UTC boundary |
+| Goal detail UI | `WalletDetailView` uses shared metric/surface/text/progress components | PASS: reached/remaining, due-day state, progress and target amount are rendered |
+| Native contract | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: 52/52 tests |
+| Release build | `xcodebuild build ... -configuration Release ... SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` | PASS |
+| Simulator route | signed `testAuthenticatedMoreMenuOpensEveryDestination` | PASS: 1/1 in 124.194s |
+
+The full API-backed suite remains 14/14 from the preceding simulator gate; this
+goal summary change was covered by the targeted route, unit and Release checks.

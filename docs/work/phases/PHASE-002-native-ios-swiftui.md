@@ -437,3 +437,11 @@ entry/payment; the complete signed API-backed UI suite passed 14/14 in 293.192
 seconds. The app launched successfully on the iPhone 16 simulator;
 physical-device, real Google OAuth, provider-backed AI/OCR and authenticated
 staging/production gates remain external checks.
+
+The follow-up goal-wallet savings-summary fix on 2026-10-06 restored the web
+contract for reached/remaining amount, account-local target-day status,
+bounded progress, and explicit target amount through shared base components.
+Native XCTest passes 52/52, the Release warnings-as-errors build passes, and
+the signed More-route sweep passes 1/1 in 124.194s. The complete API-backed
+suite remains 14/14 from the preceding gate; the targeted route covers this
+goal-detail presentation change.

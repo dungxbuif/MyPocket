@@ -163,12 +163,20 @@ struct WalletDetailView: View {
                 MPScreenHeader(title: wallet.name, leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
                 MPMetricCard(title: "Số dư hiện tại", value: MPFormat.money(wallet.currentBalance))
                 if wallet.type == "goal", let target = wallet.targetAmount {
-                    let remaining = max(0, target - wallet.currentBalance)
                     MPSurfaceCard {
                         VStack(alignment: .leading, spacing: 8) {
-                            MPText("Mục tiêu tiết kiệm", style: .title)
-                            MPProgressBar(progress: Double(wallet.currentBalance) / Double(max(1, target)), label: remaining == 0 ? "Đã đạt mục tiêu" : "Còn thiếu \(MPFormat.money(remaining))")
-                            if let targetDate = wallet.targetDate { MPText("Hạn mục tiêu: \(targetDate)", style: .secondary) }
+                            let progress = MPFormat.savingsProgress(balance: wallet.currentBalance, target: target)
+                            MPText("Số dư", style: .secondary)
+                            MPText(MPFormat.money(wallet.currentBalance), style: .title)
+                            MPText(progress.reached ? "ĐÃ ĐẠT MỤC TIÊU" : "CẦN THÊM", style: .secondary)
+                            MPText(MPFormat.money(progress.remaining), style: .title)
+                            if let days = MPFormat.calendarDayDifference(to: wallet.targetDate, timeZone: timeZone) {
+                                MPText(days < 0 ? "Đã qua hạn \(-days) ngày" : days == 0 ? "Đến hạn hôm nay" : "Còn \(days) ngày", style: .secondary)
+                            } else {
+                                MPText("Chưa đặt ngày kết thúc", style: .secondary)
+                            }
+                            MPProgressBar(progress: progress.percentage, label: "Tiến độ tiết kiệm")
+                            MPText("Mục tiêu \(MPFormat.money(target))", style: .secondary)
                         }
                     }
                 }
