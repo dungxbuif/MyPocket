@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/xml"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -124,6 +125,11 @@ func TestLiveQwenImageAndTransactionEval(t *testing.T) {
 	ocrText, err := client.ocr(ctx, Image{Name: "mock-receipt.png", MIMEType: mime, SourceURL: signedURL})
 	ocrLatency := time.Since(ocrStart)
 	if err != nil {
+		var diagnostic interface{ Diagnostic() (string, string, int) }
+		if errors.As(err, &diagnostic) {
+			stage, code, status := diagnostic.Diagnostic()
+			t.Logf("OCR diagnostic stage=%s code=%s provider_status=%d latency=%s", stage, code, status, ocrLatency.Round(time.Millisecond))
+		}
 		t.Fatal("live OCR of private S3 image:", err)
 	}
 	if !strings.Contains(strings.ReplaceAll(strings.ReplaceAll(ocrText, ".", ""), ",", ""), "45000") {

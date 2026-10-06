@@ -220,6 +220,20 @@ This file maps accepted behavior and work items to proof.
 - Tests: `rtk proxy go test -race ./internal/infrastructure/ai -count=1` PASS; `rtk proxy go test ./... -count=1` PASS in `backend/`; `rtk proxy git diff --check` PASS. Synthetic-only; no proposal approval or ledger write. A five-case benchmark is not broad model certification; owner review and broader edge-case UAT remain required.
 - Wallet-description and future provider/pricing intent: [AI-ENTRY-01](tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [AI-ENTRY-03](tickets/AI-ENTRY-03-PROVIDER-SELECTION.md) and its draft design.
 
+### AI-ENTRY-02 current provider probe — 2026-10-06
+
+- Synthetic receipt generation and private S3 PUT/signed-readback: PASS
+  (`871,036` bytes); the object was scheduled for cleanup by the test.
+- OCR submission: BLOCKED by the configured remote service returning HTTP 404
+  for `POST /v1/documents`. The safe diagnostic is
+  `stage=ocr_submit`, `code=ocr_submit_request`, `provider_status=404`; no
+  OCR result, model call, proposal, or ledger write occurred.
+- The live harness now records only this bounded diagnostic (never keys, URLs,
+  receipt text or response bodies), so the deployment/API route mismatch can
+  be fixed without weakening error redaction. Historical 2026-09-22 OCR/LLM
+  success remains valid for that provider deployment but does not prove the
+  current endpoint is reachable.
+
 ### AI-ENTRY-01 current provider compatibility regression — 2026-10-06
 
 - Read-only live text extraction: PASS with the configured `DeepSeek-V4-Flash`

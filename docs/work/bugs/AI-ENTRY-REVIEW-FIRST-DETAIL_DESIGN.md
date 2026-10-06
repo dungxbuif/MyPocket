@@ -42,6 +42,12 @@ Reconcile [AI entry page](../../design/pages/assistant/README.md), [API](../../a
 - `go test -race ./internal/infrastructure/ai -count=1` passed after the
   regression-fixture correction. No proposal, transaction, or production row
   was written by these probes.
+- A fresh synthetic S3→OCR→LLM probe on the same machine reached private S3
+  successfully, but the configured OCR service returned HTTP 404 at
+  `ocr_submit`; the safe diagnostic recorded only
+  `stage=ocr_submit`, `code=ocr_submit_request`, `provider_status=404`.
+  This is an external OCR deployment/route mismatch, not a parser or ledger
+  write failure, and the test cleaned its temporary object.
 
 ## Reconciliation and lessons
 
