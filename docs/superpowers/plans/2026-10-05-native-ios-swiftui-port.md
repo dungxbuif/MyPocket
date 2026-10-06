@@ -402,10 +402,11 @@ xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS -config
 ```
 
 The latest completed simulator gate passes 65 native unit/contract tests and
-16 signed `LOCAL_API_UI` tests; the Release warnings-as-errors build passed,
+17 signed `LOCAL_API_UI` tests (82/82 combined); the Release warnings-as-errors build passed,
 base/project guards passed, the no-invalid-frame log check passed, and the
 simulator app was relaunched after the test run. The feedback-bubble regression
-is covered by the 16-test UI suite.
+and the AI-entry twenty-file thumbnail/cap/remove flow are covered by the
+17-test UI suite.
 The latest parity fixes also cover stable-ID selectors for duplicate wallet or
 category names and account-timezone boundary formatting.
 The plan's original red/green checkbox history is retained as authoring

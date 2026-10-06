@@ -298,6 +298,30 @@ final class LaunchTests: XCTestCase {
 #endif
     }
 
+    func testAIEntryConfiguredAttachmentLimitAndThumbnails() throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI to run the deterministic attachment fixture.")
+#else
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated", "-UITestAIEntryAttachments"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Nhập giao dịch bằng AI"].waitForExistence(timeout: 10))
+        app.buttons["Nhập giao dịch bằng AI"].tap()
+        XCTAssertTrue(app.staticTexts["Nhập giao dịch bằng AI"].firstMatch.waitForExistence(timeout: 10))
+
+        let removeButtons = app.buttons.matching(
+            NSPredicate(format: "label == %@", "Bỏ tệp")
+        )
+        XCTAssertEqual(removeButtons.count, 20)
+        XCTAssertFalse(app.buttons["Đính kèm ảnh hoặc PDF"].isEnabled)
+        removeButtons.firstMatch.tap()
+        XCTAssertEqual(removeButtons.count, 19)
+        XCTAssertTrue(app.buttons["Đính kèm ảnh hoặc PDF"].isEnabled)
+#endif
+    }
+
     func testAIEntryProposalReviewRequiresExplicitType() throws {
 #if !LOCAL_API_UI
         throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI to run the deterministic review fixture.")

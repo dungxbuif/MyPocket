@@ -355,6 +355,8 @@ struct AIEntryView: View {
 #if DEBUG
             if ProcessInfo.processInfo.arguments.contains("-UITestAIEntryProposal") {
                 loadUITestProposal()
+            } else if ProcessInfo.processInfo.arguments.contains("-UITestAIEntryAttachments") {
+                loadUITestAttachments()
             } else {
                 await loadCapabilities()
                 await loadReferenceData()
@@ -487,6 +489,19 @@ struct AIEntryView: View {
             error: nil
         )
         requestID = "ui-entry-process"
+    }
+
+    private func loadUITestAttachments() {
+        capabilities = EntryCapabilitiesModel(aiConfigured: true, ocrConfigured: true, filesConfigured: true)
+        let tinyPNG = Data(base64Encoded: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=") ?? Data()
+        files = (1...20).map { index in
+            MultipartFile(
+                fieldName: "files",
+                fileName: String(format: "IMG_%02d.PNG", index),
+                mimeType: "image/png",
+                data: tinyPNG
+            )
+        }
     }
 #endif
 }

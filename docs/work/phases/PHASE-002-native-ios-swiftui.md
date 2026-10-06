@@ -599,3 +599,11 @@ feedback attachments contain the underlying screen rather than the trigger
 itself. Native XCTest passes 65/65, the complete signed `LOCAL_API_UI` suite
 passes 16/16, Release warnings-as-errors, base/project guards, the
 no-invalid-frame log check and the simulator launch all pass.
+
+The AI-entry attachment parity follow-up adds deterministic simulator proof for
+the configured multi-file flow: a DEBUG-only fixture renders twenty valid PNG
+thumbnails, disables the picker at the cap, and re-enables it after a close /
+remove action. The full signed `LOCAL_API_UI` suite now passes 17/17 (82/82
+combined with the 65 native unit/contract tests); the Release build and project
+guards remain green. This fixture is test-only and does not alter production
+provider behavior or the twenty-file API contract.

@@ -23,6 +23,10 @@ as active release entries here.
 
 ### Fixed
 
+- Native AI-entry attachment regression coverage now verifies twenty valid PNG
+  thumbnails, the picker cap, close/remove behavior and picker re-enable on the
+  iPhone 16 Simulator; the signed UI suite passes 17/17.
+
 - Native feedback capture now hides the floating feedback trigger for one
   rendered frame before taking the attached screenshot, preventing the
   feedback control from appearing in its own context. The signed simulator UI
