@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
 import { WalletSelectionList } from "../molecules/WalletSelectionList";
-import { WalletDetailPanel } from "./SavingsWalletPanel";
-import { CreditWalletPanel } from "./CreditWalletPanel";
 import { ArrowLeft, CreditCard, Landmark, PiggyBank, Plus, Trash2, WalletCards } from "lucide-react";
 
 import { BaseButton } from "../atoms/BaseButton";
@@ -18,6 +16,7 @@ import { WalletCreateForm, WalletTypePicker, canCreateWallet } from "../molecule
 import { fetchTransactions, type Transaction } from "../../services/transactions";
 import { fetchCategories, type Category } from "../../services/categories";
 import { createWallet, deleteWallet, fetchWallets, updateWallet, WALLET_TYPES, type Wallet } from "../../services/wallets";
+import { transactionsSearch } from "../../services/walletNavigation";
 
 const COPY = { title: "Ví của tôi", subtitle: "Tạo, sửa hoặc xóa ví", add: "Thêm ví", loading: "Đang tải ví...", empty: "Chưa có ví nào.", error: "Không thể lưu thay đổi. Vui lòng thử lại.", edit: "Sửa", delete: "Xóa" } as const;
 const WALLET_ICONS = { [WALLET_TYPES.basic]: WalletCards, [WALLET_TYPES.goal]: PiggyBank, [WALLET_TYPES.credit]: CreditCard } as const;
@@ -98,9 +97,6 @@ export function WalletManagementPanel({ onChanged, refreshKey = 0 }: { onChanged
     }
   };
 
-  const selectedWallet = wallets.find(wallet => wallet.id === selectedID);
-  if (selectedWallet && !editingList) return <div className="space-y-3">{error ? <StatusMessage tone="danger">{error}<BaseButton variant="ghost" onClick={() => void load()}>Thử lại</BaseButton></StatusMessage> : null}{loading ? <StatusMessage>Đang cập nhật số dư...</StatusMessage> : null}{selectedWallet.type === "credit" ? <><BaseButton variant="ghost" onClick={() => setSelectedID(null)}>← Ví của tôi</BaseButton><CreditWalletPanel wallet={selectedWallet} wallets={wallets} categories={categories} onChanged={() => { void load(); onChanged(); }} /></> : <WalletDetailPanel wallet={selectedWallet} transactions={transactions} categories={categories} onBack={() => setSelectedID(null)} onChanged={onChanged} />}</div>;
-
   return (
     <section className="space-y-3">
       <header className="mb-6 grid grid-cols-[1fr_auto_1fr] items-center"><BaseButton variant="chip" size="sm" className="justify-self-start" onClick={() => void navigate({ to: "/account" })}>Đóng</BaseButton><Text as="h1" size="lg" weight="bold">Chọn Ví</Text><BaseButton variant="chip" size="sm" className="justify-self-end" onClick={() => setEditingList(value => !value)}>{editingList ? "Xong" : "Sửa"}</BaseButton></header>
@@ -110,7 +106,7 @@ export function WalletManagementPanel({ onChanged, refreshKey = 0 }: { onChanged
         {choosingType ? <WalletTypePicker value={form.type} onSelect={(type) => { setForm({ ...form, type }); setChoosingType(false); }} /> : <div className="space-y-3">{error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}<WalletCreateForm state={form} onChange={setForm} saving={saving} onSelectType={() => setChoosingType(true)} onSubmit={() => void save()} /></div>}
       </BaseBottomSheet> : null}
       {loading ? <StatusMessage>{COPY.loading}</StatusMessage> : null}
-      {!loading ? <WalletSelectionList wallets={wallets} selectedID={selectedID} editing={editingList} onAdd={() => { setEditingID(null); setError(""); setForm(EMPTY_WALLET_FORM); }} onSelect={(id) => { if (editingList && id) { const wallet = wallets.find(item => item.id === id); if (wallet) { setError(""); setEditingID(id); setForm(toForm(wallet)); } } else setSelectedID(id); }} /> : null}
+      {!loading ? <WalletSelectionList wallets={wallets} selectedID={selectedID} editing={editingList} onAdd={() => { setEditingID(null); setError(""); setForm(EMPTY_WALLET_FORM); }} onSelect={(id) => { if (editingList && id) { const wallet = wallets.find(item => item.id === id); if (wallet) { setError(""); setEditingID(id); setForm(toForm(wallet)); } } else { setSelectedID(id); void navigate({ to: "/transactions", search: transactionsSearch(id) }); } }} /> : null}
     </section>
   );
 }

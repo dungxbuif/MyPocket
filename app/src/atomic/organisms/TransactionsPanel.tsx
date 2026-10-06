@@ -26,7 +26,8 @@ import { WalletDetailPanel } from "./SavingsWalletPanel";
 import { WalletAdjustmentSheet } from "./WalletAdjustmentSheet";
 import { WalletScopeSelector } from "../molecules/WalletScopeSelector";
 import { CreditWalletPanel } from "./CreditWalletPanel";
-import { useNavigate } from "@tanstack/react-router";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import { transactionsSearch, walletIDFromTransactionsSearch } from "../../services/walletNavigation";
 
 const COPY = { title: "Giao dịch", loading: "Đang tải giao dịch...", empty: "Chưa có giao dịch. Dùng nút + để ghi khoản thu hoặc chi đầu tiên.", noMatch: "Không có giao dịch trong phạm vi đã chọn.", error: "Không thể tải giao dịch.", retry: "Thử lại" } as const;
 
@@ -45,6 +46,7 @@ function groupLabel(key: string, timezone:string): string {
 
 export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: number; onChanged: () => void }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const timezone=useAccountTimezone();
   const [menu, setMenu] = useState(false), [period, setPeriod] = useState(false), [byCategory, setByCategory] = useState(false);
   const [from, setFrom] = useState(""), [to, setTo] = useState("");
@@ -82,6 +84,13 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
     return () => { cancelled = true; };
   }, [refreshKey, localRefresh]);
 
+  useEffect(() => {
+    const requestedWalletID = walletIDFromTransactionsSearch(location.searchStr);
+    setWalletFilter(current => current === requestedWalletID ? current : requestedWalletID);
+    setWeekOffset(0);
+    setPeriodMode("week");
+  }, [location.searchStr]);
+
   const walletNames = useMemo(() => new Map(wallets.map((wallet) => [wallet.id, wallet.name])), [wallets]);
   const categoryByID = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
   const selectedWallet = wallets.find(wallet => wallet.id === walletFilter);
@@ -96,7 +105,7 @@ export function TransactionsPanel({ refreshKey = 0, onChanged }: { refreshKey?: 
     setWeekOffset(0);
     setPeriodMode("week");
   };
-  const selectWallet = (id: string) => { setWalletFilter(id); setWeekOffset(0); setPeriodMode("week"); };
+  const selectWallet = (id: string) => { setWalletFilter(id); setWeekOffset(0); setPeriodMode("week"); void navigate({ to: "/transactions", search: transactionsSearch(id) }); };
   const toggleSelected = (id: string) => setSelectedIDs(current => current.includes(id) ? current.filter(item => item !== id) : [...current, id]);
   const leaveSelectionMode = () => { setSelectionMode(false); setSelectedIDs([]); setBulkError(""); };
   const bulkDelete = async () => {

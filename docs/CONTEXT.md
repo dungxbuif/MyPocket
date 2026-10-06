@@ -305,6 +305,13 @@ Markdown tables and headings were visible as raw characters. The web now uses
 `npm run test:ai-advisor` and the screen spec records the structured rendering
 behavior.
 
+Production feedback #e11d18e6 (`Requirements`) was reproduced in the wallet
+management flow: selecting a wallet opened a separate detail screen instead of
+scoping the transaction ledger. The web now routes the shared wallet selection
+to `/transactions?wallet_id=<id>`; the transactions page consumes the optional
+query and resets to the current week. The route contract is covered by
+`npm run test:wallet-scope` and the transaction page design contract.
+
 ## Open Questions
 
 - WORKER-01 month-end semantics: CORE-03 says live/recalculable report and derived completion; the new request names a cron job that closes/generates a report. Decide whether any stored artifact is authoritative or merely rebuildable/cache output. Recurring month-end/catch-up/duplicate prevention/timezone changes also need rules.

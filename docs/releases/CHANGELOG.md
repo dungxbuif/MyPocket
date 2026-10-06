@@ -534,3 +534,9 @@ headings, lists, inline emphasis/code and pipe tables are semantic UI instead of
 raw model delimiters. Model HTML is never injected. The advisor history and
 rendering contracts pass via `npm run test:ai-advisor`; design guard, typecheck
 and production build remain green.
+
+Wallet selection now has one ledger destination: choosing a wallet from account
+management navigates to `/transactions?wallet_id=<id>` and applies the same
+wallet-scoped weekly ledger used by the transaction selector. The old separate
+wallet-detail route is no longer opened by that selection path. Coverage is in
+`npm run test:wallet-scope`, with design, typecheck and build gates rerun.

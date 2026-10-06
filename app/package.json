@@ -16,6 +16,7 @@
     "test:ai": "node scripts/ai-entry.test.mjs && node scripts/ai-entry-browser.test.mjs",
     "test:ai-history": "node --test scripts/ai-advisor-history.test.ts",
     "test:ai-advisor": "npm run test:ai-history && node scripts/ai-advisor-markdown.test.mjs",
+    "test:wallet-scope": "node scripts/wallet-scope-navigation.test.mjs",
     "test:release-gate": "node --test scripts/pwa-release-gate.test.mjs && npm run test:ai",
     "typecheck": "tsc --noEmit",
     "preview": "vite preview --host 0.0.0.0"

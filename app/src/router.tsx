@@ -6,7 +6,11 @@ const rootRoute = createRootRoute({
 });
 
 const indexRoute = createRoute({ getParentRoute: () => rootRoute, path: "/" });
-const transactionsRoute = createRoute({ getParentRoute: () => rootRoute, path: "transactions" });
+const transactionsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "transactions",
+  validateSearch: (search: Record<string, unknown>) => typeof search.wallet_id === "string" && search.wallet_id.trim() ? { wallet_id: search.wallet_id } : {},
+});
 const budgetsRoute = createRoute({ getParentRoute: () => rootRoute, path: "budgets" });
 const accountBudgetsRoute = createRoute({ getParentRoute: () => rootRoute, path: "account/budgets" });
 const assistantRoute = createRoute({ getParentRoute: () => rootRoute, path: "assistant" });

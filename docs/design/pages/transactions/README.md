@@ -14,7 +14,7 @@ The page header uses the shared `ScreenHeader` molecule so title/action spacing 
 
 | Region | Base implementation | Contract |
 | --- | --- | --- |
-| Wallet scope filter | `WalletScopeSelector` + `WalletSelectionList` + `BaseBottomSheet` | Always visible below the header as a compact wallet capsule. Opening it shows the shared `Chọn Ví` sheet with `Tổng cộng`, included/excluded wallet groups, real balances, add-wallet and disabled-link states. `Tổng cộng` is the aggregate wallet scope, not an All-time period. Switching a goal wallet selects its specialized ledger body; other scopes use the same selector. |
+| Wallet scope filter | `WalletScopeSelector` + `WalletSelectionList` + `BaseBottomSheet` | Always visible below the header as a compact wallet capsule. Opening it shows the shared `Chọn Ví` sheet with `Tổng cộng`, included/excluded wallet groups, real balances, add-wallet and disabled-link states. `Tổng cộng` is the aggregate wallet scope, not an All-time period. Switching a goal wallet selects its specialized ledger body; other scopes use the same selector. The account wallet-management list uses the same base list, and selecting a wallet routes to `/transactions?wallet_id=<id>` rather than opening a separate wallet-detail screen. |
 | Period and week navigation | `SegmentedControl`, `BaseButton`, `Text` | Aggregate/basic: current week by default, previous/next week and custom range; no All-time tab. Goal and credit: hide ordinary period control. |
 | Date group | `SurfaceCard`, `Text` | Groups real API rows by the user's local calendar date and displays the signed group total. |
 | Transaction row | `TransactionItem` | Category icon/title, wallet and optional note, signed VND amount; activation opens edit mode. Adjustment rows use a neutral tone and cannot be edited or deleted through the ordinary editor. |
@@ -29,7 +29,7 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 | Event | State/effect |
 | --- | --- |
 | Enter `/transactions` | Load transactions, wallets and visible groups from their authenticated APIs. Never replace an error with mock rows. |
-| Select wallet scope | Recompute the real ledger view locally without another API call; `Tổng cộng` clears the wallet predicate. |
+| Select wallet scope | Recompute the real ledger view locally without another API call; `Tổng cộng` clears the wallet predicate and removes `wallet_id` from the URL. Selecting a wallet from the account wallet-management screen navigates to `/transactions?wallet_id=<id>`; the transactions screen parses that optional query, resets to the current account-local week, and applies the wallet filter. |
 | Select a goal wallet | Show real savings summary/progress and monthly history; do not show ordinary weekly cashflow cards or an All-time period control. |
 | Select a basic wallet | Keep the aggregate layout, including Week/Custom control and cashflow card; filter both totals and day rows to the selected wallet and current period. |
 | Select an aggregate/basic scope or step week | Start/restart at the current account-local Monday–Sunday week; step through prior weeks. Never navigate into a future week. A timezone change recalculates the week from the account-local current date. Credit uses its statement instead. |
