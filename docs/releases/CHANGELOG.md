@@ -23,6 +23,12 @@ as active release entries here.
 
 ### Fixed
 
+- Native AI proposal editing now matches the ordinary transaction field
+  contract: account-local date/time is preserved, stale existing hũ selections
+  remain visible and require explicit resolution, and transfer-out categories
+  cannot receive a hũ. Report inclusion remains editable and is sent in the
+  proposal patch.
+
 - Native ordinary transaction editing now matches the web form contract for
   account-local date/time, report inclusion and hũ assignment. Eligible basic
   and goal expense wallets show active account-month hũ choices; inactive

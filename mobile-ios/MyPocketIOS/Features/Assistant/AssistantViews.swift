@@ -273,12 +273,14 @@ enum AIEntryProposalReview {
         }
     }
 
-    static func canUseJar(type: String, walletType: String) -> Bool {
-        type == "expense" && (walletType == "basic" || walletType == "goal")
+    static func canUseJar(type: String, walletType: String, category: CategoryModel? = nil) -> Bool {
+        type == "expense"
+            && category?.systemKey != "expense_transfer_out"
+            && (walletType == "basic" || walletType == "goal")
     }
 
-    static func jarIDForSave(type: String, walletType: String, jarID: String?) -> String? {
-        canUseJar(type: type, walletType: walletType) ? jarID : nil
+    static func jarIDForSave(type: String, walletType: String, category: CategoryModel? = nil, jarID: String?) -> String? {
+        canUseJar(type: type, walletType: walletType, category: category) ? jarID : nil
     }
 
     static func activeJars(from summary: JarMonthSummaryModel) -> [JarIdentityModel] {
@@ -504,8 +506,9 @@ struct EntryProposalEditor: View {
     @State private var includedInReports: Bool
     @State private var note: String
     @State private var date: Date
-    @State private var jars: [JarIdentityModel] = []
+    @State private var jarSummary: JarMonthSummaryModel?
     @State private var jarsLoading = false
+    @State private var jarLoadError: String?
     @State private var saving = false
     @State private var error: String?
     @Environment(\.timeZone) private var timeZone
@@ -530,11 +533,17 @@ struct EntryProposalEditor: View {
                 MPOptionSelector(title: "Loại giao dịch", options: AIEntryProposalReview.supportedTypes, selectionID: $type, emptyLabel: "Chưa xác định — chọn loại")
                 MPOptionSelector(title: "Ví", options: TransactionsViewModel.ordinaryTransactionWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
                 MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID, emptyLabel: "Không chọn")
-                if AIEntryProposalReview.canUseJar(type: type, walletType: selectedWallet?.type ?? "") {
-                    MPOptionSelector(title: "Hũ chi tiêu", options: [MPSelectionOption(id: "", label: "Không chọn")] + jars.map { MPSelectionOption(id: $0.jarID, label: $0.name) }, selectionID: $jarID, emptyLabel: jarsLoading ? "Đang tải hũ..." : "Không chọn")
+                if canUseJar {
+                    MPOptionSelector(
+                        title: "Hũ chi tiêu",
+                        options: TransactionEditorPolicy.jarOptions(summary: jarSummary, selectedJarID: jarID, selectedJarName: nil),
+                        selectionID: $jarID,
+                        emptyLabel: jarsLoading ? "Đang tải hũ..." : "Không chọn"
+                    )
+                    if let jarLoadError { MPStatusMessage(text: jarLoadError, tone: .danger) }
                 }
                 MPBooleanSelector(title: "Tính vào báo cáo", value: $includedInReports, trueLabel: "Có", falseLabel: "Không")
-                MPDateField(title: "Ngày giao dịch", date: $date)
+                MPDateTimeField(title: "Ngày và giờ", date: $date)
                 MPTextEditor(title: "Ghi chú", text: $note)
                 if let error { MPStatusMessage(text: error, tone: .danger) }
                 MPButton("Lưu đề xuất", isLoading: saving) { Task { await save() } }
@@ -543,14 +552,17 @@ struct EntryProposalEditor: View {
         }
         .task { await loadJarsForDate() }
         .onChange(of: type) { _, _ in
-            if !AIEntryProposalReview.canUseJar(type: type, walletType: selectedWallet?.type ?? "") { jarID = "" }
+            if !canUseJar { jarID = "" }
             clearInvalidCategory()
             Task { await loadJarsForDate() }
         }
         .onChange(of: walletID) { _, _ in
-            if !AIEntryProposalReview.canUseJar(type: type, walletType: selectedWallet?.type ?? "") { jarID = "" }
+            if !canUseJar { jarID = "" }
             clearInvalidCategory()
             Task { await loadJarsForDate() }
+        }
+        .onChange(of: categoryID) { _, _ in
+            if !canUseJar { jarID = "" }
         }
         .onChange(of: date) { _, _ in Task { await loadJarsForDate() } }
     }
@@ -560,13 +572,21 @@ struct EntryProposalEditor: View {
         guard let parsed = MPFormat.parsePositiveInteger(amount), let wallet = wallets.first(where: { $0.id == walletID }) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }
         let selectedCategory = categories.first(where: { $0.id == categoryID })
         if let selectedCategory, !selectedCategory.applies(to: normalizedType, walletID: wallet.id, walletType: wallet.type) { error = "Danh mục không phù hợp với loại giao dịch hoặc ví đã chọn."; return }
+        if !jarID.isEmpty {
+            guard canUseJar else { error = "Hũ chỉ áp dụng cho khoản chi thường hoặc ví tiết kiệm."; return }
+            guard TransactionEditorPolicy.hasActiveJar(jarID, summary: jarSummary) else { error = "Hũ đã gỡ khỏi tháng này. Hãy bỏ chọn hoặc chọn hũ đang hoạt động."; return }
+        }
         saving = true; defer { saving = false }
-        let draft = EntryDraftModel(type: normalizedType, amount: parsed, walletID: wallet.id, categoryID: selectedCategory?.id, jarID: AIEntryProposalReview.jarIDForSave(type: normalizedType, walletType: wallet.type, jarID: jarID.isEmpty ? nil : jarID), occurredAt: MPFormat.instantString(date), note: note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: includedInReports)
+        let draft = EntryDraftModel(type: normalizedType, amount: parsed, walletID: wallet.id, categoryID: selectedCategory?.id, jarID: jarID.isEmpty ? nil : jarID, occurredAt: Self.timestamp(from: date, timeZone: timeZone), note: note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: includedInReports)
         do { onSaved(try await api.editEntryProposal(id: proposal.id, version: proposal.version, draft: draft)) }
         catch { self.error = "Không thể cập nhật đề xuất." }
     }
 
     private var selectedWallet: WalletModel? { wallets.first(where: { $0.id == walletID }) }
+    private var selectedCategory: CategoryModel? { categories.first(where: { $0.id == categoryID }) }
+    private var canUseJar: Bool {
+        AIEntryProposalReview.canUseJar(type: type, walletType: selectedWallet?.type ?? "", category: selectedCategory)
+    }
     private var categoryOptions: [MPSelectionOption] {
         let valid = categories.filter { $0.applies(to: type, walletID: selectedWallet?.id ?? "", walletType: selectedWallet?.type ?? "basic") }
         var options = [MPSelectionOption(id: "", label: "Không chọn")]
@@ -587,28 +607,48 @@ struct EntryProposalEditor: View {
     private func loadJarsForDate() async {
 #if DEBUG
         if ProcessInfo.processInfo.arguments.contains("-UITestAIEntryProposal") {
-            jars = [JarIdentityModel(jarID: "ui-entry-jar", name: "Ăn uống")]
+            jarSummary = JarMonthSummaryModel(
+                month: "2026-10",
+                timezone: "Asia/Ho_Chi_Minh",
+                actualIncome: 0,
+                totalSpent: 0,
+                unassignedSpent: 0,
+                totalAllocated: 0,
+                totalAllocationPercent: 0,
+                overIncome: false,
+                overOneHundredPercent: false,
+                jars: [JarIdentityModel(jarID: "ui-entry-jar", name: "Ăn uống")],
+                items: [JarItemModel(jarID: "ui-entry-jar", name: "Ăn uống", allocationMode: "amount", allocationAmount: nil, allocationPercent: nil, calculatedAllocation: nil, spent: 0, active: true)]
+            )
             jarsLoading = false
             return
         }
 #endif
-        guard AIEntryProposalReview.canUseJar(type: type, walletType: selectedWallet?.type ?? "") else {
-            jars = []
+        guard canUseJar else {
+            jarSummary = nil
+            jarLoadError = nil
             jarsLoading = false
             return
         }
         let month = String(MPFormat.calendarDateString(date, timeZone: timeZone).prefix(7))
         guard month != "0000-00", month != "" else { return }
         jarsLoading = true
+        jarLoadError = nil
         defer { jarsLoading = false }
         do {
-            let summary = try await api.jarMonth(month: month)
-            jars = AIEntryProposalReview.activeJars(from: summary)
-            if !jars.contains(where: { $0.jarID == jarID }) { jarID = "" }
+            jarSummary = try await api.jarMonth(month: month)
         } catch {
-            jars = []
-            jarID = ""
+            jarSummary = nil
+            jarLoadError = "Không thể tải hũ của tháng này."
         }
+    }
+
+    private static func timestamp(from date: Date, timeZone: TimeZone) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = timeZone
+        return formatter.string(from: date)
     }
 }
 

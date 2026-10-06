@@ -413,6 +413,10 @@ category changes clear incompatible hũ values. The policy and editor UI checks
 pass with 61/61 native unit tests and 15/15 signed `LOCAL_API_UI` tests; the
 Release warnings-as-errors build and base/project guards also pass.
 
+The AI proposal editor uses the same field policy: account-local date/time,
+report inclusion, active/inactive hũ handling and transfer-out exclusion. Its
+deterministic review fixture and policy regression remain green.
+
 ## Latest cross-surface regression — 2026-10-05
 
 The simulator-first pass was followed by a fresh local integration run. The Go

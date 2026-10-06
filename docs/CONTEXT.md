@@ -42,6 +42,13 @@ clear incompatible hũ assignments. Native XCTest passes 61/61, the signed
 iPhone 16 `LOCAL_API_UI` suite passes 15/15, the Release warnings-as-errors
 build and base/project guards pass.
 
+2026-10-06 native AI proposal parity: the proposal editor now preserves the
+account-local date/time, keeps an inactive existing hũ visible for explicit
+resolution, rejects stale hũ values instead of silently clearing them, and
+excludes the transfer-out category from hũ choices. Report inclusion remains
+part of the versioned proposal patch; deterministic proposal review and policy
+coverage pass.
+
 ## Latest AI entry correction — 2026-09-23
 
 [Review-first bug](work/bugs/AI-ENTRY-REVIEW-FIRST-DETAIL_DESIGN.md) is in_review pending owner UAT. Replaced conflicting clarification-first prompt rules with partial draft extraction, within-batch duplicate merging and inferred/default supplied wallets. Real stored nine-image OCR replay changed from zero drafts to 30 with owned wallets after raising the truncated 2048-token response budget; the current provider envelope is 32768 tokens. The application no longer caps proposal count; only provider response/transport envelopes remain. Held-out duplicate/distinct-date/missing-date fixture, 31-draft parser test, full Go tests, focused race tests and backend build pass. Local API restarted; backend health and frontend :4173 both HTTP 200. No ledger writes from replay, no production deployment; owner still reviews amounts/duplicates and existing requests retain cached outcomes.

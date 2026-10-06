@@ -230,6 +230,8 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(AIEntryProposalReview.canUseJar(type: "expense", walletType: "goal"))
         XCTAssertFalse(AIEntryProposalReview.canUseJar(type: "income", walletType: "basic"))
         XCTAssertFalse(AIEntryProposalReview.canUseJar(type: "expense", walletType: "credit"))
+        let transferOut = CategoryModel(id: "transfer-out", ownerID: nil, parentID: nil, kind: "expense", name: "Chuyển đi", systemKey: "expense_transfer_out", iconKey: "arrow.up", isSystem: true, walletIDs: [])
+        XCTAssertFalse(AIEntryProposalReview.canUseJar(type: "expense", walletType: "basic", category: transferOut))
         XCTAssertNil(AIEntryProposalReview.jarIDForSave(type: "income", walletType: "basic", jarID: "jar-1"))
         XCTAssertEqual(AIEntryProposalReview.jarIDForSave(type: "expense", walletType: "basic", jarID: "jar-1"), "jar-1")
 
