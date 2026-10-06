@@ -57,6 +57,14 @@ one rendered frame before the automatic screenshot is captured, preventing
 the control from appearing in its own attachment. [NATIVE-FEEDBACK-BUBBLE-REDACTION](bugs/NATIVE-FEEDBACK-BUBBLE-REDACTION.md)
 is regression_verified; the dedicated UI test and full simulator gate pass.
 
+2026-10-06 final simulator/provider pass: the booted iPhone 16 Simulator is
+green at 65/65 native tests and 17/17 signed API-backed UI tests. Backend
+race/vet is green. The configured DeepSeek-V4-Flash S3 → OCR Base64 → LLM
+probe is green at 5/5 cases and 24/24 semantic fields; receipt images now
+default to expense classification unless explicit income/refund evidence is
+present. Real Google iOS OAuth, physical hardware and authenticated
+staging/production remain external gates.
+
 ## Current Owner Direction
 
 2026-09-24 wallet/ledger UI follow-up: savings detail has an existing goal/progress spec; Travel Mode is still an event-linkage draft and not a new wallet type. [UI-LEDGER-WEEK](tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md) is in_review after owner correction: basic uses the same Week/Custom summary/list UI as `Tổng cộng`, filtered by wallet; goal shows complete savings history, and provisional credit remains read-only. Basic selection and week navigation were verified on the local Chrome page; goal selection/mobile visual UAT remain open. Credit has business rules, but its detailed statement/payment UI/API contract remains a separate design gap; do not mark credit complete. No deployment has been performed for this slice.
