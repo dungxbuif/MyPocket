@@ -21,10 +21,12 @@ final class AuthViewModel: ObservableObject {
     let financeAPI: FinanceAPI
     private let biometricPreferenceKey = "mypocket.biometric.enabled"
 
-    init(store: SessionStore = KeychainSessionStore(), apiClient: APIClient = APIClient()) {
-        self.store = store
-        self.google = GooglePKCEClient(apiClient: apiClient)
-        self.financeAPI = FinanceAPI(client: apiClient)
+    init(store: SessionStore? = nil, apiClient: APIClient? = nil) {
+        let resolvedStore = store ?? Self.makeDefaultStore()
+        self.store = resolvedStore
+        let resolvedAPI = apiClient ?? APIClient(sessionStore: resolvedStore)
+        self.google = GooglePKCEClient(apiClient: resolvedAPI)
+        self.financeAPI = FinanceAPI(client: resolvedAPI)
         self.biometricEnabled = UserDefaults.standard.bool(forKey: biometricPreferenceKey)
 #if DEBUG
         let isUITestAuthenticated = ProcessInfo.processInfo.arguments.contains("-UITestAuthenticated")
@@ -32,12 +34,21 @@ final class AuthViewModel: ObservableObject {
         let isUITestAuthenticated = false
 #endif
         if !isUITestAuthenticated {
-            apiClient.onSessionInvalidated = { [weak self] in
+            resolvedAPI.onSessionInvalidated = { [weak self] in
                 Task { @MainActor [weak self] in
                     self?.expireSession()
                 }
             }
         }
+    }
+
+    private static func makeDefaultStore() -> SessionStore {
+#if DEBUG
+        if ProcessInfo.processInfo.arguments.contains("-UITestAuthenticatedAPI") {
+            return InMemorySessionStore()
+        }
+#endif
+        return KeychainSessionStore()
     }
 
     func restore() async {
@@ -70,7 +81,12 @@ final class AuthViewModel: ObservableObject {
                 try store.save(output.session)
                 phase = .authenticated(output.session)
             } catch {
+#if DEBUG
+                print("[AuthFixture] local exchange failed: \(String(reflecting: error))")
+                errorMessage = "Không thể khởi tạo phiên simulator local: \(String(describing: error))"
+#else
                 errorMessage = "Không thể khởi tạo phiên simulator local."
+#endif
                 phase = .unauthenticated
             }
             return

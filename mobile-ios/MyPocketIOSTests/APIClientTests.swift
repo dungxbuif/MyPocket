@@ -3,6 +3,25 @@ import XCTest
 @testable import MyPocketIOS
 
 final class APIClientTests: XCTestCase {
+#if DEBUG
+    func testInMemorySessionStoreRoundTripAndClear() throws {
+        let store = InMemorySessionStore()
+        XCTAssertNil(store.load())
+
+        let session = AccessSession(
+            token: "fixture-access",
+            expiresAt: "2099-01-01T00:00:00Z",
+            refreshToken: "fixture-refresh",
+            refreshExpiresAt: "2099-02-01T00:00:00Z",
+            user: AuthUser(id: "fixture-user", name: nil, email: nil, timezone: nil)
+        )
+        try store.save(session)
+        XCTAssertEqual(store.load(), session)
+        store.clear()
+        XCTAssertNil(store.load())
+    }
+#endif
+
     func testGoogleConfigurationRejectsPlaceholderAndAcceptsCallbackScheme() {
         XCTAssertFalse(GooglePKCEClient.isConfigured(clientID: "REPLACE_WITH_IOS_CLIENT_ID", redirectURI: "mypocket://oauth/callback"))
         XCTAssertFalse(GooglePKCEClient.isConfigured(clientID: "client-id", redirectURI: "oauth/callback"))

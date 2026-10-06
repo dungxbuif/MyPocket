@@ -24,6 +24,15 @@ updated: 2026-10-06
 
 # Project Context
 
+2026-10-06 native simulator auth fixture correction: the API-backed UI harness
+now uses a DEBUG-only in-memory session store when launched with
+`-UITestAuthenticatedAPI`. The previous unsigned `CODE_SIGNING_ALLOWED=NO`
+run reached the disposable OAuth exchange with HTTP 200 but stayed on the login
+screen because Keychain returned `errSecMissingEntitlement (-34018)`. Production
+and normal app builds continue to use `KeychainSessionStore`; no token values
+are logged. The full iPhone 16 `LOCAL_API_UI` suite passes 15/15 after the
+correction.
+
 ## Latest AI entry correction — 2026-09-23
 
 [Review-first bug](work/bugs/AI-ENTRY-REVIEW-FIRST-DETAIL_DESIGN.md) is in_review pending owner UAT. Replaced conflicting clarification-first prompt rules with partial draft extraction, within-batch duplicate merging and inferred/default supplied wallets. Real stored nine-image OCR replay changed from zero drafts to 30 with owned wallets after raising the truncated 2048-token response budget; the current provider envelope is 32768 tokens. The application no longer caps proposal count; only provider response/transport envelopes remain. Held-out duplicate/distinct-date/missing-date fixture, 31-draft parser test, full Go tests, focused race tests and backend build pass. Local API restarted; backend health and frontend :4173 both HTTP 200. No ledger writes from replay, no production deployment; owner still reviews amounts/duplicates and existing requests retain cached outcomes.

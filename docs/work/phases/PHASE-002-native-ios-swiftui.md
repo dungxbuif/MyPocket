@@ -223,9 +223,17 @@ shared API contracts are touched.
 
 ## Simulator verification — 2026-10-06 (latest)
 
+The latest full run also corrected the local API fixture harness. An unsigned
+simulator test build reached the fixture OAuth endpoint successfully but could
+not persist its JWT in Keychain (`errSecMissingEntitlement`, `-34018`).
+`-UITestAuthenticatedAPI` now selects a DEBUG-only in-memory session store;
+normal and Release builds continue to use Keychain. No token values are
+logged. The full `LOCAL_API_UI` suite then passed 15/15 on the booted iPhone 16
+Simulator.
+
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 48 unit/contract tests and 14 signed API-backed UI tests
+suite passed: 58 unit/contract tests and 15 API-backed UI tests
 (auth launch, authenticated primary tabs, all secondary destinations, AI and
 Assistant surfaces, feedback, wallet/transaction mutations, transfer pair
 deletion and credit entry/payment refresh). The shared

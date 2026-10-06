@@ -39,6 +39,7 @@
 		A9E5AB47D879F8C44AA78475 /* PlaceholderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4857264234927FC415152BC /* PlaceholderTests.swift */; };
 		BD9D18178C21F9D283883DA5 /* APIClientTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4187C5B48B4E4102719E0E47 /* APIClientTests.swift */; };
 		C7585DBB11AE08A9A3C37AAE /* KeychainSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1FB6E104CF08872B05188BD /* KeychainSessionStore.swift */; };
+		C8A7B3E4D5F601927384ABCD /* InMemorySessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4BCD /* InMemorySessionStore.swift */; };
 		D175FC61CDCB3A23785DE629 /* Envelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711B8F5EE726E4B38C0EDB1C /* Envelope.swift */; };
 		D5A07A2E66ADCF31F7D37489 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7622FCDB17D3632924D412A4 /* OverviewView.swift */; };
 		D7F3FB7B1F6E4FA047D542D1 /* TransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E553CBF0778DF943E05D4F9F /* TransactionsView.swift */; };
@@ -105,6 +106,7 @@
 		D83806CE062DD340921F8C7C /* MPAttachmentViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPAttachmentViews.swift; sourceTree = "<group>"; };
 		DB39E134293E3AE9A08C8030 /* Environment.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Environment.swift; sourceTree = "<group>"; };
 		E1FB6E104CF08872B05188BD /* KeychainSessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainSessionStore.swift; sourceTree = "<group>"; };
+		A1B2C3D4E5F60718293A4BCD /* InMemorySessionStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InMemorySessionStore.swift; sourceTree = "<group>"; };
 		E237A1DE9AE939B13E17BF8A /* FinanceAPI.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinanceAPI.swift; sourceTree = "<group>"; };
 		E4857264234927FC415152BC /* PlaceholderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaceholderTests.swift; sourceTree = "<group>"; };
 		E553CBF0778DF943E05D4F9F /* TransactionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionsView.swift; sourceTree = "<group>"; };
@@ -168,6 +170,7 @@
 			isa = PBXGroup;
 			children = (
 				55721D9700F85AACC4B1D476 /* GooglePKCEClient.swift */,
+				A1B2C3D4E5F60718293A4BCD /* InMemorySessionStore.swift */,
 				E1FB6E104CF08872B05188BD /* KeychainSessionStore.swift */,
 				FD52BBEB98763E1968763956 /* RefreshCoordinator.swift */,
 				F1C3F44815F0ACA384DE7FA1 /* Session.swift */,
@@ -490,6 +493,7 @@
 				358F88DFB1F38E5A9A01661A /* FinanceAPI.swift in Sources */,
 				3C431D6AE2B0B17FFEE4A555 /* FinanceModels.swift in Sources */,
 				28D1DF6DCF8A45DB58B38EC0 /* GooglePKCEClient.swift in Sources */,
+				C8A7B3E4D5F601927384ABCD /* InMemorySessionStore.swift in Sources */,
 				C7585DBB11AE08A9A3C37AAE /* KeychainSessionStore.swift in Sources */,
 				1620E02EE24EA29140817C9C /* MPAsyncStates.swift in Sources */,
 				F630BB6DFAA8AB209BE280E3 /* MPAttachmentViews.swift in Sources */,

@@ -23,13 +23,20 @@ as active release entries here.
 
 ### Fixed
 
+- The native local API UI harness no longer depends on Keychain entitlements
+  when the simulator app is built unsigned. `-UITestAuthenticatedAPI` now uses
+  a DEBUG-only in-memory session store, while normal and Release builds retain
+  Keychain-backed sessions. This fixes the false login-gate failure after a
+  successful disposable OAuth exchange (`errSecMissingEntitlement -34018`).
+  The complete iPhone 16 `LOCAL_API_UI` suite passes 15/15.
+
 - Native AI transaction-entry review now treats unknown/transfer model output
   as `Chưa xác định — chọn loại` until the user explicitly selects thu/chi.
   The editor exposes shared selectors for type, wallet, category and active
   month hũ, plus an explicit report-inclusion choice; invalid category/hũ
   combinations are cleared before the existing proposal PATCH/approval flow.
   The deterministic iPhone 16 review fixture and full signed `LOCAL_API_UI`
-  suite pass (15/15); native XCTest is 58/58.
+  suite pass (15/15); native XCTest is 59/59.
 
 - Native Travel Mode now matches the web contract for active-event context,
   explicit date scope, safe delete confirmation, and the rule that only new
