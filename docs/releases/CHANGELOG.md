@@ -23,6 +23,11 @@ as active release entries here.
 
 ### Fixed
 
+- AI-entry live regression coverage now matches the approved review-first
+  fallback: an unclear wallet is prefilled with the first supplied wallet and
+  still carries a review question. DeepSeek-V4-Flash text, tool-call and
+  strict-JSON-schema probes pass with synthetic data; no ledger writes occur.
+
 - Native AI-entry attachment regression coverage now verifies twenty valid PNG
   thumbnails, the picker cap, close/remove behavior and picker re-enable on the
   iPhone 16 Simulator; the signed UI suite passes 17/17.
