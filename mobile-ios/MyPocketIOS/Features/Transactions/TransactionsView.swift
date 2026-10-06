@@ -1,5 +1,38 @@
 import SwiftUI
 
+enum TransactionEditorPolicy {
+    static func canUseJar(type: String, category: CategoryModel?, walletType: String) -> Bool {
+        type == "expense"
+            && category?.systemKey != "expense_transfer_out"
+            && (walletType == "basic" || walletType == "goal")
+    }
+
+    static func jarOptions(
+        summary: JarMonthSummaryModel?,
+        selectedJarID: String,
+        selectedJarName: String?
+    ) -> [MPSelectionOption] {
+        var options = [MPSelectionOption(id: "", label: "Không chọn")]
+        guard let summary else { return options }
+        let activeIDs = Set(summary.items.filter(\.active).map(\.jarID))
+        options += summary.jars
+            .filter { activeIDs.contains($0.jarID) }
+            .map { MPSelectionOption(id: $0.jarID, label: $0.name) }
+        if !selectedJarID.isEmpty, !activeIDs.contains(selectedJarID) {
+            let name = summary.jars.first(where: { $0.jarID == selectedJarID })?.name
+                ?? selectedJarName
+                ?? "Hũ không có cấu hình tháng"
+            options.append(MPSelectionOption(id: selectedJarID, label: "\(name) (đã gỡ khỏi tháng)"))
+        }
+        return options
+    }
+
+    static func hasActiveJar(_ jarID: String, summary: JarMonthSummaryModel?) -> Bool {
+        guard !jarID.isEmpty, let summary else { return false }
+        return summary.items.contains { $0.jarID == jarID && $0.active }
+    }
+}
+
 @MainActor
 final class TransactionsViewModel: ObservableObject {
     @Published private(set) var transactions: [TransactionModel] = []
@@ -461,7 +494,12 @@ struct TransactionEditorView: View {
     @State private var note = ""
     @State private var walletID = ""
     @State private var categoryID = ""
+    @State private var jarID = ""
+    @State private var includedInReports = true
     @State private var date = Date()
+    @State private var jarSummary: JarMonthSummaryModel?
+    @State private var jarsLoading = false
+    @State private var jarLoadError: String?
     @State private var isSaving = false
     @State private var errorMessage: String?
 
@@ -478,6 +516,8 @@ struct TransactionEditorView: View {
         _note = State(initialValue: transaction?.note ?? "")
         _walletID = State(initialValue: transaction?.walletID ?? TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "")
         _categoryID = State(initialValue: transaction?.categoryID ?? "")
+        _jarID = State(initialValue: transaction?.jarID ?? "")
+        _includedInReports = State(initialValue: transaction?.includedInReports ?? true)
         if let raw = transaction?.occurredAt, let date = MPFormat.parseInstant(raw) { _date = State(initialValue: date) }
     }
 
@@ -488,18 +528,47 @@ struct TransactionEditorView: View {
                 MPSegmentedControl(options: [("expense", "Chi tiêu"), ("income", "Thu nhập")], selection: $type)
                 MPOptionSelector(title: "Ví", options: walletOptions, selectionID: $walletID)
                 MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID, emptyLabel: "Không chọn")
+                if canUseJar {
+                    MPOptionSelector(
+                        title: "Hũ chi tiêu",
+                        options: TransactionEditorPolicy.jarOptions(
+                            summary: jarSummary,
+                            selectedJarID: jarID,
+                            selectedJarName: transaction?.jarName
+                        ),
+                        selectionID: $jarID,
+                        emptyLabel: jarsLoading ? "Đang tải hũ..." : "Không chọn"
+                    )
+                    if let jarLoadError { MPStatusMessage(text: jarLoadError, tone: .danger) }
+                }
                 MPAmountField(title: "Số tiền", text: $amount)
-                MPDateField(title: "Ngày giao dịch", date: $date)
+                MPDateTimeField(title: "Ngày và giờ", date: $date)
                 MPTextField(title: "Ghi chú", text: $note, placeholder: "Ví dụ: Ăn trưa")
+                MPBooleanSelector(title: "Tính vào báo cáo", value: $includedInReports, trueLabel: "Có", falseLabel: "Không")
                 if let errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
                 MPButton(transaction == nil ? "Lưu giao dịch" : "Lưu thay đổi", isLoading: isSaving) { Task { await save() } }
             }
             .padding(MPMetrics.pagePadding)
         }
         .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
-        .task { if walletID.isEmpty { walletID = TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "" } }
-        .onChange(of: type) { _, _ in clearInvalidCategory() }
-        .onChange(of: walletID) { _, _ in clearInvalidCategory() }
+        .task {
+            if walletID.isEmpty { walletID = TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "" }
+            await loadJarSummary()
+        }
+        .onChange(of: type) { _, _ in
+            clearInvalidCategory()
+            if !canUseJar { jarID = "" }
+            Task { await loadJarSummary() }
+        }
+        .onChange(of: walletID) { _, _ in
+            clearInvalidCategory()
+            if !canUseJar { jarID = "" }
+            Task { await loadJarSummary() }
+        }
+        .onChange(of: categoryID) { _, _ in
+            if !canUseJar { jarID = "" }
+        }
+        .onChange(of: date) { _, _ in Task { await loadJarSummary() } }
     }
 
     private func save() async {
@@ -512,10 +581,20 @@ struct TransactionEditorView: View {
             errorMessage = "Danh mục không phù hợp với loại giao dịch hoặc ví đã chọn."
             return
         }
+        if !jarID.isEmpty {
+            guard canUseJar else {
+                errorMessage = "Hũ chỉ áp dụng cho khoản chi thường hoặc ví tiết kiệm."
+                return
+            }
+            guard TransactionEditorPolicy.hasActiveJar(jarID, summary: jarSummary) else {
+                errorMessage = "Hũ đã gỡ khỏi tháng này. Hãy bỏ chọn hoặc chọn hũ đang hoạt động."
+                return
+            }
+        }
         isSaving = true
         defer { isSaving = false }
         do {
-            let input = TransactionInputModel(walletID: wallet.id, categoryID: selectedCategory?.id, type: type, amount: parsed, occurredAt: Self.dayString(from: date, timezone: timezone), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: true, travelEventID: transaction?.travelEventID)
+            let input = TransactionInputModel(walletID: wallet.id, categoryID: selectedCategory?.id, jarID: jarID.isEmpty ? nil : jarID, type: type, amount: parsed, occurredAt: Self.timestamp(from: date, timezone: timezone), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: includedInReports, travelEventID: transaction?.travelEventID)
             if let transaction { _ = try await api.updateTransaction(id: transaction.id, input: input) }
             else { _ = try await api.createTransaction(input) }
             onSaved()
@@ -524,7 +603,12 @@ struct TransactionEditorView: View {
         }
     }
 
-    private static func dayString(from date: Date, timezone: String) -> String {
+    private var selectedCategory: CategoryModel? { categories.first(where: { $0.id == categoryID }) }
+    private var selectedWallet: WalletModel? { wallets.first(where: { $0.id == walletID }) }
+    private var canUseJar: Bool {
+        TransactionEditorPolicy.canUseJar(type: type, category: selectedCategory, walletType: selectedWallet?.type ?? "")
+    }
+    private static func timestamp(from date: Date, timezone: String) -> String {
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd'T'HH:mm:ssXXXXX"
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -532,7 +616,26 @@ struct TransactionEditorView: View {
         return formatter.string(from: date)
     }
 
-    private var selectedWallet: WalletModel? { wallets.first(where: { $0.id == walletID }) }
+    private func loadJarSummary() async {
+        guard canUseJar else {
+            jarSummary = nil
+            jarsLoading = false
+            jarLoadError = nil
+            return
+        }
+        let month = String(MPFormat.calendarDateString(date, timeZone: TimeZone(identifier: timezone) ?? .current).prefix(7))
+        guard month.count == 7 else { return }
+        jarsLoading = true
+        jarLoadError = nil
+        defer { jarsLoading = false }
+        do {
+            jarSummary = try await api.jarMonth(month: month)
+        } catch {
+            jarSummary = nil
+            jarLoadError = "Không thể tải hũ của tháng này."
+        }
+    }
+
     private var walletOptions: [MPSelectionOption] { TransactionsViewModel.ordinaryTransactionWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) } }
     private var categoryOptions: [MPSelectionOption] {
         let valid = categories.filter { $0.applies(to: type, walletID: selectedWallet?.id ?? "", walletType: selectedWallet?.type ?? "basic") }

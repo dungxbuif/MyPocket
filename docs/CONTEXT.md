@@ -33,6 +33,15 @@ and normal app builds continue to use `KeychainSessionStore`; no token values
 are logged. The full iPhone 16 `LOCAL_API_UI` suite passes 15/15 after the
 correction.
 
+2026-10-06 native transaction editor parity: ordinary expense editing now
+exposes the account-month hũ selector, report-inclusion toggle, and account-
+timezone date/time field. Active hũ options are limited to eligible basic/goal
+expense wallets; an existing inactive hũ remains visible with an explicit save
+error instead of being silently remapped. Type, wallet and category changes
+clear incompatible hũ assignments. Native XCTest passes 61/61, the signed
+iPhone 16 `LOCAL_API_UI` suite passes 15/15, the Release warnings-as-errors
+build and base/project guards pass.
+
 ## Latest AI entry correction — 2026-09-23
 
 [Review-first bug](work/bugs/AI-ENTRY-REVIEW-FIRST-DETAIL_DESIGN.md) is in_review pending owner UAT. Replaced conflicting clarification-first prompt rules with partial draft extraction, within-batch duplicate merging and inferred/default supplied wallets. Real stored nine-image OCR replay changed from zero drafts to 30 with owned wallets after raising the truncated 2048-token response budget; the current provider envelope is 32768 tokens. The application no longer caps proposal count; only provider response/transport envelopes remain. Held-out duplicate/distinct-date/missing-date fixture, 31-draft parser test, full Go tests, focused race tests and backend build pass. Local API restarted; backend health and frontend :4173 both HTTP 200. No ledger writes from replay, no production deployment; owner still reviews amounts/duplicates and existing requests retain cached outcomes.

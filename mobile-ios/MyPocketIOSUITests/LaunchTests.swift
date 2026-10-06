@@ -340,6 +340,9 @@ final class LaunchTests: XCTestCase {
         app.buttons["Thêm giao dịch"].tap()
         XCTAssertTrue(app.staticTexts["Thêm giao dịch"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Danh mục"].exists)
+        XCTAssertTrue(app.staticTexts["Hũ chi tiêu"].exists)
+        XCTAssertTrue(app.staticTexts["Ngày và giờ"].exists)
+        XCTAssertTrue(app.staticTexts["Tính vào báo cáo"].exists)
         XCTAssertTrue(app.staticTexts["Ghi chú"].exists)
 #endif
     }

@@ -23,6 +23,14 @@ as active release entries here.
 
 ### Fixed
 
+- Native ordinary transaction editing now matches the web form contract for
+  account-local date/time, report inclusion and hũ assignment. Eligible basic
+  and goal expense wallets show active account-month hũ choices; inactive
+  existing assignments stay visible and are rejected explicitly until cleared
+  or replaced. Type, wallet and category changes clear incompatible hũ values.
+  Policy tests, the manual editor UI path and the complete signed iPhone 16
+  `LOCAL_API_UI` suite pass (61/61 unit, 15/15 UI).
+
 - The native local API UI harness no longer depends on Keychain entitlements
   when the simulator app is built unsigned. `-UITestAuthenticatedAPI` now uses
   a DEBUG-only in-memory session store, while normal and Release builds retain

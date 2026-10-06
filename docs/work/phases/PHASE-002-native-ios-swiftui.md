@@ -402,6 +402,17 @@ disposable environment.
 This smoke is intentionally non-production and does not replace provider-backed
 AI/OCR verification or a real authenticated staging/production iOS run.
 
+## Native ordinary transaction editor parity — 2026-10-06
+
+The shared SwiftUI transaction editor now matches the web form contract for
+ordinary expense hũ selection, report inclusion and account-local date/time.
+Only active hũ configurations for the selected account month are offered to
+eligible basic/goal expense wallets. Existing inactive assignments remain
+visible for explicit cleanup and cannot be silently remapped. Type, wallet and
+category changes clear incompatible hũ values. The policy and editor UI checks
+pass with 61/61 native unit tests and 15/15 signed `LOCAL_API_UI` tests; the
+Release warnings-as-errors build and base/project guards also pass.
+
 ## Latest cross-surface regression — 2026-10-05
 
 The simulator-first pass was followed by a fresh local integration run. The Go

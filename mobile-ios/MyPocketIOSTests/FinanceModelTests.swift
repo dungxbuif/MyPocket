@@ -409,6 +409,46 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(result.isEmpty)
     }
 
+    func testTransactionEditorJarPolicyMatchesBusinessRules() {
+        let transferOut = CategoryModel(id: "transfer-out", ownerID: nil, parentID: nil, kind: "expense", name: "Chuyển đi", systemKey: "expense_transfer_out", iconKey: "arrow.up", isSystem: true, walletIDs: [])
+
+        XCTAssertTrue(TransactionEditorPolicy.canUseJar(type: "expense", category: nil, walletType: "basic"))
+        XCTAssertTrue(TransactionEditorPolicy.canUseJar(type: "expense", category: nil, walletType: "goal"))
+        XCTAssertFalse(TransactionEditorPolicy.canUseJar(type: "income", category: nil, walletType: "basic"))
+        XCTAssertFalse(TransactionEditorPolicy.canUseJar(type: "expense", category: transferOut, walletType: "basic"))
+        XCTAssertFalse(TransactionEditorPolicy.canUseJar(type: "expense", category: nil, walletType: "credit"))
+    }
+
+    func testTransactionEditorJarOptionsKeepInactiveSelectionVisible() {
+        let summary = JarMonthSummaryModel(
+            month: "2026-10",
+            timezone: "Asia/Ho_Chi_Minh",
+            actualIncome: 10_000_000,
+            totalSpent: 2_000_000,
+            unassignedSpent: 0,
+            totalAllocated: 10_000_000,
+            totalAllocationPercent: 1,
+            overIncome: false,
+            overOneHundredPercent: false,
+            jars: [
+                JarIdentityModel(jarID: "active", name: "Ăn uống"),
+                JarIdentityModel(jarID: "inactive", name: "Du lịch")
+            ],
+            items: [
+                JarItemModel(jarID: "active", name: "Ăn uống", allocationMode: "amount", allocationAmount: 3_000_000, allocationPercent: nil, calculatedAllocation: 3_000_000, spent: 1_000_000, active: true),
+                JarItemModel(jarID: "inactive", name: "Du lịch", allocationMode: "amount", allocationAmount: 7_000_000, allocationPercent: nil, calculatedAllocation: 7_000_000, spent: 0, active: false)
+            ]
+        )
+
+        XCTAssertEqual(TransactionEditorPolicy.jarOptions(summary: summary, selectedJarID: "", selectedJarName: nil).map(\.id), ["", "active"])
+        let inactiveOptions = TransactionEditorPolicy.jarOptions(summary: summary, selectedJarID: "inactive", selectedJarName: nil)
+        XCTAssertEqual(inactiveOptions.map(\.id), ["", "active", "inactive"])
+        XCTAssertTrue(inactiveOptions.last?.label.contains("đã gỡ") == true)
+        XCTAssertTrue(TransactionEditorPolicy.hasActiveJar("active", summary: summary))
+        XCTAssertFalse(TransactionEditorPolicy.hasActiveJar("inactive", summary: summary))
+        XCTAssertFalse(TransactionEditorPolicy.hasActiveJar("missing", summary: summary))
+    }
+
     private func transaction(id: String, occurredAt: String) -> TransactionModel {
         TransactionModel(
             id: id,
