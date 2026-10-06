@@ -23,6 +23,14 @@ as active release entries here.
 
 ### Fixed
 
+- Native wallet editing now carries an explicit create/edit presentation payload,
+  so an existing wallet reliably sends `PATCH /wallets/:id` instead of opening
+  a create draft. The shared amount-field base adds a keyboard “Xong” action so
+  credit notes remain reachable while the number pad is open.
+- Added signed iPhone 16 simulator business-mutation coverage for wallet
+  create/update, atomic transfer create/delete and credit entry/payment
+  refresh. The complete `LOCAL_API_UI` suite passes 14/14 and leaves zero
+  disposable wallets, transactions or feedback rows.
 - Native Wallet Detail now has a signed simulator mutation smoke that creates a
   real expense through the API, verifies the persisted row, edits its note, and
   verifies the updated row. The complete API-backed iPhone 16 UI suite is now

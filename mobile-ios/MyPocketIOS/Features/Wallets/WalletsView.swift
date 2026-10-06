@@ -34,8 +34,7 @@ final class WalletsViewModel: ObservableObject {
 
 struct WalletsView: View {
     @StateObject private var model: WalletsViewModel
-    @State private var editorPresented = false
-    @State private var editTarget: WalletModel?
+    @State private var editorPresentation: WalletEditorPresentation?
     @State private var deleteTarget: WalletModel?
     @State private var selectedWalletID: String?
 
@@ -57,11 +56,11 @@ struct WalletsView: View {
         .refreshable { await model.load() }
         .environment(\.timeZone, TimeZone(identifier: model.accountTimezone) ?? .current)
         .overlay {
-            if editorPresented {
-                WalletEditorView(api: model.apiForChild, wallet: editTarget, timezone: model.accountTimezone, onSaved: {
-                    editorPresented = false
+            if let editorPresentation {
+                WalletEditorView(api: model.apiForChild, wallet: editorPresentation.wallet, timezone: model.accountTimezone, onSaved: {
+                    self.editorPresentation = nil
                     Task { await model.load() }
-                }, onCancel: { editorPresented = false })
+                }, onCancel: { self.editorPresentation = nil })
                 .background(MPColor.canvas.ignoresSafeArea())
             }
         }
@@ -77,8 +76,7 @@ struct WalletsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Ví", leading: { EmptyView() }, trailing: {
                     MPIconButton(systemName: "plus", label: "Thêm ví") {
-                        editTarget = nil
-                        editorPresented = true
+                        editorPresentation = .create
                     }
                 })
                 if model.isLoading && model.wallets.isEmpty {
@@ -103,7 +101,7 @@ struct WalletsView: View {
                                     }
                                 }
                                 HStack {
-                                    MPButton("Sửa", style: .secondary) { editTarget = wallet; editorPresented = true }
+                                    MPButton("Sửa", style: .secondary) { editorPresentation = .edit(wallet) }
                                     MPButton("Xóa", style: .destructive) { deleteTarget = wallet }
                                 }
                             }
@@ -114,6 +112,25 @@ struct WalletsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+    }
+}
+
+private enum WalletEditorPresentation: Identifiable {
+    case create
+    case edit(WalletModel)
+
+    var id: String {
+        switch self {
+        case .create: return "create"
+        case .edit(let wallet): return "edit-\(wallet.id)"
+        }
+    }
+
+    var wallet: WalletModel? {
+        switch self {
+        case .create: return nil
+        case .edit(let wallet): return wallet
+        }
     }
 }
 

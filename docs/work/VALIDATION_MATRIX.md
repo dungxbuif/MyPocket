@@ -23,7 +23,8 @@ updated: 2026-10-06
 | Proof | Result |
 | --- | --- |
 | iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 47 tests, 0 failures; expired access tokens refresh before Face ID, invalid refresh sessions clear safely, malformed ledger timestamps are excluded from period filters, the iOS PKCE fixture contract encodes correctly, 204 mutation responses decode safely, immutable bulk-delete rows are excluded, query paths preserve URL parameters, Advisor overview data remains structured JSON, selector enum labels stay localized without changing wire values, jar allocations reject zero percent/stale mode values, ordinary editors exclude credit wallets, portfolio trade dates preserve the account-local day, goal target dates preserve the account-local calendar day, wallet month labels interpolate calendar components, recurring drafts reject non-positive amounts/intervals and invalid metadata, portfolio trade drafts enforce side/quantity/price/fee constraints, malformed integer drafts are rejected without silent digit filtering, Travel Mode drafts reject invalid ranges, AI-entry attachments require configured files plus an idle request, and ledger week ranges stay account-local Monday–Sunday |
-| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: default suite 10 tests, 5 passed and 5 explicitly skipped API-fixture tests; opt-in `LOCAL_API_UI` suite 10/10 passed in 200.110s with Assistant, AI-entry capability, ledger week/cashflow, basic-wallet and credit-wallet fixtures seeded/removed through local API; app installed and relaunched as `com.mypocket.ios`. The opt-in UI run keeps normal simulator ad-hoc signing enabled so Keychain-backed fixture sessions can be persisted; `CODE_SIGNING_ALLOWED=NO` is valid for pure unit/build checks only. |
+| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: default suite 10 tests, 5 passed and 5 explicitly skipped API-fixture tests; the latest opt-in `LOCAL_API_UI` suite is 14/14 passed in 293.192s with Assistant, AI-entry capability, ledger week/cashflow, wallet, credit-wallet, transfer and feedback fixtures seeded/removed through local API; app installed and relaunched as `com.mypocket.ios`. The opt-in UI run keeps normal simulator ad-hoc signing enabled so Keychain-backed fixture sessions can be persisted; `CODE_SIGNING_ALLOWED=NO` is valid for pure unit/build checks only. |
+| Native business mutation smoke | PASS: signed UI created and renamed a basic wallet, created/deleted an atomic transfer pair, and created both a credit purchase and payment while observing refreshed rows. The shared numeric amount field now exposes a “Xong” keyboard action so credit notes remain reachable on iPhone. Post-run disposable counts: wallets=0, transactions=0, feedback=0. |
 | iPhone 16 Simulator: authenticated “Thêm” route sweep | PASS: all 13 secondary destinations opened and returned to the menu; the shared `MPButton` hit-shape fix keeps compact rows tappable |
 | Native category scope parity | PASS: category create/edit preserves multiple selected wallet IDs; empty selection remains the API's all-wallet scope; shared `MPMultiOptionSelector` owns the UI |
 | Native ledger/detail/assistant edge cases | PASS: malformed timestamps are excluded from period filters, wallet detail renders the complete API result, and assistant polling preserves a still-running run after the local wait budget |
@@ -432,5 +433,20 @@ The above is local regression proof. Configured-provider browser chat, SSE/recon
 - PASS: the signed debug app was reinstalled and launched with the local
   authenticated fixture on the same simulator for manual testing; screenshot
   evidence: `/tmp/mypocket-ios-simulator-ready.png`.
+- NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and
+  authenticated staging/production gates remain external checks.
+
+### Native business mutation rerun — 2026-10-06 06:50–06:59 ICT
+
+- PASS: the wallet editor now uses an explicit create/edit presentation payload;
+  signed UI created `Fixture UI Wallet`, renamed it to
+  `Fixture UI Wallet Updated`, and observed the server-backed list refresh.
+- PASS: signed transfer UI created and deleted the paired source/destination
+  rows through the overflow action; signed credit UI created a purchase and a
+  payment and observed both statement rows after refresh.
+- PASS: complete signed `LOCAL_API_UI` `MyPocketIOSUITests` suite passed 14/14
+  in 293.192 seconds on iPhone 16 Simulator.
+- PASS: local API health stayed 200 and the disposable Stage v1 database was
+  empty after teardown (`wallets=0`, `transactions=0`, `feedback=0`).
 - NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and
   authenticated staging/production gates remain external checks.

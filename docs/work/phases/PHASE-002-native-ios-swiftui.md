@@ -214,13 +214,14 @@ ledger writes. Verification is the full iOS Simulator XCTest suite, static
 base-component guard, project verification, and backend contract tests when
 shared API contracts are touched.
 
-## Simulator verification — 2026-10-05 (latest)
+## Simulator verification — 2026-10-06 (latest)
 
 The iPhone 16 simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` is booted and
 the latest native build was installed and launched successfully. The full
-suite passed: 28 unit/contract tests and 4 UI smoke tests (auth launch,
-authenticated primary tabs, More route + floating feedback overlay, and a
-fresh-launch sweep through all 13 secondary destinations). The shared
+suite passed: 47 unit/contract tests and 14 signed API-backed UI tests
+(auth launch, authenticated primary tabs, all secondary destinations, AI and
+Assistant surfaces, feedback, wallet/transaction mutations, transfer pair
+deletion and credit entry/payment refresh). The shared
 `MPButton` now explicitly owns its rectangular rendered hit shape; this fixed
 compact More rows that were visible in the accessibility tree but did not
 consistently route taps. Ledger filters reject malformed timestamps instead of
@@ -402,9 +403,11 @@ simulator test runner because they persist the disposable session in Keychain.
 The rerun also hardened numeric draft parsing. The shared parser rejects
 malformed integer input instead of silently filtering characters across
 transaction, transfer, adjustment, wallet, credit, jar, budget, assistant
-proposal and portfolio price/trade editors. Native XCTest passed 47/47. A
-focused signed mutation smoke created and updated a transaction through Wallet
-Detail in 18.348 seconds, and the complete signed API-backed UI suite passed
-11/11 in 218.318 seconds. The app launched successfully on the iPhone 16
-simulator; physical-device, real Google OAuth, provider-backed AI/OCR and
-authenticated staging/production gates remain external checks.
+proposal and portfolio price/trade editors. The shared numeric amount field
+now exposes a keyboard “Xong” action so credit notes remain reachable while a
+number pad is open. Native XCTest passed 47/47. The latest signed mutation
+smoke covers wallet create/update, transfer create/delete and credit
+entry/payment; the complete signed API-backed UI suite passed 14/14 in 293.192
+seconds. The app launched successfully on the iPhone 16 simulator;
+physical-device, real Google OAuth, provider-backed AI/OCR and authenticated
+staging/production gates remain external checks.

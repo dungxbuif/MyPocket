@@ -67,6 +67,20 @@ private enum LocalAPIFixture {
         try await deleteWallet(id: fixture.wallet.id, token: fixture.token)
     }
 
+    static func deleteWallets(named name: String) async throws {
+        let token = try await loginToken()
+        let existing = try await request(
+            path: "/wallets",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<[FixtureWallet]>.self
+        ).data
+        for item in existing where item.name == name {
+            try await deleteWallet(id: item.id, token: token)
+        }
+    }
+
     private static func loginToken() async throws -> String {
         let body = try JSONSerialization.data(withJSONObject: [
             "code": "fixture",
@@ -379,6 +393,155 @@ final class LaunchTests: XCTestCase {
             return
         }
         XCTAssertTrue(app.buttons["Thanh toán"].waitForExistence(timeout: 5))
+#endif
+    }
+
+    func testAPIBackedWalletCreateAndUpdateFromNativeEditor() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        try? await LocalAPIFixture.deleteWallets(named: "Fixture UI Wallet")
+        try? await LocalAPIFixture.deleteWallets(named: "Fixture UI Wallet Updated")
+        addTeardownBlock {
+            try? await LocalAPIFixture.deleteWallets(named: "Fixture UI Wallet")
+            try? await LocalAPIFixture.deleteWallets(named: "Fixture UI Wallet Updated")
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Ví"].waitForExistence(timeout: 10))
+        app.buttons["Ví"].tap()
+        XCTAssertTrue(app.buttons["Thêm ví"].waitForExistence(timeout: 10))
+        app.buttons["Thêm ví"].tap()
+        XCTAssertTrue(app.staticTexts["Thêm ví"].waitForExistence(timeout: 10))
+
+        let name = app.textFields["Tên ví"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        name.clearAndType("Fixture UI Wallet")
+        let openingBalance = app.textFields["Số dư ban đầu"]
+        XCTAssertTrue(openingBalance.waitForExistence(timeout: 10))
+        openingBalance.clearAndType("100000")
+        app.buttons["Tạo ví"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture UI Wallet"].waitForExistence(timeout: 15))
+
+        let edit = app.buttons["Sửa"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        edit.tap()
+        XCTAssertTrue(app.staticTexts["Sửa ví"].waitForExistence(timeout: 10))
+        let editedName = app.textFields["Tên ví"]
+        XCTAssertTrue(editedName.waitForExistence(timeout: 10))
+        let currentNameValue = editedName.value as? String ?? "<nil>"
+        print("[Wallet UI] edit field value=\(currentNameValue)")
+        XCTAssertEqual(currentNameValue, "Fixture UI Wallet")
+        editedName.clearAndType("Fixture UI Wallet Updated")
+        XCTAssertEqual(editedName.value as? String, "Fixture UI Wallet Updated")
+        try await Task.sleep(for: .milliseconds(500))
+        let returnKey = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] 'return' OR label ==[c] 'done'" )).firstMatch
+        if returnKey.exists { returnKey.tap() }
+        let save = app.buttons["Lưu thay đổi"]
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+        XCTAssertTrue(app.staticTexts["Fixture UI Wallet Updated"].waitForExistence(timeout: 15))
+#endif
+    }
+
+    func testAPIBackedTransferCreatesAndDeletesAtomicPairFromNativeUI() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let source = try await LocalAPIFixture.wallet(name: "Fixture Transfer Source", type: "basic")
+        let destination = try await LocalAPIFixture.wallet(name: "Fixture Transfer Destination", type: "basic")
+        addTeardownBlock {
+            try? await LocalAPIFixture.delete(source)
+            try? await LocalAPIFixture.delete(destination)
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Giao dịch"].waitForExistence(timeout: 10))
+        app.buttons["Giao dịch"].tap()
+        let menu = app.buttons["Tùy chọn giao dịch"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 10))
+        menu.tap()
+        XCTAssertTrue(app.buttons["Chuyển tiền đến ví khác"].waitForExistence(timeout: 10))
+        app.buttons["Chuyển tiền đến ví khác"].tap()
+        XCTAssertTrue(app.staticTexts["Chuyển tiền"].waitForExistence(timeout: 10))
+
+        let amount = app.textFields["Số tiền"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 10))
+        amount.clearAndType("12500")
+        let amountDone = app.buttons["Xong"]
+        if amountDone.exists { amountDone.tap() }
+        let note = app.textFields["Ghi chú"]
+        XCTAssertTrue(note.waitForExistence(timeout: 10))
+        note.clearAndType("UI Transfer")
+        app.buttons["Xác nhận chuyển"].tap()
+
+        let transferRow = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "UI Transfer")).firstMatch
+        XCTAssertTrue(transferRow.waitForExistence(timeout: 15), "The atomic transfer pair should be visible after save.")
+        transferRow.tap()
+        XCTAssertTrue(app.staticTexts["Chi tiết giao dịch"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["Xóa cả cặp chuyển ví"].waitForExistence(timeout: 10))
+        app.buttons["Xóa cả cặp chuyển ví"].tap()
+        XCTAssertTrue(app.buttons["Xóa"].waitForExistence(timeout: 5))
+        app.buttons["Xóa"].tap()
+        XCTAssertFalse(transferRow.waitForExistence(timeout: 5), "Deleting a transfer must remove both rows from the ledger.")
+#endif
+    }
+
+    func testAPIBackedCreditEntryAndPaymentRefreshStatementFromNativeUI() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let source = try await LocalAPIFixture.wallet(name: "Fixture Credit Source", type: "basic")
+        let credit = try await LocalAPIFixture.wallet(name: "Fixture Credit Mutation", type: "credit")
+        addTeardownBlock {
+            try? await LocalAPIFixture.delete(source)
+            try? await LocalAPIFixture.delete(credit)
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Ví"].waitForExistence(timeout: 10))
+        app.buttons["Ví"].tap()
+        XCTAssertTrue(app.staticTexts["Fixture Credit Mutation"].waitForExistence(timeout: 10))
+        app.staticTexts["Fixture Credit Mutation"].tap()
+        XCTAssertTrue(app.staticTexts["Sổ tín dụng"].waitForExistence(timeout: 10))
+
+        app.buttons["Thêm giao dịch"].tap()
+        XCTAssertTrue(app.staticTexts["Thêm giao dịch tín dụng"].waitForExistence(timeout: 10))
+        let entryAmount = app.textFields["Số tiền"]
+        XCTAssertTrue(entryAmount.waitForExistence(timeout: 10))
+        entryAmount.clearAndType("12000")
+        let entryAmountDone = app.buttons["Xong"]
+        XCTAssertTrue(entryAmountDone.waitForExistence(timeout: 5))
+        entryAmountDone.tap()
+        let entryNote = app.textFields["Ghi chú"]
+        XCTAssertTrue(entryNote.waitForExistence(timeout: 10))
+        entryNote.clearAndType("UI Credit Purchase")
+        let entryReturn = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] 'return' OR label ==[c] 'done'" )).firstMatch
+        if entryReturn.exists { entryReturn.tap() }
+        app.buttons["Lưu"].tap()
+        XCTAssertTrue(app.staticTexts["purchase"].waitForExistence(timeout: 15), "Credit entry should refresh the statement.")
+
+        app.buttons["Thanh toán"].tap()
+        XCTAssertTrue(app.staticTexts["Thanh toán thẻ"].waitForExistence(timeout: 10))
+        let paymentAmount = app.textFields["Số tiền"]
+        XCTAssertTrue(paymentAmount.waitForExistence(timeout: 10))
+        paymentAmount.clearAndType("7500")
+        let paymentAmountDone = app.buttons["Xong"]
+        XCTAssertTrue(paymentAmountDone.waitForExistence(timeout: 5))
+        paymentAmountDone.tap()
+        let paymentNote = app.textFields["Ghi chú"]
+        XCTAssertTrue(paymentNote.waitForExistence(timeout: 10))
+        paymentNote.clearAndType("UI Credit Payment")
+        let paymentReturn = app.keyboards.buttons.matching(NSPredicate(format: "label ==[c] 'return' OR label ==[c] 'done'" )).firstMatch
+        if paymentReturn.exists { paymentReturn.tap() }
+        app.buttons["Lưu"].tap()
+        XCTAssertTrue(app.staticTexts["payment"].waitForExistence(timeout: 15), "Credit payment should refresh the statement.")
 #endif
     }
 }

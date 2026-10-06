@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct MPTextField: View {
     let title: String
@@ -33,6 +34,14 @@ struct MPAmountField: View {
     var body: some View {
         MPTextField(title: title, text: $text, placeholder: "0", error: error)
             .keyboardType(.numberPad)
+            .toolbar {
+                ToolbarItemGroup(placement: .keyboard) {
+                    Spacer()
+                    Button("Xong") {
+                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+                    }
+                }
+            }
     }
 }
 
