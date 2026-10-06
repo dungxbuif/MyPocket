@@ -23,13 +23,19 @@ updated: 2026-10-06
 ---
 
 2026-10-06 clean simulator verification: a fresh DerivedData build on the
-booted iPhone 16 Simulator ran 68/68 native unit/contract tests and all 17/17
+booted iPhone 16 Simulator ran 68/68 native unit/contract tests and all 18/18
 `LOCAL_API_UI` tests with zero skips or failures against the disposable local
 API. The run covered wallet/credit/transaction/transfer/AI-entry/Assistant/
-feedback/route flows, left no `Fixture*` wallets behind, and the resulting
-`com.mypocket.ios` Debug artifact installed and launched successfully. This is
-simulator-only evidence; production authentication/deployment and a physical
-device remain external gates.
+feedback/route flows, including wallet-row → scoped-ledger selection and the
+separate wallet detail/editor path. It left no `Fixture*` wallets behind. This
+is simulator-only evidence; production authentication/deployment and a
+physical device remain external gates.
+
+2026-10-06 wallet-scope reconciliation complete: web routes a wallet selection
+to `/transactions?wallet_id=...`; native wallet management now uses the same
+primary action. A separate explicit “Chi tiết” action keeps the wallet/credit
+detail surfaces available without making the wallet picker and transaction
+scope disagree.
 
 # Project Context
 

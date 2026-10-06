@@ -69,7 +69,7 @@ final class TransactionsViewModel: ObservableObject {
     @Published private(set) var isBulkDeleting = false
     @Published private(set) var bulkDeleteErrorMessage: String?
     @Published private(set) var errorMessage: String?
-    @Published var walletSelection = "__all__"
+    @Published var walletSelection: String
     @Published var periodSelection = "week"
     @Published var weekOffset = 0
     @Published var groupByCategory = false
@@ -78,7 +78,10 @@ final class TransactionsViewModel: ObservableObject {
     @Published private(set) var accountTimezone = TimeZone.current.identifier
 
     private let api: FinanceAPI
-    init(api: FinanceAPI) { self.api = api }
+    init(api: FinanceAPI, initialWalletID: String? = nil) {
+        self.api = api
+        self.walletSelection = initialWalletID?.isEmpty == false ? (initialWalletID ?? "__all__") : "__all__"
+    }
 
     var filteredTransactions: [TransactionModel] {
         Self.applyFilters(
@@ -220,6 +223,9 @@ final class TransactionsViewModel: ObservableObject {
             errorMessage = "Không thể tải danh sách ví."
             return
         }
+        if walletSelection != "__all__", !wallets.contains(where: { $0.id == walletSelection }) {
+            walletSelection = "__all__"
+        }
         do {
             self.categories = try await api.categories()
         } catch {
@@ -284,7 +290,9 @@ struct TransactionsView: View {
     @State private var selectedIDs = Set<String>()
     @State private var bulkDeleteConfirmation = false
 
-    init(api: FinanceAPI) { _model = StateObject(wrappedValue: TransactionsViewModel(api: api)) }
+    init(api: FinanceAPI, initialWalletID: String? = nil) {
+        _model = StateObject(wrappedValue: TransactionsViewModel(api: api, initialWalletID: initialWalletID))
+    }
 
     var body: some View {
         ScrollView {

@@ -34,11 +34,15 @@ final class WalletsViewModel: ObservableObject {
 
 struct WalletsView: View {
     @StateObject private var model: WalletsViewModel
+    let onSelectWallet: (String) -> Void
     @State private var editorPresentation: WalletEditorPresentation?
     @State private var deleteTarget: WalletModel?
     @State private var selectedWalletID: String?
 
-    init(api: FinanceAPI) { _model = StateObject(wrappedValue: WalletsViewModel(api: api)) }
+    init(api: FinanceAPI, onSelectWallet: @escaping (String) -> Void = { _ in }) {
+        _model = StateObject(wrappedValue: WalletsViewModel(api: api))
+        self.onSelectWallet = onSelectWallet
+    }
 
     var body: some View {
         Group {
@@ -89,7 +93,7 @@ struct WalletsView: View {
                     ForEach(model.wallets) { wallet in
                         MPSurfaceCard {
                             VStack(alignment: .leading, spacing: 10) {
-                                    MPButton(style: .plain, action: { selectedWalletID = wallet.id }) {
+                                    MPButton(style: .plain, action: { onSelectWallet(wallet.id) }) {
                                     VStack(alignment: .leading, spacing: 10) {
                                         MPWalletRow(name: wallet.name, type: wallet.type, balance: MPFormat.money(wallet.currentBalance))
                                         if wallet.type == "goal", let target = wallet.targetAmount {
@@ -101,6 +105,7 @@ struct WalletsView: View {
                                     }
                                 }
                                 HStack {
+                                    MPButton("Chi tiết", style: .secondary) { selectedWalletID = wallet.id }
                                     MPButton("Sửa", style: .secondary) { editorPresentation = .edit(wallet) }
                                     MPButton("Xóa", style: .destructive) { deleteTarget = wallet }
                                 }

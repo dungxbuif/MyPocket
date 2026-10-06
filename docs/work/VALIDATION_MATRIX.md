@@ -16,15 +16,23 @@ shared_fields:
 updated: 2026-10-06
 ---
 
-## Clean iPhone 16 Simulator gate — 2026-10-06 14:54–15:04 ICT
+## Clean iPhone 16 Simulator gate — 2026-10-06 15:07–15:24 ICT
 
 | Proof | Result |
 | --- | --- |
 | Fresh Debug unit/contract XCTest | PASS: clean simulator test run executed 68 tests with 0 failures. |
-| Fresh API-backed UI XCTest | PASS: clean DerivedData build with `SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG LOCAL_API_UI'` executed all 17 UI tests with 0 failures and 0 skips against local `127.0.0.1:8080`; wallet, credit, transaction, transfer, AI entry, Assistant, feedback and route flows all completed. |
+| Fresh API-backed UI XCTest | PASS: clean DerivedData build with `SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG LOCAL_API_UI'` executed all 18 UI tests with 0 failures and 0 skips against local `127.0.0.1:8080`; wallet, wallet-scope, credit, transaction, transfer, AI entry, Assistant, feedback and route flows all completed. |
 | Fixture isolation | PASS: post-run owner check found no `Fixture*` wallets remaining. |
-| Install/launch artifact | PASS: the clean Debug app installed and launched on `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` as `com.mypocket.ios` (PID 21610). |
+| Wallet scope/detail contract | PASS: tapping a wallet row routes to `Giao dịch` with `Ví: <wallet>` selected; the explicit `Chi tiết` action still opens the wallet detail/editor surface. The API-backed fixture test passed. |
+| Install/launch artifact | PASS: the clean Debug app was built by the same test gate and launched by the API-backed UI runner on `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` as `com.mypocket.ios`. |
 | External gates | NOT RUN: production deployment/authentication and physical-device verification remain separate from this simulator gate. |
+
+## Wallet selection scope parity — 2026-10-06
+
+| Proof | Result |
+| --- | --- |
+| Contract decision | PASS: selecting a wallet from management routes to the transaction ledger with that wallet scoped, matching the web route; a separate detail action remains available. |
+| Verification | PASS: `testAPIBackedWalletSelectionRoutesToScopedLedger` passed in the clean `LOCAL_API_UI` run; `testAPIBackedWalletDetailExposesTransactionEditor` and the wallet mutation test separately cover the explicit detail surface. |
 
 ## Transaction category integrity — 2026-10-06
 

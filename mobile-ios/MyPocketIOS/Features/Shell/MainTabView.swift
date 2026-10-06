@@ -3,6 +3,7 @@ import SwiftUI
 struct MainTabView: View {
     @ObservedObject var auth: AuthViewModel
     @State private var selection = "overview"
+    @State private var pendingWalletID: String?
     @State private var feedbackPresented = false
     @State private var feedbackCapturePending = false
     @State private var feedbackScreenshot: Data?
@@ -14,9 +15,12 @@ struct MainTabView: View {
                 case "overview":
                     OverviewView(api: auth.financeAPI) { selection = "transactions" }
                 case "transactions":
-                    TransactionsView(api: auth.financeAPI)
+                    TransactionsView(api: auth.financeAPI, initialWalletID: pendingWalletID)
                 case "wallets":
-                    WalletsView(api: auth.financeAPI)
+                    WalletsView(api: auth.financeAPI) { walletID in
+                        pendingWalletID = walletID
+                        selection = "transactions"
+                    }
                 default:
                     MoreView(api: auth.financeAPI, auth: auth)
                 }
@@ -55,6 +59,11 @@ struct MainTabView: View {
                 ],
                 selection: $selection
             )
+        }
+        .onChange(of: selection) { _, newValue in
+            if newValue != "transactions" {
+                pendingWalletID = nil
+            }
         }
         .animation(.easeInOut(duration: 0.2), value: feedbackPresented)
         .accessibilityIdentifier("main-tab-screen")

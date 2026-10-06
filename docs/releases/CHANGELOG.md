@@ -23,6 +23,13 @@ as active release entries here.
 
 ### Fixed
 
+- Native wallet management now matches the web wallet-scope contract: tapping
+  a wallet row opens the transaction ledger with that wallet selected, while an
+  explicit `Chi tiết` action remains available for balances, progress, credit
+  statements and transaction editing. Clean iPhone 16 Simulator verification
+  passed 68/68 native contracts and 18/18 API-backed UI tests with no leftover
+  fixture wallets.
+
 - Native Finance Assistant and AI-entry replies now use the shared
   `MPMarkdown` base renderer for headings, emphasis/code, lists, fenced code
   and pipe tables. Raw assistant Markdown is no longer shown as an unreadable

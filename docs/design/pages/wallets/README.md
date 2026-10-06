@@ -2,7 +2,7 @@
 
 ## Cập nhật implementation mới nhất
 
-BaseSelect đã thay tương tác picker loại khi tạo. Danh sách đã dùng WalletSelectionList: Đóng/Chọn Ví/Sửa, Tổng cộng, hai nhóm tính/không tính vào tổng và card hành động. Sửa bật chế độ chọn ví để edit; xóa nằm trong edit. Chọn bất kỳ ví nào mở WalletDetailPanel với số dư, dòng tiền và lịch sử giao dịch; ví tín dụng mở CreditWalletPanel với dư nợ, hạn mức khả dụng, giao dịch mua/hoàn/phí/lãi và thanh toán từ ví khác. Goal hỗ trợ target_date qua API và UI. Sổ giao dịch có select đầu màn hình cho `Tổng cộng` hoặc từng ví; ví thường dùng cùng layout/kỳ với `Tổng cộng` và chỉ lọc giao dịch của ví được chọn. Xem [savings](../savings/README.md).
+BaseSelect đã thay tương tác picker loại khi tạo. Danh sách đã dùng WalletSelectionList: Đóng/Chọn Ví/Sửa, Tổng cộng, hai nhóm tính/không tính vào tổng và card hành động. Sửa bật chế độ chọn ví để edit; xóa nằm trong edit. Chạm vào dòng ví là hành động chọn phạm vi và mở sổ giao dịch với ví đó đã được lọc, giống web; action phụ “Chi tiết” mở WalletDetailPanel/CreditWalletPanel khi cần xem số dư, tiến độ hoặc dư nợ. Goal hỗ trợ target_date qua API và UI. Sổ giao dịch có select đầu màn hình cho `Tổng cộng` hoặc từng ví; ví thường dùng cùng layout/kỳ với `Tổng cộng` và chỉ lọc giao dịch của ví được chọn. Xem [savings](../savings/README.md).
 
 ## Quyết định hiện hành
 
@@ -13,7 +13,7 @@ Owner chốt dùng **FormField + BaseSelect** chọn loại khi tạo: Ví thư�
 | Vùng | Base | Contract |
 | --- | --- | --- |
 | Header quản lý | PageBackHeader hoặc BaseLink + Heading/Text | Quay lại Tài khoản, tiêu đề, Thêm ví |
-| Danh sách ví | SurfaceCard, IconBadge, Text, BaseButton | Tên, nhãn loại tiếng Việt, số dư thực, sửa/xóa; chỉ dữ liệu owner |
+| Danh sách ví | SurfaceCard, IconBadge, Text, BaseButton | Tên, nhãn loại tiếng Việt, số dư thực, chọn để mở sổ giao dịch scoped; action chi tiết/sửa/xóa; chỉ dữ liệu owner |
 | Thêm ví | BaseBottomSheet presentation=form | Hủy / Thêm Ví / Lưu; focus trap, Escape, khôi phục focus |
 | Loại ví | FormField + BaseSelect | Chỉ chọn trong draft tạo; không dùng ảnh Chọn Ví làm picker loại |
 | Thông tin chung | SurfaceCard, Divider, BaseTextInput, IconBadge | Tên, VND cố định, số dư đầu phù hợp loại; không ghi chú khi tạo |
@@ -27,7 +27,7 @@ Màu, font, bo góc theo [tokens](../../system/TOKENS.md) và [base contracts](.
 
 | Loại | Khi tạo | Sau khi mở ví — thiết kế nghiệp vụ | Hiện trạng |
 | --- | --- | --- | --- |
-| Thường | Tên, VND, số dư đầu, tính vào tổng | Số dư và lịch sử thu/chi; chuyển ví/điều chỉnh là luồng riêng | CRUD, màn chi tiết và thu/chi có |
+| Thường | Tên, VND, số dư đầu, tính vào tổng | Chọn dòng mở sổ giao dịch scoped; “Chi tiết” hiển thị số dư/lịch sử; chuyển ví/điều chỉnh là luồng riêng | CRUD, sổ giao dịch scoped, màn chi tiết và thu/chi có |
 | Tiết kiệm | Trường chung, mục tiêu > 0, hạn tùy chọn | Đã có, còn thiếu, tiến độ theo số dư thật; nạp/rút cập nhật tiến độ; không tự tính lãi ngân hàng | Có target/ngày mục tiêu trong form/API, tiến độ và lịch sử thực trong chi tiết; visual UAT còn thiếu |
 | Tín dụng | Tên, VND, hạn mức > 0; tùy chọn dư nợ sao kê/ngày sao kê/ngày đến hạn | Dư nợ, hạn mức khả dụng, mua/hoàn tiền/phí/lãi, thanh toán và sổ tín dụng; không dùng ledger thu/chi thường | API, cycle metadata, status, migration, atomic payment pair và CreditWalletPanel đã triển khai; phân bổ kỳ với ngân hàng thật vẫn là follow-up |
 
@@ -62,7 +62,7 @@ Khóa loại sau tạo là quyết định MyPocket, không gán cho Money Lover
 
 ## Acceptance và khoảng trống
 
-Runtime dùng WalletTypePicker cho loại ví, WalletDetailPanel cho basic/goal và CreditWalletPanel cho credit. Proof cần bổ sung visual UAT cho detail basic/goal/credit, chọn `Tổng cộng`/ví trong sổ giao dịch, create/edit khóa loại, validation theo loại, switch tổng, save/error/cancel và keyboard/mobile. Chạy check:design, test:design, build khi môi trường frontend có Node.
+Runtime dùng WalletTypePicker cho loại ví, WalletDetailPanel cho basic/goal và CreditWalletPanel cho credit. Chọn dòng ví phải route về sổ giao dịch scoped; action “Chi tiết” là luồng detail riêng. Proof cần bổ sung visual UAT cho detail basic/goal/credit, chọn `Tổng cộng`/ví trong sổ giao dịch, create/edit khóa loại, validation theo loại, switch tổng, save/error/cancel và keyboard/mobile. Chạy check:design, test:design, build khi môi trường frontend có Node.
 
 [Backlog](../../../work/BACKLOG.md) · [Validation](../../../work/VALIDATION_MATRIX.md) · [Ticket](../../../work/tickets/TICKET-01-02-quan-ly-vi.md) · [Release](../../../releases/CHANGELOG.md).
 
