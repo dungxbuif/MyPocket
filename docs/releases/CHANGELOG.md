@@ -518,3 +518,13 @@ as active release entries here.
 - Frontend `npm run check:design`, lint, build, and tests must be rerun in an environment
   with Node installed; this cleanup environment reported `env: node: No such file or
   directory`.
+
+### Native simulator deterministic-session regression — 2026-10-06
+
+- Authenticated UI tests now use an in-memory session for both deterministic launch
+  modes, preventing stale Keychain credentials from reaching real or fixture data.
+- The More-route sweep reuses one authenticated process instead of terminating and
+  relaunching between destinations, avoiding the Xcode 27 simulator runner kill
+  while still exercising every destination and back action.
+- Native contracts remain 65/65; all 9 API-backed flows pass as isolated local-
+  fixture invocations.

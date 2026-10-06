@@ -44,7 +44,8 @@ final class AuthViewModel: ObservableObject {
 
     private static func makeDefaultStore() -> SessionStore {
 #if DEBUG
-        if ProcessInfo.processInfo.arguments.contains("-UITestAuthenticatedAPI") {
+        if ProcessInfo.processInfo.arguments.contains("-UITestAuthenticated") ||
+            ProcessInfo.processInfo.arguments.contains("-UITestAuthenticatedAPI") {
             return InMemorySessionStore()
         }
 #endif

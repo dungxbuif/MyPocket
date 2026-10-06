@@ -234,12 +234,7 @@ final class LaunchTests: XCTestCase {
             "Tài khoản"
         ]
 
-        for (index, title) in destinations.enumerated() {
-            if index > 0 {
-                app.terminate()
-                app.launchArguments = ["-UITestAuthenticated"]
-                app.launch()
-            }
+        for title in destinations {
             XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 5))
             app.buttons["Thêm"].tap()
 

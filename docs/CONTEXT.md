@@ -290,6 +290,14 @@ tests, Release warnings-as-errors build and simulator launch are green.
 - Keep AI-ENTRY-01/02 live/provider/attachment UAT and UI-FORMS-03 visual review as separate backlog work; broader AI model evaluation remains required beyond the five synthetic cases.
 - Preserve base-first screen rules and run `npm run check:design`, `npm run test:design`, and `npm run build` for frontend changes. API/DB/runtime changes require PostgreSQL tests and migration evidence.
 
+Native simulator validation on 2026-10-06 also hardened the UI-test harness:
+`-UITestAuthenticated` and `-UITestAuthenticatedAPI` never reuse Keychain
+credentials, and the More-route sweep reuses one authenticated process instead
+of repeatedly terminating/relaunching it. The iPhone 16 simulator passed 65/65
+native contracts, 8 default UI smoke tests, and 9 isolated local API-backed UI
+flows. A multi-test `LOCAL_API_UI` xcodebuild operation still triggers an Xcode
+27 runner restart; treat the isolated per-test command list as the current gate.
+
 ## Open Questions
 
 - WORKER-01 month-end semantics: CORE-03 says live/recalculable report and derived completion; the new request names a cron job that closes/generates a report. Decide whether any stored artifact is authoritative or merely rebuildable/cache output. Recurring month-end/catch-up/duplicate prevention/timezone changes also need rules.

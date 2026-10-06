@@ -651,3 +651,18 @@ unit and Release checks.
   verification and `git diff --check` all passed.
 - NOT RUN: physical-device signing, real Google OAuth, provider-backed AI/OCR
   and authenticated staging/production gates remain external release checks.
+
+### Native simulator deterministic-session regression — 2026-10-06
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Authenticated UI isolation | `AuthViewModel.makeDefaultStore()` uses `InMemorySessionStore` for both `-UITestAuthenticated` and `-UITestAuthenticatedAPI` | PASS: generic launch tests cannot read a stale Keychain session or production data |
+| More-route sweep | `testAuthenticatedMoreMenuOpensEveryDestination` on iPhone 16 Simulator | PASS: 1/1; all 14 destinations open and return without terminating/relaunching the app between routes |
+| Native contracts | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: 65/65 |
+| Default UI smoke | `xcodebuild test ... -only-testing:MyPocketIOSUITests` without `LOCAL_API_UI` | PASS: 8 executable UI tests; provider/API fixtures are skipped as designed |
+| API-backed UI | Each of the 9 `LOCAL_API_UI` tests run as an isolated xcodebuild invocation against the disposable local API | PASS: 9/9; wallet, transaction, transfer, credit, Assistant, AI entry and route coverage |
+
+The Xcode 27 test runner can hang/restart when all API-backed cases are passed
+as one multi-test operation after a prior UI run. The same cases pass in
+isolated invocations with the local fixture; release gating must use the
+isolated command list until the runner issue is resolved upstream.
