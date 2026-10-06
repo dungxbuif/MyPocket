@@ -258,6 +258,13 @@ the Release warnings-as-errors build, base-component/project guards, and a
 after teardown. Provider-backed AI/OCR, real Google OAuth, authenticated
 staging/production and physical-device validation remain external gates.
 
+The final base-component rerun superseded the older counts above: native
+unit/contract tests are 65/65 and signed `LOCAL_API_UI` tests are 17/17
+(82/82 combined). `xcodebuild analyze` also completes with
+`SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` and exit code 0. The iPhone 16 Simulator
+remains booted and the release app launches cleanly; the external gates are
+unchanged.
+
 The follow-up system-category scope fix on 2026-10-06 corrected native parity
 with the web/backend contract: system metadata is read-only, delete is hidden,
 and wallet applicability uses `PATCH /api/v1/categories/{id}/wallets`.
