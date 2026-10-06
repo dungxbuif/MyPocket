@@ -30,6 +30,11 @@ struct CategoryModel: Codable, Identifiable, Equatable, Sendable {
     var walletIDs: [String]
 }
 
+enum CategoryEditPolicy {
+    static func metadataIsReadOnly(_ category: CategoryModel) -> Bool { category.isSystem }
+    static func canDelete(_ category: CategoryModel) -> Bool { !category.isSystem }
+}
+
 extension CategoryModel {
     func applies(to transactionType: String, walletID: String, walletType: String) -> Bool {
         let savingsTransfer = transactionType == "income"

@@ -23,6 +23,11 @@ as active release entries here.
 
 ### Fixed
 
+- Native category management now matches the backend/web scope contract:
+  system categories cannot be deleted or have metadata rewritten, while
+  applicable wallet IDs can be updated through the dedicated wallet-scope
+  endpoint. Personal categories keep full editing controls.
+
 - Native wallet editing now carries an explicit create/edit presentation payload,
   so an existing wallet reliably sends `PATCH /wallets/:id` instead of opening
   a create draft. The shared amount-field base adds a keyboard “Xong” action so

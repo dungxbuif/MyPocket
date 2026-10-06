@@ -221,10 +221,20 @@ struct CategoriesView: View {
                 if adding {
                     MPSurfaceCard {
                         VStack(alignment: .leading, spacing: 10) {
-                            MPText(editTarget == nil ? "Danh mục mới" : "Sửa danh mục", style: .title)
-                            MPTextField(title: "Tên", text: $name)
-                            MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $kind)
-                            MPOptionSelector(title: "Danh mục cha", options: availableParentOptions, selectionID: $parentID, emptyLabel: "Không có danh mục cha")
+                            MPText(editTarget.map { CategoryEditPolicy.metadataIsReadOnly($0) ? "Ví áp dụng" : "Sửa danh mục" } ?? "Danh mục mới", style: .title)
+                            if let editTarget, CategoryEditPolicy.metadataIsReadOnly(editTarget) {
+                                MPSurfaceCard {
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        MPText(editTarget.name, style: .title)
+                                        MPText("\(MPSelectionLabels.display(for: editTarget.kind)) · Nhóm hệ thống", style: .secondary)
+                                        MPText("Chỉ có thể thay đổi các ví áp dụng.", style: .secondary)
+                                    }
+                                }
+                            } else {
+                                MPTextField(title: "Tên", text: $name)
+                                MPWalletSelector(title: "Loại", options: ["expense", "income", "debt"], selection: $kind)
+                                MPOptionSelector(title: "Danh mục cha", options: availableParentOptions, selectionID: $parentID, emptyLabel: "Không có danh mục cha")
+                            }
                             MPMultiOptionSelector(title: "Áp dụng cho ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionIDs: $selectedWalletIDs, allLabel: "Tất cả ví")
                             HStack { MPButton("Hủy", style: .secondary) { adding = false; editTarget = nil }; MPButton("Lưu") { Task { await create() } } }
                         }
@@ -250,7 +260,13 @@ struct CategoriesView: View {
             Spacer()
             MPText(item.kind, style: .secondary)
             MPIconButton(systemName: "pencil", label: "Sửa \(item.name)") { beginEditing(item) }
-            MPIconButton(systemName: "trash", label: "Xóa \(item.name)") { deleteTarget = item }
+            if CategoryEditPolicy.canDelete(item) {
+                MPIconButton(systemName: "trash", label: "Xóa \(item.name)") { deleteTarget = item }
+            } else {
+                Image(systemName: "lock.fill")
+                    .foregroundStyle(MPColor.secondary)
+                    .accessibilityLabel("Nhóm hệ thống")
+            }
         }
         .padding(.leading, CGFloat(depth * 20))
         .padding(.vertical, 8)
@@ -277,7 +293,21 @@ struct CategoriesView: View {
         return excluded
     }
     private func load() async { loading = true; defer { loading = false }; do { async let categoryResult = api.categories(); async let walletResult = api.wallets(); items = try await categoryResult; wallets = try await walletResult; self.error = nil } catch { self.error = "Không thể tải danh mục." } }
-    private func create() async { guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập tên danh mục."; return }; do { let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: Array(selectedWalletIDs).sorted(), iconKey: editTarget?.iconKey ?? "tag"); if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }; adding = false; name = ""; parentID = ""; selectedWalletIDs = []; self.editTarget = nil; await load() } catch { self.error = "Không thể lưu danh mục." } }
+    private func create() async {
+        if let editTarget, CategoryEditPolicy.metadataIsReadOnly(editTarget) {
+            do {
+                _ = try await api.updateCategoryWallets(id: editTarget.id, walletIDs: Array(selectedWalletIDs))
+                adding = false; self.editTarget = nil; selectedWalletIDs = []; await load()
+            } catch { self.error = "Không thể lưu ví áp dụng." }
+            return
+        }
+        guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập tên danh mục."; return }
+        do {
+            let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: Array(selectedWalletIDs).sorted(), iconKey: editTarget?.iconKey ?? "tag")
+            if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }
+            adding = false; name = ""; parentID = ""; selectedWalletIDs = []; self.editTarget = nil; await load()
+        } catch { self.error = "Không thể lưu danh mục." }
+    }
     private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; parentID = item.parentID ?? ""; selectedWalletIDs = Set(item.walletIDs); adding = true }
 }
 

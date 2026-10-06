@@ -243,6 +243,14 @@ the Release warnings-as-errors build, base-component/project guards, and a
 after teardown. Provider-backed AI/OCR, real Google OAuth, authenticated
 staging/production and physical-device validation remain external gates.
 
+The follow-up system-category scope fix on 2026-10-06 corrected native parity
+with the web/backend contract: system metadata is read-only, delete is hidden,
+and wallet applicability uses `PATCH /api/v1/categories/{id}/wallets`.
+The native unit suite passes 49/49 and the signed simulator route sweep passes
+all 13 More destinations (1/1 test, 121.909s). A second full API-backed UI
+rerun was not claimed after one simulator diagnostic-service hang; the prior
+14/14 proof remains valid for the unchanged API-backed flows.
+
 ```bash
 xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS \
   -destination 'id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' \

@@ -39,6 +39,16 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/categories/\(id)", method: .patch, body: try body(input)))
     }
 
+    func updateCategoryWallets(id: String, walletIDs: [String]) async throws -> CategoryModel {
+        try await client.send(
+            APIRequest(
+                path: "/categories/\(id)/wallets",
+                method: .patch,
+                body: try body(["wallet_ids": walletIDs.sorted()])
+            )
+        )
+    }
+
     func deleteCategory(id: String) async throws {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/categories/\(id)", method: .delete))
     }

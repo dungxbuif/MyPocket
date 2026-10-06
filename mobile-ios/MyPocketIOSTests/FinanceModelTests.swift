@@ -4,6 +4,16 @@ import XCTest
 
 @MainActor
 final class FinanceModelTests: XCTestCase {
+    func testSystemCategoryAllowsOnlyWalletScopeMutation() {
+        let system = CategoryModel(id: "system", ownerID: nil, parentID: nil, kind: "expense", name: "Ăn uống", systemKey: "food", iconKey: "fork.knife", isSystem: true, walletIDs: [])
+        let personal = CategoryModel(id: "personal", ownerID: "owner", parentID: nil, kind: "expense", name: "Cà phê", systemKey: nil, iconKey: "cup.and.saucer", isSystem: false, walletIDs: [])
+
+        XCTAssertTrue(CategoryEditPolicy.metadataIsReadOnly(system))
+        XCTAssertFalse(CategoryEditPolicy.canDelete(system))
+        XCTAssertFalse(CategoryEditPolicy.metadataIsReadOnly(personal))
+        XCTAssertTrue(CategoryEditPolicy.canDelete(personal))
+    }
+
     func testSnakeCaseFinancialPayloadDecodesAcronyms() throws {
         let data = Data(#"{"id":"tx-1","owner_id":"u-1","wallet_id":"w-1","category_id":"c-1","type":"expense","amount":50000,"occurred_at":"2026-10-05T10:00:00Z","included_in_reports":true,"created_at":"2026-10-05T10:00:00Z","updated_at":"2026-10-05T10:00:00Z"}"#.utf8)
         let transaction = try JSONDecoder.mypocket.decode(TransactionModel.self, from: data)

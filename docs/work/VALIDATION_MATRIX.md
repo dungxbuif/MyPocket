@@ -468,3 +468,18 @@ The above is local regression proof. Configured-provider browser chat, SSE/recon
 - PASS: native unit/contract XCTest passed 48/48, the signed `LOCAL_API_UI` simulator suite passed 14/14 in 293.319s, and the Release build passed with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`.
 - PASS: base-component guard, project verification, API `/api/v1/health` (200), and post-run disposable counts (`wallets=0`, `transactions=0`, `feedback=0`).
 - NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and authenticated staging/production gates remain external checks.
+
+### Native system-category scope fix — 2026-10-06 07:28–07:39 ICT
+
+- PASS: system-category policy coverage now distinguishes read-only metadata
+  and non-deletable system rows from personal categories; the native editor
+  routes wallet applicability to `PATCH /api/v1/categories/{id}/wallets`.
+- PASS: native unit/contract XCTest passed 49/49 after the policy and API
+  contract change.
+- PASS: signed iPhone 16 Simulator route sweep
+  `testAuthenticatedMoreMenuOpensEveryDestination` passed 1/1 in 121.909s,
+  including the Danh mục route and all 13 More destinations.
+- NOT RUN: the full post-fix API-backed suite was not repeated because the
+  simulator diagnostic service hung once; the prior full 14/14 signed suite
+  remains valid for unchanged API-backed flows, and the targeted route sweep
+  plus unit proof covers this change.
