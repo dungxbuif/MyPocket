@@ -345,7 +345,7 @@ struct TransactionsView: View {
                 } onCancel: { transferPresented = false }
                 .background(MPColor.canvas.ignoresSafeArea())
             } else if adjustmentPresented {
-                AdjustmentEditorView(api: modelAPI, wallets: model.wallets) {
+                AdjustmentEditorView(api: modelAPI, wallets: model.wallets, timezone: model.accountTimezone) {
                     adjustmentPresented = false
                     Task { await model.load() }
                 } onCancel: { adjustmentPresented = false }
@@ -563,7 +563,7 @@ struct TransactionDetailView: View {
     let onDeleteTransfer: () -> Void
     let onClose: () -> Void
     @State private var travelEvents: [TravelEventModel] = []
-    @State private var travelEventName = "Không gắn chuyến"
+    @State private var travelEventID = ""
     @State private var travelError: String?
     @Environment(\.timeZone) private var timeZone
 
@@ -576,11 +576,16 @@ struct TransactionDetailView: View {
                     MPText("Ngày: \(MPFormat.shortDate(transaction.occurredAt, timeZone: timeZone))")
                     if let note = transaction.note, !note.isEmpty { MPText("Ghi chú: \(note)") }
                     if transaction.transferID == nil && !isCreditWallet {
-                        MPWalletSelector(title: "Travel Mode", options: ["Không gắn chuyến"] + travelEvents.map(\.name), selection: $travelEventName)
+                        MPOptionSelector(
+                            title: "Travel Mode",
+                            options: [MPSelectionOption(id: "", label: "Không gắn chuyến")] + travelEvents.map { MPSelectionOption(id: $0.id, label: $0.name) },
+                            selectionID: $travelEventID,
+                            emptyLabel: "Không gắn chuyến"
+                        )
                         MPButton("Lưu liên kết chuyến", style: .secondary) {
                             Task {
-                                let event = travelEvents.first(where: { $0.name == travelEventName })
-                                do { _ = try await api.updateTransactionTravel(id: transaction.id, eventID: event?.id); travelError = nil }
+                                let eventID = travelEventID.isEmpty ? nil : travelEventID
+                                do { _ = try await api.updateTransactionTravel(id: transaction.id, eventID: eventID); travelError = nil }
                                 catch { travelError = "Không thể cập nhật liên kết chuyến." }
                             }
                         }
@@ -606,7 +611,7 @@ struct TransactionDetailView: View {
             guard transaction.transferID == nil, !isCreditWallet else { return }
             do {
                 travelEvents = try await api.travelEvents()
-                travelEventName = travelEvents.first(where: { $0.id == transaction.travelEventID })?.name ?? "Không gắn chuyến"
+                travelEventID = transaction.travelEventID ?? ""
             } catch { travelError = "Không thể tải Travel Mode." }
         }
     }
@@ -693,6 +698,7 @@ struct TransferEditorView: View {
 struct AdjustmentEditorView: View {
     let api: FinanceAPI
     let wallets: [WalletModel]
+    let timezone: String
     let onSaved: () -> Void
     let onCancel: () -> Void
     @State private var walletID = ""
@@ -701,6 +707,14 @@ struct AdjustmentEditorView: View {
     @State private var note = ""
     @State private var saving = false
     @State private var error: String?
+
+    init(api: FinanceAPI, wallets: [WalletModel], timezone: String = TimeZone.current.identifier, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+        self.api = api
+        self.wallets = wallets
+        self.timezone = timezone
+        self.onSaved = onSaved
+        self.onCancel = onCancel
+    }
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
@@ -715,5 +729,14 @@ struct AdjustmentEditorView: View {
         .task { if walletID.isEmpty { walletID = ledgerWallets.first?.id ?? "" } }
     }
     private var ledgerWallets: [WalletModel] { wallets.filter { $0.type != "credit" } }
-    private func save() async { guard let selected = ledgerWallets.first(where: { $0.id == walletID }), let parsed = MPFormat.parsePositiveInteger(amount) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: ISO8601DateFormatter().string(from: Date()), note: note.isEmpty ? nil : note)); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
+    private func save() async { guard let selected = ledgerWallets.first(where: { $0.id == walletID }), let parsed = MPFormat.parsePositiveInteger(amount) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }; saving = true; defer { saving = false }; do { _ = try await api.createAdjustment(AdjustmentInputModel(walletID: selected.id, amount: parsed, direction: direction, occurredAt: Self.timestamp(Date(), timezone: timezone), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); onSaved() } catch { self.error = "Không thể điều chỉnh số dư." } }
+
+    static func timestamp(_ date: Date, timezone: String) -> String {
+        let zone = TimeZone(identifier: timezone) ?? .current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = zone
+        let components = calendar.dateComponents([.year, .month, .day], from: date)
+        let localNoon = calendar.date(bySettingHour: 12, minute: 0, second: 0, of: calendar.date(from: components) ?? date) ?? date
+        return MPFormat.instantString(localNoon)
+    }
 }

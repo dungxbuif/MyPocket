@@ -278,6 +278,16 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(previous.map(\.id), ["previous"])
     }
 
+    func testAdjustmentTimestampUsesAccountLocalCalendarDay() {
+        let source = ISO8601DateFormatter().date(from: "2026-10-01T00:30:00Z")!
+        let raw = AdjustmentEditorView.timestamp(source, timezone: "America/Los_Angeles")
+        let parsed = MPFormat.parseInstant(raw)!
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "America/Los_Angeles")!
+        XCTAssertEqual(calendar.component(.hour, from: parsed), 12)
+        XCTAssertEqual(calendar.component(.day, from: parsed), 30)
+    }
+
     func testWeekRangeLabelUsesAccountLocalMondayThroughSundayDates() {
         let now = MPFormat.parseInstant("2026-10-07T12:00:00Z")!
         let timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!

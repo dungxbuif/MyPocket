@@ -27,7 +27,7 @@ updated: 2026-10-06
 | Native business mutation smoke | PASS: signed UI created and renamed a basic wallet, created/deleted an atomic transfer pair, and created both a credit purchase and payment while observing refreshed rows. The shared numeric amount field now exposes a “Xong” keyboard action so credit notes remain reachable on iPhone. Post-run disposable counts: wallets=0, transactions=0, feedback=0. |
 | iPhone 16 Simulator: authenticated “Thêm” route sweep | PASS: all 13 secondary destinations opened and returned to the menu; the shared `MPButton` hit-shape fix keeps compact rows tappable |
 | Native category scope parity | PASS: category create/edit preserves multiple selected wallet IDs; empty selection remains the API's all-wallet scope; shared `MPMultiOptionSelector` owns the UI |
-| Native ledger/detail/assistant edge cases | PASS: malformed timestamps are excluded from period filters, wallet detail renders the complete API result, and assistant polling preserves a still-running run after the local wait budget |
+| Native ledger/detail/assistant edge cases | PASS: malformed timestamps are excluded from period filters, wallet detail renders the complete API result, assistant polling preserves a still-running run after the local wait budget, Travel Mode uses stable event IDs, and balance adjustments preserve the account-local calendar day |
 | Native transaction bulk-delete parity | PASS: selection mode uses base buttons, excludes transfer/credit/adjustment rows, enforces the 100-ID cap, confirms atomically, removes successful rows and keeps a visible error plus selection on failure |
 | Native empty mutation responses | PASS: APIClient contract test accepts `204 No Content` for the bulk-delete mutation without envelope decoding failures; the same path covers typed delete methods |
 | Native Finance Assistant history/overview parity | PASS: owner-keyed opaque conversation ID, latest 50 message reload, older-message pagination, read-only monthly overview card and structured source data are covered by API/model tests; the API-backed iPhone 16 UI smoke returned 200 from local `:8080` |
@@ -448,5 +448,15 @@ The above is local regression proof. Configured-provider browser chat, SSE/recon
   in 293.192 seconds on iPhone 16 Simulator.
 - PASS: local API health stayed 200 and the disposable Stage v1 database was
   empty after teardown (`wallets=0`, `transactions=0`, `feedback=0`).
+- NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and
+  authenticated staging/production gates remain external checks.
+
+### Native Travel/Adjustment regression rerun — 2026-10-06 07:05–07:16 ICT
+
+- PASS: unit/contract XCTest passed 48/48, including account-local adjustment
+  timestamp coverage across a timezone boundary.
+- PASS: signed API-backed `MyPocketIOSUITests` passed 14/14 in 292.296 seconds
+  after replacing name-based Travel Mode selection with stable IDs and routing
+  adjustment timestamps through the account timezone.
 - NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and
   authenticated staging/production gates remain external checks.

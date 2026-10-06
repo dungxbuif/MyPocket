@@ -31,6 +31,10 @@ as active release entries here.
   create/update, atomic transfer create/delete and credit entry/payment
   refresh. The complete `LOCAL_API_UI` suite passes 14/14 and leaves zero
   disposable wallets, transactions or feedback rows.
+- Native transaction detail now selects Travel Mode events by stable ID rather
+  than display name, and balance adjustments now preserve the account-local
+  calendar day instead of the device timezone. Native XCTest is 48/48 and the
+  signed simulator UI suite remains 14/14.
 - Native Wallet Detail now has a signed simulator mutation smoke that creates a
   real expense through the API, verifies the persisted row, edits its note, and
   verifies the updated row. The complete API-backed iPhone 16 UI suite is now
