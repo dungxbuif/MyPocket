@@ -49,6 +49,7 @@ updated: 2026-10-06
 | Native portfolio account-date parity | PASS: portfolio loads the account timezone and serializes selected trade dates at account-local noon, preventing UTC/device-day drift |
 | Native wallet month/Travel Mode validation parity | PASS: wallet detail renders `Tháng MM năm YYYY`; Travel Mode trims required names, validates optional `yyyy-MM-dd` dates and rejects reversed ranges before API submission |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |
+| Native Travel Mode parity | PASS: header explains context/status, event cards expose active state and date scope, deletion uses shared confirmation, and the editor warns that recurring/transfer/adjustment transactions do not auto-link; `MyPocketIOSTests` 54/54, Release warnings-as-errors, base/project guards, and authenticated More-route 1/1 in 122.031s all pass after the change |
 | Native Release build | PASS: iPhone 16 simulator Release build with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`; app launched as `com.mypocket.ios` after the build |
 | Simulator API-backed authenticated smoke fixture | PASS: DEBUG-only `-UITestAuthenticatedAPI` exchanged fixture PKCE fields against local `:8080`, persisted the disposable JWT, and rendered the authenticated overview with live empty wallets/ledger; screenshot `/tmp/mypocket-ios-simulator-api-auth.png` |
 | Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |

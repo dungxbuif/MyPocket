@@ -795,24 +795,80 @@ struct TravelView: View {
     @State private var context = ""
     @State private var adding = false
     @State private var editTarget: TravelEventModel?
+    @State private var deleteTarget: TravelEventModel?
     @State private var startsOn = ""
     @State private var endsOn = ""
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
             MPScreenHeader(title: "Travel Mode", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm chuyến đi") { editTarget = nil; resetEditor(); adding = true } })
+            MPSurfaceCard {
+                VStack(alignment: .leading, spacing: 8) {
+                    MPText("Travel Mode", style: .title)
+                    MPText("Gắn giao dịch thu/chi vào một chuyến để xem bối cảnh. Chuyến không phải là ví và không đổi số dư.", style: .secondary)
+                    if let active = events.first(where: { $0.active }) {
+                        MPText("Đang bật: \(active.name). Giao dịch thu/chi thường mới sẽ tự gắn chuyến này.", style: .secondary)
+                    } else {
+                        MPText("Chưa bật chuyến nào. Giao dịch mới sẽ không tự gắn Travel Mode.", style: .secondary)
+                    }
+                }
+            }
             if let error { MPErrorView(title: "Không tải được Travel Mode", detail: error) { Task { await load() } } }
             if events.isEmpty { MPEmptyView(title: "Chưa có chuyến đi", detail: "Tạo một sự kiện để gắn giao dịch du lịch.") }
             ForEach(events) { event in
-                MPSurfaceCard { HStack { VStack(alignment: .leading) { MPText(event.name); if let context = event.context { MPText(context, style: .secondary) }; if let startsOn = event.startsOn { MPText("Từ \(startsOn)", style: .secondary) }; if let endsOn = event.endsOn { MPText("Đến \(endsOn)", style: .secondary) } }; Spacer(); MPButton("Sửa", style: .secondary) { beginEditing(event) }; MPButton(event.active ? "Tắt" : "Bật", style: event.active ? .destructive : .secondary) { Task { await toggle(event) } }; MPButton("Xóa", style: .destructive) { Task { await remove(event) } } } }
+                MPSurfaceCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                MPText(event.name)
+                                MPText(event.active ? "Đang bật" : "Đã tắt", style: .secondary)
+                            }
+                            Spacer()
+                            MPButton(event.active ? "Tắt" : "Bật", style: event.active ? .destructive : .secondary) { Task { await toggle(event) } }
+                        }
+                        MPText(eventDateLabel(event), style: .secondary)
+                        if let context = event.context, !context.isEmpty { MPText(context, style: .secondary) }
+                        HStack {
+                            MPButton("Sửa", style: .secondary) { beginEditing(event) }
+                            MPButton("Xóa", style: .destructive) { deleteTarget = event }
+                        }
+                    }
+                }
             }
-            if adding { MPSurfaceCard { VStack(alignment: .leading, spacing: 10) { MPText(editTarget == nil ? "Chuyến đi mới" : "Sửa chuyến đi", style: .title); MPTextField(title: "Tên", text: $name); MPTextEditor(title: "Mô tả", text: $context); MPTextField(title: "Ngày bắt đầu (YYYY-MM-DD)", text: $startsOn); MPTextField(title: "Ngày kết thúc (YYYY-MM-DD)", text: $endsOn); HStack { MPButton("Hủy", style: .secondary) { adding = false }; MPButton("Lưu") { Task { await save() } } } } } }
-        }.padding(MPMetrics.pagePadding) }.background(MPColor.canvas.ignoresSafeArea()).task { await load() }.accessibilityIdentifier("travel-screen")
+            if adding {
+                MPSurfaceCard {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MPText(editTarget == nil ? "Chuyến đi mới" : "Sửa chuyến đi", style: .title)
+                        MPText("Chỉ giao dịch thu/chi tạo mới mới tự nhận chuyến đang bật. Giao dịch định kỳ, chuyển ví và điều chỉnh số dư không tự gắn.", style: .secondary)
+                        MPTextField(title: "Tên", text: $name)
+                        MPTextEditor(title: "Mô tả", text: $context)
+                        MPTextField(title: "Ngày bắt đầu (YYYY-MM-DD)", text: $startsOn)
+                        MPTextField(title: "Ngày kết thúc (YYYY-MM-DD)", text: $endsOn)
+                        HStack { MPButton("Hủy", style: .secondary) { adding = false }; MPButton("Lưu") { Task { await save() } } }
+                    }
+                }
+            }
+        }.padding(MPMetrics.pagePadding) }
+        .background(MPColor.canvas.ignoresSafeArea())
+        .task { await load() }
+        .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa chuyến đi?", message: "Giao dịch vẫn được giữ nguyên; chỉ gỡ liên kết chuyến.", confirmTitle: "Xóa") {
+            if let target = deleteTarget { Task { await remove(target) } }
+            deleteTarget = nil
+        }
+        .accessibilityIdentifier("travel-screen")
     }
     private func load() async { do { events = try await api.travelEvents(); self.error = nil } catch { self.error = "Không thể tải sự kiện du lịch." } }
     private func toggle(_ event: TravelEventModel) async { do { _ = try await api.setTravelEventActive(id: event.id, active: !event.active); await load() } catch { self.error = "Không thể cập nhật Travel Mode." } }
     private func resetEditor() { name = ""; context = ""; startsOn = ""; endsOn = "" }
     private func beginEditing(_ event: TravelEventModel) { editTarget = event; name = event.name; context = event.context ?? ""; startsOn = event.startsOn ?? ""; endsOn = event.endsOn ?? ""; adding = true }
+    private func eventDateLabel(_ event: TravelEventModel) -> String {
+        switch (event.startsOn, event.endsOn) {
+        case let (start?, end?): return "\(start) → \(end)"
+        case let (start?, nil): return "Từ \(start) · Không giới hạn ngày kết thúc"
+        case let (nil, end?): return "Đến \(end) · Không giới hạn ngày bắt đầu"
+        default: return "Không giới hạn ngày"
+        }
+    }
     private func save() async { guard TravelEventDraftValidator.isValid(name: name, startsOn: startsOn, endsOn: endsOn) else { self.error = "Tên chuyến và khoảng ngày không hợp lệ."; return }; let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines); let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines); let input = TravelEventInputModel(name: trimmedName, context: trimmedContext.isEmpty ? nil : trimmedContext, startsOn: startsOn.isEmpty ? nil : startsOn, endsOn: endsOn.isEmpty ? nil : endsOn, active: editTarget?.active ?? false); do { if let editTarget { _ = try await api.updateTravelEvent(id: editTarget.id, input: input) } else { _ = try await api.createTravelEvent(input) }; resetEditor(); adding = false; await load() } catch { self.error = "Không thể lưu chuyến đi." } }
     private func remove(_ event: TravelEventModel) async { do { try await api.deleteTravelEvent(id: event.id); await load() } catch { self.error = "Không thể xóa chuyến đi." } }
 }

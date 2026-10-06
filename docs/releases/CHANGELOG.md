@@ -23,6 +23,10 @@ as active release entries here.
 
 ### Fixed
 
+- Native Travel Mode now matches the web contract for active-event context,
+  explicit date scope, safe delete confirmation, and the rule that only new
+  ordinary income/expense transactions auto-link to the active trip.
+
 - Native Tháng summary now decodes jar usage, uses bounded account-local month
   selection, shows period/status/category/jar details, protects dirty notes,
   and opens the selected month in Hũ chi tiêu.

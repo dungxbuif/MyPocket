@@ -463,3 +463,9 @@ The follow-up feedback draft-normalization fix on 2026-10-06 now trims
 title/description and rejects unsupported types before JSON or screenshot
 multipart requests. Native XCTest passes 54/54, the Release warnings-as-errors
 build passes, and the signed feedback-entry UI test passes 1/1 in 9.821s.
+
+The follow-up Travel Mode parity fix on 2026-10-06 now shows active
+context/date scope, confirms deletion without removing transactions, and
+explains the ordinary-income/expense-only auto-link rule in the editor. Native
+XCTest 54/54, Release warnings-as-errors, base/project guards, and the signed
+authenticated More-route smoke 1/1 in 122.031s pass for this UI-only correction.
