@@ -469,3 +469,8 @@ context/date scope, confirms deletion without removing transactions, and
 explains the ordinary-income/expense-only auto-link rule in the editor. Native
 XCTest 54/54, Release warnings-as-errors, base/project guards, and the signed
 authenticated More-route smoke 1/1 in 122.031s pass for this UI-only correction.
+
+The recurring parity follow-up then restored account-timezone scheduling copy,
+next-run/wallet/note/type details, and safe deletion confirmation. Native
+XCTest 55/55, Release warnings-as-errors, base/project guards, and the signed
+authenticated More-route smoke 1/1 in 124.207s pass.

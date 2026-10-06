@@ -192,6 +192,11 @@ auto-link warning are now covered by the shared SwiftUI components. Native
 XCTest 54/54, Release warnings-as-errors, base/project guards, and the signed
 authenticated More-route sweep 1/1 in 122.031s pass for this correction.
 
+Native recurring parity was then restored: account-timezone scheduling copy,
+next-run/wallet/note/type details, and safe delete confirmation now match the
+web contract. Native XCTest passes 55/55, the Release warnings-as-errors
+build and guards pass, and the signed More-route sweep passes 1/1 in 124.207s.
+
 - Review the [dedicated advisor design](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md) and [V1 task sequence](superpowers/plans/2026-09-22-finance-assistant-v1.md). Feedback's browser round-trip/owner UAT and deployment checks remain separate. Finance Assistant has a local JWT/API-key synchronous JSON vertical slice with best-effort Redis access audit; next gates are typed fact cards, SSE/recovery, durable audit delivery/alerting and configured-provider browser proof.
 - Finance Assistant contract/lifecycle fixes are now locally verified: typed schemas, OpenAI-compatible tool history, bounded final-answer loop, credential revalidation, cancelled-run commit guard, and wallet/budget/goal/jar cards. Remaining gates are configured-provider browser proof, SSE/reconnect, durable audit delivery/alerting and owner UAT.
 - Finance Assistant cancellation now interrupts provider work handled by the same backend process; the database lease guard remains the source of truth. Do not describe cross-process immediate cancellation as shipped until durable pub/sub or worker ownership is implemented.

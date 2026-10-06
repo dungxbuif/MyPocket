@@ -131,6 +131,15 @@ enum MPFormat {
         return formatter.string(from: parsed)
     }
 
+    static func shortDateTime(_ raw: String, timeZone: TimeZone = .current) -> String {
+        guard let parsed = parseInstant(raw) else { return raw }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "dd/MM/yyyy HH:mm"
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.timeZone = timeZone
+        return formatter.string(from: parsed)
+    }
+
     static func todayISO(timeZone: TimeZone = .current) -> String {
         let formatter = DateFormatter()
         formatter.calendar = Calendar(identifier: .gregorian)

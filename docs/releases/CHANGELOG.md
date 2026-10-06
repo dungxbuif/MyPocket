@@ -27,6 +27,11 @@ as active release entries here.
   explicit date scope, safe delete confirmation, and the rule that only new
   ordinary income/expense transactions auto-link to the active trip.
 
+- Native recurring schedules now show account-timezone next-run dates,
+  localized type/frequency, wallet, note and active state; the screen explains
+  ordinary-transaction semantics and confirms deletion without removing rows
+  already created in the ledger.
+
 - Native Tháng summary now decodes jar usage, uses bounded account-local month
   selection, shows period/status/category/jar details, protects dirty notes,
   and opens the selected month in Hũ chi tiêu.

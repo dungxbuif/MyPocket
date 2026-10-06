@@ -19,6 +19,13 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(options, ["2026-08", "2026-09", "2026-10", "2026-11"])
     }
 
+    func testRecurringNextRunFormattingUsesAccountTimezone() {
+        XCTAssertEqual(
+            MPFormat.shortDateTime("2026-10-06T16:30:00Z", timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!),
+            "06/10/2026 23:30"
+        )
+    }
+
     func testSavingsProgressClampsTargetAndBalanceSafely() {
         XCTAssertEqual(MPFormat.savingsProgress(balance: 300, target: 1_000), MPSavingsProgress(remaining: 700, percentage: 0.3, reached: false))
         XCTAssertEqual(MPFormat.savingsProgress(balance: 1_100, target: 1_000), MPSavingsProgress(remaining: 0, percentage: 1, reached: true))

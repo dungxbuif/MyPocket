@@ -697,16 +697,38 @@ struct RecurringView: View {
     @State private var accountTimezone = TimeZone.current.identifier
     @State private var result: String?
     @State private var error: String?
+    @State private var deleteTarget: RecurringModel?
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Giao dịch định kỳ", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm lịch") { editTarget = nil; resetEditor(); showEditor = true } })
-                MPButton("Chạy các giao dịch đến hạn", style: .secondary) { Task { await runDue() } }
+                MPSurfaceCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        MPText("Giao dịch định kỳ", style: .title)
+                        MPText("Lịch bật sẽ sinh giao dịch thường theo múi giờ tài khoản. Mỗi kỳ chỉ tạo một lần; giao dịch đã tạo vẫn có thể sửa hoặc xóa như bình thường.", style: .secondary)
+                        MPButton("Chạy các giao dịch đến hạn", style: .secondary) { Task { await runDue() } }
+                    }
+                }
                 if let result { MPStatusMessage(text: result, tone: .success) }
                 if let error { MPStatusMessage(text: error, tone: .danger) }
                 if items.isEmpty { MPEmptyView(title: "Chưa có lịch định kỳ", detail: "Lịch định kỳ chỉ tạo giao dịch khi bạn chủ động chạy.") }
-                ForEach(items) { item in MPSurfaceCard { VStack(alignment: .leading, spacing: 6) { MPText(item.name); MPText("\(item.frequency) · \(MPFormat.money(item.amount))", style: .secondary); MPText(item.active ? "Đang hoạt động" : "Đã tắt", style: .secondary); HStack { MPButton("Sửa", style: .secondary) { beginEditing(item) }; MPButton("Xóa", style: .destructive) { Task { await delete(item) } } } } } }
+                ForEach(items) { item in
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                MPText(item.name)
+                                Spacer()
+                                MPText(item.active ? "Đang bật" : "Tạm dừng", style: .secondary)
+                            }
+                            MPText("\(item.type == "expense" ? "Khoản chi" : "Khoản thu") · \(frequencyLabel(item.frequency, interval: item.interval)) · \(MPFormat.money(item.amount))", style: .secondary)
+                            MPText("Ví: \(walletName(for: item.walletID))", style: .secondary)
+                            MPText("Lần chạy kế tiếp: \(MPFormat.shortDateTime(item.nextRunAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
+                            if let note = item.note, !note.isEmpty { MPText(note, style: .secondary) }
+                            HStack { MPButton("Sửa", style: .secondary) { beginEditing(item) }; MPButton("Xóa", style: .destructive) { deleteTarget = item } }
+                        }
+                    }
+                }
                 if showEditor {
                     MPSurfaceCard { VStack(alignment: .leading, spacing: 10) {
                         MPText(editTarget == nil ? "Tạo lịch" : "Sửa lịch", style: .title)
@@ -736,10 +758,26 @@ struct RecurringView: View {
                 categoryID = ""
             }
         }
+        .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa lịch định kỳ?", message: "Các giao dịch đã tạo vẫn giữ nguyên trong sổ giao dịch.", confirmTitle: "Xóa") {
+            if let target = deleteTarget { Task { await delete(target) } }
+            deleteTarget = nil
+        }
         .accessibilityIdentifier("recurring-screen")
     }
 
     private var categoriesForType: [CategoryModel] { categories.filter { $0.kind == type } }
+    private func walletName(for id: String) -> String { wallets.first(where: { $0.id == id })?.name ?? "Ví đã xóa" }
+    private func frequencyLabel(_ value: String, interval: Int) -> String {
+        let label: String
+        switch value {
+        case "daily": label = "Hàng ngày"
+        case "weekly": label = "Hàng tuần"
+        case "monthly": label = "Hàng tháng"
+        case "yearly": label = "Hàng năm"
+        default: label = value
+        }
+        return interval == 1 ? label : "Mỗi \(interval) kỳ · \(label.lowercased())"
+    }
     private func load() async { do { async let schedules = api.recurring(); async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); items = try await schedules; wallets = (try await walletList).filter { $0.type != "credit" }; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone }; if walletID.isEmpty { walletID = wallets.first?.id ?? "" }; self.error = nil } catch { self.error = "Không thể tải lịch định kỳ." } }
     private func runDue() async { do { let response = try await api.runDueRecurring(); result = "Đã tạo \(response.created) giao dịch."; await load() } catch { self.error = "Không thể chạy giao dịch đến hạn." } }
     private func resetEditor() { name = ""; amount = ""; walletID = wallets.first?.id ?? ""; frequency = "monthly"; type = "expense"; categoryID = ""; interval = "1"; note = ""; nextRunDate = Date(); endsAtDate = Date(); endsAtEnabled = "Không"; active = "Có" }
