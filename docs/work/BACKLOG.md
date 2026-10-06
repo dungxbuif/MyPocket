@@ -52,6 +52,11 @@ remain unchanged; owner visual UAT is still separate.
 the account IANA timezone as calendar dates; simulator regression proof is
 recorded in the validation matrix.
 
+2026-10-06 native feedback audit: the floating feedback trigger is hidden for
+one rendered frame before the automatic screenshot is captured, preventing
+the control from appearing in its own attachment. [NATIVE-FEEDBACK-BUBBLE-REDACTION](bugs/NATIVE-FEEDBACK-BUBBLE-REDACTION.md)
+is regression_verified; the dedicated UI test and full simulator gate pass.
+
 ## Current Owner Direction
 
 2026-09-24 wallet/ledger UI follow-up: savings detail has an existing goal/progress spec; Travel Mode is still an event-linkage draft and not a new wallet type. [UI-LEDGER-WEEK](tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md) is in_review after owner correction: basic uses the same Week/Custom summary/list UI as `Tổng cộng`, filtered by wallet; goal shows complete savings history, and provisional credit remains read-only. Basic selection and week navigation were verified on the local Chrome page; goal selection/mobile visual UAT remain open. Credit has business rules, but its detailed statement/payment UI/API contract remains a separate design gap; do not mark credit complete. No deployment has been performed for this slice.
@@ -188,3 +193,4 @@ Mark risk flags in the `Risk Flags` column when relevant:
 | 4 | BL-007 | product | high-risk | Implement basic income/expense ledger | High | in_review | [Ticket](tickets/TICKET-02-01-ghi-thu-chi.md), [Design](tickets/TICKET-02-01-DETAIL_DESIGN.md), [Proof](tickets/TICKET-02-01-VERIFICATION.md), [UI spec](../design/pages/transactions/README.md) | Public contract/API, Authorization, Multi-domain | Human review or receipt/jar follow-up | Real create/list/edit/delete UI and wallet/category rules are verified; receipts/OCR and jar assignment remain outside this slice. |
 | 5 | BL-003 | integration | normal | Implement receipt OCR adapter | Medium | open | `docs/architecture/OCR_API.md`, `docs/architecture/INTEGRATIONS.md` | External system/provider, Public contract/API, Data model | Ticket plus detail design | Use OCR Platform for receipt image/PDF recognition; keep API key server-side. |
 | 6 | BL-004 | framework | normal | Finalize first project-specific standards | Medium | open | `docs/standards/` | Standards change | TBD | Add human-maintained rules in `docs/standards/`. |
+| done | NATIVE-FEEDBACK-BUBBLE-REDACTION | bug | tiny | Exclude the floating feedback trigger from captured feedback screenshots | High | done | [Bug](bugs/NATIVE-FEEDBACK-BUBBLE-REDACTION.md), [Phase](phases/PHASE-002-native-ios-swiftui.md), [Validation](VALIDATION_MATRIX.md), [Release](../releases/CHANGELOG.md) | Existing behavior, Weak proof | None; retain regression test | Simulator regression passes; no API or schema change. |

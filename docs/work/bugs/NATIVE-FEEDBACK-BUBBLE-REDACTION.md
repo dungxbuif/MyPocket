@@ -3,6 +3,11 @@ artifact_type: bug
 id: NATIVE-FEEDBACK-BUBBLE-REDACTION
 status: regression_verified
 owner: shared
+trace:
+  backlog: ../BACKLOG.md
+  phase: ../phases/PHASE-002-native-ios-swiftui.md
+  validation: ../VALIDATION_MATRIX.md
+  release_notes: ../../releases/CHANGELOG.md
 ---
 
 # Native feedback bubble capture redaction
@@ -20,11 +25,24 @@ The screenshot-assisted feedback contract promises the screen behind the
 feedback UI. Including the trigger bubble is noisy and can expose an overlay
 control that should not be part of the report context.
 
+## Root cause
+
+The original tap handler called `ScreenSnapshot.capture()` in the same SwiftUI
+state mutation that presented the feedback overlay. The window was therefore
+captured before the trigger's removal had been rendered.
+
 ## Intended behavior
 
 The bubble must be hidden for one rendered frame before `ScreenSnapshot.capture`
 runs. The feedback overlay can then present with the captured background image;
 text-only fallback and the PNG/1 MiB backend contract remain unchanged.
+
+## Regression risk
+
+The delayed capture must not create a second trigger, lose the overlay action,
+or leave the bubble hidden after the sheet is dismissed. The dedicated UI
+regression checks the trigger/sheet label cardinality; the existing PNG,
+multipart and full simulator tests cover the attachment and route behavior.
 
 ## Verification result — 2026-10-06
 
