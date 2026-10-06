@@ -22,6 +22,15 @@ shared_fields:
 updated: 2026-10-06
 ---
 
+2026-10-06 clean simulator verification: a fresh DerivedData build on the
+booted iPhone 16 Simulator ran 68/68 native unit/contract tests and all 17/17
+`LOCAL_API_UI` tests with zero skips or failures against the disposable local
+API. The run covered wallet/credit/transaction/transfer/AI-entry/Assistant/
+feedback/route flows, left no `Fixture*` wallets behind, and the resulting
+`com.mypocket.ios` Debug artifact installed and launched successfully. This is
+simulator-only evidence; production authentication/deployment and a physical
+device remain external gates.
+
 # Project Context
 
 2026-10-06 native simulator auth fixture correction: the API-backed UI harness

@@ -16,6 +16,16 @@ shared_fields:
 updated: 2026-10-06
 ---
 
+## Clean iPhone 16 Simulator gate — 2026-10-06 14:54–15:04 ICT
+
+| Proof | Result |
+| --- | --- |
+| Fresh Debug unit/contract XCTest | PASS: clean simulator test run executed 68 tests with 0 failures. |
+| Fresh API-backed UI XCTest | PASS: clean DerivedData build with `SWIFT_ACTIVE_COMPILATION_CONDITIONS='DEBUG LOCAL_API_UI'` executed all 17 UI tests with 0 failures and 0 skips against local `127.0.0.1:8080`; wallet, credit, transaction, transfer, AI entry, Assistant, feedback and route flows all completed. |
+| Fixture isolation | PASS: post-run owner check found no `Fixture*` wallets remaining. |
+| Install/launch artifact | PASS: the clean Debug app installed and launched on `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` as `com.mypocket.ios` (PID 21610). |
+| External gates | NOT RUN: production deployment/authentication and physical-device verification remain separate from this simulator gate. |
+
 ## Transaction category integrity — 2026-10-06
 
 | Proof | Result |
