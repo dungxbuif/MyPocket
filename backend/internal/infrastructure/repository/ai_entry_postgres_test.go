@@ -36,6 +36,10 @@ func TestAIEntryPersistsReviewAndApprovesExactlyOnce(t *testing.T) {
 	if err = db.Create(&w).Error; err != nil {
 		t.Fatal(err)
 	}
+	var defaultCategory entity.Category
+	if err = db.Where("is_system = ? AND system_key = ?", true, "expense_general").First(&defaultCategory).Error; err != nil {
+		t.Fatal(err)
+	}
 	r := NewAIEntryPostgresRepository(db)
 	ctx := context.Background()
 	s, err := r.CreateSession(ctx, owner)
@@ -52,7 +56,8 @@ func TestAIEntryPersistsReviewAndApprovesExactlyOnce(t *testing.T) {
 	if _, _, err = r.BeginMessage(ctx, owner, s.ID, "request-2", "hash-2", "another"); !errors.Is(err, port.ErrAIBusy) {
 		t.Fatalf("concurrent message: %v", err)
 	}
-	draft := entity.AIEntryDraft{Type: "expense", Amount: 35000, WalletID: w.ID, OccurredAt: "2026-09-21T08:00:00+07:00", IncludedInReports: true}
+	draftCategoryID := defaultCategory.ID
+	draft := entity.AIEntryDraft{Type: "expense", Amount: 35000, WalletID: w.ID, CategoryID: &draftCategoryID, OccurredAt: "2026-09-21T08:00:00+07:00", IncludedInReports: true}
 	out := entity.AIExtractOutput{Reply: "review", Drafts: []entity.AIExtractDraft{{AIEntryDraft: draft}, {AIEntryDraft: draft}}}
 	if err = r.FinishMessage(ctx, owner, s.ID, token, out); err != nil {
 		t.Fatal(err)

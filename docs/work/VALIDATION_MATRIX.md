@@ -16,6 +16,15 @@ shared_fields:
 updated: 2026-10-06
 ---
 
+## Transaction category integrity — 2026-10-06
+
+| Proof | Result |
+| --- | --- |
+| Backend/API boundary | PASS: ordinary transaction, recurring and credit handlers reject missing categories; repository checks and AI proposal validation preserve the same invariant. |
+| Database boundary | PASS: migration `000028_transaction_category_required` backfills ordinary legacy rows with canonical fallback groups and adds a check constraint; adjustment rows remain uncategorized by design. |
+| Web/native editor parity | PASS: editors prefill the first applicable category, remove the empty option, reject incompatible categories and send a non-null category ID. |
+| iPhone 16 Simulator regression | PASS: fresh iPhone 16 Simulator run completed 66/66 native unit/contract tests and the default UI target completed 6 passed, 11 intentional `LOCAL_API_UI` skips, 0 failures; the red-to-green required-category policy test is included. |
+
 # Validation Matrix
 
 ## Native simulator and local integration regression — 2026-10-06
@@ -90,7 +99,7 @@ restart.
 | Go formatting/static quality | PASS: `gofmt -l backend` is clean; `go vet ./...` and Swift Debug build with warnings-as-errors pass |
 | FE-proxy transfer integration | PASS: paired creation, balance reconciliation, report/jar exclusion, transfer PATCH and pair DELETE with idempotency keys, auth guard |
 | Real Chromium 390×844 transfer flow | PASS: actual UI rendered both wallet options, saved, refreshed and matched persisted API state; stale fixture cleanup now deletes transfer pairs atomically |
-| AI entry browser flow | PASS: contract + Chromium fixture; fixture transactions derive the current account-local week so the grouped-ledger assertion cannot expire with the calendar |
+| AI entry browser flow | PASS: contract + Chromium fixture; the fixture mounts the route-bound transactions panel under a memory router, derives transaction dates from the current account-local week, and verifies shared form/card editing, save-all, transfer blocking and grouped ledger rendering |
 | Feedback JWT + scoped user API key + agent lifecycle | PASS: create/list/revoke, agent open → triaged → in_progress → changelog/fixed, owner-scoped reads, Redis `mypocket:audit:feedback` events observed; native screenshot regressions assert PNG bytes, `screen.png`/`image/png` multipart metadata and the 1 MiB bound |
 | Web design/typecheck/build/API roundtrips | PASS: final local design guard, base contracts, wallet-scope contract, TypeScript check and Vite build passed (1,791 modules); Vite only reports the existing large-chunk warning |
 | Provider-backed AI/OCR | PASS: configured DeepSeek-V4-Flash text/tool/schema probes and a fresh S3 → OCR Base64 → LLM receipt pipeline pass; 5/5 cases, 24/24 semantic fields, 100.0%, no ledger writes |

@@ -78,7 +78,7 @@ try {
   await clickText('Xóa item');
   await until(`${rows}.length===1`);
   assert.equal(await evaluate('fixture.refreshes'),1,'remove candidate must not refresh ledger');
-  assert.equal(await evaluate(`${rows}[0].querySelector('select').disabled`),true,'transfer remains blocked');
+  assert.equal(await evaluate(`${rows}[0].querySelector('[aria-label="Ví"]').disabled`),true,'transfer remains blocked');
   await clickText('Xóa item');
   await until(`${rows}.length===0`);
   await clickText('Đóng');
@@ -102,7 +102,7 @@ try {
   await input(`document.querySelector('[aria-label="Số tiền"]')`,'35000');
   await evaluate(`document.querySelector('[aria-label="Nhóm"]').click()`);
   await until(`!!document.querySelector('[role="dialog"][aria-label="Chọn nhóm"]')`);
-  assert.equal(await evaluate(`document.querySelectorAll('[role="dialog"][aria-label="Chọn nhóm"] [aria-pressed="false"]').length`),2,'transaction picker uses selectable category-tree rows');
+  assert.equal(await evaluate(`document.querySelectorAll('[role="dialog"][aria-label="Chọn nhóm"] [aria-pressed="false"]').length`),1,'transaction picker keeps the remaining applicable category row selectable after defaulting the first group');
   await evaluate(`Array.from(document.querySelectorAll('[role="dialog"][aria-label="Chọn nhóm"] button')).find(b=>b.textContent.includes('Cà phê')).click()`);
   await until(`!document.querySelector('[role="dialog"][aria-label="Chọn nhóm"]')`);
   assert.ok(await evaluate(`document.querySelector('[aria-label="Nhóm"]').textContent.includes('Cà phê')`),'selected group returns to transaction form');

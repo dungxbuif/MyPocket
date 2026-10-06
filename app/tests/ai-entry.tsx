@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { createMemoryHistory, createRootRoute, createRoute, createRouter, RouterProvider } from "@tanstack/react-router";
 import { createRoot } from "react-dom/client";
 import { BottomNavigation } from "../src/atomic/organisms/BottomNavigation";
 import { QuickAddSheet } from "../src/atomic/organisms/QuickAddSheet";
@@ -72,7 +73,7 @@ function Fixture() {
     <BaseButton onClick={()=>setMode("budget")}>Budget fixture</BaseButton>
     <BaseButton onClick={()=>setMode("transactions")}>Transactions fixture</BaseButton>
     {mode === "budget" ? <BudgetsPanel masked={false} onChanged={()=>fixture.refreshes++} /> : null}
-    {mode === "transactions" ? <TransactionsPanel onChanged={()=>fixture.refreshes++} /> : null}
+    {mode === "transactions" ? <RouterProvider router={transactionsRouter} /> : null}
     <BaseButton id="toggle-nav" onClick={()=>setNav(value=>!value)}>Toggle navigation</BaseButton>
     <BaseFab id="plain-fab" aria-label="Plain add" onClick={()=>fixture.plainClicks++}>+</BaseFab>
     {nav ? <BottomNavigation tab="overview" onTabChange={()=>{}} onAdd={()=>{fixture.manualOpens++;setMode("manual");}} onAiAdd={ai}/> : null}
@@ -80,4 +81,11 @@ function Fixture() {
     {mode==="ai" ? <AiEntrySheet onClose={()=>setMode(null)} onSaved={()=>fixture.refreshes++}/> : null}
   </main>;
 }
+
+const transactionsRootRoute = createRootRoute({ component: () => <TransactionsPanel onChanged={() => { fixture.refreshes++; }} /> });
+const transactionsIndexRoute = createRoute({ getParentRoute: () => transactionsRootRoute, path: "/" });
+const transactionsRouter = createRouter({
+  routeTree: transactionsRootRoute.addChildren([transactionsIndexRoute]),
+  history: createMemoryHistory({ initialEntries: ["/"] }),
+});
 createRoot(document.getElementById("root")!).render(<Fixture/>);

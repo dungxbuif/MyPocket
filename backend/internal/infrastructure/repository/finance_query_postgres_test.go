@@ -42,6 +42,7 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 	categoryID := uuid.NewString()
 	childCategoryID := uuid.NewString()
 	otherCategoryID := uuid.NewString()
+	pagingCategoryID := uuid.NewString()
 	now := time.Date(2026, 9, 10, 4, 0, 0, 0, time.UTC)
 	if err := db.Create(&entity.User{ID: owner, Email: owner + "@finance.test", GoogleSubject: owner, Timezone: "Asia/Ho_Chi_Minh", TimezoneConfirmed: true}).Error; err != nil {
 		t.Fatal(err)
@@ -61,10 +62,13 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 	if err := db.Create(&entity.Category{ID: otherCategoryID, OwnerID: &other, Kind: entity.TransactionTypeExpense, Name: "Private"}).Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := db.Create(&entity.Category{ID: pagingCategoryID, OwnerID: &owner, Kind: entity.TransactionTypeExpense, Name: "Paging"}).Error; err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() {
 		db.Where("owner_id IN ?", []string{owner, other}).Delete(&entity.Transaction{})
 		db.Where("id IN ?", []string{walletID}).Delete(&entity.Wallet{})
-		db.Where("id IN ?", []string{categoryID, childCategoryID, otherCategoryID}).Delete(&entity.Category{})
+		db.Where("id IN ?", []string{categoryID, childCategoryID, otherCategoryID, pagingCategoryID}).Delete(&entity.Category{})
 		db.Where("id IN ?", []string{owner, other}).Delete(&entity.User{})
 	})
 	transactionID := uuid.NewString()
@@ -141,7 +145,7 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 		t.Fatalf("transaction detail must not cross owner boundary: %+v", otherDetail.Results[0])
 	}
 	for i := 0; i < 51; i++ {
-		row := entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: walletID, Type: entity.TransactionTypeExpense, Amount: int64(i + 1), OccurredAt: now.Add(time.Duration(i+4) * time.Hour), IncludedInReports: true}
+		row := entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: walletID, CategoryID: &pagingCategoryID, Type: entity.TransactionTypeExpense, Amount: int64(i + 1), OccurredAt: now.Add(time.Duration(i+4) * time.Hour), IncludedInReports: true}
 		if err := db.Create(&row).Error; err != nil {
 			t.Fatal(err)
 		}

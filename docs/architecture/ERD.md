@@ -91,7 +91,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `wallets` | User-owned basic/goal/credit wallet | User | Migrated; VND enforced for this stage. |
 | `categories` | System or user-owned group | System/User | Migrated; owner-approved system catalog is seeded through `000004`. |
 | `category_wallets` | Quan hệ nhóm–ví áp dụng | Cùng user với nhóm/ví | Migrated; owner consistency remains use-case enforced. |
-| `transactions` | Owner-scoped income/expense ledger entry | User | Migrated; belongs to one wallet and optional visible category. Nullable `transfer_id` links the two rows of an internal transfer. |
+| `transactions` | Owner-scoped income/expense ledger entry | User | Migrated; ordinary income/expense rows belong to one wallet and one visible applicable category. Explicit adjustment rows are the only uncategorized exception. Nullable `transfer_id` links the two rows of an internal transfer. |
 | `jars` | Stable owner-scoped jar identity | User | Migration `000014`; month-specific names/allocation live in `jar_month_configs`. |
 | `jar_months` | Marks a month whose jar configuration has been initialized | User/month | Migration `000014`; serializes one-time prior-month copy, including empty initialization. |
 | `jar_month_configs` | Name, allocation rule and active state for one jar/month | User/month/jar | Migration `000014`; historical rows remain when a later month changes. |

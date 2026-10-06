@@ -86,12 +86,25 @@ func creditTestRouter(handler *CreditHandler) *gin.Engine {
 func TestCreateCreditEntryUsesDedicatedWalletFlow(t *testing.T) {
 	repo := &creditRepositoryStub{}
 	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"credit-1": {ID: "credit-1", OwnerID: "owner-1", Type: entity.WalletTypeCredit, CreditLimit: int64Ptr(10000000)}}}
+	categories := &creditCategoryRepositoryStub{categories: []entity.Category{{ID: "food", Kind: entity.TransactionTypeExpense}}}
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/credit/wallets/credit-1/entries", bytes.NewBufferString(`{"kind":"purchase","category_id":"food","amount":125000}`))
+	request.Header.Set("Content-Type", "application/json")
+	creditTestRouter(&CreditHandler{Credits: repo, Wallets: wallets, Categories: categories}).ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || repo.entry == nil || repo.entry.Type != entity.TransactionTypeExpense {
+		t.Fatalf("unexpected credit entry: status=%d body=%s entry=%#v", response.Code, response.Body.String(), repo.entry)
+	}
+}
+
+func TestCreateCreditEntryRequiresCategory(t *testing.T) {
+	repo := &creditRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"credit-1": {ID: "credit-1", OwnerID: "owner-1", Type: entity.WalletTypeCredit, CreditLimit: int64Ptr(10000000)}}}
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/credit/wallets/credit-1/entries", bytes.NewBufferString(`{"kind":"purchase","amount":125000}`))
 	request.Header.Set("Content-Type", "application/json")
 	creditTestRouter(&CreditHandler{Credits: repo, Wallets: wallets}).ServeHTTP(response, request)
-	if response.Code != http.StatusCreated || repo.entry == nil || repo.entry.Type != entity.TransactionTypeExpense {
-		t.Fatalf("unexpected credit entry: status=%d body=%s entry=%#v", response.Code, response.Body.String(), repo.entry)
+	if response.Code != http.StatusBadRequest || repo.entry != nil {
+		t.Fatalf("credit entry without category should be rejected: status=%d body=%s entry=%#v", response.Code, response.Body.String(), repo.entry)
 	}
 }
 

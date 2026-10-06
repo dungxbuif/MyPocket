@@ -36,7 +36,6 @@ const COPY = {
   amount: "Số tiền (VND)",
   wallet: "Ví",
   category: "Nhóm",
-  categoryOptional: "Không chọn nhóm",
   occurredAt: "Ngày và giờ",
   note: "Ghi chú",
   reports: "Tính vào báo cáo",
@@ -109,7 +108,12 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
         const ledgerWallets = nextWallets.filter((wallet) => wallet.type !== "credit");
         setWallets(ledgerWallets);
         setCategories(nextCategories);
-        setState((current) => ({ ...current, walletID: current.walletID || ledgerWallets[0]?.id || "" }));
+        setState((current) => {
+          const walletID = current.walletID || ledgerWallets[0]?.id || "";
+          const walletType = ledgerWallets.find(wallet => wallet.id === walletID)?.type;
+          const fallback = nextCategories.find(category => categoryAppliesToTransaction(category, current.type, walletID, walletType));
+          return { ...current, walletID, categoryID: current.categoryID || fallback?.id || "" };
+        });
         setTransferState((current) => ({ ...current, sourceWalletID: current.sourceWalletID || ledgerWallets[0]?.id || "", destinationWalletID: current.destinationWalletID || ledgerWallets.find(wallet => wallet.id !== (current.sourceWalletID || ledgerWallets[0]?.id))?.id || "" }));
       })
       .catch(() => { if (!cancelled) setError(COPY.loadError); })
@@ -133,6 +137,7 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
       const next = { ...current, ...updates };
       const selected = categories.find((category) => category.id === next.categoryID);
       if (selected && !categoryAppliesToTransaction(selected, next.type, next.walletID, wallets.find(wallet => wallet.id === next.walletID)?.type)) next.categoryID = "";
+      if (!next.categoryID) next.categoryID = categories.find(category => categoryAppliesToTransaction(category, next.type, next.walletID, wallets.find(wallet => wallet.id === next.walletID)?.type))?.id || "";
       return next;
     });
   };
@@ -164,8 +169,8 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
       setError(COPY.validationError);
       return;
     }
-    if (state.categoryID && !applicableCategories.some(category => category.id === state.categoryID)) {
-      setError("Nhóm cũ không phù hợp với ví này. Hãy chọn lại hoặc bỏ chọn nhóm.");
+    if (!state.categoryID || !applicableCategories.some(category => category.id === state.categoryID)) {
+      setError("Hãy chọn nhóm phù hợp với loại giao dịch và ví.");
       return;
     }
     let occurredAt:string;
@@ -177,7 +182,7 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
     }
     const input: TransactionInput = {
       wallet_id: state.walletID,
-      category_id: state.categoryID || undefined,
+      category_id: state.categoryID,
       jar_id: state.jarID || null,
       type: state.type,
       amount,
@@ -217,7 +222,7 @@ export function QuickAddSheet({ onClose, onSaved, onAiEntry, transaction, initia
   let validTime=true;
   try { instantFromLocalDateTime(state.occurredAt,timezone); } catch { validTime=false; }
   const transferValid = wallets.some(wallet => wallet.id === transferState.sourceWalletID) && wallets.some(wallet => wallet.id === transferState.destinationWalletID) && transferState.sourceWalletID !== transferState.destinationWalletID && Number.isSafeInteger(Number(transferState.amount)) && Number(transferState.amount) > 0 && (() => { try { instantFromLocalDateTime(transferState.occurredAt, timezone); return true; } catch { return false; } })();
-  const valid = mode === "transfer" ? transferValid : wallets.some(wallet => wallet.id === state.walletID) && Number.isSafeInteger(Number(state.amount)) && Number(state.amount) > 0 && validTime;
+  const valid = mode === "transfer" ? transferValid : wallets.some(wallet => wallet.id === state.walletID) && applicableCategories.some(category => category.id === state.categoryID) && Number.isSafeInteger(Number(state.amount)) && Number(state.amount) > 0 && validTime;
   return <BaseBottomSheet presentation="form" closingDisabled={saving} title={transaction ? COPY.editTitle : transferOnly ? "Chuyển tiền đến ví khác" : COPY.addTitle} closeLabel="Hủy" onClose={() => { if (!saving) onClose(); }}
     footer={<div className="flex gap-3"><BaseButton className="flex-1" size="lg" loading={saving} disabled={loading || !valid} onClick={() => void submit()}>Lưu</BaseButton>{transaction ? <BaseButton variant="danger" disabled={saving} aria-label={COPY.delete} onClick={() => void remove()}><Trash2 size={20} /></BaseButton> : onAiEntry ? <BaseButton disabled={saving} aria-label="Nhập bằng AI từ ảnh hoặc nội dung" onClick={onAiEntry}><ImagePlus size={22} /></BaseButton> : null}</div>}>
     <div className="space-y-3">

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AlignLeft, Tags, WalletCards } from "lucide-react";
 import { BaseButton } from "../atoms/BaseButton";
 import { BaseSelect, BaseTextInput, FormField } from "../atoms/FormField";
@@ -25,6 +25,9 @@ export function TransactionFields({ state, onChange, wallets, categories, jars =
   const applicable = categories.filter(category => categoryAppliesToTransaction(category, state.type, state.walletID, wallet?.type));
   const selectedCategory = categories.find(item => item.id === state.categoryID);
   const display = selectedCategory ? categoryPresentationFor(selectedCategory.system_key ?? selectedCategory.icon_key) : undefined;
+  useEffect(() => {
+    if (!state.categoryID && applicable[0]) onChange({ ...state, categoryID: applicable[0].id });
+  }, [applicable, onChange, state]);
   const change = (patch: Partial<TransactionFormState>) => {
     const next = { ...state, ...patch };
     if ("type" in patch || "walletID" in patch) {
@@ -53,7 +56,7 @@ export function TransactionFields({ state, onChange, wallets, categories, jars =
     </SurfaceCard>
     {picker ? <BaseModal label={picker === "wallet" ? "Chọn ví" : "Chọn nhóm"} onClose={() => setPicker(null)}>
       <div className="space-y-3"><Text size="lg" weight="bold">{picker === "wallet" ? "Chọn ví" : "Chọn nhóm"}</Text>
-        {picker === "category" ? <CategoryTreeSelector categories={categories.filter(category => category.kind === state.type)} selectableIDs={applicable.map(category => category.id)} selectedID={state.categoryID} onSelect={categoryID => { change({ categoryID }); setPicker(null); }} /> : wallets.filter(item => item.type !== "credit").map(item => <FormSelectorRow key={item.id} label={item.name} value={item.name} icon={WalletCards} onClick={() => { change({ walletID: item.id }); setPicker(null); }} />)}
+        {picker === "category" ? <CategoryTreeSelector categories={categories.filter(category => category.kind === state.type)} selectableIDs={applicable.map(category => category.id)} selectedID={state.categoryID} clearLabel="" onSelect={categoryID => { if (categoryID) change({ categoryID }); setPicker(null); }} /> : wallets.filter(item => item.type !== "credit").map(item => <FormSelectorRow key={item.id} label={item.name} value={item.name} icon={WalletCards} onClick={() => { change({ walletID: item.id }); setPicker(null); }} />)}
         <BaseButton variant="ghost" onClick={() => setPicker(null)}>Hủy</BaseButton>
       </div>
     </BaseModal> : null}

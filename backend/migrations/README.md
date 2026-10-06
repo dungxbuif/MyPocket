@@ -14,6 +14,7 @@ Stage v1 starts with one baseline migration pair and uses additive forward migra
 - `000025_credit_ledger.up.sql` adds credit entry kind/payment pairing metadata and indexes.
 - `000026_travel_mode.up.sql` adds owner-scoped travel events, a one-active-event invariant, and nullable transaction links.
 - `000027_portfolio_ledger.up.sql` adds owner-scoped immutable buy/sell history and optional manual prices for the portfolio ledger.
+- `000028_transaction_category_required.up.sql` backfills ordinary income/expense rows with the canonical fallback groups and enforces a non-null category for ordinary and credit ledger rows; adjustment rows remain the explicit uncategorized exception.
 
 The previous incremental migration files were squashed for the stage reset. Existing databases whose migration table is at version 19 must be recreated or explicitly reset to version 1 in a disposable environment before running this baseline. Do not force or drop a production database.
 

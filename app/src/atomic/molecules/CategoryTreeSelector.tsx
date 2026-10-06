@@ -45,7 +45,7 @@ export function CategoryTreeSelector({ categories, selectableIDs, selectedID, on
 
   return <div className="space-y-3">
     <BaseTextInput type="search" aria-label="Tìm kiếm nhóm" placeholder="Tìm kiếm nhóm" value={query} onChange={event => setQuery(event.target.value)} />
-    <BaseButton variant="ghost" className="w-full justify-start" aria-pressed={!selectedID} onClick={() => onSelect("")}>{clearLabel}</BaseButton>
+    {clearLabel ? <BaseButton variant="ghost" className="w-full justify-start" aria-pressed={!selectedID} onClick={() => onSelect("")}>{clearLabel}</BaseButton> : null}
     {groups.map(group => <BaseCategoryTree key={group.root.id} mode="selection" selectedID={selectedID} root={group.root} children={group.children} onSelect={onSelect} />)}
     {groups.length === 0 ? <StatusMessage variant="plain">Không có nhóm phù hợp.</StatusMessage> : null}
   </div>;

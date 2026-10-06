@@ -64,13 +64,17 @@ func TestCreditLedgerKeepsSignedBalanceAndAtomicPaymentPair(t *testing.T) {
 	if err := db.Create(&sourceWallet).Error; err != nil {
 		t.Fatal(err)
 	}
+	var expenseCategory entity.Category
+	if err := db.Where("is_system = ? AND system_key = ?", true, "expense_general").First(&expenseCategory).Error; err != nil {
+		t.Fatal(err)
+	}
 	t.Cleanup(func() {
 		db.Where("owner_id = ?", owner).Delete(&entity.Transaction{})
 		db.Where("owner_id = ?", owner).Delete(&entity.Wallet{})
 		db.Where("id = ?", owner).Delete(&entity.User{})
 	})
 	repo := &TransactionPostgresRepository{db: db}
-	created, err := repo.CreateCreditEntry(owner, transactionrepo.CreditEntryInput{WalletID: creditWallet.ID, Kind: entity.CreditKindPurchase, Amount: 100, OccurredAt: time.Now().UTC()})
+	created, err := repo.CreateCreditEntry(owner, transactionrepo.CreditEntryInput{WalletID: creditWallet.ID, Kind: entity.CreditKindPurchase, CategoryID: &expenseCategory.ID, Amount: 100, OccurredAt: time.Now().UTC()})
 	if err != nil || created == nil || created.CreditKind == nil || *created.CreditKind != entity.CreditKindPurchase {
 		t.Fatalf("create credit entry: row=%#v err=%v", created, err)
 	}

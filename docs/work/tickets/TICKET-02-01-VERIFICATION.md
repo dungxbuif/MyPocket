@@ -19,7 +19,7 @@ Verified 2026-09-13 for the approved basic income/expense slice.
 
 - Authenticated users can list, create, edit and delete owner-scoped income/expense transactions.
 - Amount is a positive integer; direction applies through type. Wallet must belong to the owner and be `basic` or `goal`; credit waits for its own ledger semantics.
-- Category is optional. A chosen category must be visible, match income/expense kind, and apply to the selected wallet when restricted.
+- Category is required for ordinary income/expense rows. It must be visible, match income/expense kind, and apply to the selected wallet when restricted; only adjustment rows are uncategorized.
 - Note, local datetime converted to RFC3339 UTC, and report inclusion round-trip through the editor.
 - The real list groups newest rows by local date, displays signed group totals and opens the same base-composed editor for changes.
 - Global add, transaction edit and wallet changes refresh Header, Overview, Transactions and Wallet management through one refresh contract.

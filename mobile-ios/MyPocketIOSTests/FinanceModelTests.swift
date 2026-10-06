@@ -109,6 +109,17 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(TransactionsViewModel.ordinaryTransactionWallets(wallets).map(\.id), ["basic"])
     }
 
+    func testRequiredCategoryDefaultsToFirstApplicableAndPreservesValidSelection() {
+        let food = CategoryModel(id: "food", ownerID: nil, parentID: nil, kind: "expense", name: "Ăn uống", systemKey: nil, iconKey: "tag", isSystem: false, walletIDs: [])
+        let shopping = CategoryModel(id: "shopping", ownerID: nil, parentID: nil, kind: "expense", name: "Mua sắm", systemKey: nil, iconKey: "tag", isSystem: false, walletIDs: [])
+        let income = CategoryModel(id: "income", ownerID: nil, parentID: nil, kind: "income", name: "Thu nhập", systemKey: nil, iconKey: "tag", isSystem: false, walletIDs: [])
+        let categories = [food, shopping, income]
+
+        XCTAssertEqual(TransactionEditorPolicy.requiredCategoryID(type: "expense", walletID: "wallet-1", walletType: "basic", categories: categories, currentID: ""), "food")
+        XCTAssertEqual(TransactionEditorPolicy.requiredCategoryID(type: "expense", walletID: "wallet-1", walletType: "basic", categories: categories, currentID: "shopping"), "shopping")
+        XCTAssertEqual(TransactionEditorPolicy.requiredCategoryID(type: "income", walletID: "wallet-1", walletType: "basic", categories: categories, currentID: "missing"), "income")
+    }
+
     func testPortfolioTradeDateUsesAccountLocalDay() {
         let date = MPFormat.parseCalendarDate("2026-10-06")!
         let timestamp = PortfolioView.accountLocalNoonTimestamp(date, timezone: "Asia/Ho_Chi_Minh")

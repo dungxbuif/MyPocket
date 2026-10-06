@@ -171,6 +171,13 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		if d.Type != "income" && d.Type != "expense" && d.Type != "transfer" {
 			d.Type = "unknown"
 		}
+		if category == nil && (d.Type == entity.TransactionTypeIncome || d.Type == entity.TransactionTypeExpense) {
+			if fallback := defaultAIEntryCategory(d.AIEntryDraft, wallet, categories); fallback != nil {
+				d.CategoryID = &fallback.ID
+				category = fallback
+				appendAIQuestion(d, "Nhóm được chọn mặc định từ loại giao dịch và ví; hãy kiểm tra lại trước khi lưu.")
+			}
+		}
 		if d.Amount < 0 || d.Amount > 9007199254740991 {
 			d.Amount = 0
 		}
@@ -200,6 +207,53 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 	}
 	process.Reply = out.Reply
 	return process, nil
+}
+
+func defaultAIEntryCategory(d entity.AIEntryDraft, wallet entity.Wallet, categories []entity.Category) *entity.Category {
+	preferred := ""
+	if wallet.Type == entity.WalletTypeGoal {
+		if d.Type == entity.TransactionTypeIncome {
+			preferred = "income_transfer_in"
+		} else {
+			preferred = "expense_transfer_out"
+		}
+	} else if d.Type == entity.TransactionTypeIncome {
+		preferred = "income_other"
+	} else {
+		preferred = "expense_general"
+	}
+	applicable := func(category entity.Category) bool {
+		if category.Kind != d.Type {
+			return false
+		}
+		if wallet.Type == entity.WalletTypeGoal {
+			if category.SystemKey == nil || *category.SystemKey != preferred {
+				return false
+			}
+		}
+		if len(category.WalletIDs) == 0 {
+			return true
+		}
+		for _, walletID := range category.WalletIDs {
+			if walletID == wallet.ID {
+				return true
+			}
+		}
+		return false
+	}
+	for index := range categories {
+		category := &categories[index]
+		if category.SystemKey != nil && *category.SystemKey == preferred && applicable(*category) {
+			return category
+		}
+	}
+	for index := range categories {
+		category := &categories[index]
+		if applicable(*category) {
+			return category
+		}
+	}
+	return nil
 }
 
 func appendAIQuestion(d *entity.AIExtractDraft, question string) {

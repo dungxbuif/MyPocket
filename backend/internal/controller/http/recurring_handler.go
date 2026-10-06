@@ -207,7 +207,11 @@ func (h *RecurringHandler) bind(c *gin.Context, owner string, existing *entity.R
 		return entity.RecurringSchedule{}, false
 	}
 	input.CategoryID = normalizeOptional(input.CategoryID)
-	if input.CategoryID != nil && !categoryValidForRecurring(h.Categories, owner, *input.CategoryID, input.Type) {
+	if input.CategoryID == nil {
+		transactionBadRequest(c, transactionCategoryRequiredMessage)
+		return entity.RecurringSchedule{}, false
+	}
+	if !categoryValidForRecurring(h.Categories, owner, *input.CategoryID, input.Type) {
 		transactionBadRequest(c, transactionCategoryMessage)
 		return entity.RecurringSchedule{}, false
 	}

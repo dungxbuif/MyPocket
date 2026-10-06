@@ -24,7 +24,7 @@ func ValidateAIEntryDraft(d entity.AIEntryDraft, wallet entity.Wallet, category 
 		return errors.New("ghi chú tối đa 2000 ký tự")
 	}
 	if d.CategoryID == nil || strings.TrimSpace(*d.CategoryID) == "" {
-		return nil
+		return errors.New("hãy chọn nhóm cho giao dịch")
 	}
 	if category == nil || category.ID != *d.CategoryID || category.Kind != d.Type {
 		return errors.New("nhóm không phù hợp giao dịch")

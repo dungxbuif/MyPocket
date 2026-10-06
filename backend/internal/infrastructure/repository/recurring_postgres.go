@@ -183,8 +183,8 @@ func validateRecurringWallet(tx *gorm.DB, ownerID, walletID string) error {
 }
 
 func validateRecurringCategory(tx *gorm.DB, ownerID string, categoryID *string, kind string) error {
-	if categoryID == nil {
-		return nil
+	if categoryID == nil || *categoryID == "" {
+		return recurringrepo.ErrRecurringCategoryInvalid
 	}
 	var category entity.Category
 	if err := tx.Where("id = ? AND (owner_id = ? OR owner_id IS NULL)", *categoryID, ownerID).First(&category).Error; err != nil || category.Kind != kind {

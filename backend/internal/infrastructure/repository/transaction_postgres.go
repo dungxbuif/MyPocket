@@ -71,6 +71,9 @@ func (r *TransactionPostgresRepository) Find(ownerID, id string) (*entity.Transa
 }
 
 func (r *TransactionPostgresRepository) Create(transaction *entity.Transaction) error {
+	if transaction == nil || ((transaction.Type == entity.TransactionTypeIncome || transaction.Type == entity.TransactionTypeExpense) && (transaction.CategoryID == nil || strings.TrimSpace(*transaction.CategoryID) == "")) {
+		return transactionrepo.ErrTransactionCategoryRequired
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if transaction != nil && transaction.TravelEventID != nil {
 			var event entity.TravelEvent
@@ -113,7 +116,7 @@ func (r *TransactionPostgresRepository) CreateAdjustment(transaction *entity.Tra
 }
 
 func (r *TransactionPostgresRepository) CreateCreditEntry(ownerID string, input transactionrepo.CreditEntryInput) (*entity.Transaction, error) {
-	if strings.TrimSpace(ownerID) == "" || strings.TrimSpace(input.WalletID) == "" || input.Amount <= 0 || input.OccurredAt.IsZero() {
+	if strings.TrimSpace(ownerID) == "" || strings.TrimSpace(input.WalletID) == "" || input.CategoryID == nil || strings.TrimSpace(*input.CategoryID) == "" || input.Amount <= 0 || input.OccurredAt.IsZero() {
 		return nil, transactionrepo.ErrCreditInvalid
 	}
 	typeForKind := map[string]string{

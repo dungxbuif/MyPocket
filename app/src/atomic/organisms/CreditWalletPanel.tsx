@@ -11,6 +11,7 @@ import { formatVND } from "../utils/format";
 import { createCreditEntry, createCreditPayment, fetchCreditStatement, type CreditKind, type CreditStatement } from "../../services/credit";
 import type { Category } from "../../services/categories";
 import type { Wallet } from "../../services/wallets";
+import { categoryAppliesToTransaction } from "../../services/transactionLogic";
 
 const entryKinds: Array<{ value: CreditKind; label: string }> = [
   { value: "purchase", label: "Mua hàng" },
@@ -30,7 +31,10 @@ export function CreditWalletPanel({ wallet, wallets, categories, onChanged }: { 
   const [sourceWalletID, setSourceWalletID] = useState("");
   const [note, setNote] = useState("");
   const sourceWallets = useMemo(() => wallets.filter(item => item.type !== "credit" && item.id !== wallet.id), [wallets, wallet.id]);
-  const categoriesForKind = useMemo(() => categories.filter(category => category.kind === (kind === "refund" ? "income" : "expense")), [categories, kind]);
+  const categoriesForKind = useMemo(() => {
+    const type = kind === "refund" ? "income" : "expense";
+    return categories.filter(category => categoryAppliesToTransaction(category, type, wallet.id, wallet.type));
+  }, [categories, kind, wallet.id, wallet.type]);
   const [categoryID, setCategoryID] = useState("");
 
   const load = () => {
@@ -47,7 +51,7 @@ export function CreditWalletPanel({ wallet, wallets, categories, onChanged }: { 
     if (!Number.isFinite(value) || value <= 0) return;
     try {
       setSaving(true);
-      if (action === "entry") await createCreditEntry(wallet.id, { kind, amount: value, category_id: categoryID || undefined, note: note || undefined, occurred_at: new Date().toISOString() });
+      if (action === "entry") await createCreditEntry(wallet.id, { kind, amount: value, category_id: categoryID, note: note || undefined, occurred_at: new Date().toISOString() });
       if (action === "payment") await createCreditPayment(wallet.id, { source_wallet_id: sourceWalletID, amount: value, note: note || undefined, occurred_at: new Date().toISOString() });
       close(); load(); onChanged();
     } catch { setError("Không thể lưu thao tác tín dụng."); } finally { setSaving(false); }
@@ -60,6 +64,6 @@ export function CreditWalletPanel({ wallet, wallets, categories, onChanged }: { 
     <div className="grid grid-cols-2 gap-2"><BaseButton onClick={() => setAction("entry")}>Thêm giao dịch</BaseButton><BaseButton variant="chip" onClick={() => setAction("payment")}>Thanh toán thẻ</BaseButton></div>
     {statement && statement.items.length === 0 ? <StatusMessage variant="plain">Chưa có giao dịch tín dụng.</StatusMessage> : null}
     {statement?.items.map(item => <SurfaceCard key={item.id} tone="form" padding="sm"><div className="flex items-center justify-between gap-3"><div><Text size="sm">{item.credit_kind === "purchase" ? "Mua hàng" : item.credit_kind === "refund" ? "Hoàn tiền" : item.credit_kind === "fee" ? "Phí" : item.credit_kind === "payment" ? "Thanh toán" : "Lãi"}</Text><Text size="xs" tone="secondary">{item.note || new Date(item.occurred_at).toLocaleDateString("vi-VN")}</Text></div><Text numeric tone={item.type === "income" ? "action" : "danger"}>{item.type === "income" ? "+" : "−"}{formatVND(item.amount)}</Text></div></SurfaceCard>)}
-    {action ? <BaseBottomSheet presentation="form" title={action === "payment" ? "Thanh toán thẻ" : "Thêm giao dịch tín dụng"} closeLabel="Hủy" onClose={close} closingDisabled={saving} footer={<BaseButton className="w-full" size="lg" loading={saving} disabled={!amount || (action === "payment" && !sourceWalletID)} onClick={() => void save()}>Lưu</BaseButton>}><div className="space-y-3"><SurfaceCard tone="form" padding="md">{action === "entry" ? <><FormField label="Loại giao dịch"><BaseSelect value={kind} disabled={saving} onChange={event => setKind(event.target.value as CreditKind)}>{entryKinds.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</BaseSelect></FormField><Divider /><FormField label="Nhóm"><BaseSelect value={categoryID} disabled={saving} onChange={event => setCategoryID(event.target.value)}><option value="">Không chọn nhóm</option>{categoriesForKind.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</BaseSelect></FormField></> : <FormField label="Ví thanh toán"><BaseSelect value={sourceWalletID} disabled={saving} onChange={event => setSourceWalletID(event.target.value)}>{sourceWallets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</BaseSelect></FormField>}<AmountField value={amount} disabled={saving} onChange={setAmount} /><FormField label="Ghi chú"><BaseTextInput variant="inline" value={note} disabled={saving} onChange={event => setNote(event.target.value)} /></FormField></SurfaceCard></div></BaseBottomSheet> : null}
+    {action ? <BaseBottomSheet presentation="form" title={action === "payment" ? "Thanh toán thẻ" : "Thêm giao dịch tín dụng"} closeLabel="Hủy" onClose={close} closingDisabled={saving} footer={<BaseButton className="w-full" size="lg" loading={saving} disabled={!amount || (action === "entry" && !categoryID) || (action === "payment" && !sourceWalletID)} onClick={() => void save()}>Lưu</BaseButton>}><div className="space-y-3"><SurfaceCard tone="form" padding="md">{action === "entry" ? <><FormField label="Loại giao dịch"><BaseSelect value={kind} disabled={saving} onChange={event => setKind(event.target.value as CreditKind)}>{entryKinds.map(item => <option key={item.value} value={item.value}>{item.label}</option>)}</BaseSelect></FormField><Divider /><FormField label="Nhóm"><BaseSelect required value={categoryID} disabled={saving} onChange={event => setCategoryID(event.target.value)}>{categoriesForKind.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}</BaseSelect></FormField></> : <FormField label="Ví thanh toán"><BaseSelect value={sourceWalletID} disabled={saving} onChange={event => setSourceWalletID(event.target.value)}>{sourceWallets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</BaseSelect></FormField>}<AmountField value={amount} disabled={saving} onChange={setAmount} /><FormField label="Ghi chú"><BaseTextInput variant="inline" value={note} disabled={saving} onChange={event => setNote(event.target.value)} /></FormField></SurfaceCard></div></BaseBottomSheet> : null}
   </div>;
 }

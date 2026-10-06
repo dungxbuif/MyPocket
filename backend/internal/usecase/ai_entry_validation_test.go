@@ -7,8 +7,10 @@ import (
 
 func TestAIEntryValidationPreventsUnsupportedOrIncompleteLedgerWrites(t *testing.T) {
 	wallet := entity.Wallet{ID: "w", OwnerID: "owner", Type: "basic"}
-	valid := entity.AIEntryDraft{Type: "expense", Amount: 35000, WalletID: "w", OccurredAt: "2026-09-21T00:30:00+07:00", IncludedInReports: true}
-	if err := ValidateAIEntryDraft(valid, wallet, nil); err != nil {
+	categoryID := "cat"
+	category := entity.Category{ID: categoryID, Kind: entity.TransactionTypeExpense}
+	valid := entity.AIEntryDraft{Type: "expense", Amount: 35000, WalletID: "w", CategoryID: &categoryID, OccurredAt: "2026-09-21T00:30:00+07:00", IncludedInReports: true}
+	if err := ValidateAIEntryDraft(valid, wallet, &category); err != nil {
 		t.Fatal(err)
 	}
 	for _, change := range []func(*entity.AIEntryDraft){
@@ -18,12 +20,12 @@ func TestAIEntryValidationPreventsUnsupportedOrIncompleteLedgerWrites(t *testing
 	} {
 		d := valid
 		change(&d)
-		if ValidateAIEntryDraft(d, wallet, nil) == nil {
+		if ValidateAIEntryDraft(d, wallet, &category) == nil {
 			t.Fatalf("invalid draft accepted: %+v", d)
 		}
 	}
 	wallet.Type = "credit"
-	if ValidateAIEntryDraft(valid, wallet, nil) == nil {
+	if ValidateAIEntryDraft(valid, wallet, &category) == nil {
 		t.Fatal("credit treated as ordinary expense")
 	}
 }

@@ -773,7 +773,7 @@ struct RecurringView: View {
                         MPAmountField(title: "Số tiền", text: $amount)
                         MPOptionSelector(title: "Ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
                         MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $type)
-                        MPOptionSelector(title: "Danh mục", options: [MPSelectionOption(id: "", label: "Không chọn")] + categoriesForType.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryID, emptyLabel: "Không chọn")
+                        MPOptionSelector(title: "Danh mục", options: categoriesForType.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryID)
                         MPWalletSelector(title: "Tần suất", options: ["daily", "weekly", "monthly", "yearly"], selection: $frequency)
                         MPAmountField(title: "Mỗi bao nhiêu kỳ", text: $interval)
                         MPDateTimeField(title: "Lần chạy kế tiếp", date: $nextRunDate)
@@ -791,9 +791,7 @@ struct RecurringView: View {
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .onChange(of: type) { _, _ in
-            if !categoriesForType.contains(where: { $0.id == categoryID }) {
-                categoryID = ""
-            }
+            categoryID = TransactionEditorPolicy.requiredCategoryID(type: type, walletID: walletID, walletType: wallets.first(where: { $0.id == walletID })?.type ?? "basic", categories: categories, currentID: categoryID)
         }
         .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa lịch định kỳ?", message: "Các giao dịch đã tạo vẫn giữ nguyên trong sổ giao dịch.", confirmTitle: "Xóa") {
             if let target = deleteTarget { Task { await delete(target) } }
@@ -802,7 +800,9 @@ struct RecurringView: View {
         .accessibilityIdentifier("recurring-screen")
     }
 
-    private var categoriesForType: [CategoryModel] { categories.filter { $0.kind == type } }
+    private var categoriesForType: [CategoryModel] {
+        TransactionEditorPolicy.applicableCategories(type: type, walletID: walletID, walletType: wallets.first(where: { $0.id == walletID })?.type ?? "basic", categories: categories)
+    }
     private func walletName(for id: String) -> String { wallets.first(where: { $0.id == id })?.name ?? "Ví đã xóa" }
     private func frequencyLabel(_ value: String, interval: Int) -> String {
         let label: String
@@ -815,10 +815,10 @@ struct RecurringView: View {
         }
         return interval == 1 ? label : "Mỗi \(interval) kỳ · \(label.lowercased())"
     }
-    private func load() async { do { async let schedules = api.recurring(); async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); items = try await schedules; wallets = (try await walletList).filter { $0.type != "credit" }; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone }; if walletID.isEmpty { walletID = wallets.first?.id ?? "" }; self.error = nil } catch { self.error = "Không thể tải lịch định kỳ." } }
+    private func load() async { do { async let schedules = api.recurring(); async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); items = try await schedules; wallets = (try await walletList).filter { $0.type != "credit" }; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone }; if walletID.isEmpty { walletID = wallets.first?.id ?? "" }; categoryID = TransactionEditorPolicy.requiredCategoryID(type: type, walletID: walletID, walletType: wallets.first(where: { $0.id == walletID })?.type ?? "basic", categories: categories, currentID: categoryID); self.error = nil } catch { self.error = "Không thể tải lịch định kỳ." } }
     private func runDue() async { do { let response = try await api.runDueRecurring(); result = "Đã tạo \(response.created) giao dịch."; await load() } catch { self.error = "Không thể chạy giao dịch đến hạn." } }
-    private func resetEditor() { name = ""; amount = ""; walletID = wallets.first?.id ?? ""; frequency = "monthly"; type = "expense"; categoryID = ""; interval = "1"; note = ""; nextRunDate = Date(); endsAtDate = Date(); endsAtEnabled = "Không"; active = "Có" }
-    private func beginEditing(_ item: RecurringModel) { editTarget = item; name = item.name; amount = String(item.amount); note = item.note ?? ""; walletID = item.walletID; type = item.type; categoryID = item.categoryID ?? ""; frequency = item.frequency; interval = String(item.interval); nextRunDate = MPFormat.parseInstant(item.nextRunAt) ?? Date(); if let endsAt = item.endsAt, let parsed = MPFormat.parseInstant(endsAt) { endsAtDate = parsed; endsAtEnabled = "Có" } else { endsAtDate = Date(); endsAtEnabled = "Không" }; active = item.active ? "Có" : "Không"; showEditor = true }
+    private func resetEditor() { name = ""; amount = ""; walletID = wallets.first?.id ?? ""; frequency = "monthly"; type = "expense"; categoryID = TransactionEditorPolicy.requiredCategoryID(type: "expense", walletID: wallets.first?.id ?? "", walletType: wallets.first?.type ?? "basic", categories: categories, currentID: ""); interval = "1"; note = ""; nextRunDate = Date(); endsAtDate = Date(); endsAtEnabled = "Không"; active = "Có" }
+    private func beginEditing(_ item: RecurringModel) { editTarget = item; name = item.name; amount = String(item.amount); note = item.note ?? ""; walletID = item.walletID; type = item.type; categoryID = TransactionEditorPolicy.requiredCategoryID(type: item.type, walletID: item.walletID, walletType: wallets.first(where: { $0.id == item.walletID })?.type ?? "basic", categories: categories, currentID: item.categoryID ?? ""); frequency = item.frequency; interval = String(item.interval); nextRunDate = MPFormat.parseInstant(item.nextRunAt) ?? Date(); if let endsAt = item.endsAt, let parsed = MPFormat.parseInstant(endsAt) { endsAtDate = parsed; endsAtEnabled = "Có" } else { endsAtDate = Date(); endsAtEnabled = "Không" }; active = item.active ? "Có" : "Không"; showEditor = true }
     private func save() async {
         guard let wallet = wallets.first(where: { $0.id == walletID }),
               RecurringDraftValidator.isValid(
@@ -833,14 +833,18 @@ struct RecurringView: View {
               ),
               let parsed = RecurringDraftValidator.positiveInteger(amount),
               let parsedInterval = RecurringDraftValidator.positiveInteger(interval).flatMap(Int.init) else {
-            self.error = "Nhập đủ tên, ví, chu kỳ và số tiền hợp lệ."
+            self.error = "Nhập đủ tên, ví, nhóm, chu kỳ và số tiền hợp lệ."
+            return
+        }
+        guard let category = categoriesForType.first(where: { $0.id == categoryID }) else {
+            self.error = "Hãy chọn nhóm cho lịch định kỳ."
             return
         }
         let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
         let input = RecurringInputModel(
             name: name.trimmingCharacters(in: .whitespacesAndNewlines),
             walletID: wallet.id,
-            categoryID: categoryID.isEmpty ? nil : categoryID,
+            categoryID: category.id,
             type: type,
             amount: parsed,
             note: trimmedNote.isEmpty ? nil : trimmedNote,
@@ -1246,7 +1250,7 @@ struct CreditView: View {
                                 MPText(action == "payment" ? "Thanh toán thẻ" : "Thêm giao dịch tín dụng", style: .title)
                                 if action == "entry" {
                                     MPWalletSelector(title: "Loại giao dịch", options: ["purchase", "refund", "fee", "interest"], selection: $entryKind)
-                                    MPOptionSelector(title: "Nhóm", options: [MPSelectionOption(id: "", label: "Không chọn nhóm")] + categoriesForEntry.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryID, emptyLabel: "Không chọn nhóm")
+                                    MPOptionSelector(title: "Nhóm", options: categoriesForEntry.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryID)
                                 } else {
                                     MPOptionSelector(title: "Ví thanh toán", options: sourceWallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $sourceWalletID, emptyLabel: "Chọn ví thanh toán")
                                 }
@@ -1307,8 +1311,8 @@ struct CreditView: View {
         do {
             categories = try await api.categories()
         } catch {
-            // Category metadata is optional for the ledger surface. Keep the
-            // entry/payment actions usable even if this secondary request fails.
+            // Keep the statement readable if catalog metadata is unavailable;
+            // entry creation remains blocked until an applicable category is loaded.
             categories = []
         }
 
@@ -1330,6 +1334,6 @@ struct CreditView: View {
         guard action != nil else { return }
         if action == "entry" { await addEntry() } else { await pay() }
     }
-    private func addEntry() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount) else { error = "Chọn ví tín dụng và nhập số tiền."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: categoryID.isEmpty ? nil : categoryID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
+    private func addEntry() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount) else { error = "Chọn ví tín dụng và nhập số tiền."; return }; guard let category = categoriesForEntry.first(where: { $0.id == categoryID }) else { error = "Hãy chọn nhóm cho bút toán tín dụng."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: category.id, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
     private func pay() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount), !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
 }

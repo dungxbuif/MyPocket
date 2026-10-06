@@ -146,7 +146,12 @@ func (s *transactionCategoryRepositoryStub) EnsurePersonalDefaults(string) error
 func (s *transactionCategoryRepositoryStub) ListVisible(string) ([]entity.Category, error) {
 	return s.categories, nil
 }
-func (s *transactionCategoryRepositoryStub) FindVisible(string, string) (*entity.Category, error) {
+func (s *transactionCategoryRepositoryStub) FindVisible(_, id string) (*entity.Category, error) {
+	for index := range s.categories {
+		if s.categories[index].ID == id {
+			return &s.categories[index], nil
+		}
+	}
 	return nil, errors.New("not found")
 }
 func (s *transactionCategoryRepositoryStub) FindPersonal(string, string) (*entity.Category, error) {
@@ -427,17 +432,18 @@ func stringPtr(value string) *string { return &value }
 func TestUpdatingUnchangedJarAssignmentSurvivesTimezoneRebucketing(t *testing.T) {
 	occurredAt := time.Date(2026, time.February, 1, 0, 30, 0, 0, time.UTC)
 	jarID := "8ec3f4f6-c002-4e59-a16e-ae5ea6237a70"
-	existing := &entity.Transaction{ID: "transaction-1", OwnerID: "owner-1", WalletID: "wallet-1", Type: entity.TransactionTypeExpense, Amount: 1200, OccurredAt: occurredAt, JarID: &jarID}
+	categoryID := "category-1"
+	existing := &entity.Transaction{ID: "transaction-1", OwnerID: "owner-1", WalletID: "wallet-1", CategoryID: &categoryID, Type: entity.TransactionTypeExpense, Amount: 1200, OccurredAt: occurredAt, JarID: &jarID}
 	transactions := &transactionRepositoryStub{existing: existing, updated: existing}
 	users := &transactionUserRepositoryStub{user: entity.User{ID: "owner-1", Timezone: "America/Los_Angeles"}}
 	jars := &transactionJarRepositoryStub{configErr: repository.ErrJarInvalid}
 	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
 		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
 	}}
-	handler := NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{})
+	handler := NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: categoryID, Kind: entity.TransactionTypeExpense}}})
 	handler.Users, handler.Jars = users, jars
 	router := transactionTestRouter(handler)
-	body := fmt.Sprintf(`{"wallet_id":"wallet-1","type":"expense","amount":1200,"occurred_at":%q,"jar_id":%q,"note":"updated note"}`, occurredAt.Format(time.RFC3339), jarID)
+	body := fmt.Sprintf(`{"wallet_id":"wallet-1","category_id":%q,"type":"expense","amount":1200,"occurred_at":%q,"jar_id":%q,"note":"updated note"}`, categoryID, occurredAt.Format(time.RFC3339), jarID)
 	request := httptest.NewRequest(http.MethodPatch, "/transactions/transaction-1", bytes.NewBufferString(body))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
@@ -472,6 +478,41 @@ func TestCreateTransactionRejectsCategoryRestrictedToAnotherWallet(t *testing.T)
 	}
 	if transactions.created != nil {
 		t.Fatalf("restricted category was persisted: %#v", transactions.created)
+	}
+}
+
+func TestCreateTransactionRequiresCategory(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
+		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
+	}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPost, "/transactions", bytes.NewBufferString(`{"wallet_id":"wallet-1","type":"expense","amount":50000}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest || transactions.created != nil {
+		t.Fatalf("transaction without category should be rejected before persistence: status=%d body=%s transaction=%#v", response.Code, response.Body.String(), transactions.created)
+	}
+}
+
+func TestUpdateTransactionRequiresCategory(t *testing.T) {
+	categoryID := "category-1"
+	transactions := &transactionRepositoryStub{existing: &entity.Transaction{ID: "transaction-1", OwnerID: "owner-1", WalletID: "wallet-1", CategoryID: &categoryID, Type: entity.TransactionTypeExpense, Amount: 50000, OccurredAt: time.Now().UTC()}}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
+		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
+	}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPatch, "/transactions/transaction-1", bytes.NewBufferString(`{"wallet_id":"wallet-1","type":"expense","amount":50000}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+
+	router.ServeHTTP(response, request)
+
+	if response.Code != http.StatusBadRequest || transactions.updated != nil {
+		t.Fatalf("transaction update without category should be rejected before persistence: status=%d body=%s transaction=%#v", response.Code, response.Body.String(), transactions.updated)
 	}
 }
 

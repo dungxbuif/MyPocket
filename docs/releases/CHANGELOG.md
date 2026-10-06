@@ -23,6 +23,13 @@ as active release entries here.
 
 ### Fixed
 
+- Transaction category integrity is now enforced across the database, API and
+  web/iOS editors. Ordinary income/expense, recurring and credit entries must
+  use an applicable visible group; clients prefill the first valid group, while
+  adjustment rows remain the explicit uncategorized exception. Migration
+  `000028_transaction_category_required` backfills the canonical fallback
+  groups before adding the database check.
+
 - AI-entry live regression coverage now matches the approved review-first
   fallback: an unclear wallet is prefilled with the first supplied wallet and
   still carries a review question. DeepSeek-V4-Flash text, tool-call and

@@ -10,7 +10,7 @@ The page header uses the shared `ScreenHeader` molecule so title/action spacing 
 
 2026-09-24 owner correction: the supplied savings screenshot's “TẤT CẢ CÁC GIAO DỊCH” is a goal-history heading, not a shared All-time tab. Keep one wallet selector at the top. `Tổng cộng` and selected basic wallets use account-local Monday–Sunday Week/Custom controls, period cashflow and date-grouped rows. Credit wallets use a dedicated debt statement with current debt, available limit, credit rows, and actions for purchase/refund/fee/interest or payment from another non-credit wallet; ordinary period, bulk-delete and transfer/adjustment controls are hidden. Goal alone shows distinct balance/remaining/progress and complete history. [Correction design](../../../work/tickets/UI-LEDGER-WEEK-DETAIL_DESIGN.md#owner-correction--wallet-specific-ledger-2026-09-24).
 
-2026-09-20: editor uses grouped SurfaceCards for wallet/large amount/category/note and date, retaining the shared inputs and form-sheet shell. Goal category selection is restricted to real savings catalog keys and backend enforces the same rule; category remains optional. Unsupported old goal categories remain visible in history but must be cleared/reselected before editing. Report flag for external entries defaults true. This is not the paired-wallet transfer flow.
+2026-09-20: editor uses grouped SurfaceCards for wallet/large amount/category/note and date, retaining the shared inputs and form-sheet shell. Goal category selection is restricted to real savings catalog keys and backend enforces the same rule; ordinary income/expense and credit entries require a category, with the first applicable group prefilled when needed. Unsupported old goal categories remain visible in history but must be cleared/reselected before editing. Report flag for external entries defaults true. This is not the paired-wallet transfer flow.
 
 | Region | Base implementation | Contract |
 | --- | --- | --- |
@@ -61,7 +61,7 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 - Error: danger status with an explicit retry action; stale successful data may remain visible but mock data must not appear.
 - Saving/deleting: submit controls disabled/loading; one request per activation.
 - No wallets: editor explains that a wallet must be created first and cannot submit.
-- No matching groups: category remains optional; the transaction can still be saved.
+- No matching groups: the form blocks saving and explains that an applicable group is required. Adjustment rows are created only through the dedicated adjustment flow and may remain uncategorized.
 
 ## Validation and source of truth
 
@@ -69,7 +69,7 @@ No screen-local color, shape, input, button or card styling is allowed. Debt, re
 - `wallet_id` must belong to the authenticated owner. Basic income/expense accepts `basic` and `goal`; credit entries use the separate debt/payment ledger and dedicated credit endpoints.
 - `type` is `income` or `expense`; `amount` is an integer greater than zero.
 - Transfer mode requires two different non-credit owner wallets and a positive integer amount; the API creates the paired rows and sets report inclusion false.
-- Category is optional. It must be visible, match the transaction type, and either have no wallet restriction or include the selected wallet ID.
+- Category is required for ordinary income/expense and credit entries. It must be visible, match the transaction type, and either have no wallet restriction or include the selected wallet ID. Only adjustment rows may omit it.
 - `occurred_at` is sent as an RFC3339 timestamp. Note is trimmed and omitted when empty.
 - `included_in_reports` defaults to true.
 - `jar_id` is optional and may reference one active owner/month configuration only for ordinary expenses; income and transfer-out rows cannot be assigned. Clearing the selection sends null.

@@ -23,6 +23,7 @@ const (
 	transactionTypeMessage                = "loại giao dịch không hợp lệ"
 	transactionWalletMessage              = "ví không tồn tại hoặc không thuộc tài khoản"
 	transactionCreditWalletMessage        = "ví tín dụng cần luồng giao dịch tín dụng riêng"
+	transactionCategoryRequiredMessage    = "hãy chọn nhóm cho giao dịch"
 	transactionCategoryMessage            = "nhóm không phù hợp với loại giao dịch"
 	transactionDateMessage                = "thời điểm giao dịch không hợp lệ"
 	transactionNotFoundMessage            = "không tìm thấy giao dịch"
@@ -374,6 +375,10 @@ func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 	}
 	transaction := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: input.WalletID, CategoryID: input.CategoryID, JarID: input.JarID, Type: input.Type, Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: included, TravelEventID: travelEventID}
 	if err := h.Transactions.Create(transaction); err != nil {
+		if errors.Is(err, transactionrepo.ErrTransactionCategoryRequired) {
+			transactionBadRequest(c, transactionCategoryRequiredMessage)
+			return
+		}
 		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
 		return
 	}
@@ -669,7 +674,11 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string, exist
 		return transactionInput{}, time.Time{}, false
 	}
 	input.CategoryID = normalizeOptional(input.CategoryID)
-	if input.CategoryID != nil && !h.categoryValid(owner, *input.CategoryID, input.Type, input.WalletID, wallet.Type) {
+	if input.CategoryID == nil {
+		transactionBadRequest(c, transactionCategoryRequiredMessage)
+		return transactionInput{}, time.Time{}, false
+	}
+	if !h.categoryValid(owner, *input.CategoryID, input.Type, input.WalletID, wallet.Type) {
 		transactionBadRequest(c, transactionCategoryMessage)
 		return transactionInput{}, time.Time{}, false
 	}

@@ -29,10 +29,15 @@ func TestJarSpendRemainsVisibleWhenTimezoneRebucketsLinkedTransaction(t *testing
 	t.Cleanup(func() {
 		db.Where("owner_id = ?", owner).Delete(&entity.Transaction{})
 		db.Where("owner_id = ?", owner).Delete(&entity.Wallet{})
+		db.Where("owner_id = ?", owner).Delete(&entity.Category{})
 		db.Where("id = ?", owner).Delete(&entity.User{})
 	})
 	wallet := entity.Wallet{ID: walletID, OwnerID: owner, Name: "timezone test", Type: entity.WalletTypeBasic, Currency: "VND"}
 	if err = db.Create(&wallet).Error; err != nil {
+		t.Fatal(err)
+	}
+	category := entity.Category{ID: uuid.NewString(), OwnerID: &owner, Kind: entity.TransactionTypeExpense, Name: "Ăn uống", IconKey: "tag"}
+	if err = db.Create(&category).Error; err != nil {
 		t.Fatal(err)
 	}
 	jar := entity.Jar{ID: jarID, OwnerID: owner}
@@ -50,7 +55,7 @@ func TestJarSpendRemainsVisibleWhenTimezoneRebucketsLinkedTransaction(t *testing
 		t.Fatal(err)
 	}
 	instant := time.Date(2026, time.February, 1, 0, 30, 0, 0, time.FixedZone("ICT", 7*60*60))
-	transaction := entity.Transaction{ID: transactionID, OwnerID: owner, WalletID: walletID, JarID: &jarID, Type: entity.TransactionTypeExpense, Amount: 1200, OccurredAt: instant, IncludedInReports: true}
+	transaction := entity.Transaction{ID: transactionID, OwnerID: owner, WalletID: walletID, CategoryID: &category.ID, JarID: &jarID, Type: entity.TransactionTypeExpense, Amount: 1200, OccurredAt: instant, IncludedInReports: true}
 	if err = db.Create(&transaction).Error; err != nil {
 		t.Fatal(err)
 	}

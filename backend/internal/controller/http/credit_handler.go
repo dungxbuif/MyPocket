@@ -80,7 +80,11 @@ func (h *CreditHandler) CreateEntry(c *gin.Context) {
 		creditWalletNotFound(c)
 		return
 	}
-	if input.CategoryID != nil && !h.creditCategoryValid(owner, *input.CategoryID, creditEntryTransactionType(input.Kind), wallet.ID) {
+	if input.CategoryID == nil {
+		transactionBadRequest(c, transactionCategoryRequiredMessage)
+		return
+	}
+	if !h.creditCategoryValid(owner, *input.CategoryID, creditEntryTransactionType(input.Kind), wallet.ID) {
 		transactionBadRequest(c, transactionCategoryMessage)
 		return
 	}

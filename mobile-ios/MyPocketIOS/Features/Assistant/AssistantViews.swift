@@ -532,8 +532,11 @@ struct EntryProposalEditor: View {
         self.api = api; self.proposal = proposal; self.wallets = wallets; self.categories = categories; self.onSaved = onSaved; self.onCancel = onCancel
         _amount = State(initialValue: String(proposal.draft.amount))
         _type = State(initialValue: AIEntryProposalReview.normalizedType(proposal.draft.type) ?? "")
-        _walletID = State(initialValue: proposal.draft.walletID.isEmpty ? (TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "") : proposal.draft.walletID)
-        _categoryID = State(initialValue: proposal.draft.categoryID ?? "")
+        let initialWalletID = proposal.draft.walletID.isEmpty ? (TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "") : proposal.draft.walletID
+        let initialType = AIEntryProposalReview.normalizedType(proposal.draft.type) ?? ""
+        let initialWalletType = wallets.first(where: { $0.id == initialWalletID })?.type ?? "basic"
+        _walletID = State(initialValue: initialWalletID)
+        _categoryID = State(initialValue: TransactionEditorPolicy.requiredCategoryID(type: initialType, walletID: initialWalletID, walletType: initialWalletType, categories: categories, currentID: proposal.draft.categoryID ?? ""))
         _jarID = State(initialValue: proposal.draft.jarID ?? "")
         _includedInReports = State(initialValue: proposal.draft.includedInReports)
         _note = State(initialValue: proposal.draft.note)
@@ -547,7 +550,7 @@ struct EntryProposalEditor: View {
                 MPAmountField(title: "Số tiền", text: $amount)
                 MPOptionSelector(title: "Loại giao dịch", options: AIEntryProposalReview.supportedTypes, selectionID: $type, emptyLabel: "Chưa xác định — chọn loại")
                 MPOptionSelector(title: "Ví", options: TransactionsViewModel.ordinaryTransactionWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
-                MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID, emptyLabel: "Không chọn")
+                MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID)
                 if canUseJar {
                     MPOptionSelector(
                         title: "Hũ chi tiêu",
@@ -565,7 +568,10 @@ struct EntryProposalEditor: View {
             }
             .padding(MPMetrics.pagePadding)
         }
-        .task { await loadJarsForDate() }
+        .task {
+            clearInvalidCategory()
+            await loadJarsForDate()
+        }
         .onChange(of: type) { _, _ in
             if !canUseJar { jarID = "" }
             clearInvalidCategory()
@@ -585,14 +591,14 @@ struct EntryProposalEditor: View {
     private func save() async {
         guard let normalizedType = AIEntryProposalReview.normalizedType(type) else { error = "Chọn loại giao dịch là thu nhập hoặc chi tiêu trước khi lưu."; return }
         guard let parsed = MPFormat.parsePositiveInteger(amount), let wallet = wallets.first(where: { $0.id == walletID }) else { error = "Chọn ví và nhập số tiền hợp lệ."; return }
-        let selectedCategory = categories.first(where: { $0.id == categoryID })
-        if let selectedCategory, !selectedCategory.applies(to: normalizedType, walletID: wallet.id, walletType: wallet.type) { error = "Danh mục không phù hợp với loại giao dịch hoặc ví đã chọn."; return }
+        guard let selectedCategory = categories.first(where: { $0.id == categoryID }) else { error = "Hãy chọn nhóm cho giao dịch."; return }
+        if !selectedCategory.applies(to: normalizedType, walletID: wallet.id, walletType: wallet.type) { error = "Danh mục không phù hợp với loại giao dịch hoặc ví đã chọn."; return }
         if !jarID.isEmpty {
             guard canUseJar else { error = "Hũ chỉ áp dụng cho khoản chi thường hoặc ví tiết kiệm."; return }
             guard TransactionEditorPolicy.hasActiveJar(jarID, summary: jarSummary) else { error = "Hũ đã gỡ khỏi tháng này. Hãy bỏ chọn hoặc chọn hũ đang hoạt động."; return }
         }
         saving = true; defer { saving = false }
-        let draft = EntryDraftModel(type: normalizedType, amount: parsed, walletID: wallet.id, categoryID: selectedCategory?.id, jarID: jarID.isEmpty ? nil : jarID, occurredAt: Self.timestamp(from: date, timeZone: timeZone), note: note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: includedInReports)
+        let draft = EntryDraftModel(type: normalizedType, amount: parsed, walletID: wallet.id, categoryID: selectedCategory.id, jarID: jarID.isEmpty ? nil : jarID, occurredAt: Self.timestamp(from: date, timeZone: timeZone), note: note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: includedInReports)
         do { onSaved(try await api.editEntryProposal(id: proposal.id, version: proposal.version, draft: draft)) }
         catch { self.error = "Không thể cập nhật đề xuất." }
     }
@@ -603,9 +609,8 @@ struct EntryProposalEditor: View {
         AIEntryProposalReview.canUseJar(type: type, walletType: selectedWallet?.type ?? "", category: selectedCategory)
     }
     private var categoryOptions: [MPSelectionOption] {
-        let valid = categories.filter { $0.applies(to: type, walletID: selectedWallet?.id ?? "", walletType: selectedWallet?.type ?? "basic") }
-        var options = [MPSelectionOption(id: "", label: "Không chọn")]
-        options += valid.map { MPSelectionOption(id: $0.id, label: $0.name) }
+        let valid = TransactionEditorPolicy.applicableCategories(type: type, walletID: selectedWallet?.id ?? "", walletType: selectedWallet?.type ?? "basic", categories: categories)
+        var options = valid.map { MPSelectionOption(id: $0.id, label: $0.name) }
         if !categoryID.isEmpty, !options.contains(where: { $0.id == categoryID }), let current = categories.first(where: { $0.id == categoryID }) {
             options.append(MPSelectionOption(id: current.id, label: current.name))
         }
@@ -613,10 +618,8 @@ struct EntryProposalEditor: View {
     }
 
     private func clearInvalidCategory() {
-        guard let selectedCategory = categories.first(where: { $0.id == categoryID }), let selectedWallet else { return }
-        if !selectedCategory.applies(to: type, walletID: selectedWallet.id, walletType: selectedWallet.type) {
-            categoryID = ""
-        }
+        guard let selectedWallet else { return }
+        categoryID = TransactionEditorPolicy.requiredCategoryID(type: type, walletID: selectedWallet.id, walletType: selectedWallet.type, categories: categories, currentID: categoryID)
     }
 
     private func loadJarsForDate() async {
