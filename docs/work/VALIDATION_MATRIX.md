@@ -30,8 +30,8 @@ After the correction the complete UI suite passed 15/15 on the booted iPhone
 
 | Proof | Result |
 | --- | --- |
-| iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 61 tests, 0 failures; includes transaction-editor hũ eligibility, inactive-selection and report/date-time policy coverage alongside expired access-token refresh, invalid-session clearing, malformed ledger timestamp exclusion, iOS PKCE encoding, safe 204 mutation decoding, immutable bulk-delete boundaries, URL query preservation, structured Advisor data, localized selectors, jar/portfolio/recurring/Travel Mode/AI-entry validation and account-local period/date behavior |
-| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: default suite 10 tests, 5 passed and 5 explicitly skipped API-fixture tests; the latest opt-in `LOCAL_API_UI` suite is 15/15 passed in 306.748s with Assistant, AI-entry capability/review, ledger week/cashflow, wallet, credit-wallet, transfer and feedback fixtures seeded/removed through local API. The unsigned simulator test build uses the DEBUG-only in-memory fixture session store; normal and Release builds retain Keychain-backed sessions. |
+| iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`: native unit/contract XCTest | PASS: 62 tests, 0 failures; includes the immutable wallet-row action policy and adjustment-direction display alongside transaction-editor hũ eligibility, inactive-selection and report/date-time policy coverage, expired access-token refresh, invalid-session clearing, malformed ledger timestamp exclusion, iOS PKCE encoding, safe 204 mutation decoding, immutable bulk-delete boundaries, URL query preservation, structured Advisor data, localized selectors, jar/portfolio/recurring/Travel Mode/AI-entry validation and account-local period/date behavior |
+| iPhone 16 Simulator: authenticated route/feedback UI smoke | PASS: default suite 10 tests, 5 passed and 5 explicitly skipped API-fixture tests; the latest opt-in `LOCAL_API_UI` suite is 15/15 passed in 310.705s with Assistant, AI-entry capability/review, ledger week/cashflow, wallet, credit-wallet, transfer and feedback fixtures seeded/removed through local API. The unsigned simulator test build uses the DEBUG-only in-memory fixture session store; normal and Release builds retain Keychain-backed sessions. |
 | Native business mutation smoke | PASS: signed UI created and renamed a basic wallet, created/deleted an atomic transfer pair, and created both a credit purchase and payment while observing refreshed rows. The shared numeric amount field now exposes a “Xong” keyboard action so credit notes remain reachable on iPhone. Post-run disposable counts: wallets=0, transactions=0, feedback=0. |
 | iPhone 16 Simulator: authenticated “Thêm” route sweep | PASS: all 13 secondary destinations opened and returned to the menu; the shared `MPButton` hit-shape fix keeps compact rows tappable |
 | Native category scope parity | PASS: category create/edit preserves multiple selected wallet IDs; empty selection remains the API's all-wallet scope; shared `MPMultiOptionSelector` owns the UI |
@@ -586,3 +586,22 @@ unit and Release checks.
   authenticated staging/production gates remain external checks. The simulator
   AI/OCR attachment test intentionally verifies the unavailable-provider state
   on the disposable local API; it is not evidence of provider availability.
+
+### Native wallet-detail immutable-row fix — 2026-10-06 10:23–10:30 ICT
+
+- PASS: native unit/contract XCTest completed 62/62 on the booted iPhone 16
+  Simulator. `TransactionDetailPolicy` now keeps ordinary, transfer,
+  adjustment and credit actions within their server-supported boundaries, and
+  adjustment amounts honor `adjustment_direction`.
+- PASS: targeted wallet transaction create/edit UI regression completed 1/1;
+  the test now follows the user-visible row → detail → edit flow.
+- PASS: full `LOCAL_API_UI` API-backed XCTest completed 15/15 in 310.705s,
+  including wallet/transaction/credit/transfer mutations, AI proposal review,
+  Finance Assistant overview, feedback entry and all secondary destinations.
+- PASS: local health returned 200 and fixture-wallet cleanup returned no
+  `Fixture*` wallets after teardown.
+- PASS: Release simulator build with
+  `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`, base-component guard, project
+  verification and `git diff --check` all passed.
+- NOT RUN: physical-device signing, real Google OAuth, provider-backed AI/OCR
+  and authenticated staging/production gates remain external release checks.

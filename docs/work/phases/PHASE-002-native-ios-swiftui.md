@@ -550,3 +550,13 @@ Release simulator build passed with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`.
 Physical-device, real Google OAuth, provider-backed AI/OCR and authenticated
 staging/production checks remain external release gates; the local AI/OCR test
 intentionally asserts the unavailable-provider state.
+
+The wallet-detail immutable-row follow-up then aligned native actions with the
+web ledger contract: ordinary rows open edit/delete, transfer rows use paired
+actions, adjustments are read-only with direction-aware signed amounts, credit
+rows remain in the credit statement, and Travel Mode is limited to ordinary
+non-credit rows. Native XCTest completed 62/62; the full `LOCAL_API_UI` suite
+completed 15/15 in 310.705 seconds on the booted iPhone 16 Simulator; the
+Release warnings-as-errors build and base/project guards passed; local health
+remained 200 and no fixture wallets remained. Physical-device, real OAuth,
+provider-backed AI/OCR and staging/production checks remain external gates.

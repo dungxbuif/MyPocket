@@ -142,6 +142,7 @@ struct WalletDetailView: View {
     let api: FinanceAPI
     let onBack: () -> Void
     @State private var wallet: WalletModel
+    @State private var wallets: [WalletModel] = []
     @State private var transactions: [TransactionModel] = []
     @State private var categories: [CategoryModel] = []
     @State private var statement: CreditStatementModel?
@@ -149,6 +150,9 @@ struct WalletDetailView: View {
     @State private var error: String?
     @State private var editorPresented = false
     @State private var editTarget: TransactionModel?
+    @State private var selectedTransaction: TransactionModel?
+    @State private var transferEditID: String?
+    @State private var deleteTarget: TransactionModel?
     @Environment(\.timeZone) private var timeZone
 
     init(api: FinanceAPI, wallet: WalletModel, onBack: @escaping () -> Void) {
@@ -256,7 +260,66 @@ struct WalletDetailView: View {
                     onCancel: { editorPresented = false; editTarget = nil }
                 )
                 .background(MPColor.canvas.ignoresSafeArea())
+            } else if wallet.type != "credit", let transferEditID {
+                TransferEditorView(
+                    api: api,
+                    wallets: wallets.isEmpty ? [wallet] : wallets,
+                    timezone: timeZone.identifier,
+                    transactions: transactions,
+                    existingTransferID: transferEditID,
+                    onSaved: {
+                        self.transferEditID = nil
+                        Task { await load() }
+                    },
+                    onCancel: { self.transferEditID = nil }
+                )
+                .background(MPColor.canvas.ignoresSafeArea())
+            } else if wallet.type != "credit", let selectedTransaction {
+                TransactionDetailView(
+                    api: api,
+                    transaction: selectedTransaction,
+                    allTransactions: transactions,
+                    isCreditWallet: false,
+                    onEdit: {
+                        editTarget = selectedTransaction
+                        self.selectedTransaction = nil
+                        editorPresented = true
+                    },
+                    onEditTransfer: {
+                        transferEditID = selectedTransaction.transferID
+                        self.selectedTransaction = nil
+                    },
+                    onDelete: {
+                        deleteTarget = selectedTransaction
+                        self.selectedTransaction = nil
+                    },
+                    onDeleteTransfer: {
+                        deleteTarget = selectedTransaction
+                        self.selectedTransaction = nil
+                    },
+                    onClose: { self.selectedTransaction = nil }
+                )
+                .background(MPColor.canvas.ignoresSafeArea())
             }
+        }
+        .mpConfirmDialog(
+            isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+            title: deleteTarget?.transferID == nil ? "Xóa giao dịch?" : "Xóa cả cặp chuyển ví?",
+            message: deleteTarget?.transferID == nil
+                ? "Hành động này không thể hoàn tác."
+                : "Cả hai dòng của cặp chuyển ví sẽ bị xóa.",
+            confirmTitle: "Xóa"
+        ) {
+            if let target = deleteTarget {
+                Task {
+                    if target.transferID != nil {
+                        await deleteTransfer(target)
+                    } else {
+                        await deleteTransaction(target)
+                    }
+                }
+            }
+            deleteTarget = nil
         }
         .accessibilityIdentifier("wallet-detail-screen")
     }
@@ -279,11 +342,12 @@ struct WalletDetailView: View {
     @ViewBuilder
     private func walletTransactionRow(_ row: TransactionModel) -> some View {
         let category = categories.first(where: { $0.id == row.categoryID })
-        let title = category?.name ?? (row.type == "income" ? "Khoản thu" : "Khoản chi")
+        let title = row.type == "adjustment"
+            ? "Điều chỉnh số dư"
+            : category?.name ?? (row.type == "income" ? "Khoản thu" : "Khoản chi")
         let subtitle = [MPFormat.shortDate(row.occurredAt, timeZone: timeZone), row.note].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
         MPButton(style: .plain) {
-            editTarget = row
-            editorPresented = true
+            selectedTransaction = row
         } label: {
             MPTransactionRow(title: title, subtitle: subtitle, amount: MPFormat.signedMoney(signedAmount(row)), isIncome: row.type == "income")
         }
@@ -304,7 +368,28 @@ struct WalletDetailView: View {
     }
 
     private func signedAmount(_ row: TransactionModel) -> Int64 {
-        row.type == "income" ? row.amount : -row.amount
+        if row.type == "income" { return row.amount }
+        if row.type == "adjustment" { return row.adjustmentDirection == "increase" ? row.amount : -row.amount }
+        return -row.amount
+    }
+
+    private func deleteTransaction(_ transaction: TransactionModel) async {
+        do {
+            try await api.deleteTransaction(id: transaction.id)
+            await load()
+        } catch {
+            self.error = "Không thể xóa giao dịch."
+        }
+    }
+
+    private func deleteTransfer(_ transaction: TransactionModel) async {
+        guard let transferID = transaction.transferID else { return }
+        do {
+            try await api.deleteTransfer(id: transferID)
+            await load()
+        } catch {
+            self.error = "Không thể xóa cặp giao dịch chuyển ví."
+        }
     }
 
     private func load() async {
@@ -321,9 +406,11 @@ struct WalletDetailView: View {
                 transactions = try await transactionResult
                 categories = (try? await categoryResult) ?? []
             }
-            if let refreshedWallets = try? await walletResult,
-               let refreshed = refreshedWallets.first(where: { $0.id == wallet.id }) {
-                wallet = refreshed
+            if let refreshedWallets = try? await walletResult {
+                wallets = refreshedWallets
+                if let refreshed = refreshedWallets.first(where: { $0.id == wallet.id }) {
+                    wallet = refreshed
+                }
             }
             error = nil
         } catch {

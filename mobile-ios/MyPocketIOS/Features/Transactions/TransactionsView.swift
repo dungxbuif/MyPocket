@@ -33,6 +33,23 @@ enum TransactionEditorPolicy {
     }
 }
 
+enum TransactionDetailPolicy {
+    static func canEditOrdinary(_ transaction: TransactionModel, isCreditWallet: Bool) -> Bool {
+        !isCreditWallet && transaction.transferID == nil && transaction.type != "adjustment" && transaction.creditKind == nil
+    }
+
+    static func canLinkTravel(_ transaction: TransactionModel, isCreditWallet: Bool) -> Bool {
+        canEditOrdinary(transaction, isCreditWallet: isCreditWallet)
+    }
+
+    static func actionKind(_ transaction: TransactionModel, isCreditWallet: Bool) -> String {
+        if isCreditWallet || transaction.creditKind != nil { return "credit" }
+        if transaction.transferID != nil { return "transfer" }
+        if transaction.type == "adjustment" { return "adjustment" }
+        return "ordinary"
+    }
+}
+
 @MainActor
 final class TransactionsViewModel: ObservableObject {
     @Published private(set) var transactions: [TransactionModel] = []
@@ -169,7 +186,11 @@ final class TransactionsViewModel: ObservableObject {
     }
 
     func signedAmount(for transaction: TransactionModel) -> Int64 {
-        transaction.type == "income" ? transaction.amount : -transaction.amount
+        if transaction.type == "income" { return transaction.amount }
+        if transaction.type == "adjustment" {
+            return transaction.adjustmentDirection == "increase" ? transaction.amount : -transaction.amount
+        }
+        return -transaction.amount
     }
 
     func load() async {
@@ -678,7 +699,7 @@ struct TransactionDetailView: View {
                 VStack(alignment: .leading, spacing: 8) {
                     MPText("Ngày: \(MPFormat.shortDate(transaction.occurredAt, timeZone: timeZone))")
                     if let note = transaction.note, !note.isEmpty { MPText("Ghi chú: \(note)") }
-                    if transaction.transferID == nil && !isCreditWallet {
+                    if TransactionDetailPolicy.canLinkTravel(transaction, isCreditWallet: isCreditWallet) {
                         MPOptionSelector(
                             title: "Travel Mode",
                             options: [MPSelectionOption(id: "", label: "Không gắn chuyến")] + travelEvents.map { MPSelectionOption(id: $0.id, label: $0.name) },
@@ -697,9 +718,11 @@ struct TransactionDetailView: View {
                     MPText(transaction.includedInReports ? "Được tính vào báo cáo" : "Không tính vào báo cáo", style: .secondary)
                 }
             }
-            if transaction.transferID == nil && !isCreditWallet {
+            if TransactionDetailPolicy.canEditOrdinary(transaction, isCreditWallet: isCreditWallet) {
                 MPButton("Sửa giao dịch", style: .secondary, action: onEdit)
                 MPButton("Xóa giao dịch", style: .destructive, action: onDelete)
+            } else if transaction.type == "adjustment" {
+                MPStatusMessage(text: "Điều chỉnh số dư không thể sửa hoặc xóa. Hãy ghi một điều chỉnh ngược để bù trừ.", tone: .info)
             } else if isCreditWallet {
                 MPStatusMessage(text: "Bút toán tín dụng chỉ được sửa hoặc hoàn tác trong Sổ tín dụng.", tone: .info)
             } else {
@@ -711,7 +734,7 @@ struct TransactionDetailView: View {
         }
         .padding(MPMetrics.pagePadding)
         .task {
-            guard transaction.transferID == nil, !isCreditWallet else { return }
+            guard TransactionDetailPolicy.canLinkTravel(transaction, isCreditWallet: isCreditWallet) else { return }
             do {
                 travelEvents = try await api.travelEvents()
                 travelEventID = transaction.travelEventID ?? ""

@@ -451,6 +451,33 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertFalse(TransactionEditorPolicy.hasActiveJar("missing", summary: summary))
     }
 
+    func testTransactionDetailPolicyKeepsTransfersAdjustmentsAndCreditRowsSafe() {
+        let ordinary = transaction(id: "ordinary", occurredAt: "2026-10-06T00:00:00Z")
+        var transfer = ordinary
+        transfer.transferID = "transfer-1"
+        var adjustment = ordinary
+        adjustment.type = "adjustment"
+        adjustment.adjustmentDirection = "decrease"
+        var credit = ordinary
+        credit.creditKind = "purchase"
+
+        XCTAssertTrue(TransactionDetailPolicy.canEditOrdinary(ordinary, isCreditWallet: false))
+        XCTAssertTrue(TransactionDetailPolicy.canLinkTravel(ordinary, isCreditWallet: false))
+        XCTAssertFalse(TransactionDetailPolicy.canEditOrdinary(transfer, isCreditWallet: false))
+        XCTAssertFalse(TransactionDetailPolicy.canLinkTravel(transfer, isCreditWallet: false))
+        XCTAssertEqual(TransactionDetailPolicy.actionKind(transfer, isCreditWallet: false), "transfer")
+        XCTAssertFalse(TransactionDetailPolicy.canEditOrdinary(adjustment, isCreditWallet: false))
+        XCTAssertFalse(TransactionDetailPolicy.canLinkTravel(adjustment, isCreditWallet: false))
+        XCTAssertEqual(TransactionDetailPolicy.actionKind(adjustment, isCreditWallet: false), "adjustment")
+        XCTAssertFalse(TransactionDetailPolicy.canEditOrdinary(credit, isCreditWallet: true))
+        XCTAssertEqual(TransactionDetailPolicy.actionKind(credit, isCreditWallet: true), "credit")
+
+        let viewModel = TransactionsViewModel(api: FinanceAPI())
+        XCTAssertEqual(viewModel.signedAmount(for: adjustment), -10_000)
+        adjustment.adjustmentDirection = "increase"
+        XCTAssertEqual(viewModel.signedAmount(for: adjustment), 10_000)
+    }
+
     private func transaction(id: String, occurredAt: String) -> TransactionModel {
         TransactionModel(
             id: id,

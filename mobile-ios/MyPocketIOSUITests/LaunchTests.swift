@@ -375,6 +375,9 @@ final class LaunchTests: XCTestCase {
         let createdRow = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Khoản chi")).firstMatch
         XCTAssertTrue(createdRow.waitForExistence(timeout: 15), "Created transaction should be visible in wallet detail.")
         createdRow.tap()
+        let editTransaction = app.buttons["Sửa giao dịch"]
+        XCTAssertTrue(editTransaction.waitForExistence(timeout: 10), "Ordinary wallet rows should open a detail action before editing.")
+        editTransaction.tap()
         XCTAssertTrue(app.staticTexts["Sửa giao dịch"].waitForExistence(timeout: 10))
 
         let editableNote = app.textFields["Ghi chú"]

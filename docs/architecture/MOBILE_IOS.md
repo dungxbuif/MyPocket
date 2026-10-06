@@ -84,6 +84,15 @@ Ended budgets are immutable in the native editor: the screen keeps their
 history and delete action visible but does not offer a save/edit path, matching
 the web's view-or-delete behavior.
 
+Wallet detail rows use the same action policy as the web ledger. Ordinary
+income/expense rows open a detail screen with edit/delete actions; transfer rows
+open paired transfer edit/delete actions; balance-adjustment rows are
+read-only; and credit rows remain in the dedicated credit statement. The
+policy also restricts Travel Mode linking to ordinary non-credit rows. The
+detail screen receives the complete owner wallet set so a paired transfer can
+be edited without losing its destination wallet, and adjustment display signs
+follow `adjustment_direction` (`increase` or `decrease`).
+
 Portfolio trade date pickers use the account timezone and serialize the selected
 calendar day at local noon before sending the instant, preventing a device
 timezone offset from moving a trade to the previous or next account day.

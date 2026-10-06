@@ -23,6 +23,13 @@ as active release entries here.
 
 ### Fixed
 
+- Native wallet detail now preserves immutable ledger semantics: ordinary rows
+  open the detail action flow for edit/delete, transfer rows use paired
+  transfer actions, adjustment rows are read-only with direction-aware signed
+  amounts, credit rows stay in the credit statement, and Travel Mode linking
+  is limited to ordinary non-credit rows. The simulator contract suite is
+  62/62 and the API-backed UI suite is 15/15.
+
 - Native AI proposal editing now matches the ordinary transaction field
   contract: account-local date/time is preserved, stale existing hũ selections
   remain visible and require explicit resolution, and transfer-out categories
