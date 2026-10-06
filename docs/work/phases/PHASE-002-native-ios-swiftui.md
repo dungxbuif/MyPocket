@@ -474,3 +474,9 @@ The recurring parity follow-up then restored account-timezone scheduling copy,
 next-run/wallet/note/type details, and safe deletion confirmation. Native
 XCTest 55/55, Release warnings-as-errors, base/project guards, and the signed
 authenticated More-route smoke 1/1 in 124.207s pass.
+
+The Reports parity follow-up then added the optional month-summary category,
+type/count, and ledger-activity sections beside Insider metrics, preserving the
+Insider surface when that optional request fails. Native XCTest 55/55, Release
+warnings-as-errors, base/project guards, and the signed authenticated
+More-route smoke 1/1 in 124.287s pass.

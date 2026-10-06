@@ -131,6 +131,7 @@ struct ReportsView: View {
     let onBack: () -> Void
     @State private var month = MPFormat.currentMonth
     @State private var summary: InsiderSummaryModel?
+    @State private var monthDetail: MonthSummaryModel?
     @State private var loading = false
     @State private var error: String?
     @State private var accountTimezone = TimeZone.current.identifier
@@ -162,6 +163,28 @@ struct ReportsView: View {
                         MPChart(values: summary.topCategories.map { ($0.name, min(180, max(4, Double($0.amount) / 100_000))) })
                         ForEach(summary.topCategories, id: \.name) { item in MPText("\(item.name): \(MPFormat.money(item.amount))", style: .secondary) }
                     }
+                    if let monthDetail {
+                        MPAssistantCard(title: "Theo nhóm trong sổ tháng") {
+                            if monthDetail.categories.isEmpty {
+                                MPText("Chưa có giao dịch được tính vào báo cáo.", style: .secondary)
+                            } else {
+                                ForEach(monthDetail.categories, id: \.stableID) { item in
+                                    HStack {
+                                        VStack(alignment: .leading, spacing: 3) {
+                                            MPText(item.name)
+                                            MPText("\(item.type == "income" ? "Thu" : "Chi") · \(item.count) giao dịch", style: .secondary)
+                                        }
+                                        Spacer()
+                                        MPText(MPFormat.money(item.amount), style: .secondary)
+                                    }
+                                }
+                            }
+                        }
+                        MPAssistantCard(title: "Hoạt động trong tháng") {
+                            MPText("\(monthDetail.transactionCount) giao dịch được tính vào báo cáo. Chuyển ví và điều chỉnh số dư không làm tăng thu/chi.", style: .secondary)
+                            MPText("Số liệu được tính lại từ sổ giao dịch theo múi giờ tài khoản.", style: .secondary)
+                        }
+                    }
                     MPAssistantCard(title: "Khoản chi lớn") {
                         ForEach(summary.topExpenses) { item in MPTransactionRow(title: item.categoryName ?? "Chi tiêu", subtitle: MPFormat.shortDate(item.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current), amount: MPFormat.money(item.amount), isIncome: false) }
                     }
@@ -184,7 +207,10 @@ struct ReportsView: View {
                 accountTimezone = profile.timezone
                 if summary == nil { month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current) }
             }
-            summary = try await api.insider(month: month)
+            async let insiderResult = api.insider(month: month)
+            async let monthResult = api.monthSummary(month: month)
+            summary = try await insiderResult
+            monthDetail = try? await monthResult
             self.error = nil
         } catch { self.error = "Không thể tải báo cáo." }
     }

@@ -32,6 +32,10 @@ as active release entries here.
   ordinary-transaction semantics and confirms deletion without removing rows
   already created in the ledger.
 
+- Native reports now include the month-summary category/type/count breakdown and
+  the ledger activity explanation alongside Insider metrics, while keeping the
+  Insider view usable when the optional month-summary request fails.
+
 - Native Tháng summary now decodes jar usage, uses bounded account-local month
   selection, shows period/status/category/jar details, protects dirty notes,
   and opens the selected month in Hũ chi tiêu.
