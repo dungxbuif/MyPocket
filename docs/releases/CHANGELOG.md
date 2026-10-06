@@ -40,6 +40,10 @@ as active release entries here.
   confirmation card for basic, savings and credit wallets. Web and iOS use the
   existing owner-scoped wallet API only after an explicit confirmation.
 
+- Wallet creation money fields now use the shared web `AmountField` base with
+  formatted VND display and calculator input. Notification delivery is not
+  represented by a non-functional toggle; it remains a documented follow-up.
+
 - Fixed the native wallet-detail create/edit regression. The custom snake-case
   decoder now maps API `wallet_ids` to Swift `walletIDs`, category metadata no
   longer drops the detail screen into an error state, and the add action stays

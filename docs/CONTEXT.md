@@ -131,6 +131,11 @@ coverage pass.
   and only permits a validated wallet-creation proposal followed by explicit
   confirmation through the owner-scoped wallet API; category, budget, jar and
   transaction writes remain unsupported.
+- 2026-10-06 wallet form input: web wallet creation now uses the shared
+  `AmountField` base for opening balance, savings target, credit limit and
+  statement balance, preserving integer validation while adding formatted
+  display and calculator input. Notification delivery remains explicitly
+  unsupported until the notification domain is implemented.
 
 - 2026-09-21: owner requested feasibility assessment and a reviewable file for the two AI flows. [DESIGN-09-AI](work/tickets/TICKET-09-DETAIL_DESIGN.md) is `in_review`, approval pending: text/OCR proposals, internal-transfer reconciliation, read-only financial Q&A, prompt/eval contracts and T0–T7 delivery plan. No AI/transfer/jar runtime implemented in this documentation task.
 

@@ -742,6 +742,8 @@ User messages remain plain text.
 - PASS: web `npm run test:ai-advisor`, `npm run check:design`,
   `npm run typecheck` and `npm run build` all passed. The web card calls the
   existing wallet API only from an explicit confirmation action.
+- PASS: the wallet form base-contract test and web typecheck/design/build pass
+  after all VND money inputs moved to `AmountField`.
 - PASS: native `xcodebuild test ... -only-testing:MyPocketIOSTests` passed
   68/68; Debug build, Release analyze/build with warnings-as-errors,
   base-component guard and project verification passed.
