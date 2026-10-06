@@ -9,8 +9,8 @@ if [ ! -d "$FEATURES" ]; then
   exit 0
 fi
 
-if rg -n --glob '*.swift' '\b(Button|TextField|SecureField|DatePicker|ProgressView)\s*\(' "$FEATURES"; then
-  echo "raw SwiftUI control found outside DesignSystem" >&2
+if rg -n --glob '*.swift' '\b(Button|TextField|SecureField|DatePicker|ProgressView|Text|Image)\s*\(' "$FEATURES"; then
+  echo "raw SwiftUI visual/control found outside DesignSystem" >&2
   exit 1
 fi
 

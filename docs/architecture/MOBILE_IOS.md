@@ -46,6 +46,12 @@ mutation forms; the bridge preserves the binding, accessibility label,
 rounded-border style and keyboard dismissal behavior without entering that
 SwiftUI layout path.
 
+The base-component guard also rejects raw feature-level `Text` and `Image`
+declarations. Feature rows use `MPText` and `MPIcon`; decorative icons are
+hidden from accessibility while interactive rows expose one stable semantic
+label. This keeps the design-system ownership rule from being bypassed by
+small visual primitives.
+
 `APIClient` treats an HTTP `204 No Content` response as a successful
 `EmptyResponse` for typed delete/bulk-delete mutations; it never tries to
 decode an empty body as an envelope. This is required by the existing wallet,

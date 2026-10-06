@@ -10,11 +10,13 @@ bash "$GUARD"
 
 mkdir -p "$ROOT/MyPocketIOS/Features/GuardFixture"
 trap 'rm -f "$ROOT/MyPocketIOS/Features/GuardFixture/BadView.swift" 2>/dev/null || true; rmdir "$ROOT/MyPocketIOS/Features/GuardFixture" 2>/dev/null || true; rmdir "$TEST_ROOT" 2>/dev/null || true' EXIT
-printf '%s\n' 'import SwiftUI' 'struct BadView: View { var body: some View { Button("bad") {} } }' > "$ROOT/MyPocketIOS/Features/GuardFixture/BadView.swift"
-if bash "$GUARD" >/dev/null 2>&1; then
-  echo "guard failed to detect raw control" >&2
-  exit 1
-fi
+for expression in 'Button("bad") {}' 'Text("bad")' 'Image(systemName: "xmark")'; do
+  printf '%s\n' 'import SwiftUI' "struct BadView: View { var body: some View { $expression } }" > "$ROOT/MyPocketIOS/Features/GuardFixture/BadView.swift"
+  if bash "$GUARD" >/dev/null 2>&1; then
+    echo "guard failed to detect raw feature visual/control: $expression" >&2
+    exit 1
+  fi
+done
 rm -f "$ROOT/MyPocketIOS/Features/GuardFixture/BadView.swift"
 rmdir "$ROOT/MyPocketIOS/Features/GuardFixture"
 

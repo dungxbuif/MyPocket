@@ -482,8 +482,11 @@ struct TransactionsView: View {
                 }
             } label: {
                 HStack(spacing: 8) {
-                    Image(systemName: selectedIDs.contains(transaction.id) ? "checkmark.circle.fill" : "circle")
-                        .foregroundStyle(selectable ? MPColor.action : MPColor.secondary)
+                    MPIcon(
+                        systemName: selectedIDs.contains(transaction.id) ? "checkmark.circle.fill" : "circle",
+                        label: selectedIDs.contains(transaction.id) ? "Đã chọn" : "Chưa chọn",
+                        color: selectable ? MPColor.action : MPColor.secondary
+                    )
                     row
                 }
             }

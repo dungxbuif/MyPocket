@@ -27,6 +27,11 @@ as active release entries here.
   thumbnails, the picker cap, close/remove behavior and picker re-enable on the
   iPhone 16 Simulator; the signed UI suite passes 17/17.
 
+- Native base-component hardening moved remaining feature-level raw text/icon
+  rendering into `MPText`/`MPIcon`; the guard now rejects raw `Text` and
+  `Image` in feature code, and the full signed UI suite remains 17/17 after
+  correcting decorative-icon accessibility labels.
+
 - Native feedback capture now hides the floating feedback trigger for one
   rendered frame before taking the attached screenshot, preventing the
   feedback control from appearing in its own context. The signed simulator UI

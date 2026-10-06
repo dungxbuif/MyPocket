@@ -280,8 +280,7 @@ struct CategoriesView: View {
 
     private func categoryRow(_ item: CategoryModel, depth: Int) -> some View {
         HStack {
-            Image(systemName: depth == 0 ? "folder.fill" : "arrow.turn.down.right")
-                .foregroundStyle(MPColor.action)
+            MPIcon(systemName: depth == 0 ? "folder.fill" : "arrow.turn.down.right", color: MPColor.action)
             MPText(item.name)
             Spacer()
             MPText(MPSelectionLabels.display(for: item.kind), style: .secondary)
@@ -289,9 +288,7 @@ struct CategoriesView: View {
             if CategoryEditPolicy.canDelete(item) {
                 MPIconButton(systemName: "trash", label: "Xóa \(item.name)") { deleteTarget = item }
             } else {
-                Image(systemName: "lock.fill")
-                    .foregroundStyle(MPColor.secondary)
-                    .accessibilityLabel("Nhóm hệ thống")
+                MPIcon(systemName: "lock.fill", label: "Nhóm hệ thống", color: MPColor.secondary)
             }
         }
         .padding(.leading, CGFloat(depth * 20))

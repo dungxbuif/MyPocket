@@ -4,6 +4,7 @@ enum MPTextStyle {
     case title
     case body
     case secondary
+    case emphasis
 }
 
 struct MPText: View {
@@ -29,6 +30,8 @@ struct MPText: View {
             return .body
         case .secondary:
             return .subheadline
+        case .emphasis:
+            return .body.weight(.semibold)
         }
     }
 }

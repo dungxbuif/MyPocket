@@ -275,6 +275,12 @@ cap, and re-enables it after removing one file. The complete signed
 with the fixture isolated from production behavior and the existing twenty-file
 API contract preserved.
 
+The follow-up base-component audit moved the last feature-level raw text/icon
+nodes into `MPText`/`MPIcon` and extended the static guard to reject raw
+`Text`/`Image` as well as native controls. A red accessibility regression from
+decorative icon labels was fixed; the full 17/17 signed UI rerun, 65/65 unit
+tests, Release warnings-as-errors build and simulator launch are green.
+
 - Review the [dedicated advisor design](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md) and [V1 task sequence](superpowers/plans/2026-09-22-finance-assistant-v1.md). Feedback's browser round-trip/owner UAT and deployment checks remain separate. Finance Assistant has a local JWT/API-key synchronous JSON vertical slice with best-effort Redis access audit; next gates are typed fact cards, SSE/recovery, durable audit delivery/alerting and configured-provider browser proof.
 - Finance Assistant contract/lifecycle fixes are now locally verified: typed schemas, OpenAI-compatible tool history, bounded final-answer loop, credential revalidation, cancelled-run commit guard, and wallet/budget/goal/jar cards. Remaining gates are configured-provider browser proof, SSE/reconnect, durable audit delivery/alerting and owner UAT.
 - Finance Assistant cancellation now interrupts provider work handled by the same backend process; the database lease guard remains the source of truth. Do not describe cross-process immediate cancellation as shipped until durable pub/sub or worker ownership is implemented.

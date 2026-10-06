@@ -59,11 +59,13 @@ struct MoreView: View {
                                 ForEach(MoreDestination.allCases) { item in
                                     MPButton(style: .plain) { destination = item } label: {
                                         HStack(spacing: 12) {
-                                            Image(systemName: item.icon).frame(width: MPMetrics.hitTarget)
-                                            Text(item.title).font(.body.weight(.semibold))
+                                            MPIcon(systemName: item.icon, size: MPMetrics.hitTarget)
+                                            MPText(item.title, style: .emphasis)
                                             Spacer()
-                                            Image(systemName: "chevron.right").foregroundStyle(MPColor.secondary)
+                                            MPIcon(systemName: "chevron.right", color: MPColor.secondary)
                                         }
+                                        .accessibilityElement(children: .ignore)
+                                        .accessibilityLabel(item.title)
                                     }
                                 }
                             }

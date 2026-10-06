@@ -607,3 +607,11 @@ remove action. The full signed `LOCAL_API_UI` suite now passes 17/17 (82/82
 combined with the 65 native unit/contract tests); the Release build and project
 guards remain green. This fixture is test-only and does not alter production
 provider behavior or the twenty-file API contract.
+
+The base-component audit then moved the remaining feature-level raw `Text` and
+`Image` nodes into `MPText`/`MPIcon`, and the guard now rejects those raw visual
+primitives alongside native controls. The first full UI run caught an
+accessibility-label regression in the new icon wrapper; decorative icons are
+now hidden from the accessibility tree and More-row labels are explicit. The
+targeted red/green test and the rerun of all 17 signed UI tests pass, alongside
+65/65 unit tests, Release warnings-as-errors and simulator launch checks.
