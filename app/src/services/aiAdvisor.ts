@@ -6,7 +6,7 @@ export type AdvisorPart = { type: string; text?: string; data?: unknown };
 export type AdvisorMessage = { id: string; conversation_id: string; seq: number; role: "user" | "assistant"; parts: AdvisorPart[]; created_at: string };
 export type AdvisorRun = { id: string; conversation_id: string; status: string; generation: number; created_at: string; finished_at?: string };
 export type AdvisorSubmit = { run_id: string; conversation_id: string; text: string; status: string };
-export type AdvisorCapabilities = { enabled: boolean; write: boolean; parts_version: number; tools: string[] };
+export type AdvisorCapabilities = { enabled: boolean; write: boolean; parts_version: number; tools: string[]; actions?: string[] };
 export type AdvisorOverview = { view_kind: string; view: unknown; source: unknown; status: string };
 
 const request = <T>(path: string, options: RequestInit = {}) => apiRequest<T>(`/api/v1/ai/advisor${path}`, { ...options }, getStoredToken());
