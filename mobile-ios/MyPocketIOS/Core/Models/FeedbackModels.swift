@@ -26,3 +26,14 @@ struct FeedbackInputModel: Codable, Sendable {
     var title: String
     var description: String
 }
+
+enum FeedbackDraftValidator {
+    static let allowedTypes: Set<String> = ["bug", "feature", "improvement"]
+
+    static func normalized(type: String, title: String, description: String) -> FeedbackInputModel? {
+        let normalizedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard allowedTypes.contains(type), !normalizedTitle.isEmpty, !normalizedDescription.isEmpty else { return nil }
+        return FeedbackInputModel(type: type, title: normalizedTitle, description: normalizedDescription)
+    }
+}

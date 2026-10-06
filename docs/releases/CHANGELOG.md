@@ -23,6 +23,9 @@ as active release entries here.
 
 ### Fixed
 
+- Native feedback submission now trims title/description and rejects
+  unsupported feedback types before JSON or screenshot multipart requests.
+
 - Native portfolio asset drafts now trim symbol/name values before submission,
   reject whitespace-only values, and expose a shared-header refresh action.
 

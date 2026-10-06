@@ -40,6 +40,14 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertNil(PortfolioAssetDraftValidator.normalized(symbol: "VN30F", name: " \n"))
     }
 
+    func testFeedbackDraftTrimsAndRestrictsType() {
+        let draft = FeedbackDraftValidator.normalized(type: "bug", title: "  Không lưu  ", description: "  Mô tả lỗi  ")
+        XCTAssertEqual(draft?.title, "Không lưu")
+        XCTAssertEqual(draft?.description, "Mô tả lỗi")
+        XCTAssertNil(FeedbackDraftValidator.normalized(type: "other", title: "Lỗi", description: "Mô tả"))
+        XCTAssertNil(FeedbackDraftValidator.normalized(type: "bug", title: " \n", description: "Mô tả"))
+    }
+
     func testSnakeCaseFinancialPayloadDecodesAcronyms() throws {
         let data = Data(#"{"id":"tx-1","owner_id":"u-1","wallet_id":"w-1","category_id":"c-1","type":"expense","amount":50000,"occurred_at":"2026-10-05T10:00:00Z","included_in_reports":true,"created_at":"2026-10-05T10:00:00Z","updated_at":"2026-10-05T10:00:00Z"}"#.utf8)
         let transaction = try JSONDecoder.mypocket.decode(TransactionModel.self, from: data)

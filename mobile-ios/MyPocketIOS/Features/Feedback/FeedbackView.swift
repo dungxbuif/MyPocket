@@ -28,14 +28,14 @@ final class FeedbackViewModel: ObservableObject {
     }
 
     func submit(screenshot: Data? = nil) async -> Bool {
-        guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty, !description.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+        guard let input = FeedbackDraftValidator.normalized(type: type, title: title, description: description) else {
             errorMessage = "Nhập tiêu đề và mô tả trước khi gửi."
             return false
         }
         isSending = true
         defer { isSending = false }
         do {
-            let item = try await api.createFeedback(FeedbackInputModel(type: type, title: title, description: description), screenshot: screenshot)
+            let item = try await api.createFeedback(input, screenshot: screenshot)
             items.insert(item, at: 0)
             title = ""
             description = ""

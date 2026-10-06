@@ -528,3 +528,13 @@ goal summary change was covered by the targeted route, unit and Release checks.
 The complete API-backed suite remains 14/14 from the preceding simulator gate;
 this portfolio presentation/input change is covered by the targeted route,
 unit and Release checks.
+
+### Native feedback draft normalization fix — 2026-10-06
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Feedback payload | `FinanceModelTests.testFeedbackDraftTrimsAndRestrictsType` | PASS: title/description are normalized and unsupported type values reject |
+| JSON/multipart parity | `FeedbackViewModel.submit` passes the normalized model to both client paths | PASS |
+| Native contract | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: 54/54 tests |
+| Release build | `xcodebuild build ... -configuration Release ... SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` | PASS |
+| Simulator feedback flow | `testAuthenticatedMoreRoutesAndFeedbackEntry` | PASS: 1/1 in 9.821s |
