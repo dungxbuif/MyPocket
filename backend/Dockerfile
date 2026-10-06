@@ -4,13 +4,15 @@ COPY backend/go.mod backend/go.sum ./
 RUN go mod download
 COPY backend/ .
 RUN CGO_ENABLED=0 go build -o /out/api ./cmd/api && \
-    CGO_ENABLED=0 go build -o /out/migrate ./cmd/migrate
+    CGO_ENABLED=0 go build -o /out/migrate ./cmd/migrate && \
+    CGO_ENABLED=0 go build -o /out/worker ./cmd/worker
 
 FROM alpine:3.22
 RUN apk add --no-cache tzdata && adduser -D -H app
 WORKDIR /app
 COPY --from=build /out/api /app/api
 COPY --from=build /out/migrate /app/migrate
+COPY --from=build /out/worker /app/worker
 COPY backend/migrations /app/migrations
 USER app
 ENTRYPOINT ["/app/api"]
