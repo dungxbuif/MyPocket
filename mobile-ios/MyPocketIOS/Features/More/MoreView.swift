@@ -1,7 +1,10 @@
 import SwiftUI
 
 enum MoreDestination: String, CaseIterable, Identifiable {
-    case budgets, reports, categories, jars, months, recurring, travel, portfolio, credit, assistant, aiEntry, feedback, account
+    // Keep account near the top of the menu. The shell owns a persistent
+    // bottom tab bar, so placing it last makes its hit target overlap that
+    // bar on compact phones.
+    case budgets, reports, categories, jars, months, recurring, travel, portfolio, credit, aiEntry, account, feedback, notifications, assistant
 
     var id: String { rawValue }
     var title: String {
@@ -15,6 +18,7 @@ enum MoreDestination: String, CaseIterable, Identifiable {
         case .travel: return "Travel Mode"
         case .portfolio: return "Danh mục đầu tư"
         case .credit: return "Sổ tín dụng"
+        case .notifications: return "Thông báo"
         case .assistant: return "Finance Assistant"
         case .aiEntry: return "Nhập giao dịch bằng AI"
         case .feedback: return "Phản hồi & changelog"
@@ -33,6 +37,7 @@ enum MoreDestination: String, CaseIterable, Identifiable {
         case .travel: return "airplane"
         case .portfolio: return "chart.line.uptrend.xyaxis"
         case .credit: return "creditcard.fill"
+        case .notifications: return "bell.fill"
         case .assistant: return "sparkles"
         case .aiEntry: return "doc.text.image"
         case .feedback: return "bubble.left.and.bubble.right.fill"
@@ -73,8 +78,19 @@ struct MoreView: View {
                         MPButton("Đăng xuất", style: .destructive, action: auth.logout)
                     }
                     .padding(MPMetrics.pagePadding)
+                    // Leave room for the shell's bottom navigation so the
+                    // final destinations remain tappable instead of being
+                    // covered by the persistent tab bar.
+                    .padding(.bottom, MPMetrics.hitTarget * 2)
                 }
                 .background(MPColor.canvas.ignoresSafeArea())
+                // The shell's persistent tab bar sits outside this screen's
+                // scroll view. Reserve its hit area so the last menu rows are
+                // reported as non-hittable until XCTest/users scroll them
+                // into view, rather than receiving a tap on the tab bar.
+                .safeAreaInset(edge: .bottom) {
+                    Color.clear.frame(height: MPMetrics.hitTarget * 2)
+                }
             }
         }
         .accessibilityIdentifier("more-screen")
@@ -89,25 +105,39 @@ struct SecondaryScreen: View {
     let onBack: () -> Void
 
     var body: some View {
-        switch destination {
-        case .budgets: BudgetsView(api: api, onBack: onBack)
-        case .reports: ReportsView(api: api, onBack: onBack)
-        case .categories: CategoriesView(api: api, onBack: onBack)
-        case .jars: JarsView(api: api, onBack: onBack)
-        case .months: MonthsView(api: api, onBack: onBack, onOpenJars: onOpenJars)
-        case .recurring: RecurringView(api: api, onBack: onBack)
-        case .travel: TravelView(api: api, onBack: onBack)
-        case .portfolio: PortfolioView(api: api, onBack: onBack)
-        case .credit: CreditView(api: api, onBack: onBack)
-        case .assistant: AssistantView(api: api, onBack: onBack, ownerID: assistantOwnerID)
-        case .aiEntry: AIEntryView(api: api, onBack: onBack)
-        case .feedback: FeedbackView(api: api, onBack: onBack)
-        case .account: AccountView(auth: auth, onBack: onBack)
+        Group {
+            switch destination {
+            case .budgets: BudgetsView(api: api, onBack: onBack)
+            case .reports: ReportsView(api: api, onBack: onBack)
+            case .categories: CategoriesView(api: api, onBack: onBack)
+            case .jars: JarsView(api: api, onBack: onBack)
+            case .months: MonthsView(api: api, onBack: onBack, onOpenJars: onOpenJars)
+            case .recurring: RecurringView(api: api, onBack: onBack)
+            case .travel: TravelView(api: api, onBack: onBack)
+            case .portfolio: PortfolioView(api: api, onBack: onBack)
+            case .credit: CreditView(api: api, onBack: onBack)
+            case .notifications: NotificationsView(api: api, onBack: onBack, timeZone: accountTimeZone)
+            case .assistant: AssistantView(api: api, onBack: onBack, ownerID: assistantOwnerID)
+            case .aiEntry: AIEntryView(api: api, onBack: onBack)
+            case .feedback: FeedbackView(api: api, onBack: onBack)
+            case .account: AccountView(auth: auth, onBack: onBack)
+            }
         }
+        // Each secondary screen owns its own scroll position. Without an
+        // explicit identity SwiftUI may reuse the previous route's offset,
+        // hiding the header/back action after navigating from a long screen.
+        .id(destination.id)
     }
 
     private var assistantOwnerID: String {
         if case .authenticated(let session) = auth.phase { return session.user.id }
         return "unknown"
+    }
+
+    private var accountTimeZone: TimeZone {
+        if case .authenticated(let session) = auth.phase {
+            return TimeZone(identifier: session.user.timezone ?? "") ?? .current
+        }
+        return .current
     }
 }

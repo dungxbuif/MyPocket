@@ -24,17 +24,18 @@ const (
 type WalletHandler struct{ Wallets walletrepo.WalletRepository }
 
 type walletInput struct {
-	Name                 string  `json:"name"`
-	Type                 string  `json:"type"`
-	OpeningBalance       int64   `json:"opening_balance"`
-	IsInTotal            *bool   `json:"is_in_total"`
-	Description          *string `json:"description"`
-	TargetAmount         *int64  `json:"target_amount"`
-	CreditLimit          *int64  `json:"credit_limit"`
-	LastStatementBalance *int64  `json:"last_statement_balance"`
-	StatementDay         *int    `json:"statement_day"`
-	PaymentDueDay        *int    `json:"payment_due_day"`
-	TargetDate           *string `json:"target_date"`
+	Name                     string  `json:"name"`
+	Type                     string  `json:"type"`
+	OpeningBalance           int64   `json:"opening_balance"`
+	IsInTotal                *bool   `json:"is_in_total"`
+	Description              *string `json:"description"`
+	TargetAmount             *int64  `json:"target_amount"`
+	CreditLimit              *int64  `json:"credit_limit"`
+	LastStatementBalance     *int64  `json:"last_statement_balance"`
+	StatementDay             *int    `json:"statement_day"`
+	PaymentDueDay            *int    `json:"payment_due_day"`
+	TargetDate               *string `json:"target_date"`
+	GoalNotificationsEnabled *bool   `json:"goal_notifications_enabled"`
 }
 
 func NewWalletHandler(wallets walletrepo.WalletRepository) *WalletHandler {
@@ -88,7 +89,11 @@ func (h *WalletHandler) CreateWallet(c *gin.Context) {
 	if input.IsInTotal != nil {
 		isInTotal = *input.IsInTotal
 	}
-	wallet := &entity.Wallet{ID: uuid.NewString(), OwnerID: owner, Name: input.Name, Type: input.Type, Currency: entity.WalletCurrencyVND, OpeningBalance: input.OpeningBalance, IsInTotal: isInTotal, Description: input.Description, TargetAmount: input.TargetAmount, CreditLimit: input.CreditLimit, LastStatementBalance: input.LastStatementBalance, StatementDay: input.StatementDay, PaymentDueDay: input.PaymentDueDay}
+	goalNotifications := false
+	if input.GoalNotificationsEnabled != nil && input.Type == entity.WalletTypeGoal {
+		goalNotifications = *input.GoalNotificationsEnabled
+	}
+	wallet := &entity.Wallet{ID: uuid.NewString(), OwnerID: owner, Name: input.Name, Type: input.Type, Currency: entity.WalletCurrencyVND, OpeningBalance: input.OpeningBalance, IsInTotal: isInTotal, Description: input.Description, TargetAmount: input.TargetAmount, CreditLimit: input.CreditLimit, LastStatementBalance: input.LastStatementBalance, StatementDay: input.StatementDay, PaymentDueDay: input.PaymentDueDay, GoalNotificationsEnabled: goalNotifications}
 	if input.TargetDate != nil && *input.TargetDate != "" {
 		parsed, _ := entity.ParseCalendarDate(*input.TargetDate)
 		wallet.TargetDate = &parsed
@@ -140,6 +145,9 @@ func (h *WalletHandler) UpdateWallet(c *gin.Context) {
 		}
 	}
 	updates := map[string]any{"name": input.Name, "description": input.Description, "target_amount": input.TargetAmount, "credit_limit": input.CreditLimit, "last_statement_balance": input.LastStatementBalance, "statement_day": input.StatementDay, "payment_due_day": input.PaymentDueDay}
+	if existing.Type == entity.WalletTypeGoal && input.GoalNotificationsEnabled != nil {
+		updates["goal_notifications_enabled"] = *input.GoalNotificationsEnabled
+	}
 	if input.TargetDate != nil {
 		updates["target_date"] = nil
 		if *input.TargetDate != "" {

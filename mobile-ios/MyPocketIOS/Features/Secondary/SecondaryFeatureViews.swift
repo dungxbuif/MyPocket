@@ -67,6 +67,11 @@ struct BudgetsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        // Keep the last form controls scrollable above the shell's persistent
+        // bottom navigation on compact devices.
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: MPMetrics.hitTarget * 2)
+        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa ngân sách?", message: "Các giao dịch không bị xóa.", confirmTitle: "Xóa") {
@@ -194,6 +199,9 @@ struct ReportsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: MPMetrics.hitTarget * 2)
+        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .accessibilityIdentifier("reports-screen")
@@ -446,6 +454,9 @@ struct JarsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: MPMetrics.hitTarget * 2)
+        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .onChange(of: month) { _, _ in
@@ -604,6 +615,9 @@ struct MonthsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: MPMetrics.hitTarget * 2)
+        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .mpConfirmDialog(isPresented: Binding(get: { pendingMonth != nil }, set: { if !$0 { pendingMonth = nil } }), title: "Bỏ ghi chú đang sửa?", message: "Nội dung chưa lưu sẽ bị bỏ khi chuyển tháng.", confirmTitle: "Chuyển tháng") {
@@ -788,6 +802,9 @@ struct RecurringView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: MPMetrics.hitTarget * 2)
+        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .onChange(of: type) { _, _ in
@@ -929,6 +946,9 @@ struct TravelView: View {
             }
         }.padding(MPMetrics.pagePadding) }
         .background(MPColor.canvas.ignoresSafeArea())
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: MPMetrics.hitTarget * 2)
+        }
         .task { await load() }
         .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa chuyến đi?", message: "Giao dịch vẫn được giữ nguyên; chỉ gỡ liên kết chuyến.", confirmTitle: "Xóa") {
             if let target = deleteTarget { Task { await remove(target) } }
@@ -1336,4 +1356,66 @@ struct CreditView: View {
     }
     private func addEntry() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount) else { error = "Chọn ví tín dụng và nhập số tiền."; return }; guard let category = categoriesForEntry.first(where: { $0.id == categoryID }) else { error = "Hãy chọn nhóm cho bút toán tín dụng."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: category.id, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
     private func pay() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount), !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
+}
+
+struct NotificationsView: View {
+    let api: FinanceAPI
+    let onBack: () -> Void
+    let timeZone: TimeZone
+    @State private var items: [NotificationModel] = []
+    @State private var loading = true
+    @State private var error: String?
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MPScreenHeader(title: "Thông báo", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+                if loading && items.isEmpty {
+                    MPLoadingView(label: "Đang tải thông báo...")
+                } else if let error, items.isEmpty {
+                    MPErrorView(title: "Không tải được thông báo", detail: error) { Task { await load() } }
+                } else if items.isEmpty {
+                    MPEmptyView(title: "Chưa có thông báo", detail: "Thông báo trong ứng dụng sẽ xuất hiện tại đây.")
+                } else {
+                    ForEach(items) { item in
+                        MPSurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    MPText(item.title, style: .emphasis)
+                                    Spacer()
+                                    if item.readAt == nil { Circle().fill(MPColor.action).frame(width: 8, height: 8).accessibilityHidden(true) }
+                                }
+                                MPText(item.body, style: .secondary)
+                                MPText(MPFormat.shortDate(item.createdAt, timeZone: timeZone), style: .secondary)
+                                if item.readAt == nil {
+                                    MPButton("Đánh dấu đã đọc", style: .secondary) { Task { await markRead(item) } }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(MPMetrics.pagePadding)
+        }
+        .background(MPColor.canvas.ignoresSafeArea())
+        .task { await load() }
+        .refreshable { await load() }
+        .accessibilityIdentifier("notifications-screen")
+    }
+
+    private func load() async {
+        do { items = try await api.notifications(); error = nil }
+        catch { self.error = "Không thể tải thông báo." }
+        loading = false
+    }
+
+    private func markRead(_ item: NotificationModel) async {
+        do {
+            try await api.markNotificationRead(id: item.id)
+            if let index = items.firstIndex(where: { $0.id == item.id }) {
+                let current = items[index]
+                items[index] = NotificationModel(id: current.id, kind: current.kind, title: current.title, body: current.body, readAt: current.readAt ?? MPFormat.instantString(Date()), createdAt: current.createdAt)
+            }
+        } catch { self.error = "Không thể cập nhật thông báo." }
+    }
 }

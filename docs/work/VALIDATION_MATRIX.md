@@ -16,6 +16,38 @@ shared_fields:
 updated: 2026-10-06
 ---
 
+## Production backend rollout and migration — 2026-10-06
+
+| Proof | Result |
+| --- | --- |
+| Pre-migration backup | PASS: `pg_dump -Fc` completed on `vm100-prod` before migration; `pg_restore --list` validated `mypocket-20261006-pre-migration.dump` in the retained `mypocket-prod-backups` volume. |
+| Forward migration | PASS: production database advanced from migration version 27 to version 29; verification reported `dirty=false`. No reset, drop, truncate or destructive migration was used. |
+| API image rollout | PASS: `mypocket-api` now runs immutable candidate digest `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb` on `vm100-prod`; Swarm update completed and the task remained running after the monitor window. |
+| Redis connectivity | PASS: created the attachable overlay `mypocket-redis-net`, connected `redis-prod` with the `redis-mypocket` alias, and verified `PONG` from a probe scheduled on `vm100-prod`. The API service now uses the alias instead of a container IP. |
+| Redis network lifecycle | PASS: the Redis container remains attached to its existing networks; the new overlay was additive and caused no Redis restart. Future Redis/API recreation must preserve `mypocket-redis-net` and the `redis-mypocket` alias. |
+| External health | PASS: `GET https://money.dungxbuif.com/api/v1/health` returned HTTP 200 after rollout; `GET /api/v1/docs/doc.json` returned HTTP 200 (171469 bytes). |
+| Rollback readiness | PASS: previous API digest remains available in the service history and the pre-migration database dump is retained. Candidate rollout was configured with automatic Swarm rollback on task failure. |
+
+## Native email/password authentication slice — 2026-10-06
+
+| Proof | Result |
+| --- | --- |
+| API contract | PASS: native XCTest verifies `POST /api/v1/login`, email/password JSON encoding, unauthenticated request headers and `LoginOutput` decoding. |
+| Session persistence | PASS: native XCTest verifies `AuthViewModel` stores the returned access/refresh session and enters the authenticated phase. |
+| Native UI | PASS: iPhone 16 Simulator unauthenticated launch test finds the email-login action and both email/password controls; the default UI target is 6 passed and 20 intentional `LOCAL_API_UI` skips; base-component guard passes. |
+| Native contract regression | PASS: full iPhone 16 Simulator XCTest run completed 73/73 with 0 failures. |
+| Production route probe | PASS: production `POST /api/v1/login` returned the expected `401 LOGIN_FAILED` for a synthetic invalid credential; no account or database row was changed. |
+| Production migration | NOT RUN: no production account was selected or mutated; Google remains available for rollback/browser compatibility. |
+
+## Notification preference and inbox — 2026-10-06
+
+| Proof | Result |
+| --- | --- |
+| Migration | PASS: disposable simulator database applies `000029_notifications` cleanly and reports version 29, `dirty=false`. |
+| Owner isolation/idempotency | PASS: repository integration test lists only the owner’s rows, rejects a foreign mark-read, and accepts a repeated mark-read. |
+| Wallet preference | PASS: local API create/update roundtrip toggles `goal_notifications_enabled` for a goal wallet; basic/credit payloads remain ignored by the server. |
+| Client surfaces | PASS: web and native editors use base controls; native More exposes the owner-scoped notification inbox. Push/APNs and scheduled fan-out remain explicit follow-up scope. |
+
 ## Clean iPhone 16 Simulator gate — 2026-10-06 15:46–15:52 ICT
 
 | Proof | Result |
@@ -26,6 +58,23 @@ updated: 2026-10-06
 | Wallet scope/detail contract | PASS: tapping a wallet row routes to `Giao dịch` with `Ví: <wallet>` selected; the explicit `Chi tiết` action still opens the wallet detail/editor surface. The API-backed fixture test passed. |
 | Portfolio API/UI contract | PASS: `testAPIBackedPortfolioAssetCreateAndPriceRefresh` created an owner-scoped `FXT` asset through the local API, loaded it in native `Danh mục đầu tư`, updated `Giá hiện tại` to 120.000 through the UI, observed the refreshed value, and deleted the unused fixture with HTTP 204. The native decoder regression for `asset_id`/P/L fields is covered by the 68-test contract run. |
 | Install/launch artifact | PASS: the clean Debug app was built by the same test gate and launched by the API-backed UI runner on `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` as `com.mypocket.ios`. |
+| External gates | NOT RUN: production deployment/authentication and physical-device verification remain separate from this simulator gate. |
+
+## Latest iPhone 16 Simulator rerun — 2026-10-06 16:38–16:43 ICT
+
+| Proof | Result |
+| --- | --- |
+| Native unit/contract regression | PASS: `xcodebuild test -only-testing:MyPocketIOSTests` executed 69 tests with 0 failures on `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`. The notification preference/inbox models and the assistant diagnostic-only DEBUG logging compile and test cleanly. |
+| API-backed AI UI group | PASS: attachment availability, 20-file thumbnail/cap behavior and explicit proposal-type review executed 3/3 with 0 failures against the disposable local API. |
+| API-backed financial UI groups | PASS: ledger week/cashflow, wallet detail/editor, scoped wallet ledger, portfolio price refresh, wallet create/update, transfer pair, credit entry/payment, credit ledger actions and route sweep executed 11/11 with 0 failures. |
+| Shell/feedback/overflow UI group | PASS: launch, authenticated shell, floating feedback capture, overflow actions and More/feedback routes executed 5/5 with 0 failures. |
+| Fixture isolation | PASS: portfolio fixture setup removes an existing same-symbol `FXT` asset before create; wallet editor selects the named wallet through the dynamic accessibility label `Sửa ví <name>`, preventing stale/ambiguous XCTest matches. |
+| Full-suite runner note | VERIFIED: the 19-test `LOCAL_API_UI` suite is green when split into bounded groups/individual processes. A single long invocation can be terminated by the Xcode runner with signal-kill after an earlier failure; xcresult is the authoritative result for each bounded gate. This is harness/resource behavior, not an app assertion failure. |
+| Backend regression | PASS: `TEST_DATABASE_URL=<disposable simulator db> go test ./... -count=1` and `go vet ./...` completed without failures after the notification API changes. |
+| Web regression | PASS: design guardrails, TypeScript, Vite build (1,793 modules), design/base contracts, transaction, calendar, jar and wallet-scope tests completed without failures; Vite only reports the existing chunk-size warning. |
+| Notification timezone/accessibility follow-up | PASS: after fixing the optional account-timezone fallback, native unit/contract XCTest passed 69/69 and the authenticated More destination sweep passed 1/1; the notification route now formats timestamps in the session timezone. |
+| Assistant diagnostics follow-up | PASS: DEBUG-only capability/overview diagnostics now interpolate the actual typed error instead of emitting a literal placeholder; native XCTest remains 69/69 and the API-backed Assistant overview test passes 1/1. |
+| Account timezone session follow-up | PASS: successful timezone updates now refresh the persisted authenticated session context, preventing later notification/calendar screens from using the pre-update timezone; native XCTest passes 70/70. |
 | External gates | NOT RUN: production deployment/authentication and physical-device verification remain separate from this simulator gate. |
 
 ## Wallet selection scope parity — 2026-10-06
@@ -463,7 +512,13 @@ Feedback implementation completion checkpoint — 2026-09-22:
 - PASS: frontend `rtk npm run typecheck`, `rtk npm run check:design`, `rtk npm run build` after Account → Feedback route/panel/service.
 - PASS: `rtk go generate ./cmd/api`; generated Swagger includes feedback/changelog models and routes.
 - PASS: public/agent API contract documented in [FEEDBACK_API](../architecture/FEEDBACK_API.md). Redis audit remains best-effort after commit; no finance access is granted to the service token.
-- NOT RUN: browser feedback E2E and real API roundtrip; no dedicated script currently exists in the dirty worktree. Residual risk is recorded; do not claim production deployment or full user UAT.
+- Historical as-of 2026-09-22: browser feedback E2E and real API roundtrip were not run because no dedicated script existed at that checkpoint. This residual risk is superseded by the 2026-10-06 feedback contract and browser-proxy E2E evidence below; it does not represent the current validation state.
+
+Feedback storage-fallback regression — 2026-10-06:
+
+- PASS: `cd app && npm run test:feedback` proves a screenshot multipart request retries exactly once as text-only for `FEEDBACK_SCREENSHOT_INVALID` and `FEEDBACK_SCREENSHOT_STORAGE_UNAVAILABLE`, while unrelated provider failures are not retried.
+- PASS: `cd app && TEST_API_ORIGIN=http://127.0.0.1:4173 TEST_DATABASE_URL=postgres://dev:password@127.0.0.1:5432/mypocket_simulator_20261006?sslmode=disable npm run test:feedback:e2e` covers the real Chromium flow through Vite → Gin → PostgreSQL, controlled storage failure, JSON fallback, persisted owner row and cleanup.
+- PASS: native `testAPIBackedFeedbackBubbleSubmitsWhenScreenshotStorageUnavailable` covers the same controlled fallback on the iPhone 16 simulator; full native UI suite remains 20/20.
 
 Finance Assistant Task 1 foundation — 2026-09-22:
 
@@ -803,3 +858,134 @@ writes.
 - PASS: web typecheck and native simulator build cover the confirmation-card
   integration; native action cards call `FinanceAPI.createWallet` only after
   explicit confirmation.
+
+### iPhone 16 Simulator bounded UI rerun — 2026-10-06 17:06 ICT
+
+- PASS: `xcodebuild test ... -only-testing:MyPocketIOSTests` executed 70/70
+  native unit/contract tests with zero failures.
+- PASS: all 19 API-backed UI cases were rerun as isolated xcodebuild
+  invocations against the booted iPhone 16 Simulator and disposable local API:
+  shell/feedback/overflow (5/5), More/AI entry/Assistant (5/5),
+  ledger/wallet/portfolio (5/5), and credit/transfer/wallet mutation (4/4).
+- PASS: each bounded `xcresult` reported `TEST SUCCEEDED`; no app crash or
+  test failure was observed. The simulator remains the pre-device validation
+  gate; physical signing, real Google OAuth, provider-backed AI/OCR and
+  authenticated production feedback remain external gates.
+- The portfolio UI fixture cleanup was also corrected to interpolate the
+  owner-scoped asset ID when removing a pre-existing same-symbol fixture;
+  this prevents stale test data from surviving a rerun.
+- Feedback multipart handling now normalizes an unconfigured development
+  storage pointer instead of passing a typed-nil S3 interface (which previously
+  panicked with HTTP 500). The native client falls back to text-only feedback
+  for the explicit screenshot-storage error codes; production keeps PNG capture
+  when private storage is configured. JSON feedback/list roundtrip passed on
+  the disposable API; multipart without storage now returns controlled 400.
+- PASS: the new feedback fallback contract brings native unit/contract XCTest
+  to 71/71. The API-backed feedback UI test covers capture → multipart storage
+  error → text-only fallback → persisted owner feedback on the simulator.
+- Counting the prior 19 bounded parity cases plus the new feedback case, the
+  current simulator UI evidence is 20/20 with zero failures; the portfolio
+  cleanup case was rerun after its interpolation fix as well.
+
+### Full simulator and web regression rerun — 2026-10-06 17:32–17:37 ICT
+
+- PASS: the complete `LOCAL_API_UI` XCTest suite ran on the booted iPhone 16
+  Simulator (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`), executing 20 tests with
+  0 failures. This includes the feedback screenshot-storage fallback and the
+  owner-scoped mutation/cleanup flows; the disposable API remained healthy.
+- PASS: `go test ./... -count=1`, `go test -race ./... -count=1`, `go vet ./...`,
+  `git diff --check`, native base-component guard and project verification all
+  passed after the UI run.
+- PASS: Release `xcodebuild analyze` with warnings-as-errors and the complete
+  web design/type/domain/build suite passed. Vite still reports the existing
+  advisory bundle-size warning only; it is not a build failure.
+- NOT RUN: physical-device signing, real Google OAuth/OCR/provider calls and
+  authenticated production feedback remain external gates and were not
+  substituted with simulator evidence.
+- PASS: web `npm run test:feedback` proves the browser retries exactly once as
+  JSON for the two explicit screenshot-storage codes and never retries an
+  unrelated feedback failure.
+- PASS: `TEST_API_ORIGIN=http://127.0.0.1:4173 npm run test:feedback:e2e`
+  exercised the real Chromium UI through Vite → Gin → PostgreSQL: capture,
+  controlled local-storage error, JSON fallback, owner-row persistence and
+  cleanup all passed.
+
+### Portfolio refresh assertion race fix — 2026-10-06 17:57–18:03 ICT
+
+- PASS: the targeted portfolio UI test first passed after changing the
+  assertion to wait for the refreshed rendered value (`Giá hiện tại: 120.000`)
+  rather than the static `Giá trị hiện tại` card title.
+- PASS: the complete booted iPhone 16 Simulator `LOCAL_API_UI` suite then ran
+  20 tests with 0 failures. The failure was in test synchronization only; no
+  portfolio production code change was required.
+
+### Confirmed simulator-first regression — 2026-10-06 18:08–18:14 ICT
+
+- PASS: the complete `LOCAL_API_UI` XCTest suite was rerun on the booted
+  iPhone 16 Simulator (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`) against the
+  disposable local API and database. All 20 UI tests passed with 0 failures
+  in 344.875 seconds.
+- PASS: the run covered shell/auth, feedback capture and fallback, all More
+  destinations, AI-entry attachment/proposal review, Assistant state,
+  week-scoped ledger, wallet selection/detail/create/edit, transaction
+  create/edit, transfer pair deletion, credit entry/payment, and portfolio
+  price refresh.
+- PASS: no app crash, assertion failure, or owner-scoping fixture leak was
+  observed. The simulator remains the authoritative pre-device gate for this
+  iteration.
+- NOT RUN: physical-device signing, real Google OAuth, provider-backed
+  AI/OCR, and authenticated production feedback remain external gates; this
+  simulator run does not substitute for them.
+- PASS: the post-UI native unit/contract run executed 71 tests with 0
+  failures; backend `go test ./... -count=1`, `go test -race ./... -count=1`,
+  and `go vet ./...` also completed successfully.
+
+### Stateful secondary-screen simulator regression — 2026-10-06 18:45–18:56 ICT
+
+- PASS: the full `LOCAL_API_UI` suite on iPhone 16 simulator executed 26 UI
+  tests with 0 failures in 547.331 seconds.
+- PASS: the added stateful flows verify budget/category create-edit-delete,
+  jar create-edit-remove, month note save-delete, recurring create-edit-run-
+  due-delete and Travel Mode create-activate-edit-delete. Assertions wait for
+  rendered state after each API mutation.
+- PASS: unique owner-scoped fixtures and teardown remove generated recurring
+  transactions before deleting the disposable wallet; no fixture leak was
+  observed.
+- PASS: the budget/secondary forms reserve safe-area hit space so controls do
+  not overlap the shell's persistent bottom navigation on the compact phone
+  viewport.
+
+### Final simulator gate after recurring run-due coverage — 2026-10-06 18:58–19:08 ICT
+
+- PASS: the complete `LOCAL_API_UI` XCTest suite executed 26/26 cases with
+  zero failures on iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`
+  in 547.401 seconds; the latest `.xcresult` marks the test plan `Passed`.
+- PASS: stateful flows cover budget/category create-edit-delete, jar
+  create-edit-remove, month-note save-delete, recurring create-edit-run-due-
+  delete with generated transaction cleanup, Travel Mode create-activate-
+  edit-delete, plus the existing auth/shell, wallet, ledger, transfer,
+  credit, portfolio, AI-entry and feedback cases.
+- PASS: native unit/contract XCTest passed 71/71 cases with 0 failures;
+  base-component guard, project verification and `git diff --check` passed.
+  Backend `go test ./...` passed 231/231 in normal and race modes, and
+  `go vet ./...` found no issues.
+- PASS: post-run fixture checks returned empty wallets, budgets, recurring
+  schedules and travel events. Empty jar identities are retained by design to
+  preserve jar history after month removal.
+- PASS: the unsigned Release simulator artifact built, installed and launched
+  on the same iPhone 16 simulator; the Google sign-in gate rendered without a
+  crash. This is a runtime smoke check, not real OAuth validation.
+- PASS: the web PWA global button base now uses `touch-action: manipulation`
+  to prevent accidental double-tap zoom while preserving pinch zoom; the new
+  release-gate regression test is green alongside the full web build/design
+  checks.
+- BLOCKED EXTERNAL: the paired iPhone 15 Plus is discoverable and a local Apple
+  Development identity exists, but physical signing fails because Xcode has
+  invalid account credentials and no provisioning profile for
+  `com.mypocket.ios`; provisioning updates cannot run without a valid Xcode
+  account. Physical-device behavior therefore remains unverified.
+- PASS: read-only production probes confirm `GET /api/v1/health` and
+  `/docs/` are reachable, production OpenAPI is version 2.0 and contains the
+  feedback/changelog, API-key and AI route families. Invalid API-key probes for
+  feedback, advisor capabilities and API-key listing correctly return 401;
+  no production mutation was performed.

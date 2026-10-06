@@ -25,6 +25,7 @@ export type Wallet = {
   last_statement_balance?: number | null;
   statement_day?: number | null;
   payment_due_day?: number | null;
+  goal_notifications_enabled?: boolean;
 };
 
 export type WalletInput = {
@@ -39,6 +40,7 @@ export type WalletInput = {
   last_statement_balance?: number;
   statement_day?: number;
   payment_due_day?: number;
+  goal_notifications_enabled?: boolean;
 };
 
 const WALLET_API_PATH = "/api/v1/wallets";

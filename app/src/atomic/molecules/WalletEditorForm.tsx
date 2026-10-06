@@ -1,6 +1,8 @@
 import { BaseButton } from "../atoms/BaseButton";
 import { BaseSelect, BaseTextInput, FormField } from "../atoms/FormField";
 import { BaseCheckbox } from "../atoms/BaseCheckbox";
+import { BaseSwitch } from "../atoms/BaseSwitch";
+import { Text } from "../atoms/Text";
 import { WALLET_TYPES, type WalletInput, type WalletType } from "../../services/wallets";
 
 const COPY = {
@@ -28,6 +30,7 @@ export type WalletFormState = {
   lastStatementBalance: string;
   statementDay: string;
   paymentDueDay: string;
+  goalNotificationsEnabled: boolean;
 };
 
 export const EMPTY_WALLET_FORM: WalletFormState = {
@@ -42,6 +45,7 @@ export const EMPTY_WALLET_FORM: WalletFormState = {
   lastStatementBalance: "",
   statementDay: "",
   paymentDueDay: "",
+  goalNotificationsEnabled: false,
 };
 
 const TYPE_LABELS: Record<WalletType, string> = {
@@ -63,6 +67,7 @@ export function walletFormToInput(state: WalletFormState): WalletInput {
     last_statement_balance: state.type === WALLET_TYPES.credit && state.lastStatementBalance ? Number(state.lastStatementBalance) : undefined,
     statement_day: state.type === WALLET_TYPES.credit && state.statementDay ? Number(state.statementDay) : undefined,
     payment_due_day: state.type === WALLET_TYPES.credit && state.paymentDueDay ? Number(state.paymentDueDay) : undefined,
+    goal_notifications_enabled: state.type === WALLET_TYPES.goal ? state.goalNotificationsEnabled : undefined,
   };
 }
 
@@ -75,6 +80,7 @@ export function WalletEditorForm({ state, onChange, onSubmit, onCancel, saving, 
     {state.type === WALLET_TYPES.credit ? <FormField label="Hạn mức tín dụng (VND)"><BaseTextInput required disabled={saving} inputMode="numeric" value={state.creditLimit} onChange={(event) => onChange({ ...state, creditLimit: event.target.value.replace(/\D/g, "") })} /></FormField> : null}
     {state.type === WALLET_TYPES.credit ? <><FormField label="Dư nợ sao kê (VND)"><BaseTextInput disabled={saving} inputMode="numeric" value={state.lastStatementBalance} onChange={(event) => onChange({ ...state, lastStatementBalance: event.target.value.replace(/\D/g, "") })} /></FormField><div className="grid grid-cols-2 gap-3"><FormField label="Ngày sao kê"><BaseTextInput type="number" min="1" max="31" disabled={saving} value={state.statementDay} onChange={(event) => onChange({ ...state, statementDay: event.target.value.replace(/\D/g, "") })} /></FormField><FormField label="Ngày đến hạn"><BaseTextInput type="number" min="1" max="31" disabled={saving} value={state.paymentDueDay} onChange={(event) => onChange({ ...state, paymentDueDay: event.target.value.replace(/\D/g, "") })} /></FormField></div></> : null}
     {state.type === WALLET_TYPES.goal ? <FormField label="Ngày kết thúc"><BaseTextInput type="date" disabled={saving} value={state.targetDate} onChange={(event) => onChange({ ...state, targetDate: event.target.value })} /></FormField> : null}
+    {state.type === WALLET_TYPES.goal ? <div className="space-y-1"><BaseSwitch label="Bật thông báo tiến độ" disabled={saving} checked={state.goalNotificationsEnabled} onChange={(event) => onChange({ ...state, goalNotificationsEnabled: event.target.checked })} /><Text size="xs" tone="secondary">Lựa chọn này lưu cho ví; thông báo trong ứng dụng sẽ xuất hiện khi có sự kiện phù hợp.</Text></div> : null}
     <BaseCheckbox label={COPY.includeTotal} disabled={saving} checked={state.isInTotal} onChange={(event) => onChange({ ...state, isInTotal: event.target.checked })}>{COPY.includeTotal}</BaseCheckbox>
     {editing ? <FormField label={COPY.description}><BaseTextInput disabled={saving} value={state.description} onChange={(event) => onChange({ ...state, description: event.target.value })} /></FormField> : null}
     <div className="flex gap-2"><BaseButton type="submit" loading={saving} className="flex-1">{COPY.save}</BaseButton><BaseButton type="button" variant="ghost" disabled={saving} onClick={onCancel}>{COPY.cancel}</BaseButton></div>

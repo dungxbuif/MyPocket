@@ -32,6 +32,13 @@ features, with base-component ownership and an iOS Simulator-first proof.
 - XCTest, API contract tests, static base-component guard and Simulator UI
   smoke proof.
 
+The native login surface now uses the existing email/password endpoint
+(`POST /api/v1/login`); “username” is the account email. The Google button is
+removed from the iOS UI but the backend Google routes and DEBUG fixture remain
+for browser compatibility and rollback during migration. Password setup for
+existing Google-only production users and production rollout are separate
+release gates.
+
 ## Out of scope
 
 - Deleting/moving web or Expo code.
@@ -626,3 +633,82 @@ accessibility-label regression in the new icon wrapper; decorative icons are
 now hidden from the accessibility tree and More-row labels are explicit. The
 targeted red/green test and the rerun of all 17 signed UI tests pass, alongside
 65/65 unit tests, Release warnings-as-errors and simulator launch checks.
+
+## Notification inbox and final simulator rerun — 2026-10-06
+
+The notification preference/inbox slice is now wired end to end: goal-wallet
+notification preference persistence, owner-scoped inbox listing, idempotent
+mark-read and the native More → Notifications route use the same typed API and
+base components as the existing wallet surfaces. Migration `000029` is
+verified clean on the disposable simulator database; backend repository,
+handler and owner-isolation tests pass.
+
+The final iPhone 16 simulator verification was rerun after fixture and
+accessibility corrections. Native unit/contract XCTest passed 69/69. The 19
+API-backed UI cases passed 19/19 in bounded groups: shell/feedback/overflow,
+AI entry, Assistant, week ledger, wallet detail/editor, scoped wallet ledger,
+portfolio, credit entry/payment, transfer, wallet mutation and all More routes.
+The long single-process UI invocation is not the authoritative gate because
+Xcode can signal-kill that runner after an earlier failure; each bounded
+`xcresult` reported zero failed tests. Web design/type/build tests, backend
+`go test ./...` and `go vet ./...`, Release warnings-as-errors analysis and
+base/project guards also pass. Production authentication, deployment and
+physical-device validation remain external release gates.
+
+The follow-up auth-context correction then made a successful account timezone
+update replace the stored session's user timezone immediately. This prevents
+subsequent notification/calendar surfaces from using stale timezone state.
+Native unit/contract XCTest now passes 70/70, Release warnings-as-errors
+analysis and base/project guards remain green, and the Assistant diagnostics
+and authenticated More route continue to pass targeted simulator checks.
+
+The simulator-first gate was rerun at 17:06 ICT on the booted iPhone 16:
+all 70 native unit/contract tests passed, followed by all 19 API-backed UI
+cases in bounded isolated invocations against the disposable local API. No
+app crash or UI test failure was observed. Physical-device signing, real
+Google OAuth, provider-backed AI/OCR and authenticated production feedback
+remain deliberately unverified external gates.
+
+The feedback smoke then exposed a typed-nil S3 interface in the development
+API: multipart feedback could panic with HTTP 500 when storage was absent.
+The API now normalizes optional storage and returns a controlled screenshot
+error; iOS falls back to text-only feedback for those explicit storage codes.
+The new simulator feedback test verifies capture → fallback → persisted
+feedback, and native unit/contract XCTest passes 71/71.
+Together with the previously bounded parity groups, the simulator evidence is
+now 20/20 UI cases with zero failures; the portfolio fixture cleanup was
+rerun after its ID interpolation correction.
+
+The complete simulator-first regression was rerun at 17:32–17:37 ICT on the
+booted iPhone 16 Simulator. All 20 `LOCAL_API_UI` UI tests passed. Backend
+normal, race and vet suites, Release warnings-as-errors analysis, base/project
+guards, and the web design/type/domain/build suites also passed. This confirms
+the local simulator/API parity gate; physical signing, real OAuth/provider
+calls and authenticated production feedback remain explicitly unverified.
+
+The next full simulator run initially exposed a test-only race in the portfolio
+price assertion: the test waited for the always-present card title instead of
+the refreshed formatted price. The assertion now waits for
+`Giá hiện tại: 120.000`, and the targeted test passed before the complete rerun.
+The complete `LOCAL_API_UI` suite then passed 20/20 at 17:57–18:03 ICT on the
+same booted iPhone 16 Simulator. This closes the discovered regression without
+changing portfolio business logic.
+
+The final simulator gate after the recurring run-due coverage completed at
+18:58–19:08 ICT. The complete `LOCAL_API_UI` suite passed 26/26 on iPhone 16
+Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D` in 547.401 seconds, and the
+latest `.xcresult` marks every case passed. Native unit/contract XCTest passed
+71/71; web design/type/build, API-backed AI/feedback/transfer/browser flows,
+backend 231/231 normal and race tests, `go vet`, Release warnings-as-errors,
+base-component/project guards and `git diff --check` also pass. The disposable
+fixture account has no wallets, budgets, recurring schedules or travel events
+after teardown; empty jar identities are retained only for history after month
+assignment removal. Physical-device signing, real Google OAuth/provider calls
+and authenticated production feedback remain external release gates.
+
+An attempted physical build against the paired iPhone 15 Plus confirmed the
+remaining signing prerequisite rather than a source failure: Xcode has an
+Apple Development identity but invalid stored account credentials and no
+provisioning profile for `com.mypocket.ios`. Automatic provisioning is also
+unable to proceed without a valid Xcode account. The native branch keeps the
+simulator gate authoritative until those external credentials are repaired.

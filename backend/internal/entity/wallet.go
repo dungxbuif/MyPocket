@@ -25,24 +25,25 @@ const (
 )
 
 type Wallet struct {
-	ID                   string        `json:"id" gorm:"primaryKey"`
-	OwnerID              string        `json:"owner_id" gorm:"index;not null"`
-	Name                 string        `json:"name" gorm:"not null"`
-	Type                 string        `json:"type" gorm:"not null"`
-	Currency             string        `json:"currency" gorm:"not null;default:VND"`
-	OpeningBalance       int64         `json:"opening_balance"`
-	CurrentBalance       int64         `json:"current_balance" gorm:"-"`
-	AvailableCredit      int64         `json:"available_credit,omitempty" gorm:"-"`
-	IsInTotal            bool          `json:"is_in_total" gorm:"not null;default:true"`
-	Description          *string       `json:"description,omitempty"`
-	TargetAmount         *int64        `json:"target_amount,omitempty"`
-	TargetDate           *CalendarDate `json:"target_date,omitempty" gorm:"column:target_date;type:date"`
-	CreditLimit          *int64        `json:"credit_limit,omitempty"`
-	LastStatementBalance *int64        `json:"last_statement_balance,omitempty"`
-	StatementDay         *int          `json:"statement_day,omitempty"`
-	PaymentDueDay        *int          `json:"payment_due_day,omitempty"`
-	CreatedAt            time.Time     `json:"created_at"`
-	UpdatedAt            time.Time     `json:"updated_at"`
+	ID                       string        `json:"id" gorm:"primaryKey"`
+	OwnerID                  string        `json:"owner_id" gorm:"index;not null"`
+	Name                     string        `json:"name" gorm:"not null"`
+	Type                     string        `json:"type" gorm:"not null"`
+	Currency                 string        `json:"currency" gorm:"not null;default:VND"`
+	OpeningBalance           int64         `json:"opening_balance"`
+	CurrentBalance           int64         `json:"current_balance" gorm:"-"`
+	AvailableCredit          int64         `json:"available_credit,omitempty" gorm:"-"`
+	IsInTotal                bool          `json:"is_in_total" gorm:"not null;default:true"`
+	Description              *string       `json:"description,omitempty"`
+	TargetAmount             *int64        `json:"target_amount,omitempty"`
+	TargetDate               *CalendarDate `json:"target_date,omitempty" gorm:"column:target_date;type:date"`
+	CreditLimit              *int64        `json:"credit_limit,omitempty"`
+	LastStatementBalance     *int64        `json:"last_statement_balance,omitempty"`
+	StatementDay             *int          `json:"statement_day,omitempty"`
+	PaymentDueDay            *int          `json:"payment_due_day,omitempty"`
+	GoalNotificationsEnabled bool          `json:"goal_notifications_enabled" gorm:"column:goal_notifications_enabled;not null;default:false"`
+	CreatedAt                time.Time     `json:"created_at"`
+	UpdatedAt                time.Time     `json:"updated_at"`
 }
 
 type Category struct {

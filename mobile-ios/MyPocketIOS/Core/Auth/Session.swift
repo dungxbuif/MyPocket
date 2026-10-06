@@ -19,6 +19,11 @@ struct LoginOutput: Codable, Equatable, Sendable {
     }
 }
 
+struct LoginRequest: Codable, Sendable {
+    let email: String
+    let password: String
+}
+
 struct RefreshRequest: Codable, Sendable {
     let refreshToken: String
 

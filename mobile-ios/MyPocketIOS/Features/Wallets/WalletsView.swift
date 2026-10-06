@@ -107,6 +107,7 @@ struct WalletsView: View {
                                 HStack {
                                     MPButton("Chi tiết", style: .secondary) { selectedWalletID = wallet.id }
                                     MPButton("Sửa", style: .secondary) { editorPresentation = .edit(wallet) }
+                                        .accessibilityLabel("Sửa ví " + wallet.name)
                                     MPButton("Xóa", style: .destructive) { deleteTarget = wallet }
                                 }
                             }
@@ -450,6 +451,7 @@ struct WalletEditorView: View {
     @State private var paymentDueDay: String
     @State private var description: String
     @State private var isInTotal: String
+    @State private var goalNotificationsEnabled: Bool
     @State private var saving = false
     @State private var errorMessage: String?
 
@@ -471,6 +473,7 @@ struct WalletEditorView: View {
         _paymentDueDay = State(initialValue: wallet?.paymentDueDay.map(String.init) ?? "")
         _description = State(initialValue: wallet?.description ?? "")
         _isInTotal = State(initialValue: wallet?.isInTotal == false ? "Không" : "Có")
+        _goalNotificationsEnabled = State(initialValue: wallet?.goalNotificationsEnabled ?? false)
     }
 
     var body: some View {
@@ -499,6 +502,10 @@ struct WalletEditorView: View {
                     MPAmountField(title: "Dư nợ sao kê", text: $lastStatementBalance)
                     MPTextField(title: "Ngày sao kê (1-31)", text: $statementDay, placeholder: "Không bắt buộc")
                     MPTextField(title: "Ngày đến hạn (1-31)", text: $paymentDueDay, placeholder: "Không bắt buộc")
+                }
+                if type == "goal" {
+                    MPBooleanSelector(title: "Bật thông báo tiến độ", value: $goalNotificationsEnabled)
+                    MPText("Thông báo trong ứng dụng sẽ xuất hiện khi có sự kiện phù hợp.", style: .secondary)
                 }
                 MPWalletSelector(title: "Tính vào tổng cộng", options: ["Có", "Không"], selection: $isInTotal)
                 MPTextField(title: "Mô tả", text: $description, placeholder: "Không bắt buộc")
@@ -541,7 +548,7 @@ struct WalletEditorView: View {
         saving = true
         defer { saving = false }
         let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
-        let input = WalletModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), type: wallet?.type ?? type, openingBalance: wallet?.openingBalance ?? (parsedOpeningBalance ?? 0), isInTotal: isInTotal == "Có", description: trimmedDescription.isEmpty ? nil : trimmedDescription, targetAmount: type == "goal" ? parsedTarget : nil, targetDate: type == "goal" && targetDateEnabled == "Có" ? MPFormat.calendarDateString(targetDate, timeZone: TimeZone(identifier: timezone) ?? .current) : nil, creditLimit: type == "credit" ? parsedCreditLimit : nil, lastStatementBalance: type == "credit" ? parsedStatementBalance : nil, statementDay: type == "credit" ? parsedStatementDay : nil, paymentDueDay: type == "credit" ? parsedPaymentDueDay : nil)
+        let input = WalletModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), type: wallet?.type ?? type, openingBalance: wallet?.openingBalance ?? (parsedOpeningBalance ?? 0), isInTotal: isInTotal == "Có", description: trimmedDescription.isEmpty ? nil : trimmedDescription, targetAmount: type == "goal" ? parsedTarget : nil, targetDate: type == "goal" && targetDateEnabled == "Có" ? MPFormat.calendarDateString(targetDate, timeZone: TimeZone(identifier: timezone) ?? .current) : nil, creditLimit: type == "credit" ? parsedCreditLimit : nil, lastStatementBalance: type == "credit" ? parsedStatementBalance : nil, statementDay: type == "credit" ? parsedStatementDay : nil, paymentDueDay: type == "credit" ? parsedPaymentDueDay : nil, goalNotificationsEnabled: type == "goal" ? goalNotificationsEnabled : false)
         do {
             if let wallet { _ = try await api.updateWallet(id: wallet.id, input: input) }
             else { _ = try await api.createWallet(input) }

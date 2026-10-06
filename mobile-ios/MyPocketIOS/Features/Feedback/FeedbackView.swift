@@ -40,10 +40,30 @@ final class FeedbackViewModel: ObservableObject {
             title = ""
             description = ""
             return true
+        } catch let error where screenshot != nil && Self.shouldFallbackToTextOnly(error) {
+            // Local development may intentionally run without private object
+            // storage. Preserve the user's feedback instead of turning the
+            // optional screenshot into a hard failure; production still keeps
+            // the screenshot whenever storage is configured.
+            do {
+                let item = try await api.createFeedback(input)
+                items.insert(item, at: 0)
+                title = ""
+                description = ""
+                return true
+            } catch {
+                errorMessage = "Không thể gửi phản hồi."
+                return false
+            }
         } catch {
             errorMessage = "Không thể gửi phản hồi."
             return false
         }
+    }
+
+    static func shouldFallbackToTextOnly(_ error: Error) -> Bool {
+        guard let apiError = error as? APIError, case .problem(let problem) = apiError else { return false }
+        return problem.code == "FEEDBACK_SCREENSHOT_INVALID" || problem.code == "FEEDBACK_SCREENSHOT_STORAGE_UNAVAILABLE"
     }
 }
 

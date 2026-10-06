@@ -22,6 +22,14 @@ The Stage v1 baseline creates `ai_entry_sessions`, `ai_entry_messages`, `ai_entr
 
 `budgets`: text UUID id, owner_id FK user, name, positive safe-integer limit_amount, nullable wallet_id/category_id FKs, account-calendar `start_date`/`end_date` SQL `date`, timestamps. Owner/period index. Delete owner/wallet/category cascades matching budget configuration; deleting budget never removes transactions. Spent/remaining days/ended are derived fields, not stored counters. The Stage v1 baseline creates the final date-only schema. [ADR-004](../decisions/ADR-004-budget-api-data.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md), [API design](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md). No AutoMigrate is used.
 
+## Notification preference and inbox — migration 000029
+
+`wallets.goal_notifications_enabled` is an owner-owned boolean preference and
+defaults to `false`. `notifications` stores owner-scoped in-app rows with
+`kind`, title/body, a unique per-owner `dedupe_key`, optional `read_at` and
+creation time. The inbox is read-only except for idempotent mark-read; worker
+generation and push delivery are separate concerns.
+
 ## Field Ownership
 
 - Human owns data ownership and migration approval.
@@ -98,6 +106,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `month_notes` | User-authored note for one account-local month | User/month | Migration `000015`; independent from calculated report figures. |
 | `transaction_attachments` | Private S3 receipt metadata and OCR text/state | User/process | Migration `000011`–`000012`; object key is backend-only; 24-hour unlinked cleanup lifecycle. |
 | `transaction_attachment_links` | Approved transaction-to-receipt relation | User via both FKs | Unique transaction/attachment pair; only created inside proposal approval. |
+| `notifications` | Owner-scoped in-app notification inbox | User | Migration `000029`; unique `(owner_id, dedupe_key)` and newest-first index. |
 
 ## Relationships
 
@@ -113,6 +122,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `jars` | `transactions` | 1-to-many optional | Composite owner/jar FK; use case additionally validates ordinary-expense kind and month configuration. |
 | `transactions` | `transactions` | Paired 1-to-1 by nullable `transfer_id` | Source expense and destination income share a transfer id; both rows are created atomically and excluded from reports/jars. |
 | `transactions` | `transaction_attachments` | Many-to-many | Qua `transaction_attachment_links`; transaction owner and attachment owner are both checked before signed download. |
+| `user` | `notifications` | 1-to-many | `notifications.owner_id` references `user.id` with cascade delete; all reads/marks scope by owner. |
 
 ## Constraints
 

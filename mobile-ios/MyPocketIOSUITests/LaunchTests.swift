@@ -25,9 +25,59 @@ private struct FixturePortfolioAsset: Decodable, Sendable {
     let name: String
 }
 
+private struct FixturePortfolioAssetList: Decodable, Sendable {
+    let id: String
+    let symbol: String
+    let name: String
+}
+
 private struct FixturePortfolioAssetHandle: Sendable {
     let token: String
     let asset: FixturePortfolioAsset
+}
+
+private struct FixtureBudget: Decodable, Sendable {
+    let id: String
+    let name: String
+}
+
+private struct FixtureCategory: Decodable, Sendable {
+    let id: String
+    let name: String
+}
+
+private struct FixtureJarItem: Decodable, Sendable {
+    let jarID: String
+    let name: String
+
+    enum CodingKeys: String, CodingKey {
+        case jarID = "jar_id"
+        case name
+    }
+}
+
+private struct FixtureJarMonth: Decodable, Sendable {
+    let items: [FixtureJarItem]
+}
+
+private struct FixtureRecurring: Decodable, Sendable {
+    let id: String
+    let name: String
+}
+
+private struct FixtureTravelEvent: Decodable, Sendable {
+    let id: String
+    let name: String
+}
+
+private struct FixtureTransaction: Decodable, Sendable {
+    let id: String
+    let walletID: String
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case walletID = "wallet_id"
+    }
 }
 
 private enum LocalFixtureError: Error {
@@ -92,8 +142,164 @@ private enum LocalAPIFixture {
         }
     }
 
+    static func deleteBudgets(named name: String) async throws {
+        let token = try await loginToken()
+        let existing = try await request(
+            path: "/budgets",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<BudgetList>.self
+        ).data.items
+        for item in existing where item.name == name {
+            _ = try await request(
+                path: "/budgets/\(item.id)",
+                method: "DELETE",
+                token: token,
+                body: nil,
+                decode: EmptyFixtureResponse.self
+            )
+        }
+    }
+
+    static func deleteCategories(named name: String) async throws {
+        let token = try await loginToken()
+        let existing = try await request(
+            path: "/categories",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<[FixtureCategory]>.self
+        ).data
+        for item in existing where item.name == name {
+            _ = try await request(
+                path: "/categories/\(item.id)",
+                method: "DELETE",
+                token: token,
+                body: nil,
+                decode: EmptyFixtureResponse.self
+            )
+        }
+    }
+
+    static func deleteJars(named name: String, month: String) async throws {
+        let token = try await loginToken()
+        let summary = try await request(
+            path: "/jars?month=\(month)",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<FixtureJarMonth>.self
+        ).data
+        for item in summary.items where item.name == name {
+            _ = try await request(
+                path: "/jars/\(item.jarID)/months/\(month)",
+                method: "DELETE",
+                token: token,
+                body: nil,
+                decode: EmptyFixtureResponse.self
+            )
+        }
+    }
+
+    static func deleteRecurring(named name: String) async throws {
+        let token = try await loginToken()
+        let existing = try await request(
+            path: "/recurring",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<[FixtureRecurring]>.self
+        ).data
+        for item in existing where item.name == name {
+            _ = try await request(
+                path: "/recurring/\(item.id)",
+                method: "DELETE",
+                token: token,
+                body: nil,
+                decode: EmptyFixtureResponse.self
+            )
+        }
+    }
+
+    static func deleteTravelEvents(named name: String) async throws {
+        let token = try await loginToken()
+        let existing = try await request(
+            path: "/travel/events",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<[FixtureTravelEvent]>.self
+        ).data
+        for item in existing where item.name == name {
+            _ = try await request(
+                path: "/travel/events/\(item.id)",
+                method: "DELETE",
+                token: token,
+                body: nil,
+                decode: EmptyFixtureResponse.self
+            )
+        }
+    }
+
+    static func deleteTransactions(walletID: String) async throws {
+        let token = try await loginToken()
+        let existing = try await request(
+            path: "/transactions",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<[FixtureTransaction]>.self
+        ).data
+        for item in existing where item.walletID == walletID {
+            _ = try await request(
+                path: "/transactions/\(item.id)",
+                method: "DELETE",
+                token: token,
+                body: nil,
+                decode: EmptyFixtureResponse.self
+            )
+        }
+    }
+
+    static func currentMonth() -> String {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        formatter.dateFormat = "yyyy-MM"
+        return formatter.string(from: Date())
+    }
+
+    static func deleteMonthNote(month: String) async throws {
+        let token = try await loginToken()
+        _ = try await request(
+            path: "/months/\(month)/note",
+            method: "DELETE",
+            token: token,
+            body: nil,
+            decode: EmptyFixtureResponse.self
+        )
+    }
+
     static func portfolioAsset(symbol: String, name: String) async throws -> FixturePortfolioAssetHandle {
         let token = try await loginToken()
+        let existing = try await request(
+            path: "/portfolio/assets",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<[FixturePortfolioAssetList]>.self
+        ).data
+        for item in existing where item.symbol == symbol {
+            _ = try await request(
+                path: "/portfolio/assets/\(item.id)",
+                method: "DELETE",
+                token: token,
+                body: nil,
+                decode: EmptyFixtureResponse.self
+            )
+        }
         let data = try JSONSerialization.data(withJSONObject: ["symbol": symbol, "name": name])
         let created = try await request(
             path: "/portfolio/assets",
@@ -148,7 +354,16 @@ private enum LocalAPIFixture {
         body: Data?,
         decode: Value.Type
     ) async throws -> Value {
-        var request = URLRequest(url: baseURL.appendingPathComponent(String(path.dropFirst())))
+        let rawPath = String(path.dropFirst())
+        let url: URL
+        if let queryIndex = rawPath.firstIndex(of: "?") {
+            let route = String(rawPath[..<queryIndex])
+            let query = String(rawPath[rawPath.index(after: queryIndex)...])
+            url = URL(string: "\(baseURL.appendingPathComponent(route).absoluteString)?\(query)")!
+        } else {
+            url = baseURL.appendingPathComponent(rawPath)
+        }
+        var request = URLRequest(url: url)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let token { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
@@ -161,6 +376,10 @@ private enum LocalAPIFixture {
         if response.statusCode == 204 { return try JSONDecoder().decode(Value.self, from: Data("{}".utf8)) }
         return try JSONDecoder().decode(Value.self, from: data)
     }
+}
+
+private struct BudgetList: Decodable, Sendable {
+    let items: [FixtureBudget]
 }
 
 private struct EmptyFixtureResponse: Decodable {}
@@ -178,14 +397,30 @@ private extension XCUIElement {
 
 @MainActor
 final class LaunchTests: XCTestCase {
+    private func dismissKeyboard(_ app: XCUIApplication) {
+        let key = app.keyboards.buttons.matching(
+            NSPredicate(format: "label ==[c] 'return' OR label ==[c] 'done' OR label ==[c] 'xong'")
+        ).firstMatch
+        if key.exists { key.tap() }
+    }
+
+    private func reveal(_ element: XCUIElement, in app: XCUIApplication) {
+        let bottomTabBarTop = app.windows.firstMatch.frame.maxY - 100
+        for _ in 0..<8 where !element.isHittable || element.frame.maxY > bottomTabBarTop {
+            app.swipeUp()
+        }
+    }
+
     func testAppLaunches() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestUnauthenticated"]
         app.launch()
         XCTAssertTrue(
-            app.buttons["Đăng nhập bằng Google"].waitForExistence(timeout: 5),
-            "Auth screen should expose the Google sign-in action after launch."
+            app.buttons["Đăng nhập"].waitForExistence(timeout: 5),
+            "Auth screen should expose the email sign-in action after launch."
         )
+        XCTAssertTrue(app.textFields["Email"].exists)
+        XCTAssertTrue(app.secureTextFields["Mật khẩu"].exists)
     }
 
     func testAuthenticatedShellExposesPrimaryRoutes() throws {
@@ -247,6 +482,46 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Phản hồi"].firstMatch.waitForExistence(timeout: 5))
     }
 
+    func testAPIBackedFeedbackBubbleSubmitsWhenScreenshotStorageUnavailable() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let title = "UI feedback \(UUID().uuidString.prefix(8))"
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+
+        let bubble = app.buttons["Gửi phản hồi"]
+        XCTAssertTrue(bubble.waitForExistence(timeout: 10))
+        bubble.tap()
+        XCTAssertTrue(app.staticTexts["Phản hồi"].firstMatch.waitForExistence(timeout: 10))
+
+        let titleField = app.textFields["Tiêu đề"]
+        XCTAssertTrue(titleField.waitForExistence(timeout: 10))
+        titleField.clearAndType(title)
+        let detail = app.textViews["Chi tiết"]
+        XCTAssertTrue(detail.waitForExistence(timeout: 10))
+        detail.clearAndType("Ảnh chụp không có storage trong môi trường local; nội dung vẫn phải được lưu.")
+        let submit = app.buttons["Gửi phản hồi"]
+        XCTAssertTrue(submit.waitForExistence(timeout: 10))
+        submit.tap()
+        XCTAssertFalse(app.staticTexts["Phản hồi"].firstMatch.waitForExistence(timeout: 5), "Overlay should close after text-only fallback succeeds.")
+
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        let feedbackRoute = app.buttons["Phản hồi & changelog"].firstMatch
+        XCTAssertTrue(feedbackRoute.waitForExistence(timeout: 10))
+        let bottomTabBarTop = app.windows.firstMatch.frame.maxY - 100
+        for _ in 0..<5 where !feedbackRoute.isHittable || feedbackRoute.frame.maxY > bottomTabBarTop {
+            app.swipeUp()
+        }
+        XCTAssertTrue(feedbackRoute.isHittable)
+        feedbackRoute.tap()
+        XCTAssertTrue(app.staticTexts["Phản hồi & changelog"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts[title].waitForExistence(timeout: 15))
+#endif
+    }
+
     func testAuthenticatedMoreMenuOpensEveryDestination() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]
@@ -262,6 +537,7 @@ final class LaunchTests: XCTestCase {
             "Travel Mode",
             "Danh mục đầu tư",
             "Sổ tín dụng",
+            "Thông báo",
             "Finance Assistant",
             "Nhập giao dịch bằng AI",
             "Phản hồi & changelog",
@@ -274,10 +550,14 @@ final class LaunchTests: XCTestCase {
 
             let entry = app.buttons[title].firstMatch
             XCTAssertTrue(entry.waitForExistence(timeout: 5), "Missing More destination: \(title)")
-            for _ in 0..<5 where !entry.isHittable {
+            // The persistent bottom tab bar occupies the final ~100pt of the
+            // simulator. XCTest may still report a row underneath it as
+            // hittable, so use its frame as well as isHittable before tapping.
+            let bottomTabBarTop = app.windows.firstMatch.frame.maxY - 100
+            for _ in 0..<5 where !entry.isHittable || entry.frame.maxY > bottomTabBarTop {
                 app.swipeUp()
             }
-            XCTAssertTrue(entry.isHittable, "More destination is not reachable: \(title)")
+            XCTAssertTrue(entry.isHittable && entry.frame.maxY <= bottomTabBarTop, "More destination is not reachable: \(title)")
             entry.tap()
             XCTAssertTrue(app.staticTexts[title].firstMatch.waitForExistence(timeout: 5), "Destination did not render: \(title)")
 
@@ -300,8 +580,14 @@ final class LaunchTests: XCTestCase {
         app.launch()
         XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
         app.buttons["Thêm"].tap()
-        XCTAssertTrue(app.buttons["Finance Assistant"].waitForExistence(timeout: 10))
-        app.buttons["Finance Assistant"].tap()
+        let assistantEntry = app.buttons["Finance Assistant"]
+        XCTAssertTrue(assistantEntry.waitForExistence(timeout: 10))
+        let bottomTabBarTop = app.windows.firstMatch.frame.maxY - 100
+        for _ in 0..<5 where !assistantEntry.isHittable || assistantEntry.frame.maxY > bottomTabBarTop {
+            app.swipeUp()
+        }
+        XCTAssertTrue(assistantEntry.isHittable && assistantEntry.frame.maxY <= bottomTabBarTop)
+        assistantEntry.tap()
         XCTAssertTrue(app.staticTexts["Finance Assistant"].firstMatch.waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Finance Assistant chưa được bật."].waitForExistence(timeout: 10))
         XCTAssertFalse(app.staticTexts["Không thể tải tổng quan trợ lý tài chính."].exists)
@@ -395,6 +681,331 @@ final class LaunchTests: XCTestCase {
 #endif
     }
 
+    func testAPIBackedBudgetCreateUpdateDeleteFromNativeUI() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let suffix = String(UUID().uuidString.prefix(8))
+        let nameValue = "Fixture Budget \(suffix)"
+        let updatedNameValue = "Fixture Budget Updated \(suffix)"
+        try? await LocalAPIFixture.deleteBudgets(named: nameValue)
+        try? await LocalAPIFixture.deleteBudgets(named: updatedNameValue)
+        addTeardownBlock {
+            try? await LocalAPIFixture.deleteBudgets(named: nameValue)
+            try? await LocalAPIFixture.deleteBudgets(named: updatedNameValue)
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Ngân sách"].waitForExistence(timeout: 10))
+        app.buttons["Ngân sách"].tap()
+        XCTAssertTrue(app.staticTexts["Ngân sách"].firstMatch.waitForExistence(timeout: 10))
+
+        app.buttons["Tạo ngân sách"].tap()
+        XCTAssertTrue(app.staticTexts["Tạo ngân sách"].waitForExistence(timeout: 10))
+        let name = app.textFields["Tên"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        name.clearAndType(nameValue)
+        dismissKeyboard(app)
+        let limit = app.textFields["Giới hạn"]
+        XCTAssertTrue(limit.waitForExistence(timeout: 10))
+        limit.clearAndType("500000")
+        if app.buttons["Xong"].exists { app.buttons["Xong"].tap() }
+        app.buttons["Lưu"].tap()
+        let created = app.staticTexts[nameValue]
+        XCTAssertTrue(created.waitForExistence(timeout: 15), "Budget did not render after POST: \(nameValue)")
+        guard created.exists else { return }
+
+        app.buttons["Sửa"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Sửa ngân sách"].waitForExistence(timeout: 10))
+        let editedName = app.textFields["Tên"]
+        XCTAssertTrue(editedName.waitForExistence(timeout: 10))
+        editedName.clearAndType(updatedNameValue)
+        dismissKeyboard(app)
+        app.buttons["Lưu"].tap()
+        XCTAssertTrue(app.staticTexts[updatedNameValue].waitForExistence(timeout: 15))
+
+        app.buttons["Xóa"].firstMatch.tap()
+        XCTAssertTrue(app.alerts.buttons["Xóa"].waitForExistence(timeout: 5))
+        app.alerts.buttons["Xóa"].tap()
+        XCTAssertFalse(app.staticTexts[updatedNameValue].waitForExistence(timeout: 5))
+#endif
+    }
+
+    func testAPIBackedCategoryCreateUpdateDeleteFromNativeUI() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let suffix = String(UUID().uuidString.prefix(8))
+        let nameValue = "Fixture Category \(suffix)"
+        let updatedNameValue = "Fixture Category Updated \(suffix)"
+        try? await LocalAPIFixture.deleteCategories(named: nameValue)
+        try? await LocalAPIFixture.deleteCategories(named: updatedNameValue)
+        addTeardownBlock {
+            try? await LocalAPIFixture.deleteCategories(named: nameValue)
+            try? await LocalAPIFixture.deleteCategories(named: updatedNameValue)
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Danh mục"].waitForExistence(timeout: 10))
+        app.buttons["Danh mục"].tap()
+        XCTAssertTrue(app.staticTexts["Danh mục"].firstMatch.waitForExistence(timeout: 10))
+
+        app.buttons["Thêm danh mục"].tap()
+        XCTAssertTrue(app.staticTexts["Danh mục mới"].waitForExistence(timeout: 10))
+        let name = app.textFields["Tên"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        name.clearAndType(nameValue)
+        app.buttons["Lưu"].tap()
+        let created = app.staticTexts[nameValue]
+        XCTAssertTrue(created.waitForExistence(timeout: 15))
+        guard created.exists else { return }
+
+        app.buttons["Sửa \(nameValue)"].tap()
+        XCTAssertTrue(app.staticTexts["Sửa danh mục"].waitForExistence(timeout: 10))
+        let editedName = app.textFields["Tên"]
+        XCTAssertTrue(editedName.waitForExistence(timeout: 10))
+        editedName.clearAndType(updatedNameValue)
+        app.buttons["Lưu"].tap()
+        XCTAssertTrue(app.staticTexts[updatedNameValue].waitForExistence(timeout: 15))
+
+        app.buttons["Xóa \(updatedNameValue)"].tap()
+        XCTAssertTrue(app.buttons["Xóa"].waitForExistence(timeout: 5))
+        app.buttons["Xóa"].tap()
+        XCTAssertFalse(app.staticTexts[updatedNameValue].waitForExistence(timeout: 5))
+#endif
+    }
+
+    func testAPIBackedJarCreateUpdateRemoveFromNativeUI() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let month = LocalAPIFixture.currentMonth()
+        let suffix = String(UUID().uuidString.prefix(8))
+        let nameValue = "Fixture Jar \(suffix)"
+        let updatedNameValue = "Fixture Jar Updated \(suffix)"
+        try? await LocalAPIFixture.deleteJars(named: nameValue, month: month)
+        try? await LocalAPIFixture.deleteJars(named: updatedNameValue, month: month)
+        addTeardownBlock {
+            try? await LocalAPIFixture.deleteJars(named: nameValue, month: month)
+            try? await LocalAPIFixture.deleteJars(named: updatedNameValue, month: month)
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Hũ chi tiêu"].waitForExistence(timeout: 10))
+        app.buttons["Hũ chi tiêu"].tap()
+        XCTAssertTrue(app.staticTexts["Hũ chi tiêu"].firstMatch.waitForExistence(timeout: 10))
+
+        app.buttons["Thêm hũ"].tap()
+        XCTAssertTrue(app.staticTexts["Tạo hũ"].waitForExistence(timeout: 10))
+        let name = app.textFields["Tên"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        name.clearAndType(nameValue)
+        let save = app.buttons["Lưu"].firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        reveal(save, in: app)
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+        let created = app.staticTexts[nameValue]
+        XCTAssertTrue(created.waitForExistence(timeout: 15))
+        guard created.exists else { return }
+
+        let edit = app.buttons["Sửa tháng này"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 10))
+        reveal(edit, in: app)
+        edit.tap()
+        XCTAssertTrue(app.staticTexts["Sửa hũ"].waitForExistence(timeout: 10))
+        let editedName = app.textFields["Tên"]
+        XCTAssertTrue(editedName.waitForExistence(timeout: 10))
+        editedName.clearAndType(updatedNameValue)
+        let editSave = app.buttons["Lưu"].firstMatch
+        reveal(editSave, in: app)
+        editSave.tap()
+        XCTAssertTrue(app.staticTexts[updatedNameValue].waitForExistence(timeout: 15))
+
+        let remove = app.buttons["Gỡ khỏi tháng"].firstMatch
+        XCTAssertTrue(remove.waitForExistence(timeout: 10))
+        reveal(remove, in: app)
+        remove.tap()
+        // The stable jar identity remains available in the cumulative selector;
+        // removing a month only removes the active month configuration. Assert
+        // that the month row and its mutation controls disappear.
+        XCTAssertFalse(app.buttons["Sửa tháng này"].waitForExistence(timeout: 10))
+#endif
+    }
+
+    func testAPIBackedMonthNoteSaveAndDeleteFromNativeUI() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let month = LocalAPIFixture.currentMonth()
+        let noteValue = "UI month note \(UUID().uuidString.prefix(8))"
+        try? await LocalAPIFixture.deleteMonthNote(month: month)
+        addTeardownBlock { try? await LocalAPIFixture.deleteMonthNote(month: month) }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Tháng"].waitForExistence(timeout: 10))
+        app.buttons["Tháng"].tap()
+        XCTAssertTrue(app.staticTexts["Tháng"].firstMatch.waitForExistence(timeout: 10))
+
+        let note = app.textViews["Ghi chú tháng"]
+        XCTAssertTrue(note.waitForExistence(timeout: 15))
+        reveal(note, in: app)
+        note.clearAndType(noteValue)
+        let save = app.buttons["Lưu ghi chú"]
+        reveal(save, in: app)
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+
+        app.buttons["Quay lại"].tap()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        app.buttons["Tháng"].tap()
+        XCTAssertTrue(app.staticTexts["Tháng"].firstMatch.waitForExistence(timeout: 10))
+        let persisted = app.textViews["Ghi chú tháng"]
+        XCTAssertTrue(persisted.waitForExistence(timeout: 10))
+        XCTAssertEqual(persisted.value as? String, noteValue)
+        let delete = app.buttons["Xóa ghi chú"]
+        reveal(delete, in: app)
+        delete.tap()
+        XCTAssertFalse(app.buttons["Xóa ghi chú"].waitForExistence(timeout: 5))
+#endif
+    }
+
+    func testAPIBackedRecurringCreateUpdateDeleteFromNativeUI() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let suffix = String(UUID().uuidString.prefix(8))
+        let nameValue = "Fixture Recurring \(suffix)"
+        let updatedNameValue = "Fixture Recurring Updated \(suffix)"
+        let wallet = try await LocalAPIFixture.wallet(name: "Fixture Recurring Wallet \(suffix)", type: "basic")
+        addTeardownBlock {
+            try? await LocalAPIFixture.deleteRecurring(named: nameValue)
+            try? await LocalAPIFixture.deleteRecurring(named: updatedNameValue)
+            try? await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
+            try? await LocalAPIFixture.delete(wallet)
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Giao dịch định kỳ"].waitForExistence(timeout: 10))
+        app.buttons["Giao dịch định kỳ"].tap()
+        XCTAssertTrue(app.staticTexts["Giao dịch định kỳ"].firstMatch.waitForExistence(timeout: 10))
+
+        app.buttons["Thêm lịch"].tap()
+        XCTAssertTrue(app.staticTexts["Tạo lịch"].waitForExistence(timeout: 10))
+        let name = app.textFields["Tên"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        name.clearAndType(nameValue)
+        let amount = app.textFields["Số tiền"].firstMatch
+        XCTAssertTrue(amount.waitForExistence(timeout: 10))
+        amount.clearAndType("15000")
+        if app.buttons["Xong"].exists { app.buttons["Xong"].firstMatch.tap() }
+        let save = app.buttons["Lưu"].firstMatch
+        XCTAssertTrue(save.waitForExistence(timeout: 10))
+        reveal(save, in: app)
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+        let created = app.staticTexts[nameValue]
+        XCTAssertTrue(created.waitForExistence(timeout: 15))
+        guard created.exists else { return }
+
+        app.buttons["Sửa"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Sửa lịch"].waitForExistence(timeout: 10))
+        let editedName = app.textFields["Tên"]
+        XCTAssertTrue(editedName.waitForExistence(timeout: 10))
+        editedName.clearAndType(updatedNameValue)
+        let editSave = app.buttons["Lưu"].firstMatch
+        reveal(editSave, in: app)
+        editSave.tap()
+        XCTAssertTrue(app.staticTexts[updatedNameValue].waitForExistence(timeout: 15))
+
+        app.buttons["Chạy các giao dịch đến hạn"].tap()
+        XCTAssertTrue(app.staticTexts["Đã tạo 1 giao dịch."].waitForExistence(timeout: 15))
+
+        app.buttons["Xóa"].firstMatch.tap()
+        XCTAssertTrue(app.alerts.buttons["Xóa"].waitForExistence(timeout: 5))
+        app.alerts.buttons["Xóa"].tap()
+        XCTAssertFalse(app.staticTexts[updatedNameValue].waitForExistence(timeout: 10))
+#endif
+    }
+
+    func testAPIBackedTravelCreateToggleUpdateDeleteFromNativeUI() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")
+#else
+        let suffix = String(UUID().uuidString.prefix(8))
+        let nameValue = "Fixture Travel \(suffix)"
+        let updatedNameValue = "Fixture Travel Updated \(suffix)"
+        try? await LocalAPIFixture.deleteTravelEvents(named: nameValue)
+        try? await LocalAPIFixture.deleteTravelEvents(named: updatedNameValue)
+        addTeardownBlock {
+            try? await LocalAPIFixture.deleteTravelEvents(named: nameValue)
+            try? await LocalAPIFixture.deleteTravelEvents(named: updatedNameValue)
+        }
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Travel Mode"].waitForExistence(timeout: 10))
+        app.buttons["Travel Mode"].tap()
+        XCTAssertTrue(app.staticTexts["Travel Mode"].firstMatch.waitForExistence(timeout: 10))
+
+        app.buttons["Thêm chuyến đi"].tap()
+        XCTAssertTrue(app.staticTexts["Chuyến đi mới"].waitForExistence(timeout: 10))
+        let name = app.textFields["Tên"]
+        XCTAssertTrue(name.waitForExistence(timeout: 10))
+        name.clearAndType(nameValue)
+        dismissKeyboard(app)
+        let save = app.buttons["Lưu"].firstMatch
+        reveal(save, in: app)
+        XCTAssertTrue(save.isHittable)
+        save.tap()
+        XCTAssertTrue(app.staticTexts[nameValue].waitForExistence(timeout: 15))
+
+        let enable = app.buttons["Bật"].firstMatch
+        XCTAssertTrue(enable.waitForExistence(timeout: 10))
+        reveal(enable, in: app)
+        enable.tap()
+        XCTAssertTrue(app.buttons["Tắt"].waitForExistence(timeout: 15))
+
+        app.buttons["Sửa"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Sửa chuyến đi"].waitForExistence(timeout: 10))
+        let editedName = app.textFields["Tên"]
+        XCTAssertTrue(editedName.waitForExistence(timeout: 10))
+        editedName.clearAndType(updatedNameValue)
+        dismissKeyboard(app)
+        let editSave = app.buttons["Lưu"].firstMatch
+        reveal(editSave, in: app)
+        editSave.tap()
+        XCTAssertTrue(app.staticTexts[updatedNameValue].waitForExistence(timeout: 15))
+
+        app.buttons["Xóa"].firstMatch.tap()
+        XCTAssertTrue(app.alerts.buttons["Xóa"].waitForExistence(timeout: 5))
+        app.alerts.buttons["Xóa"].tap()
+        XCTAssertFalse(app.staticTexts[updatedNameValue].waitForExistence(timeout: 10))
+#endif
+    }
+
     func testAPIBackedWalletDetailExposesTransactionEditor() async throws {
 #if !LOCAL_API_UI
         throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and seed the disposable fixture wallet.")
@@ -466,9 +1077,11 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(price.waitForExistence(timeout: 10))
         price.clearAndType("120000")
         app.buttons["Cập nhật giá"].tap()
-        XCTAssertTrue(app.staticTexts["Giá trị hiện tại"].waitForExistence(timeout: 15))
-        let refreshedValue = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "120.000")).firstMatch
-        XCTAssertTrue(refreshedValue.waitForExistence(timeout: 10))
+        // The card title is present before the request completes, so waiting for
+        // that title would make this assertion race the refresh. Wait for the
+        // formatted latest-price value rendered from the refreshed API state.
+        let refreshedPrice = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Giá hiện tại: 120.000")).firstMatch
+        XCTAssertTrue(refreshedPrice.waitForExistence(timeout: 15))
 #endif
     }
 
@@ -588,7 +1201,7 @@ final class LaunchTests: XCTestCase {
         app.buttons["Tạo ví"].tap()
         XCTAssertTrue(app.staticTexts["Fixture UI Wallet"].waitForExistence(timeout: 15))
 
-        let edit = app.buttons["Sửa"].firstMatch
+        let edit = app.buttons["Sửa ví Fixture UI Wallet"]
         XCTAssertTrue(edit.waitForExistence(timeout: 10))
         edit.tap()
         XCTAssertTrue(app.staticTexts["Sửa ví"].waitForExistence(timeout: 10))
@@ -671,7 +1284,9 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.buttons["Ví"].waitForExistence(timeout: 10))
         app.buttons["Ví"].tap()
         XCTAssertTrue(app.staticTexts["Fixture Credit Mutation"].waitForExistence(timeout: 10))
-        app.staticTexts["Fixture Credit Mutation"].tap()
+        let creditRow = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "Fixture Credit Mutation")).firstMatch
+        XCTAssertTrue(creditRow.waitForExistence(timeout: 10))
+        creditRow.tap()
         XCTAssertTrue(app.staticTexts["Sổ tín dụng"].waitForExistence(timeout: 10))
 
         app.buttons["Thêm giao dịch"].tap()

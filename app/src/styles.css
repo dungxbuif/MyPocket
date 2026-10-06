@@ -25,6 +25,14 @@
   button {
     font: inherit;
     cursor: pointer;
+    touch-action: manipulation;
+  }
+
+  a,
+  input,
+  select,
+  textarea {
+    touch-action: manipulation;
   }
 
   button:disabled {

@@ -19,6 +19,7 @@ Owner chốt dùng **FormField + BaseSelect** chọn loại khi tạo: Ví thư�
 | Thông tin chung | SurfaceCard, Divider, BaseTextInput, IconBadge | Tên, VND cố định, số dư đầu phù hợp loại; không ghi chú khi tạo |
 | Trường theo loại | FormField + BaseTextInput | Target/limit dương theo loại; ngày/sao kê chưa hỗ trợ phải ghi rõ |
 | Không tính vào tổng | BaseSwitch + SurfaceCard + Text | checked = is_in_total false; mặc định tính vào tổng |
+| Thông báo ví tiết kiệm | BaseSwitch + SurfaceCard / MPBooleanSelector | Goal wallets persist `goal_notifications_enabled`; mặc định tắt và hiện trong inbox nội bộ |
 | Trạng thái | StatusMessage | Empty plain; lỗi alert; giữ draft khi lỗi |
 
 Màu, font, bo góc theo [tokens](../../system/TOKENS.md) và [base contracts](../../system/BASE_COMPONENTS.md), không copy CSS/device frame từ ảnh. Liên kết dịch vụ hiện disabled với giải thích chưa hỗ trợ.

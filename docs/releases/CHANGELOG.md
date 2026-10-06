@@ -10,6 +10,50 @@ shared_fields: [status]
 
 # Changelog
 
+## Production backend migration and rollout — 2026-10-06 (unreleased)
+
+- Created and validated a pre-migration PostgreSQL custom-format backup on
+  `vm100-prod` before applying the forward migrations.
+- Applied production migrations from version 27 through version 29 and
+  verified the database is clean (`dirty=false`). No production data reset or
+  destructive operation was used.
+- Rolled `mypocket-api` to immutable candidate image digest
+  `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb`.
+  The rollout completed with automatic rollback enabled and the public health
+  and OpenAPI endpoints returned HTTP 200.
+- Resolved the Redis network issue without restarting Redis: added the
+  attachable overlay `mypocket-redis-net`, connected `redis-prod` with the
+  stable `redis-mypocket` alias, verified `PONG` from `vm100-prod`, and
+  switched the API service off the temporary container IP workaround.
+- This entry is an operational deployment record only; it is not a release
+  approval or a replacement for committing the dirty worktree.
+
+## Native email login slice — 2026-10-06
+
+- Native iOS now signs in through `POST /api/v1/login` using the account email
+  as the username and a user-supplied password. Tokens continue to use the
+  existing Keychain + rotating refresh-token contract; passwords are not stored.
+- Removed the user-facing Google login control from the native screen. Google
+  backend routes remain available during the migration window for browser
+  compatibility and rollback; production Google shutdown is not claimed.
+- Verified the password API contract and session persistence with targeted
+  XCTest, the full 73-test native unit suite, base-component guards and the
+  iPhone 16 Simulator UI target (6 passed, 20 intentional fixture skips). A
+  synthetic invalid-credential probe confirmed production `/api/v1/login`
+  returns `401 LOGIN_FAILED`; no production account was mutated.
+
+## Simulator-first regression — 2026-10-06
+
+- Full `LOCAL_API_UI` run passed 20/20 native UI cases on the booted iPhone 16
+  Simulator, including feedback screenshot-storage fallback and owner-scoped
+  mutation cleanup.
+- Hardened the portfolio price-refresh UI test to wait for the refreshed
+  formatted price instead of a pre-existing card title; the follow-up full run
+  passed 20/20 with zero failures.
+- Backend normal/race/vet checks, Release analysis, base-component guards and
+  the web design/type/domain/build suites passed. Physical-device and
+  production-provider gates remain separate.
+
 ## Field Ownership
 
 - Human owns release approval.
@@ -23,11 +67,31 @@ as active release entries here.
 
 ### Fixed
 
+- Fixed feedback submission when development runs without private S3 storage.
+  The backend no longer panics on a typed-nil storage interface; it returns a
+  controlled screenshot error, and both web and iOS preserve the feedback with
+  a text-only fallback. Configured production storage still receives the
+  captured PNG.
+
+- Added real Chromium feedback E2E coverage through the Vite proxy, including
+  capture, controlled storage failure, JSON fallback, persisted owner state and
+  fixture cleanup.
+
+- Replaced the disabled savings-wallet notification toggle with a persisted
+  `goal_notifications_enabled` preference, owner-scoped `GET /notifications`
+  inbox and idempotent mark-read route. Web and iOS use shared/base controls;
+  notification timestamps use the authenticated account timezone; push/APNs
+  and scheduled fan-out remain separate follow-up work.
+
+- Native account timezone changes now update the persisted authenticated session
+  context immediately, so notification and calendar surfaces use the new IANA
+  timezone without requiring a logout or app restart.
+
 - Native wallet management now matches the web wallet-scope contract: tapping
   a wallet row opens the transaction ledger with that wallet selected, while an
   explicit `Chi tiết` action remains available for balances, progress, credit
   statements and transaction editing. Clean iPhone 16 Simulator verification
-  passed 68/68 native contracts and 19/19 API-backed UI tests with no leftover
+  passed 69/69 native contracts and 19/19 API-backed UI tests with no leftover
   fixture wallets.
 
 - Fixed native portfolio summary decoding for `asset_id`, `realized_pnl`,
@@ -38,7 +102,7 @@ as active release entries here.
 - Native Finance Assistant and AI-entry replies now use the shared
   `MPMarkdown` base renderer for headings, emphasis/code, lists, fenced code
   and pipe tables. Raw assistant Markdown is no longer shown as an unreadable
-  delimiter string; native parser coverage is included in the 68/68 contract
+  delimiter string; native parser coverage is included in the 69/69 contract
   suite.
 
 - Finance Assistant requests now prepend a bounded, versioned MyPocket product
@@ -53,8 +117,9 @@ as active release entries here.
   existing owner-scoped wallet API only after an explicit confirmation.
 
 - Wallet creation money fields now use the shared web `AmountField` base with
-  formatted VND display and calculator input. Notification delivery is not
-  represented by a non-functional toggle; it remains a documented follow-up.
+  formatted VND display and calculator input. Goal-wallet notification
+  preferences are persisted and rendered through the shared/base controls;
+  push/APNs delivery remains a documented follow-up.
 
 - Fixed the native wallet-detail create/edit regression. The custom snake-case
   decoder now maps API `wallet_ids` to Swift `walletIDs`, category metadata no

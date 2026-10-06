@@ -2186,6 +2186,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/notifications": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "List in-app notifications for the authenticated owner",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.Notification"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/notifications/{id}/read": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Mark one in-app notification as read",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Notification ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/portfolio/assets": {
             "get": {
                 "security": [
@@ -4434,6 +4497,32 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.Notification": {
+            "type": "object",
+            "properties": {
+                "body": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "read_at": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.PortfolioAsset": {
             "type": "object",
             "properties": {
@@ -4770,6 +4859,9 @@ const docTemplate = `{
                 },
                 "description": {
                     "type": "string"
+                },
+                "goal_notifications_enabled": {
+                    "type": "boolean"
                 },
                 "id": {
                     "type": "string"
@@ -5353,6 +5445,9 @@ const docTemplate = `{
                 },
                 "description": {
                     "type": "string"
+                },
+                "goal_notifications_enabled": {
+                    "type": "boolean"
                 },
                 "is_in_total": {
                     "type": "boolean"

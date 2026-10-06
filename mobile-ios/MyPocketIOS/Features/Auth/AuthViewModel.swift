@@ -17,7 +17,6 @@ final class AuthViewModel: ObservableObject {
     @Published var biometricEnabled = false
 
     private let store: SessionStore
-    private let google: GooglePKCEClient
     let financeAPI: FinanceAPI
     private let biometricPreferenceKey = "mypocket.biometric.enabled"
 
@@ -25,7 +24,6 @@ final class AuthViewModel: ObservableObject {
         let resolvedStore = store ?? Self.makeDefaultStore()
         self.store = resolvedStore
         let resolvedAPI = apiClient ?? APIClient(sessionStore: resolvedStore)
-        self.google = GooglePKCEClient(apiClient: resolvedAPI)
         self.financeAPI = FinanceAPI(client: resolvedAPI)
         self.biometricEnabled = UserDefaults.standard.bool(forKey: biometricPreferenceKey)
 #if DEBUG
@@ -135,19 +133,22 @@ final class AuthViewModel: ObservableObject {
         phase = .unauthenticated
     }
 
-    func signIn() async {
+    func signIn(email: String, password: String) async {
         guard !isBusy else { return }
+        let normalizedEmail = email.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedEmail.isEmpty, !password.isEmpty else {
+            errorMessage = "Nhập email và mật khẩu để đăng nhập."
+            return
+        }
         isBusy = true
         errorMessage = nil
         defer { isBusy = false }
         do {
-            let output = try await google.signIn()
+            let output = try await financeAPI.login(email: normalizedEmail, password: password)
             try store.save(output.session)
             phase = .authenticated(output.session)
-        } catch GooglePKCEError.cancelled {
-            errorMessage = "Đăng nhập đã được hủy."
-        } catch GooglePKCEError.invalidConfiguration {
-            errorMessage = "Google OAuth chưa được cấu hình cho bản build này."
+        } catch APIError.unauthorized {
+            errorMessage = "Email hoặc mật khẩu không đúng."
         } catch {
             errorMessage = "Không thể đăng nhập. Vui lòng thử lại."
         }
@@ -158,6 +159,22 @@ final class AuthViewModel: ObservableObject {
         biometricEnabled = false
         UserDefaults.standard.set(false, forKey: biometricPreferenceKey)
         phase = .unauthenticated
+    }
+
+    /// Keeps the persisted session's user context in sync after the account
+    /// timezone API succeeds. Screens that derive calendar formatting from the
+    /// authenticated session (for example notifications) must not keep using
+    /// the pre-update timezone until the next app restore.
+    func updateAccountTimezone(_ timezone: String) {
+        guard case .authenticated(let session) = phase else { return }
+        let updatedUser = AuthUser(id: session.user.id, name: session.user.name, email: session.user.email, timezone: timezone)
+        let updatedSession = AccessSession(token: session.token, expiresAt: session.expiresAt, refreshToken: session.refreshToken, refreshExpiresAt: session.refreshExpiresAt, user: updatedUser)
+        do {
+            try store.save(updatedSession)
+            phase = .authenticated(updatedSession)
+        } catch {
+            errorMessage = "Không thể lưu múi giờ cho phiên hiện tại."
+        }
     }
 
     func toggleBiometric() async {

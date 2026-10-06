@@ -14,6 +14,8 @@
     "test:transfer:e2e": "node scripts/transfer-browser.test.mjs",
     "test:api:full": "node scripts/full-api-roundtrip.mjs",
     "test:ai": "node scripts/ai-entry.test.mjs && node scripts/ai-entry-browser.test.mjs",
+    "test:feedback": "node scripts/feedback.test.mjs",
+    "test:feedback:e2e": "node scripts/feedback-browser.test.mjs",
     "test:ai-history": "node --test scripts/ai-advisor-history.test.ts",
     "test:ai-advisor": "npm run test:ai-history && node scripts/ai-advisor-markdown.test.mjs",
     "test:wallet-scope": "node scripts/wallet-scope-navigation.test.mjs",

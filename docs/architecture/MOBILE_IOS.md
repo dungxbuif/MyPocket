@@ -1,7 +1,7 @@
 ---
 artifact_type: architecture_reference
 id: MOBILE_IOS
-status: design_approved_for_scaffold
+status: implementation_in_progress
 owner: shared
 updated: 2026-10-06
 trace:
@@ -125,8 +125,10 @@ authenticated owner ID. The native screen reloads that conversation's latest
 page older messages with `before_seq`. UserDefaults stores only the opaque
 conversation ID, never message text or financial data.
 
-The only native-specific API addition is
-`POST /api/v1/auth/mobile/google/exchange`; it validates the iOS PKCE code and
+The native client prefers the existing `POST /api/v1/login` contract, so no
+new backend route is required for password sign-in. The previously added
+`POST /api/v1/auth/mobile/google/exchange` remains a compatible optional route
+for the DEBUG fixture and future rollback; it validates the iOS PKCE code and
 redirect allowlist before returning the existing login/refresh response.
 
 ## Environments
@@ -137,6 +139,13 @@ no `.xcconfig` containing a secret is committed. Simulator development should
 use a local or staging API with a fixture OAuth path when real Google OAuth is
 not configured.
 
+For a paired physical iPhone, signing requires an authenticated Xcode account
+and a provisioning profile for `com.mypocket.ios`. The API URL must also be
+overridden to a host-reachable HTTPS/staging URL; the simulator's
+`127.0.0.1` Debug default is intentionally not usable from a physical device.
+Use the selected environment's xcconfig or an `MP_API_BASE_URL` build-setting
+override instead of committing a developer-specific LAN address.
+
 For API-backed simulator smoke, Debug builds expose the launch argument
 `-UITestAuthenticatedAPI`. It exchanges fixture PKCE fields against the local
 development endpoint, stores the returned disposable session in the Keychain,
@@ -146,15 +155,22 @@ production.
 
 ## Native authentication
 
-The app uses `ASWebAuthenticationSession` and S256 PKCE. The callback includes
-an authorization code and state only. The app sends that code to
-`POST /api/v1/auth/mobile/google/exchange`; the Go API validates the exact
-platform/client/redirect allowlist and returns the normal short-lived JWT plus
-rotating opaque refresh token. Tokens are stored in Keychain. On restore, an
-expired access token is refreshed once when the rotating refresh token is still
-valid. Only the refreshed valid session can enter the optional Face ID unlock
-gate; an expired or rejected refresh token clears the Keychain session and
-biometric preference. Face ID is not a replacement for server authentication.
+The native login screen uses the existing `POST /api/v1/login` email/password
+contract. “Username” means the normalized account email; the password is sent
+only over the configured HTTPS API and is never persisted by the app. A
+successful response is stored in Keychain as the access/refresh session.
+
+On restore, an expired access token is refreshed once when the rotating refresh
+token is still valid. Only the refreshed valid session can enter the optional
+Face ID unlock gate; an expired or rejected refresh token clears the Keychain
+session and biometric preference. Face ID is not a replacement for server
+authentication.
+
+The native UI no longer exposes Google login. The backend Google routes and the
+DEBUG-only local PKCE fixture remain during the migration window so existing
+browser users and simulator harnesses retain a reversible path. The native
+Google exchange is not a release requirement for the current password-login
+build.
 
 ## Native scope selectors
 
@@ -176,6 +192,21 @@ xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj \
 xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj \
   -scheme MyPocketIOS -destination 'platform=iOS Simulator,name=<available iPhone>'
 ```
+
+Physical-device prerequisite check:
+
+```bash
+xcrun devicectl list devices
+security find-identity -v -p codesigning
+xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj \
+  -scheme MyPocketIOS -destination 'id=<paired-device-udid>' \
+  -allowProvisioningUpdates \
+  DEVELOPMENT_TEAM=<your-team-id> \
+  MP_API_BASE_URL=<host-reachable-api-base-url> build
+```
+
+This is a prerequisite command, not simulator evidence. Never commit the
+developer team, OAuth client secret or a local LAN address to shared config.
 
 If `simctl list runtimes` is empty, install an iOS Simulator runtime from
 Xcode Settings → Components before claiming a booted-app test. A generic SDK

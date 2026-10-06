@@ -36,6 +36,7 @@ referenced user data; restore from a database backup is the recovery path.
 | `000001` | Renames legacy `app_users` to `user` when needed; creates user, wallets, categories, assignments and transactions schema. | The migration ledger records completion; `CREATE ... IF NOT EXISTS` supports existing dev tables during the first adoption. |
 | `000002` | Seeds the reviewed Vietnamese system category catalog. | `system_key` conflict handling keeps one stable row per catalog item. |
 | `000003` | Makes wallet deletion cascade to its transaction rows. | Matches the owner-approved permanent-delete policy. |
+| `000029` | Adds goal-wallet notification preference and owner-scoped in-app notifications with dedupe/read indexes. | Additive; existing wallets default to notifications off. |
 
-The development database is expected to reach version `3`, `dirty=false`, with 28
-system groups and the expected `user` and `transactions` tables.
+The current disposable development database reaches version `29`, `dirty=false`;
+the stage-v1 baseline and later additive migrations own the complete schema.

@@ -50,6 +50,13 @@ Travel Mode is an owner-scoped event dimension, not a fourth wallet type. `GET/P
 
 Wallet create/update accepts optional `target_date` as `YYYY-MM-DD` for goal wallets. PostgreSQL stores it as `date`; omission preserves the date and an empty string clears it. Budget `start_date`/`end_date` are also date-only calendar labels interpreted in the account timezone. [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md) records the migration and timezone rules.
 
+Goal-wallet create/update also accepts `goal_notifications_enabled` (default
+`false`). The field is accepted only for goal wallets and is owner-scoped. The
+current delivery surface is the in-app inbox: `GET /api/v1/notifications`
+returns the authenticated owner's newest-first items and
+`POST /api/v1/notifications/{id}/read` is an idempotent owner-scoped operation.
+Push/APNs and scheduled notification fan-out are not claimed yet.
+
 `POST /api/v1/transactions` and transaction edits require an applicable category for ordinary income/expense rows and accept optional `jar_id` (null clears it). A jar is valid only for an ordinary expense and an active configuration for that owner's transaction month. Income and transfer-out categories cannot be assigned. Adjustment rows remain the only uncategorized transaction type.
 
 Portfolio routes are owner-scoped and intentionally separate from wallet ledger balances: `GET /api/v1/portfolio/summary`, `GET/POST /api/v1/portfolio/assets`, `PATCH /api/v1/portfolio/assets/{id}/price`, and `GET/POST /api/v1/portfolio/assets/{id}/trades`. Assets hold an optional manual latest-price snapshot. Trades are immutable `buy`/`sell` events with decimal-string quantity (up to eight fractional places), integer VND unit price and fee. The server stores fixed-point quantity, applies weighted-average cost before every sale, rejects sales above the available position with `409 PORTFOLIO_INSUFFICIENT_QUANTITY`, and never mutates wallet balances or ordinary reports. Clearing a price returns valuation to an explicit unknown state; it is not treated as zero. Corrections use compensating trades rather than editing history.
@@ -82,6 +89,7 @@ Document HTTP endpoints, RPC methods, events, CLI commands, or any other public 
 | `/api/v1/categories` | HTTP REST | JWT bearer | implemented | `GET` returns the owner-approved system catalog and owner-visible groups with `wallet_ids`; `POST`/`PATCH` accept name, kind, parent and owner-scoped applicable wallet IDs; `DELETE` removes a personal group and returns its personal children to root. |
 | `/api/v1/categories/:id/wallets` | HTTP REST | JWT bearer | implemented | Replaces applicable-wallet selections for a visible personal or system category. System metadata remains immutable. |
 | `/api/v1/wallets` | HTTP REST | JWT bearer | implemented; core UAT verified | Create/list/update/delete owner-scoped VND wallets. List returns `opening_balance` and ledger-derived `current_balance`; goal requires positive target and credit requires positive limit. |
+| `/api/v1/notifications` | HTTP REST | JWT bearer | implemented locally | Owner-scoped in-app inbox; `GET` lists newest-first and `POST /:id/read` is idempotent. No push delivery. |
 | `/api/v1/transactions` | HTTP REST | JWT bearer | implemented; basic ledger UAT verified | Create/list/update/delete owner-scoped income and expense entries for basic/goal wallets. Category is required for ordinary rows and must match kind/applicable-wallet scope; credit mutations use the dedicated ledger. Adjustment rows are read through this collection but cannot be edited/deleted here. |
 | `/api/v1/transactions/transfer` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | Atomically create paired source-expense/destination-income rows for an internal transfer; pair edit/delete require an idempotency key. Transfers are excluded from reports and jars. |
 | `/api/v1/transactions/adjustment` | HTTP REST | JWT bearer | implemented; automated proof, owner UAT pending | Record a signed increase/decrease correction for a basic or goal wallet. Corrections affect wallet balance but never report totals and are immutable. |

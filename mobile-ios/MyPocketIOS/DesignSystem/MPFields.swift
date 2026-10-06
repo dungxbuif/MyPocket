@@ -6,22 +6,71 @@ struct MPTextField: View {
     @Binding var text: String
     var placeholder: String = ""
     var error: String?
+    var accessibilityIdentifier: String?
+
+    init(title: String, text: Binding<String>, placeholder: String = "", error: String? = nil, accessibilityIdentifier: String? = nil) {
+        self.title = title
+        self._text = text
+        self.placeholder = placeholder
+        self.error = error
+        self.accessibilityIdentifier = accessibilityIdentifier
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
                 .font(.subheadline.weight(.semibold))
                 .foregroundStyle(MPColor.ink)
-            TextField(placeholder, text: $text)
-                .textFieldStyle(.roundedBorder)
-                .frame(minHeight: MPMetrics.controlHeight)
-                .accessibilityLabel(title)
+            Group {
+                if let accessibilityIdentifier {
+                    TextField(placeholder, text: $text)
+                        .accessibilityIdentifier(accessibilityIdentifier)
+                } else {
+                    TextField(placeholder, text: $text)
+                }
+            }
+            .textFieldStyle(.roundedBorder)
+            .frame(minHeight: MPMetrics.controlHeight)
+            .accessibilityLabel(title)
             if let error {
                 Text(error)
                     .font(.footnote)
                     .foregroundStyle(MPColor.danger)
                     .accessibilityLabel("Lỗi: \(error)")
             }
+        }
+    }
+}
+
+struct MPSecureField: View {
+    let title: String
+    @Binding var text: String
+    var placeholder: String = ""
+    var accessibilityIdentifier: String?
+
+    init(title: String, text: Binding<String>, placeholder: String = "", accessibilityIdentifier: String? = nil) {
+        self.title = title
+        self._text = text
+        self.placeholder = placeholder
+        self.accessibilityIdentifier = accessibilityIdentifier
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(MPColor.ink)
+            Group {
+                if let accessibilityIdentifier {
+                    SecureField(placeholder, text: $text)
+                        .accessibilityIdentifier(accessibilityIdentifier)
+                } else {
+                    SecureField(placeholder, text: $text)
+                }
+            }
+            .textFieldStyle(.roundedBorder)
+            .frame(minHeight: MPMetrics.controlHeight)
+            .accessibilityLabel(title)
         }
     }
 }

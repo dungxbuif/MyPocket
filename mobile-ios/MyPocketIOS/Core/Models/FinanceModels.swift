@@ -16,6 +16,16 @@ struct WalletModel: Codable, Identifiable, Equatable, Sendable {
     var lastStatementBalance: Int64?
     var statementDay: Int?
     var paymentDueDay: Int?
+    var goalNotificationsEnabled: Bool = false
+}
+
+struct NotificationModel: Codable, Identifiable, Equatable, Sendable {
+    let id: String
+    let kind: String
+    let title: String
+    let body: String
+    let readAt: String?
+    let createdAt: String
 }
 
 struct CategoryModel: Codable, Identifiable, Equatable, Sendable {

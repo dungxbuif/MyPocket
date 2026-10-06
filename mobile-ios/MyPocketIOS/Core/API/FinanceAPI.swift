@@ -11,8 +11,27 @@ final class FinanceAPI: @unchecked Sendable {
         try JSONEncoder.mypocket.encode(value)
     }
 
+    func login(email: String, password: String) async throws -> LoginOutput {
+        try await client.send(
+            APIRequest<LoginOutput>(
+                path: "/login",
+                method: .post,
+                body: try body(LoginRequest(email: email, password: password)),
+                auth: .none
+            )
+        )
+    }
+
     func wallets() async throws -> [WalletModel] {
         try await client.send(APIRequest(path: "/wallets"))
+    }
+
+    func notifications() async throws -> [NotificationModel] {
+        try await client.send(APIRequest(path: "/notifications"))
+    }
+
+    func markNotificationRead(id: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/notifications/\(id)/read", method: .post))
     }
 
     func createWallet(_ input: WalletModelInput) async throws -> WalletModel {
@@ -369,6 +388,7 @@ struct WalletModelInput: Codable, Sendable {
     var lastStatementBalance: Int64?
     var statementDay: Int?
     var paymentDueDay: Int?
+    var goalNotificationsEnabled: Bool = false
 }
 
 struct CategoryModelInput: Codable, Sendable {

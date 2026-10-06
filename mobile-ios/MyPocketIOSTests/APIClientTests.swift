@@ -60,6 +60,26 @@ final class APIClientTests: XCTestCase {
         XCTAssertFalse(transport.requestID?.isEmpty ?? true)
     }
 
+    func testPasswordLoginUsesEmailEndpointAndReturnsSession() async throws {
+        let transport = PasswordLoginTransport()
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: TestSessionStore(session: nil)
+        )
+        let api = FinanceAPI(client: client)
+
+        let output = try await api.login(email: "user@example.com", password: "test-password")
+
+        XCTAssertEqual(output.session.user.email, "user@example.com")
+        XCTAssertEqual(transport.request?.url?.path, "/api/v1/login")
+        XCTAssertNil(transport.request?.value(forHTTPHeaderField: "Authorization"))
+        let body = try XCTUnwrap(transport.request?.httpBody)
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? [String: String])
+        XCTAssertEqual(json["email"], "user@example.com")
+        XCTAssertEqual(json["password"], "test-password")
+    }
+
     func testFeedbackScreenshotUsesBackendPNGContract() async throws {
         let transport = FeedbackMultipartTransport()
         let client = APIClient(
@@ -77,6 +97,31 @@ final class APIClientTests: XCTestCase {
         let body = String(decoding: transport.request?.httpBody ?? Data(), as: UTF8.self)
         XCTAssertTrue(body.contains("filename=\"screen.png\""))
         XCTAssertTrue(body.contains("Content-Type: image/png"))
+    }
+
+    @MainActor
+    func testFeedbackScreenshotStorageErrorsFallBackToTextOnly() {
+        let invalid = APIError.problem(ProblemDetails(
+            title: "Bad Request",
+            status: 400,
+            detail: "invalid screenshot",
+            instance: "/api/v1/feedback",
+            code: "FEEDBACK_SCREENSHOT_INVALID",
+            requestID: "req-1"
+        ))
+        let unavailable = APIError.problem(ProblemDetails(
+            title: "Service Unavailable",
+            status: 503,
+            detail: "storage unavailable",
+            instance: "/api/v1/feedback",
+            code: "FEEDBACK_SCREENSHOT_STORAGE_UNAVAILABLE",
+            requestID: "req-2"
+        ))
+        let transport = APIError.transport("offline")
+
+        XCTAssertTrue(FeedbackViewModel.shouldFallbackToTextOnly(invalid))
+        XCTAssertTrue(FeedbackViewModel.shouldFallbackToTextOnly(unavailable))
+        XCTAssertFalse(FeedbackViewModel.shouldFallbackToTextOnly(transport))
     }
 
     @MainActor
@@ -127,6 +172,16 @@ private final class URLCaptureTransport: HTTPTransport, @unchecked Sendable {
         url = request.url
         requestID = request.value(forHTTPHeaderField: "X-Request-ID")
         return (Data(#"{"data":{}}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+private final class PasswordLoginTransport: HTTPTransport, @unchecked Sendable {
+    private(set) var request: URLRequest?
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        self.request = request
+        let response = #"{"data":{"token":"access","expires_at":"2099-01-01T00:00:00Z","refresh_token":"refresh","refresh_expires_at":"2099-02-01T00:00:00Z","user":{"id":"u-1","name":"Test","email":"user@example.com","timezone":"Asia/Ho_Chi_Minh"}},"meta":null}"#
+        return (Data(response.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
     }
 }
 
@@ -313,5 +368,44 @@ final class AuthRestoreTests: XCTestCase {
         XCTAssertNil(store.load())
         XCTAssertEqual(auth.phase, .unauthenticated)
         XCTAssertFalse(auth.biometricEnabled)
+    }
+
+    func testTimezoneUpdateKeepsAuthenticatedSessionContextInSync() async {
+        let session = AccessSession(token: "access", expiresAt: "2099-01-01T00:00:00Z", refreshToken: "refresh", refreshExpiresAt: "2099-02-01T00:00:00Z", user: AuthUser(id: "u-1", name: "Test", email: "test@example.com", timezone: "Asia/Ho_Chi_Minh"))
+        let store = RestoreSessionStore(session: session)
+        let client = APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: RestoreTransport(), sessionStore: store)
+        let auth = AuthViewModel(store: store, apiClient: client)
+
+        await auth.restore()
+        auth.updateAccountTimezone("UTC")
+
+        XCTAssertEqual(store.session?.user.timezone, "UTC")
+        guard case .authenticated(let updated) = auth.phase else {
+            return XCTFail("a valid authenticated session should remain authenticated")
+        }
+        XCTAssertEqual(updated.user.timezone, "UTC")
+        XCTAssertEqual(updated.token, "access")
+    }
+}
+
+@MainActor
+final class PasswordAuthViewModelTests: XCTestCase {
+    func testSignInWithEmailAndPasswordPersistsSession() async {
+        let store = TestSessionStore(session: nil)
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: PasswordLoginTransport(),
+            sessionStore: store
+        )
+        let auth = AuthViewModel(store: store, apiClient: client)
+
+        await auth.signIn(email: "user@example.com", password: "test-password")
+
+        guard case .authenticated(let session) = auth.phase else {
+            return XCTFail("a successful password login should authenticate the session")
+        }
+        XCTAssertEqual(session.user.email, "user@example.com")
+        XCTAssertEqual(store.load()?.token, "access")
+        XCTAssertNil(auth.errorMessage)
     }
 }

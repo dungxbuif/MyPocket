@@ -8,6 +8,7 @@ const main = await readFile(new URL("../src/main.tsx", import.meta.url), "utf8")
 const shell = await readFile(new URL("../src/atomic/templates/MobileAppShell.tsx", import.meta.url), "utf8");
 const prompt = await readFile(new URL("../src/atomic/organisms/PwaInstallPrompt.tsx", import.meta.url), "utf8").catch(() => "");
 const worker = await readFile(new URL("../public/sw.js", import.meta.url), "utf8").catch(() => "");
+const styles = await readFile(new URL("../src/styles.css", import.meta.url), "utf8");
 
 test("PWA manifest and install surfaces are complete", () => {
   assert.equal(manifest.display, "standalone");
@@ -20,4 +21,8 @@ test("PWA manifest and install surfaces are complete", () => {
   assert.match(prompt, /beforeinstallprompt/);
   assert.match(prompt, /\.prompt\(\)/);
   assert.match(worker, /addEventListener\(["']fetch["']/);
+});
+
+test("mobile controls opt out of double-tap zoom without disabling pinch zoom", () => {
+  assert.match(styles, /button\s*\{[^}]*touch-action:\s*manipulation/s);
 });

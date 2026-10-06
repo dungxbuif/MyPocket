@@ -472,6 +472,23 @@ definitions:
       transaction_count:
         type: integer
     type: object
+  entity.Notification:
+    properties:
+      body:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      owner_id:
+        type: string
+      read_at:
+        type: string
+      title:
+        type: string
+    type: object
   entity.PortfolioAsset:
     properties:
       created_at:
@@ -694,6 +711,8 @@ definitions:
         type: integer
       description:
         type: string
+      goal_notifications_enabled:
+        type: boolean
       id:
         type: string
       is_in_total:
@@ -1072,6 +1091,8 @@ definitions:
         type: integer
       description:
         type: string
+      goal_notifications_enabled:
+        type: boolean
       is_in_total:
         type: boolean
       last_statement_balance:
@@ -2493,6 +2514,44 @@ paths:
       summary: Save the user's independent note for an account month
       tags:
       - Months
+  /api/v1/notifications:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Notification'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List in-app notifications for the authenticated owner
+      tags:
+      - Notifications
+  /api/v1/notifications/{id}/read:
+    post:
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Mark one in-app notification as read
+      tags:
+      - Notifications
   /api/v1/portfolio/assets:
     get:
       produces:

@@ -30,6 +30,22 @@ release commit; never deploy a mutable `latest` tag.
 6. Verify `GET /api/v1/health` returns HTTP 200 and smoke-test the public web
    origin.
 
+### 2026-10-06 production rollout note
+
+The API rollout on 2026-10-06 migrated the live database from version 27 to
+version 29 after a validated `pg_dump -Fc` backup. The deployed candidate is
+the immutable digest recorded in `docs/work/VALIDATION_MATRIX.md`; the public
+health and OpenAPI endpoints were checked after the Swarm update.
+
+During the rollout, `redis-prod` resolved to its `data-net` address from the
+API worker, but Redis was reachable on `homelab-net`. The production fix was
+additive: an attachable overlay named `mypocket-redis-net` was created, the
+existing `redis-prod` container was connected to it with the `redis-mypocket`
+alias, and the API service was updated to use that alias. A `redis-cli ping`
+probe scheduled on `vm100-prod` returned `PONG` before the API restart. Do not
+replace this with a container IP. Preserve the overlay and alias when
+recreating Redis, and run the same worker-local probe before changing the API.
+
 ## Database reset (explicit owner approval only)
 
 A production reset is destructive and is not part of a normal release. If an

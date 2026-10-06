@@ -20,6 +20,29 @@ JWTs and are never logged or returned after the initial login/refresh response.
 The frontend retries one failed authenticated request after refreshing, then
 clears the session if refresh is rejected. API-key requests are never refreshed.
 
+## Native iOS email/password login
+
+The native iOS client currently uses the existing password contract rather than
+the web-only Google flow:
+
+```http
+POST /api/v1/login
+Content-Type: application/json
+
+{"email":"user@example.com","password":"<user-supplied-password>"}
+```
+
+The response is the normal `LoginOutput` shape above. The app stores the access
+and refresh tokens in Keychain, never stores the password, and refreshes the
+session through `POST /api/v1/auth/refresh` after an expired access token. The
+identifier labelled “username” in the native UI is the account email; no new
+`username` column or alias is introduced.
+
+The native login screen no longer presents a Google button. Google routes remain
+available during migration for existing browser users and rollback; they must
+not be disabled until every affected account has a verified password setup or
+reset path and a production rollback window has been approved.
+
 ## Native iOS Google PKCE exchange
 
 `POST /api/v1/auth/mobile/google/exchange` is a mobile-only public auth route.

@@ -119,6 +119,7 @@ func main() {
 	middleware.APIKeys = apiKeyService
 	middleware.Audit = cacheRepo
 	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, walletHandler, transactionHandler, middleware, cfg.CORSAllowedOrigins)
+	router.RegisterNotificationRoutes(&httpapi.NotificationHandler{Notifications: repo.NewNotificationPostgresRepository(database)})
 	router.RegisterAPIKeyRoutes(&httpapi.APIKeyHandler{Service: apiKeyService})
 	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: repo.NewBudgetPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Transactions: repo.NewTransactionPostgresRepository(database), Users: userRepo})
 	router.RegisterJarRoutes(&httpapi.JarHandler{Jars: jarRepository, Users: userRepo})
@@ -137,7 +138,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("configure private attachment storage failed: %v", err)
 	}
-	router.RegisterAIEntryRoutes(&httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: attachmentStorage, Users: userRepo}})
+	// Do not assign a nil *storage.S3 directly to an interface. In development
+	// storage is intentionally optional; a typed-nil interface would compare
+	// non-nil and panic when feedback/AI attachment code calls Key or Put.
+	aiAttachmentStorage, feedbackStorage := optionalAttachmentStores(attachmentStorage)
+	router.RegisterAIEntryRoutes(&httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: aiAttachmentStorage, Users: userRepo}})
 	financeReader := repo.NewFinanceQueryPostgresRepository(database)
 	financeQueryService := usecase.NewFinanceQueryService(financeReader)
 	advisorProvider := ai.NewAdvisorClient(ai.AdvisorClientConfig{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, StoreUsage: cfg.AIStoreUsage})
@@ -164,7 +169,7 @@ func main() {
 	router.RegisterAdvisorRoutes(&httpapi.AdvisorHandler{Service: advisorService, Users: userRepo, Finance: financeQueryService})
 	feedbackRepository := repo.NewFeedbackPostgresRepository(database)
 	changelogRepository := repo.NewChangelogPostgresRepository(database)
-	feedbackService := usecase.NewFeedbackServiceWithStorage(feedbackRepository, cacheRepo, attachmentStorage, time.Now)
+	feedbackService := usecase.NewFeedbackServiceWithStorage(feedbackRepository, cacheRepo, feedbackStorage, time.Now)
 	changelogService := usecase.NewChangelogService(feedbackRepository, changelogRepository, cacheRepo, time.Now)
 	if cfg.AppEnv != "development" && strings.TrimSpace(cfg.FeedbackAgentToken) == "" {
 		log.Fatal("FEEDBACK_AGENT_TOKEN must be configured outside development")
@@ -186,4 +191,15 @@ func newAttachmentStorage(cfg config.Config) (*storage.S3, error) {
 		return nil, nil
 	}
 	return storage.NewS3(storage.S3Config{Endpoint: cfg.S3Endpoint, Region: cfg.S3Region, Bucket: cfg.S3Bucket, Prefix: cfg.S3Prefix, Environment: cfg.AppEnv, AccessKeyID: cfg.S3AccessKeyID, SecretAccessKey: cfg.S3SecretAccessKey, ForcePathStyle: cfg.S3ForcePathStyle})
+}
+
+// optionalAttachmentStores keeps an unconfigured development *storage.S3 from
+// becoming a non-nil interface value. Both consumers intentionally treat nil
+// as "attachments unavailable" and return a controlled API error instead of
+// dereferencing a typed-nil pointer.
+func optionalAttachmentStores(s3 *storage.S3) (usecase.AttachmentStorage, usecase.FeedbackStorage) {
+	if s3 == nil {
+		return nil, nil
+	}
+	return s3, s3
 }

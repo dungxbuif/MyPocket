@@ -219,6 +219,17 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(summary.totalUnrealizedPnL, 5000)
     }
 
+    func testGoalNotificationPreferenceAndInboxDecode() throws {
+        let walletData = Data(#"{"id":"goal-1","name":"Du lịch","type":"goal","currency":"VND","opening_balance":0,"current_balance":0,"is_in_total":true,"goal_notifications_enabled":true}"#.utf8)
+        let wallet = try JSONDecoder.mypocket.decode(WalletModel.self, from: walletData)
+        XCTAssertTrue(wallet.goalNotificationsEnabled)
+
+        let notificationData = Data(#"{"id":"notice-1","kind":"budget","title":"Ngân sách","body":"Sắp chạm hạn mức","created_at":"2026-10-06T10:00:00Z"}"#.utf8)
+        let notification = try JSONDecoder.mypocket.decode(NotificationModel.self, from: notificationData)
+        XCTAssertEqual(notification.id, "notice-1")
+        XCTAssertNil(notification.readAt)
+    }
+
     func testPortfolioTradeDraftValidatorMirrorsBackendNumericContract() {
         XCTAssertTrue(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "1.25000000", unitPrice: "72000", fee: "1000"))
         XCTAssertTrue(PortfolioTradeDraftValidator.isValid(side: "sell", quantity: "0.25", unitPrice: "0", fee: ""))

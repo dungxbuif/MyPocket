@@ -3,7 +3,7 @@ artifact_type: api_reference
 id: FEEDBACK_API
 status: implemented_local
 owner: shared
-updated: 2026-09-22
+updated: 2026-10-06
 trace:
   design: ../superpowers/specs/2026-09-22-feedback-fix-changelog-design.md
   plan: ../superpowers/plans/2026-09-22-feedback-fix-changelog.md
@@ -102,11 +102,29 @@ Account → Phản hồi uses the authenticated user endpoints. A fixed row show
 
 The app also renders a floating feedback bubble above the bottom navigation on every authenticated screen. Opening it captures the current DOM view in the background (excluding the feedback overlay itself); submitting the form sends that PNG as the optional `screenshot` multipart field. If browser capture fails, text feedback still submits without an attachment.
 
+The native iOS bubble follows the same contract. If the API explicitly reports
+`FEEDBACK_SCREENSHOT_INVALID` or `FEEDBACK_SCREENSHOT_STORAGE_UNAVAILABLE`,
+iOS submits the same validated feedback once as JSON without the optional PNG.
+This keeps local development usable when private storage is intentionally not
+configured; production keeps the captured PNG whenever storage is available.
+The web floating bubble uses the same one-time fallback and does not retry
+network, validation, or authentication failures.
+
+The browser E2E contract covers the real Vite proxy and verifies that a
+storage-error fallback persists the text feedback with `screenshot_available:
+false`.
+
 ## AI-agent quick reference
 
 ## Screenshot capture
 
 `POST /feedback` also accepts `multipart/form-data` with `type`, `title`, `description`, and one `screenshot` PNG (maximum 1 MiB). The server stores it privately and exposes only `screenshot_available` in feedback JSON. `GET /feedback/{id}/screenshot` is owner-scoped and returns a short-lived `302` signed URL; `GET /agent/feedback/{id}/screenshot` uses the dedicated feedback-agent token. Storage object keys are never returned.
+
+When private storage is unavailable, the server returns a controlled problem
+(`FEEDBACK_SCREENSHOT_INVALID` in local development or
+`FEEDBACK_SCREENSHOT_STORAGE_UNAVAILABLE` for a configured storage failure);
+clients may preserve the feedback with the JSON endpoint, but must not claim
+that a screenshot was stored.
 
 ```text
 1. GET /api/v1/agent/feedback?status=open with Authorization: Bearer FEEDBACK_AGENT_TOKEN.

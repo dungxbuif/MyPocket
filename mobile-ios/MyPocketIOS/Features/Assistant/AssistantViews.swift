@@ -101,11 +101,31 @@ struct AssistantView: View {
         historyLoading = true
         defer { historyLoading = false }
         do { capabilities = try await api.advisorCapabilities() }
-        catch let error as APIError { self.error = error.userMessage }
-        catch { self.error = "Không thể kết nối Finance Assistant." }
+        catch let error as APIError {
+#if DEBUG
+            print("[Assistant] capabilities failed: \(String(reflecting: error))")
+#endif
+            self.error = error.userMessage
+        }
+        catch {
+#if DEBUG
+            print("[Assistant] capabilities failed: \(String(reflecting: error))")
+#endif
+            self.error = "Không thể kết nối Finance Assistant."
+        }
         do { overview = try await api.advisorOverview() }
-        catch let error as APIError { self.error = error.userMessage }
-        catch { self.error = "Không thể tải tổng quan trợ lý tài chính." }
+        catch let error as APIError {
+#if DEBUG
+            print("[Assistant] overview failed: \(String(reflecting: error))")
+#endif
+            self.error = error.userMessage
+        }
+        catch {
+#if DEBUG
+            print("[Assistant] overview failed: \(String(reflecting: error))")
+#endif
+            self.error = "Không thể tải tổng quan trợ lý tài chính."
+        }
         if !conversationID.isEmpty {
             await reloadHistory()
         }
@@ -763,9 +783,15 @@ struct AccountView: View {
     @State private var error: String?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Tài khoản", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+        VStack(spacing: 0) {
+            // Keep navigation fixed while account settings scroll. This is
+            // especially important on smaller phones where the API-key and
+            // security sections extend beyond the first viewport.
+            MPScreenHeader(title: "Tài khoản", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+                .padding(.horizontal, MPMetrics.pagePadding)
+
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
                 if case .authenticated(let session) = auth.phase {
                     MPSurfaceCard {
                         VStack(alignment: .leading, spacing: 8) {
@@ -813,10 +839,11 @@ struct AccountView: View {
                 if let error = auth.errorMessage { MPStatusMessage(text: error, tone: .danger) }
                 if let error { MPStatusMessage(text: error, tone: .danger) }
                 MPButton("Đăng xuất", style: .destructive, action: auth.logout)
+                }
+                .padding(MPMetrics.pagePadding)
             }
-            .padding(MPMetrics.pagePadding)
+            .background(MPColor.canvas.ignoresSafeArea())
         }
-        .background(MPColor.canvas.ignoresSafeArea())
         .task { await loadAccount() }
         .accessibilityIdentifier("account-screen")
     }
@@ -827,7 +854,11 @@ struct AccountView: View {
     }
 
     private func saveTimezone() async {
-        do { profile = try await auth.financeAPI.updateTimezone(timezone); error = nil }
+        do {
+            profile = try await auth.financeAPI.updateTimezone(timezone)
+            auth.updateAccountTimezone(profile?.timezone ?? timezone)
+            error = nil
+        }
         catch { self.error = "Múi giờ không hợp lệ hoặc không thể cập nhật." }
     }
 
