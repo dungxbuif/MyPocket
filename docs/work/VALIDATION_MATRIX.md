@@ -78,13 +78,13 @@ signed API-backed UI tests. No token values are written to logs.
 | Native ordinary transaction editor parity | PASS: manual expense editor shows active account-month hũ options for eligible wallets, preserves inactive existing hũ selections for explicit resolution, sends `included_in_reports`, and serializes account-local date/time; incompatible hũ values clear on type/wallet/category changes. Policy tests and the API-backed editor UI assertion pass; full signed `LOCAL_API_UI` is 15/15. |
 | Native Release build | PASS: iPhone 16 simulator Release build with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`; app installed and launched as `com.mypocket.ios` after the build |
 | Simulator API-backed authenticated smoke fixture | PASS: DEBUG-only `-UITestAuthenticatedAPI` exchanged fixture PKCE fields against local `:8080`, stored the disposable JWT in the in-memory UI harness session store, and rendered the authenticated overview with live empty wallets/ledger; screenshot `/tmp/mypocket-ios-simulator-api-auth.png` |
-| Go backend disposable PostgreSQL + Redis race suite | PASS: `TEST_DATABASE_URL=... go test -race ./... -count=1`; no data race or package failure |
+| Go backend disposable PostgreSQL + Redis race suite | PASS: final rerun `go test -race ./... -count=1` completed successfully across API, worker, controller, entity, AI, cache, repository, storage and usecase packages; no data race or package failure |
 | Go formatting/static quality | PASS: `gofmt -l backend` is clean; `go vet ./...` and Swift Debug build with warnings-as-errors pass |
 | FE-proxy transfer integration | PASS: paired creation, balance reconciliation, report/jar exclusion, transfer PATCH and pair DELETE with idempotency keys, auth guard |
 | Real Chromium 390×844 transfer flow | PASS: actual UI rendered both wallet options, saved, refreshed and matched persisted API state; stale fixture cleanup now deletes transfer pairs atomically |
 | AI entry browser flow | PASS: contract + Chromium fixture; fixture transactions derive the current account-local week so the grouped-ledger assertion cannot expire with the calendar |
 | Feedback JWT + scoped user API key + agent lifecycle | PASS: create/list/revoke, agent open → triaged → in_progress → changelog/fixed, owner-scoped reads, Redis `mypocket:audit:feedback` events observed; native screenshot regressions assert PNG bytes, `screen.png`/`image/png` multipart metadata and the 1 MiB bound |
-| Web design/typecheck/build/API roundtrips | PASS: latest local suite; Vite only reports the existing large-chunk warning |
+| Web design/typecheck/build/API roundtrips | PASS: final local design guard, base contracts, wallet-scope contract, TypeScript check and Vite build passed (1,791 modules); Vite only reports the existing large-chunk warning |
 | Provider-backed AI/OCR, real Google iOS OAuth, authenticated staging/production and physical device | NOT RUN; external release gates remain explicit |
 
 The disposable database was `mypocket_ios_local`; generated feedback/changelog
