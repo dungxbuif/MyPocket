@@ -514,3 +514,17 @@ the current post-change proof.
 
 The full API-backed suite remains 14/14 from the preceding simulator gate; this
 goal summary change was covered by the targeted route, unit and Release checks.
+
+### Native portfolio draft/refresh fix — 2026-10-06
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Asset draft | `FinanceModelTests.testPortfolioAssetDraftTrimsAndRejectsWhitespaceOnlyValues` | PASS: whitespace-only drafts reject and valid values are normalized before API submission |
+| Refresh affordance | `PortfolioView` uses the shared `MPIconButton` header base | PASS: current summary can be refreshed without leaving the route |
+| Native contract | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: 53/53 tests |
+| Release build | `xcodebuild build ... -configuration Release ... SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` | PASS |
+| Simulator route | signed `testAuthenticatedMoreMenuOpensEveryDestination` | PASS: 1/1 in 124.144s |
+
+The complete API-backed suite remains 14/14 from the preceding simulator gate;
+this portfolio presentation/input change is covered by the targeted route,
+unit and Release checks.

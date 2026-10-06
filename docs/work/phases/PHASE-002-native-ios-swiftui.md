@@ -445,3 +445,10 @@ Native XCTest passes 52/52, the Release warnings-as-errors build passes, and
 the signed More-route sweep passes 1/1 in 124.194s. The complete API-backed
 suite remains 14/14 from the preceding gate; the targeted route covers this
 goal-detail presentation change.
+
+The follow-up portfolio draft/refresh fix on 2026-10-06 now trims asset
+symbol/name values, rejects whitespace-only drafts, and exposes the shared
+header refresh action. Native XCTest passes 53/53, the Release
+warnings-as-errors build passes, and the signed More-route sweep passes 1/1 in
+124.144s. The complete API-backed suite remains 14/14 from the preceding gate;
+the targeted route covers this portfolio presentation/input change.

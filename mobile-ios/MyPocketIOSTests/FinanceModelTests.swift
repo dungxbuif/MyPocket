@@ -33,6 +33,13 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertNil(MPFormat.calendarDayDifference(to: nil, from: now, timeZone: timezone))
     }
 
+    func testPortfolioAssetDraftTrimsAndRejectsWhitespaceOnlyValues() {
+        XCTAssertEqual(PortfolioAssetDraftValidator.normalized(symbol: " VN30F ", name: " Quỹ chỉ số ")?.symbol, "VN30F")
+        XCTAssertEqual(PortfolioAssetDraftValidator.normalized(symbol: " VN30F ", name: " Quỹ chỉ số ")?.name, "Quỹ chỉ số")
+        XCTAssertNil(PortfolioAssetDraftValidator.normalized(symbol: "  ", name: "Quỹ chỉ số"))
+        XCTAssertNil(PortfolioAssetDraftValidator.normalized(symbol: "VN30F", name: " \n"))
+    }
+
     func testSnakeCaseFinancialPayloadDecodesAcronyms() throws {
         let data = Data(#"{"id":"tx-1","owner_id":"u-1","wallet_id":"w-1","category_id":"c-1","type":"expense","amount":50000,"occurred_at":"2026-10-05T10:00:00Z","included_in_reports":true,"created_at":"2026-10-05T10:00:00Z","updated_at":"2026-10-05T10:00:00Z"}"#.utf8)
         let transaction = try JSONDecoder.mypocket.decode(TransactionModel.self, from: data)

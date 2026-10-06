@@ -23,6 +23,9 @@ as active release entries here.
 
 ### Fixed
 
+- Native portfolio asset drafts now trim symbol/name values before submission,
+  reject whitespace-only values, and expose a shared-header refresh action.
+
 - Native goal-wallet detail now matches the savings summary contract: it shows
   reached/remaining amount, account-local target-day status, bounded progress,
   and the explicit target amount using shared base components.

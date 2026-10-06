@@ -746,7 +746,12 @@ struct PortfolioView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Danh mục đầu tư", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm tài sản") { adding = true } })
+                MPScreenHeader(title: "Danh mục đầu tư", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
+                    HStack(spacing: 8) {
+                        MPIconButton(systemName: "arrow.clockwise", label: "Làm mới") { Task { await load() } }
+                        MPIconButton(systemName: "plus", label: "Thêm tài sản") { adding = true }
+                    }
+                })
                 if let summary {
                     LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
                         MPMetricCard(title: "Giá vốn", value: MPFormat.money(summary.totalCostBasis))
@@ -820,7 +825,11 @@ struct PortfolioView: View {
             self.error = nil
         } catch { self.error = "Không thể tải danh mục đầu tư." }
     }
-    private func createAsset() async { guard !symbol.isEmpty, !assetName.isEmpty else { error = "Nhập mã và tên tài sản."; return }; do { _ = try await api.createPortfolioAsset(symbol: symbol, name: assetName); adding = false; symbol = ""; assetName = ""; await load() } catch { self.error = "Không thể tạo tài sản." } }
+    private func createAsset() async {
+        guard let draft = PortfolioAssetDraftValidator.normalized(symbol: symbol, name: assetName) else { error = "Nhập mã và tên tài sản."; return }
+        do { _ = try await api.createPortfolioAsset(symbol: draft.symbol, name: draft.name); adding = false; symbol = ""; assetName = ""; await load() }
+        catch { self.error = "Không thể tạo tài sản." }
+    }
     private func updatePrice(_ asset: PortfolioAssetModel) async {
         let draft = (priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let parsed: Int64?
@@ -856,6 +865,15 @@ struct PortfolioView: View {
         let components = calendar.dateComponents([.year, .month, .day], from: date)
         let localNoon = calendar.date(from: DateComponents(year: components.year, month: components.month, day: components.day, hour: 12)) ?? date
         return MPFormat.instantString(localNoon)
+    }
+}
+
+enum PortfolioAssetDraftValidator {
+    static func normalized(symbol: String, name: String) -> (symbol: String, name: String)? {
+        let normalizedSymbol = symbol.trimmingCharacters(in: .whitespacesAndNewlines)
+        let normalizedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !normalizedSymbol.isEmpty, !normalizedName.isEmpty else { return nil }
+        return (normalizedSymbol, normalizedName)
     }
 }
 
