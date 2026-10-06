@@ -35,6 +35,11 @@ as active release entries here.
   explicitly describes income, refund or reimbursement received; no ledger
   writes occur in the probe.
 
+- Tightened extraction classification for internal transfers: one explicitly
+  stated transfer event keeps one draft and one amount; the live JSON Schema
+  probe now passes the transfer-splitting regression as well as the other four
+  synthetic cases.
+
 - Native AI-entry attachment regression coverage now verifies twenty valid PNG
   thumbnails, the picker cap, close/remove behavior and picker re-enable on the
   iPhone 16 Simulator; the signed UI suite passes 17/17.

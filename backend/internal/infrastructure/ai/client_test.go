@@ -218,6 +218,9 @@ func TestTextOnlyRequestAndUnverifiedIDs(t *testing.T) {
 		if !strings.Contains(messages[0].Content, "paid invoices and receipts for goods/services are expenses") || !strings.Contains(messages[0].Content, "refund/return/reimbursement received") {
 			t.Errorf("system prompt must classify paid receipts as expenses unless they are explicit income")
 		}
+		if !strings.Contains(messages[0].Content, "exactly one transfer draft per explicitly stated transfer event") || !strings.Contains(messages[0].Content, "never split one transfer amount") {
+			t.Errorf("system prompt must preserve one transfer event and amount")
+		}
 		modelResponse(w, `{"reply":"Please clarify","drafts":[`+validDraft+`]}`)
 	})
 	description := "Daily cash for food and transit"

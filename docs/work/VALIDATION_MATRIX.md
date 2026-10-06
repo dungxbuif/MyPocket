@@ -249,7 +249,9 @@ This file maps accepted behavior and work items to proof.
 - Strict JSON Schema probe: PASS, 5/5 synthetic cases and all semantic checks;
   the unclear-wallet case now intentionally prefills the first supplied wallet
   (`wallet-cash`) while retaining a review question, matching the approved
-  review-first/default-wallet contract. No ledger or proposal writes occurred.
+  review-first/default-wallet contract. The transfer case preserves one
+  explicitly stated amount as one transfer draft (no model splitting). No
+  ledger or proposal writes occurred.
 - Regression fixture correction: the previous expectation that an unclear
   wallet must remain empty contradicted the shipped default-wallet policy; the
   live test now asserts default prefill plus review question.
