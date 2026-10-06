@@ -25,12 +25,12 @@ updated: 2026-10-06
 2026-10-06 production backend rollout: a validated pre-migration custom-format
 backup was retained on `vm100-prod`; the live database advanced from migration
 27 to 29 without reset/drop/truncate; and `mypocket-api` was rolled to the
-immutable release `release-75f7f07` at digest `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb`.
+immutable release `release-73c4c37` at digest `sha256:d1f3f3b1bba9648192feccb814bd0823b9bc7df2c80518bf29a89cf77df691c2`.
 Public health and OpenAPI probes returned 200. Redis is now reached through
 the additive attachable overlay `mypocket-redis-net` and stable
 `redis-mypocket` alias, verified with `PONG` from `vm100-prod`; no Redis
-restart was needed. Commit `75f7f07` on `codex/native-ios-port` is the source
-baseline for this deployed release.
+restart was needed. Commits `75f7f07` and `73c4c37` on
+`codex/native-ios-port` are the source baseline for this deployed release.
 
 2026-10-06 recurring worker enablement: commit `73c4c37` added `/app/worker`
 to the amd64 API image. A one-shot production pass completed on `vm100-prod`,

@@ -39,7 +39,7 @@ version 29 after a validated `pg_dump -Fc` backup. The deployed candidate is
 the immutable digest recorded in `docs/work/VALIDATION_MATRIX.md`; the public
 health and OpenAPI endpoints were checked after the Swarm update.
 
-The same release family now includes the recurring worker image
+The API and recurring worker now both run immutable image
 `release-73c4c37`. A one-shot worker pass completed on `vm100-prod`, then the
 long-running `mypocket-worker` service was scaled from `0/0` to `1/1` with the
 production Redis overlay attached.

@@ -18,7 +18,9 @@ shared_fields: [status]
   verified the database is clean (`dirty=false`). No production data reset or
   destructive operation was used.
 - Rolled `mypocket-api` to immutable release image `release-75f7f07` at digest
-  `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb`.
+  `sha256:7718c93a141f91711f58b9dcb5f0b5d716eae738157de44daf23b4653f1abcdb`;
+  the final API and worker deployment is `release-73c4c37` at digest
+  `sha256:d1f3f3b1bba9648192feccb814bd0823b9bc7df2c80518bf29a89cf77df691c2`.
   The rollout completed with automatic rollback enabled and the public health
   and OpenAPI endpoints returned HTTP 200.
 - Resolved the Redis network issue without restarting Redis: added the
@@ -38,6 +40,8 @@ shared_fields: [status]
   `WORKER_ONCE=true`; the active-schedule query completed without an error.
 - Scaled `mypocket-worker` from `0/0` to `1/1`, using the stable Redis overlay
   and `/app/worker` entrypoint. The API stayed healthy throughout the update.
+- Updated `mypocket-api` to the same `release-73c4c37` image so API and worker
+  share one reproducible binary set.
 
 ## Native email login slice — 2026-10-06
 
