@@ -29,6 +29,16 @@ shared_fields: [status]
   `codex/native-ios-port`; this entry records the production rollout and its
   verification evidence.
 
+## Recurring worker enablement — 2026-10-06
+
+- Added `/app/worker` to the immutable API image and published
+  `release-73c4c37` at digest
+  `sha256:d1f3f3b1bba9648192feccb814bd0823b9bc7df2c80518bf29a89cf77df691c2`.
+- Ran a one-shot production worker pass on `vm100-prod` with
+  `WORKER_ONCE=true`; the active-schedule query completed without an error.
+- Scaled `mypocket-worker` from `0/0` to `1/1`, using the stable Redis overlay
+  and `/app/worker` entrypoint. The API stayed healthy throughout the update.
+
 ## Native email login slice — 2026-10-06
 
 - Native iOS now signs in through `POST /api/v1/login` using the account email

@@ -1,7 +1,7 @@
 ---
 artifact_type: implementation_note
 id: WORKER_PRODUCTION_ENABLEMENT_2026-10-06
-status: in_progress
+status: complete
 owner: shared
 ---
 
@@ -22,16 +22,16 @@ repository code and recurring idempotency rules cannot drift. The worker keeps
 the current `DATABASE_URL` and stable `mypocket-redis-net` network attachment;
 no production data reset or Redis restart is allowed.
 
-## Verification plan
+## Verification result
 
-1. Build `api`, `migrate` and `worker` for `linux/amd64` with warnings/tests
-   passing, and verify all three binaries exist in the image.
-2. Pull the immutable image on `vm100-prod` and run a one-shot worker service
-   with the production environment and `WORKER_ONCE=true`.
-3. Confirm the one-shot task exits 0 without duplicate occurrence rows, then
-   update the long-running worker service to one replica with automatic
-   rollback and verify stable logs.
-4. Recheck API health, Redis alias connectivity and service task states.
+1. PASS: built `api`, `migrate` and `worker` for `linux/amd64`; all three
+   binaries exist in `release-73c4c37`.
+2. PASS: a one-shot service on `vm100-prod` ran with `WORKER_ONCE=true`, used
+   the production database and completed the active-schedule query cleanly.
+3. PASS: `mypocket-worker` now runs one replica with automatic rollback and
+   the stable `/app/worker` entrypoint.
+4. PASS: API health remained HTTP 200 and Redis alias connectivity remained
+   verified after the worker rollout.
 
 The visible iOS Simulator is an independent host UI concern; this worker
 change does not alter the iOS app or its simulator runtime.

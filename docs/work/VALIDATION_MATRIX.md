@@ -27,6 +27,7 @@ updated: 2026-10-06
 | Redis network lifecycle | PASS: the Redis container remains attached to its existing networks; the new overlay was additive and caused no Redis restart. Future Redis/API recreation must preserve `mypocket-redis-net` and the `redis-mypocket` alias. |
 | External health | PASS: `GET https://money.dungxbuif.com/api/v1/health` returned HTTP 200 after rollout; `GET /api/v1/docs/doc.json` returned HTTP 200 (171469 bytes). |
 | Rollback readiness | PASS: previous API digest remains available in the service history and the pre-migration database dump is retained. Candidate rollout was configured with automatic Swarm rollback on task failure. |
+| Recurring worker enablement | PASS: release `release-73c4c37` contains `/app/worker`; a `WORKER_ONCE=true` smoke task on `vm100-prod` completed the active-schedule query, then `mypocket-worker` was updated to `1/1` with `/app/worker`, production env, `mypocket-redis-net` and automatic rollback. |
 
 ## Native email/password authentication slice — 2026-10-06
 

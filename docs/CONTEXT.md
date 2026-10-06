@@ -32,6 +32,13 @@ the additive attachable overlay `mypocket-redis-net` and stable
 restart was needed. Commit `75f7f07` on `codex/native-ios-port` is the source
 baseline for this deployed release.
 
+2026-10-06 recurring worker enablement: commit `73c4c37` added `/app/worker`
+to the amd64 API image. A one-shot production pass completed on `vm100-prod`,
+then `mypocket-worker` was scaled from `0/0` to `1/1` with the same production
+environment and stable Redis overlay. The worker remains responsible only for
+idempotent recurring schedules; report snapshots and notification fan-out are
+not enabled by this change.
+
 2026-10-06 clean simulator verification: a fresh DerivedData build on the
 booted iPhone 16 Simulator ran 68/68 native unit/contract tests and all 19/19
 `LOCAL_API_UI` tests with zero skips or failures against a disposable local

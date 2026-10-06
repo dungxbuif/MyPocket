@@ -7,7 +7,7 @@
 | Web/API | `https://money.dungxbuif.com` |
 | Edge | Traefik on the gateway host, routed through the homelab Swarm edge |
 | Runtime node | Swarm node `vm100-prod` (`linux/amd64`) |
-| Services | `mypocket-api`, `mypocket-web` |
+| Services | `mypocket-api`, `mypocket-worker`, `mypocket-web` |
 | Image registry | `registry.dungxbuif.com` |
 | Database | PostgreSQL database `mypocket`, reached by the API through `pgbouncer` |
 
@@ -25,10 +25,12 @@ release commit; never deploy a mutable `latest` tag.
    node. The frontend image build runs its own design/typecheck/build gate.
 4. For a normal release, run the forward migration command from the API image
    on `homelab-net`, `data-net` and `mypocket-net` before updating the API.
-5. Update both Swarm services with the immutable image tag and registry auth;
-   wait until each service reports `1/1` running.
-6. Verify `GET /api/v1/health` returns HTTP 200 and smoke-test the public web
-   origin.
+5. Update the API and worker Swarm services with the immutable image tag and
+   registry auth; the API uses `/app/api` and the worker uses
+   `--entrypoint /app/worker`. Wait until API and worker each report `1/1`.
+6. Verify `GET /api/v1/health` returns HTTP 200, run a bounded
+   `WORKER_ONCE=true` smoke service on `vm100-prod`, and smoke-test the public
+   web origin.
 
 ### 2026-10-06 production rollout note
 
@@ -36,6 +38,11 @@ The API rollout on 2026-10-06 migrated the live database from version 27 to
 version 29 after a validated `pg_dump -Fc` backup. The deployed candidate is
 the immutable digest recorded in `docs/work/VALIDATION_MATRIX.md`; the public
 health and OpenAPI endpoints were checked after the Swarm update.
+
+The same release family now includes the recurring worker image
+`release-73c4c37`. A one-shot worker pass completed on `vm100-prod`, then the
+long-running `mypocket-worker` service was scaled from `0/0` to `1/1` with the
+production Redis overlay attached.
 
 During the rollout, `redis-prod` resolved to its `data-net` address from the
 API worker, but Redis was reachable on `homelab-net`. The production fix was
@@ -77,6 +84,7 @@ backup directory. Do not delete or overwrite that backup during cleanup.
 curl -fsS https://money.dungxbuif.com/api/v1/health
 docker service ls
 docker service ps mypocket-api
+docker service ps mypocket-worker
 docker service ps mypocket-web
 ```
 
