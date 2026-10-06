@@ -1,5 +1,6 @@
 import Foundation
 import XCTest
+import UIKit
 @testable import MyPocketIOS
 
 final class APIClientTests: XCTestCase {
@@ -58,6 +59,32 @@ final class APIClientTests: XCTestCase {
         XCTAssertNotNil(transport.requestID)
         XCTAssertFalse(transport.requestID?.isEmpty ?? true)
     }
+
+    func testFeedbackScreenshotUsesBackendPNGContract() async throws {
+        let transport = FeedbackMultipartTransport()
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: TestSessionStore(session: AccessSession(token: "access", expiresAt: "2099-01-01T00:00:00Z", refreshToken: "refresh", refreshExpiresAt: "2099-02-01T00:00:00Z", user: AuthUser(id: "u", name: nil, email: nil, timezone: nil)))
+        )
+        let api = FinanceAPI(client: client)
+
+        _ = try await api.createFeedback(
+            FeedbackInputModel(type: "bug", title: "Ảnh lỗi", description: "Không tải được ảnh"),
+            screenshot: Data("fixture-image".utf8)
+        )
+
+        let body = String(decoding: transport.request?.httpBody ?? Data(), as: UTF8.self)
+        XCTAssertTrue(body.contains("filename=\"screen.png\""))
+        XCTAssertTrue(body.contains("Content-Type: image/png"))
+    }
+
+    @MainActor
+    func testScreenSnapshotEncodesPNGBytes() {
+        let image = UIGraphicsImageRenderer(size: CGSize(width: 1, height: 1)).image { _ in }
+        let data = ScreenSnapshot.pngData(for: image)
+        XCTAssertEqual(data?.prefix(8), Data([137, 80, 78, 71, 13, 10, 26, 10]))
+    }
 }
 
 private final class URLCaptureTransport: HTTPTransport, @unchecked Sendable {
@@ -68,6 +95,16 @@ private final class URLCaptureTransport: HTTPTransport, @unchecked Sendable {
         url = request.url
         requestID = request.value(forHTTPHeaderField: "X-Request-ID")
         return (Data(#"{"data":{}}"#.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+private final class FeedbackMultipartTransport: HTTPTransport, @unchecked Sendable {
+    private(set) var request: URLRequest?
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        self.request = request
+        let response = #"{"data":{"id":"feedback-1","type":"bug","title":"Ảnh lỗi","description":"Không tải được ảnh","status":"open","fixed_at":null,"changelog_id":null,"created_at":"2026-10-06T00:00:00Z","updated_at":"2026-10-06T00:00:00Z","screenshot_available":true},"meta":null}"#
+        return (Data(response.utf8), HTTPURLResponse(url: request.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
     }
 }
 

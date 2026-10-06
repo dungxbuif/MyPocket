@@ -253,7 +253,7 @@ final class FinanceAPI: @unchecked Sendable {
         return try await client.sendMultipart(
             path: "/feedback",
             fields: ["type": input.type, "title": input.title, "description": input.description],
-            files: [MultipartFile(fieldName: "screenshot", fileName: "screen.jpg", mimeType: "image/jpeg", data: screenshot)],
+            files: [MultipartFile(fieldName: "screenshot", fileName: "screen.png", mimeType: "image/png", data: screenshot)],
             idempotencyKey: UUID().uuidString
         )
     }

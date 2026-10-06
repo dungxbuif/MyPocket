@@ -576,3 +576,8 @@ characters and separators are rejected before persistence. Native XCTest passes
 62/62 and the signed iPhone 16 `LOCAL_API_UI` suite passes 77/77 with zero
 failures; the Release warnings-as-errors build, guards, no-invalid-frame log
 check and disposable-fixture cleanup also pass.
+
+The feedback screenshot contract follow-up then corrected native screen capture
+from JPEG to PNG. The multipart regression now verifies PNG signature bytes and
+the backend-required `screen.png`/`image/png` part, closing the previously
+unusable screenshot path while preserving text-only fallback behavior.

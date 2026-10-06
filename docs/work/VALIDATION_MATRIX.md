@@ -74,7 +74,7 @@ After the correction the complete UI suite passed 15/15 on the booted iPhone
 | FE-proxy transfer integration | PASS: paired creation, balance reconciliation, report/jar exclusion, transfer PATCH and pair DELETE with idempotency keys, auth guard |
 | Real Chromium 390×844 transfer flow | PASS: actual UI rendered both wallet options, saved, refreshed and matched persisted API state; stale fixture cleanup now deletes transfer pairs atomically |
 | AI entry browser flow | PASS: contract + Chromium fixture; fixture transactions derive the current account-local week so the grouped-ledger assertion cannot expire with the calendar |
-| Feedback JWT + scoped user API key + agent lifecycle | PASS: create/list/revoke, agent open → triaged → in_progress → changelog/fixed, owner-scoped reads, Redis `mypocket:audit:feedback` events observed |
+| Feedback JWT + scoped user API key + agent lifecycle | PASS: create/list/revoke, agent open → triaged → in_progress → changelog/fixed, owner-scoped reads, Redis `mypocket:audit:feedback` events observed; native screenshot regression asserts PNG bytes and `screen.png`/`image/png` multipart metadata |
 | Web design/typecheck/build/API roundtrips | PASS: latest local suite; Vite only reports the existing large-chunk warning |
 | Provider-backed AI/OCR, real Google iOS OAuth, authenticated staging/production and physical device | NOT RUN; external release gates remain explicit |
 

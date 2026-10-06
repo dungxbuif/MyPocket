@@ -2,6 +2,10 @@ import UIKit
 
 @MainActor
 enum ScreenSnapshot {
+    static func pngData(for image: UIImage) -> Data? {
+        image.pngData()
+    }
+
     static func capture() -> Data? {
         guard let window = UIApplication.shared.connectedScenes
             .compactMap({ $0 as? UIWindowScene })
@@ -11,6 +15,6 @@ enum ScreenSnapshot {
         let image = renderer.image { _ in
             window.drawHierarchy(in: window.bounds, afterScreenUpdates: false)
         }
-        return image.jpegData(compressionQuality: 0.78)
+        return pngData(for: image)
     }
 }
