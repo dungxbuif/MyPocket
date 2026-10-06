@@ -85,6 +85,38 @@ final class APIClientTests: XCTestCase {
         let data = ScreenSnapshot.pngData(for: image)
         XCTAssertEqual(data?.prefix(8), Data([137, 80, 78, 71, 13, 10, 26, 10]))
     }
+
+    @MainActor
+    func testScreenSnapshotKeepsComplexCaptureUnderFeedbackLimit() {
+        let width = 960
+        let height = 1_600
+        var bytes = Data(count: width * height * 4)
+        bytes.withUnsafeMutableBytes { rawBuffer in
+            var state: UInt32 = 0x9E3779B9
+            for index in 0..<rawBuffer.count {
+                state = state &* 1_664_525 &+ 1_013_904_223
+                rawBuffer[index] = UInt8(truncatingIfNeeded: state >> 24)
+            }
+        }
+        let provider = CGDataProvider(data: bytes as CFData)!
+        let image = UIImage(cgImage: CGImage(
+            width: width,
+            height: height,
+            bitsPerComponent: 8,
+            bitsPerPixel: 32,
+            bytesPerRow: width * 4,
+            space: CGColorSpaceCreateDeviceRGB(),
+            bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+            provider: provider,
+            decode: nil,
+            shouldInterpolate: false,
+            intent: .defaultIntent
+        )!)
+
+        let data = ScreenSnapshot.pngData(for: image)
+        XCTAssertNotNil(data)
+        XCTAssertLessThanOrEqual(data?.count ?? Int.max, 1 << 20)
+    }
 }
 
 private final class URLCaptureTransport: HTTPTransport, @unchecked Sendable {

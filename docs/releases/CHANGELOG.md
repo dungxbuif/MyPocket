@@ -23,9 +23,9 @@ as active release entries here.
 
 ### Fixed
 
-- Native feedback screenshots now use the backend's accepted PNG contract;
-  screen captures are sent as `screen.png`/`image/png` instead of rejected
-  JPEG multipart parts.
+- Native feedback screenshots now use the backend's accepted bounded PNG
+  contract; complex screen captures are downscaled to 1 MiB or less and sent
+  as `screen.png`/`image/png` instead of rejected JPEG or oversized parts.
 
 - Native recurring numeric drafts now validate thousands grouping strictly:
   valid values such as `5.000.000` remain supported, while mixed characters,

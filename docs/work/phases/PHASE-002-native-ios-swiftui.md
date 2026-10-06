@@ -581,3 +581,14 @@ The feedback screenshot contract follow-up then corrected native screen capture
 from JPEG to PNG. The multipart regression now verifies PNG signature bytes and
 the backend-required `screen.png`/`image/png` part, closing the previously
 unusable screenshot path while preserving text-only fallback behavior.
+
+The follow-up size audit found that full-resolution PNGs could exceed the
+backend's 1 MiB limit. The shared snapshot base now downsizes complex captures
+until they fit or safely falls back to text-only submission; a noisy
+high-resolution regression covers the bound.
+
+The final simulator verification after the size-bound fix passed 65/65 native
+unit tests, 15/15 signed `LOCAL_API_UI` tests, Release with
+`SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`, base/project guards, the no-invalid-frame
+log check, and the disposable fixture cleanup probe. The Release app installed
+and launched successfully as `com.mypocket.ios`.

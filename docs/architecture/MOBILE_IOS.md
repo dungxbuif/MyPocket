@@ -58,10 +58,11 @@ semantic paths such as `/credit/wallets/{id}/statement?from=...`; the client
 must never percent-encode the `?` into the resource path. The URL contract is
 covered by native XCTest.
 
-The global native feedback bubble captures the current window as PNG and sends
-the optional `screenshot` multipart part as `screen.png`/`image/png`, matching
-the backend's private feedback attachment contract. Text-only feedback remains
-the fallback when a window snapshot cannot be produced.
+The global native feedback bubble captures the current window as a bounded PNG
+(at most 1 MiB) and sends the optional `screenshot` multipart part as
+`screen.png`/`image/png`, matching the backend's private feedback attachment
+contract. Text-only feedback remains the fallback when a window snapshot
+cannot be produced within that bound.
 
 The transactions screen treats transactions and wallets as required data, but
 loads category labels and account timezone as optional metadata. A metadata
