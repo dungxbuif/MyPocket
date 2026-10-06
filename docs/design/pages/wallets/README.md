@@ -35,7 +35,7 @@ Không suy diễn số dư sao kê bằng dư nợ hiện tại. Màn chi tiết
 
 Ví tín dụng hiện đã có sổ nợ và API ghi mua/hoàn/phí/lãi, thanh toán cặp nguyên tử, hạn mức khả dụng, metadata kỳ sao kê/ngày đến hạn, amount due/status và danh sách statement. Phân bổ thanh toán với dữ liệu sao kê ngân hàng thật chưa được triển khai; UI chỉ dùng metadata người dùng cung cấp.
 
-Du lịch hiện là `Travel Mode`/sự kiện gắn giao dịch theo [TICKET-05-03](../../../work/tickets/TICKET-05-03-su-kien-travel-mode.md), không phải loại ví thứ tư. Chưa có màn/contract UI riêng cho chuyến đi được phê duyệt và chưa có runtime Travel Mode; không hiển thị nhãn “ví du lịch” hoặc hứa rằng số dư ví thuộc riêng chuyến đi. Khi thiết kế màn chuyến đi, cần phân biệt tổng thu/chi của giao dịch liên kết với số dư của các ví nguồn.
+Du lịch hiện là `Travel Mode`/sự kiện gắn giao dịch theo [TICKET-05-03](../../../work/tickets/TICKET-05-03-su-kien-travel-mode.md), không phải loại ví thứ tư. Runtime web và native đã có màn quản lý sự kiện, active state, khoảng ngày, gắn/gỡ giao dịch thường và xác nhận xóa; báo cáo narrative riêng theo chuyến và offline/backfill vẫn là gap. Không hiển thị nhãn “ví du lịch” hoặc hứa rằng số dư ví thuộc riêng chuyến đi. Khi thiết kế màn chuyến đi, cần phân biệt tổng thu/chi của giao dịch liên kết với số dư của các ví nguồn.
 
 ## Sự kiện và trạng thái
 

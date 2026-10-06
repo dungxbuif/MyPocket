@@ -300,6 +300,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.buttons["Chi tiêu"].waitForExistence(timeout: 5))
         app.buttons["Chi tiêu"].tap()
         XCTAssertTrue(app.buttons["Hũ chi tiêu: Không chọn"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["Ngày và giờ"].exists)
         XCTAssertTrue(app.buttons["Tính vào báo cáo: Có"].waitForExistence(timeout: 5))
 #endif
     }
