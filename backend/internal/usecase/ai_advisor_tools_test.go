@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/mypocket/backend/internal/entity"
@@ -11,12 +12,12 @@ import (
 func TestAdvisorToolRegistryContainsOnlyReadTools(t *testing.T) {
 	reader := &financeReaderStub{bundle: entity.FactBundle{Results: []entity.FinanceResult{{QueryKey: "q1"}}}}
 	registry := NewAdvisorToolRegistry(NewFinanceQueryService(reader))
-	for _, name := range []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress"} {
+	for _, name := range []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "propose_create_wallet"} {
 		if _, ok := registry.Lookup(name); !ok {
 			t.Fatalf("missing read tool %s", name)
 		}
 	}
-	for _, forbidden := range []string{"execute_sql", "create_transaction", "confirm_action"} {
+	for _, forbidden := range []string{"execute_sql", "create_transaction", "create_wallet", "confirm_action"} {
 		if _, ok := registry.Lookup(forbidden); ok {
 			t.Fatalf("write/escape tool registered: %s", forbidden)
 		}
@@ -34,6 +35,7 @@ func TestAdvisorToolDefinitionsExposeModelParameters(t *testing.T) {
 		"get_goal_progress":        {"wallet_ids"},
 		"get_jar_progress":         {"month", "jar_ids"},
 		"get_transaction":          {"transaction_id"},
+		"propose_create_wallet":    {"name", "type", "opening_balance", "is_in_total", "description", "target_amount", "target_date", "credit_limit", "last_statement_balance", "statement_day", "payment_due_day"},
 	}
 	for name, properties := range expected {
 		tool, ok := registry.Lookup(name)
@@ -91,5 +93,28 @@ func TestAdvisorGetTransactionRequiresOneID(t *testing.T) {
 	tool, _ := NewAdvisorToolRegistry(NewFinanceQueryService(reader)).Lookup("get_transaction")
 	if _, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}, json.RawMessage(`{"transaction_id":""}`)); err == nil {
 		t.Fatal("empty transaction id must be rejected")
+	}
+}
+
+func TestAdvisorWalletProposalValidatesAndDoesNotWrite(t *testing.T) {
+	tool, ok := NewAdvisorToolRegistry(NewFinanceQueryService(&financeReaderStub{})).Lookup("propose_create_wallet")
+	if !ok {
+		t.Fatal("wallet proposal tool missing")
+	}
+	result, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1"}, json.RawMessage([]byte("{\"name\":\"Tiền mặt\",\"type\":\"basic\",\"opening_balance\":250000}")))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Status != "proposed" || result.ViewKind != "wallet_creation_proposal" || !strings.Contains(string(result.View), "create_wallet") {
+		t.Fatalf("unexpected wallet proposal: %+v", result)
+	}
+	for _, raw := range []string{
+		"{\"name\":\"Goal\",\"type\":\"goal\"}",
+		"{\"name\":\"Card\",\"type\":\"credit\"}",
+		"{\"name\":\"Cash\",\"type\":\"basic\",\"owner_id\":\"other\"}",
+	} {
+		if _, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1"}, json.RawMessage([]byte(raw))); err == nil {
+			t.Fatalf("invalid wallet proposal must be rejected: %s", raw)
+		}
 	}
 }

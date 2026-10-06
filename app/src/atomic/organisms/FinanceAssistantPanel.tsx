@@ -8,6 +8,7 @@ import { AssistantComposer } from "../molecules/AssistantComposer";
 import { FinanceAssistantPart } from "../molecules/FinanceAssistantPart";
 import { FinanceAssistantMarkdown } from "../molecules/FinanceAssistantMarkdown";
 import { fetchAdvisorCapabilities, fetchAdvisorMessages, fetchAdvisorOverview, mergeAdvisorMessages, submitAdvisorMessage, type AdvisorMessage, type AdvisorOverview } from "../../services/aiAdvisor";
+import { createWallet, type WalletInput } from "../../services/wallets";
 
 const CONVERSATION_KEY = "mypocket.advisor.conversation";
 
@@ -89,18 +90,22 @@ export function FinanceAssistantPanel({ ownerID, masked = false }: { ownerID: st
     }
   };
 
+  const confirmWalletCreation = async (input: WalletInput): Promise<void> => {
+    await createWallet(input);
+  };
+
   if (loading) return <div className="space-y-3 p-4"><Text tone="secondary">Đang tải Finance Assistant...</Text></div>;
 
   return <div className="flex min-h-[calc(100vh-8rem)] flex-col gap-3 p-4 pb-24">
     <div className="flex items-start justify-between gap-3">
-      <div><Heading as="h1" size="screen">Finance Assistant</Heading><Text tone="secondary" size="xs">Hỏi đáp trên dữ liệu tài chính thật · chỉ đọc</Text></div>
+      <div><Heading as="h1" size="screen">Finance Assistant</Heading><Text tone="secondary" size="xs">Hỏi đáp trên dữ liệu tài chính thật · đọc và đề xuất có xác nhận</Text></div>
       {messages.length ? <div className="flex items-center gap-2">{hasOlder ? <BaseButton variant="ghost" size="sm" loading={loadingOlder} onClick={() => void loadOlder()}>Tải tin cũ</BaseButton> : null}<BaseButton variant="ghost" size="sm" onClick={() => void reloadHistory()}>Tải lại lịch sử</BaseButton></div> : null}
     </div>
     {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
-    {overview ? <FinanceAssistantPart type={overview.view_kind} data={{ view: overview.view, source: overview.source }} masked={masked} /> : null}
+    {overview ? <FinanceAssistantPart type={overview.view_kind} data={{ view: overview.view, source: overview.source }} masked={masked} onCreateWallet={confirmWalletCreation} /> : null}
     {!enabled ? <SurfaceCard tone="muted" padding="md"><Text>Trợ lý chưa được bật hoặc chưa cấu hình nhà cung cấp AI.</Text></SurfaceCard> : null}
     {!messages.length ? <SurfaceCard padding="md" className="space-y-3"><Text weight="semibold">Bạn có thể hỏi</Text><div className="flex flex-wrap gap-2">{suggestions.map(suggestion => <BaseButton key={suggestion} variant="secondary" size="sm" onClick={() => setText(suggestion)}>{suggestion}</BaseButton>)}</div></SurfaceCard> : null}
-    <div className="flex flex-1 flex-col gap-2" aria-live="polite">{messages.map(message => <SurfaceCard key={message.id} padding="sm" tone={message.role === "user" ? "muted" : "default"} className={message.role === "user" ? "ml-8" : "mr-8"}><div className="space-y-2">{message.parts.map((part, index) => part.type === "text" ? (masked ? <Text key={`${message.id}-text-${index}`} weight={message.role === "assistant" ? "normal" : "semibold"}>Nội dung ẩn khi bật chế độ che số dư.</Text> : message.role === "assistant" ? <FinanceAssistantMarkdown key={`${message.id}-text-${index}`} content={part.text ?? ""} /> : <Text key={`${message.id}-text-${index}`} weight="semibold">{part.text}</Text>) : <FinanceAssistantPart key={`${message.id}-${part.type}-${index}`} type={part.type} data={part.data} masked={masked} />)}</div></SurfaceCard>)}</div>
-    <AssistantComposer mode="advisor" text={text} files={[]} disabled={!enabled} uploadDisabled loading={sending} canSend={!!text.trim()} hint="Dữ liệu chỉ được đọc; không có thao tác ngân hàng hoặc thanh toán." onTextChange={setText} onFiles={() => undefined} onClearFiles={() => undefined} onSubmit={() => void submit()} />
+    <div className="flex flex-1 flex-col gap-2" aria-live="polite">{messages.map(message => <SurfaceCard key={message.id} padding="sm" tone={message.role === "user" ? "muted" : "default"} className={message.role === "user" ? "ml-8" : "mr-8"}><div className="space-y-2">{message.parts.map((part, index) => part.type === "text" ? (masked ? <Text key={`${message.id}-text-${index}`} weight={message.role === "assistant" ? "normal" : "semibold"}>Nội dung ẩn khi bật chế độ che số dư.</Text> : message.role === "assistant" ? <FinanceAssistantMarkdown key={`${message.id}-text-${index}`} content={part.text ?? ""} /> : <Text key={`${message.id}-text-${index}`} weight="semibold">{part.text}</Text>) : <FinanceAssistantPart key={`${message.id}-${part.type}-${index}`} type={part.type} data={part.data} masked={masked} onCreateWallet={confirmWalletCreation} />)}</div></SurfaceCard>)}</div>
+    <AssistantComposer mode="advisor" text={text} files={[]} disabled={!enabled} uploadDisabled loading={sending} canSend={!!text.trim()} hint="Không có thao tác ngân hàng hoặc thanh toán; đề xuất tạo ví cần bạn xác nhận." onTextChange={setText} onFiles={() => undefined} onClearFiles={() => undefined} onSubmit={() => void submit()} />
   </div>;
 }

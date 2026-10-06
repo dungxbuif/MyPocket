@@ -23,6 +23,23 @@ as active release entries here.
 
 ### Fixed
 
+- Native Finance Assistant and AI-entry replies now use the shared
+  `MPMarkdown` base renderer for headings, emphasis/code, lists, fenced code
+  and pipe tables. Raw assistant Markdown is no longer shown as an unreadable
+  delimiter string; native parser coverage is included in the 68/68 contract
+  suite.
+
+- Finance Assistant requests now prepend a bounded, versioned MyPocket product
+  handbook. It grounds feature/navigation answers, routes financial claims to
+  owner-scoped tools and allows only a validated wallet-creation proposal; the
+  native/web confirmation cards call the existing wallet API explicitly, while
+  category/budget/jar/transaction writes remain blocked. The orchestrator
+  contract tests cover this system-context injection.
+
+- Added `propose_create_wallet`, a strict no-write advisor tool that returns a
+  confirmation card for basic, savings and credit wallets. Web and iOS use the
+  existing owner-scoped wallet API only after an explicit confirmation.
+
 - Fixed the native wallet-detail create/edit regression. The custom snake-case
   decoder now maps API `wallet_ids` to Swift `walletIDs`, category metadata no
   longer drops the detail screen into an error state, and the add action stays

@@ -2,7 +2,10 @@ import { BaseButton } from "../atoms/BaseButton";
 import { Heading } from "../atoms/Heading";
 import { Progress } from "../atoms/Progress";
 import { SurfaceCard } from "../atoms/SurfaceCard";
+import { StatusMessage } from "../atoms/StatusMessage";
 import { Text } from "../atoms/Text";
+import { useState } from "react";
+import type { WalletInput } from "../../services/wallets";
 
 type UnknownRecord = Record<string, unknown>;
 
@@ -32,6 +35,7 @@ function normalizeType(type: string): string {
     spending_comparison: "period_comparison",
     transaction_search: "transaction_list",
     budget_progress: "budget_status",
+    wallet_creation_proposal: "wallet_confirmation",
   };
   return aliases[type] ?? type;
 }
@@ -43,7 +47,7 @@ function sourceLabel(data: UnknownRecord): string {
   return timezone ? `Nguồn dữ liệu · ${timezone}` : "Nguồn dữ liệu tài chính";
 }
 
-export function FinanceAssistantPart({ type, data, masked = false }: { type: string; data: unknown; masked?: boolean }) {
+export function FinanceAssistantPart({ type, data, masked = false, onCreateWallet }: { type: string; data: unknown; masked?: boolean; onCreateWallet?: (input: WalletInput) => Promise<void> }) {
   const payload = record(data);
   const view = payload ? record(payload.view) : null;
   if (!payload || !view) return <SurfaceCard tone="danger" padding="sm"><Text tone="danger">Nội dung trợ lý chưa được hỗ trợ.</Text></SurfaceCard>;
@@ -74,7 +78,54 @@ export function FinanceAssistantPart({ type, data, masked = false }: { type: str
     const items = Array.isArray(view.items) ? view.items.map(record).filter((item): item is UnknownRecord => !!item) : [];
     return <SurfaceCard padding="sm" className="space-y-2"><Heading as="h3" size="field">Tiến độ hũ chi tiêu</Heading><div className="space-y-2">{items.slice(0, 8).map(item => { const spent = numberValue(item.spent) ?? 0; const allocation = numberValue(item.allocation_amount); const percent = allocation === null ? null : progress(spent, allocation); return <div className="rounded-lg bg-row p-2" key={String(item.jar_id)}><div className="flex items-center justify-between gap-2"><Text weight="semibold">{String(item.name || "Hũ")}</Text><Text numeric weight="bold">{money(spent, masked)}</Text></div>{allocation !== null && percent !== null ? <><Text size="xs" numeric tone="secondary">/ {money(allocation, masked)}</Text><Progress value={percent} label={String(item.name || "Hũ")} danger={spent > allocation} className="mt-2" /></> : null}</div>; })}</div><Text size="micro" tone="secondary">Kỳ {String(view.month || "đang chọn")}</Text></SurfaceCard>;
   }
+  if (normalizedType === "wallet_confirmation") {
+    return <WalletCreationConfirmation view={view} onCreateWallet={onCreateWallet} />;
+  }
   return <SurfaceCard tone="muted" padding="sm"><Text size="xs">Dữ liệu {type} đã có nhưng giao diện hiện tại chưa hỗ trợ hiển thị.</Text></SurfaceCard>;
+}
+
+function WalletCreationConfirmation({ view, onCreateWallet }: { view: UnknownRecord; onCreateWallet?: (input: WalletInput) => Promise<void> }) {
+  const [saving, setSaving] = useState(false);
+  const [done, setDone] = useState(false);
+  const [error, setError] = useState("");
+  const name = typeof view.name === "string" ? view.name : "Ví mới";
+  const type = view.type === "goal" || view.type === "credit" ? view.type : "basic";
+  const openingBalance = numberValue(view.opening_balance) ?? 0;
+  const targetAmount = numberValue(view.target_amount);
+  const creditLimit = numberValue(view.credit_limit);
+  const input: WalletInput = {
+    name,
+    type,
+    opening_balance: openingBalance,
+    is_in_total: view.is_in_total !== false,
+    ...(typeof view.description === "string" && view.description ? { description: view.description } : {}),
+    ...(targetAmount !== null ? { target_amount: targetAmount } : {}),
+    ...(typeof view.target_date === "string" && view.target_date ? { target_date: view.target_date } : {}),
+    ...(creditLimit !== null ? { credit_limit: creditLimit } : {}),
+    ...(numberValue(view.last_statement_balance) !== null ? { last_statement_balance: numberValue(view.last_statement_balance)! } : {}),
+    ...(numberValue(view.statement_day) !== null ? { statement_day: numberValue(view.statement_day)! } : {}),
+    ...(numberValue(view.payment_due_day) !== null ? { payment_due_day: numberValue(view.payment_due_day)! } : {}),
+  };
+  const confirm = async () => {
+    if (!onCreateWallet || saving || done) return;
+    setSaving(true);
+    setError("");
+    try {
+      await onCreateWallet(input);
+      setDone(true);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Không thể tạo ví sau khi xác nhận.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return <SurfaceCard padding="sm" className="space-y-2" role="group" aria-label="Đề xuất tạo ví">
+    <Heading as="h3" size="field">Đề xuất tạo ví</Heading>
+    <Text>{name} · {type === "goal" ? "Tiết kiệm" : type === "credit" ? "Tín dụng" : "Thông thường"}</Text>
+    <Text size="xs" numeric tone="secondary">Số dư ban đầu: {money(openingBalance, false)}</Text>
+    {error ? <StatusMessage tone="danger">{error}</StatusMessage> : null}
+    {done ? <StatusMessage>Đã tạo ví sau khi bạn xác nhận.</StatusMessage> : <BaseButton variant="secondary" size="sm" loading={saving} disabled={!onCreateWallet} onClick={() => void confirm()}>Xác nhận tạo ví</BaseButton>}
+  </SurfaceCard>;
 }
 
 function progress(value: unknown, target: unknown): number {

@@ -120,6 +120,17 @@ coverage pass.
   `wallet_ids` (`walletIDs` Swift property) was fixed and covered by XCTest;
   the iPhone 16 local API UI suite now passes 17/17, native contracts 67/67,
   and the default UI suite passes with only its intentional provider/API skips.
+- 2026-10-06 native Assistant readability: persisted assistant prose and
+  one-shot AI-entry replies now render through the shared `MPMarkdown` base
+  component. Headings, emphasis/code, lists and pipe tables are native SwiftUI
+  content; model HTML/view code is never evaluated. The parser contract is
+  covered in the 68/68 native unit suite.
+- 2026-10-06 Finance Assistant grounding: every advisor run now receives a
+  bounded/versioned product handbook before the owner conversation. It maps
+  actual routes and feature boundaries, requires tool-grounded financial facts,
+  and only permits a validated wallet-creation proposal followed by explicit
+  confirmation through the owner-scoped wallet API; category, budget, jar and
+  transaction writes remain unsupported.
 
 - 2026-09-21: owner requested feasibility assessment and a reviewable file for the two AI flows. [DESIGN-09-AI](work/tickets/TICKET-09-DETAIL_DESIGN.md) is `in_review`, approval pending: text/OCR proposals, internal-transfer reconciliation, read-only financial Q&A, prompt/eval contracts and T0–T7 delivery plan. No AI/transfer/jar runtime implemented in this documentation task.
 

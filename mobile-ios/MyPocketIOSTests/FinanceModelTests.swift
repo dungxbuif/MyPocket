@@ -498,6 +498,30 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(viewModel.signedAmount(for: adjustment), 10_000)
     }
 
+    func testAssistantMarkdownParserBuildsReadableBlocks() {
+        let content = """
+        ## Tổng quan
+        Bạn đã chi **3.250.000 ₫**.
+
+        - Ăn uống
+        - Mua sắm
+
+        | Hũ | Tỷ lệ |
+        | --- | ---: |
+        | NEC | 55% |
+        """
+
+        XCTAssertEqual(
+            MPMarkdownParser.parse(content),
+            [
+                .heading(level: 2, text: "Tổng quan"),
+                .paragraph("Bạn đã chi **3.250.000 ₫**."),
+                .list(ordered: false, items: ["Ăn uống", "Mua sắm"]),
+                .table(headers: ["Hũ", "Tỷ lệ"], rows: [["NEC", "55%"]])
+            ]
+        )
+    }
+
     private func transaction(id: String, occurredAt: String) -> TransactionModel {
         TransactionModel(
             id: id,

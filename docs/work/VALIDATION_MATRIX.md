@@ -718,3 +718,67 @@ with no applicable category and silently leaving the transaction unsaved.
   0 failures; Release simulator build with warnings-as-errors, base-component
   guard, project verification and `git diff --check` all pass.
 - PASS: local backend health remained 200 throughout the simulator run.
+
+### Native Finance Assistant response readability — 2026-10-06
+
+The iOS Assistant must render assistant prose as safe, readable structured
+content instead of showing raw Markdown delimiters. The renderer will be a
+shared native base component (no HTML or model-generated view code): headings,
+bold/code spans, lists, fenced code blocks and pipe tables are parsed into
+SwiftUI text/table primitives, with a plain-text fallback for malformed input.
+User messages remain plain text.
+
+- PASS: `MPMarkdownParser` contract covers headings, bold inline content,
+  unordered lists and pipe tables; malformed content falls back to plain text.
+- PASS: native unit/contract XCTest now runs 68/68, including the assistant
+  Markdown parser regression.
+- The same base renderer is used for persisted Finance Assistant assistant
+  messages and one-shot AI-entry replies; user messages remain plain text.
+
+### Native/web Assistant proposal and simulator regression — 2026-10-06 14:41–14:51 ICT
+
+- PASS: `propose_create_wallet` is strict, owner-independent and no-write; Go
+  `go test -race ./... -count=1` passed across all backend packages.
+- PASS: web `npm run test:ai-advisor`, `npm run check:design`,
+  `npm run typecheck` and `npm run build` all passed. The web card calls the
+  existing wallet API only from an explicit confirmation action.
+- PASS: native `xcodebuild test ... -only-testing:MyPocketIOSTests` passed
+  68/68; Debug build, Release analyze/build with warnings-as-errors,
+  base-component guard and project verification passed.
+- PASS: default native UI suite passed 17/17 with 11 intentional provider/API
+  skips; `LOCAL_API_UI` passed 17/17 against the disposable API and cleaned up
+  its fixtures. The native confirmation card is wired to the owner-scoped
+  wallet API and never writes from the model/tool loop.
+
+### Finance Assistant product-context grounding — 2026-10-06
+
+Every advisor run will prepend a bounded, versioned product handbook to the
+model context. It explains the actual navigation, supported feature boundaries,
+read-only tool contract and how to answer “where/how do I use this?” questions.
+Financial facts still come only from owner-scoped tools; the handbook contains
+no user data. A contract test will assert the system message is present and
+forbids invented writes, unsupported banking claims and ungrounded amounts.
+
+- PASS: `BuildAdvisorSystemMessage` prepends the bounded handbook before the
+  twelve-message conversation context and includes the account timezone.
+- PASS: `TestAdvisorOrchestratorPrependsProductHandbook` verifies the system
+  role, navigation map, read-only boundary and tool-grounding rule.
+- The current handbook explicitly reports wallet/category/budget/jar/transaction
+  writes as unsupported; no assistant message may claim a mutation completed.
+
+### Advisor wallet creation proposal — 2026-10-06
+
+The wallet-creation feedback is closed without allowing a model to mutate the
+ledger directly. A bounded `propose_create_wallet` tool validates a wallet
+draft and returns an action card; the user must confirm in the native/web card,
+which then calls the existing owner-scoped wallet API. The tool itself never
+writes.
+
+- PASS: strict proposal schema and type-specific validation cover basic, goal
+  and credit wallets; unknown fields are rejected and irrelevant fields are
+  stripped before the card is returned.
+- PASS: focused Go usecase/controller tests cover proposal output and the
+  existing owner-scoped wallet API boundary.
+- PASS: web typecheck and native simulator build cover the confirmation-card
+  integration; native action cards call `FinanceAPI.createWallet` only after
+  explicit confirmation.

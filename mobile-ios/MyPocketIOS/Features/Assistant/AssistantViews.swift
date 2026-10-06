@@ -15,6 +15,7 @@ struct AssistantView: View {
     @State private var hasOlder = false
     @State private var activeRunID: String?
     @State private var error: String?
+    @State private var walletActionMessage: String?
 
     init(api: FinanceAPI, onBack: @escaping () -> Void, ownerID: String) {
         self.api = api
@@ -39,10 +40,12 @@ struct AssistantView: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: 12) {
                     if let capabilities, !capabilities.enabled { MPStatusMessage(text: "Finance Assistant chưa được bật.", tone: .info) }
+                    if let walletActionMessage { MPStatusMessage(text: walletActionMessage, tone: .success) }
                     if let overview {
                         AssistantStructuredCard(
                             type: overview.viewKind,
-                            data: .object(["view": overview.view ?? .null, "source": overview.source ?? .null])
+                            data: .object(["view": overview.view ?? .null, "source": overview.source ?? .null]),
+                            onCreateWallet: createWalletFromAssistant
                         )
                     }
                     if historyLoading {
@@ -58,9 +61,15 @@ struct AssistantView: View {
                             VStack(alignment: .leading, spacing: 8) {
                                 MPText(message.role == "user" ? "Bạn" : "Trợ lý", style: .secondary)
                                 ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
-                                    if let text = part.text { MPText(text) }
+                                    if let text = part.text {
+                                        if message.role == "assistant" {
+                                            MPMarkdown(content: text)
+                                        } else {
+                                            MPText(text)
+                                        }
+                                    }
                                     else if let data = part.data {
-                                        AssistantStructuredCard(type: part.type, data: data)
+                                        AssistantStructuredCard(type: part.type, data: data, onCreateWallet: createWalletFromAssistant)
                                     } else { MPText("Đã nhận thẻ dữ liệu tài chính.", style: .secondary) }
                                 }
                             }
@@ -167,11 +176,31 @@ struct AssistantView: View {
         do { try await api.cancelAdvisorRun(id: runID); sending = false; activeRunID = nil; error = "Đã hủy yêu cầu." }
         catch { self.error = "Không thể hủy yêu cầu đang chạy." }
     }
+
+    private func createWalletFromAssistant(_ input: WalletModelInput) {
+        Task {
+            do {
+                _ = try await api.createWallet(input)
+                walletActionMessage = "Đã tạo ví \(input.name) sau khi bạn xác nhận."
+            } catch let error as APIError {
+                self.error = error.userMessage
+            } catch {
+                self.error = "Không thể tạo ví từ đề xuất của trợ lý."
+            }
+        }
+    }
 }
 
 struct AssistantStructuredCard: View {
     let type: String
     let data: JSONValue
+    let onCreateWallet: ((WalletModelInput) -> Void)?
+
+    init(type: String, data: JSONValue, onCreateWallet: ((WalletModelInput) -> Void)? = nil) {
+        self.type = type
+        self.data = data
+        self.onCreateWallet = onCreateWallet
+    }
 
     var body: some View {
         MPAssistantCard(title: type.replacingOccurrences(of: "_", with: " ")) {
@@ -182,6 +211,7 @@ struct AssistantStructuredCard: View {
                 case "transaction_list": transactionListView(view)
                 case "wallet_balances", "goal_progress": walletListView(view)
                 case "budget_status", "jar_progress": progressListView(view)
+                case "wallet_creation_proposal", "wallet_confirmation": walletConfirmationView(view)
                 default: MPText(data.prettyDescription, style: .secondary)
                 }
             } else {
@@ -242,10 +272,60 @@ struct AssistantStructuredCard: View {
         } else { MPText(data.prettyDescription, style: .secondary) }
     }
 
+    @ViewBuilder private func walletConfirmationView(_ view: [String: JSONValue]) -> some View {
+        if let input = walletInput(view) {
+            MPText("\(input.name) · \(walletTypeLabel(input.type))")
+            MPText("Số dư ban đầu: \(MPFormat.money(input.openingBalance))", style: .secondary)
+            MPButton("Xác nhận tạo ví", style: .secondary, isDisabled: onCreateWallet == nil) {
+                onCreateWallet?(input)
+            }
+        } else {
+            MPStatusMessage(text: "Đề xuất tạo ví chưa đủ dữ liệu để xác nhận.", tone: .danger)
+        }
+    }
+
+    private func walletInput(_ view: [String: JSONValue]) -> WalletModelInput? {
+        guard let rawName = string(view["name"]) else { return nil }
+        let name = rawName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { return nil }
+        let rawType = string(view["type"]) ?? "basic"
+        let type = ["basic", "goal", "credit"].contains(rawType) ? rawType : "basic"
+        return WalletModelInput(
+            name: name,
+            type: type,
+            openingBalance: integer(view["opening_balance"]) ?? 0,
+            isInTotal: bool(view["is_in_total"]) ?? true,
+            description: nonEmptyString(view["description"]),
+            targetAmount: type == "goal" ? integer(view["target_amount"]) : nil,
+            targetDate: type == "goal" ? nonEmptyString(view["target_date"]) : nil,
+            creditLimit: type == "credit" ? integer(view["credit_limit"]) : nil,
+            lastStatementBalance: type == "credit" ? integer(view["last_statement_balance"]) : nil,
+            statementDay: type == "credit" ? integer(view["statement_day"]).map(Int.init) : nil,
+            paymentDueDay: type == "credit" ? integer(view["payment_due_day"]).map(Int.init) : nil
+        )
+    }
+
+    private func walletTypeLabel(_ type: String) -> String {
+        switch type {
+        case "goal": return "Tiết kiệm"
+        case "credit": return "Tín dụng"
+        default: return "Thông thường"
+        }
+    }
+
     private func metric(_ title: String, _ value: JSONValue?) -> some View { MPMetricCard(title: title, value: money(value)) }
     private func object(_ value: JSONValue?) -> [String: JSONValue]? { guard let value, case .object(let object) = value else { return nil }; return object }
     private func string(_ value: JSONValue?) -> String? { guard let value, case .string(let text) = value else { return nil }; return text }
     private func number(_ value: JSONValue?) -> Double? { guard let value else { return nil }; if case .number(let number) = value { return number }; return nil }
+    private func bool(_ value: JSONValue?) -> Bool? { guard let value, case .bool(let bool) = value else { return nil }; return bool }
+    private func nonEmptyString(_ value: JSONValue?) -> String? {
+        guard let value = string(value)?.trimmingCharacters(in: .whitespacesAndNewlines), !value.isEmpty else { return nil }
+        return value
+    }
+    private func integer(_ value: JSONValue?) -> Int64? {
+        guard let value = number(value), value.isFinite, value.rounded() == value, value >= Double(Int64.min), value <= Double(Int64.max) else { return nil }
+        return Int64(value)
+    }
     private func money(_ value: JSONValue?) -> String { MPFormat.money(Int64(number(value) ?? 0)) }
 }
 
@@ -328,7 +408,7 @@ struct AIEntryView: View {
                     if process.processing && !processing {
                         MPButton("Tải lại kết quả", style: .secondary) { Task { await refreshResult() } }
                     }
-                    if let reply = process.reply { MPAssistantCard(title: "Phản hồi của AI") { MPText(reply) } }
+                    if let reply = process.reply { MPAssistantCard(title: "Phản hồi của AI") { MPMarkdown(content: reply) } }
                     if !process.processing && process.proposals.isEmpty && process.reply == nil && process.error == nil { MPEmptyView(title: "Chưa có đề xuất", detail: "Hãy thêm mô tả rõ hơn hoặc đính kèm chứng từ.") }
                     ForEach(process.proposals) { proposal in
                         MPSurfaceCard {

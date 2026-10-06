@@ -95,7 +95,9 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 	if o == nil || o.Provider == nil || o.Tools == nil || strings.TrimSpace(principal.OwnerID) == "" || len(messages) == 0 {
 		return AdvisorAnswer{}, ErrAdvisorProviderUnavailable
 	}
-	working := append([]AdvisorChatMessage(nil), messages...)
+	working := make([]AdvisorChatMessage, 0, len(messages)+1)
+	working = append(working, BuildAdvisorSystemMessage(principal))
+	working = append(working, messages...)
 	definitions := make([]ToolDefinition, 0, len(o.Tools.tools))
 	for _, tool := range o.Tools.tools {
 		definitions = append(definitions, tool.Definition())

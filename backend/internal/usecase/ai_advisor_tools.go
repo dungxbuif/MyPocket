@@ -59,7 +59,7 @@ func NewAdvisorToolRegistry(finance *FinanceQueryService) *AdvisorToolRegistry {
 	for _, tool := range []AdvisorTool{
 		&summaryTool{finance: finance}, &searchTool{finance: finance}, &compareTool{finance: finance},
 		&walletTool{finance: finance}, &budgetTool{finance: finance}, &goalTool{finance: finance}, &jarTool{finance: finance},
-		&transactionTool{finance: finance},
+		&transactionTool{finance: finance}, &walletProposalTool{},
 	} {
 		registry.tools[tool.Name()] = tool
 	}
@@ -135,6 +135,20 @@ type jarArgs struct {
 
 type transactionArgs struct {
 	TransactionID string `json:"transaction_id"`
+}
+
+type walletProposalArgs struct {
+	Name                 string `json:"name"`
+	Type                 string `json:"type"`
+	OpeningBalance       int64  `json:"opening_balance"`
+	IsInTotal            *bool  `json:"is_in_total"`
+	Description          string `json:"description"`
+	TargetAmount         *int64 `json:"target_amount"`
+	TargetDate           string `json:"target_date"`
+	CreditLimit          *int64 `json:"credit_limit"`
+	LastStatementBalance *int64 `json:"last_statement_balance"`
+	StatementDay         *int   `json:"statement_day"`
+	PaymentDueDay        *int   `json:"payment_due_day"`
 }
 
 type summaryTool struct{ finance *FinanceQueryService }
@@ -281,6 +295,113 @@ func (t *transactionTool) Execute(ctx context.Context, principal Principal, raw 
 		return entity.FinanceResult{}, ErrAdvisorToolInvalid
 	}
 	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: []string{strings.TrimSpace(args.TransactionID)}})
+}
+
+// walletProposalTool intentionally validates only. The returned action card is
+// confirmed by the client through the normal wallet API, so a model/tool call
+// can never mutate an owner's wallet without an explicit user action.
+type walletProposalTool struct{}
+
+func (t *walletProposalTool) Name() string { return "propose_create_wallet" }
+func (t *walletProposalTool) Definition() ToolDefinition {
+	return ToolDefinition{
+		Name:        t.Name(),
+		Description: "Prepare a wallet creation proposal for the user to review and confirm; never create the wallet directly",
+		Parameters: map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []string{"name", "type"},
+			"properties": map[string]any{
+				"name":                   map[string]any{"type": "string", "minLength": 1, "maxLength": 80},
+				"type":                   map[string]any{"type": "string", "enum": []string{entity.WalletTypeBasic, entity.WalletTypeGoal, entity.WalletTypeCredit}},
+				"opening_balance":        map[string]any{"type": "integer", "minimum": 0},
+				"is_in_total":            map[string]any{"type": "boolean"},
+				"description":            map[string]any{"type": "string", "maxLength": 512},
+				"target_amount":          map[string]any{"type": "integer", "minimum": 1},
+				"target_date":            map[string]any{"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+				"credit_limit":           map[string]any{"type": "integer", "minimum": 1},
+				"last_statement_balance": map[string]any{"type": "integer", "minimum": 0},
+				"statement_day":          map[string]any{"type": "integer", "minimum": 1, "maximum": 31},
+				"payment_due_day":        map[string]any{"type": "integer", "minimum": 1, "maximum": 31},
+			},
+		},
+	}
+}
+
+func (t *walletProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args walletProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.Name = strings.TrimSpace(args.Name)
+	args.Type = strings.TrimSpace(args.Type)
+	args.Description = strings.TrimSpace(args.Description)
+	args.TargetDate = strings.TrimSpace(args.TargetDate)
+	if args.Name == "" || len(args.Name) > 80 || args.Description != "" && len(args.Description) > 512 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if args.Type != entity.WalletTypeBasic && args.Type != entity.WalletTypeGoal && args.Type != entity.WalletTypeCredit {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if err := entity.ValidateMoneyAmount(args.OpeningBalance); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if args.IsInTotal == nil {
+		value := true
+		args.IsInTotal = &value
+	}
+	if args.TargetDate != "" {
+		if parsed, err := time.Parse("2006-01-02", args.TargetDate); err != nil || parsed.Format("2006-01-02") != args.TargetDate {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+	}
+	if args.Type == entity.WalletTypeGoal {
+		if args.TargetAmount == nil || *args.TargetAmount <= 0 || entity.ValidateMoneyAmount(*args.TargetAmount) != nil {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+	} else if args.TargetAmount != nil || args.TargetDate != "" {
+		args.TargetAmount, args.TargetDate = nil, ""
+	}
+	if args.Type == entity.WalletTypeCredit {
+		if args.CreditLimit == nil || *args.CreditLimit <= 0 || entity.ValidateMoneyAmount(*args.CreditLimit) != nil {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+		if args.LastStatementBalance != nil && (entity.ValidateMoneyAmount(*args.LastStatementBalance) != nil || *args.LastStatementBalance < 0) {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+		for _, day := range []*int{args.StatementDay, args.PaymentDueDay} {
+			if day != nil && (*day < 1 || *day > 31) {
+				return entity.FinanceResult{}, ErrAdvisorToolInvalid
+			}
+		}
+	} else {
+		args.CreditLimit, args.LastStatementBalance, args.StatementDay, args.PaymentDueDay = nil, nil, nil, nil
+	}
+	view, err := json.Marshal(map[string]any{
+		"action":                 "create_wallet",
+		"name":                   args.Name,
+		"type":                   args.Type,
+		"opening_balance":        args.OpeningBalance,
+		"is_in_total":            *args.IsInTotal,
+		"description":            args.Description,
+		"target_amount":          args.TargetAmount,
+		"target_date":            nullableString(args.TargetDate),
+		"credit_limit":           args.CreditLimit,
+		"last_statement_balance": args.LastStatementBalance,
+		"statement_day":          args.StatementDay,
+		"payment_due_day":        args.PaymentDueDay,
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "wallet_proposal", Status: "proposed", ViewKind: "wallet_creation_proposal", View: view}, nil
+}
+
+func nullableString(value string) any {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return value
 }
 
 func readDefinition(name, description string, properties map[string]any, required []string) ToolDefinition {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/mypocket/backend/internal/entity"
@@ -12,6 +13,16 @@ import (
 type advisorProviderStub struct {
 	responses []AdvisorResponse
 	calls     int
+}
+
+type capturingAdvisorProvider struct {
+	response AdvisorResponse
+	request  AdvisorRequest
+}
+
+func (p *capturingAdvisorProvider) Chat(_ context.Context, request AdvisorRequest) (AdvisorResponse, error) {
+	p.request = request
+	return p.response, nil
 }
 
 type advisorPrincipalValidatorStub struct {
@@ -42,6 +53,23 @@ func TestAdvisorOrchestratorResolvesToolCallBeforeAnswer(t *testing.T) {
 	}
 	if answer.Text != "Bạn đã chi 150 ₫." || provider.calls != 2 || reader.owner != "owner-1" {
 		t.Fatalf("unexpected grounded answer: %+v calls=%d owner=%q", answer, provider.calls, reader.owner)
+	}
+}
+
+func TestAdvisorOrchestratorPrependsProductHandbook(t *testing.T) {
+	provider := &capturingAdvisorProvider{response: AdvisorResponse{Text: "ok"}}
+	orchestrator := NewAdvisorOrchestrator(provider, NewAdvisorToolRegistry(NewFinanceQueryService(&financeReaderStub{})))
+	if _, err := orchestrator.Answer(context.Background(), Principal{OwnerID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}, []AdvisorChatMessage{{Role: "user", Content: "Tính năng ví ở đâu?"}}); err != nil {
+		t.Fatal(err)
+	}
+	if len(provider.request.Messages) != 2 || provider.request.Messages[0].Role != "system" {
+		t.Fatalf("advisor must prepend a system handbook: %+v", provider.request.Messages)
+	}
+	content := provider.request.Messages[0].Content
+	for _, required := range []string{"read-only", "Giao dịch", "tool", "create/edit/delete"} {
+		if !strings.Contains(content, required) {
+			t.Fatalf("handbook missing %q: %s", required, content)
+		}
 	}
 }
 

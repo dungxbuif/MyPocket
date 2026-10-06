@@ -59,7 +59,7 @@ func (h *AdvisorHandler) Capabilities(c *gin.Context) {
 	if !requireAdvisorScope(c, entity.APIKeyScopeAdvisorRead) {
 		return
 	}
-	OK(c, map[string]any{"enabled": h != nil && h.Service != nil && h.Service.Enabled(), "write": false, "parts_version": 1, "tools": []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress"}})
+	OK(c, map[string]any{"enabled": h != nil && h.Service != nil && h.Service.Enabled(), "write": false, "parts_version": 1, "tools": []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "propose_create_wallet"}, "actions": []string{"create_wallet"}})
 }
 
 // AdvisorOverview godoc

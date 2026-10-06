@@ -55,6 +55,8 @@ func advisorPartType(viewKind string) (string, bool) {
 		return "goal_progress", true
 	case "jar_progress":
 		return "jar_progress", true
+	case "wallet_creation_proposal":
+		return "wallet_confirmation", true
 	default:
 		return "", false
 	}
