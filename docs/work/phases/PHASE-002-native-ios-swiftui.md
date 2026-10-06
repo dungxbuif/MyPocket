@@ -192,6 +192,13 @@ same multipart payload again automatically. Transaction/report dates displayed
 or filtered by native screens must use the account timezone rather than the
 simulator/device timezone.
 
+AI entry review is explicit for every mutable field: unsupported model types
+remain `Chưa xác định — chọn loại` until the user chooses income or expense;
+category options follow that type and wallet; only active hũ configurations
+for the account-local proposal month are offered to ordinary expense rows; and
+report inclusion is an editable choice preserved in the existing proposal
+PATCH contract.
+
 Identity-bearing selectors use the shared `MPOptionSelector` base component
 with stable wallet/category IDs; duplicate display names no longer select an
 arbitrary record. Credit statement dates use the account timezone, and wallet
@@ -347,6 +354,12 @@ owner-scoped wallet through `POST /wallets`, and register async teardown via
 `DELETE /wallets/:id`. The full `LOCAL_API_UI` UI suite passed 10/10 with no
 skips; a post-run local API check found zero `Fixture*` wallets. This remains
 local disposable proof, not production validation.
+
+The AI-entry review follow-up is covered by the deterministic debug-only
+`-UITestAIEntryProposal` fixture: an unknown proposal renders the explicit
+type-selection error, then the simulator exposes the active hũ selector and
+report-inclusion control after `Chi tiêu` is selected. The targeted review
+smoke passes, as does the complete signed `LOCAL_API_UI` suite (15/15).
 
 AI-entry capability parity is also covered: the shared document picker remains
 disabled until the API reports private OCR/storage readiness, while text-only

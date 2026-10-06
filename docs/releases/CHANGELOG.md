@@ -23,6 +23,14 @@ as active release entries here.
 
 ### Fixed
 
+- Native AI transaction-entry review now treats unknown/transfer model output
+  as `Chưa xác định — chọn loại` until the user explicitly selects thu/chi.
+  The editor exposes shared selectors for type, wallet, category and active
+  month hũ, plus an explicit report-inclusion choice; invalid category/hũ
+  combinations are cleared before the existing proposal PATCH/approval flow.
+  The deterministic iPhone 16 review fixture and full signed `LOCAL_API_UI`
+  suite pass (15/15); native XCTest is 58/58.
+
 - Native Travel Mode now matches the web contract for active-event context,
   explicit date scope, safe delete confirmation, and the rule that only new
   ordinary income/expense transactions auto-link to the active trip.

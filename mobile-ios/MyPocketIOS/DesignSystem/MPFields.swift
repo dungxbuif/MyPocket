@@ -242,6 +242,34 @@ struct MPOptionSelector: View {
     }
 }
 
+/// Base selector for a boolean product decision that must remain explicit in
+/// a review form. The wire value stays a Bool while the UI uses localized
+/// labels and the same selector surface as other option fields.
+struct MPBooleanSelector: View {
+    let title: String
+    @Binding var value: Bool
+    var trueLabel: String = "Có"
+    var falseLabel: String = "Không"
+
+    private var selectionID: Binding<String> {
+        Binding(
+            get: { value ? "true" : "false" },
+            set: { value = $0 == "true" }
+        )
+    }
+
+    var body: some View {
+        MPOptionSelector(
+            title: title,
+            options: [
+                MPSelectionOption(id: "true", label: trueLabel),
+                MPSelectionOption(id: "false", label: falseLabel)
+            ],
+            selectionID: selectionID
+        )
+    }
+}
+
 /// Multi-select selector for relationships that may apply to more than one
 /// wallet. An empty selection means "all wallets", matching the API contract.
 struct MPMultiOptionSelector: View {

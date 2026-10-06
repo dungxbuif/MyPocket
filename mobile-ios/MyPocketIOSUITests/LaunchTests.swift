@@ -280,6 +280,30 @@ final class LaunchTests: XCTestCase {
 #endif
     }
 
+    func testAIEntryProposalReviewRequiresExplicitType() throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI to run the deterministic review fixture.")
+#else
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated", "-UITestAIEntryProposal"]
+        app.launch()
+        XCTAssertTrue(app.buttons["Thêm"].waitForExistence(timeout: 10))
+        app.buttons["Thêm"].tap()
+        XCTAssertTrue(app.buttons["Nhập giao dịch bằng AI"].waitForExistence(timeout: 10))
+        app.buttons["Nhập giao dịch bằng AI"].tap()
+        XCTAssertTrue(app.staticTexts["Chưa xác định — chọn loại"].waitForExistence(timeout: 10))
+        app.buttons["Sửa"].tap()
+        XCTAssertTrue(app.buttons["Loại giao dịch: Chưa xác định — chọn loại"].waitForExistence(timeout: 10))
+        app.buttons["Lưu đề xuất"].tap()
+        XCTAssertTrue(app.staticTexts["Chọn loại giao dịch là thu nhập hoặc chi tiêu trước khi lưu."].waitForExistence(timeout: 5))
+        app.buttons["Loại giao dịch: Chưa xác định — chọn loại"].tap()
+        XCTAssertTrue(app.buttons["Chi tiêu"].waitForExistence(timeout: 5))
+        app.buttons["Chi tiêu"].tap()
+        XCTAssertTrue(app.buttons["Hũ chi tiêu: Không chọn"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Tính vào báo cáo: Có"].waitForExistence(timeout: 5))
+#endif
+    }
+
     func testAPIBackedLedgerUsesWeekModeAndCashflowCard() throws {
 #if !LOCAL_API_UI
         throw XCTSkip("Build with SWIFT_ACTIVE_COMPILATION_CONDITIONS=DEBUG LOCAL_API_UI and run against the disposable local API fixture.")

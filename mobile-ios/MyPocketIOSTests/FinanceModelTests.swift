@@ -221,6 +221,31 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(json.contains("Cà phê"))
     }
 
+    func testAIEntryReviewKeepsUnknownTypeExplicitAndScopesJarToExpenses() {
+        XCTAssertEqual(AIEntryProposalReview.typeLabel("unknown"), "Chưa xác định — chọn loại")
+        XCTAssertEqual(AIEntryProposalReview.typeLabel("transfer"), "Chưa xác định — chọn loại")
+        XCTAssertNil(AIEntryProposalReview.normalizedType("unknown"))
+        XCTAssertEqual(AIEntryProposalReview.normalizedType("income"), "income")
+        XCTAssertTrue(AIEntryProposalReview.canUseJar(type: "expense", walletType: "basic"))
+        XCTAssertTrue(AIEntryProposalReview.canUseJar(type: "expense", walletType: "goal"))
+        XCTAssertFalse(AIEntryProposalReview.canUseJar(type: "income", walletType: "basic"))
+        XCTAssertFalse(AIEntryProposalReview.canUseJar(type: "expense", walletType: "credit"))
+        XCTAssertNil(AIEntryProposalReview.jarIDForSave(type: "income", walletType: "basic", jarID: "jar-1"))
+        XCTAssertEqual(AIEntryProposalReview.jarIDForSave(type: "expense", walletType: "basic", jarID: "jar-1"), "jar-1")
+
+        let summary = JarMonthSummaryModel(
+            month: "2026-10", timezone: "Asia/Ho_Chi_Minh", actualIncome: 0,
+            totalSpent: 0, unassignedSpent: 0, totalAllocated: 0,
+            totalAllocationPercent: 0, overIncome: false, overOneHundredPercent: false,
+            jars: [JarIdentityModel(jarID: "active", name: "Ăn uống"), JarIdentityModel(jarID: "old", name: "Đã gỡ")],
+            items: [
+                JarItemModel(jarID: "active", name: "Ăn uống", allocationMode: "none", allocationAmount: nil, allocationPercent: nil, calculatedAllocation: nil, spent: 0, active: true),
+                JarItemModel(jarID: "old", name: "Đã gỡ", allocationMode: "none", allocationAmount: nil, allocationPercent: nil, calculatedAllocation: nil, spent: 0, active: false)
+            ]
+        )
+        XCTAssertEqual(AIEntryProposalReview.activeJars(from: summary).map(\.jarID), ["active"])
+    }
+
     func testWalletInputEncodesGoalAndCreditMetadata() throws {
         let input = WalletModelInput(name: "Credit", type: "credit", openingBalance: 0, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: 3_000_000, lastStatementBalance: 250_000, statementDay: 15, paymentDueDay: 5)
         let json = String(decoding: try JSONEncoder.mypocket.encode(input), as: UTF8.self)
