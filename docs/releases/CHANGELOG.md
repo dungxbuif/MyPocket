@@ -23,6 +23,12 @@ as active release entries here.
 
 ### Fixed
 
+- Native iOS simulator stability: replaced the SwiftUI number-pad keyboard
+  toolbar in the shared amount field with a UIKit input accessory. This keeps
+  the `Xong` dismissal action and removes the invalid-frame runtime fault seen
+  while scrolling mutation forms. The four affected API-backed UI tests pass
+  4/4 on the iPhone 16 Simulator.
+
 - Native wallet detail now preserves immutable ledger semantics: ordinary rows
   open the detail action flow for edit/delete, transfer rows use paired
   transfer actions, adjustment rows are read-only with direction-aware signed

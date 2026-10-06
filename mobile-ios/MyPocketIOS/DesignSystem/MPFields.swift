@@ -26,22 +26,86 @@ struct MPTextField: View {
     }
 }
 
+@MainActor
+private struct MPNumberPadTextField: UIViewRepresentable {
+    @Binding var text: String
+    let placeholder: String
+    let accessibilityLabel: String
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text)
+    }
+
+    func makeUIView(context: Context) -> UITextField {
+        let field = UITextField(frame: .zero)
+        field.borderStyle = .roundedRect
+        field.keyboardType = .numberPad
+        field.placeholder = placeholder
+        field.accessibilityLabel = accessibilityLabel
+        field.text = text
+        field.addTarget(context.coordinator, action: #selector(Coordinator.valueChanged(_:)), for: .editingChanged)
+        field.inputAccessoryView = context.coordinator.makeInputAccessoryView(for: field)
+        return field
+    }
+
+    func updateUIView(_ field: UITextField, context: Context) {
+        if field.text != text {
+            field.text = text
+        }
+        if field.accessibilityLabel != accessibilityLabel {
+            field.accessibilityLabel = accessibilityLabel
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        private var text: Binding<String>
+        private weak var field: UITextField?
+
+        init(text: Binding<String>) {
+            self.text = text
+        }
+
+        @objc func valueChanged(_ sender: UITextField) {
+            text.wrappedValue = sender.text ?? ""
+        }
+
+        func makeInputAccessoryView(for field: UITextField) -> UIToolbar {
+            self.field = field
+            let toolbar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 0, height: 44))
+            toolbar.items = [
+                UIBarButtonItem(systemItem: .flexibleSpace),
+                UIBarButtonItem(title: "Xong", style: .done, target: self, action: #selector(done(_:)))
+            ]
+            toolbar.sizeToFit()
+            return toolbar
+        }
+
+        @objc private func done(_ sender: UIBarButtonItem) {
+            field?.resignFirstResponder()
+        }
+    }
+}
+
 struct MPAmountField: View {
     let title: String
     @Binding var text: String
     var error: String?
 
     var body: some View {
-        MPTextField(title: title, text: $text, placeholder: "0", error: error)
-            .keyboardType(.numberPad)
-            .toolbar {
-                ToolbarItemGroup(placement: .keyboard) {
-                    Spacer()
-                    Button("Xong") {
-                        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
-                    }
-                }
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(MPColor.ink)
+            MPNumberPadTextField(text: $text, placeholder: "0", accessibilityLabel: title)
+                .frame(minHeight: MPMetrics.controlHeight)
+            if let error {
+                Text(error)
+                    .font(.footnote)
+                    .foregroundStyle(MPColor.danger)
+                    .accessibilityLabel("Lỗi: \(error)")
             }
+        }
     }
 }
 

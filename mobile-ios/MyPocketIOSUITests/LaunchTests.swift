@@ -453,6 +453,9 @@ final class LaunchTests: XCTestCase {
         let openingBalance = app.textFields["Số dư ban đầu"]
         XCTAssertTrue(openingBalance.waitForExistence(timeout: 10))
         openingBalance.clearAndType("100000")
+        let openingBalanceDone = app.buttons["Xong"]
+        XCTAssertTrue(openingBalanceDone.waitForExistence(timeout: 5))
+        openingBalanceDone.tap()
         app.buttons["Tạo ví"].tap()
         XCTAssertTrue(app.staticTexts["Fixture UI Wallet"].waitForExistence(timeout: 15))
 

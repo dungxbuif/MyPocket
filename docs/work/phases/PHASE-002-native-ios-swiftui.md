@@ -489,6 +489,14 @@ warnings-as-errors build passes, and the signed More-route sweep passes 1/1 in
 124.144s. The complete API-backed suite remains 14/14 from the preceding gate;
 the targeted route covers this portfolio presentation/input change.
 
+The simulator frame-warning follow-up on 2026-10-06 traced the four mutation
+form warnings to SwiftUI's number-pad keyboard toolbar layout. The shared
+`MPAmountField` now owns a UIKit-backed number field and input accessory,
+retaining the `Xong` action without `.toolbar(placement: .keyboard)`. The
+wallet create/update test explicitly taps `Xong`; all four previously affected
+mutation tests pass 4/4 and the simulator runtime log contains no new invalid
+frame fault.
+
 The follow-up month-summary scope fix on 2026-10-06 now decodes `jar_summary`,
 uses bounded account-local month selection, renders period/status/category/jar
 details, protects dirty notes, and routes to Hũ chi tiêu for the selected

@@ -38,6 +38,14 @@ The native client consumes the existing Go API and never opens PostgreSQL,
 Redis or S3 directly. Feature code is owner-scoped by the JWT issued by the
 backend. Provider secrets remain server-side.
 
+`MPAmountField` remains a project-owned base component. Its number-pad input
+uses a UIKit `UITextField` bridge with a UIKit `inputAccessoryView` for `Xong`
+instead of SwiftUI's `.toolbar(placement: .keyboard)`. The latter emitted
+invalid-frame runtime faults on the iPhone 16 Simulator while XCTest scrolled
+mutation forms; the bridge preserves the binding, accessibility label,
+rounded-border style and keyboard dismissal behavior without entering that
+SwiftUI layout path.
+
 `APIClient` treats an HTTP `204 No Content` response as a successful
 `EmptyResponse` for typed delete/bulk-delete mutations; it never tries to
 decode an empty body as an envelope. This is required by the existing wallet,
