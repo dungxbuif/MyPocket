@@ -237,6 +237,7 @@ extension JSONDecoder {
             let converted = parts.dropFirst().reduce(String(first)) { result, part in
                 switch part.lowercased() {
                 case "id": return result + "ID"
+                case "ids": return result + "IDs"
                 case "url": return result + "URL"
                 case "bps": return result + "BPS"
                 default: return result + part.prefix(1).uppercased() + part.dropFirst()

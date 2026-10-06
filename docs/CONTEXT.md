@@ -115,6 +115,11 @@ coverage pass.
 - 2026-09-22 AI-ENTRY-02 follow-up: one-shot multipart `POST /api/v1/ai/entry/process`, read-only recovery and independent proposal APIs are implemented. Backend stores originals in environment-qualified private S3, OCRs via a short-lived signed URL before LLM, and sends OCR text only. The Stage v1 baseline owns attachment/OCR metadata, approval links and cleanup claims; approval links are atomic and authenticated download checks owner/link. Explicit cleanup command is implemented but not run against bucket contents; browser download UAT remains pending. Do not retry the user's prior PDF automatically.
 - 2026-09-22 LLM resolution: JSON-object mode previously scored 0/15; strict OpenAI-compatible JSON Schema mode now passes 5/5 synthetic cases and 24/24 scored fields. Live S3 PUT/readback 83 ms, OCR 4.034 s, LLM p50 19.769 s/p95 25.655 s, OCR+receipt-case pipeline 29.689 s; transfer-safety passes. Provider calls use the existing standard `net/http` adapter, with no additional SDK. Saved wallet descriptions now enter the bounded, untrusted wallet-matching context (2 KiB each). No transactions were approved or written. Broader model evaluation and owner UAT remain pending. Future multi-provider selection and sourced price transparency are captured in draft [AI-ENTRY-03](work/tickets/AI-ENTRY-03-PROVIDER-SELECTION.md); no additional provider was enabled.
 - Local test servers restarted with latest code: frontend `http://localhost:4173/` returns 200 and backend `http://localhost:8080/api/v1/health` returns 200. Keep them running for owner UAT.
+- 2026-10-06 native simulator regression: wallet detail now fails closed until
+  transaction/category metadata is loaded. A custom decoder bug for plural
+  `wallet_ids` (`walletIDs` Swift property) was fixed and covered by XCTest;
+  the iPhone 16 local API UI suite now passes 17/17, native contracts 67/67,
+  and the default UI suite passes with only its intentional provider/API skips.
 
 - 2026-09-21: owner requested feasibility assessment and a reviewable file for the two AI flows. [DESIGN-09-AI](work/tickets/TICKET-09-DETAIL_DESIGN.md) is `in_review`, approval pending: text/OCR proposals, internal-transfer reconciliation, read-only financial Q&A, prompt/eval contracts and T0–T7 delivery plan. No AI/transfer/jar runtime implemented in this documentation task.
 

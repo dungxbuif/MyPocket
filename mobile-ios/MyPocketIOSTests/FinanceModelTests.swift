@@ -72,6 +72,12 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertTrue(transaction.includedInReports)
     }
 
+    func testCategoryPayloadDecodesPluralIDKey() throws {
+        let data = Data(#"{"id":"category-1","kind":"expense","name":"Ăn uống","icon_key":"fork.knife","is_system":false,"wallet_ids":["wallet-1","wallet-2"]}"#.utf8)
+        let category = try JSONDecoder.mypocket.decode(CategoryModel.self, from: data)
+        XCTAssertEqual(category.walletIDs, ["wallet-1", "wallet-2"])
+    }
+
     func testTransactionInputEncodesBackendSnakeCase() throws {
         let input = TransactionInputModel(walletID: "w-1", categoryID: "c-1", jarID: nil, type: "expense", amount: 1000, occurredAt: "2026-10-05", note: nil, includedInReports: true, travelEventID: nil)
         let data = try JSONEncoder.mypocket.encode(input)

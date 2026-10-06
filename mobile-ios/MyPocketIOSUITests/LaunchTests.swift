@@ -409,8 +409,12 @@ final class LaunchTests: XCTestCase {
         amount.clearAndType("25000")
         app.buttons["Lưu giao dịch"].tap()
 
-        let createdRow = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Khoản chi")).firstMatch
-        XCTAssertTrue(createdRow.waitForExistence(timeout: 15), "Created transaction should be visible in wallet detail.")
+        // Ordinary rows render the persisted category name when metadata is
+        // available; "Khoản chi" is only the uncategorized fallback. Assert
+        // the stable persisted amount instead of coupling the test to a label
+        // that is intentionally category-specific.
+        let createdRow = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] %@", "25.000")).firstMatch
+        XCTAssertTrue(createdRow.waitForExistence(timeout: 15), "Created transaction amount should be visible in wallet detail.")
         createdRow.tap()
         let editTransaction = app.buttons["Sửa giao dịch"]
         XCTAssertTrue(editTransaction.waitForExistence(timeout: 10), "Ordinary wallet rows should open a detail action before editing.")

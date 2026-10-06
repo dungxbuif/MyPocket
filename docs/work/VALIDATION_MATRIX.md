@@ -683,3 +683,38 @@ The Xcode 27 test runner can hang/restart when all API-backed cases are passed
 as one multi-test operation after a prior UI run. The same cases pass in
 isolated invocations with the local fixture; release gating must use the
 isolated command list until the runner issue is resolved upstream.
+
+### Native wallet-detail category-label assertion correction — 2026-10-06
+
+The wallet-detail mutation test must assert the persisted amount/row identity,
+not the fallback label `Khoản chi`. Ordinary rows now render their selected
+category name when category metadata is available (the required-category
+contract), so a fallback-label assertion can report a false failure even when
+the transaction is persisted and visible. The verification will use the
+formatted amount as the stable UI signal, then continue through row → detail →
+edit → save and assert the updated note.
+
+The wallet-detail editor must not be opened until its transaction and category
+metadata load has completed. The add action is therefore gated by a local
+`detailsReady` state; this prevents a fast simulator tap from opening an editor
+with no applicable category and silently leaving the transaction unsaved.
+
+### Native wallet-detail local API regression — 2026-10-06 14:21–14:32 ICT
+
+- Root cause found and fixed: the custom native snake-case decoder converted
+  `wallet_ids` to `walletIds` instead of `walletIDs`, so category metadata failed
+  to decode and the wallet detail entered its error state after a successful
+  transaction create. The decoder now handles plural `ids`, and
+  `FinanceModelTests.testCategoryPayloadDecodesPluralIDKey` locks the contract.
+- PASS: targeted wallet-detail create → row → detail → edit → update UI test,
+  1/1 on the booted iPhone 16 Simulator. The assertion taps the actual row
+  button and verifies the persisted formatted amount before opening the detail
+  action; it does not depend on the uncategorized fallback label.
+- PASS: native unit/contract XCTest, 67/67.
+- PASS: full `LOCAL_API_UI` suite, 17/17 in 287.945s, including wallet,
+  transaction, transfer, credit, Assistant, AI entry, feedback and route
+  coverage; all disposable fixtures were created through the local API flow.
+- PASS: default UI suite, 17 executed with 11 intentional provider/API skips and
+  0 failures; Release simulator build with warnings-as-errors, base-component
+  guard, project verification and `git diff --check` all pass.
+- PASS: local backend health remained 200 throughout the simulator run.

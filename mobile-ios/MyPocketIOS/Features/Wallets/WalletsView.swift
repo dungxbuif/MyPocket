@@ -147,6 +147,7 @@ struct WalletDetailView: View {
     @State private var categories: [CategoryModel] = []
     @State private var statement: CreditStatementModel?
     @State private var loading = false
+    @State private var detailsReady = false
     @State private var error: String?
     @State private var editorPresented = false
     @State private var editTarget: TransactionModel?
@@ -235,7 +236,11 @@ struct WalletDetailView: View {
                             }
                         }
                     }
-                    MPButton("Thêm giao dịch") { editTarget = nil; editorPresented = true }
+                    if detailsReady {
+                        MPButton("Thêm giao dịch") { editTarget = nil; editorPresented = true }
+                    } else if !loading, error == nil {
+                        MPStatusMessage(text: "Chưa tải được danh mục giao dịch.", tone: .danger)
+                    }
                 }
                 if loading { MPLoadingView(label: "Đang tải chi tiết...") }
                 if let error { MPErrorView(title: "Không tải được chi tiết ví", detail: error) { Task { await load() } } }
@@ -395,6 +400,7 @@ struct WalletDetailView: View {
     private func load() async {
         guard !loading else { return }
         loading = true
+        detailsReady = false
         defer { loading = false }
         do {
             async let walletResult = api.wallets()
@@ -404,7 +410,7 @@ struct WalletDetailView: View {
                 async let transactionResult = api.transactions()
                 async let categoryResult = api.categories()
                 transactions = try await transactionResult
-                categories = (try? await categoryResult) ?? []
+                categories = try await categoryResult
             }
             if let refreshedWallets = try? await walletResult {
                 wallets = refreshedWallets
@@ -412,8 +418,10 @@ struct WalletDetailView: View {
                     wallet = refreshed
                 }
             }
+            detailsReady = wallet.type == "credit" || !categories.isEmpty
             error = nil
         } catch {
+            detailsReady = false
             self.error = "Vui lòng thử lại."
         }
     }

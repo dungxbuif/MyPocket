@@ -23,6 +23,13 @@ as active release entries here.
 
 ### Fixed
 
+- Fixed the native wallet-detail create/edit regression. The custom snake-case
+  decoder now maps API `wallet_ids` to Swift `walletIDs`, category metadata no
+  longer drops the detail screen into an error state, and the add action stays
+  disabled until required metadata is ready. The iPhone 16 Simulator proof is
+  green: 67/67 native contracts, 17/17 local API-backed UI tests and 0 failures
+  in the default UI suite (11 intentional skips).
+
 - Transaction category integrity is now enforced across the database, API and
   web/iOS editors. Ordinary income/expense, recurring and credit entries must
   use an applicable visible group; clients prefill the first valid group, while
