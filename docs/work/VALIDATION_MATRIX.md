@@ -567,3 +567,22 @@ unit and Release checks.
 | Native contract | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: 54/54 tests |
 | Release build | `xcodebuild build ... -configuration Release ... SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` | PASS |
 | Simulator route | signed `testAuthenticatedMoreMenuOpensEveryDestination` | PASS: 1/1 in 122.295s |
+
+### Native simulator gate after transaction/AI proposal parity — 2026-10-06 10:08–10:14 ICT
+
+- PASS: native unit/contract XCTest completed 61/61 on the booted iPhone 16
+  Simulator, including transaction hũ/report/time fields and AI proposal
+  hũ/date/report validation.
+- PASS: full `LOCAL_API_UI` API-backed XCTest completed 15/15 in 306.876s;
+  the suite covered wallet create/update, transaction create/update, credit
+  purchase/payment, transfer pair create/delete, Finance Assistant overview,
+  AI proposal review, all More destinations, feedback entry and primary route
+  navigation.
+- PASS: local fixture session and wallet cleanup left no `Fixture*` wallets
+  after teardown; local `/api/v1/health` remained 200.
+- PASS: base-component guard, project verification, `git diff --check`, and
+  Release simulator build with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` all passed.
+- NOT RUN: physical-device, real Google OAuth, provider-backed AI/OCR and
+  authenticated staging/production gates remain external checks. The simulator
+  AI/OCR attachment test intentionally verifies the unavailable-provider state
+  on the disposable local API; it is not evidence of provider availability.

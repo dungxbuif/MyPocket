@@ -538,3 +538,15 @@ The enum-label parity follow-up then routed wallet/category/credit/feedback and
 Assistant status display through `MPSelectionLabels`, with no wire-contract
 change. Native XCTest 57/57, Release warnings-as-errors and guards pass; the
 signed credit-wallet and feedback/more targeted UI checks pass 1/1 each.
+
+The simulator gate was rerun after the transaction-editor and AI-proposal
+parity fixes. Native XCTest completed 61/61. The complete `LOCAL_API_UI`
+API-backed suite completed 15/15 in 306.876 seconds on the booted iPhone 16
+Simulator, including wallet/transaction/credit/transfer mutations, Finance
+Assistant overview, AI proposal review, More destinations, feedback entry and
+primary route navigation. The disposable fixture left no `Fixture*` wallets,
+the local health endpoint remained 200, base/project guards passed, and the
+Release simulator build passed with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`.
+Physical-device, real Google OAuth, provider-backed AI/OCR and authenticated
+staging/production checks remain external release gates; the local AI/OCR test
+intentionally asserts the unavailable-provider state.
