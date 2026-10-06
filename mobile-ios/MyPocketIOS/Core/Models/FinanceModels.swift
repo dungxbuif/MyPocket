@@ -138,6 +138,7 @@ struct BudgetInputModel: Codable, Sendable {
 }
 
 struct MonthCategoryTotalModel: Codable, Sendable {
+    var stableID: String { "\(type):\(categoryID ?? name)" }
     var categoryID: String?
     var name: String
     var type: String
@@ -158,6 +159,7 @@ struct MonthSummaryModel: Codable, Sendable {
     var transactionCount: Int
     var categories: [MonthCategoryTotalModel]
     var note: String
+    var jarSummary: JarMonthSummaryModel?
     var calculatedAt: String
 }
 

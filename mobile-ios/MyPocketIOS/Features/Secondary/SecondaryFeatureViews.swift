@@ -497,9 +497,13 @@ struct JarsView: View {
 struct MonthsView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    let onOpenJars: () -> Void
     @State private var month = MPFormat.currentMonth
     @State private var summary: MonthSummaryModel?
     @State private var note = ""
+    @State private var savedNote = ""
+    @State private var pendingMonth: String?
+    @State private var loading = false
     @State private var error: String?
     @State private var accountTimezone = TimeZone.current.identifier
 
@@ -507,28 +511,107 @@ struct MonthsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Tháng", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
-                MPTextField(title: "Tháng (YYYY-MM)", text: $month)
-                MPButton("Tải tháng") { Task { await load() } }
+                MPOptionSelector(title: "Tháng", options: MPFormat.monthOptions(around: month, timeZone: TimeZone(identifier: accountTimezone) ?? .current).map { MPSelectionOption(id: $0, label: MPFormat.monthLabel($0)) }, selectionID: monthSelection)
+                if loading && summary == nil { MPLoadingView(label: "Đang tải tổng kết...") }
                 if let summary {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) { MPMetricCard(title: "Thu", value: MPFormat.money(summary.income)); MPMetricCard(title: "Chi", value: MPFormat.money(summary.expense)); MPMetricCard(title: "Ròng", value: MPFormat.money(summary.net)); MPMetricCard(title: "Số giao dịch", value: "\(summary.transactionCount)") }
-                    MPTextEditor(title: "Ghi chú tháng", text: $note, placeholder: "Ghi lại điều quan trọng của tháng")
-                    HStack {
-                        MPButton("Lưu ghi chú", style: .secondary) { Task { do { try await api.saveMonthNote(month: month, note: note); self.error = nil } catch { self.error = "Không thể lưu ghi chú." } } }
-                        MPButton("Xóa ghi chú", style: .destructive) { Task { do { try await api.deleteMonthNote(month: month); note = ""; self.error = nil } catch { self.error = "Không thể xóa ghi chú." } } }
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    MPText(MPFormat.monthLabel(summary.month), style: .title)
+                                    MPText(summary.isComplete ? "Đã hoàn tất" : "Đang diễn ra", style: .secondary)
+                                }
+                                Spacer()
+                                MPButton("Hũ tháng", style: .secondary, action: onOpenJars)
+                            }
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                MPMetricCard(title: "Thu", value: MPFormat.money(summary.income))
+                                MPMetricCard(title: "Chi", value: MPFormat.money(summary.expense))
+                                MPMetricCard(title: "Chênh lệch", value: MPFormat.signedMoney(summary.net))
+                                MPMetricCard(title: "Giao dịch", value: "\(summary.transactionCount)")
+                            }
+                            MPText("Kỳ báo cáo: \(MPFormat.shortDate(summary.startAt, timeZone: accountTimezoneValue)) – \(MPFormat.shortDate(summary.nextStartAt, timeZone: accountTimezoneValue))", style: .secondary)
+                        }
                     }
-                    MPAssistantCard(title: "Theo danh mục") { ForEach(summary.categories, id: \.name) { item in MPText("\(item.name): \(MPFormat.money(item.amount))", style: .secondary) } }
-                } else if let error { MPErrorView(title: "Không tải được tháng", detail: error) { Task { await load() } } }
-                else { MPEmptyView(title: "Chưa có dữ liệu", detail: "Chọn một tháng để xem tổng kết.") }
+                    MPAssistantCard(title: "Theo nhóm") {
+                        if summary.categories.isEmpty {
+                            MPEmptyView(title: "Chưa có giao dịch", detail: "Tháng này chưa có dữ liệu.")
+                        } else {
+                            ForEach(summary.categories, id: \.stableID) { item in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        MPText(item.name)
+                                        MPText("\(item.type == "income" ? "Thu" : "Chi") · \(item.count) giao dịch", style: .secondary)
+                                    }
+                                    Spacer()
+                                    MPText(MPFormat.money(item.amount), style: .secondary)
+                                }
+                            }
+                        }
+                    }
+                    MPAssistantCard(title: "Hũ chi tiêu") {
+                        if let jarSummary = summary.jarSummary, !jarSummary.items.isEmpty {
+                            ForEach(jarSummary.items) { item in
+                                let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil)
+                                VStack(alignment: .leading, spacing: 5) {
+                                    HStack { MPText(item.name); Spacer(); MPText(MPFormat.money(item.spent), style: .secondary) }
+                                    if let allocation {
+                                        MPProgressBar(progress: Double(item.spent) / Double(max(1, allocation)), label: "Mức sử dụng hũ")
+                                    }
+                                }
+                            }
+                        } else {
+                            MPEmptyView(title: "Chưa có hũ", detail: "Quản lý hũ cho tháng này nếu cần.")
+                        }
+                    }
+                    MPAssistantCard(title: "Ghi chú của tôi") {
+                        MPTextEditor(title: "Ghi chú tháng", text: $note, placeholder: "Điều bạn muốn ghi nhớ về tháng này")
+                        HStack {
+                            MPButton("Lưu ghi chú", style: .secondary, isDisabled: note == savedNote) { Task { await saveNote() } }
+                            MPButton("Bỏ thay đổi", style: .secondary, isDisabled: note == savedNote) { note = savedNote }
+                            if !savedNote.isEmpty { MPButton("Xóa ghi chú", style: .destructive) { Task { await deleteNote() } } }
+                        }
+                    }
+                } else if let error {
+                    MPErrorView(title: "Không tải được tháng", detail: error) { Task { await load() } }
+                } else if !loading {
+                    MPEmptyView(title: "Chưa có dữ liệu", detail: "Chọn một tháng để xem tổng kết.")
+                }
             }
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
+        .mpConfirmDialog(isPresented: Binding(get: { pendingMonth != nil }, set: { if !$0 { pendingMonth = nil } }), title: "Bỏ ghi chú đang sửa?", message: "Nội dung chưa lưu sẽ bị bỏ khi chuyển tháng.", confirmTitle: "Chuyển tháng") {
+                guard let next = pendingMonth else { return }
+                pendingMonth = nil
+                month = next
+                Task { await load() }
+        }
         .accessibilityIdentifier("months-screen")
     }
 
+    private var accountTimezoneValue: TimeZone { TimeZone(identifier: accountTimezone) ?? .current }
+    private var monthSelection: Binding<String> {
+        Binding(get: { month }, set: { selectMonth($0) })
+    }
+    private var noteIsDirty: Bool { note != savedNote }
+
+    private func selectMonth(_ next: String) {
+        guard next != month else { return }
+        if noteIsDirty {
+            pendingMonth = next
+        } else {
+            month = next
+            Task { await load() }
+        }
+    }
+
     private func load() async {
+        guard !loading else { return }
+        loading = true
+        defer { loading = false }
         do {
             let firstLoad = summary == nil
             if let profile = try? await api.profile() {
@@ -537,8 +620,31 @@ struct MonthsView: View {
             }
             summary = try await api.monthSummary(month: month)
             note = summary?.note ?? ""
+            savedNote = note
             self.error = nil
         } catch { self.error = "Không thể tải tháng." }
+    }
+
+    private func saveNote() async {
+        do {
+            if note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                try await api.deleteMonthNote(month: month)
+                note = ""
+            } else {
+                try await api.saveMonthNote(month: month, note: note)
+            }
+            savedNote = note
+            error = nil
+        } catch { self.error = "Không thể lưu ghi chú." }
+    }
+
+    private func deleteNote() async {
+        do {
+            try await api.deleteMonthNote(month: month)
+            note = ""
+            savedNote = ""
+            error = nil
+        } catch { self.error = "Không thể xóa ghi chú." }
     }
 }
 

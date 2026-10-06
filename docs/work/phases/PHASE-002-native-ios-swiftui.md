@@ -453,6 +453,12 @@ warnings-as-errors build passes, and the signed More-route sweep passes 1/1 in
 124.144s. The complete API-backed suite remains 14/14 from the preceding gate;
 the targeted route covers this portfolio presentation/input change.
 
+The follow-up month-summary scope fix on 2026-10-06 now decodes `jar_summary`,
+uses bounded account-local month selection, renders period/status/category/jar
+details, protects dirty notes, and routes to Hũ chi tiêu for the selected
+month. Native XCTest remains 54/54, the Release warnings-as-errors build
+passes, and the signed More-route sweep passes 1/1 in 122.295s.
+
 The follow-up feedback draft-normalization fix on 2026-10-06 now trims
 title/description and rejects unsupported types before JSON or screenshot
 multipart requests. Native XCTest passes 54/54, the Release warnings-as-errors

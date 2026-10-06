@@ -49,7 +49,7 @@ struct MoreView: View {
     var body: some View {
         Group {
             if let destination {
-                SecondaryScreen(destination: destination, api: api, auth: auth) { self.destination = nil }
+                SecondaryScreen(destination: destination, api: api, auth: auth, onOpenJars: { self.destination = .jars }) { self.destination = nil }
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 16) {
@@ -83,6 +83,7 @@ struct SecondaryScreen: View {
     let destination: MoreDestination
     let api: FinanceAPI
     @ObservedObject var auth: AuthViewModel
+    let onOpenJars: () -> Void
     let onBack: () -> Void
 
     var body: some View {
@@ -91,7 +92,7 @@ struct SecondaryScreen: View {
         case .reports: ReportsView(api: api, onBack: onBack)
         case .categories: CategoriesView(api: api, onBack: onBack)
         case .jars: JarsView(api: api, onBack: onBack)
-        case .months: MonthsView(api: api, onBack: onBack)
+        case .months: MonthsView(api: api, onBack: onBack, onOpenJars: onOpenJars)
         case .recurring: RecurringView(api: api, onBack: onBack)
         case .travel: TravelView(api: api, onBack: onBack)
         case .portfolio: PortfolioView(api: api, onBack: onBack)

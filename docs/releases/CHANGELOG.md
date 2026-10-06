@@ -23,6 +23,10 @@ as active release entries here.
 
 ### Fixed
 
+- Native Tháng summary now decodes jar usage, uses bounded account-local month
+  selection, shows period/status/category/jar details, protects dirty notes,
+  and opens the selected month in Hũ chi tiêu.
+
 - Native feedback submission now trims title/description and rejects
   unsupported feedback types before JSON or screenshot multipart requests.
 

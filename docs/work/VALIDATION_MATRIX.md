@@ -538,3 +538,15 @@ unit and Release checks.
 | Native contract | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: 54/54 tests |
 | Release build | `xcodebuild build ... -configuration Release ... SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` | PASS |
 | Simulator feedback flow | `testAuthenticatedMoreRoutesAndFeedbackEntry` | PASS: 1/1 in 9.821s |
+
+### Native month-summary scope fix — 2026-10-06
+
+| Area | Evidence | Result |
+| --- | --- | --- |
+| Typed payload | `MonthSummaryModel.jarSummary` | PASS: backend `jar_summary` is decoded without losing existing fields |
+| Month selection | shared `MPFormat.monthOptions` and `MPOptionSelector` | PASS: free-form month entry is replaced by bounded account-local options |
+| Summary coverage | `MonthsView` | PASS: status, boundaries, category counts, jar usage and note controls render through base components |
+| Dirty-note safety | `MonthsView` pending-month alert and failed-save retention | PASS: changing month requires confirmation when the note draft is dirty |
+| Native contract | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: 54/54 tests |
+| Release build | `xcodebuild build ... -configuration Release ... SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` | PASS |
+| Simulator route | signed `testAuthenticatedMoreMenuOpensEveryDestination` | PASS: 1/1 in 122.295s |
