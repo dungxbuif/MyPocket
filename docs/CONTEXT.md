@@ -196,6 +196,7 @@ The independent UI-FORMS-03/AI flows still use the base-first contracts: `Catego
 - Monthly reports remain recalculable after month-end. User notes are independent; related context and AI summaries are generated separately and cannot overwrite manual notes.
 - Timestamps use UTC; account timezone drives query boundaries; calendar-only dates/months keep their explicit labels. Only VND is seeded; multi-currency has no designed contract.
 - Travel Mode automatically links eligible new transactions; recurring-generated transactions do not inherit it. Recurring creates ordinary editable transactions with a default note.
+- Native recurring numeric drafts now preserve valid thousands grouping while rejecting malformed characters/separators before create/update; see [NATIVE-RECURRING-NUMERIC-STRICTNESS](work/bugs/NATIVE-RECURRING-NUMERIC-STRICTNESS.md).
 - The following older bullets describe the existing preview/history, not authority over the current product specification.
 - Keep `AGENTS.md` at the repository root for agent discovery.
 - Keep shared state in `docs/CONTEXT.md`.

@@ -23,6 +23,11 @@ as active release entries here.
 
 ### Fixed
 
+- Native recurring numeric drafts now validate thousands grouping strictly:
+  valid values such as `5.000.000` remain supported, while mixed characters,
+  whitespace inside a number and malformed separators are rejected instead of
+  being silently stripped before a schedule write.
+
 - Native iOS simulator stability: replaced the SwiftUI number-pad keyboard
   toolbar in the shared amount field with a UIKit input accessory. This keeps
   the `Xong` dismissal action and removes the invalid-frame runtime fault seen

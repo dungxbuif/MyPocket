@@ -295,6 +295,9 @@ final class FinanceModelTests: XCTestCase {
 
         XCTAssertTrue(RecurringDraftValidator.isValid(name: "Tiền nhà", amount: "5.000.000", interval: "1", type: "expense", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: true, endsAtDate: end))
         XCTAssertEqual(RecurringDraftValidator.positiveInteger("5.000.000"), 5_000_000)
+        XCTAssertNil(RecurringDraftValidator.positiveInteger("1a2"))
+        XCTAssertNil(RecurringDraftValidator.positiveInteger("1 2"))
+        XCTAssertNil(RecurringDraftValidator.positiveInteger("5.00.000"))
         XCTAssertFalse(RecurringDraftValidator.isValid(name: "Tiền nhà", amount: "0", interval: "1", type: "expense", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: false, endsAtDate: nextRun))
         XCTAssertFalse(RecurringDraftValidator.isValid(name: "Tiền nhà", amount: "5.000", interval: "0", type: "expense", frequency: "monthly", nextRunDate: nextRun, endsAtEnabled: false, endsAtDate: nextRun))
     }

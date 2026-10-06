@@ -54,7 +54,7 @@ After the correction the complete UI suite passed 15/15 on the booted iPhone
 | Native ordinary transaction/credit boundary parity | PASS: ordinary and AI proposal editors exclude credit wallets, invalid categories clear when wallet/type changes, and aggregate credit rows do not expose ordinary edit/delete actions |
 | Native budget/adjustment wallet scope parity | PASS: budget categories are expense-only and both budget and adjustment wallet selectors exclude credit wallets |
 | Native ended-budget mutation parity | PASS: ended budgets do not expose the edit/save action, while their history and delete path remain available |
-| Native recurring draft validation parity | PASS: shared validator requires positive amount/interval, supported type/frequency, trimmed name and non-reversed optional end date before create/update; server ownership/category checks remain authoritative |
+| Native recurring draft validation parity | PASS: shared validator requires positive amount/interval, accepts only valid integer/thousands-grouped input (never silently filters malformed characters), supported type/frequency, trimmed name and non-reversed optional end date before create/update; server ownership/category checks remain authoritative |
 | Native portfolio account-date parity | PASS: portfolio loads the account timezone and serializes selected trade dates at account-local noon, preventing UTC/device-day drift |
 | Native wallet month/Travel Mode validation parity | PASS: wallet detail renders `Tháng MM năm YYYY`; Travel Mode trims required names, validates optional `yyyy-MM-dd` dates and rejects reversed ranges before API submission |
 | Native base-component and project guards | PASS: `check-base-components.test.sh`, `verify-project.sh` |

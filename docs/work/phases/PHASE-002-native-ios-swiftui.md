@@ -568,3 +568,11 @@ completed 15/15 in 310.705 seconds on the booted iPhone 16 Simulator; the
 Release warnings-as-errors build and base/project guards passed; local health
 remained 200 and no fixture wallets remained. Physical-device, real OAuth,
 provider-backed AI/OCR and staging/production checks remain external gates.
+
+The recurring numeric strictness follow-up then removed the last silent
+character-filtering path in the native recurring editor. Valid thousands-grouped
+input remains compatible with the existing display contract, while malformed
+characters and separators are rejected before persistence. Native XCTest passes
+62/62 and the signed iPhone 16 `LOCAL_API_UI` suite passes 77/77 with zero
+failures; the Release warnings-as-errors build, guards, no-invalid-frame log
+check and disposable-fixture cleanup also pass.

@@ -16,7 +16,9 @@ integer or reject the draft, never silently change the value.
 - Reject signs, separators, letters, exponent notation, overflow, and other
   malformed characters.
 - Keep explicitly supported formatting behavior (for example recurring-entry
-  display normalization) separate from API-bound validation.
+  display normalization) separate from API-bound validation. The recurring
+  editor accepts a valid dot-grouped value such as `5.000.000`, but validates
+  its grouping and rejects malformed characters instead of filtering them.
 - Preserve existing field-specific constraints such as `> 0`, optional empty
   values, or maximum safe integer limits.
 

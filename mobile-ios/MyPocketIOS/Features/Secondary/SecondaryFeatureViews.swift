@@ -676,8 +676,22 @@ struct MonthsView: View {
 
 enum RecurringDraftValidator {
     static func positiveInteger(_ value: String) -> Int64? {
-        let digits = value.filter(\.isNumber)
-        guard !digits.isEmpty, let parsed = Int64(digits), parsed > 0 else { return nil }
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+
+        let groups = trimmed.split(separator: ".", omittingEmptySubsequences: false)
+        let grouped = groups.count > 1
+        guard groups.allSatisfy({ group in
+            let scalars = group.unicodeScalars
+            guard scalars.allSatisfy({ $0.value >= 48 && $0.value <= 57 }) else { return false }
+            guard !scalars.isEmpty else { return false }
+            if !grouped { return true }
+            if group != groups.first { return scalars.count == 3 }
+            return scalars.count <= 3
+        }) else { return nil }
+
+        let digits = groups.joined()
+        guard let parsed = MPFormat.parsePositiveInteger(digits) else { return nil }
         return parsed
     }
 
