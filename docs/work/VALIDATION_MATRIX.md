@@ -228,6 +228,10 @@ This file maps accepted behavior and work items to proof.
   for `POST /v1/documents`. The safe diagnostic is
   `stage=ocr_submit`, `code=ocr_submit_request`, `provider_status=404`; no
   OCR result, model call, proposal, or ledger write occurred.
+- Independent route probe confirms the domain serves the public capability
+  document at `GET /v1/ocr/capabilities` (HTTP 200) but returns HTTP 404 for
+  both `GET` and `POST /v1/documents`; this indicates a deployment/ingress
+  mismatch rather than an invalid receipt payload or client timeout.
 - The live harness now records only this bounded diagnostic (never keys, URLs,
   receipt text or response bodies), so the deployment/API route mismatch can
   be fixed without weakening error redaction. Historical 2026-09-22 OCR/LLM
