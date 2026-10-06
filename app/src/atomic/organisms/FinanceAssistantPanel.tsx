@@ -6,6 +6,7 @@ import { SurfaceCard } from "../atoms/SurfaceCard";
 import { Text } from "../atoms/Text";
 import { AssistantComposer } from "../molecules/AssistantComposer";
 import { FinanceAssistantPart } from "../molecules/FinanceAssistantPart";
+import { FinanceAssistantMarkdown } from "../molecules/FinanceAssistantMarkdown";
 import { fetchAdvisorCapabilities, fetchAdvisorMessages, fetchAdvisorOverview, mergeAdvisorMessages, submitAdvisorMessage, type AdvisorMessage, type AdvisorOverview } from "../../services/aiAdvisor";
 
 const CONVERSATION_KEY = "mypocket.advisor.conversation";
@@ -99,7 +100,7 @@ export function FinanceAssistantPanel({ ownerID, masked = false }: { ownerID: st
     {overview ? <FinanceAssistantPart type={overview.view_kind} data={{ view: overview.view, source: overview.source }} masked={masked} /> : null}
     {!enabled ? <SurfaceCard tone="muted" padding="md"><Text>Trợ lý chưa được bật hoặc chưa cấu hình nhà cung cấp AI.</Text></SurfaceCard> : null}
     {!messages.length ? <SurfaceCard padding="md" className="space-y-3"><Text weight="semibold">Bạn có thể hỏi</Text><div className="flex flex-wrap gap-2">{suggestions.map(suggestion => <BaseButton key={suggestion} variant="secondary" size="sm" onClick={() => setText(suggestion)}>{suggestion}</BaseButton>)}</div></SurfaceCard> : null}
-    <div className="flex flex-1 flex-col gap-2" aria-live="polite">{messages.map(message => <SurfaceCard key={message.id} padding="sm" tone={message.role === "user" ? "muted" : "default"} className={message.role === "user" ? "ml-8" : "mr-8"}><div className="space-y-2">{message.parts.map((part, index) => part.type === "text" ? <Text key={`${message.id}-text-${index}`} weight={message.role === "assistant" ? "normal" : "semibold"}>{masked ? "Nội dung ẩn khi bật chế độ che số dư." : part.text}</Text> : <FinanceAssistantPart key={`${message.id}-${part.type}-${index}`} type={part.type} data={part.data} masked={masked} />)}</div></SurfaceCard>)}</div>
+    <div className="flex flex-1 flex-col gap-2" aria-live="polite">{messages.map(message => <SurfaceCard key={message.id} padding="sm" tone={message.role === "user" ? "muted" : "default"} className={message.role === "user" ? "ml-8" : "mr-8"}><div className="space-y-2">{message.parts.map((part, index) => part.type === "text" ? (masked ? <Text key={`${message.id}-text-${index}`} weight={message.role === "assistant" ? "normal" : "semibold"}>Nội dung ẩn khi bật chế độ che số dư.</Text> : message.role === "assistant" ? <FinanceAssistantMarkdown key={`${message.id}-text-${index}`} content={part.text ?? ""} /> : <Text key={`${message.id}-text-${index}`} weight="semibold">{part.text}</Text>) : <FinanceAssistantPart key={`${message.id}-${part.type}-${index}`} type={part.type} data={part.data} masked={masked} />)}</div></SurfaceCard>)}</div>
     <AssistantComposer mode="advisor" text={text} files={[]} disabled={!enabled} uploadDisabled loading={sending} canSend={!!text.trim()} hint="Dữ liệu chỉ được đọc; không có thao tác ngân hàng hoặc thanh toán." onTextChange={setText} onFiles={() => undefined} onClearFiles={() => undefined} onSubmit={() => void submit()} />
   </div>;
 }

@@ -16,7 +16,10 @@ The first implementation is a read-only conversation tab. It keeps the conversat
 - History loads from `GET /api/v1/ai/advisor/conversation/messages?conversation_id=...`.
 - V1 is read-only. No confirmation, transaction mutation, bank connection, payment, or arbitrary model URL is exposed.
 - When the AI provider is missing, the screen shows a configuration state instead of fake finance numbers.
+- Assistant text is rendered through the shared `FinanceAssistantMarkdown` molecule: headings, emphasis, lists, inline code and pipe tables become semantic UI; raw Markdown delimiters are not shown as plain text. The renderer accepts text only and never injects model HTML.
 
 ## Navigation
 
 The bottom navigation has six measured slots: overview, transactions, Add, budgets, assistant and account. The Add FAB remains owned by `BaseFab`; the assistant slot is a normal `BaseNavigationItem`.
+
+The markdown contract is covered by `node scripts/ai-advisor-markdown.test.mjs`.

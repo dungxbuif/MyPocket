@@ -528,3 +528,9 @@ as active release entries here.
   while still exercising every destination and back action.
 - Native contracts remain 65/65; all 9 API-backed flows pass as isolated local-
   fixture invocations.
+
+Finance Assistant responses now render through a safe shared Markdown molecule:
+headings, lists, inline emphasis/code and pipe tables are semantic UI instead of
+raw model delimiters. Model HTML is never injected. The advisor history and
+rendering contracts pass via `npm run test:ai-advisor`; design guard, typecheck
+and production build remain green.

@@ -298,6 +298,13 @@ native contracts, 8 default UI smoke tests, and 9 isolated local API-backed UI
 flows. A multi-test `LOCAL_API_UI` xcodebuild operation still triggers an Xcode
 27 runner restart; treat the isolated per-test command list as the current gate.
 
+Production feedback #62e31193 (`AI respone`) was reproduced in the web Finance
+Assistant: assistant text was passed directly to the base `Text` component, so
+Markdown tables and headings were visible as raw characters. The web now uses
+`FinanceAssistantMarkdown` with no HTML injection; the regression contract is
+`npm run test:ai-advisor` and the screen spec records the structured rendering
+behavior.
+
 ## Open Questions
 
 - WORKER-01 month-end semantics: CORE-03 says live/recalculable report and derived completion; the new request names a cron job that closes/generates a report. Decide whether any stored artifact is authoritative or merely rebuildable/cache output. Recurring month-end/catch-up/duplicate prevention/timezone changes also need rules.
