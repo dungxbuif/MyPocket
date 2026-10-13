@@ -30,6 +30,7 @@ type AuthInteractor struct {
 	GoogleOAuth       GoogleOAuthProvider
 	MobileGoogleOAuth MobileGoogleOAuthProvider
 	RefreshTTL        time.Duration
+	Devices           repository.DeviceCredentialRepository
 }
 
 func NewAuthInteractor(
@@ -117,33 +118,62 @@ func (a *AuthInteractor) Refresh(ctx context.Context, rawToken string) (*LoginOu
 	if err != nil || !ok {
 		return nil, ErrInvalidRefreshToken
 	}
-	var record struct {
-		UserID string `json:"user_id"`
-	}
+	var record refreshRecord
 	if json.Unmarshal([]byte(value), &record) != nil || strings.TrimSpace(record.UserID) == "" {
 		return nil, ErrInvalidRefreshToken
+	}
+	if record.FamilyID == "" {
+		record.FamilyID = legacySessionFamily(record.UserID)
+	}
+	if record.FamilyID != "" {
+		if _, revoked, cacheErr := a.CacheRepo.Get(familyRevocationKey(record.FamilyID)); cacheErr != nil || revoked {
+			return nil, ErrInvalidRefreshToken
+		}
 	}
 	user, err := a.UserRepo.FindByID(record.UserID)
 	if err != nil {
 		return nil, ErrInvalidRefreshToken
 	}
-	return a.buildLoginOutput(ctx, user)
+	return a.buildSessionOutput(ctx, user, record.FamilyID)
 }
 
 func (a *AuthInteractor) buildLoginOutput(ctx context.Context, user *entity.User) (*LoginOutput, error) {
+	return a.buildSessionOutput(ctx, user, "")
+}
+
+func (a *AuthInteractor) buildSessionOutput(ctx context.Context, user *entity.User, familyID string) (*LoginOutput, error) {
 	_ = ctx
 	sessionID := uuid.NewString()
+	if familyID == "" {
+		familyID = uuid.NewString()
+	}
 	token, exp, err := a.TokenSvc.Generate(user.ID, user.Email, user.Name, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	key := a.sessionKey(sessionID)
-	if err := a.CacheRepo.Set(key, user.ID, time.Until(exp)); err != nil {
+	record, err := json.Marshal(sessionRecord{UserID: user.ID, FamilyID: familyID, ExpiresAt: exp})
+	if err != nil {
+		return nil, err
+	}
+	if err := a.CacheRepo.Set(key, string(record), time.Until(exp)); err != nil {
 		return nil, fmt.Errorf("set session cache: %w", err)
 	}
-	refreshToken, refreshExp, err := a.issueRefreshToken(user.ID)
+	refreshToken, refreshExp, err := a.issueRefreshToken(user.ID, familyID)
 	if err != nil {
 		return nil, fmt.Errorf("set refresh token: %w", err)
+	}
+	// Issuance may overlap logout after Refresh's initial check. Do not return
+	// credentials minted after its revocation marker. If logout occurs after
+	// this final check, its TTL starts later than these credentials' TTLs.
+	_, revoked, cacheErr := a.CacheRepo.Get(familyRevocationKey(familyID))
+	if cacheErr != nil || revoked {
+		_ = a.CacheRepo.Delete(key)
+		_ = a.CacheRepo.Delete(refreshTokenKey(refreshToken))
+		if cacheErr != nil {
+			return nil, fmt.Errorf("check session revocation: %w", cacheErr)
+		}
+		return nil, ErrInvalidRefreshToken
 	}
 	return &LoginOutput{
 		Token:            token,
@@ -161,7 +191,7 @@ func (a *AuthInteractor) buildLoginOutput(ctx context.Context, user *entity.User
 	}, nil
 }
 
-func (a *AuthInteractor) issueRefreshToken(userID string) (string, time.Time, error) {
+func (a *AuthInteractor) issueRefreshToken(userID, familyID string) (string, time.Time, error) {
 	refreshTTL := a.RefreshTTL
 	if refreshTTL <= 0 {
 		refreshTTL = 30 * 24 * time.Hour
@@ -172,9 +202,7 @@ func (a *AuthInteractor) issueRefreshToken(userID string) (string, time.Time, er
 	}
 	token := "mpr_" + base64.RawURLEncoding.EncodeToString(raw)
 	expiresAt := time.Now().Add(refreshTTL)
-	record, err := json.Marshal(struct {
-		UserID string `json:"user_id"`
-	}{UserID: userID})
+	record, err := json.Marshal(refreshRecord{UserID: userID, FamilyID: familyID})
 	if err != nil {
 		return "", time.Time{}, err
 	}
@@ -298,14 +326,25 @@ func (a *AuthInteractor) sessionKey(sessionID string) string {
 
 func (a *AuthInteractor) VerifySession(ctx context.Context, sessionID string) (string, error) {
 	key := a.sessionKey(sessionID)
-	userID, ok, err := a.CacheRepo.Get(key)
+	value, ok, err := a.CacheRepo.Get(key)
 	if err != nil {
 		return "", err
 	}
-	if !ok || userID == "" {
+	if !ok || value == "" {
 		return "", ErrInvalidCredentials
 	}
-	return userID, nil
+	record, err := decodeSessionRecord(value)
+	if err != nil || record.UserID == "" {
+		return "", ErrInvalidCredentials
+	}
+	if record.FamilyID != "" {
+		if _, revoked, cacheErr := a.CacheRepo.Get(familyRevocationKey(record.FamilyID)); cacheErr != nil {
+			return "", cacheErr
+		} else if revoked {
+			return "", ErrInvalidCredentials
+		}
+	}
+	return record.UserID, nil
 }
 
 func (a *AuthInteractor) IsGoogleAuthReady() bool {

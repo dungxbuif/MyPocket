@@ -910,6 +910,13 @@ definitions:
       source_wallet_id:
         type: string
     type: object
+  httpapi.deviceLoginRequest:
+    properties:
+      id:
+        type: string
+      secret:
+        type: string
+    type: object
   httpapi.feedbackInput:
     properties:
       description:
@@ -1110,6 +1117,24 @@ definitions:
       target_date:
         type: string
       type:
+        type: string
+    type: object
+  usecase.DeviceCredentialOutput:
+    properties:
+      expires_at:
+        type: string
+      id:
+        type: string
+      secret:
+        type: string
+    type: object
+  usecase.DeviceEnrollmentInput:
+    properties:
+      device_id:
+        type: string
+      device_name:
+        type: string
+      password:
         type: string
     type: object
   usecase.HomeOutput:
@@ -1539,6 +1564,90 @@ paths:
       summary: Revoke a current user's API key
       tags:
       - API Keys
+  /api/v1/auth/device-login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Device credential
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.deviceLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      summary: Exchange a remembered device credential for a new access/refresh session
+      tags:
+      - Authentication
+  /api/v1/auth/devices:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Device enrollment
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/usecase.DeviceEnrollmentInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.DeviceCredentialOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Remember a device for biometric sign-in (password confirmation required)
+      tags:
+      - Authentication
+  /api/v1/auth/devices/{id}:
+    delete:
+      parameters:
+      - description: Device credential ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Forget a remembered device owned by the authenticated user
+      tags:
+      - Authentication
   /api/v1/auth/google:
     get:
       parameters:
@@ -1609,6 +1718,30 @@ paths:
               type: string
             type: object
       summary: Complete Google OAuth login
+      tags:
+      - Authentication
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Current refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.refreshRequest'
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Revoke the current access/refresh session family; keep remembered device
+        enrollment
       tags:
       - Authentication
   /api/v1/auth/mobile/google/exchange:

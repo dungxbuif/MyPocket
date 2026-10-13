@@ -632,6 +632,140 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/auth/device-login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Exchange a remembered device credential for a new access/refresh session",
+                "parameters": [
+                    {
+                        "description": "Device credential",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.deviceLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/usecase.LoginOutput"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/devices": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Remember a device for biometric sign-in (password confirmation required)",
+                "parameters": [
+                    {
+                        "description": "Device enrollment",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/usecase.DeviceEnrollmentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/usecase.DeviceCredentialOutput"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/devices/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Forget a remembered device owned by the authenticated user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Device credential ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/google": {
             "get": {
                 "produces": [
@@ -738,6 +872,44 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Revoke the current access/refresh session family; keep remembered device enrollment",
+                "parameters": [
+                    {
+                        "description": "Current refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.refreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
                         }
                     }
                 }
@@ -5166,6 +5338,17 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.deviceLoginRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.feedbackInput": {
             "type": "object",
             "properties": {
@@ -5474,6 +5657,34 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "type": {
+                    "type": "string"
+                }
+            }
+        },
+        "usecase.DeviceCredentialOutput": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                }
+            }
+        },
+        "usecase.DeviceEnrollmentInput": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string"
+                },
+                "device_name": {
+                    "type": "string"
+                },
+                "password": {
                     "type": "string"
                 }
             }

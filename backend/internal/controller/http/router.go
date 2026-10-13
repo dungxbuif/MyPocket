@@ -46,6 +46,7 @@ func NewRouter(authHandler *AuthHandler, profileHandler *ProfileHandler, homeHan
 	registerPublicRoutes(api, authHandler)
 	protected := api.Group(routeRootPath)
 	protected.Use(middleware.RequireAuth)
+	registerDeviceAuthRoutes(protected, authHandler)
 	registerAccountRoutes(protected, profileHandler, homeHandler)
 	registerCategoryRoutes(protected, categoryHandler)
 	registerWalletRoutes(protected, walletHandler)

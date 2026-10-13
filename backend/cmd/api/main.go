@@ -92,6 +92,7 @@ func main() {
 	})
 	authUc := usecase.NewAuthInteractor(userRepo, passwordSvc, jwtSvc, cacheRepo, googleOAuth)
 	authUc.RefreshTTL = cfg.RefreshTTL
+	authUc.Devices = repo.NewDeviceCredentialPostgresRepository(database)
 	authUc.MobileGoogleOAuth = mobileGoogleOAuth
 
 	authHandler := httpapi.NewAuthHandler(
