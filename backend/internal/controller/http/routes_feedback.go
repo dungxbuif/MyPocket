@@ -8,6 +8,7 @@ func (r *Router) RegisterFeedbackRoutes(feedback *FeedbackHandler, changelog *Ch
 	userFeedback := r.Engine.Group("/api/v1/feedback")
 	userFeedback.GET("", r.AuthMiddleware.RequireFeedbackReadAuth, feedback.List)
 	userFeedback.POST("", r.AuthMiddleware.RequireFeedbackWriteAuth, feedback.Create)
+	userFeedback.PATCH("/:id/resolution", r.AuthMiddleware.RequireFeedbackWriteAuth, feedback.SetResolution)
 	userFeedback.GET("/:id", r.AuthMiddleware.RequireFeedbackReadAuth, feedback.Get)
 	userFeedback.GET("/:id/screenshot", r.AuthMiddleware.RequireFeedbackReadAuth, feedback.Screenshot)
 

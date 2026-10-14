@@ -139,6 +139,20 @@ func (s *FeedbackService) Screenshot(ctx context.Context, owner, id string) (str
 	return s.signedScreenshot(ctx, row)
 }
 
+func (s *FeedbackService) SetResolution(ctx context.Context, owner, id string, resolved bool) (*entity.Feedback, error) {
+	row, err := s.Feedback.UpdateResolution(ctx, owner, id, resolved, s.Now().UTC())
+	if err != nil {
+		return nil, err
+	}
+	row.ScreenshotAvailable = row.ScreenshotObjectKey != ""
+	reason := "reopened"
+	if resolved {
+		reason = "resolved"
+	}
+	s.record(ctx, repository.AuditEvent{Action: "feedback.owner_resolution", FeedbackID: row.ID, Reason: reason})
+	return row, nil
+}
+
 func (s *FeedbackService) AgentScreenshot(ctx context.Context, id string) (string, error) {
 	row, err := s.Feedback.FindByID(ctx, id)
 	if err != nil {

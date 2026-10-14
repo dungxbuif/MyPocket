@@ -90,3 +90,32 @@ func (r *FeedbackPostgresRepository) FindByID(ctx context.Context, id string) (*
 	}
 	return &row, err
 }
+
+// UpdateResolution is owner-scoped and independent of the developer lifecycle.
+// Locking preserves the timestamp on retries and serializes concurrent toggles.
+func (r *FeedbackPostgresRepository) UpdateResolution(ctx context.Context, owner, id string, resolved bool, now time.Time) (*entity.Feedback, error) {
+	var row entity.Feedback
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND user_id = ?", id, owner).First(&row).Error; err != nil {
+			if err == gorm.ErrRecordNotFound {
+				return contract.ErrNotFound
+			}
+			return err
+		}
+		if row.Resolved == resolved {
+			return nil
+		}
+		row.Resolved, row.UpdatedAt = resolved, now
+		row.ResolvedAt = nil
+		if resolved {
+			row.ResolvedAt = &now
+		}
+		return tx.Model(&entity.Feedback{}).Where("id = ? AND user_id = ?", id, owner).Updates(map[string]any{
+			"resolved": resolved, "resolved_at": row.ResolvedAt, "updated_at": now,
+		}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}

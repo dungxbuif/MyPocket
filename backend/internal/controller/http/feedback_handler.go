@@ -28,6 +28,47 @@ type feedbackStatusInput struct {
 	Status string `json:"status"`
 }
 
+type feedbackResolutionInput struct {
+	Resolved *bool `json:"resolved" binding:"required"`
+}
+
+// SetFeedbackResolution godoc
+// @Summary Confirm or reopen the authenticated owner's feedback
+// @Description Independent of developer status/changelog. JWT or user API key with feedback:write. Repeating the same value is idempotent. Other owners' IDs return 404.
+// @Tags Feedback
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Feedback ID"
+// @Param resolution body feedbackResolutionInput true "Owner confirmation"
+// @Success 200 {object} entity.Feedback
+// @Failure 400 {object} Problem
+// @Failure 404 {object} Problem
+// @Router /api/v1/feedback/{id}/resolution [patch]
+func (h *FeedbackHandler) SetResolution(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		feedbackUnauthorized(c)
+		return
+	}
+	if h.Service == nil {
+		feedbackFailure(c, errors.New("feedback service unavailable"))
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
+	var input feedbackResolutionInput
+	if c.ShouldBindJSON(&input) != nil || input.Resolved == nil {
+		feedbackBadRequest(c)
+		return
+	}
+	row, err := h.Service.SetResolution(feedbackContext(c, "user"), owner, c.Param("id"), *input.Resolved)
+	if err != nil {
+		feedbackFailure(c, err)
+		return
+	}
+	OK(c, row)
+}
+
 // ListFeedback godoc
 // @Summary List the authenticated user's feedback
 // @Description Accepts a normal JWT/session or a user API key with feedback:read.

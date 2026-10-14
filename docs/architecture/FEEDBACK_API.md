@@ -11,6 +11,21 @@ trace:
 
 # Feedback → Fix → Changelog API
 
+## Owner resolution (2026-10-14)
+
+`PATCH /api/v1/feedback/{id}/resolution` accepts required boolean `resolved`.
+JWT/session or owner-scoped API key `feedback:write`; read-only key403,
+missing/invalid/null boolean400, cross-owner or nonexistent feedback404.
+Response is feedback in the usual envelope. Additive migration32 adds
+`resolved NOT NULL DEFAULT false`, nullable `resolved_at`. True records server
+UTC time; false clears it; same-value retry preserves timestamp. Owner-scoped
+row lock updates only resolution fields/updated_at; dev status/fixed_at,
+changelog, screenshots and description preserved. List/Get/agent list include
+the fields. Agent status/changelog updates do not resolve user feedback.
+Existing best-effort Redis audit emits `feedback.owner_resolution` with reason
+resolved/reopened. UI uses counted tabs/shared checkbox; moves only on success.
+This Markdown serves humans/agents; OpenAPI includes route/response fields.
+
 This reference describes the implemented local API surface. All endpoints are under `/api/v1`. Responses use the shared envelope `{ "data": ..., "meta": ... }`; errors use the existing problem response with `code`, `status`, `detail`, and `request_id`.
 
 ## Authentication boundaries
