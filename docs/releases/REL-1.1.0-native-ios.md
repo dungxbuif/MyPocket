@@ -43,6 +43,10 @@ Fresh release-gate evidence for tag `v1.1.0`:
 - Production: API and worker both converged on
   `registry.dungxbuif.com/mypocket-api:release-1.1.0-20261015-2212@sha256:bef8040e7a372774234fd96d69e690215dd5d823f4520f901fd5cf1638fb37d2`;
   `/api/v1/health` returned `200` and public Swagger reports version `1.1.0`.
+- Owner-device smoke: a Personal Team-signed Release artifact embedding
+  `https://money.dungxbuif.com/api/v1` installed and launched on the connected
+  iPhone as `com.mypocket.ios` version `1.1.0 (2)`. This is a development
+  install only; it does not claim App Store/TestFlight distribution.
 - Data safety: no migration was run as part of this release and no financial
   data was deleted or rewritten.
 
@@ -51,8 +55,9 @@ production UAT.
 
 ## Known gates
 
-- A physical iPhone install requires an Apple development team/account and a
-  provisioning profile for `com.mypocket.ios`.
+- The current physical install uses the owner's Personal Team development
+  profile. Associated Domains are not available to that profile, so universal
+  links remain a separate signing gate.
 - Owner-authenticated production UAT remains required for the advisor jar
   capability and other configuration-dependent provider routes.
 - APNs and provider-configured routes remain environment-dependent.

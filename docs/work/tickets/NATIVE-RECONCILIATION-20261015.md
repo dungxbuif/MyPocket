@@ -4,6 +4,23 @@ Status: in_progress. Owner: “Đối soát và làm hết đi”. This is the c
 cross-ticket index; older checkpoint paragraphs are historical evidence, not
 current completion claims. [Full goal](NATIVE-FULL-COMPLETION-20261014.md).
 
+## Fresh recheck — 2026-10-15 22:44 +0700
+
+The previous unauthenticated production checkpoint is stale. Read-only public
+probes now show `GET /api/v1/sync/capabilities` returning `401 AUTH_REQUIRED`
+(the route is deployed; a valid owner session is required for its payload),
+`GET /docs/` returning `302` to `/api/v1/docs/index.html`, and both the
+versioned Swagger UI and `/api/v1/docs/doc.json` returning `200`. The deployed
+Swagger document reports version `1.1.0`, 77 paths, and includes the sync,
+device-auth, feedback, and advisor cancellation routes. `GET /api/v1/health`
+returns `200`. No authenticated data or production state was changed.
+
+The connected iPhone now has a signed Personal Team Release build installed
+and launched (`com.mypocket.ios`, `1.1.0 (2)`). The Release artifact embeds
+`https://money.dungxbuif.com/api/v1`; the temporary entitlement omission used
+only to satisfy Personal Team signing was reverted in the source tree. Password
+login and physical Face ID enrollment/logout UAT remain owner actions.
+
 ## Before changes
 
 Reconcile internal backlog/tickets/validation with code and actual artifacts;
@@ -25,19 +42,19 @@ Add and AI jar-tool requirements. No production feedback status changed.
 | Dedicated transaction note editor | TransactionsView note sheet; note RED→GREEN2/2 and API note readback in validation | owner UAT only, not missing implementation | correct stale feedback ticket, retain API/current CRUD regression |
 | Remembered-device Face ID | protected device credential flow and local API/UI proof | auth backend already deployed12572c87; physical biometrics UAT pending | owner device acceptance, not auth reimplementation |
 | API-key copy/revoke | actual local account key create/copy/revoke/reopen proof | updated account/full-owner policy not fully rolled out | full-owner rollout + owner UAT |
-| Full-owner API keys | common RequireAuth, no scope gates, realPG/JWT/Redis security tests | old auth-only API image still live | scoped immutable backend release, isolation/security gates |
-| Offline receipts/outbox/engine/foreground | encrypted store, acknowledgements, retry/lease/restart/fault E2E implemented locally | fresh production capability404; public OpenAPI lacks route | deploy matching backend BEFORE another new native install |
+| Full-owner API keys | common RequireAuth, no scope gates, realPG/JWT/Redis security tests | production owner-authenticated write/read UAT still not run | owner-key isolation and write/read UAT |
+| Offline receipts/outbox/engine/foreground | encrypted store, acknowledgements, retry/lease/restart/fault E2E implemented locally | capability route is deployed, but authenticated payload/compatibility UAT is still open | owner-authenticated capability probe, then enable replay |
 | Financial overview/report cache | encrypted owner-scoped snapshot now includes optional server-returned MonthSummary/Insider payloads; Overview and exact-month Reports transient fallback show cached timestamp; invalid-month stale-content bug fixed | PostgreSQL-backed UI fixture and device UAT unavailable; full native unit remains green | real API/UI offline read regression when fixture is available |
 | Savings rejected draft |503same-key/pair/balance/report proofPASS; transfer edit eligibility and the approved fault-injected 422 savings UI flow are green locally | production capability/API rollout and device UAT remain open | keep the local fixture command repeatable; re-run only against the compatible backend candidate before release |
 | Critical business regression | isolated category280/280PASS; final12business+280unit **292/292PASS**,0skip,0 warnings (latest additive dispatcher-context assertion included) | local gate is green; physical/device, prod compatibility and lifecycle gates remain | retain test-only corrections, then continue non-environment product gates |
-| AI numeric/privacy | exact amounts, no invented zero, exact count/JSON, masked fallback;287/287PASS | updated Release pending signing, phone unavailable | signed compatible-backend install + owner UAT |
-| AI cancellation | approved conversation→run recheck, realPG4/4 + Go racePASS | patch not deployed; initial Stop unavailable until synchronousPOST returnsID | backend rollout, initial transport/action design |
+| AI numeric/privacy | exact amounts, no invented zero, exact count/JSON, masked fallback;287/287PASS | signed Release is installed; configured-provider and owner UAT remain open | real-provider probe + owner UAT |
+| AI cancellation | approved conversation→run recheck, realPG4/4 + Go racePASS | deployed route is present; live provider cancellation and initial Stop timing remain unverified | configured-provider UAT and transport/action follow-up |
 | AI confirmed actions/help | wallet, jar create/update and budget create/update proposal parser/history local proof; bounded `get_product_help` retrieval and native/web `product_help` cards are locally verified; persisted proposals now use the owner/generation-bound confirmation dispatcher, reject stale/tampered requests, and replay through the mutation ledger; legacy cards retain fallback | live grounded help/RAG, real-provider proof and compatible backend rollout remain incomplete | deploy matching backend, then real-provider eval and owner UAT |
 | Idle chat expiry |30min access purge, worker cleanup, 410 mapping, idempotent Chat mới reset, in-process cancellation of purged provider runs, and additive history metadata implemented locally | real-DB proof, production rollout and owner UAT open | compatible backend rollout plus expiry/reset E2E and owner UAT |
-| Feedback placement/completeness | bubble/no reserved lane, owner resolve/reopen support, and stale refresh/PATCH snapshot protection are locally verified | production OpenAPI lacks owner-resolution route/migration32; protected-region overlap and new fixed-anchor request open | scoped backend rollout plus reviewed fixed-anchor/UI proof |
+| Feedback placement/completeness | bubble/no reserved lane, owner resolve/reopen support, and stale refresh/PATCH snapshot protection are locally verified | production OpenAPI now includes owner-resolution route; protected-region overlap and fixed-anchor/device UAT remain open | owner-authenticated feedback round-trip and visual proof |
 | Notifications | inbox/read API and native screen exist | no APNs provider/delivery proof; current Personal Team lacks entitlement | supported signing/delivery decision, not inbox-only completion |
-| Public documentation | human/agent Markdown and generated Swagger maintained locally; backend now redirects `/docs` and `/docs/` to `/api/v1/docs/index.html` with a regression test | deployed versioned Swagger UI is reachable at `/api/v1/docs/index.html`, but legacy `/docs/` redirect is still 404; OpenAPI/agent-surface rollout remains unverified | deploy matching redirect and recheck public guide/agent surface without restarting archived web |
-| Release | unsigned Debug/Release device builds compile locally; no final signed install | provisioning profile missing; no final whole-branch review/UAT | compatible backend, strict signing, install/launch, owner acceptance |
+| Public documentation | human/agent Markdown and generated Swagger maintained locally; backend redirects `/docs` and `/docs/` to `/api/v1/docs/index.html` | public UI/doc JSON are live and match 77 local paths; authenticated examples and agent UAT remain open | verify owner/API-key examples against production |
+| Release | signed Personal Team Release build installs and launches on connected iPhone; source remains clean | Face ID/password UAT, dynamic type/landscape and full visual sweep remain owner/device gates | owner acceptance before release publication |
 
 Fresh production read-only evidence: `/api/v1/sync/capabilities`404; downloaded
 public OpenAPI lists device/auth and advisor/feedback/key routes but no sync
