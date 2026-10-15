@@ -1,9 +1,9 @@
 ---
 artifact_type: api_reference
 id: FEEDBACK_API
-status: implemented_local
+status: implemented_with_production_route_owner_uat_open
 owner: shared
-updated: 2026-10-06
+updated: 2026-10-15
 trace:
   design: ../superpowers/specs/2026-09-22-feedback-fix-changelog-design.md
   plan: ../superpowers/plans/2026-09-22-feedback-fix-changelog.md
@@ -30,7 +30,7 @@ This reference describes the implemented local API surface. All endpoints are un
 
 ## Authentication boundaries
 
-User endpoints accept JWT/session or a full-owner user API key (`Authorization: Bearer mpk_...`). No scopes: old metadata does not restrict read/create/resolution/screenshot operations. Owner isolation, key expiry/revocation and domain validation still apply. This policy is implemented locally, production rollout pending.
+User endpoints accept JWT/session or a full-owner user API key (`Authorization: Bearer mpk_...`). No scopes: old metadata does not restrict read/create/resolution/screenshot operations. Owner isolation, key expiry/revocation and domain validation still apply. The current production OpenAPI exposes these routes; owner-authenticated production UAT is still required before closing the rollout gate.
 
 Agent and internal endpoints require the dedicated `FEEDBACK_AGENT_TOKEN` as `Authorization: Bearer <service-token>`. This token is for the local/dev fix agent only. It is not a user API key and has no access to finance endpoints. The server compares the token in constant time and emits redacted Redis audit metadata.
 

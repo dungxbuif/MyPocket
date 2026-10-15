@@ -1,7 +1,8 @@
 # Gửi giao dịch có khóa chống trùng
 
 Trạng thái: server contract đã deploy trong API/worker image
-`ai-jar-capability-20261015-215712`; ứng dụng iPhone chưa bật outbox/sync gửi thật.
+`release-1.1.0-20261015-2212`; ứng dụng iPhone có outbox/sync nhưng vẫn fail-closed
+cho tới khi owner-authenticated capability payload được kiểm chứng.
 Capability phải được đọc bằng phiên owner trước mỗi drain. Nếu server trả 404,
 `enabled:false` hoặc thiếu operation/version/meta thì app phải giữ hàng đợi,
 không gửi tự động. Không giả định server cũ hỗ trợ chỉ vì nó chấp nhận header.
@@ -18,9 +19,9 @@ Cache mất key/hỏng sẽ không tự bị xóa hay ghi đè. Cần phiên đ�
 chưa bổ sung đăng nhập offline khi phải refresh token. Overview và Reports hiện
 cũng đọc được snapshot report server-authoritative khi lỗi mạng tạm thời; Reports
 chỉ dùng snapshot nếu đúng tháng đang chọn và có đủ cả summary/insider, không tự
-tính lại số liệu. Hàng đợi ghi offline đã có contract local nhưng iPhone chưa
-bật sender thật; bản native mới chưa cài và banner offline vẫn chờ kiểm chứng
-UI thực tế.
+tính lại số liệu. Hàng đợi ghi offline đã có contract local và sender được
+đóng gói trong bản native; việc drain thật vẫn chờ owner-authenticated capability
+UAT để tránh gửi vào backend không tương thích.
 
 ## Cách dùng
 
@@ -267,7 +268,7 @@ cho giao dịch gửi muộn.
 | Safety | completed receipt lookup precedes mutable catalog validation; ledger+receipt commit atomically |
 | Legacy | absent header retains unprotected online path, not offline-ready |
 | Auth | JWT + live Redis session OR active full-owner key; both bind authenticated owner |
-| Native store | SQLite schema1, AES-GCM, per-server/account device-only Keychain key; default native create/queue wired locally, not released |
+| Native store | SQLite schema1, AES-GCM, per-server/account device-only Keychain key; default native create/queue wired in the installed Release build, sender remains capability-gated |
 | Local validation | ordinary income/expense requires category identifier at enqueue/replacement; optional jar/trip remain optional; transfer has no ordinary category input; existing ciphertext is not migrated/deleted |
 | Compatibility | validateNewIntent applies only at creation/replacement; leased frozen replay keeps previous validation/key/body and lets server resolve original receipt or business rejection |
 | Lifecycle | default AppRoot owner+scene and NWPathMonitor→coordinator; active+reachable only; one FIFO due/lease timer; inactive/network loss suspends generation without auth-block; logout separately blocks auth |
@@ -277,6 +278,6 @@ cho giao dịch gửi muộn.
 | Recovery proof | local real native UI+API:422/409 changed-only replacement/newkey/date; rejected/committed discard remains local after restart; transfer503/commitdrop one paired write, unchanged monthly report aggregates |
 | Native session | expectedOwnerID local-only; identity before/after request; refresh CAS preserves later login/logout |
 | Travel | transaction.create requires capability explicit_travel_v1 + stored auto_link_travel=false + explicit trip/no-trip and fixed occurred_at; legacy omitted/null hash unchanged |
-| Outstanding | production rollout, full cache/recovery/transfer/session UI verification, physical-device UAT; no full offline availability claim |
+| Outstanding | authenticated capability payload, full cache/recovery/transfer/session UI verification and physical-device UAT; no full offline availability claim until those gates pass |
 
 [API/OpenAPI](../architecture/API.md), [verification](../work/tickets/OFFLINE-CREATE-RECEIPTS-20261014.md).

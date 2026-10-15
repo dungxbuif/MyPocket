@@ -113,7 +113,7 @@ worker also performs bounded `SKIP LOCKED` cleanup for owners who do not return;
 worker downtime can delay physical deletion, while access-time enforcement
 still hides expired content. The local native header now exposes an explicit
 idempotent “Chat mới” reset; history metadata is additive, and the reset/expiry
-routes have not been rolled out to production.
+routes are present in the current production OpenAPI; owner-authenticated production UAT remains open.
 
 All listed routes use the same owner credential authority. Create/list/revoke keys through `/api/v1/api-keys` with JWT or owner key; secret is shown once and only its hash persists. See [full-key guide](../guides/api-keys.md). Advisor auth still audits best-effort to Redis stream `mypocket:audit:advisor` with request/credential ID, route, status, decision and latency; no prompts, notes, tokens or monetary rows. `POST /messages` waits for the bounded provider/tool loop and returns JSON. SSE, lost-POST recovery, conversation clear, fact-bundle drilldown and durable audit delivery remain separate gates.
 
