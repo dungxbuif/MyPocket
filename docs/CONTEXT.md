@@ -22,7 +22,7 @@ shared_fields:
 updated: 2026-10-15
 ---
 
-## Current checkpoint — 2026-10-15 22:10 +0700
+## Current checkpoint — 2026-10-15 22:45 +0700
 
 Latest authoritative state: release tag `v1.1.0` is deployed and
 `mypocket-api` plus `mypocket-worker` both run
@@ -44,11 +44,15 @@ vet pass; the focused native queue/cache/design suite passed 123/123 at
 The savings 422 E2E artifact is present and reports 1/1 passed at
 `/tmp/mypocket-offline-savings-20261015e/Logs/Test/Test-MyPocketIOS-2026.10.15_20-37-31-+0700.xcresult`.
 
-Remaining release gates are unchanged: authenticated production capability and
-AI UAT, synchronous first-request cancellation UX, signed iPhone build and
-visual/device acceptance, APNs, and configuration-dependent Google/Travel/
-Insider/Credit provider paths. These are not inferred as complete from local
-tests or unauthenticated probes.
+The connected iPhone now has a Personal Team-signed Release build installed
+and launched (`com.mypocket.ios`, version `1.1.0 (2)`), with the production API
+base embedded. Password login and physical Face ID enrollment/logout still need
+owner interaction on that device.
+
+Remaining release gates are authenticated production capability and AI UAT,
+synchronous first-request cancellation UX, visual/device acceptance, APNs, and
+configuration-dependent Google/Travel/Insider/Credit provider paths. These are
+not inferred as complete from local tests or unauthenticated probes.
 
 ## Historical checkpoint — 2026-10-15 (superseded)
 
