@@ -22,7 +22,7 @@ shared_fields:
 updated: 2026-10-15
 ---
 
-## Current checkpoint — 2026-10-15 22:45 +0700
+## Current checkpoint — 2026-10-15 22:54 +0700
 
 Latest authoritative state: release tag `v1.1.0` is deployed and
 `mypocket-api` plus `mypocket-worker` both run
@@ -55,6 +55,12 @@ Remaining release gates are authenticated production capability and AI UAT,
 synchronous first-request cancellation UX, visual/device acceptance, APNs, and
 configuration-dependent Google/Travel/Insider/Credit provider paths. These are
 not inferred as complete from local tests or unauthenticated probes.
+
+The deployed-state reconciliation also updated the AI advisor, Feedback API and
+offline-sync public references: production route presence is documented, while
+owner-authenticated payload/UAT remains explicitly open. Backend tests were
+re-run at 295/295 with `go vet` clean; the installed Release app was relaunched
+on the connected iPhone after verification.
 
 ## Historical checkpoint — 2026-10-15 (superseded)
 
