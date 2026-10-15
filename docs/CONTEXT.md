@@ -41,6 +41,8 @@ must render a confirmation card; direct writes still require owner confirmation.
 Feedback remains open pending owner-authenticated UAT. Backend full tests and
 vet pass; the focused native queue/cache/design suite passed 123/123 at
 `/tmp/mypocket-goal-contracts-20261015/Logs/Test/Test-MyPocketIOS-2026.10.15_22-01-14-+0700.xcresult`.
+The current native unit target then passed 304/304 with zero skips, failures,
+or runtime warnings at `/tmp/mypocket-unit-current-20261015.xcresult`.
 The savings 422 E2E artifact is present and reports 1/1 passed at
 `/tmp/mypocket-offline-savings-20261015e/Logs/Test/Test-MyPocketIOS-2026.10.15_20-37-31-+0700.xcresult`.
 
