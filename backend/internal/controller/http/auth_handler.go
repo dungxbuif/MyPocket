@@ -122,6 +122,7 @@ func (h *AuthHandler) Refresh(c *gin.Context) {
 // @Failure 400 {object} map[string]string
 // @Failure 401 {object} map[string]string
 // @Failure 501 {object} map[string]string
+// @Failure 503 {object} Problem
 // @Router /api/v1/auth/mobile/google/exchange [post]
 func (h *AuthHandler) MobileGoogleExchange(c *gin.Context) {
 	var req mobileGoogleExchangeRequest
@@ -138,6 +139,10 @@ func (h *AuthHandler) MobileGoogleExchange(c *gin.Context) {
 			DisplayName:   googleAuthFixtureName,
 		})
 		if err != nil {
+			if errors.Is(err, usecase.ErrGoogleUserStore) {
+				Fail(c, http.StatusServiceUnavailable, Problem{Code: problemCodeGoogleUserStoreUnavailable, Title: problemTitleInternalServer, Detail: "dịch vụ lưu tài khoản Google tạm thời không khả dụng"})
+				return
+			}
 			FailError(c, http.StatusUnauthorized, problemCodeGoogleMobileInvalid, problemTitleUnauthorized, err)
 			return
 		}
@@ -151,6 +156,10 @@ func (h *AuthHandler) MobileGoogleExchange(c *gin.Context) {
 	}
 	out, err := h.Auth.LoginWithMobileGoogleCode(c.Request.Context(), req.Code, req.CodeVerifier, req.RedirectURI)
 	if err != nil {
+		if errors.Is(err, usecase.ErrGoogleUserStore) {
+			Fail(c, http.StatusServiceUnavailable, Problem{Code: problemCodeGoogleUserStoreUnavailable, Title: problemTitleInternalServer, Detail: "dịch vụ lưu tài khoản Google tạm thời không khả dụng"})
+			return
+		}
 		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeGoogleMobileInvalid, Title: problemTitleUnauthorized, Detail: httpStatusMessageGoogleProfileInvalid})
 		return
 	}

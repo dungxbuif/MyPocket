@@ -4,7 +4,7 @@ id: PHASE-002-native-ios-swiftui
 status: in_progress
 owner: shared
 created: 2026-10-05
-updated: 2026-10-06
+updated: 2026-10-08
 trace:
   backlog: ../BACKLOG.md
   roadmap: ../ROADMAP.md
@@ -127,9 +127,13 @@ note text and submit account-local date/time as RFC3339 instants; date-only
 strings are not a valid backend schedule input.
 
 Credit entry/payment forms must preserve the web contract: an entry chooses its
-kind and an applicable category, while a payment chooses a non-credit source
-wallet; both actions accept amount and optional note. The native screen must not
-silently drop category or note fields when calling the credit APIs.
+kind and an applicable category through the shared searchable category tree,
+while a payment chooses a non-credit source wallet; both actions accept amount
+and optional note. Switching between the credit form and category picker must
+preserve the entry draft. The native screen must not silently drop category or
+note fields when calling the credit APIs. Existing backend category hierarchy,
+kind and wallet-scope validation remains authoritative; no API update was
+needed for this parity slice.
 
 Recurring schedule parity also follows the web constraints: credit wallets are
 not valid recurring sources, category options are filtered to the selected
@@ -329,6 +333,28 @@ Two audit findings were fixed before the simulator test pass:
   shape/range validation instead of leaking interpolation source text.
 - Travel Mode drafts now trim required text and reject malformed or reversed
   optional calendar ranges before an API request.
+
+## Category editor route and applicable-wallet wire contract — 2026-10-08
+
+Native category create/edit now matches the dedicated web/Stitch editor route,
+with visible `MPWalletApplicabilityCard` and shared `MPCheckboxRow` controls.
+The API-backed iPhone 16 CRUD flow exposed an acronym-encoding defect:
+`walletIDs` was serialized as `wallet_i_ds`, which Go ignored while returning a
+successful category create. The request model now explicitly emits
+`wallet_ids`, and a wire-level XCTest guards the exact JSON key. Category plus
+wallet links are persisted in one owner-validating backend transaction. No
+endpoint, schema or migration changed. Focused proof is recorded in
+`docs/work/VALIDATION_MATRIX.md`; inactive-category behavior and overall visual
+acceptance remain open.
+
+The follow-up Stitch/web comparison also aligns the management list: kind
+selector precedes “Nhóm mới”, category rows navigate as a whole to the editor,
+delete stays in that editor, and row subtitles reflect existing wallet scope.
+The shared native tree and button bases own these changes. API-backed iPhone
+UI passes 1/1 with screenshot attachments; the native unit/contract suite is
+138/138. No backend change was needed because `/categories` already returns
+`wallet_ids`. The floating feedback bubble overlaps one row in the long-list
+capture; this remains visible UAT work, not a data/API defect.
 
 Verification on the same simulator:
 
@@ -712,3 +738,28 @@ Apple Development identity but invalid stored account credentials and no
 provisioning profile for `com.mypocket.ios`. Automatic provisioning is also
 unable to proceed without a valid Xcode account. The native branch keeps the
 simulator gate authoritative until those external credentials are repaired.
+
+## Native notification inbox interaction proof — 2026-10-08
+
+The seeded inbox gap is now covered without adding a production notification
+create endpoint. `testAPIBackedNotificationCanBeMarkedRead` verifies the
+synthetic unread row appears, the stable row action can be tapped, and a fresh
+owner-scoped API read returns the persisted `read_at` value. The test API ran
+temporarily on loopback port 8081 against `mypocket_stage_v1` and Redis DB 15;
+the exact synthetic notification row was removed and the temporary process
+stopped after the run. The already-running port 8080 API uses the local default
+`postgres` database and must not be used for this stage fixture.
+
+The focused UI result is 1/1 at
+`/tmp/mypocket-notification-green3.xcresult`; native unit/contract tests pass
+127/127 at `/tmp/mypocket-notification-unit.xcresult`. Project/base guards,
+web design contracts (12/12), TypeScript and Vite build pass. The configured
+DeepSeek-V4-Flash synthetic text extraction and OpenAI-compatible tool-call
+probe also pass (2/2); the wire probe does not execute or persist its tool.
+Provider-backed Advisor stage send/history also completes, persists the user
+and assistant messages, stores usage metadata (`prompt_tokens`,
+`completion_tokens`, `total_tokens`, `provider_calls`), and is fully cleaned up.
+Live OCR/PDF could not be run because local `OCR_API_KEY` and S3 credentials
+are absent. API/public docs
+and changelog remain unchanged because no product contract or user-visible
+behavior changed. Authenticated visual/device acceptance remains open.

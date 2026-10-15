@@ -7,6 +7,7 @@ Route `/`; implements the non-AI part of [CORE-03](../../../work/tickets/CORE-03
 | Region | Base | Behavior |
 | --- | --- | --- |
 | Current month summary | `SurfaceCard`, `SectionTitle`, `Text`, `BaseButton`, `StatusMessage` | Shows the account-local month, included income/expense totals, completion label, and the user's saved note when non-empty. It is a navigation summary, not an AI narrative or frozen close record. |
+| Week/month report card | `OverviewReportCard`, `SegmentedControl`, `BaseBarChart` | The weekly view uses the account-local Monday–Sunday week and sums only report-included income/expense transactions. Transfers, balance adjustments, excluded rows, invalid timestamps, and rows outside the week do not contribute. The monthly view continues to use the server month summary. |
 | Jar shortcut | `BaseButton` inside the month card | Opens `/jars` for the same account-local month. |
 | Wallets and recent transactions | Existing `SurfaceCard`, `SectionTitle`, `WalletCard`, `TransactionItem`, `StatusMessage` | Preserve the live API behavior and existing borderless empty states. Recent transaction metadata includes the account-local date and time before wallet/note context. |
 
@@ -17,6 +18,7 @@ The screen composes only existing bases. `className` values may position content
 | Event | Effect |
 | --- | --- |
 | Enter overview | Read the month label using the saved account timezone, then load `GET /api/v1/months/{YYYY-MM}` alongside existing overview data. |
+| Select weekly report | Derive the current Monday–Sunday date range from the saved account timezone; apply the same report-inclusion and income/expense-only rules on web and iOS. |
 | Activate month summary | Navigate to `/months/{YYYY-MM}`. |
 | Activate jar shortcut | Navigate to `/jars?month={YYYY-MM}`. |
 | Ledger refresh | Reload live totals and recent rows; the backend recalculates from persisted transactions. |
@@ -29,7 +31,7 @@ The screen composes only existing bases. `className` values may position content
 - Empty: real zero totals are allowed only after a successful API response; wallet and transaction empty states retain their current plain variant.
 - Error: retry the month API independently from wallet/transaction data.
 - Privacy mask: hides all currency values, including month totals.
-- The month label and `is_complete` are server-derived; clients do not close months or calculate totals independently.
+- The month label and `is_complete` are server-derived; clients do not close months or recalculate monthly totals independently. Weekly card totals are derived from the transaction feed under the rule above.
 
 ## Copy and source of truth
 
@@ -45,4 +47,4 @@ API: `GET /api/v1/months/{YYYY-MM}`. No AI text, fixture data, or manual close a
 
 Implementation update: the month card is connected to the authenticated month API, formats the current month using the saved account timezone, masks currency with the privacy toggle, retries report errors independently, and links to month detail/Hũ. No fixture totals are rendered.
 
-Automated proof: `npm run check:design`, `npm run test:design`, and `npm run build` pass. `npm run test:calendar` covers account-local month selection. Runtime proof must still verify totals after a persisted transaction change and note independence. Owner browser UAT is pending; AI narrative and other report modules are outside this screen.
+Automated proof: `npm run check:design`, `npm run test:design`, and `npm run build` pass. `npm run test:calendar` covers account-local month selection. Weekly report totals are additionally covered by deterministic web and native tests for timezone boundaries and excluded transaction kinds. Runtime proof must still verify totals after a persisted transaction change and note independence. Owner browser UAT is pending; AI narrative and other report modules are outside this screen.

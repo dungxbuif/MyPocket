@@ -65,12 +65,9 @@ func TestUserAPIKeyCreateReturnsSecretButStoresOnlyDigest(t *testing.T) {
 	if created.Secret == "" || repo.created == nil || repo.created.SecretHash == created.Secret || repo.created.SecretHash == "" {
 		t.Fatal("secret must be returned once and stored only as a digest")
 	}
-	if !repo.created.HasScope(entity.APIKeyScopeFinanceRead) || !repo.created.HasScope(entity.APIKeyScopeAdvisorRead) {
-		t.Fatalf("advisor chat key missing implied read scopes: %v", repo.created.Scopes)
-	}
 }
 
-func TestUserAPIKeyAuthenticateChecksOwnerIndependentScopesAndRevocation(t *testing.T) {
+func TestUserAPIKeyAuthenticateIgnoresLegacyScopesButKeepsOwnerAndRevocation(t *testing.T) {
 	repo := &apiKeyRepoStub{}
 	service := NewUserAPIKeyService(repo)
 	service.Now = func() time.Time { return time.Date(2026, 9, 22, 8, 0, 0, 0, time.UTC) }
@@ -82,8 +79,8 @@ func TestUserAPIKeyAuthenticateChecksOwnerIndependentScopesAndRevocation(t *test
 	if err != nil || principal.OwnerID != "owner-1" || principal.CredentialKind != "user_api_key" || !repo.touched {
 		t.Fatalf("unexpected principal: %+v err=%v touched=%t", principal, err, repo.touched)
 	}
-	if _, err := service.Authenticate(context.Background(), created.Secret, []string{entity.APIKeyScopeAdvisorChat}); !errors.Is(err, ErrAPIKeyScopeDenied) {
-		t.Fatalf("missing scope must be denied, got %v", err)
+	if full, err := service.Authenticate(context.Background(), created.Secret, []string{entity.APIKeyScopeAdvisorChat}); err != nil || full.OwnerID != "owner-1" {
+		t.Fatalf("legacy read key must have full same-owner access, got %v", err)
 	}
 	if err := service.Revoke(context.Background(), "other-owner", repo.key.ID); err == nil {
 		t.Fatal("cross-owner revoke must fail")
@@ -93,6 +90,20 @@ func TestUserAPIKeyAuthenticateChecksOwnerIndependentScopesAndRevocation(t *test
 	}
 	if _, err := service.Authenticate(context.Background(), created.Secret, []string{entity.APIKeyScopeFinanceRead}); err == nil {
 		t.Fatal("revoked key must not authenticate")
+	}
+}
+
+func TestUserAPIKeyCreateNeedsNoScopesAndIgnoresObsoleteInput(t *testing.T) {
+	for _, scopes := range [][]string{nil, {}, {"obsolete_unknown_scope"}} {
+		service := NewUserAPIKeyService(&apiKeyRepoStub{})
+		created, err := service.Create(context.Background(), APIKeyCreateInput{OwnerID: "owner-1", Name: "Full access", Scopes: scopes})
+		if err != nil {
+			t.Fatalf("scope-free key creation failed:%v", err)
+		}
+		principal, err := service.Authenticate(context.Background(), created.Secret, []string{"any-old-required-scope"})
+		if err != nil || principal.OwnerID != "owner-1" {
+			t.Fatal("valid key did not authenticate its own account")
+		}
 	}
 }
 

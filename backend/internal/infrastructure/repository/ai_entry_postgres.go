@@ -276,7 +276,7 @@ func (r *AIEntryPostgresRepository) DecideProposal(ctx context.Context, owner, i
 			var category *entity.Category
 			if p.Draft.CategoryID != nil && *p.Draft.CategoryID != "" {
 				category = &entity.Category{}
-				if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ? AND (owner_id = ? OR is_system = true)", *p.Draft.CategoryID, owner).First(category).Error; err != nil {
+				if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ? AND (owner_id = ? OR is_system = true) AND is_active = true", *p.Draft.CategoryID, owner).First(category).Error; err != nil {
 					return fmt.Errorf("%w: nhóm không còn hợp lệ", port.ErrAIInvalid)
 				}
 				if err := tx.Model(&entity.CategoryWallet{}).Joins("JOIN wallets ON wallets.id = category_wallets.wallet_id").Where("category_id = ? AND wallets.owner_id = ?", category.ID, owner).Pluck("wallet_id", &category.WalletIDs).Error; err != nil {

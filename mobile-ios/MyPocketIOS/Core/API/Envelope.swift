@@ -30,7 +30,9 @@ enum JSONValue: Decodable, Sendable {
     var prettyDescription: String {
         switch self {
         case .string(let value): return value
-        case .number(let value): return value.rounded() == value ? String(Int(value)) : String(value)
+        case .number(let value):
+            if let exact = Int(exactly: value) { return String(exact) }
+            return String(value)
         case .bool(let value): return value ? "Có" : "Không"
         case .null: return "—"
         case .array(let values): return values.map(\.prettyDescription).joined(separator: ", ")
@@ -43,6 +45,8 @@ struct APIEnvelope<Payload: Decodable>: Decodable {
     let data: Payload
     let meta: JSONValue?
 }
+
+extension APIEnvelope: Sendable where Payload: Sendable {}
 
 enum HTTPMethod: String, Sendable {
     case get = "GET"
@@ -64,18 +68,21 @@ struct APIRequest<Response: Decodable & Sendable>: Sendable {
     let body: Data?
     let auth: APIAuth
     let idempotencyKey: String?
+    let expectedOwnerID: String?
 
     init(
         path: String,
         method: HTTPMethod = .get,
         body: Data? = nil,
         auth: APIAuth = .session,
-        idempotencyKey: String? = nil
+        idempotencyKey: String? = nil,
+        expectedOwnerID: String? = nil
     ) {
         self.path = path
         self.method = method
         self.body = body
         self.auth = auth
         self.idempotencyKey = idempotencyKey
+        self.expectedOwnerID = expectedOwnerID
     }
 }

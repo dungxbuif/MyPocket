@@ -8,14 +8,33 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mypocket/backend/internal/entity"
+	walletrepo "github.com/mypocket/backend/internal/repository"
 )
 
 type walletRepositoryStub struct {
-	created *entity.Wallet
-	deleted string
-	updates map[string]any
-	found   *entity.Wallet
+	created          *entity.Wallet
+	deleted          string
+	updates          map[string]any
+	found            *entity.Wallet
+	idempotencyKey   string
+	idempotencyCalls int
+	idempotencyErr   error
 }
+
+// walletRepositoryWithoutMutation models a legacy adapter that cannot safely
+// honor a caller-supplied idempotency key. The handler must fail closed rather
+// than silently downgrade the write to a non-idempotent create.
+type walletRepositoryWithoutMutation struct{}
+
+func (walletRepositoryWithoutMutation) List(string) ([]entity.Wallet, error) { return nil, nil }
+func (walletRepositoryWithoutMutation) Find(_, id string) (*entity.Wallet, error) {
+	return &entity.Wallet{ID: id, Type: entity.WalletTypeBasic}, nil
+}
+func (walletRepositoryWithoutMutation) Create(*entity.Wallet) error { return nil }
+func (walletRepositoryWithoutMutation) Update(_, id string, _ map[string]any) (*entity.Wallet, error) {
+	return &entity.Wallet{ID: id}, nil
+}
+func (walletRepositoryWithoutMutation) Delete(_, _ string) error { return nil }
 
 func (s *walletRepositoryStub) List(ownerID string) ([]entity.Wallet, error) { return nil, nil }
 func (s *walletRepositoryStub) Find(ownerID, id string) (*entity.Wallet, error) {
@@ -30,6 +49,15 @@ func (s *walletRepositoryStub) Update(ownerID, id string, updates map[string]any
 	return &entity.Wallet{ID: id, OwnerID: ownerID}, nil
 }
 func (s *walletRepositoryStub) Delete(ownerID, id string) error { s.deleted = id; return nil }
+func (s *walletRepositoryStub) CreateIdempotent(wallet *entity.Wallet, key, requestHash string) (*entity.Wallet, bool, error) {
+	s.idempotencyCalls++
+	s.idempotencyKey = key
+	if s.idempotencyErr != nil {
+		return nil, false, s.idempotencyErr
+	}
+	s.created = wallet
+	return wallet, false, nil
+}
 
 func walletTestRouter(handler *WalletHandler) *gin.Engine {
 	gin.SetMode(gin.TestMode)
@@ -87,6 +115,69 @@ func TestCreateWalletScopesOwnerAndSeedsVND(t *testing.T) {
 	}
 	if stub.created == nil || stub.created.OwnerID != "owner-1" || stub.created.Currency != entity.WalletCurrencyVND {
 		t.Fatalf("unexpected wallet: %#v", stub.created)
+	}
+}
+
+func TestCreateWalletWithIdempotencyKeyUsesDurableMutationAdapter(t *testing.T) {
+	stub := &walletRepositoryStub{}
+	router := walletTestRouter(NewWalletHandler(stub))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Tiền mặt","type":"basic","opening_balance":250000}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "wallet-confirm-1")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || stub.idempotencyCalls != 1 || stub.idempotencyKey != "wallet-confirm-1" {
+		t.Fatalf("status=%d calls=%d key=%q body=%s", response.Code, stub.idempotencyCalls, stub.idempotencyKey, response.Body.String())
+	}
+}
+
+func TestCreateWalletWithIdempotencyKeyFailsClosedWithoutDurableAdapter(t *testing.T) {
+	router := walletTestRouter(NewWalletHandler(walletRepositoryWithoutMutation{}))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Tiền mặt","type":"basic"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "wallet-confirm-legacy")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCreateWalletRejectsNonASCIIIdempotencyKey(t *testing.T) {
+	router := walletTestRouter(NewWalletHandler(&walletRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Tiền mặt","type":"basic"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "khóa-wallet")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCreateWalletRejectsMultipleIdempotencyKeys(t *testing.T) {
+	router := walletTestRouter(NewWalletHandler(&walletRepositoryStub{}))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Tiền mặt","type":"basic"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Add("Idempotency-Key", "wallet-one")
+	request.Header.Add("Idempotency-Key", "wallet-two")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
+	}
+}
+
+func TestCreateWalletMapsIdempotencyConflict(t *testing.T) {
+	stub := &walletRepositoryStub{idempotencyErr: walletrepo.ErrMutationConflict}
+	router := walletTestRouter(NewWalletHandler(stub))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Tiền mặt","type":"basic"}`))
+	request.Header.Set("Content-Type", "application/json")
+	request.Header.Set("Idempotency-Key", "wallet-confirm-1")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusConflict {
+		t.Fatalf("status=%d body=%s", response.Code, response.Body.String())
 	}
 }
 

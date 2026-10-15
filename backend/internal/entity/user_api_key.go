@@ -2,10 +2,14 @@ package entity
 
 import (
 	"errors"
-	"strings"
 	"time"
 )
 
+// Repository input validation, unrelated to removed per-operation scopes.
+var ErrAPIKeyInvalid = errors.New("api key is invalid")
+
+// Deprecated metadata labels, retained only for existing stored records/clients.
+// None of these values grants or restricts authenticated user operations.
 const (
 	APIKeyScopeFinanceRead   = "finance:read"
 	APIKeyScopeAdvisorRead   = "advisor:read"
@@ -13,8 +17,6 @@ const (
 	APIKeyScopeFeedbackRead  = "feedback:read"
 	APIKeyScopeFeedbackWrite = "feedback:write"
 )
-
-var ErrAPIKeyInvalid = errors.New("api key is invalid")
 
 type UserAPIKey struct {
 	ID         string     `json:"id" gorm:"primaryKey"`
@@ -32,58 +34,9 @@ type UserAPIKey struct {
 
 func (UserAPIKey) TableName() string { return "user_api_keys" }
 
-func NormalizeAPIKeyScopes(scopes []string) ([]string, error) {
-	seen := make(map[string]struct{}, len(scopes)+2)
-	result := make([]string, 0, len(scopes)+2)
-	for _, scope := range scopes {
-		scope = strings.TrimSpace(scope)
-		if scope == "" {
-			continue
-		}
-		switch scope {
-		case APIKeyScopeFinanceRead, APIKeyScopeAdvisorRead, APIKeyScopeAdvisorChat, APIKeyScopeFeedbackRead, APIKeyScopeFeedbackWrite:
-		default:
-			return nil, ErrAPIKeyInvalid
-		}
-		if _, ok := seen[scope]; ok {
-			continue
-		}
-		seen[scope] = struct{}{}
-		result = append(result, scope)
-	}
-	if containsScope(result, APIKeyScopeAdvisorChat) {
-		if _, ok := seen[APIKeyScopeAdvisorRead]; !ok {
-			result = append(result, APIKeyScopeAdvisorRead)
-		}
-		if _, ok := seen[APIKeyScopeFinanceRead]; !ok {
-			result = append(result, APIKeyScopeFinanceRead)
-		}
-	}
-	if containsScope(result, APIKeyScopeFeedbackWrite) {
-		if _, ok := seen[APIKeyScopeFeedbackRead]; !ok {
-			result = append(result, APIKeyScopeFeedbackRead)
-		}
-	}
-	if len(result) == 0 {
-		return nil, ErrAPIKeyInvalid
-	}
-	return result, nil
-}
-
-func (k UserAPIKey) HasScope(scope string) bool { return containsScope(k.Scopes, scope) }
-
 func (k UserAPIKey) ActiveAt(now time.Time) bool {
 	if k.RevokedAt != nil && !k.RevokedAt.After(now) {
 		return false
 	}
 	return k.ExpiresAt == nil || k.ExpiresAt.After(now)
-}
-
-func containsScope(scopes []string, wanted string) bool {
-	for _, scope := range scopes {
-		if scope == wanted {
-			return true
-		}
-	}
-	return false
 }

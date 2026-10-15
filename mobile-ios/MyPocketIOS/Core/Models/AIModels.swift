@@ -50,6 +50,31 @@ struct AdvisorMessageModel: Decodable, Identifiable, Sendable {
     var createdAt: String
 }
 
+struct AdvisorHistoryMetaModel: Sendable, Equatable {
+    var conversationID: String
+    var generation: Int64
+    var lastUserMessageAt: String?
+    var expiresAt: String?
+    var serverTime: String
+
+    init?(json: JSONValue?) {
+        guard case .object(let object) = json,
+              case .string(let conversationID) = object["conversation_id"], !conversationID.isEmpty,
+              case .number(let generation) = object["generation"], let exactGeneration = Int64(exactly: generation),
+              case .string(let serverTime) = object["server_time"], !serverTime.isEmpty else { return nil }
+        self.conversationID = conversationID
+        self.generation = exactGeneration
+        if case .string(let value) = object["last_user_message_at"] { self.lastUserMessageAt = value } else { self.lastUserMessageAt = nil }
+        if case .string(let value) = object["expires_at"] { self.expiresAt = value } else { self.expiresAt = nil }
+        self.serverTime = serverTime
+    }
+}
+
+struct AdvisorHistoryPageModel: Sendable {
+    var messages: [AdvisorMessageModel]
+    var meta: AdvisorHistoryMetaModel?
+}
+
 struct AdvisorCapabilitiesModel: Codable, Sendable {
     var enabled: Bool
     var write: Bool
@@ -69,6 +94,13 @@ struct AdvisorSubmitModel: Codable, Sendable {
     var conversationID: String
     var text: String
     var status: String
+}
+
+struct AdvisorResetModel: Codable, Sendable {
+    var conversationID: String
+    var generation: Int64
+    var serverTime: String
+    var replayed: Bool
 }
 
 struct AdvisorRunModel: Codable, Sendable {

@@ -1,84 +1,152 @@
 import SwiftUI
 
+enum BudgetPresentation {
+    static func actionTitle(ended: Bool) -> String { ended ? "Xem / Xóa" : "Sửa" }
+    static func isReadOnly(ended: Bool) -> Bool { ended }
+}
+
 struct BudgetsView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    let masked: Bool
     @State private var summary: BudgetSummaryModel?
     @State private var loading = false
     @State private var error: String?
+    @State private var saving = false
     @State private var name = ""
     @State private var limit = ""
-    @State private var start = MPFormat.currentMonth + "-01"
-    @State private var end = MPFormat.currentMonth + "-28"
+    @State private var startDate = Date()
+    @State private var endDate = Date()
     @State private var wallets: [WalletModel] = []
     @State private var categories: [CategoryModel] = []
     @State private var walletScopeID = "__all__"
     @State private var categoryScopeID = "__all__"
+    @State private var categoryPickerPresented = false
     @State private var showEditor = false
     @State private var editTarget: BudgetModel?
     @State private var deleteTarget: BudgetModel?
     @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Ngân sách", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Tạo ngân sách") { showEditor = true } })
-                if loading && summary == nil { MPLoadingView(label: "Đang tải ngân sách...") }
-                else if let error, summary == nil { MPErrorView(title: "Không tải được ngân sách", detail: error) { Task { await load() } } }
-                else if let summary {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        MPMetricCard(title: "Đã chi", value: MPFormat.money(summary.spent))
-                        MPMetricCard(title: "Giới hạn", value: MPFormat.money(summary.limitAmount))
-                    }
-                    if summary.items.isEmpty { MPEmptyView(title: "Chưa có ngân sách", detail: "Tạo ngân sách theo ví hoặc danh mục.") }
-                    ForEach(summary.items) { budget in
-                        MPSurfaceCard {
-                            VStack(alignment: .leading, spacing: 8) {
-                                MPText(budget.name)
-                                MPProgressBar(progress: Double(budget.spent) / Double(max(1, budget.limitAmount)), label: "\(MPFormat.money(budget.spent)) / \(MPFormat.money(budget.limitAmount))")
-                                MPText("\(budget.startDate) → \(budget.endDate)", style: .secondary)
-                                HStack {
-                                    if !budget.ended {
-                                        MPButton("Sửa", style: .secondary) { beginEditing(budget) }
-                                    } else {
-                                        MPText("Đã kết thúc", style: .secondary)
-                                    }
-                                    MPButton("Xóa", style: .destructive) { deleteTarget = budget }
-                                }
-                            }
-                        }
-                    }
-                }
-                if showEditor {
-                    MPSurfaceCard {
-                        VStack(alignment: .leading, spacing: 12) {
-                            MPText(editTarget == nil ? "Tạo ngân sách" : "Sửa ngân sách", style: .title)
-                            MPTextField(title: "Tên", text: $name, placeholder: "Ăn uống tháng này")
-                            MPAmountField(title: "Giới hạn", text: $limit)
-                            MPTextField(title: "Ngày bắt đầu (YYYY-MM-DD)", text: $start)
-                            MPTextField(title: "Ngày kết thúc (YYYY-MM-DD)", text: $end)
-                            MPOptionSelector(title: "Phạm vi ví", options: [MPSelectionOption(id: "__all__", label: "Tất cả ví")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletScopeID, emptyLabel: "Tất cả ví")
-                            MPOptionSelector(title: "Phạm vi danh mục", options: [MPSelectionOption(id: "__all__", label: "Tất cả danh mục")] + categories.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryScopeID, emptyLabel: "Tất cả danh mục")
-                            HStack { MPButton("Hủy", style: .secondary) { showEditor = false; editTarget = nil }; MPButton("Lưu") { Task { await create() } } }
-                        }
-                    }
-                }
-            }
-            .padding(MPMetrics.pagePadding)
+        Group {
+            if showEditor { editorContent } else { listContent }
         }
         .background(MPColor.canvas.ignoresSafeArea())
-        // Keep the last form controls scrollable above the shell's persistent
-        // bottom navigation on compact devices.
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: MPMetrics.hitTarget * 2)
-        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa ngân sách?", message: "Các giao dịch không bị xóa.", confirmTitle: "Xóa") {
             if let target = deleteTarget { Task { do { try await api.deleteBudget(id: target.id); await load() } catch { self.error = "Không thể xóa ngân sách." } } }
             deleteTarget = nil
         }
-        .accessibilityIdentifier("budgets-screen")
+        .mpFormBottomSheet(
+            isPresented: $categoryPickerPresented,
+            title: "Chọn danh mục",
+            accessibilityIdentifier: "budget-category-picker-sheet",
+            onClose: { categoryPickerPresented = false },
+            fields: {
+                MPCategoryPicker(
+                    categories: categories,
+                    kind: "expense",
+                    selectableIDs: nil,
+                    selectedID: categoryScopeID,
+                    clearLabel: "Tất cả danh mục",
+                    clearID: "__all__",
+                    onSelect: { categoryScopeID = $0; categoryPickerPresented = false }
+                )
+            },
+            footer: {
+                MPButton("Đóng", style: .secondary) { categoryPickerPresented = false }
+            }
+        )
+    }
+
+    private var listContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MPScreenHeader(title: "Ngân sách", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
+                    MPButton(BudgetReferenceCopy.addAction, style: .secondary, fullWidth: false) { beginCreating() }
+                        .accessibilityIdentifier(BudgetReferenceCopy.addActionAccessibilityID)
+                })
+                if loading && summary == nil { MPLoadingView(label: "Đang tải ngân sách...") }
+                else if let error, summary == nil { MPErrorView(title: "Không tải được ngân sách", detail: error) { Task { await load() } } }
+                else if let summary {
+                    if BudgetReferenceCopy.shouldShowSummary(itemCount: summary.items.count) {
+                        MPSurfaceCard(style: .reference) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                MPText("Tổng quan ngân sách", style: .emphasis)
+                                MPBudgetGauge(
+                                    value: Double(summary.spent) / Double(max(1, summary.limitAmount)) * 100,
+                                    label: "Đã dùng \(MPFormat.money(summary.spent, masked: masked)) / \(MPFormat.money(summary.limitAmount, masked: masked))"
+                                )
+                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible()), GridItem(.flexible())], spacing: 8) {
+                                    MPMetric(title: "Ngân sách", value: MPFormat.money(summary.limitAmount, masked: masked))
+                                    MPMetric(title: "Đã chi", value: MPFormat.money(summary.spent, masked: masked))
+                                    MPMetric(title: "Còn lại", value: MPFormat.money(summary.limitAmount - summary.spent, masked: masked))
+                                }
+                            }
+                        }
+                    }
+                    if let error { MPStatusMessage(text: error, tone: .danger) }
+                    if summary.items.isEmpty { MPEmptyView(title: "Chưa có ngân sách", detail: "Tạo ngân sách theo ví hoặc danh mục.") }
+                    ForEach(summary.items) { budget in
+                        MPSurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                MPText(budget.name)
+                                MPProgressBar(progress: Double(budget.spent) / Double(max(1, budget.limitAmount)), label: "\(MPFormat.money(budget.spent, masked: masked)) / \(MPFormat.money(budget.limitAmount, masked: masked))")
+                                MPText("\(budget.startDate) → \(budget.endDate) · \(MPBudgetCopy.timing(ended: budget.ended, startDate: budget.startDate, today: MPFormat.todayISO(timeZone: TimeZone(identifier: accountTimezone) ?? .current), daysRemaining: budget.daysRemaining))", style: .secondary)
+                                if !budget.ended {
+                                    MPText(MPBudgetCopy.dailySuggestion(limit: budget.limitAmount, spent: budget.spent, daysRemaining: budget.daysRemaining, masked: masked), style: .secondary)
+                                }
+                                if let threshold = MPBudgetCopy.threshold(spent: budget.spent, limit: budget.limitAmount) {
+                                    MPStatusBadge(text: threshold.text, tone: threshold.tone == .danger ? .danger : .muted)
+                                }
+                                HStack {
+                                    MPButton(BudgetPresentation.actionTitle(ended: budget.ended), style: .secondary) { beginEditing(budget) }
+                                        .accessibilityIdentifier(budget.ended ? "budget-preview-\(budget.id)" : "budget-edit-\(budget.id)")
+                                    MPButton("Xóa", style: .destructive) { deleteTarget = budget }
+                                        .accessibilityIdentifier("budget-delete-\(budget.id)")
+                                }
+                            }
+                        }
+                    }
+                }
+
+            }
+            .padding(MPMetrics.pagePadding)
+        }
+    }
+
+    private var editorContent: some View {
+        MPEditorScaffold(title: editTarget.map { $0.ended ? "Xem ngân sách" : "Sửa ngân sách" } ?? "Tạo ngân sách", isBusy: saving, onCancel: { showEditor = false }) {
+            if let endedBudget = editTarget, endedBudget.ended {
+                MPStatusMessage(text: "Ngân sách đã kết thúc; chỉ có thể xem hoặc xóa.", tone: .info)
+                MPText(endedBudget.name, style: .emphasis)
+                MPText("Giới hạn: \(MPFormat.money(endedBudget.limitAmount, masked: masked))", style: .secondary)
+                MPText("Đã chi: \(MPFormat.money(endedBudget.spent, masked: masked))", style: .secondary)
+                MPText("Thời gian: \(endedBudget.startDate) → \(endedBudget.endDate)", style: .secondary)
+                MPText("Ví: \(walletName(for: endedBudget))", style: .secondary)
+                MPText("Danh mục: \(categoryName(for: endedBudget))", style: .secondary)
+            } else {
+                MPTextField(title: "Tên", text: $name, placeholder: "Ăn uống tháng này")
+                MPAmountField(title: "Giới hạn", text: $limit)
+                MPDateField(title: "Ngày bắt đầu", date: $startDate, timeZone: accountTimezone)
+                MPDateField(title: "Ngày kết thúc", date: $endDate, timeZone: accountTimezone)
+                MPOptionSelector(title: "Phạm vi ví", options: [MPSelectionOption(id: "__all__", label: "Tất cả ví")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletScopeID, emptyLabel: "Tất cả ví")
+                MPFormRow(
+                    title: "Phạm vi danh mục",
+                    iconName: "tag",
+                    value: categoryScopeLabel,
+                    accessibilityIdentifier: "budget-category-scope-row"
+                ) { categoryPickerPresented = true }
+            }
+            if let error { MPStatusMessage(text: error, tone: .danger) }
+        } footer: {
+            if let endedBudget = editTarget, endedBudget.ended {
+                MPButton("Xóa", style: .destructive) { deleteTarget = endedBudget; showEditor = false }
+            } else {
+                MPButton("Lưu", isLoading: saving) { Task { await create() } }
+            }
+        }
     }
 
     private func load() async {
@@ -98,8 +166,9 @@ struct BudgetsView: View {
                 if firstLoad {
                     let currentMonth = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current)
                     if let range = MPFormat.monthRange(month: currentMonth, timeZone: TimeZone(identifier: accountTimezone) ?? .current) {
-                        start = range.start
-                        end = range.end
+                        let zone = TimeZone(identifier: accountTimezone) ?? .current
+                        startDate = MPFormat.parseCalendarDate(range.start, timeZone: zone) ?? Date()
+                        endDate = MPFormat.parseCalendarDate(range.end, timeZone: zone) ?? Date()
                     }
                 }
             }
@@ -108,119 +177,318 @@ struct BudgetsView: View {
     }
 
     private func create() async {
+        guard !saving, editTarget?.ended != true else { return }
         guard let parsed = MPFormat.parsePositiveInteger(limit), !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập tên và giới hạn hợp lệ."; return }
-        guard let startDate = MPFormat.parseCalendarDate(start), let endDate = MPFormat.parseCalendarDate(end), startDate <= endDate else { error = "Khoảng thời gian ngân sách không hợp lệ."; return }
+        guard startDate <= endDate else { error = "Khoảng thời gian ngân sách không hợp lệ."; return }
+        let zone = TimeZone(identifier: accountTimezone) ?? .current
+        let start = MPFormat.calendarDateString(startDate, timeZone: zone)
+        let end = MPFormat.calendarDateString(endDate, timeZone: zone)
+        saving = true; error = nil; defer { saving = false }
         do {
             let input = BudgetInputModel(name: name.trimmingCharacters(in: .whitespacesAndNewlines), limitAmount: parsed, walletID: walletScopeID == "__all__" ? nil : walletScopeID, categoryID: categoryScopeID == "__all__" ? nil : categoryScopeID, startDate: start, endDate: end)
             if let editTarget { _ = try await api.updateBudget(id: editTarget.id, input: input) } else { _ = try await api.createBudget(input) }
-            showEditor = false; self.editTarget = nil; await load()
+            showEditor = false; self.editTarget = nil; name = ""; limit = ""; walletScopeID = "__all__"; categoryScopeID = "__all__"; await load()
         }
-        catch { self.error = "Không thể tạo ngân sách." }
+        catch {
+#if DEBUG
+            print("[Budgets] save failed: \(APIError.diagnosticDescription(error))")
+#endif
+            self.error = (error as? APIError)?.userMessage ?? "Không thể lưu ngân sách."
+        }
+    }
+
+    private func beginCreating() {
+        if editTarget != nil {
+            name = ""; limit = ""; walletScopeID = "__all__"; categoryScopeID = "__all__"
+            let zone = TimeZone(identifier: accountTimezone) ?? .current
+            if let range = MPFormat.monthRange(month: MPFormat.currentMonth(timeZone: zone), timeZone: zone) {
+                startDate = MPFormat.parseCalendarDate(range.start, timeZone: zone) ?? Date()
+                endDate = MPFormat.parseCalendarDate(range.end, timeZone: zone) ?? Date()
+            }
+        }
+        editTarget = nil; error = nil; showEditor = true
     }
 
     private func beginEditing(_ budget: BudgetModel) {
-        guard !budget.ended else { return }
+        if editTarget?.id == budget.id {
+            editTarget = budget
+            showEditor = true
+            return
+        }
         editTarget = budget
         name = budget.name
         limit = String(budget.limitAmount)
-        start = budget.startDate
-        end = budget.endDate
+        let zone = TimeZone(identifier: accountTimezone) ?? .current
+        startDate = MPFormat.parseCalendarDate(budget.startDate, timeZone: zone) ?? Date()
+        endDate = MPFormat.parseCalendarDate(budget.endDate, timeZone: zone) ?? Date()
         walletScopeID = budget.walletID ?? "__all__"
         categoryScopeID = budget.categoryID ?? "__all__"
         showEditor = true
+    }
+
+    private func walletName(for budget: BudgetModel) -> String {
+        guard let walletID = budget.walletID else { return "Tất cả ví" }
+        return wallets.first(where: { $0.id == walletID })?.name ?? "Ví đã xóa"
+    }
+
+    private func categoryName(for budget: BudgetModel) -> String {
+        guard let categoryID = budget.categoryID else { return "Tất cả danh mục" }
+        return categories.first(where: { $0.id == categoryID })?.name ?? "Danh mục đã xóa"
+    }
+
+    private var categoryScopeLabel: String {
+        guard categoryScopeID != "__all__" else { return "Tất cả danh mục" }
+        return categories.first(where: { $0.id == categoryScopeID })?.name ?? "Chọn danh mục"
+    }
+}
+
+/// Stable composition contract for the Stitch reports screen.
+enum ReportsReferenceSection: String, CaseIterable {
+    case header
+    case filter
+    case summary
+    case trend
+    case breakdown
+    case activity
+    case insider
+
+    static let stitchOrder: [ReportsReferenceSection] = [
+        .header,
+        .filter,
+        .summary,
+        .trend,
+        .breakdown,
+        .activity,
+        .insider
+    ]
+}
+
+enum ReportsReferenceCopy {
+    static func summaryAction(month: String) -> String { month }
+}
+
+enum ReportsOfflinePolicy {
+    static func accepts(_ snapshot: FinancialSnapshot?, month: String) -> Bool {
+        guard let snapshot,
+              snapshot.monthSummary?.month == month,
+              snapshot.insider?.month == month else { return false }
+        return true
+    }
+}
+
+enum ReportsMonthPolicy {
+    static func isValid(_ value: String) -> Bool {
+        let parts = value.split(separator: "-", omittingEmptySubsequences: false)
+        guard parts.count == 2,
+              parts[0].count == 4,
+              parts[1].count == 2,
+              parts[0].allSatisfy(\.isNumber),
+              parts[1].allSatisfy(\.isNumber),
+              let year = Int(parts[0]),
+              let month = Int(parts[1]) else { return false }
+        return year > 0 && (1...12).contains(month)
     }
 }
 
 struct ReportsView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    let masked: Bool
+    let ownerID: String?
+    let snapshotCache: FinancialSnapshotCache?
     @State private var month = MPFormat.currentMonth
     @State private var summary: InsiderSummaryModel?
     @State private var monthDetail: MonthSummaryModel?
     @State private var loading = false
     @State private var error: String?
     @State private var accountTimezone = TimeZone.current.identifier
+    @State private var transactions: [TransactionModel] = []
+    @State private var cachedAt: Date?
+
+    init(
+        api: FinanceAPI,
+        onBack: @escaping () -> Void,
+        masked: Bool,
+        ownerID: String? = nil,
+        snapshotCache: FinancialSnapshotCache? = nil
+    ) {
+        self.api = api
+        self.onBack = onBack
+        self.masked = masked
+        self.ownerID = ownerID
+        self.snapshotCache = snapshotCache
+    }
 
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Báo cáo", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
-                MPTextField(title: "Tháng (YYYY-MM)", text: $month)
-                MPButton("Xem báo cáo", isLoading: loading) { Task { await load() } }
+                MPScreenHeader(title: "Báo cáo", leading: {
+                    MPButton(style: .plain, fullWidth: false, action: onBack) {
+                        Label("Quay lại", systemImage: "chevron.left")
+                    }
+                    .accessibilityIdentifier("screen-back")
+                }, trailing: { EmptyView() })
+                MPSurfaceCard(style: .reference) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MPTextField(title: "Tháng (YYYY-MM)", text: $month, accessibilityIdentifier: "reports-month")
+                        MPButton("Xem báo cáo", isLoading: loading) { Task { await load() } }
+                            .accessibilityIdentifier("reports-load-button")
+                    }
+                }
                 if let summary {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        MPMetricCard(title: "Thu nhập", value: MPFormat.money(summary.income))
-                        MPMetricCard(title: "Chi tiêu", value: MPFormat.money(summary.expense))
-                        MPMetricCard(title: "Còn lại", value: MPFormat.money(summary.net))
-                        MPMetricCard(title: "Trung bình/ngày", value: MPFormat.money(summary.averageDailyExpense))
-                        MPMetricCard(
-                            title: "So với tháng trước",
-                            value: MPFormat.signedMoney(summary.expenseDelta),
-                            detail: summary.expenseChangeBPS.map { MPFormat.percentageFromBPS($0) }
-                        )
-                        MPMetricCard(
-                            title: "Tỷ lệ chi / thu",
-                            value: MPFormat.percentageFromBPS(summary.spendingIncomeRatioBPS),
-                            detail: summary.spendingIncomeRatioBPS == nil ? "Chưa có thu nhập để tính tỷ lệ" : nil
-                        )
+                    if let cachedAt {
+                        MPStatusMessage(text: "Bản lưu \(cachedAt.formatted(date: .abbreviated, time: .shortened)) · Chưa cập nhật từ máy chủ.", tone: .info)
                     }
-                    MPAssistantCard(title: "Theo danh mục") {
-                        MPChart(values: summary.topCategories.map { ($0.name, min(180, max(4, Double($0.amount) / 100_000))) })
-                        ForEach(summary.topCategories, id: \.name) { item in MPText("\(item.name): \(MPFormat.money(item.amount))", style: .secondary) }
-                    }
-                    if let monthDetail {
-                        MPAssistantCard(title: "Theo nhóm trong sổ tháng") {
-                            if monthDetail.categories.isEmpty {
-                                MPText("Chưa có giao dịch được tính vào báo cáo.", style: .secondary)
-                            } else {
-                                ForEach(monthDetail.categories, id: \.stableID) { item in
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 3) {
-                                            MPText(item.name)
-                                            MPText("\(item.type == "income" ? "Thu" : "Chi") · \(item.count) giao dịch", style: .secondary)
-                                        }
-                                        Spacer()
-                                        MPText(MPFormat.money(item.amount), style: .secondary)
-                                    }
-                                }
+                    MPSurfaceCard(style: .reference) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            MPSectionHeader(title: "Tổng quan báo cáo", actionTitle: ReportsReferenceCopy.summaryAction(month: month))
+                            MPReportComparisonChart(income: summary.income, expense: summary.expense)
+                            HStack(spacing: 12) {
+                                reportMetric(label: "Chi tiêu", value: summary.expense, color: MPColor.danger)
+                                reportMetric(label: "Thu nhập", value: summary.income, color: MPColor.action)
+                                reportMetric(label: "Chênh lệch", value: summary.net, color: MPColor.ink)
                             }
                         }
-                        MPAssistantCard(title: "Hoạt động trong tháng") {
-                            MPText("\(monthDetail.transactionCount) giao dịch được tính vào báo cáo. Chuyển ví và điều chỉnh số dư không làm tăng thu/chi.", style: .secondary)
-                            MPText("Số liệu được tính lại từ sổ giao dịch theo múi giờ tài khoản.", style: .secondary)
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("reports-section-summary")
+                    MPAssistantCard(title: "Xu hướng chi tiêu") {
+                        MPTrendChart(
+                            points: MPTrendData.points(
+                                transactions: transactions,
+                                month: month,
+                                timeZone: TimeZone(identifier: accountTimezone) ?? .current
+                            ),
+                            masked: masked
+                        )
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("reports-section-trend")
+                    MPAssistantCard(title: "Theo nhóm") {
+                        if let categories = monthDetail?.categories, !categories.isEmpty {
+                            ForEach(categories, id: \.stableID) { item in
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        MPText(item.name)
+                                        MPText("\(item.type == "income" ? "Thu" : "Chi") · \(item.count) giao dịch", style: .secondary)
+                                    }
+                                    Spacer()
+                                    MPText(MPFormat.money(item.amount, masked: masked), style: .secondary)
+                                }
+                            }
+                        } else {
+                            MPText("Chưa có giao dịch được tính vào báo cáo.", style: .secondary)
                         }
                     }
-                    MPAssistantCard(title: "Khoản chi lớn") {
-                        ForEach(summary.topExpenses) { item in MPTransactionRow(title: item.categoryName ?? "Chi tiêu", subtitle: MPFormat.shortDate(item.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current), amount: MPFormat.money(item.amount), isIncome: false) }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("reports-section-breakdown")
+                    MPAssistantCard(title: "Hoạt động trong tháng") {
+                        MPText("\(monthDetail?.transactionCount ?? 0) giao dịch được tính vào báo cáo. Chuyển ví và điều chỉnh số dư không làm tăng thu/chi.", style: .secondary)
+                        MPText("Số liệu được tính lại từ sổ giao dịch theo múi giờ tài khoản.", style: .secondary)
                     }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("reports-section-activity")
+                    MPReportsInsiderCard(value: summary, masked: masked)
                 } else if let error { MPErrorView(title: "Không tải được báo cáo", detail: error) { Task { await load() } } }
                 else { MPEmptyView(title: "Chọn tháng để xem báo cáo", detail: "Số liệu luôn được tính theo timezone tài khoản.") }
             }
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: MPMetrics.hitTarget * 2)
-        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
-        .accessibilityIdentifier("reports-screen")
+    }
+
+    private func reportMetric(label: String, value: Int64, color: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            MPText(label, style: .secondary)
+            MPText(MPFormat.money(value, masked: masked), style: .emphasis)
+                .foregroundStyle(color)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func load() async {
         guard !loading else { return }
         loading = true; defer { loading = false }
+        error = nil
+        cachedAt = nil
         do {
             if let profile = try? await api.profile() {
                 accountTimezone = profile.timezone
                 if summary == nil { month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current) }
             }
+            month = month.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard ReportsMonthPolicy.isValid(month) else {
+                summary = nil
+                monthDetail = nil
+                transactions = []
+                error = "Nhập tháng theo định dạng YYYY-MM (tháng từ 01 đến 12)."
+                return
+            }
+            // Never leave a previous month's totals visible under a new scope
+            // while the three report reads are in flight or when one fails.
+            summary = nil
+            monthDetail = nil
+            transactions = []
             async let insiderResult = api.insider(month: month)
             async let monthResult = api.monthSummary(month: month)
+            async let transactionResult = api.transactions()
             summary = try await insiderResult
             monthDetail = try? await monthResult
-            self.error = nil
-        } catch { self.error = "Không thể tải báo cáo." }
+            // Trend data is part of the same verified read scope. If the
+            // ledger read fails, do not persist a report with an empty/fake
+            // trend; recover the exact cached month instead.
+            transactions = try await transactionResult
+            await persistSnapshot()
+        } catch {
+            await recoverFromSnapshot(error)
+        }
+    }
+
+    private func recoverFromSnapshot(_ failure: Error) async {
+        guard FinancialSnapshotCache.allowsFallback(failure), let ownerID, let snapshotCache else {
+            summary = nil; monthDetail = nil; transactions = []; self.error = "Không thể tải báo cáo."
+            return
+        }
+        do {
+            guard let snapshot = try await snapshotCache.load(ownerID: ownerID),
+                  ReportsOfflinePolicy.accepts(snapshot, month: month),
+                  let cachedSummary = snapshot.insider,
+                  let cachedMonth = snapshot.monthSummary else {
+                throw OutboxStoreError.storageUnavailable
+            }
+            summary = cachedSummary
+            monthDetail = cachedMonth
+            transactions = snapshot.transactions
+            accountTimezone = snapshot.timezone
+            cachedAt = snapshot.fetchedAt
+            error = nil
+        } catch {
+            summary = nil; monthDetail = nil; transactions = []; self.error = "Không thể tải báo cáo."
+        }
+    }
+
+    private func persistSnapshot() async {
+        guard let ownerID, let snapshotCache, let summary, let monthDetail else { return }
+        do {
+            let existing = try await snapshotCache.load(ownerID: ownerID)
+            let base = existing ?? FinancialSnapshot(ownerID: ownerID, fetchedAt: Date(), transactions: transactions, wallets: [], categories: [], timezone: accountTimezone)
+            try await snapshotCache.save(FinancialSnapshot(
+                ownerID: ownerID,
+                fetchedAt: Date(),
+                transactions: transactions,
+                wallets: base.wallets,
+                categories: base.categories,
+                timezone: accountTimezone,
+                monthSummary: monthDetail,
+                insider: summary
+            ))
+        } catch {
+            // Online report data remains authoritative even if local storage is unavailable.
+        }
     }
 }
 
@@ -232,85 +500,199 @@ struct CategoriesView: View {
     @State private var error: String?
     @State private var name = ""
     @State private var kind = "expense"
+    @State private var listKind = "expense"
+    @State private var showInactiveCategories = false
+    @State private var walletScopeID = "__all__"
+    @State private var searchText = ""
     @State private var adding = false
+    @State private var saving = false
     @State private var editTarget: CategoryModel?
     @State private var deleteTarget: CategoryModel?
     @State private var wallets: [WalletModel] = []
     @State private var selectedWalletIDs: Set<String> = []
     @State private var parentID = ""
+    @State private var iconKey = "tag"
 
     var body: some View {
+        Group {
+            if adding { categoryEditor }
+            else { categoryList }
+        }
+        .background(MPColor.canvas.ignoresSafeArea())
+        .task { await load() }
+        .mpConfirmDialog(
+            isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+            title: "Xóa danh mục?",
+            message: "Danh mục con sẽ được xử lý theo chính sách máy chủ.",
+            confirmTitle: "Xóa"
+        ) {
+            guard let target = deleteTarget, !saving else { return }
+            saving = true
+            Task {
+                defer { saving = false }
+                do {
+                    try await api.deleteCategory(id: target.id)
+                    cancelEditor()
+                    await load()
+                } catch {
+                    self.error = "Không thể xóa danh mục."
+                }
+            }
+            deleteTarget = nil
+        }
+    }
+
+    private var categoryList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Danh mục", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm danh mục") { adding = true } })
+                MPScreenHeader(title: "Danh mục", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+                MPSegmentedControl(
+                    options: [
+                        (id: "expense", title: "Khoản chi"),
+                        (id: "income", title: "Khoản thu"),
+                        (id: "debt", title: "Vay-Nợ")
+                    ],
+                    selection: $listKind,
+                    accessibilityIdentifier: CategoriesReferenceCopy.kindFilterAccessibilityID
+                )
+                MPButton(CategoriesReferenceCopy.addAction, systemName: "plus.circle", style: .outline) { beginCreating() }
+                    .accessibilityIdentifier(CategoriesReferenceCopy.addActionAccessibilityID)
+                MPOptionSelector(
+                    title: "Phạm vi ví",
+                    options: [MPSelectionOption(id: "__all__", label: "Tất cả ví")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) },
+                    selectionID: $walletScopeID,
+                    emptyLabel: "Tất cả ví",
+                    accessibilityIdentifier: CategoriesReferenceCopy.walletFilterAccessibilityID
+                )
+                MPTextField(
+                    title: "Tìm danh mục",
+                    text: $searchText,
+                    placeholder: "Nhập tên nhóm",
+                    accessibilityIdentifier: CategoriesReferenceCopy.searchAccessibilityID
+                )
+                MPButton(showInactiveCategories ? "Đang hiển thị nhóm không hoạt động" : "Hiển thị nhóm không hoạt động", systemName: showInactiveCategories ? "checkmark.circle.fill" : "circle", style: .secondary) {
+                    showInactiveCategories.toggle()
+                }
+                .accessibilityIdentifier("category-show-inactive")
                 if loading && items.isEmpty { MPLoadingView(label: "Đang tải danh mục...") }
                 else if let error, items.isEmpty { MPErrorView(title: "Không tải được danh mục", detail: error) { Task { await load() } } }
+                else if categoryTreeItems.isEmpty {
+                    MPText(
+                        searchText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            ? "Chưa có danh mục phù hợp."
+                            : "Không tìm thấy danh mục phù hợp.",
+                        style: .secondary
+                    ).accessibilityIdentifier("category-empty-filter-result")
+                }
                 else {
+                    MPCategoryTree(items: categoryTreeItems, onSelect: selectCategory)
+                        .accessibilityIdentifier("category-tree")
+                }
+            }
+            .padding(MPMetrics.pagePadding)
+        }
+    }
+
+    private var categoryEditor: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MPScreenHeader(
+                    title: editTarget == nil ? "Nhóm mới" : "Sửa nhóm",
+                    accessibilityIdentifier: "category-editor-title",
+                    leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại") { if !saving { cancelEditor() } } },
+                    trailing: {
+                        if let editTarget, CategoryEditPolicy.canDelete(editTarget) {
+                            MPIconButton(systemName: "trash", label: "Xóa nhóm") { requestDelete(editTarget.id) }
+                                .accessibilityIdentifier("category-delete")
+                                .disabled(saving)
+                        } else {
+                            EmptyView()
+                        }
+                    }
+                )
+                if let editTarget, CategoryEditPolicy.metadataIsReadOnly(editTarget) {
                     MPSurfaceCard {
-                        VStack(spacing: 0) {
-                            categoryTree(parentID: nil, depth: 0)
+                        VStack(alignment: .leading, spacing: 8) {
+                            MPText(editTarget.name, style: .title)
+                            MPText("\(MPSelectionLabels.display(for: editTarget.kind)) · Nhóm hệ thống", style: .secondary)
+                        }
+                    }
+                    MPText("Đây là nhóm của hệ thống. Bạn chỉ có thể chọn ví áp dụng.", style: .secondary)
+                } else {
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            MPTextField(title: "Tên nhóm", text: $name)
+                            MPOptionSelector(
+                                title: "Loại nhóm",
+                                options: [
+                                    MPSelectionOption(id: "expense", label: "Khoản chi"),
+                                    MPSelectionOption(id: "income", label: "Khoản thu"),
+                                    MPSelectionOption(id: "debt", label: "Vay/Nợ")
+                                ],
+                                selectionID: Binding(
+                                    get: { kind },
+                                    set: { nextKind in if kind != nextKind { kind = nextKind; parentID = "" } }
+                                ),
+                                accessibilityIdentifier: "category-kind-editor"
+                            )
+                            MPOptionSelector(
+                                title: "Nhóm cha",
+                                options: availableParentOptions,
+                                selectionID: $parentID,
+                                emptyLabel: "Không có nhóm cha",
+                                accessibilityIdentifier: "category-parent-editor"
+                            )
+                            MPCategoryIconSelector(title: "Biểu tượng", selection: $iconKey)
                         }
                     }
                 }
-                if adding {
-                    MPSurfaceCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            MPText(editTarget.map { CategoryEditPolicy.metadataIsReadOnly($0) ? "Ví áp dụng" : "Sửa danh mục" } ?? "Danh mục mới", style: .title)
-                            if let editTarget, CategoryEditPolicy.metadataIsReadOnly(editTarget) {
-                                MPSurfaceCard {
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        MPText(editTarget.name, style: .title)
-                                        MPText("\(MPSelectionLabels.display(for: editTarget.kind)) · Nhóm hệ thống", style: .secondary)
-                                        MPText("Chỉ có thể thay đổi các ví áp dụng.", style: .secondary)
-                                    }
-                                }
-                            } else {
-                                MPTextField(title: "Tên", text: $name)
-                                MPWalletSelector(title: "Loại", options: ["expense", "income", "debt"], selection: $kind)
-                                MPOptionSelector(title: "Danh mục cha", options: availableParentOptions, selectionID: $parentID, emptyLabel: "Không có danh mục cha")
-                            }
-                            MPMultiOptionSelector(title: "Áp dụng cho ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionIDs: $selectedWalletIDs, allLabel: "Tất cả ví")
-                            HStack { MPButton("Hủy", style: .secondary) { adding = false; editTarget = nil }; MPButton("Lưu") { Task { await create() } } }
-                        }
+                MPWalletApplicabilityCard(wallets: wallets, selectedWalletIDs: $selectedWalletIDs)
+                if let error { MPStatusMessage(text: error, tone: .danger) }
+                HStack(spacing: 10) {
+                    MPButton("Lưu nhóm", isLoading: saving, isDisabled: saving) { Task { await create() } }
+                    MPButton("Hủy", style: .secondary, isDisabled: saving) { cancelEditor() }
+                }
+                if let editTarget, CategoryEditPolicy.canArchive(editTarget) {
+                    MPButton(editTarget.isActive == false ? "Khôi phục nhóm" : "Lưu trữ nhóm", style: editTarget.isActive == false ? .secondary : .destructive, isLoading: saving, isDisabled: saving) {
+                        Task { await changeActive() }
                     }
+                    .accessibilityIdentifier("category-active-toggle")
                 }
             }
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
-        .task { await load() }
-        .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa danh mục?", message: "Danh mục con sẽ được xử lý theo chính sách máy chủ.", confirmTitle: "Xóa") {
-            if let target = deleteTarget { Task { do { try await api.deleteCategory(id: target.id); await load() } catch { self.error = "Không thể xóa danh mục." } } }
-            deleteTarget = nil
-        }
-        .accessibilityIdentifier("categories-screen")
+        .accessibilityIdentifier("category-editor-screen")
     }
 
-    private func categoryRow(_ item: CategoryModel, depth: Int) -> some View {
-        HStack {
-            MPIcon(systemName: depth == 0 ? "folder.fill" : "arrow.turn.down.right", color: MPColor.action)
-            MPText(item.name)
-            Spacer()
-            MPText(MPSelectionLabels.display(for: item.kind), style: .secondary)
-            MPIconButton(systemName: "pencil", label: "Sửa \(item.name)") { beginEditing(item) }
-            if CategoryEditPolicy.canDelete(item) {
-                MPIconButton(systemName: "trash", label: "Xóa \(item.name)") { deleteTarget = item }
-            } else {
-                MPIcon(systemName: "lock.fill", label: "Nhóm hệ thống", color: MPColor.secondary)
-            }
+    private var categoryTreeItems: [MPCategoryTreeItem] {
+        CategoryListPresentation.nodes(
+            items: items,
+            kind: listKind,
+            walletID: walletScopeID == "__all__" ? nil : walletScopeID,
+            search: searchText,
+            includeInactive: showInactiveCategories
+        ).map { node in
+            let category = node.item
+            let glyph = MPTransactionPresentation.glyph(systemKey: category.systemKey ?? category.iconKey, type: category.kind)
+            return MPCategoryTreeItem(
+                id: category.id,
+                title: category.name,
+                subtitle: category.isActive == false ? "Đã lưu trữ · \(CategoriesReferenceCopy.scopeSubtitle(walletIDs: category.walletIDs))" : CategoriesReferenceCopy.scopeSubtitle(walletIDs: category.walletIDs),
+                systemName: glyph.systemName,
+                tone: glyph.tone,
+                depth: node.depth,
+                isSystem: category.isSystem,
+                isSelectable: !node.isHierarchyContext,
+                isHierarchyContext: node.isHierarchyContext,
+                continuesBranch: node.continuesBranch
+            )
         }
-        .padding(.leading, CGFloat(depth * 20))
-        .padding(.vertical, 8)
-    }
-    private func categoryTree(parentID: String?, depth: Int) -> AnyView {
-        AnyView(ForEach(items.filter { $0.parentID == parentID }) { item in
-            categoryRow(item, depth: depth)
-            categoryTree(parentID: item.id, depth: depth + 1)
-        })
     }
     private var availableParentOptions: [MPSelectionOption] {
         let excluded = excludedParentIDs()
-        return [MPSelectionOption(id: "", label: "Không có danh mục cha")] + items.filter { !excluded.contains($0.id) }.map { MPSelectionOption(id: $0.id, label: $0.name) }
+        let roots = items.filter { $0.kind == kind && $0.parentID == nil && !excluded.contains($0.id) }
+        return [MPSelectionOption(id: "", label: "Không có nhóm cha")] + roots.map { MPSelectionOption(id: $0.id, label: $0.name) }
     }
     private func excludedParentIDs() -> Set<String> {
         guard let editTarget else { return [] }
@@ -324,7 +706,36 @@ struct CategoriesView: View {
         return excluded
     }
     private func load() async { loading = true; defer { loading = false }; do { async let categoryResult = api.categories(); async let walletResult = api.wallets(); items = try await categoryResult; wallets = try await walletResult; self.error = nil } catch { self.error = "Không thể tải danh mục." } }
+    private func selectCategory(_ id: String) {
+        guard let item = items.first(where: { $0.id == id }) else { return }
+        beginEditing(item)
+    }
+    private func requestDelete(_ id: String) {
+        deleteTarget = items.first(where: { $0.id == id })
+    }
+    private func beginCreating() {
+        editTarget = nil
+        name = ""
+        kind = listKind
+        parentID = ""
+        iconKey = "tag"
+        selectedWalletIDs = []
+        error = nil
+        adding = true
+    }
+    private func cancelEditor() {
+        adding = false
+        editTarget = nil
+        name = ""
+        parentID = ""
+        iconKey = "tag"
+        selectedWalletIDs = []
+        error = nil
+    }
     private func create() async {
+        guard !saving else { return }
+        saving = true
+        defer { saving = false }
         if let editTarget, CategoryEditPolicy.metadataIsReadOnly(editTarget) {
             do {
                 _ = try await api.updateCategoryWallets(id: editTarget.id, walletIDs: Array(selectedWalletIDs))
@@ -334,12 +745,22 @@ struct CategoriesView: View {
         }
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập tên danh mục."; return }
         do {
-            let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: Array(selectedWalletIDs).sorted(), iconKey: editTarget?.iconKey ?? "tag")
+            let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: Array(selectedWalletIDs).sorted(), iconKey: iconKey)
             if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }
-            adding = false; name = ""; parentID = ""; selectedWalletIDs = []; self.editTarget = nil; await load()
+            cancelEditor(); await load()
         } catch { self.error = "Không thể lưu danh mục." }
     }
-    private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; parentID = item.parentID ?? ""; selectedWalletIDs = Set(item.walletIDs); adding = true }
+    private func changeActive() async {
+        guard let editTarget, CategoryEditPolicy.canArchive(editTarget), !saving else { return }
+        saving = true
+        defer { saving = false }
+        do {
+            _ = try await api.setCategoryActive(id: editTarget.id, active: editTarget.isActive == false)
+            cancelEditor()
+            await load()
+        } catch { self.error = "Không thể cập nhật trạng thái nhóm." }
+    }
+    private func beginEditing(_ item: CategoryModel) { editTarget = item; name = item.name; kind = item.kind; parentID = item.parentID ?? ""; iconKey = item.iconKey; selectedWalletIDs = Set(item.walletIDs); error = nil; adding = true }
 }
 
 enum JarAllocationDraftValidator {
@@ -363,10 +784,12 @@ enum JarAllocationDraftValidator {
 struct JarsView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    let masked: Bool
     @State private var summary: JarMonthSummaryModel?
     @State private var month = MPFormat.currentMonth
     @State private var loading = false
     @State private var error: String?
+    @State private var saving = false
     @State private var showEditor = false
     @State private var editTarget: JarItemModel?
     @State private var name = ""
@@ -380,86 +803,16 @@ struct JarsView: View {
     @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Hũ chi tiêu", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm hũ") { editTarget = nil; resetEditor(); showEditor = true } })
-                MPOptionSelector(title: "Tháng", options: MPFormat.monthOptions(around: month, timeZone: TimeZone(identifier: accountTimezone) ?? .current).map { MPSelectionOption(id: $0, label: MPFormat.monthLabel($0)) }, selectionID: $month)
-                if loading { MPLoadingView(label: "Đang tải hũ tháng này...") }
-                if let summary {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        MPMetricCard(title: "Thu thực tế", value: MPFormat.money(summary.actualIncome))
-                        MPMetricCard(title: "Chi thực tế", value: MPFormat.money(summary.totalSpent))
-                        MPMetricCard(title: "Đã phân bổ", value: MPFormat.money(summary.totalAllocated))
-                        MPMetricCard(title: "Chi chưa gắn hũ", value: MPFormat.money(summary.unassignedSpent))
-                    }
-                    if summary.overIncome || summary.overOneHundredPercent {
-                        MPStatusMessage(text: "Tổng phân bổ vượt thu thực tế. Đây là cảnh báo, không chặn giao dịch.", tone: .danger)
-                    }
-                    MPText("Hũ tháng", style: .title)
-                    if summary.items.isEmpty { MPEmptyView(title: "Chưa có hũ cho tháng này", detail: "Chi tiêu vẫn được ghi nhận bình thường.") }
-                    ForEach(summary.items) { item in
-                        MPSurfaceCard {
-                            VStack(alignment: .leading, spacing: 8) {
-                                MPText(item.name)
-                                if let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil) {
-                                    MPProgressBar(progress: Double(item.spent) / Double(max(1, allocation)), label: "Đã chi \(MPFormat.money(item.spent)) / \(MPFormat.money(allocation))")
-                                } else {
-                                    MPText("Chưa đặt phân bổ · Đã chi \(MPFormat.money(item.spent))", style: .secondary)
-                                }
-                                if item.active {
-                                    HStack {
-                                        MPButton("Sửa tháng này", style: .secondary) { beginEditing(item) }
-                                        MPButton("Gỡ khỏi tháng", style: .destructive) { Task { await remove(item) } }
-                                    }
-                                } else {
-                                    MPText("Cấu hình lịch sử; giao dịch vẫn được giữ.", style: .secondary)
-                                }
-                            }
-                        }
-                    }
-                    MPAssistantCard(title: "Cộng dồn") {
-                        if summary.jars.isEmpty {
-                            MPEmptyView(title: "Chưa có hũ", detail: "Tạo hũ để xem chi tiêu cộng dồn.")
-                        } else {
-                            MPOptionSelector(title: "Chọn hũ", options: summary.jars.map { MPSelectionOption(id: $0.jarID, label: $0.name) }, selectionID: $reportJarID)
-                            if reportLoading { MPLoadingView(label: "Đang tải báo cáo cộng dồn...") }
-                            if let reportError { MPStatusMessage(text: reportError, tone: .info) }
-                            if let report {
-                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                                    MPMetricCard(title: "Chi thực tế", value: MPFormat.money(report.totalSpent))
-                                    MPMetricCard(title: "Đã phân bổ", value: MPFormat.money(report.totalAllocated))
-                                }
-                                MPText("\(MPFormat.monthLabel(report.fromMonth)) → \(MPFormat.monthLabel(report.toMonth)) · Không cộng dồn số dư.", style: .secondary)
-                                ForEach(report.months, id: \.month) { item in
-                                    HStack { MPText(MPFormat.monthLabel(item.month)); Spacer(); MPText(MPFormat.money(item.spent), style: .secondary) }
-                                }
-                            }
-                        }
-                    }
-                } else if let error { MPErrorView(title: "Không tải được hũ", detail: error) { Task { await load() } } }
-                else if !loading { MPEmptyView(title: "Chưa chọn tháng", detail: "Hũ là lớp ngân sách theo tháng và không thay đổi số dư ví.") }
-                if showEditor {
-                    MPSurfaceCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            MPText(editTarget == nil ? "Tạo hũ" : "Sửa hũ", style: .title)
-                            MPTextField(title: "Tên", text: $name, placeholder: "Ăn uống")
-                            MPWalletSelector(title: "Cách phân bổ", options: ["none", "fixed", "percent"], selection: $mode)
-                            if mode == "fixed" { MPAmountField(title: "Số tiền mỗi tháng", text: $amount) }
-                            if mode == "percent" { MPTextField(title: "Tỷ lệ (%)", text: $percent, placeholder: "20") }
-                            HStack { MPButton("Hủy", style: .secondary) { showEditor = false }; MPButton("Lưu") { Task { await save() } } }
-                        }
-                    }
-                }
-            }
-            .padding(MPMetrics.pagePadding)
+        Group {
+            if showEditor { editorContent } else { listContent }
         }
         .background(MPColor.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: MPMetrics.hitTarget * 2)
-        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .onChange(of: month) { _, _ in
+            editTarget = nil
+            resetEditor()
+            showEditor = false
             report = nil
             reportError = nil
             Task { await load() }
@@ -482,7 +835,93 @@ struct JarsView: View {
                 percent = ""
             }
         }
-        .accessibilityIdentifier("jars-screen")
+    }
+
+    private var listContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MPScreenHeader(title: "Hũ chi tiêu", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+                MPOptionSelector(title: "Tháng", options: MPFormat.monthOptions(around: month, timeZone: TimeZone(identifier: accountTimezone) ?? .current).map { MPSelectionOption(id: $0, label: MPFormat.monthLabel($0)) }, selectionID: $month)
+                if loading { MPLoadingView(label: "Đang tải hũ tháng này...") }
+                if let summary {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                        MPMetricCard(title: "Thu thực tế", value: MPFormat.money(summary.actualIncome, masked: masked))
+                        MPMetricCard(title: "Chi thực tế", value: MPFormat.money(summary.totalSpent, masked: masked))
+                        MPMetricCard(title: "Đã phân bổ", value: MPFormat.money(summary.totalAllocated, masked: masked))
+                        MPMetricCard(title: "Chi chưa gắn hũ", value: MPFormat.money(summary.unassignedSpent, masked: masked))
+                    }
+                    if summary.overIncome || summary.overOneHundredPercent {
+                        MPStatusMessage(text: "Tổng phân bổ vượt thu thực tế. Đây là cảnh báo, không chặn giao dịch.", tone: .danger)
+                    }
+                    HStack {
+                        MPText("Hũ tháng", style: .title)
+                        Spacer()
+                        MPButton(JarsReferenceCopy.addAction, style: .secondary, fullWidth: false) {
+                            if editTarget != nil { resetEditor() }
+                            editTarget = nil
+                            error = nil
+                            showEditor = true
+                        }
+                        .accessibilityIdentifier(JarsReferenceCopy.addActionAccessibilityID)
+                    }
+                    if summary.items.isEmpty { MPEmptyView(title: "Chưa có hũ cho tháng này", detail: "Chi tiêu vẫn được ghi nhận bình thường.") }
+                    ForEach(summary.items) { item in
+                        MPSurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                MPText(item.name)
+                                if let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil) {
+                                    MPProgressBar(progress: Double(item.spent) / Double(max(1, allocation)), label: "Đã chi \(MPFormat.money(item.spent, masked: masked)) / \(MPFormat.money(allocation, masked: masked))")
+                                } else {
+                                    MPText("Chưa đặt phân bổ · Đã chi \(MPFormat.money(item.spent, masked: masked))", style: .secondary)
+                                }
+                                if item.active {
+                                    HStack {
+                                        MPButton("Sửa tháng này", style: .secondary) { beginEditing(item) }
+                                        MPButton("Gỡ khỏi tháng", style: .destructive) { Task { await remove(item) } }
+                                    }
+                                } else {
+                                    MPText("Cấu hình lịch sử; giao dịch vẫn được giữ.", style: .secondary)
+                                }
+                            }
+                        }
+                    }
+                    MPAssistantCard(title: "Cộng dồn") {
+                        if summary.jars.isEmpty {
+                            MPEmptyView(title: "Chưa có hũ", detail: "Tạo hũ để xem chi tiêu cộng dồn.")
+                        } else {
+                            MPOptionSelector(title: "Chọn hũ", options: summary.jars.map { MPSelectionOption(id: $0.jarID, label: $0.name) }, selectionID: $reportJarID)
+                            if reportLoading { MPLoadingView(label: "Đang tải báo cáo cộng dồn...") }
+                            if let reportError { MPStatusMessage(text: reportError, tone: .info) }
+                            if let report {
+                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                                    MPMetricCard(title: "Chi thực tế", value: MPFormat.money(report.totalSpent, masked: masked))
+                                    MPMetricCard(title: "Đã phân bổ", value: MPFormat.money(report.totalAllocated, masked: masked))
+                                }
+                                MPText("\(MPFormat.monthLabel(report.fromMonth)) → \(MPFormat.monthLabel(report.toMonth)) · Không cộng dồn số dư.", style: .secondary)
+                                ForEach(report.months, id: \.month) { item in
+                                    HStack { MPText(MPFormat.monthLabel(item.month)); Spacer(); MPText(MPFormat.money(item.spent, masked: masked), style: .secondary) }
+                                }
+                            }
+                        }
+                    }
+                } else if let error { MPErrorView(title: "Không tải được hũ", detail: error) { Task { await load() } } }
+                else if !loading { MPEmptyView(title: "Chưa chọn tháng", detail: "Hũ là lớp ngân sách theo tháng và không thay đổi số dư ví.") }
+
+            }
+            .padding(MPMetrics.pagePadding)
+        }
+    }
+
+    private var editorContent: some View {
+        MPEditorScaffold(title: editTarget == nil ? "Tạo hũ" : "Sửa hũ", isBusy: saving, onCancel: { showEditor = false }) {
+            MPTextField(title: "Tên", text: $name, placeholder: "Ăn uống")
+            MPWalletSelector(title: "Cách phân bổ", options: ["none", "fixed", "percent"], selection: $mode)
+            if mode == "fixed" { MPAmountField(title: "Số tiền mỗi tháng", text: $amount) }
+            if mode == "percent" { MPNumberField(title: "Tỷ lệ (%)", text: $percent, kind: .percentage, placeholder: "20") }
+            if let error { MPStatusMessage(text: error, tone: .danger) }
+        } footer: {
+            MPButton("Lưu", isLoading: saving) { Task { await save() } }
+        }
     }
 
     private func load() async {
@@ -509,14 +948,23 @@ struct JarsView: View {
         } catch { self.error = "Không thể tải hũ chi tiêu." }
     }
     private func resetEditor() { name = ""; mode = "none"; amount = ""; percent = "" }
-    private func beginEditing(_ item: JarItemModel) { editTarget = item; name = item.name; mode = item.allocationMode; amount = item.allocationAmount.map { String($0) } ?? ""; percent = item.allocationPercent.map { String($0) } ?? ""; showEditor = true }
+    private func beginEditing(_ item: JarItemModel) {
+        if editTarget?.jarID == item.jarID {
+            editTarget = item
+            showEditor = true
+            return
+        }
+        editTarget = item; name = item.name; mode = item.allocationMode; amount = item.allocationAmount.map { String($0) } ?? ""; percent = item.allocationPercent.map { String($0) } ?? ""; showEditor = true
+    }
     private func save() async {
+        guard !saving else { return }
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { error = "Nhập tên hũ."; return }
         let parsedAmount = MPFormat.parseNonNegativeInteger(amount)
-        let parsedPercent = Double(percent.replacingOccurrences(of: ",", with: "."))
+        let parsedPercent = MPNumberInputKind.percentage.normalized(percent).flatMap(Double.init)
         guard JarAllocationDraftValidator.isValid(mode: mode, amount: parsedAmount, percent: parsedPercent) else { error = "Cách phân bổ không hợp lệ."; return }
         let input = JarConfigInputModel(month: month, name: name.trimmingCharacters(in: .whitespacesAndNewlines), allocationMode: mode, allocationAmount: mode == "fixed" ? parsedAmount : nil, allocationPercent: mode == "percent" ? parsedPercent : nil)
-        do { if let editTarget { _ = try await api.updateJarMonth(jarID: editTarget.jarID, month: month, input: input) } else { _ = try await api.createJar(input) }; showEditor = false; await load() }
+        saving = true; error = nil; defer { saving = false }
+        do { if let editTarget { _ = try await api.updateJarMonth(jarID: editTarget.jarID, month: month, input: input) } else { _ = try await api.createJar(input) }; showEditor = false; editTarget = nil; resetEditor(); await load() }
         catch { self.error = "Không thể lưu hũ." }
     }
     private func remove(_ item: JarItemModel) async { do { try await api.removeJarMonth(jarID: item.jarID, month: month); await load() } catch { self.error = "Không thể gỡ hũ khỏi tháng." } }
@@ -528,10 +976,29 @@ struct JarsView: View {
     }
 }
 
+enum MonthsPresentation {
+    static func timezoneLabel(_ timezone: String) -> String {
+        "theo múi giờ tài khoản"
+    }
+
+    static func reportPeriod(startAt: String, nextStartAt: String, timeZone: TimeZone) -> String {
+        guard
+            let start = MPFormat.parseInstant(startAt),
+            let nextStart = MPFormat.parseInstant(nextStartAt)
+        else { return "Không xác định kỳ báo cáo" }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let inclusiveEnd = calendar.date(byAdding: .day, value: -1, to: nextStart) ?? nextStart
+        return "\(MPFormat.shortDate(MPFormat.instantString(start), timeZone: timeZone)) – \(MPFormat.shortDate(MPFormat.instantString(inclusiveEnd), timeZone: timeZone))"
+    }
+}
+
 struct MonthsView: View {
     let api: FinanceAPI
     let onBack: () -> Void
     let onOpenJars: () -> Void
+    let masked: Bool
     @State private var month = MPFormat.currentMonth
     @State private var summary: MonthSummaryModel?
     @State private var note = ""
@@ -550,21 +1017,22 @@ struct MonthsView: View {
                 if let summary {
                     MPSurfaceCard {
                         VStack(alignment: .leading, spacing: 10) {
+                            let reportTimeZone = TimeZone(identifier: summary.timezone) ?? accountTimezoneValue
                             HStack {
                                 VStack(alignment: .leading, spacing: 4) {
                                     MPText(MPFormat.monthLabel(summary.month), style: .title)
-                                    MPText(summary.isComplete ? "Đã hoàn tất" : "Đang diễn ra", style: .secondary)
+                                    MPText("\(summary.isComplete ? "Đã hoàn tất" : "Đang diễn ra") · \(MonthsPresentation.timezoneLabel(summary.timezone))", style: .secondary)
                                 }
                                 Spacer()
                                 MPButton("Hũ tháng", style: .secondary, action: onOpenJars)
                             }
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                                MPMetricCard(title: "Thu", value: MPFormat.money(summary.income))
-                                MPMetricCard(title: "Chi", value: MPFormat.money(summary.expense))
-                                MPMetricCard(title: "Chênh lệch", value: MPFormat.signedMoney(summary.net))
+                                MPMetricCard(title: "Thu", value: MPFormat.money(summary.income, masked: masked))
+                                MPMetricCard(title: "Chi", value: MPFormat.money(summary.expense, masked: masked))
+                                MPMetricCard(title: "Chênh lệch", value: MPFormat.signedMoney(summary.net, masked: masked))
                                 MPMetricCard(title: "Giao dịch", value: "\(summary.transactionCount)")
                             }
-                            MPText("Kỳ báo cáo: \(MPFormat.shortDate(summary.startAt, timeZone: accountTimezoneValue)) – \(MPFormat.shortDate(summary.nextStartAt, timeZone: accountTimezoneValue))", style: .secondary)
+                            MPText("Kỳ báo cáo: \(MonthsPresentation.reportPeriod(startAt: summary.startAt, nextStartAt: summary.nextStartAt, timeZone: reportTimeZone))", style: .secondary)
                         }
                     }
                     MPAssistantCard(title: "Theo nhóm") {
@@ -578,7 +1046,7 @@ struct MonthsView: View {
                                         MPText("\(item.type == "income" ? "Thu" : "Chi") · \(item.count) giao dịch", style: .secondary)
                                     }
                                     Spacer()
-                                    MPText(MPFormat.money(item.amount), style: .secondary)
+                                    MPText(MPFormat.money(item.amount, masked: masked), style: .secondary)
                                 }
                             }
                         }
@@ -588,7 +1056,7 @@ struct MonthsView: View {
                             ForEach(jarSummary.items) { item in
                                 let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil)
                                 VStack(alignment: .leading, spacing: 5) {
-                                    HStack { MPText(item.name); Spacer(); MPText(MPFormat.money(item.spent), style: .secondary) }
+                                    HStack { MPText(item.name); Spacer(); MPText(MPFormat.money(item.spent, masked: masked), style: .secondary) }
                                     if let allocation {
                                         MPProgressBar(progress: Double(item.spent) / Double(max(1, allocation)), label: "Mức sử dụng hũ")
                                     }
@@ -615,9 +1083,6 @@ struct MonthsView: View {
             .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: MPMetrics.hitTarget * 2)
-        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .mpConfirmDialog(isPresented: Binding(get: { pendingMonth != nil }, set: { if !$0 { pendingMonth = nil } }), title: "Bỏ ghi chú đang sửa?", message: "Nội dung chưa lưu sẽ bị bỏ khi chuyển tháng.", confirmTitle: "Chuyển tháng") {
@@ -626,7 +1091,6 @@ struct MonthsView: View {
                 month = next
                 Task { await load() }
         }
-        .accessibilityIdentifier("months-screen")
     }
 
     private var accountTimezoneValue: TimeZone { TimeZone(identifier: accountTimezone) ?? .current }
@@ -718,7 +1182,7 @@ enum RecurringDraftValidator {
     ) -> Bool {
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
               positiveInteger(amount) != nil,
-              positiveInteger(interval) != nil,
+              MPFormat.parsePositiveInteger(interval) != nil,
               type == "expense" || type == "income",
               ["daily", "weekly", "monthly", "yearly"].contains(frequency) else { return false }
         return !endsAtEnabled || endsAtDate >= nextRunDate
@@ -728,6 +1192,7 @@ enum RecurringDraftValidator {
 struct RecurringView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    @Environment(\.mpFinancialValuesMasked) private var masked
     @State private var items: [RecurringModel] = []
     @State private var wallets: [WalletModel] = []
     @State private var categories: [CategoryModel] = []
@@ -739,6 +1204,7 @@ struct RecurringView: View {
     @State private var frequency = "monthly"
     @State private var type = "expense"
     @State private var categoryID = ""
+    @State private var categoryPickerPresented = false
     @State private var interval = "1"
     @State private var active = "Có"
     @State private var note = ""
@@ -748,63 +1214,14 @@ struct RecurringView: View {
     @State private var accountTimezone = TimeZone.current.identifier
     @State private var result: String?
     @State private var error: String?
+    @State private var saving = false
     @State private var deleteTarget: RecurringModel?
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Giao dịch định kỳ", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm lịch") { editTarget = nil; resetEditor(); showEditor = true } })
-                MPSurfaceCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        MPText("Giao dịch định kỳ", style: .title)
-                        MPText("Lịch bật sẽ sinh giao dịch thường theo múi giờ tài khoản. Mỗi kỳ chỉ tạo một lần; giao dịch đã tạo vẫn có thể sửa hoặc xóa như bình thường.", style: .secondary)
-                        MPButton("Chạy các giao dịch đến hạn", style: .secondary) { Task { await runDue() } }
-                    }
-                }
-                if let result { MPStatusMessage(text: result, tone: .success) }
-                if let error { MPStatusMessage(text: error, tone: .danger) }
-                if items.isEmpty { MPEmptyView(title: "Chưa có lịch định kỳ", detail: "Lịch định kỳ chỉ tạo giao dịch khi bạn chủ động chạy.") }
-                ForEach(items) { item in
-                    MPSurfaceCard {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                MPText(item.name)
-                                Spacer()
-                                MPText(item.active ? "Đang bật" : "Tạm dừng", style: .secondary)
-                            }
-                            MPText("\(item.type == "expense" ? "Khoản chi" : "Khoản thu") · \(frequencyLabel(item.frequency, interval: item.interval)) · \(MPFormat.money(item.amount))", style: .secondary)
-                            MPText("Ví: \(walletName(for: item.walletID))", style: .secondary)
-                            MPText("Lần chạy kế tiếp: \(MPFormat.shortDateTime(item.nextRunAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
-                            if let note = item.note, !note.isEmpty { MPText(note, style: .secondary) }
-                            HStack { MPButton("Sửa", style: .secondary) { beginEditing(item) }; MPButton("Xóa", style: .destructive) { deleteTarget = item } }
-                        }
-                    }
-                }
-                if showEditor {
-                    MPSurfaceCard { VStack(alignment: .leading, spacing: 10) {
-                        MPText(editTarget == nil ? "Tạo lịch" : "Sửa lịch", style: .title)
-                        MPTextField(title: "Tên", text: $name)
-                        MPAmountField(title: "Số tiền", text: $amount)
-                        MPOptionSelector(title: "Ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
-                        MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $type)
-                        MPOptionSelector(title: "Danh mục", options: categoriesForType.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryID)
-                        MPWalletSelector(title: "Tần suất", options: ["daily", "weekly", "monthly", "yearly"], selection: $frequency)
-                        MPAmountField(title: "Mỗi bao nhiêu kỳ", text: $interval)
-                        MPDateTimeField(title: "Lần chạy kế tiếp", date: $nextRunDate)
-                        MPWalletSelector(title: "Có ngày kết thúc", options: ["Có", "Không"], selection: $endsAtEnabled)
-                        if endsAtEnabled == "Có" { MPDateTimeField(title: "Ngày kết thúc", date: $endsAtDate) }
-                        MPWalletSelector(title: "Trạng thái", options: ["Có", "Không"], selection: $active)
-                        MPTextField(title: "Ghi chú", text: $note, placeholder: "Không bắt buộc")
-                        HStack { MPButton("Hủy", style: .secondary) { showEditor = false; editTarget = nil }; MPButton("Lưu") { Task { await save() } } }
-                    } }
-                }
-            }
-            .padding(MPMetrics.pagePadding)
+        Group {
+            if showEditor { editorContent } else { listContent }
         }
         .background(MPColor.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: MPMetrics.hitTarget * 2)
-        }
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .onChange(of: type) { _, _ in
@@ -814,7 +1231,26 @@ struct RecurringView: View {
             if let target = deleteTarget { Task { await delete(target) } }
             deleteTarget = nil
         }
-        .accessibilityIdentifier("recurring-screen")
+        .mpFormBottomSheet(
+            isPresented: $categoryPickerPresented,
+            title: "Chọn danh mục",
+            accessibilityIdentifier: "recurring-category-picker-sheet",
+            onClose: { categoryPickerPresented = false },
+            fields: {
+                MPCategoryPicker(
+                    categories: categories,
+                    kind: type,
+                    selectableIDs: Set(categoriesForType.map(\.id)),
+                    selectedID: categoryID,
+                    clearLabel: nil,
+                    clearID: nil,
+                    onSelect: { categoryID = $0; categoryPickerPresented = false }
+                )
+            },
+            footer: {
+                MPButton("Đóng", style: .secondary) { categoryPickerPresented = false }
+            }
+        )
     }
 
     private var categoriesForType: [CategoryModel] {
@@ -832,11 +1268,98 @@ struct RecurringView: View {
         }
         return interval == 1 ? label : "Mỗi \(interval) kỳ · \(label.lowercased())"
     }
+    private var listContent: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                MPScreenHeader(title: "Giao dịch định kỳ", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+                MPSurfaceCard {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            MPText("Giao dịch định kỳ", style: .title)
+                            Spacer()
+                            MPButton(RecurringReferenceCopy.addAction, fullWidth: false) {
+                                if editTarget != nil { resetEditor() }
+                                editTarget = nil
+                                error = nil
+                                showEditor = true
+                            }
+                            .accessibilityIdentifier(RecurringReferenceCopy.addActionAccessibilityID)
+                        }
+                        MPText("Lịch bật sẽ sinh giao dịch thường theo múi giờ tài khoản. Mỗi kỳ chỉ tạo một lần; giao dịch đã tạo vẫn có thể sửa hoặc xóa như bình thường.", style: .secondary)
+                        MPButton("Chạy các giao dịch đến hạn", style: .secondary) { Task { await runDue() } }
+                    }
+                }
+                if let result { MPStatusMessage(text: result, tone: .success) }
+                if let error { MPStatusMessage(text: error, tone: .danger) }
+                if items.isEmpty { MPEmptyView(title: "Chưa có lịch định kỳ", detail: "Lịch định kỳ chỉ tạo giao dịch khi bạn chủ động chạy.") }
+                ForEach(items) { item in
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack {
+                                MPText(item.name)
+                                Spacer()
+                                MPStatusBadge(text: item.active ? "Đang bật" : "Tạm dừng", tone: MPStatusBadge.tone(for: item.active))
+                            }
+                            MPText("\(item.type == "expense" ? "Khoản chi" : "Khoản thu") · \(frequencyLabel(item.frequency, interval: item.interval)) · \(MPFormat.money(item.amount, masked: masked))", style: .secondary)
+                            MPText("Ví: \(walletName(for: item.walletID))", style: .secondary)
+                            MPText("Lần chạy kế tiếp: \(MPFormat.shortDateTime(item.nextRunAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
+                            if let note = item.note, !note.isEmpty { MPText(note, style: .secondary) }
+                            HStack {
+                                MPButton("Sửa", style: .secondary) { beginEditing(item) }
+                                    .accessibilityIdentifier("recurring-edit-\(item.id)")
+                                MPButton("Xóa", style: .destructive) { deleteTarget = item }
+                                    .accessibilityIdentifier("recurring-delete-\(item.id)")
+                            }
+                        }
+                    }
+                }
+
+            }
+            .padding(MPMetrics.pagePadding)
+        }
+    }
+
+    private var editorContent: some View {
+        MPEditorScaffold(title: editTarget == nil ? "Tạo lịch" : "Sửa lịch", isBusy: saving, onCancel: { showEditor = false }) {
+            MPTextField(title: "Tên", text: $name, accessibilityIdentifier: "recurring-name")
+            MPAmountField(title: "Số tiền", text: $amount)
+            MPOptionSelector(title: "Ví", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
+            MPWalletSelector(title: "Loại", options: ["expense", "income"], selection: $type)
+            MPFormRow(
+                title: "Danh mục",
+                iconName: "tag",
+                value: categories.first(where: { $0.id == categoryID }).map { $0.name + ($0.isActive == false ? " (đã lưu trữ)" : "") } ?? "Chọn danh mục",
+                accessibilityIdentifier: "recurring-category-row"
+            ) { categoryPickerPresented = true }
+            MPWalletSelector(title: "Tần suất", options: ["daily", "weekly", "monthly", "yearly"], selection: $frequency)
+            MPNumberField(title: "Mỗi bao nhiêu kỳ", text: $interval, kind: .integer)
+            MPDateTimeField(title: "Lần chạy kế tiếp", date: $nextRunDate, timeZone: accountTimezone)
+            MPWalletSelector(title: "Có ngày kết thúc", options: ["Có", "Không"], selection: $endsAtEnabled)
+            if endsAtEnabled == "Có" { MPDateTimeField(title: "Ngày kết thúc", date: $endsAtDate, timeZone: accountTimezone) }
+            MPWalletSelector(title: "Trạng thái", options: ["Có", "Không"], selection: $active)
+            MPTextField(title: "Ghi chú", text: $note, placeholder: "Không bắt buộc")
+            if categories.first(where: { $0.id == categoryID })?.isActive == false {
+                MPStatusMessage(text: "Lịch hiện tại giữ nhóm đã lưu trữ; chọn nhóm đang hoạt động để thay đổi.", tone: .info)
+            }
+            if let error { MPStatusMessage(text: error, tone: .danger) }
+        } footer: {
+            MPButton("Lưu", isLoading: saving) { Task { await save() } }
+        }
+    }
+
     private func load() async { do { async let schedules = api.recurring(); async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); items = try await schedules; wallets = (try await walletList).filter { $0.type != "credit" }; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone }; if walletID.isEmpty { walletID = wallets.first?.id ?? "" }; categoryID = TransactionEditorPolicy.requiredCategoryID(type: type, walletID: walletID, walletType: wallets.first(where: { $0.id == walletID })?.type ?? "basic", categories: categories, currentID: categoryID); self.error = nil } catch { self.error = "Không thể tải lịch định kỳ." } }
     private func runDue() async { do { let response = try await api.runDueRecurring(); result = "Đã tạo \(response.created) giao dịch."; await load() } catch { self.error = "Không thể chạy giao dịch đến hạn." } }
     private func resetEditor() { name = ""; amount = ""; walletID = wallets.first?.id ?? ""; frequency = "monthly"; type = "expense"; categoryID = TransactionEditorPolicy.requiredCategoryID(type: "expense", walletID: wallets.first?.id ?? "", walletType: wallets.first?.type ?? "basic", categories: categories, currentID: ""); interval = "1"; note = ""; nextRunDate = Date(); endsAtDate = Date(); endsAtEnabled = "Không"; active = "Có" }
-    private func beginEditing(_ item: RecurringModel) { editTarget = item; name = item.name; amount = String(item.amount); note = item.note ?? ""; walletID = item.walletID; type = item.type; categoryID = TransactionEditorPolicy.requiredCategoryID(type: item.type, walletID: item.walletID, walletType: wallets.first(where: { $0.id == item.walletID })?.type ?? "basic", categories: categories, currentID: item.categoryID ?? ""); frequency = item.frequency; interval = String(item.interval); nextRunDate = MPFormat.parseInstant(item.nextRunAt) ?? Date(); if let endsAt = item.endsAt, let parsed = MPFormat.parseInstant(endsAt) { endsAtDate = parsed; endsAtEnabled = "Có" } else { endsAtDate = Date(); endsAtEnabled = "Không" }; active = item.active ? "Có" : "Không"; showEditor = true }
+    private func beginEditing(_ item: RecurringModel) {
+        if editTarget?.id == item.id {
+            editTarget = item
+            showEditor = true
+            return
+        }
+        editTarget = item; name = item.name; amount = String(item.amount); note = item.note ?? ""; walletID = item.walletID; type = item.type; categoryID = TransactionEditorPolicy.requiredCategoryID(type: item.type, walletID: item.walletID, walletType: wallets.first(where: { $0.id == item.walletID })?.type ?? "basic", categories: categories, currentID: item.categoryID ?? ""); frequency = item.frequency; interval = String(item.interval); nextRunDate = MPFormat.parseInstant(item.nextRunAt) ?? Date(); if let endsAt = item.endsAt, let parsed = MPFormat.parseInstant(endsAt) { endsAtDate = parsed; endsAtEnabled = "Có" } else { endsAtDate = Date(); endsAtEnabled = "Không" }; active = item.active ? "Có" : "Không"; showEditor = true
+    }
     private func save() async {
+        guard !saving else { return }
         guard let wallet = wallets.first(where: { $0.id == walletID }),
               RecurringDraftValidator.isValid(
                   name: name,
@@ -849,11 +1372,13 @@ struct RecurringView: View {
                   endsAtDate: endsAtDate
               ),
               let parsed = RecurringDraftValidator.positiveInteger(amount),
-              let parsedInterval = RecurringDraftValidator.positiveInteger(interval).flatMap(Int.init) else {
+              let parsedInterval = MPFormat.parsePositiveInteger(interval).flatMap(Int.init) else {
             self.error = "Nhập đủ tên, ví, nhóm, chu kỳ và số tiền hợp lệ."
             return
         }
-        guard let category = categoriesForType.first(where: { $0.id == categoryID }) else {
+        guard let category = categories.first(where: { $0.id == categoryID }),
+              category.applies(to: type, walletID: wallet.id, walletType: wallet.type)
+                || (editTarget?.categoryID == category.id && category.isActive == false && category.appliesIgnoringActivity(to: type, walletID: wallet.id, walletType: wallet.type)) else {
             self.error = "Hãy chọn nhóm cho lịch định kỳ."
             return
         }
@@ -871,11 +1396,13 @@ struct RecurringView: View {
             endsAt: endsAtEnabled == "Có" ? MPFormat.instantString(endsAtDate) : nil,
             active: active == "Có"
         )
+        saving = true; error = nil; defer { saving = false }
         do {
             if let editTarget { _ = try await api.updateRecurring(id: editTarget.id, input: input) }
             else { _ = try await api.createRecurring(input) }
             showEditor = false
             self.editTarget = nil
+            resetEditor()
             await load()
         } catch { self.error = "Không thể lưu lịch định kỳ." }
     }
@@ -885,8 +1412,10 @@ struct RecurringView: View {
 struct TravelView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    @Environment(\.mpFinancialValuesMasked) private var masked
     @State private var events: [TravelEventModel] = []
     @State private var error: String?
+    @State private var saving = false
     @State private var name = ""
     @State private var context = ""
     @State private var adding = false
@@ -894,13 +1423,35 @@ struct TravelView: View {
     @State private var deleteTarget: TravelEventModel?
     @State private var startsOn = ""
     @State private var endsOn = ""
+    @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
+        Group {
+            if adding { editorContent } else { listContent }
+        }
+        .background(MPColor.canvas.ignoresSafeArea())
+        .task { await load() }
+        .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa chuyến đi?", message: "Giao dịch vẫn được giữ nguyên; chỉ gỡ liên kết chuyến.", confirmTitle: "Xóa") {
+            if let target = deleteTarget { Task { await remove(target) } }
+            deleteTarget = nil
+        }
+    }
+    private var listContent: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
-            MPScreenHeader(title: "Travel Mode", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { MPIconButton(systemName: "plus", label: "Thêm chuyến đi") { editTarget = nil; resetEditor(); adding = true } })
+            MPScreenHeader(title: "Travel Mode", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
             MPSurfaceCard {
                 VStack(alignment: .leading, spacing: 8) {
-                    MPText("Travel Mode", style: .title)
+                    HStack {
+                        MPText("Travel Mode", style: .title)
+                        Spacer()
+                        MPButton(TravelReferenceCopy.addAction, fullWidth: false) {
+                            if editTarget != nil { resetEditor() }
+                            editTarget = nil
+                            error = nil
+                            adding = true
+                        }
+                        .accessibilityIdentifier(TravelReferenceCopy.addActionAccessibilityID)
+                    }
                     MPText("Gắn giao dịch thu/chi vào một chuyến để xem bối cảnh. Chuyến không phải là ví và không đổi số dư.", style: .secondary)
                     if let active = events.first(where: { $0.active }) {
                         MPText("Đang bật: \(active.name). Giao dịch thu/chi thường mới sẽ tự gắn chuyến này.", style: .secondary)
@@ -921,45 +1472,55 @@ struct TravelView: View {
                             }
                             Spacer()
                             MPButton(event.active ? "Tắt" : "Bật", style: event.active ? .destructive : .secondary) { Task { await toggle(event) } }
+                                .accessibilityIdentifier("travel-toggle-\(event.id)")
                         }
                         MPText(eventDateLabel(event), style: .secondary)
                         if let context = event.context, !context.isEmpty { MPText(context, style: .secondary) }
                         HStack {
                             MPButton("Sửa", style: .secondary) { beginEditing(event) }
+                                .accessibilityIdentifier("travel-edit-\(event.id)")
                             MPButton("Xóa", style: .destructive) { deleteTarget = event }
+                                .accessibilityIdentifier("travel-delete-\(event.id)")
                         }
                     }
                 }
             }
-            if adding {
-                MPSurfaceCard {
-                    VStack(alignment: .leading, spacing: 10) {
-                        MPText(editTarget == nil ? "Chuyến đi mới" : "Sửa chuyến đi", style: .title)
-                        MPText("Chỉ giao dịch thu/chi tạo mới mới tự nhận chuyến đang bật. Giao dịch định kỳ, chuyển ví và điều chỉnh số dư không tự gắn.", style: .secondary)
-                        MPTextField(title: "Tên", text: $name)
-                        MPTextEditor(title: "Mô tả", text: $context)
-                        MPTextField(title: "Ngày bắt đầu (YYYY-MM-DD)", text: $startsOn)
-                        MPTextField(title: "Ngày kết thúc (YYYY-MM-DD)", text: $endsOn)
-                        HStack { MPButton("Hủy", style: .secondary) { adding = false }; MPButton("Lưu") { Task { await save() } } }
-                    }
-                }
-            }
+
         }.padding(MPMetrics.pagePadding) }
-        .background(MPColor.canvas.ignoresSafeArea())
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: MPMetrics.hitTarget * 2)
-        }
-        .task { await load() }
-        .mpConfirmDialog(isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }), title: "Xóa chuyến đi?", message: "Giao dịch vẫn được giữ nguyên; chỉ gỡ liên kết chuyến.", confirmTitle: "Xóa") {
-            if let target = deleteTarget { Task { await remove(target) } }
-            deleteTarget = nil
-        }
-        .accessibilityIdentifier("travel-screen")
     }
-    private func load() async { do { events = try await api.travelEvents(); self.error = nil } catch { self.error = "Không thể tải sự kiện du lịch." } }
+
+    private var editorContent: some View {
+        MPEditorScaffold(title: editTarget == nil ? "Chuyến đi mới" : "Sửa chuyến đi", isBusy: saving, onCancel: { adding = false }) {
+            MPText("Chỉ giao dịch thu/chi tạo mới mới tự nhận chuyến đang bật. Giao dịch định kỳ, chuyển ví và điều chỉnh số dư không tự gắn.", style: .secondary)
+            MPTextField(title: "Tên", text: $name)
+            MPTextEditor(title: "Mô tả", text: $context)
+            MPOptionalDateField(title: "Ngày bắt đầu", value: $startsOn, timeZone: accountTimezone, accessibilityIdentifier: "travel-start")
+            MPOptionalDateField(title: "Ngày kết thúc", value: $endsOn, timeZone: accountTimezone, accessibilityIdentifier: "travel-end")
+            if let error { MPStatusMessage(text: error, tone: .danger) }
+        } footer: {
+            MPButton("Lưu", isLoading: saving) { Task { await save() } }
+        }
+    }
+
+    private func load() async {
+        do {
+            async let eventList = api.travelEvents()
+            async let profile = api.profile()
+            events = try await eventList
+            if let owner = try? await profile { accountTimezone = owner.timezone }
+            self.error = nil
+        } catch { self.error = "Không thể tải sự kiện du lịch." }
+    }
     private func toggle(_ event: TravelEventModel) async { do { _ = try await api.setTravelEventActive(id: event.id, active: !event.active); await load() } catch { self.error = "Không thể cập nhật Travel Mode." } }
     private func resetEditor() { name = ""; context = ""; startsOn = ""; endsOn = "" }
-    private func beginEditing(_ event: TravelEventModel) { editTarget = event; name = event.name; context = event.context ?? ""; startsOn = event.startsOn ?? ""; endsOn = event.endsOn ?? ""; adding = true }
+    private func beginEditing(_ event: TravelEventModel) {
+        if editTarget?.id == event.id {
+            editTarget = event
+            adding = true
+            return
+        }
+        editTarget = event; name = event.name; context = event.context ?? ""; startsOn = event.startsOn ?? ""; endsOn = event.endsOn ?? ""; adding = true
+    }
     private func eventDateLabel(_ event: TravelEventModel) -> String {
         switch (event.startsOn, event.endsOn) {
         case let (start?, end?): return "\(start) → \(end)"
@@ -968,7 +1529,7 @@ struct TravelView: View {
         default: return "Không giới hạn ngày"
         }
     }
-    private func save() async { guard TravelEventDraftValidator.isValid(name: name, startsOn: startsOn, endsOn: endsOn) else { self.error = "Tên chuyến và khoảng ngày không hợp lệ."; return }; let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines); let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines); let input = TravelEventInputModel(name: trimmedName, context: trimmedContext.isEmpty ? nil : trimmedContext, startsOn: startsOn.isEmpty ? nil : startsOn, endsOn: endsOn.isEmpty ? nil : endsOn, active: editTarget?.active ?? false); do { if let editTarget { _ = try await api.updateTravelEvent(id: editTarget.id, input: input) } else { _ = try await api.createTravelEvent(input) }; resetEditor(); adding = false; await load() } catch { self.error = "Không thể lưu chuyến đi." } }
+    private func save() async { guard !saving else { return }; guard TravelEventDraftValidator.isValid(name: name, startsOn: startsOn, endsOn: endsOn) else { self.error = "Tên chuyến và khoảng ngày không hợp lệ."; return }; let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines); let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines); let input = TravelEventInputModel(name: trimmedName, context: trimmedContext.isEmpty ? nil : trimmedContext, startsOn: startsOn.isEmpty ? nil : startsOn, endsOn: endsOn.isEmpty ? nil : endsOn, active: editTarget?.active ?? false); saving = true; error = nil; defer { saving = false }; do { if let editTarget { _ = try await api.updateTravelEvent(id: editTarget.id, input: input) } else { _ = try await api.createTravelEvent(input) }; resetEditor(); editTarget = nil; adding = false; await load() } catch { self.error = "Không thể lưu chuyến đi." } }
     private func remove(_ event: TravelEventModel) async { do { try await api.deleteTravelEvent(id: event.id); await load() } catch { self.error = "Không thể xóa chuyến đi." } }
 }
 
@@ -990,65 +1551,61 @@ enum TravelEventDraftValidator {
 struct PortfolioView: View {
     let api: FinanceAPI
     let onBack: () -> Void
+    @Environment(\.mpFinancialValuesMasked) private var masked
     @State private var summary: PortfolioSummaryModel?
+    @State private var tradeHistory: [PortfolioTradeModel] = []
     @State private var error: String?
-    @State private var adding = false
     @State private var symbol = ""
     @State private var assetName = ""
-    @State private var tradeAsset: PortfolioAssetModel?
+    @State private var tradeAssetID = ""
     @State private var tradeSide = "buy"
     @State private var tradeQuantity = ""
     @State private var tradePrice = ""
     @State private var tradeFee = ""
     @State private var tradeDate = Date()
     @State private var priceByAsset: [String: String] = [:]
+    @State private var assetEditorPresented = false
+    @State private var tradeEditorPresented = false
+    @State private var priceTarget: PortfolioAssetModel?
+    @State private var deleteTarget: PortfolioAssetModel?
+    @State private var saving = false
     @State private var accountTimezone = TimeZone.current.identifier
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
                 MPScreenHeader(title: "Danh mục đầu tư", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
-                    HStack(spacing: 8) {
-                        MPIconButton(systemName: "arrow.clockwise", label: "Làm mới") { Task { await load() } }
-                        MPIconButton(systemName: "plus", label: "Thêm tài sản") { adding = true }
-                    }
+                    MPButton(PortfolioReferenceCopy.refreshAction, style: .secondary, fullWidth: false) { Task { await load() } }
+                        .accessibilityIdentifier(PortfolioReferenceCopy.refreshActionAccessibilityID)
                 })
+                MPText(PortfolioReferenceCopy.subtitle, style: .secondary)
+                    .accessibilityIdentifier("portfolio-subtitle")
+                HStack(spacing: 8) {
+                    MPButton("Thêm tài sản", style: .secondary) { error = nil; assetEditorPresented = true }
+                        .accessibilityIdentifier("portfolio-open-asset-editor")
+                    MPButton("Ghi giao dịch", style: .secondary, isDisabled: summary?.assets.isEmpty != false) { error = nil; tradeEditorPresented = true }
+                        .accessibilityIdentifier("portfolio-open-trade-editor")
+                }
+                if let error, summary != nil { MPStatusMessage(text: error, tone: .danger) }
                 if let summary {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        MPMetricCard(title: "Giá vốn", value: MPFormat.money(summary.totalCostBasis))
-                        MPMetricCard(title: "Giá trị hiện tại", value: summary.totalMarketValue.map(MPFormat.money) ?? "Chưa có giá")
-                        MPMetricCard(title: "Lãi/lỗ chưa thực hiện", value: summary.totalUnrealizedPnL.map(MPFormat.signedMoney) ?? "Chưa có giá")
+                    MPSurfaceCard(style: .reference) {
+                        VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
+                            MPSectionHeader(title: PortfolioReferenceCopy.summaryTitle)
+                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: MPMetrics.sectionSpacing) {
+                                MPMetric(title: "Giá vốn", value: MPFormat.money(summary.totalCostBasis, masked: masked), compact: true)
+                                MPMetric(title: "Giá trị hiện tại", value: summary.totalMarketValue.map { MPFormat.money($0, masked: masked) } ?? "Chưa có giá", compact: true)
+                                MPMetric(title: "Lãi/lỗ chưa thực hiện", value: summary.totalUnrealizedPnL.map { MPFormat.signedMoney($0, masked: masked) } ?? "Chưa có giá", compact: true)
+                            }
+                        }
                     }
+                    .accessibilityIdentifier("portfolio-summary")
                     ForEach(summary.assets) { asset in
-                        portfolioAssetCard(asset, position: summary.positions.first(where: { $0.assetID == asset.id }), trades: summary.trades)
+                        portfolioAssetCard(asset, position: summary.positions.first(where: { $0.assetID == asset.id }), trades: tradeHistory)
                     }
                 } else if let error {
                     MPErrorView(title: "Không tải được đầu tư", detail: error) { Task { await load() } }
                 } else {
                     MPEmptyView(title: "Chưa có danh mục đầu tư", detail: "Giá chưa biết được hiển thị là chưa định giá, không phải bằng 0.")
-                }
-                if adding {
-                    MPSurfaceCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            MPText("Tài sản mới", style: .title)
-                            MPTextField(title: "Mã", text: $symbol)
-                            MPTextField(title: "Tên", text: $assetName)
-                            HStack { MPButton("Hủy", style: .secondary) { adding = false }; MPButton("Tạo") { Task { await createAsset() } } }
-                        }
-                    }
-                }
-                if let tradeAsset {
-                    MPSurfaceCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            MPText("Ghi nhận \(tradeAsset.symbol)", style: .title)
-                            MPWalletSelector(title: "Loại", options: ["buy", "sell"], selection: $tradeSide)
-                            MPTextField(title: "Khối lượng", text: $tradeQuantity, placeholder: "0.25")
-                            MPAmountField(title: "Giá mỗi đơn vị", text: $tradePrice)
-                            MPAmountField(title: "Phí", text: $tradeFee)
-                            MPDateField(title: "Ngày giao dịch", date: $tradeDate)
-                            HStack { MPButton("Hủy", style: .secondary) { self.tradeAsset = nil }; MPButton("Lưu") { Task { await saveTrade(tradeAsset) } } }
-                        }
-                    }
                 }
             }
             .padding(MPMetrics.pagePadding)
@@ -1056,39 +1613,98 @@ struct PortfolioView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
-        .accessibilityIdentifier("portfolio-screen")
+        .mpFullScreenCover(isPresented: $assetEditorPresented) {
+            MPEditorScaffold(title: "Thêm tài sản", isBusy: saving, onCancel: { assetEditorPresented = false }) {
+                MPTextField(title: "Mã", text: $symbol, placeholder: "VN30F")
+                MPTextField(title: "Tên", text: $assetName, placeholder: "Quỹ chỉ số")
+                if let error { MPStatusMessage(text: error, tone: .danger) }
+            } footer: {
+                MPButton(PortfolioReferenceCopy.addAssetAction, isLoading: saving, isDisabled: PortfolioAssetDraftValidator.normalized(symbol: symbol, name: assetName) == nil) { Task { await createAsset() } }
+                    .accessibilityIdentifier(PortfolioReferenceCopy.addAssetActionAccessibilityID)
+            }
+        }
+        .mpFullScreenCover(isPresented: $tradeEditorPresented) {
+            MPEditorScaffold(title: "Ghi giao dịch đầu tư", isBusy: saving, onCancel: { tradeEditorPresented = false }) {
+                MPOptionSelector(title: "Tài sản", options: (summary?.assets ?? []).map { MPSelectionOption(id: $0.id, label: "\($0.symbol) · \($0.name)") }, selectionID: $tradeAssetID, emptyLabel: "Chọn tài sản", accessibilityIdentifier: "portfolio-trade-asset")
+                MPWalletSelector(title: "Loại", options: ["buy", "sell"], selection: $tradeSide)
+                MPNumberField(title: "Khối lượng", text: $tradeQuantity, kind: .decimal, placeholder: "1,5")
+                MPAmountField(title: "Giá đơn vị", text: $tradePrice)
+                MPAmountField(title: "Phí", text: $tradeFee)
+                MPDateField(title: "Ngày", date: $tradeDate, timeZone: accountTimezone)
+                if let error { MPStatusMessage(text: error, tone: .danger) }
+            } footer: {
+                MPButton(PortfolioReferenceCopy.saveTradeAction, isLoading: saving, isDisabled: selectedTradeAsset == nil || !PortfolioTradeDraftValidator.isValid(side: tradeSide, quantity: tradeQuantity, unitPrice: tradePrice, fee: tradeFee)) { Task { await saveTrade() } }
+                    .accessibilityIdentifier(PortfolioReferenceCopy.saveTradeActionAccessibilityID)
+            }
+        }
+        .mpFormBottomSheet(isPresented: Binding(get: { priceTarget != nil }, set: { if !$0 { priceTarget = nil } }), title: "Cập nhật giá", accessibilityIdentifier: "portfolio-price-editor", isDismissDisabled: saving, onClose: { if !saving { priceTarget = nil } }) {
+            if let asset = priceTarget {
+                MPText("\(asset.symbol) · \(asset.name)", style: .emphasis)
+                MPAmountField(title: "Giá hiện tại", text: Binding(get: { priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "" }, set: { priceByAsset[asset.id] = $0 }), accessibilityIdentifier: "portfolio-price-\(asset.id)")
+                    .disabled(saving)
+            }
+            if let error { MPStatusMessage(text: error, tone: .danger) }
+        } footer: {
+            if let asset = priceTarget {
+                MPButton("Lưu giá", isLoading: saving) { Task { await updatePrice(asset) } }
+                    .accessibilityIdentifier("portfolio-price-save")
+            }
+        }
+        .mpConfirmDialog(
+            isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
+            title: "Xóa tài sản?",
+            message: "Chỉ tài sản chưa có giao dịch mới có thể xóa. Lịch sử đầu tư không bị thay đổi.",
+            confirmTitle: "Xóa"
+        ) {
+            if let target = deleteTarget { Task { await deleteAsset(target) } }
+            deleteTarget = nil
+        }
     }
 
     @ViewBuilder
     private func portfolioAssetCard(_ asset: PortfolioAssetModel, position: PortfolioPositionModel?, trades: [PortfolioTradeModel]) -> some View {
+        let assetTrades = Self.tradesForAsset(trades, assetID: asset.id)
         MPAssistantCard(title: "\(asset.symbol) · \(asset.name)") {
             HStack {
                 VStack(alignment: .leading, spacing: 4) {
                     MPText("Số lượng: \(position?.quantity ?? "0")")
-                    MPText(asset.latestPrice.map { "Giá hiện tại: \(MPFormat.money($0))" } ?? "Chưa có giá", style: .secondary)
+                    MPText(asset.latestPrice.map { "Giá hiện tại: \(MPFormat.money($0, masked: masked))" } ?? "Chưa có giá", style: .secondary)
                 }
                 Spacer()
-                MPButton("Giao dịch", style: .secondary) { tradeAsset = asset; tradeSide = "buy"; tradeQuantity = ""; tradePrice = asset.latestPrice.map(String.init) ?? ""; tradeFee = ""; tradeDate = Date() }
+                MPButton("Giao dịch", style: .secondary) {
+                    tradeAssetID = asset.id
+                    tradeSide = "buy"
+                    tradeQuantity = ""
+                    tradePrice = asset.latestPrice.map(String.init) ?? ""
+                    tradeFee = ""
+                    tradeDate = Date()
+                    error = nil
+                    tradeEditorPresented = true
+                }
             }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 10) {
-                MPMetricCard(title: "Giá vốn", value: MPFormat.money(position?.costBasis ?? 0))
-                MPMetricCard(title: "Bình quân", value: MPFormat.money(position?.averageCost ?? 0))
-                MPMetricCard(title: "Đã thực hiện", value: MPFormat.signedMoney(position?.realizedPnL ?? 0))
-                MPMetricCard(title: "Giá trị hiện tại", value: position?.marketValue.map(MPFormat.money) ?? "Chưa có giá")
-                MPMetricCard(title: "Lãi/lỗ chưa thực hiện", value: position?.unrealizedPnL.map(MPFormat.signedMoney) ?? "Chưa có giá")
+            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: MPMetrics.sectionSpacing) {
+                MPMetric(title: "Giá vốn", value: MPFormat.money(position?.costBasis ?? 0, masked: masked), compact: true)
+                MPMetric(title: "Bình quân", value: MPFormat.money(position?.averageCost ?? 0, masked: masked), compact: true)
+                MPMetric(title: "Đã thực hiện", value: MPFormat.signedMoney(position?.realizedPnL ?? 0, masked: masked), compact: true)
+                MPMetric(title: "Giá trị hiện tại", value: position?.marketValue.map { MPFormat.money($0, masked: masked) } ?? "Chưa có giá", compact: true)
+                MPMetric(title: "Lãi/lỗ chưa thực hiện", value: position?.unrealizedPnL.map { MPFormat.signedMoney($0, masked: masked) } ?? "Chưa có giá", compact: true)
             }
-            MPAmountField(title: "Giá hiện tại", text: Binding(get: { priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "" }, set: { priceByAsset[asset.id] = $0 }))
-            MPButton("Cập nhật giá", style: .secondary) { Task { await updatePrice(asset) } }
-            MPAssistantCard(title: "Lịch sử mua bán") {
-                let assetTrades = Self.tradesForAsset(trades, assetID: asset.id)
+            MPButton("Cập nhật giá", style: .secondary) { error = nil; priceTarget = asset }
+                .accessibilityIdentifier("portfolio-price-update-\(asset.id)")
+            if assetTrades.isEmpty {
+                MPButton("Xóa tài sản", style: .destructive) { error = nil; deleteTarget = asset }
+                    .accessibilityIdentifier("portfolio-delete-\(asset.id)")
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                MPText("Lịch sử mua bán", style: .emphasis)
                 if assetTrades.isEmpty {
                     MPText("Chưa có giao dịch mua bán.", style: .secondary)
                 } else {
                     ForEach(assetTrades) { trade in
                         MPTransactionRow(
                             title: "\(Self.tradeSideLabel(trade.side)) · \(trade.quantity)",
-                            subtitle: Self.tradeSubtitle(trade, timeZone: TimeZone(identifier: accountTimezone) ?? .current),
-                            amount: MPFormat.money(trade.unitPrice),
+                            subtitle: Self.tradeSubtitle(trade, timeZone: TimeZone(identifier: accountTimezone) ?? .current, masked: masked),
+                            amount: MPFormat.money(trade.unitPrice, masked: masked),
                             isIncome: trade.side == "sell"
                         )
                     }
@@ -1111,30 +1727,50 @@ struct PortfolioView: View {
         }
     }
 
-    static func tradeSubtitle(_ trade: PortfolioTradeModel, timeZone: TimeZone) -> String {
+    static func tradeSubtitle(_ trade: PortfolioTradeModel, timeZone: TimeZone, masked: Bool = false) -> String {
         let date = MPFormat.shortDateTime(trade.occurredAt, timeZone: timeZone)
-        let fee = MPFormat.money(trade.fee)
+        let fee = MPFormat.money(trade.fee, masked: masked)
         if let note = trade.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty {
-            return "Giá \(MPFormat.money(trade.unitPrice)) · Phí \(fee) · \(date) · \(note)"
+            return "Giá \(MPFormat.money(trade.unitPrice, masked: masked)) · Phí \(fee) · \(date) · \(note)"
         }
-        return "Giá \(MPFormat.money(trade.unitPrice)) · Phí \(fee) · \(date)"
+        return "Giá \(MPFormat.money(trade.unitPrice, masked: masked)) · Phí \(fee) · \(date)"
     }
 
     private func load() async {
         do {
             async let summaryResult = api.portfolioSummary()
             async let profile = api.profile()
-            summary = try await summaryResult
+            let loadedSummary = try await summaryResult
+            var loadedTrades: [PortfolioTradeModel] = []
+            for asset in loadedSummary.assets {
+                loadedTrades.append(contentsOf: try await api.portfolioTrades(assetID: asset.id))
+            }
+            summary = loadedSummary
+            tradeHistory = loadedTrades
             if let profile = try? await profile { accountTimezone = profile.timezone }
             self.error = nil
         } catch { self.error = "Không thể tải danh mục đầu tư." }
     }
+    private var selectedTradeAsset: PortfolioAssetModel? {
+        summary?.assets.first(where: { $0.id == tradeAssetID })
+    }
     private func createAsset() async {
+        guard !saving else { return }
         guard let draft = PortfolioAssetDraftValidator.normalized(symbol: symbol, name: assetName) else { error = "Nhập mã và tên tài sản."; return }
-        do { _ = try await api.createPortfolioAsset(symbol: draft.symbol, name: draft.name); adding = false; symbol = ""; assetName = ""; await load() }
+        saving = true; error = nil
+        defer { saving = false }
+        do {
+            let created = try await api.createPortfolioAsset(symbol: draft.symbol, name: draft.name)
+            if tradeAssetID.isEmpty { tradeAssetID = created.id }
+            symbol = ""
+            assetName = ""
+            assetEditorPresented = false
+            await load()
+        }
         catch { self.error = "Không thể tạo tài sản." }
     }
     private func updatePrice(_ asset: PortfolioAssetModel) async {
+        guard !saving else { return }
         let draft = (priceByAsset[asset.id] ?? asset.latestPrice.map(String.init) ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         let parsed: Int64?
         if draft.isEmpty {
@@ -1145,19 +1781,44 @@ struct PortfolioView: View {
             error = "Giá hiện tại phải là số nguyên không âm hoặc để trống."
             return
         }
-        do { _ = try await api.updatePortfolioPrice(assetID: asset.id, latestPrice: parsed); await load() }
+        saving = true; error = nil
+        defer { saving = false }
+        do { _ = try await api.updatePortfolioPrice(assetID: asset.id, latestPrice: parsed); priceTarget = nil; await load() }
         catch { self.error = "Không thể cập nhật giá." }
     }
-    private func saveTrade(_ asset: PortfolioAssetModel) async {
-        guard PortfolioTradeDraftValidator.isValid(side: tradeSide, quantity: tradeQuantity, unitPrice: tradePrice, fee: tradeFee),
+    private func deleteAsset(_ asset: PortfolioAssetModel) async {
+        guard !saving else { return }
+        saving = true
+        error = nil
+        defer { saving = false }
+        do {
+            try await api.deletePortfolioAsset(assetID: asset.id)
+            await load()
+        } catch {
+            self.error = "Không thể xóa tài sản. Tài sản đã có giao dịch sẽ được giữ nguyên."
+        }
+    }
+    private func saveTrade() async {
+        guard !saving else { return }
+        guard let asset = selectedTradeAsset else {
+            error = "Hãy chọn tài sản."
+            return
+        }
+        guard let normalizedQuantity = MPNumberInputKind.decimal.normalized(tradeQuantity),
+              PortfolioTradeDraftValidator.isValid(side: tradeSide, quantity: normalizedQuantity, unitPrice: tradePrice, fee: tradeFee),
               let parsedPrice = PortfolioTradeDraftValidator.nonNegativeInteger(tradePrice),
               let parsedFee = PortfolioTradeDraftValidator.nonNegativeInteger(tradeFee, allowingEmpty: true) else {
             error = "Nhập loại, khối lượng, giá và phí hợp lệ. Khối lượng tối đa 8 chữ số thập phân."
             return
         }
+        saving = true; error = nil
+        defer { saving = false }
         do {
-            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: tradeQuantity.trimmingCharacters(in: .whitespacesAndNewlines), unitPrice: parsedPrice, fee: parsedFee, occurredAt: Self.accountLocalNoonTimestamp(tradeDate, timezone: accountTimezone), note: nil))
-            tradeAsset = nil
+            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: normalizedQuantity, unitPrice: parsedPrice, fee: parsedFee, occurredAt: Self.accountLocalNoonTimestamp(tradeDate, timezone: accountTimezone), note: nil))
+            tradeQuantity = ""
+            tradePrice = ""
+            tradeFee = ""
+            tradeEditorPresented = false
             await load()
         } catch { self.error = "Không thể ghi nhận giao dịch danh mục." }
     }
@@ -1194,8 +1855,7 @@ enum PortfolioTradeDraftValidator {
     }
 
     private static func isPositiveQuantity(_ raw: String) -> Bool {
-        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !value.isEmpty, !value.contains("+") && !value.contains("-") && !value.contains("e") && !value.contains("E") else { return false }
+        guard let value = MPNumberInputKind.decimal.normalized(raw), !value.isEmpty else { return false }
         let parts = value.split(separator: ".", omittingEmptySubsequences: false)
         guard parts.count <= 2, let whole = parts.first, !whole.isEmpty,
               whole.allSatisfy(\.isNumber) else { return false }
@@ -1207,10 +1867,35 @@ enum PortfolioTradeDraftValidator {
     }
 }
 
+enum CreditLedgerCopy {
+    static let emptyStatement = "Chưa có giao dịch tín dụng."
+    static let addEntryAction = "Thêm giao dịch"
+    static let addEntryActionAccessibilityID = "credit-add-entry"
+    static let paymentAction = "Thanh toán thẻ"
+    static let paymentActionAccessibilityID = "credit-add-payment"
+}
+
+enum CreditLedgerReferenceSection: String, CaseIterable {
+    case header
+    case walletSelector
+    case summary
+    case actions
+    case statement
+
+    static let stitchOrder: [CreditLedgerReferenceSection] = [
+        .header,
+        .walletSelector,
+        .summary,
+        .actions,
+        .statement
+    ]
+}
+
 struct CreditView: View {
     let api: FinanceAPI
     let onBack: () -> Void
     let preferredWalletID: String?
+    @Environment(\.mpFinancialValuesMasked) private var masked
     @State private var wallets: [WalletModel] = []
     @State private var sourceWallets: [WalletModel] = []
     @State private var categories: [CategoryModel] = []
@@ -1218,6 +1903,8 @@ struct CreditView: View {
     @State private var statement: CreditStatementModel?
     @State private var error: String?
     @State private var action: String?
+    @State private var isChoosingEntryCategory = false
+    @State private var saving = false
     @State private var entryKind = "purchase"
     @State private var categoryID = ""
     @State private var entryAmount = ""
@@ -1239,61 +1926,128 @@ struct CreditView: View {
             else {
                 MPOptionSelector(title: "Ví tín dụng", options: wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: Binding(get: { selectedID }, set: { selectedID = $0; categoryID = ""; Task { await loadStatement() } }))
                 if let statement {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        MPMetricCard(title: "Dư nợ", value: MPFormat.money(abs(statement.balance)))
-                        MPMetricCard(title: "Khả dụng", value: MPFormat.money(statement.availableCredit))
-                        MPMetricCard(title: "Đến hạn", value: MPFormat.money(statement.amountDue))
-                        MPMetricCard(title: "Trạng thái", value: MPSelectionLabels.display(for: statement.paymentStatus))
-                    }
-                    if statement.paymentStatus == "not_configured" {
-                        MPText("Chưa cấu hình dư nợ sao kê và ngày đến hạn.", style: .secondary)
-                    } else {
-                        VStack(alignment: .leading, spacing: 4) {
-                            MPText(MPSelectionLabels.display(for: statement.paymentStatus), style: .secondary)
-                            if let paymentDueAt = statement.paymentDueAt {
-                                MPText("Hạn thanh toán: \(MPFormat.shortDate(paymentDueAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
+                    MPSurfaceCard(style: .reference) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 12) {
+                                creditMetric(label: "Dư nợ hiện tại", value: MPFormat.money(abs(statement.balance), masked: masked))
+                                creditMetric(label: "Còn khả dụng", value: MPFormat.money(statement.availableCredit, masked: masked), tone: statement.availableCredit < 0 ? .danger : .action)
+                            }
+                            Divider().overlay(MPColor.line)
+                            HStack {
+                                MPText("Hạn mức", style: .secondary)
+                                Spacer()
+                                MPText(MPFormat.money(statement.creditLimit, masked: masked), style: .emphasis)
+                            }
+                            if statement.paymentStatus == "not_configured" {
+                                MPText("Chưa cấu hình dư nợ sao kê và ngày đến hạn.", style: .secondary)
+                            } else {
+                                HStack {
+                                    MPText("Kỳ này cần trả", style: .secondary)
+                                    Spacer()
+                                    MPText(MPFormat.money(statement.amountDue, masked: masked), style: .emphasis)
+                                }
+                                MPText(
+                                    paymentStatusText(statement),
+                                    style: statement.paymentStatus == "overdue" ? .danger : .secondary
+                                )
                             }
                         }
                     }
-                    MPAssistantCard(title: "Giao dịch tín dụng") {
-                        ForEach(statement.items) { item in
-                            MPTransactionRow(title: MPSelectionLabels.creditKind(item.creditKind), subtitle: creditItemSubtitle(item), amount: MPFormat.money(item.amount), isIncome: item.creditKind == "refund" || item.creditKind == "payment")
-                        }
-                    }
                     HStack {
-                        MPButton("Thêm giao dịch", style: .secondary) { beginAction("entry") }
-                        MPButton("Thanh toán") { beginAction("payment") }
+                        MPButton(CreditLedgerCopy.addEntryAction, style: .secondary) { beginAction("entry") }
+                            .accessibilityIdentifier(CreditLedgerCopy.addEntryActionAccessibilityID)
+                        MPButton(CreditLedgerCopy.paymentAction) { beginAction("payment") }
+                            .accessibilityIdentifier(CreditLedgerCopy.paymentActionAccessibilityID)
                     }
-                    if let action {
-                        MPSurfaceCard {
-                            VStack(alignment: .leading, spacing: 10) {
-                                MPText(action == "payment" ? "Thanh toán thẻ" : "Thêm giao dịch tín dụng", style: .title)
-                                if action == "entry" {
-                                    MPWalletSelector(title: "Loại giao dịch", options: ["purchase", "refund", "fee", "interest"], selection: $entryKind)
-                                    MPOptionSelector(title: "Nhóm", options: categoriesForEntry.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $categoryID)
-                                } else {
-                                    MPOptionSelector(title: "Ví thanh toán", options: sourceWallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $sourceWalletID, emptyLabel: "Chọn ví thanh toán")
-                                }
-                                MPAmountField(title: "Số tiền", text: $entryAmount)
-                                MPTextField(title: "Ghi chú", text: $note, placeholder: "Không bắt buộc")
-                                HStack {
-                                    MPButton("Hủy", style: .secondary) { cancelAction() }
-                                    MPButton("Lưu") { Task { await saveAction() } }
-                                }
+                    if statement.items.isEmpty {
+                        MPText("Giao dịch tín dụng", style: .title)
+                        MPText(CreditLedgerCopy.emptyStatement, style: .secondary)
+                            .accessibilityIdentifier("credit-empty-statement")
+                    } else {
+                        MPAssistantCard(title: "Giao dịch tín dụng") {
+                            ForEach(statement.items) { item in
+                                MPTransactionRow(transaction: item, category: categories.first(where: { $0.id == item.categoryID }), timeZone: TimeZone(identifier: accountTimezone) ?? .current, masked: masked)
                             }
                         }
                     }
                 }
             }
             if let error { MPStatusMessage(text: error, tone: .danger) }
-        }.padding(MPMetrics.pagePadding) }.background(MPColor.canvas.ignoresSafeArea()).environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current).task { await loadWallets() }.onChange(of: entryKind) { _, _ in
+        }.padding(MPMetrics.pagePadding) }
+        .background(MPColor.canvas.ignoresSafeArea())
+        .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
+        .task { await loadWallets() }
+        .onChange(of: entryKind) { _, _ in
             if !categoriesForEntry.contains(where: { $0.id == categoryID }) { categoryID = categoriesForEntry.first?.id ?? "" }
-        }.accessibilityIdentifier("credit-screen")
+        }
+        .mpFormBottomSheet(
+            isPresented: Binding(get: { action != nil }, set: { if !$0 { cancelAction() } }),
+            title: isChoosingEntryCategory ? "Chọn nhóm" : (action == "payment" ? "Thanh toán thẻ" : "Thêm giao dịch tín dụng"),
+            accessibilityIdentifier: "credit-action-sheet",
+            isDismissDisabled: saving,
+            onClose: cancelAction,
+            fields: {
+                if isChoosingEntryCategory {
+                    MPCategoryPicker(
+                        categories: categories,
+                        kind: entryCategoryKind,
+                        selectableIDs: Set(categoriesForEntry.map(\.id)),
+                        selectedID: categoryID,
+                        clearLabel: nil,
+                        clearID: nil,
+                        onSelect: { categoryID = $0; isChoosingEntryCategory = false }
+                    )
+                } else {
+                    MPSurfaceCard {
+                        VStack(alignment: .leading, spacing: 12) {
+                            if let error { MPStatusMessage(text: error, tone: .danger) }
+                            if action == "entry" {
+                                MPWalletSelector(title: "Loại giao dịch", options: ["purchase", "refund", "fee", "interest"], selection: $entryKind)
+                                MPFormRow(
+                                    title: "Nhóm",
+                                    iconName: "tag",
+                                    value: categoriesForEntry.first(where: { $0.id == categoryID })?.name ?? "Chọn nhóm",
+                                    accessibilityIdentifier: "credit-entry-category"
+                                ) { isChoosingEntryCategory = true }
+                            } else {
+                                MPOptionSelector(title: "Ví thanh toán", options: sourceWallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $sourceWalletID, emptyLabel: "Chọn ví thanh toán")
+                            }
+                            MPAmountField(title: "Số tiền", text: $entryAmount)
+                            MPTextField(title: "Ghi chú", text: $note, placeholder: "Không bắt buộc")
+                        }
+                    }
+                }
+            },
+            footer: {
+                if isChoosingEntryCategory {
+                    MPButton("Quay lại", style: .secondary, isDisabled: saving) { isChoosingEntryCategory = false }
+                } else {
+                    MPButton("Lưu", isLoading: saving, isDisabled: saveIsDisabled) { Task { await saveAction() } }
+                }
+            }
+        )
     }
+    @ViewBuilder
+    private func creditMetric(label: String, value: String, tone: MPTextStyle = .emphasis) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            MPText(label, style: .secondary)
+            MPText(value, style: tone)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func paymentStatusText(_ statement: CreditStatementModel) -> String {
+        let status = MPSelectionLabels.display(for: statement.paymentStatus)
+        guard let paymentDueAt = statement.paymentDueAt else { return status }
+        return "\(status) · hạn \(MPFormat.shortDate(paymentDueAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))"
+    }
+
     private var categoriesForEntry: [CategoryModel] {
         let transactionType = entryKind == "refund" ? "income" : "expense"
         return categories.filter { $0.applies(to: transactionType, walletID: selectedID, walletType: "credit") }
     }
+
+    private var entryCategoryKind: String { entryKind == "refund" ? "income" : "expense" }
 
     private func creditItemSubtitle(_ item: TransactionModel) -> String {
         if let note = item.note?.trimmingCharacters(in: .whitespacesAndNewlines), !note.isEmpty { return note }
@@ -1302,6 +2056,8 @@ struct CreditView: View {
 
     private func beginAction(_ value: String) {
         action = value
+        isChoosingEntryCategory = false
+        error = nil
         entryAmount = ""
         note = ""
         if value == "entry" { categoryID = categoriesForEntry.first?.id ?? "" }
@@ -1309,6 +2065,8 @@ struct CreditView: View {
 
     private func cancelAction() {
         action = nil
+        isChoosingEntryCategory = false
+        error = nil
         entryAmount = ""
         note = ""
         categoryID = ""
@@ -1351,8 +2109,16 @@ struct CreditView: View {
         }
     }
     private func saveAction() async {
-        guard action != nil else { return }
+        guard action != nil, !saving else { return }
+        saving = true
+        defer { saving = false }
         if action == "entry" { await addEntry() } else { await pay() }
+    }
+    private var saveIsDisabled: Bool {
+        guard MPFormat.parsePositiveInteger(entryAmount) != nil else { return true }
+        if action == "entry" { return !categoriesForEntry.contains(where: { $0.id == categoryID }) }
+        if action == "payment" { return sourceWallets.contains(where: { $0.id == sourceWalletID }) == false }
+        return true
     }
     private func addEntry() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount) else { error = "Chọn ví tín dụng và nhập số tiền."; return }; guard let category = categoriesForEntry.first(where: { $0.id == categoryID }) else { error = "Hãy chọn nhóm cho bút toán tín dụng."; return }; do { _ = try await api.createCreditEntry(walletID: selectedID, input: CreditEntryInputModel(kind: entryKind, categoryID: category.id, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể ghi nhận bút toán tín dụng." } }
     private func pay() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount), !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
@@ -1389,6 +2155,7 @@ struct NotificationsView: View {
                                 MPText(MPFormat.shortDate(item.createdAt, timeZone: timeZone), style: .secondary)
                                 if item.readAt == nil {
                                     MPButton("Đánh dấu đã đọc", style: .secondary) { Task { await markRead(item) } }
+                                        .accessibilityIdentifier("notification-mark-read-\(item.id)")
                                 }
                             }
                         }
@@ -1400,7 +2167,6 @@ struct NotificationsView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .task { await load() }
         .refreshable { await load() }
-        .accessibilityIdentifier("notifications-screen")
     }
 
     private func load() async {

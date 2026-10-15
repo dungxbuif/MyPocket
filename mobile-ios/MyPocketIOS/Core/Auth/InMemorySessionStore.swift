@@ -24,5 +24,21 @@ final class InMemorySessionStore: SessionStore, @unchecked Sendable {
         defer { lock.unlock() }
         session = nil
     }
+
+    func replace(_ session: AccessSession, ifCredentialsMatch original: AccessSession) throws -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard self.session?.hasSameCredentials(as: original) == true, session.user.id == original.user.id else { return false }
+        self.session = session
+        return true
+    }
+
+    func clear(ifCredentialsMatch original: AccessSession) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard session?.hasSameCredentials(as: original) == true else { return false }
+        session = nil
+        return true
+    }
 }
 #endif

@@ -52,7 +52,7 @@ func TestCreateRecurringScheduleUsesAccountLocalAnchor(t *testing.T) {
 	repo := &recurringRepositoryStub{}
 	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic}}}
 	users := &transactionUserRepositoryStub{user: entity.User{ID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}}
-	handler := &RecurringHandler{Schedules: repo, Wallets: wallets, Categories: &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: "category-1", Kind: entity.TransactionTypeExpense}}}, Users: users}
+	handler := &RecurringHandler{Schedules: repo, Wallets: wallets, Categories: &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: "category-1", Kind: entity.TransactionTypeExpense, IsActive: true}}}, Users: users}
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/recurring", bytes.NewBufferString(`{"name":"Tiền nhà","wallet_id":"wallet-1","category_id":"category-1","type":"expense","amount":5000000,"frequency":"monthly","interval":1,"next_run_at":"2026-01-31T09:30:00+07:00"}`))
 	request.Header.Set("Content-Type", "application/json")
@@ -76,6 +76,20 @@ func TestCreateRecurringScheduleRequiresCategory(t *testing.T) {
 	recurringTestRouter(handler).ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest || repo.created != nil {
 		t.Fatalf("recurring schedule without category should be rejected: status=%d body=%s schedule=%#v", response.Code, response.Body.String(), repo.created)
+	}
+}
+
+func TestCreateRecurringRejectsArchivedCategory(t *testing.T) {
+	repo := &recurringRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic}}}
+	users := &transactionUserRepositoryStub{user: entity.User{ID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}}
+	handler := &RecurringHandler{Schedules: repo, Wallets: wallets, Categories: &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: "archived", Kind: entity.TransactionTypeExpense, IsActive: false}}}, Users: users}
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/recurring", bytes.NewBufferString(`{"name":"Tiền nhà","wallet_id":"wallet-1","category_id":"archived","type":"expense","amount":5000000,"frequency":"monthly","interval":1,"next_run_at":"2026-01-31T09:30:00+07:00"}`))
+	request.Header.Set("Content-Type", "application/json")
+	recurringTestRouter(handler).ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || !bytes.Contains(response.Body.Bytes(), []byte(`"code":"category_inactive"`)) || repo.created != nil {
+		t.Fatalf("archived category must not be assigned to a new schedule: status=%d body=%s schedule=%#v", response.Code, response.Body.String(), repo.created)
 	}
 }
 

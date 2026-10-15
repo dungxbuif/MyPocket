@@ -71,6 +71,21 @@ type changelogRepoStub struct {
 	last     contract.AuditEvent
 }
 
+func (s *feedbackRepoStub) UpdateResolution(ctx context.Context, owner, id string, resolved bool, now time.Time) (*entity.Feedback, error) {
+	row, err := s.FindByOwner(ctx, owner, id)
+	if err != nil {
+		return nil, err
+	}
+	if row.Resolved != resolved {
+		row.Resolved, row.UpdatedAt, row.ResolvedAt = resolved, now, nil
+		if resolved {
+			row.ResolvedAt = &now
+		}
+		s.rows[id] = *row
+	}
+	return row, nil
+}
+
 func (s *changelogRepoStub) Publish(_ context.Context, changelog *entity.Changelog, ids []string) error {
 	for _, id := range ids {
 		row, ok := s.feedback.rows[id]

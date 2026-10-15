@@ -1,13 +1,14 @@
 import { apiRequest } from "./api";
 import { getStoredToken } from "./auth";
 
-export type Category = { id: string; owner_id?: string | null; parent_id?: string | null; kind: string; name: string; system_key?: string | null; icon_key: string; is_system: boolean; wallet_ids: string[] };
+export type Category = { id: string; owner_id?: string | null; parent_id?: string | null; kind: string; name: string; system_key?: string | null; icon_key: string; is_system: boolean; is_active?: boolean; wallet_ids: string[] };
 
 export type CategoryInput = { name: string; kind: string; parent_id?: string | null; wallet_ids: string[]; icon_key: string };
 
 const CATEGORY_API_PATH = "/api/v1/categories";
 const categoryPath = (id: string) => `${CATEGORY_API_PATH}/${id}`;
 const categoryWalletsPath = (id: string) => `${categoryPath(id)}/wallets`;
+const categoryStatusPath = (id: string) => `${categoryPath(id)}/status`;
 
 export async function fetchCategories(): Promise<Category[]> {
   return apiRequest<Category[]>(CATEGORY_API_PATH, {}, getStoredToken());
@@ -23,6 +24,10 @@ export async function updateCategory(id: string, input: CategoryInput): Promise<
 
 export async function updateCategoryWallets(id: string, walletIDs: string[]): Promise<Category> {
 	return apiRequest<Category>(categoryWalletsPath(id), { method: "PATCH", body: JSON.stringify({ wallet_ids: walletIDs }) }, getStoredToken());
+}
+
+export async function setCategoryActive(id: string, active: boolean): Promise<Category> {
+  return apiRequest<Category>(categoryStatusPath(id), { method: "PATCH", body: JSON.stringify({ is_active: active }) }, getStoredToken());
 }
 
 export async function deleteCategory(id: string): Promise<void> {

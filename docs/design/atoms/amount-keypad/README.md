@@ -1,6 +1,6 @@
 # Amount input & numeric keypad
 
-Source IMG-02: [extraction](../../system/SOURCE_EXTRACTION.md). Status: partial preview; dedicated amount/keypad bases must be created before real transaction use.
+Source IMG-02: [extraction](../../system/SOURCE_EXTRACTION.md). Status: implemented in web and native; `AmountField`/`MPAmountField` expose a shared calculator/keypad base.
 
 ## Observed layout / copy
 
@@ -12,8 +12,11 @@ Use base key/chip/button + Text; complete keypad needs one reusable molecule own
 HTML stores primary operand, secondary operand, operator and calculated flag. Digits edit active operand; 000 appends zeros; comma is a decimal separator. Setting another operator computes the prior pair when available. Backspace removes digit or clears operator; C resets; preset replaces value and clears operator; XONG evaluates pending expression then formats vi-VN result.
 Display uses thousands separators, separate operator indicator and approximate amount-in-words. Save in export is a mock action, not proof of persistence.
 
-## Production contract required before use
+## Production contract
 
 Record allowed precision/negative values/max length, divide-by-zero error, rounding and VND integer policy against transaction requirements. Avoid copying JavaScript demo number parsing/zero-division fallback as business rules. XONG confirms amount editing; Lưu submits the form only when all required fields validate. Hủy must follow screen's dirty-form rule.
 States: zero, entering, operator pending, calculated, invalid expression, disabled/saving. Accessible key labels for symbol keys; min 44px controls; keyboard support must be specified/tested.
-Current QuickAddSheet has incomplete arithmetic and is not mounted. Do not claim the exported calculator is implemented.
+Native `MPAmountCalculator` mirrors the web's non-`eval` grammar and adds
+checked `Int64` arithmetic. `MPAmountKeypad` is mounted by `MPAmountField` and
+commits only non-negative integer VND results. The web and native forms still
+own the final required-field validation and persistence action.

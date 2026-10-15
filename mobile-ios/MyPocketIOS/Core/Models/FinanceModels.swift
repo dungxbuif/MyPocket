@@ -1,5 +1,22 @@
 import Foundation
 
+struct OfflineSyncCapabilitiesModel: Codable, Equatable, Sendable {
+    let contractVersion: Int
+    let enabled: Bool
+    let operations: [String]
+    let receiptMetadata: String
+    let idempotencyKeyRequiredForOffline: Bool
+    let legacyUnkeyedOnline: Bool
+    var transactionCreateContext: String? = nil
+
+    func supports(operation: String) -> Bool {
+        guard enabled, contractVersion == 1, idempotencyKeyRequiredForOffline,
+              receiptMetadata == "/meta/mutation",
+              operation == "transaction.create" || operation == "transfer.create" else { return false }
+        return operations.contains(operation) && (operation != "transaction.create" || transactionCreateContext == "explicit_travel_v1")
+    }
+}
+
 struct WalletModel: Codable, Identifiable, Equatable, Sendable {
     let id: String
     var name: String
@@ -37,16 +54,152 @@ struct CategoryModel: Codable, Identifiable, Equatable, Sendable {
     var systemKey: String?
     var iconKey: String
     var isSystem: Bool
+    var isActive: Bool? = true
     var walletIDs: [String]
 }
 
 enum CategoryEditPolicy {
     static func metadataIsReadOnly(_ category: CategoryModel) -> Bool { category.isSystem }
     static func canDelete(_ category: CategoryModel) -> Bool { !category.isSystem }
+    static func canArchive(_ category: CategoryModel) -> Bool { !category.isSystem }
+    static func canSelect(_ category: CategoryModel) -> Bool { category.isActive != false }
+}
+
+struct CategoryListNode: Identifiable, Equatable {
+    let item: CategoryModel
+    let depth: Int
+    let isSelectable: Bool
+    let isHierarchyContext: Bool
+    var continuesBranch: Bool
+
+    var id: String { item.id }
+}
+
+struct CategorySelectionGroup: Identifiable, Equatable {
+    let root: CategoryListNode
+    var children: [CategoryListNode]
+
+    var id: String { root.id }
+    var nodes: [CategoryListNode] { [root] + children }
+}
+
+enum CategoryListPresentation {
+    static func nodes(
+        items: [CategoryModel],
+        kind: String,
+        walletID: String?,
+        search: String,
+        selectableIDs: Set<String>? = nil,
+        includeInactive: Bool = false
+    ) -> [CategoryListNode] {
+        let candidates = items.filter { $0.kind == kind }
+        let knownIDs = Set(candidates.map(\.id))
+        let childPairs = candidates.compactMap { item -> (String, CategoryModel)? in
+            guard let parentID = item.parentID, knownIDs.contains(parentID) else { return nil }
+            return (parentID, item)
+        }
+        let childMap = Dictionary(grouping: childPairs, by: { $0.0 }).mapValues { $0.map { $0.1 } }
+        let roots = candidates.filter { $0.parentID == nil || !knownIDs.contains($0.parentID ?? "") }
+        let normalizedQuery = normalize(search)
+
+        func matchesSearch(_ item: CategoryModel) -> Bool {
+            normalizedQuery.isEmpty || normalize(item.name).contains(normalizedQuery)
+        }
+
+        func appliesToWallet(_ item: CategoryModel) -> Bool {
+            guard let walletID, !walletID.isEmpty else { return true }
+            return item.walletIDs.isEmpty || item.walletIDs.contains(walletID)
+        }
+
+        func build(_ item: CategoryModel, depth: Int, inheritedSearchMatch: Bool) -> CategoryListNode? {
+            let itemMatches = matchesSearch(item)
+            let showAllDescendants = inheritedSearchMatch || (normalizedQuery.isEmpty || itemMatches)
+            let children = (childMap[item.id] ?? []).compactMap {
+                build($0, depth: depth + 1, inheritedSearchMatch: showAllDescendants)
+            }
+            let statusEligible = includeInactive || CategoryEditPolicy.canSelect(item)
+            let eligible = appliesToWallet(item) && statusEligible && (selectableIDs?.contains(item.id) ?? true)
+            guard (eligible && showAllDescendants) || !children.isEmpty else { return nil }
+            return CategoryListNode(
+                item: item,
+                depth: depth,
+                isSelectable: eligible,
+                isHierarchyContext: !eligible || (!normalizedQuery.isEmpty && !itemMatches && !inheritedSearchMatch),
+                continuesBranch: false
+            )
+        }
+
+        func appendChildren(_ nodes: [CategoryListNode], into output: inout [CategoryListNode]) {
+            for (index, node) in nodes.enumerated() {
+                var node = node
+                node.continuesBranch = index < nodes.count - 1
+                output.append(node)
+                let childNodes = (childMap[node.item.id] ?? []).compactMap {
+                    build($0, depth: node.depth + 1, inheritedSearchMatch: normalizedQuery.isEmpty || matchesSearch(node.item))
+                }
+                appendChildren(childNodes, into: &output)
+            }
+        }
+
+        var output: [CategoryListNode] = []
+        appendChildren(roots.compactMap { build($0, depth: 0, inheritedSearchMatch: false) }, into: &output)
+        return output
+    }
+
+    private static func normalize(_ value: String) -> String {
+        value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: Locale(identifier: "vi_VN"))
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+}
+
+enum CategorySelectionPresentation {
+    static func subtitle(isSystem: Bool, isSelectable: Bool) -> String {
+        guard isSelectable else { return "Không áp dụng cho lựa chọn này" }
+        return isSystem ? "Nhóm mặc định" : "Nhóm cá nhân"
+    }
+
+    static func nodes(
+        items: [CategoryModel],
+        kind: String,
+        selectableIDs: Set<String>? = nil,
+        search: String
+    ) -> [CategoryListNode] {
+        CategoryListPresentation.nodes(
+            items: items,
+            kind: kind,
+            walletID: nil,
+            search: search,
+            selectableIDs: selectableIDs
+        )
+    }
+
+    static func groups(
+        items: [CategoryModel],
+        kind: String,
+        selectableIDs: Set<String>? = nil,
+        search: String
+    ) -> [CategorySelectionGroup] {
+        let nodes = nodes(items: items, kind: kind, selectableIDs: selectableIDs, search: search)
+        var groups: [CategorySelectionGroup] = []
+
+        for node in nodes {
+            if node.depth == 0 {
+                groups.append(CategorySelectionGroup(root: node, children: []))
+            } else if !groups.isEmpty {
+                groups[groups.count - 1].children.append(node)
+            }
+        }
+
+        return groups
+    }
 }
 
 extension CategoryModel {
     func applies(to transactionType: String, walletID: String, walletType: String) -> Bool {
+        isActive != false && appliesIgnoringActivity(to: transactionType, walletID: walletID, walletType: walletType)
+    }
+
+    func appliesIgnoringActivity(to transactionType: String, walletID: String, walletType: String) -> Bool {
         let savingsTransfer = transactionType == "income"
             ? systemKey == "income_transfer_in" || systemKey == "income_interest"
             : systemKey == "expense_transfer_out"
@@ -87,6 +240,7 @@ struct TransactionInputModel: Codable, Sendable {
     var note: String?
     var includedInReports: Bool
     var travelEventID: String?
+    var autoLinkTravel: Bool? = nil
 }
 
 struct BulkDeleteInputModel: Codable, Sendable {
@@ -405,4 +559,15 @@ struct APIKeyCreatedModel: Codable, Sendable {
     var scopes: [String]
     var expiresAt: String?
     var secret: String
+}
+
+enum APIKeySecretClipboard {
+    /// Copies the exact one-time secret only in response to an explicit caller
+    /// action. The injected writer keeps the policy deterministic in tests.
+    @discardableResult
+    static func copy(_ secret: String, write: (String) -> Void) -> Bool {
+        guard !secret.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        write(secret)
+        return true
+    }
 }

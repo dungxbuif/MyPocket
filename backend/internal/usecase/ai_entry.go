@@ -79,6 +79,13 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 	if err != nil {
 		return nil, err
 	}
+	activeCategories := make([]entity.Category, 0, len(categories))
+	for _, category := range categories {
+		if category.IsActive {
+			activeCategories = append(activeCategories, category)
+		}
+	}
+	categories = activeCategories
 	slog.Info("AI entry catalogs loaded", "process_id", id, "wallet_count", len(wallets), "category_count", len(categories))
 	payload, _ := json.Marshal(in)
 	hash := sha256.Sum256(payload)

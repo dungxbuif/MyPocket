@@ -27,6 +27,9 @@ type categoryInput struct {
 type categoryWalletInput struct {
 	WalletIDs []string `json:"wallet_ids"`
 }
+type categoryStatusInput struct {
+	IsActive *bool `json:"is_active"`
+}
 
 func NewCategoryHandler(categories *usecase.CategoryInteractor) *CategoryHandler {
 	return &CategoryHandler{Categories: categories}
@@ -143,6 +146,38 @@ func (h *CategoryHandler) UpdateCategoryWallets(c *gin.Context) {
 	OK(c, item)
 }
 
+// SetCategoryStatus godoc
+// @Summary Archive or restore a personal category
+// @Tags Categories
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Category ID"
+// @Param status body categoryStatusInput true "Category active state"
+// @Success 200 {object} entity.Category
+// @Failure 400 {object} Problem
+// @Failure 401 {object} Problem
+// @Failure 404 {object} Problem
+// @Router /api/v1/categories/{id}/status [patch]
+func (h *CategoryHandler) SetCategoryStatus(c *gin.Context) {
+	owner, ok := categoryOwner(c)
+	if !ok {
+		categoryUnauthorized(c)
+		return
+	}
+	var input categoryStatusInput
+	if err := c.ShouldBindJSON(&input); err != nil || input.IsActive == nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	item, err := h.Categories.SetActive(owner, c.Param("id"), *input.IsActive)
+	if err != nil {
+		categoryError(c, err, categoryNotFoundMessage)
+		return
+	}
+	OK(c, item)
+}
+
 // DeleteCategory godoc
 // @Summary Delete a personal category without children
 // @Tags Categories
@@ -169,6 +204,10 @@ func (h *CategoryHandler) DeleteCategory(c *gin.Context) {
 func categoryOwner(c *gin.Context) (string, bool) { return walletOwner(c) }
 func categoryUnauthorized(c *gin.Context) {
 	Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthRequired, Title: problemTitleUnauthorized, Detail: categoryUnauthorizedMessage})
+}
+
+func categoryInactive(c *gin.Context) {
+	Fail(c, http.StatusBadRequest, Problem{Code: problemCodeCategoryInactive, Title: problemTitleBadRequest, Detail: "Nhóm này đã lưu trữ. Hãy chọn một nhóm đang hoạt động."})
 }
 func bindCategoryInput(c *gin.Context) (usecase.CategoryInput, bool) {
 	var input categoryInput

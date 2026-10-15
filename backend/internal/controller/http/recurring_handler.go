@@ -211,8 +211,14 @@ func (h *RecurringHandler) bind(c *gin.Context, owner string, existing *entity.R
 		transactionBadRequest(c, transactionCategoryRequiredMessage)
 		return entity.RecurringSchedule{}, false
 	}
-	if !categoryValidForRecurring(h.Categories, owner, *input.CategoryID, input.Type) {
+	category, categoryErr := h.Categories.FindVisible(owner, *input.CategoryID)
+	keepHistoricalCategory := existing != nil && existing.CategoryID != nil && *existing.CategoryID == *input.CategoryID
+	if categoryErr != nil || category == nil || category.Kind != input.Type {
 		transactionBadRequest(c, transactionCategoryMessage)
+		return entity.RecurringSchedule{}, false
+	}
+	if !category.IsActive && !keepHistoricalCategory {
+		Fail(c, http.StatusBadRequest, Problem{Code: "category_inactive", Title: problemTitleBadRequest, Detail: "Nhóm này đã lưu trữ. Hãy chọn một nhóm đang hoạt động."})
 		return entity.RecurringSchedule{}, false
 	}
 	user, err := h.Users.FindByID(owner)
@@ -248,11 +254,6 @@ func (h *RecurringHandler) bind(c *gin.Context, owner string, existing *entity.R
 		return entity.RecurringSchedule{}, false
 	}
 	return entity.RecurringSchedule{Name: input.Name, OwnerID: owner, WalletID: wallet.ID, CategoryID: input.CategoryID, Type: input.Type, Amount: input.Amount, Note: normalizeOptional(input.Note), Frequency: input.Frequency, Interval: input.Interval, NextRunAt: next.UTC(), EndsAt: ends, AnchorDay: next.Day(), AnchorMonth: int(next.Month()), Active: *input.Active}, true
-}
-
-func categoryValidForRecurring(categories categoryrepo.CategoryRepository, owner, id, kind string) bool {
-	row, err := categories.FindVisible(owner, id)
-	return err == nil && row != nil && row.Kind == kind
 }
 
 func (h *RecurringHandler) mapError(c *gin.Context, err error) {

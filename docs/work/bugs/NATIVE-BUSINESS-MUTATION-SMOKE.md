@@ -25,8 +25,9 @@ note field.
 - A wallet created from the native editor appears in the wallet list with the
   server-assigned name and can be removed by teardown.
 - A transfer submitted from the transaction overflow flow creates the paired
-  source/destination rows, refreshes the ledger, and can be deleted as one
-  atomic pair.
+  source/destination rows, refreshes the ledger, can update both linked rows
+  without implying that source/destination can be changed, and can be deleted
+  as one atomic pair.
 - A credit entry and a payment submitted from the credit statement flow refresh
   the statement and expose the resulting rows; the payment must use a
   non-credit source wallet.
@@ -45,8 +46,12 @@ fixture wallets even when an assertion fails.
   payload, so editing an existing wallet always sends `PATCH /wallets/:id`.
 - The shared native amount field exposes a keyboard “Xong” action so a numeric
   keyboard can be dismissed before entering a note or submitting a form.
+- Transfer edit mode disables source/destination selectors because the existing
+  idempotent pair-update API accepts only amount, date and note. A regression
+  test proves those fields update both persisted rows and keeps wallet IDs
+  unchanged.
 - Signed iPhone 16 Simulator `LOCAL_API_UI` mutation tests pass for wallet
-  create/update, atomic transfer create/delete, and credit entry/payment.
+  create/update, atomic transfer create/update/delete, and credit entry/payment.
 - The complete signed API-backed UI suite passes 14/14 in 293.192 seconds.
 - Disposable Stage v1 fixture counts after the run are wallets=0,
   transactions=0, feedback=0.
@@ -64,3 +69,14 @@ fixture wallets even when an assertion fails.
 
 Real Google OAuth, provider-backed AI/OCR, authenticated staging/production,
 and physical-device signing remain separate release gates.
+
+## 2026-10-08 transfer-edit addendum
+
+The transfer-edit regression was reproduced and fixed after the original smoke
+run. A dedicated disposable PostgreSQL database and loopback Redis container
+were used (not `mypocket_stage_v1`): the API-backed iPhone 16 test now creates,
+edits, reads back both pair rows, verifies the wallet IDs remain unchanged and
+deletes the pair. The full current native suite passed 145/145; see the
+[validation matrix](../VALIDATION_MATRIX.md#native-transfer-pair-edit-integrity--2026-10-08).
+The dedicated DB/container and DerivedData were removed; retained xcresult
+bundles contain the verification evidence.

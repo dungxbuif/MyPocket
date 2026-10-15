@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -189,19 +190,91 @@ func (r *JarPostgresRepository) Create(owner, monthLabel, timezone, name, mode s
 	}
 	config := &entity.JarMonthConfig{OwnerID: owner, Month: month, JarID: uuid.NewString(), Name: name, AllocationMode: mode, AllocationAmount: amount, AllocationPercentBPS: percentBPS, Active: true}
 	err = r.db.Transaction(func(tx *gorm.DB) error {
-		if err := r.lockOwner(tx, owner); err != nil {
-			return err
+		created, createErr := r.createInTx(tx, owner, month, name, mode, amount, percentBPS)
+		if createErr == nil {
+			config = created
 		}
-		if err := r.ensureMonth(tx, owner, month); err != nil {
-			return err
-		}
-		jar := entity.Jar{ID: config.JarID, OwnerID: owner}
-		if err := tx.Create(&jar).Error; err != nil {
-			return err
-		}
-		return tx.Create(config).Error
+		return createErr
 	})
 	return config, err
+}
+
+func (r *JarPostgresRepository) createInTx(tx *gorm.DB, owner string, month entity.CalendarDate, name, mode string, amount *int64, percentBPS *int) (*entity.JarMonthConfig, error) {
+	if err := r.lockOwner(tx, owner); err != nil {
+		return nil, err
+	}
+	if err := r.ensureMonth(tx, owner, month); err != nil {
+		return nil, err
+	}
+	config := &entity.JarMonthConfig{OwnerID: owner, Month: month, JarID: uuid.NewString(), Name: name, AllocationMode: mode, AllocationAmount: amount, AllocationPercentBPS: percentBPS, Active: true}
+	jar := entity.Jar{ID: config.JarID, OwnerID: owner}
+	if err := tx.Create(&jar).Error; err != nil {
+		return nil, err
+	}
+	if err := tx.Create(config).Error; err != nil {
+		return nil, err
+	}
+	return config, nil
+}
+
+// CreateIdempotent atomically creates a jar month configuration and stores its
+// response in the shared mutation ledger. This is the replay boundary used by
+// a confirmed Finance Assistant action.
+func (r *JarPostgresRepository) CreateIdempotent(owner, monthLabel, timezone, name, mode string, amount *int64, percentBPS *int, idempotencyKey, requestHash string) (*entity.JarMonthConfig, bool, error) {
+	if owner == "" || idempotencyKey == "" || requestHash == "" {
+		return nil, false, contract.ErrMutationInvalid
+	}
+	month, _, err := parseJarPeriod(monthLabel, timezone)
+	if err != nil {
+		return nil, false, contract.ErrJarInvalid
+	}
+	var replayed bool
+	var result entity.JarMonthConfig
+	err = r.db.Transaction(func(tx *gorm.DB) error {
+		mutation := entity.TransactionMutation{ID: uuid.NewString(), OwnerID: owner, Operation: "jar.create", IdempotencyKey: idempotencyKey, RequestHash: requestHash, Status: "pending", ResponseJSON: "{}"}
+		inserted := tx.Exec(`INSERT INTO transaction_mutations (id, owner_id, operation, idempotency_key, request_hash, status, response_json) VALUES (?, ?, ?, ?, ?, ?, ?::jsonb) ON CONFLICT (owner_id, operation, idempotency_key) DO NOTHING`, mutation.ID, mutation.OwnerID, mutation.Operation, mutation.IdempotencyKey, mutation.RequestHash, mutation.Status, mutation.ResponseJSON)
+		if inserted.Error != nil {
+			return inserted.Error
+		}
+		if inserted.RowsAffected == 0 {
+			var persisted entity.TransactionMutation
+			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND operation = ? AND idempotency_key = ?", owner, mutation.Operation, idempotencyKey).First(&persisted).Error; err != nil {
+				return err
+			}
+			if persisted.RequestHash != requestHash {
+				return contract.ErrMutationConflict
+			}
+			if persisted.Status != contract.TransactionMutationCompleted {
+				return contract.ErrMutationPending
+			}
+			if err := json.Unmarshal([]byte(persisted.ResponseJSON), &result); err != nil {
+				return err
+			}
+			replayed = true
+			return nil
+		}
+		created, err := r.createInTx(tx, owner, month, name, mode, amount, percentBPS)
+		if err != nil {
+			return err
+		}
+		result = *created
+		encoded, err := json.Marshal(result)
+		if err != nil {
+			return err
+		}
+		updated := tx.Model(&entity.TransactionMutation{}).Where("id = ?", mutation.ID).Updates(map[string]any{"status": contract.TransactionMutationCompleted, "response_json": string(encoded)})
+		if updated.Error != nil {
+			return updated.Error
+		}
+		if updated.RowsAffected != 1 {
+			return contract.ErrMutationPending
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, replayed, err
+	}
+	return &result, replayed, nil
 }
 
 func (r *JarPostgresRepository) UpdateMonthConfig(owner, jarID, monthLabel, name, mode string, amount *int64, percentBPS *int) (*entity.JarMonthConfig, error) {

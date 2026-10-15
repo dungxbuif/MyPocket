@@ -10,6 +10,16 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-06-offline-financial-sync-contract.md`
 
+2026-10-14 reconciliation: Task2's new table/migration30/file list is superseded
+by [ADR018](../../decisions/ADR-018-reuse-durable-financial-receipts.md).
+Reuse migration22 transaction_mutations,30 occupied/schema32 unchanged. New
+transaction_create_receipt.go/offline_create_receipt_test.go and additive
+TransactionCreateMutationRepository capability verified locally, not completion
+of Tasks1–3 or native offline availability. Keyed HTTP branch now locally verified
+with meta.mutation and typed input hashing; missing-key legacy path remains during
+transition. Required-key rollout/auth middleware E2E still open before full backend
+contract gate. [Current work](../../work/tickets/OFFLINE-CREATE-RECEIPTS-20261014.md).
+
 ## Global Constraints
 
 - PostgreSQL is the only financial source of truth; Redis is never used for mutation durability.
@@ -91,6 +101,13 @@
 - [ ] **Step 5: Regenerate Swagger/OpenAPI and reconcile `docs/architecture/API.md`.** Include required header, error codes, and replay response.
 
 ### Task 4: Build the Swift account-scoped outbox store
+
+2026-10-14 implementation checkpoint: SQLite3/AES-GCM/Keychain store and
+transactional lease/outcome/auth-block APIs locally verified209/209unit0skip
+(16store cases). Typed markOutcome unifies planned four setters, per ADR020 and
+ledger; recovery only expires old leases, never steals a live lease. Session
+integration/cache/sync/UI still open; do not mark entire task/goal complete.
+[Evidence](../../work/tickets/OFFLINE-ENCRYPTED-STORE-20261014.md).
 
 **Files:**
 - Create: `mobile-ios/MyPocketIOS/Core/Offline/OutboxModels.swift`

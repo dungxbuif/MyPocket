@@ -8,7 +8,7 @@ import (
 func TestAIEntryValidationPreventsUnsupportedOrIncompleteLedgerWrites(t *testing.T) {
 	wallet := entity.Wallet{ID: "w", OwnerID: "owner", Type: "basic"}
 	categoryID := "cat"
-	category := entity.Category{ID: categoryID, Kind: entity.TransactionTypeExpense}
+	category := entity.Category{ID: categoryID, Kind: entity.TransactionTypeExpense, IsActive: true}
 	valid := entity.AIEntryDraft{Type: "expense", Amount: 35000, WalletID: "w", CategoryID: &categoryID, OccurredAt: "2026-09-21T00:30:00+07:00", IncludedInReports: true}
 	if err := ValidateAIEntryDraft(valid, wallet, &category); err != nil {
 		t.Fatal(err)
@@ -35,7 +35,7 @@ func TestAIEntryValidationUsesCategoryWalletAndSavingsRules(t *testing.T) {
 	d := entity.AIEntryDraft{Type: "income", Amount: 10000, WalletID: "goal", CategoryID: &id, OccurredAt: "2026-09-20T17:30:00Z"}
 	w := entity.Wallet{ID: "goal", Type: "goal"}
 	key := "income_interest"
-	c := entity.Category{ID: id, Kind: "income", SystemKey: &key, WalletIDs: []string{"goal"}}
+	c := entity.Category{ID: id, Kind: "income", SystemKey: &key, WalletIDs: []string{"goal"}, IsActive: true}
 	if err := ValidateAIEntryDraft(d, w, &c); err != nil {
 		t.Fatal(err)
 	}

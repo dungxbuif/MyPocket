@@ -48,6 +48,18 @@ func (s authUserStub) FindOrCreateGoogleUser(entity.GoogleProfile) (*entity.User
 func (s authUserStub) SetTimezone(string, string, bool) (*entity.User, error) { return s.user, nil }
 func (s authUserStub) Create(*entity.User) error                              { return nil }
 
+type failingGoogleUserStub struct{ err error }
+
+func (s failingGoogleUserStub) FindByEmail(string) (*entity.User, error) { return nil, s.err }
+func (s failingGoogleUserStub) FindByID(string) (*entity.User, error)    { return nil, s.err }
+func (s failingGoogleUserStub) FindOrCreateGoogleUser(entity.GoogleProfile) (*entity.User, error) {
+	return nil, s.err
+}
+func (s failingGoogleUserStub) SetTimezone(string, string, bool) (*entity.User, error) {
+	return nil, s.err
+}
+func (s failingGoogleUserStub) Create(*entity.User) error { return s.err }
+
 type authTokenStub struct{ calls int }
 
 type authPasswordStub struct{}
@@ -113,5 +125,49 @@ func TestMobileGoogleLoginRequiresVerifiedEmail(t *testing.T) {
 	service.MobileGoogleOAuth = mobileGoogleStub{profile: entity.GoogleProfile{Subject: "sub", Email: "user@example.com", EmailVerified: false}}
 	if _, err := service.LoginWithMobileGoogleCode(nil, "code", "verifier", "mypocket://oauth/callback"); !errors.Is(err, ErrInvalidGoogleProfile) {
 		t.Fatalf("unverified native profile should be rejected, got %v", err)
+	}
+}
+
+func TestGoogleLoginPreservesUserStoreFailureClassification(t *testing.T) {
+	storeErr := errors.New("database connection refused")
+	service := NewAuthInteractor(
+		failingGoogleUserStub{err: storeErr},
+		authPasswordStub{},
+		&authTokenStub{},
+		&authCacheStub{values: map[string]string{}},
+		nil,
+	)
+
+	_, err := service.LoginWithGoogle(nil, entity.GoogleProfile{
+		Subject:       "fixture-ios-user",
+		Email:         "fixture@example.com",
+		EmailVerified: true,
+	})
+	if !errors.Is(err, ErrGoogleUserStore) {
+		t.Fatalf("expected user-store sentinel, got %v", err)
+	}
+	if !errors.Is(err, storeErr) {
+		t.Fatalf("expected underlying store error to remain inspectable, got %v", err)
+	}
+}
+
+func TestMobileGoogleLoginPreservesUserStoreFailureClassification(t *testing.T) {
+	storeErr := errors.New("database connection refused")
+	service := NewAuthInteractor(
+		failingGoogleUserStub{err: storeErr},
+		authPasswordStub{},
+		&authTokenStub{},
+		&authCacheStub{values: map[string]string{}},
+		nil,
+	)
+	service.MobileGoogleOAuth = mobileGoogleStub{profile: entity.GoogleProfile{
+		Subject:       "fixture-ios-user",
+		Email:         "fixture@example.com",
+		EmailVerified: true,
+	}}
+
+	_, err := service.LoginWithMobileGoogleCode(nil, "fixture-code", "fixture-verifier", "mypocket://oauth/callback")
+	if !errors.Is(err, ErrGoogleUserStore) || !errors.Is(err, storeErr) {
+		t.Fatalf("expected mobile login to preserve user-store failure, got %v", err)
 	}
 }

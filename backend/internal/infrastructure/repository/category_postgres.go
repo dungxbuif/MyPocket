@@ -44,7 +44,7 @@ func (r *CategoryPostgresRepository) EnsurePersonalDefaults(ownerID string) erro
 			if id == "" {
 				continue
 			}
-			copy := entity.Category{ID: id, OwnerID: &ownerID, Kind: item.Kind, Name: item.Name, IconKey: item.IconKey}
+			copy := entity.Category{ID: id, OwnerID: &ownerID, Kind: item.Kind, Name: item.Name, IconKey: item.IconKey, IsActive: true}
 			if item.ParentID != nil {
 				if parent := ids[*item.ParentID]; parent != "" {
 					copy.ParentID = &parent
@@ -59,13 +59,63 @@ func (r *CategoryPostgresRepository) EnsurePersonalDefaults(ownerID string) erro
 }
 
 func (r *CategoryPostgresRepository) Create(ownerID string, category *entity.Category) error {
-	category.OwnerID, category.IsSystem = &ownerID, false
-	return r.db.Create(category).Error
+	category.OwnerID, category.IsSystem, category.IsActive = &ownerID, false, true
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		if len(category.WalletIDs) > 0 {
+			var count int64
+			if err := tx.Model(&entity.Wallet{}).Where("id IN ? AND owner_id = ?", category.WalletIDs, ownerID).Count(&count).Error; err != nil {
+				return err
+			}
+			if count != int64(len(category.WalletIDs)) {
+				return usecase.ErrCategoryWalletInvalid
+			}
+		}
+		if err := tx.Create(category).Error; err != nil {
+			return err
+		}
+		for _, walletID := range category.WalletIDs {
+			if err := tx.Create(&entity.CategoryWallet{CategoryID: category.ID, WalletID: walletID}).Error; err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (r *CategoryPostgresRepository) FindPersonal(ownerID, id string) (*entity.Category, error) {
 	var item entity.Category
 	if err := r.db.Where("id = ? AND owner_id = ? AND is_system = ?", id, ownerID, false).First(&item).Error; err != nil {
+		return nil, err
+	}
+	return &item, nil
+}
+
+func (r *CategoryPostgresRepository) SetActive(ownerID, id string, active bool) (*entity.Category, error) {
+	var item entity.Category
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		var current entity.Category
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ? AND is_system = ?", id, ownerID, false).First(&current).Error; err != nil {
+			return err
+		}
+		result := tx.Model(&current).Update("is_active", active)
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected == 0 && current.IsActive != active {
+			return gorm.ErrRecordNotFound
+		}
+		if err := tx.Where("id = ? AND owner_id = ? AND is_system = ?", id, ownerID, false).First(&item).Error; err != nil {
+			return err
+		}
+		item.WalletIDs = make([]string, 0)
+		return tx.Table("category_wallets").
+			Select("category_wallets.wallet_id").
+			Joins("JOIN wallets ON wallets.id = category_wallets.wallet_id").
+			Where("category_wallets.category_id = ? AND wallets.owner_id = ?", id, ownerID).
+			Order("category_wallets.wallet_id").
+			Pluck("category_wallets.wallet_id", &item.WalletIDs).Error
+	})
+	if err != nil {
 		return nil, err
 	}
 	return &item, nil

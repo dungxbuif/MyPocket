@@ -1,15 +1,20 @@
 ---
 artifact_type: release_notes
 id: REL-1.1.0-native-ios-simulator-draft
-status: draft
+status: superseded
 version: 1.1.0
 release_approval: pending
-deployment: not_deployed
+deployment: superseded_by_REL-1.1.0-native-ios
 linked_phase: ../work/phases/PHASE-002-native-ios-swiftui.md
 linked_plan: ../superpowers/plans/2026-10-05-native-ios-swiftui-port.md
 ---
 
-# Native iOS SwiftUI parity — draft release note
+# Native iOS SwiftUI parity — superseded draft
+
+This simulator-only draft was superseded by the verified release note
+[`REL-1.1.0-native-ios.md`](REL-1.1.0-native-ios.md), which records the
+production API/worker deployment, fresh release gates, and the remaining
+physical-device signing gate.
 
 ## Scope
 

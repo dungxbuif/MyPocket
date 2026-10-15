@@ -28,6 +28,20 @@ type Router struct {
 	AuthMiddleware     *AuthMiddleware
 }
 
+// RegisterPublicDocsRedirect keeps the public documentation entry point
+// stable while Swagger remains mounted under the versioned API namespace.
+// The route is intentionally unauthenticated and contains no user data.
+func RegisterPublicDocsRedirect(engine *gin.Engine) {
+	if engine == nil {
+		return
+	}
+	redirect := func(c *gin.Context) {
+		c.Redirect(http.StatusFound, apiV1Path+"/docs/index.html")
+	}
+	engine.GET("/docs", redirect)
+	engine.GET("/docs/", redirect)
+}
+
 func NewRouter(authHandler *AuthHandler, profileHandler *ProfileHandler, homeHandler *HomeHandler, categoryHandler *CategoryHandler, walletHandler *WalletHandler, transactionHandler *TransactionHandler, middleware *AuthMiddleware, allowedOrigins []string) *Router {
 	engine := gin.Default()
 	engine.Use(requestIDMiddleware())
@@ -46,10 +60,12 @@ func NewRouter(authHandler *AuthHandler, profileHandler *ProfileHandler, homeHan
 	registerPublicRoutes(api, authHandler)
 	protected := api.Group(routeRootPath)
 	protected.Use(middleware.RequireAuth)
+	registerDeviceAuthRoutes(protected, authHandler, middleware.APIKeys)
 	registerAccountRoutes(protected, profileHandler, homeHandler)
 	registerCategoryRoutes(protected, categoryHandler)
 	registerWalletRoutes(protected, walletHandler)
 	registerTransactionRoutes(protected, transactionHandler)
+	protected.GET("/sync/capabilities", transactionHandler.SyncCapabilities)
 	return r
 }
 

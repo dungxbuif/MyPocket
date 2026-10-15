@@ -11,11 +11,26 @@ trace:
 
 # Feedback → Fix → Changelog API
 
+## Owner resolution (2026-10-14)
+
+`PATCH /api/v1/feedback/{id}/resolution` accepts required boolean `resolved`.
+JWT/session or full-owner API key, without scope checks; expired/revoked key401,
+missing/invalid/null boolean400, cross-owner or nonexistent feedback404.
+Response is feedback in the usual envelope. Additive migration32 adds
+`resolved NOT NULL DEFAULT false`, nullable `resolved_at`. True records server
+UTC time; false clears it; same-value retry preserves timestamp. Owner-scoped
+row lock updates only resolution fields/updated_at; dev status/fixed_at,
+changelog, screenshots and description preserved. List/Get/agent list include
+the fields. Agent status/changelog updates do not resolve user feedback.
+Existing best-effort Redis audit emits `feedback.owner_resolution` with reason
+resolved/reopened. UI uses counted tabs/shared checkbox; moves only on success.
+This Markdown serves humans/agents; OpenAPI includes route/response fields.
+
 This reference describes the implemented local API surface. All endpoints are under `/api/v1`. Responses use the shared envelope `{ "data": ..., "meta": ... }`; errors use the existing problem response with `code`, `status`, `detail`, and `request_id`.
 
 ## Authentication boundaries
 
-User endpoints accept either the normal MyPocket session (`Authorization: Bearer <JWT>`) or an owner-scoped user API key (`Authorization: Bearer mpk_...`). API keys are scoped per operation: `feedback:read` is required for listing/reading feedback and screenshots; `feedback:write` is required to create feedback. A `feedback:write` key automatically includes `feedback:read`. They are owner-scoped: a user can only read or create feedback under the key owner's account. JWT session behavior remains unchanged.
+User endpoints accept JWT/session or a full-owner user API key (`Authorization: Bearer mpk_...`). No scopes: old metadata does not restrict read/create/resolution/screenshot operations. Owner isolation, key expiry/revocation and domain validation still apply. This policy is implemented locally, production rollout pending.
 
 Agent and internal endpoints require the dedicated `FEEDBACK_AGENT_TOKEN` as `Authorization: Bearer <service-token>`. This token is for the local/dev fix agent only. It is not a user API key and has no access to finance endpoints. The server compares the token in constant time and emits redacted Redis audit metadata.
 
@@ -27,7 +42,7 @@ Public changelog endpoints do not expose raw feedback, user IDs, email addresses
 
 Create an owner-scoped feedback item.
 
-Authentication: JWT session or API key with `feedback:write`.
+Authentication: JWT session or full-owner API key, no scopes.
 
 ```json
 {
@@ -43,13 +58,13 @@ Authentication: JWT session or API key with `feedback:write`.
 
 List the authenticated user's feedback, newest first. No other user's rows are returned.
 
-Authentication: JWT session or API key with `feedback:read`.
+Authentication: JWT session or full-owner API key, no scopes.
 
 ### `GET /feedback/{id}`
 
 Read one feedback item owned by the authenticated user. A foreign or missing ID returns the shared not-found problem without disclosing whether another owner has it.
 
-Authentication: JWT session or API key with `feedback:read`.
+Authentication: JWT session or full-owner API key, no scopes.
 
 ## Agent/internal endpoints
 

@@ -86,6 +86,77 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/ai/advisor/actions/{action_id}/confirm": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Confirm a persisted Finance Assistant action",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Persisted action identity",
+                        "name": "action_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Conversation binding",
+                        "name": "action",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.advisorConfirmActionInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ai/advisor/capabilities": {
             "get": {
                 "security": [
@@ -118,6 +189,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "The response keeps the message array in data. The envelope meta may include server-authoritative conversation_id, generation, last_user_message_at, expires_at and server_time.",
                 "produces": [
                     "application/json"
                 ],
@@ -141,6 +213,42 @@ const docTemplate = `{
                             "items": {
                                 "$ref": "#/definitions/entity.AdvisorMessage"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/conversation/reset": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Explicitly clear the owner's Finance Assistant conversation",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stable reset request key",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.AdvisorResetResult"
                         }
                     }
                 }
@@ -571,6 +679,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Keys have full access to the authenticated owner's operations. No scopes are selected or enforced; old scope input is ignored. Expiry and revocation still apply.",
                 "consumes": [
                     "application/json"
                 ],
@@ -628,6 +737,152 @@ const docTemplate = `{
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/device-login": {
+            "post": {
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Exchange a remembered device credential for a new access/refresh session",
+                "parameters": [
+                    {
+                        "description": "Device credential",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.deviceLoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/usecase.LoginOutput"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/devices": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Remember a device for biometric sign-in (password confirmation required)",
+                "parameters": [
+                    {
+                        "description": "Device enrollment",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/usecase.DeviceEnrollmentInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/usecase.DeviceCredentialOutput"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/auth/devices/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Forget a remembered device owned by the authenticated user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Device credential ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
                     }
                 }
             }
@@ -743,6 +998,45 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/auth/logout": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "JWT logout revokes its access/refresh family. API-key logout revokes only that user key; no refresh token is needed for API keys.",
+                "consumes": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Revoke the current access/refresh session family; keep remembered device enrollment",
+                "parameters": [
+                    {
+                        "description": "Current refresh token",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.refreshRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/auth/mobile/google/exchange": {
             "post": {
                 "consumes": [
@@ -798,6 +1092,12 @@ const docTemplate = `{
                             "additionalProperties": {
                                 "type": "string"
                             }
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
                         }
                     }
                 }
@@ -1276,6 +1576,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/categories/{id}/status": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Categories"
+                ],
+                "summary": "Archive or restore a personal category",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Category ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Category active state",
+                        "name": "status",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.categoryStatusInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Category"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/categories/{id}/wallets": {
             "patch": {
                 "security": [
@@ -1590,7 +1953,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Accepts a normal JWT/session or a user API key with feedback:read.",
+                "description": "Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.",
                 "produces": [
                     "application/json"
                 ],
@@ -1616,7 +1979,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Accepts a normal JWT/session or a user API key with feedback:write.",
+                "description": "Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.",
                 "consumes": [
                     "application/json"
                 ],
@@ -1655,7 +2018,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Accepts a normal JWT/session or a user API key with feedback:read.",
+                "description": "Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.",
                 "produces": [
                     "application/json"
                 ],
@@ -1682,6 +2045,64 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/feedback/{id}/resolution": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Independent of developer status/changelog. JWT or full-owner user API key; legacy scopes are ignored. Repeating the same value is idempotent. Other owners' IDs return 404.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Feedback"
+                ],
+                "summary": "Confirm or reopen the authenticated owner's feedback",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Feedback ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Owner confirmation",
+                        "name": "resolution",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.feedbackResolutionInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Feedback"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/feedback/{id}/screenshot": {
             "get": {
                 "security": [
@@ -1689,7 +2110,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Accepts a normal JWT/session or a user API key with feedback:read.",
+                "description": "Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.",
                 "produces": [
                     "application/json"
                 ],
@@ -1894,6 +2315,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpapi.jarInput"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Stable ASCII key (1-128 bytes) reused to replay a confirmed jar write",
+                        "name": "Idempotency-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -2766,6 +3193,49 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/sync/capabilities": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "JWT/session or full-owner API key required. This read-only endpoint advertises configured implementation, not database health. Old-server404/disabled/unsupported version must block outbox sends. No-header online creates remain legacy and unsafe to retry.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Transactions"
+                ],
+                "summary": "Inspect durable offline-create contract support",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/httpapi.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/httpapi.SyncCapabilitiesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/transactions": {
             "get": {
                 "security": [
@@ -2804,6 +3274,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "auto_link_travel=false disables active-trip fallback; explicit travel_event_id remains owner-validated. Omitted/null/true preserves online auto-link behavior. Offline clients must freeze date/trip and send false.\nSupply a stable Idempotency-Key for durable replay. Missing key is legacy online-only behavior, not safe automatic retry. Replay keeps the original data object and adds meta.mutation.\nAccepts JWT/session or a full-owner user API key. Legacy scope metadata does not restrict access; owner/domain validation still applies.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2816,20 +3287,32 @@ const docTemplate = `{
                 "summary": "Create an income or expense transaction",
                 "parameters": [
                     {
-                        "description": "Transaction input",
+                        "description": "Transaction create input",
                         "name": "transaction",
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/httpapi.transactionInput"
+                            "$ref": "#/definitions/httpapi.transactionCreateInput"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "One ASCII key, 1-128 bytes, reused with the same typed request",
+                        "name": "Idempotency-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.CreateTransactionResponse"
+                        }
+                    },
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/entity.Transaction"
+                            "$ref": "#/definitions/httpapi.CreateTransactionResponse"
                         }
                     },
                     "400": {
@@ -2846,6 +3329,18 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/httpapi.Problem"
                         }
@@ -2972,6 +3467,7 @@ const docTemplate = `{
                         "BearerAuth": []
                     }
                 ],
+                "description": "Supply a stable Idempotency-Key for durable replay. Missing key is legacy online-only behavior, not safe automatic retry. Replay keeps the original data array and adds meta.mutation.\nAccepts JWT/session or a full-owner user API key. Legacy scope metadata does not restrict access; owner/domain validation still applies.",
                 "consumes": [
                     "application/json"
                 ],
@@ -2991,16 +3487,25 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpapi.transferInput"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "One ASCII key, 1-128 bytes, reused with the same typed request",
+                        "name": "Idempotency-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.CreateTransferResponse"
+                        }
+                    },
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/entity.Transaction"
-                            }
+                            "$ref": "#/definitions/httpapi.CreateTransferResponse"
                         }
                     },
                     "400": {
@@ -3021,8 +3526,20 @@ const docTemplate = `{
                             "$ref": "#/definitions/httpapi.Problem"
                         }
                     },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
                     "501": {
                         "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/httpapi.Problem"
                         }
@@ -3652,6 +4169,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpapi.walletInput"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Stable ASCII key (1-128 bytes) reused to replay a confirmed wallet write",
+                        "name": "Idempotency-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -3669,6 +4192,18 @@ const docTemplate = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/httpapi.Problem"
                         }
@@ -3895,6 +4430,23 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.AdvisorResetResult": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "integer"
+                },
+                "replayed": {
+                    "type": "boolean"
+                },
+                "server_time": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.AdvisorRun": {
             "type": "object",
             "properties": {
@@ -4014,6 +4566,9 @@ const docTemplate = `{
                 "id": {
                     "type": "string"
                 },
+                "is_active": {
+                    "type": "boolean"
+                },
                 "is_system": {
                     "type": "boolean"
                 },
@@ -4123,6 +4678,12 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "id": {
+                    "type": "string"
+                },
+                "resolved": {
+                    "type": "boolean"
+                },
+                "resolved_at": {
                     "type": "string"
                 },
                 "screenshot_available": {
@@ -4901,6 +5462,56 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.CreateMutationMeta": {
+            "type": "object",
+            "properties": {
+                "mutation": {
+                    "$ref": "#/definitions/httpapi.CreateMutationMetadata"
+                }
+            }
+        },
+        "httpapi.CreateMutationMetadata": {
+            "type": "object",
+            "properties": {
+                "idempotency_key": {
+                    "type": "string"
+                },
+                "operation": {
+                    "type": "string"
+                },
+                "replayed": {
+                    "type": "boolean"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.CreateTransactionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "$ref": "#/definitions/entity.Transaction"
+                },
+                "meta": {
+                    "$ref": "#/definitions/httpapi.CreateMutationMeta"
+                }
+            }
+        },
+        "httpapi.CreateTransferResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.Transaction"
+                    }
+                },
+                "meta": {
+                    "$ref": "#/definitions/httpapi.CreateMutationMeta"
+                }
+            }
+        },
         "httpapi.Problem": {
             "type": "object",
             "properties": {
@@ -4934,6 +5545,35 @@ const docTemplate = `{
                 "meta": {}
             }
         },
+        "httpapi.SyncCapabilitiesResponse": {
+            "type": "object",
+            "properties": {
+                "contract_version": {
+                    "type": "integer"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "idempotency_key_required_for_offline": {
+                    "type": "boolean"
+                },
+                "legacy_unkeyed_online": {
+                    "type": "boolean"
+                },
+                "operations": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "receipt_metadata": {
+                    "type": "string"
+                },
+                "transaction_create_context": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.adjustmentInput": {
             "type": "object",
             "properties": {
@@ -4951,6 +5591,17 @@ const docTemplate = `{
                 },
                 "wallet_id": {
                     "type": "string"
+                }
+            }
+        },
+        "httpapi.advisorConfirmActionInput": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "integer"
                 }
             }
         },
@@ -5009,12 +5660,6 @@ const docTemplate = `{
                 },
                 "name": {
                     "type": "string"
-                },
-                "scopes": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
                 }
             }
         },
@@ -5098,6 +5743,14 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.categoryStatusInput": {
+            "type": "object",
+            "properties": {
+                "is_active": {
+                    "type": "boolean"
+                }
+            }
+        },
         "httpapi.categoryWalletInput": {
             "type": "object",
             "properties": {
@@ -5166,6 +5819,17 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.deviceLoginRequest": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.feedbackInput": {
             "type": "object",
             "properties": {
@@ -5177,6 +5841,17 @@ const docTemplate = `{
                 },
                 "type": {
                     "type": "string"
+                }
+            }
+        },
+        "httpapi.feedbackResolutionInput": {
+            "type": "object",
+            "required": [
+                "resolved"
+            ],
+            "properties": {
+                "resolved": {
+                    "type": "boolean"
                 }
             }
         },
@@ -5343,6 +6018,42 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.transactionCreateInput": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "auto_link_travel": {
+                    "description": "False freezes explicit no-trip/selected-trip intent; omitted keeps online defaults.",
+                    "type": "boolean"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "included_in_reports": {
+                    "type": "boolean"
+                },
+                "jar_id": {
+                    "type": "string"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "travel_event_id": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.transactionInput": {
             "type": "object",
             "properties": {
@@ -5478,6 +6189,34 @@ const docTemplate = `{
                 }
             }
         },
+        "usecase.DeviceCredentialOutput": {
+            "type": "object",
+            "properties": {
+                "expires_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "secret": {
+                    "type": "string"
+                }
+            }
+        },
+        "usecase.DeviceEnrollmentInput": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string"
+                },
+                "device_name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
         "usecase.HomeOutput": {
             "type": "object",
             "properties": {
@@ -5555,7 +6294,7 @@ const docTemplate = `{
 
 // SwaggerInfo holds exported Swagger Info so clients can modify it
 var SwaggerInfo = &swag.Spec{
-	Version:          "0.1.0",
+	Version:          "1.1.0",
 	Host:             "localhost:8080",
 	BasePath:         "/",
 	Schemes:          []string{},

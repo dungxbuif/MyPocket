@@ -6,9 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"math"
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/mypocket/backend/internal/entity"
 )
 
@@ -22,20 +24,7 @@ type Principal struct {
 	CredentialID   string
 	CredentialKind string
 	ExpiresAt      time.Time
-	Scopes         []string
 	Timezone       string
-}
-
-func (p Principal) HasScope(scope string) bool {
-	if p.CredentialKind == "session" {
-		return true
-	}
-	for _, candidate := range p.Scopes {
-		if candidate == scope {
-			return true
-		}
-	}
-	return false
 }
 
 type ToolDefinition struct {
@@ -59,7 +48,7 @@ func NewAdvisorToolRegistry(finance *FinanceQueryService) *AdvisorToolRegistry {
 	for _, tool := range []AdvisorTool{
 		&summaryTool{finance: finance}, &searchTool{finance: finance}, &compareTool{finance: finance},
 		&walletTool{finance: finance}, &budgetTool{finance: finance}, &goalTool{finance: finance}, &jarTool{finance: finance},
-		&transactionTool{finance: finance}, &walletProposalTool{},
+		&transactionTool{finance: finance}, &productHelpTool{}, &walletProposalTool{}, &jarProposalTool{}, &jarUpdateProposalTool{}, &budgetProposalTool{}, &budgetUpdateProposalTool{},
 	} {
 		registry.tools[tool.Name()] = tool
 	}
@@ -149,6 +138,42 @@ type walletProposalArgs struct {
 	LastStatementBalance *int64 `json:"last_statement_balance"`
 	StatementDay         *int   `json:"statement_day"`
 	PaymentDueDay        *int   `json:"payment_due_day"`
+}
+
+type jarProposalArgs struct {
+	Month             string   `json:"month"`
+	Name              string   `json:"name"`
+	AllocationMode    string   `json:"allocation_mode"`
+	AllocationAmount  *int64   `json:"allocation_amount"`
+	AllocationPercent *float64 `json:"allocation_percent"`
+}
+
+type jarUpdateProposalArgs struct {
+	JarID             string   `json:"jar_id"`
+	Month             string   `json:"month"`
+	Name              string   `json:"name"`
+	AllocationMode    string   `json:"allocation_mode"`
+	AllocationAmount  *int64   `json:"allocation_amount"`
+	AllocationPercent *float64 `json:"allocation_percent"`
+}
+
+type budgetProposalArgs struct {
+	Name        string  `json:"name"`
+	LimitAmount int64   `json:"limit_amount"`
+	WalletID    *string `json:"wallet_id"`
+	CategoryID  *string `json:"category_id"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
+}
+
+type budgetUpdateProposalArgs struct {
+	BudgetID    string  `json:"budget_id"`
+	Name        string  `json:"name"`
+	LimitAmount int64   `json:"limit_amount"`
+	WalletID    *string `json:"wallet_id"`
+	CategoryID  *string `json:"category_id"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
 }
 
 type summaryTool struct{ finance *FinanceQueryService }
@@ -378,6 +403,7 @@ func (t *walletProposalTool) Execute(_ context.Context, _ Principal, raw json.Ra
 		args.CreditLimit, args.LastStatementBalance, args.StatementDay, args.PaymentDueDay = nil, nil, nil, nil
 	}
 	view, err := json.Marshal(map[string]any{
+		"action_id":              uuid.NewString(),
 		"action":                 "create_wallet",
 		"name":                   args.Name,
 		"type":                   args.Type,
@@ -395,6 +421,214 @@ func (t *walletProposalTool) Execute(_ context.Context, _ Principal, raw json.Ra
 		return entity.FinanceResult{}, ErrAdvisorToolInvalid
 	}
 	return entity.FinanceResult{QueryKey: "wallet_proposal", Status: "proposed", ViewKind: "wallet_creation_proposal", View: view}, nil
+}
+
+// jarProposalTool validates a jar creation request but never mutates data.
+// The persisted proposal is confirmed through the action endpoint so a model
+// response cannot create a financial object on its own.
+type jarProposalTool struct{}
+
+func (t *jarProposalTool) Name() string { return "propose_create_jar" }
+func (t *jarProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare a monthly spending jar for the user to review and confirm; never create it directly", map[string]any{
+		"month":              monthSchema(),
+		"name":               map[string]any{"type": "string", "minLength": 1, "maxLength": 100},
+		"allocation_mode":    map[string]any{"type": "string", "enum": []string{entity.JarAllocationNone, entity.JarAllocationFixed, entity.JarAllocationPercent}},
+		"allocation_amount":  map[string]any{"type": "integer", "minimum": 1},
+		"allocation_percent": map[string]any{"type": "number", "minimum": 0, "maximum": 100, "multipleOf": 0.01},
+	}, []string{"month", "name", "allocation_mode"})
+}
+
+func (t *jarProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args jarProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	if err := validateJarProposal(&args.Month, &args.Name, &args.AllocationMode, args.AllocationAmount, args.AllocationPercent); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id": uuid.NewString(), "action": "create_jar", "month": args.Month, "name": args.Name,
+		"allocation_mode": args.AllocationMode, "allocation_amount": args.AllocationAmount, "allocation_percent": args.AllocationPercent,
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "jar_proposal", Status: "proposed", ViewKind: "jar_creation_proposal", View: view}, nil
+}
+
+// jarUpdateProposalTool prepares a replacement for one jar's month-specific
+// configuration. It deliberately does not read or mutate the jar: the
+// owner-scoped PUT handler remains the single write path after confirmation.
+type jarUpdateProposalTool struct{}
+
+func (t *jarUpdateProposalTool) Name() string { return "propose_update_jar" }
+func (t *jarUpdateProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare an update to one monthly spending jar for review and confirmation; never update it directly", map[string]any{
+		"jar_id":             map[string]any{"type": "string", "minLength": 1, "maxLength": 128},
+		"month":              monthSchema(),
+		"name":               map[string]any{"type": "string", "minLength": 1, "maxLength": 100},
+		"allocation_mode":    map[string]any{"type": "string", "enum": []string{entity.JarAllocationNone, entity.JarAllocationFixed, entity.JarAllocationPercent}},
+		"allocation_amount":  map[string]any{"type": "integer", "minimum": 1},
+		"allocation_percent": map[string]any{"type": "number", "minimum": 0, "maximum": 100, "multipleOf": 0.01},
+	}, []string{"jar_id", "month", "name", "allocation_mode"})
+}
+
+func (t *jarUpdateProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args jarUpdateProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.JarID = strings.TrimSpace(args.JarID)
+	if args.JarID == "" || len(args.JarID) > 128 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if _, err := uuid.Parse(args.JarID); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if err := validateJarProposal(&args.Month, &args.Name, &args.AllocationMode, args.AllocationAmount, args.AllocationPercent); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id": uuid.NewString(), "action": "update_jar", "jar_id": args.JarID, "month": args.Month, "name": args.Name,
+		"allocation_mode": args.AllocationMode, "allocation_amount": args.AllocationAmount, "allocation_percent": args.AllocationPercent,
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "jar_update_proposal", Status: "proposed", ViewKind: "jar_update_proposal", View: view}, nil
+}
+
+func validateJarProposal(month, name, mode *string, amount *int64, percent *float64) error {
+	*month = strings.TrimSpace(*month)
+	*name = strings.TrimSpace(*name)
+	*mode = strings.TrimSpace(*mode)
+	if _, err := entity.ParseMonth(*month); err != nil || *name == "" || len(*name) > 100 {
+		return ErrAdvisorToolInvalid
+	}
+	switch *mode {
+	case entity.JarAllocationNone:
+		if amount != nil || percent != nil {
+			return ErrAdvisorToolInvalid
+		}
+	case entity.JarAllocationFixed:
+		if amount == nil || *amount <= 0 || entity.ValidateMoneyAmount(*amount) != nil || percent != nil {
+			return ErrAdvisorToolInvalid
+		}
+	case entity.JarAllocationPercent:
+		if percent == nil || math.IsNaN(*percent) || math.IsInf(*percent, 0) || *percent < 0 || *percent > 100 || math.Round(*percent*100) != *percent*100 || amount != nil {
+			return ErrAdvisorToolInvalid
+		}
+	default:
+		return ErrAdvisorToolInvalid
+	}
+	return nil
+}
+
+// budgetProposalTool validates a budget request without mutating the ledger.
+// Confirmation delegates to the ordinary budget handler with a durable
+// idempotency key, so retries cannot create a second budget.
+type budgetProposalTool struct{}
+
+func (t *budgetProposalTool) Name() string { return "propose_create_budget" }
+func (t *budgetProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare an expense budget for review and confirmation; never create it directly", map[string]any{
+		"name":         map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
+		"limit_amount": map[string]any{"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+		"wallet_id":    map[string]any{"type": "string", "format": "uuid"},
+		"category_id":  map[string]any{"type": "string", "format": "uuid"},
+		"start_date":   dateSchema(),
+		"end_date":     dateSchema(),
+	}, []string{"name", "limit_amount", "start_date", "end_date"})
+}
+
+func (t *budgetProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args budgetProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.Name = strings.TrimSpace(args.Name)
+	if args.Name == "" || len(args.Name) > 200 || args.LimitAmount <= 0 || args.LimitAmount > 9007199254740991 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	start, startErr := entity.ParseCalendarDate(strings.TrimSpace(args.StartDate))
+	end, endErr := entity.ParseCalendarDate(strings.TrimSpace(args.EndDate))
+	if startErr != nil || endErr != nil || end.Time.Before(start.Time) {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	for _, id := range []*string{args.WalletID, args.CategoryID} {
+		if id != nil {
+			trimmed := strings.TrimSpace(*id)
+			if _, err := uuid.Parse(trimmed); err != nil {
+				return entity.FinanceResult{}, ErrAdvisorToolInvalid
+			}
+			*id = trimmed
+		}
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id": uuid.NewString(), "action": "create_budget", "name": args.Name, "limit_amount": args.LimitAmount,
+		"wallet_id": args.WalletID, "category_id": args.CategoryID, "start_date": start.Format("2006-01-02"), "end_date": end.Format("2006-01-02"),
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "budget_proposal", Status: "proposed", ViewKind: "budget_creation_proposal", View: view}, nil
+}
+
+// budgetUpdateProposalTool prepares a replacement for an existing budget. It
+// deliberately does not read or mutate the budget; confirmation dispatches to
+// the owner-scoped PATCH handler so all domain validation stays centralized.
+type budgetUpdateProposalTool struct{}
+
+func (t *budgetUpdateProposalTool) Name() string { return "propose_update_budget" }
+func (t *budgetUpdateProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare a replacement for one expense budget for review and confirmation; never update it directly", map[string]any{
+		"budget_id":    map[string]any{"type": "string", "format": "uuid"},
+		"name":         map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
+		"limit_amount": map[string]any{"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+		"wallet_id":    map[string]any{"type": "string", "format": "uuid"},
+		"category_id":  map[string]any{"type": "string", "format": "uuid"},
+		"start_date":   dateSchema(),
+		"end_date":     dateSchema(),
+	}, []string{"budget_id", "name", "limit_amount", "start_date", "end_date"})
+}
+
+func (t *budgetUpdateProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args budgetUpdateProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.BudgetID = strings.TrimSpace(args.BudgetID)
+	if _, err := uuid.Parse(args.BudgetID); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	args.Name = strings.TrimSpace(args.Name)
+	if args.Name == "" || len(args.Name) > 200 || args.LimitAmount <= 0 || args.LimitAmount > 9007199254740991 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	start, startErr := entity.ParseCalendarDate(strings.TrimSpace(args.StartDate))
+	end, endErr := entity.ParseCalendarDate(strings.TrimSpace(args.EndDate))
+	if startErr != nil || endErr != nil || end.Time.Before(start.Time) {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	for _, id := range []*string{args.WalletID, args.CategoryID} {
+		if id != nil {
+			trimmed := strings.TrimSpace(*id)
+			if _, err := uuid.Parse(trimmed); err != nil {
+				return entity.FinanceResult{}, ErrAdvisorToolInvalid
+			}
+			*id = trimmed
+		}
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id": uuid.NewString(), "action": "update_budget", "budget_id": args.BudgetID,
+		"name": args.Name, "limit_amount": args.LimitAmount, "wallet_id": args.WalletID,
+		"category_id": args.CategoryID, "start_date": start.Format("2006-01-02"), "end_date": end.Format("2006-01-02"),
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "budget_update_proposal", Status: "proposed", ViewKind: "budget_update_proposal", View: view}, nil
 }
 
 func nullableString(value string) any {

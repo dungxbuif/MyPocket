@@ -33,6 +33,8 @@ type Feedback struct {
 	Title               string     `json:"title" gorm:"not null"`
 	Description         string     `json:"description" gorm:"not null"`
 	Status              string     `json:"status" gorm:"not null;default:open"`
+	Resolved            bool       `json:"resolved" gorm:"not null;default:false"`
+	ResolvedAt          *time.Time `json:"resolved_at,omitempty"`
 	FixedAt             *time.Time `json:"fixed_at,omitempty"`
 	ChangelogID         *string    `json:"changelog_id,omitempty" gorm:"column:changelog_id;index"`
 	CreatedAt           time.Time  `json:"created_at"`

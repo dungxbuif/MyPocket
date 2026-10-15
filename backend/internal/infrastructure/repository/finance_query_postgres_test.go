@@ -40,6 +40,7 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 	owner, other := uuid.NewString(), uuid.NewString()
 	walletID := uuid.NewString()
 	categoryID := uuid.NewString()
+	incomeCategoryID := uuid.NewString()
 	childCategoryID := uuid.NewString()
 	otherCategoryID := uuid.NewString()
 	pagingCategoryID := uuid.NewString()
@@ -56,6 +57,9 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 	if err := db.Create(&entity.Category{ID: categoryID, OwnerID: &owner, Kind: entity.TransactionTypeExpense, Name: "Food"}).Error; err != nil {
 		t.Fatal(err)
 	}
+	if err := db.Create(&entity.Category{ID: incomeCategoryID, OwnerID: &owner, Kind: entity.TransactionTypeIncome, Name: "Salary"}).Error; err != nil {
+		t.Fatal(err)
+	}
 	if err := db.Create(&entity.Category{ID: childCategoryID, OwnerID: &owner, ParentID: &categoryID, Kind: entity.TransactionTypeExpense, Name: "Coffee"}).Error; err != nil {
 		t.Fatal(err)
 	}
@@ -68,10 +72,11 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 	t.Cleanup(func() {
 		db.Where("owner_id IN ?", []string{owner, other}).Delete(&entity.Transaction{})
 		db.Where("id IN ?", []string{walletID}).Delete(&entity.Wallet{})
-		db.Where("id IN ?", []string{categoryID, childCategoryID, otherCategoryID, pagingCategoryID}).Delete(&entity.Category{})
+		db.Where("id IN ?", []string{categoryID, incomeCategoryID, childCategoryID, otherCategoryID, pagingCategoryID}).Delete(&entity.Category{})
 		db.Where("id IN ?", []string{owner, other}).Delete(&entity.User{})
 	})
 	transactionID := uuid.NewString()
+	transactionRepository := NewTransactionPostgresRepository(db)
 	for _, tx := range []entity.Transaction{
 		{ID: transactionID, OwnerID: owner, WalletID: walletID, CategoryID: &categoryID, Type: entity.TransactionTypeIncome, Amount: 1000, OccurredAt: now, IncludedInReports: true},
 		{ID: uuid.NewString(), OwnerID: owner, WalletID: walletID, CategoryID: &categoryID, Type: entity.TransactionTypeExpense, Amount: 100, OccurredAt: now.Add(time.Hour), IncludedInReports: true},
@@ -79,14 +84,15 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 		{ID: uuid.NewString(), OwnerID: owner, WalletID: walletID, CategoryID: &categoryID, Type: entity.TransactionTypeExpense, Amount: 20, OccurredAt: now.Add(3 * time.Hour), IncludedInReports: false},
 		{ID: uuid.NewString(), OwnerID: other, WalletID: walletID, CategoryID: &otherCategoryID, Type: entity.TransactionTypeExpense, Amount: 999, OccurredAt: now, IncludedInReports: true},
 	} {
-		excluded := tx.Amount == 20
-		if err := db.Create(&tx).Error; err != nil {
-			t.Fatal(err)
-		}
-		if excluded {
-			if err := db.Exec("UPDATE transactions SET included_in_reports = false WHERE id = ?", tx.ID).Error; err != nil {
+		if tx.OwnerID == owner {
+			if tx.Type == entity.TransactionTypeIncome {
+				tx.CategoryID = &incomeCategoryID
+			}
+			if err := transactionRepository.Create(&tx); err != nil {
 				t.Fatal(err)
 			}
+		} else if err := db.Create(&tx).Error; err != nil {
+			t.Fatal(err)
 		}
 	}
 	var includedCount, excludedCount int64
@@ -134,7 +140,7 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 	if err := json.Unmarshal(detailBundle.Results[0].View, &detail); err != nil {
 		t.Fatal(err)
 	}
-	if detail.ID != transactionID || detail.Amount != 1000 || detail.WalletName != "Cash" || detail.CategoryName != "Food" {
+	if detail.ID != transactionID || detail.Amount != 1000 || detail.WalletName != "Cash" || detail.CategoryName != "Salary" {
 		t.Fatalf("unexpected transaction detail: %+v", detail)
 	}
 	otherDetail, err := reader.ReadBundle(context.Background(), other, []entity.NormalizedQuery{{Key: "q-detail-other", Kind: "get_transaction", ObjectIDs: []string{transactionID}}})

@@ -10,7 +10,11 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-15-advisor-idle-reset-design.md` (commit9ab9248d).
 
-Status: review_required; owner approved30minutes and requested completion. Written plan must be reviewed before lifecycle/schema/API implementation. Preserve inline/native execution method already chosen for this workstream.
+Status: in_progress; owner approved30minutes and requested completion. The
+server retention foundation and idempotent manual reset route are implemented
+locally, and native Chat mới consumes the route. Native lifecycle metadata, real
+PostgreSQL proof and production rollout remain review gates.
+Preserve inline/native execution method already chosen for this workstream.
 
 ## Global Constraints
 
@@ -57,11 +61,11 @@ Status: review_required; owner approved30minutes and requested completion. Writt
 
 ### Task2: Idempotent reset and owner-authenticated API
 
-**Interfaces:** Add `ResetConversation(ctx context.Context, ownerID, requestID, payloadHash string, now time.Time) (entity.AdvisorResetResult, error)` to lifecycle capability. Result contains ConversationID, Generation, ServerTime, Replayed. Reset ledger unique(owner_id,request_id), no content. Use existing ErrAdvisorPurged mapped410 `advisor_history_expired`; changed-payload key remains409. Keep history data array; add lifecycle fields in response meta for old decoder compatibility.
+**Interfaces:** Add `ResetConversation(ctx context.Context, ownerID, requestID, payloadHash string) (*entity.AdvisorResetResult, error)` to lifecycle capability. Result contains ConversationID, Generation, ServerTime, Replayed. Reset ledger unique(owner_id,request_id), no content. Use existing ErrAdvisorPurged mapped410 `advisor_history_expired`; changed-payload key remains409. Keep history data array; add lifecycle fields in response meta for old decoder compatibility. The local route, ledger and native consumer are implemented; real DB/auth replay proof remains open.
 
 - [ ] RED: JWT and full-owner key reset only own chat; invalid/missing key400; same reset replay after new accepted question returns original generation and preserves new question; changed body409; old purged message key410 with zero provider calls; foreign owner cannot reset/read/poll old content.
 - [ ] Run `rtk proxy go test -race ./internal/controller/http ./internal/usecase -run 'TestAdvisorIdle|TestAdvisorReset|TestAdvisorPurgedReplay' -count=1`. Expected lifecycle contractFAIL.
-- [ ] Implement `POST /api/v1/ai/advisor/conversation/reset`, access-time expiry for submit/history/run polling, meta and410 handling. Purged replay check must not load deleted user message; retain owner/principal validation before lookup. No fake finance run for reset.
+- [x] Implement `POST /api/v1/ai/advisor/conversation/reset` and preserve access-time expiry/410 handling. Purged replay check must not load deleted user message; retain owner/principal validation before lookup. No fake finance run for reset.
 - [ ] GREEN full Go tests/race/vet including realHTTP/PG/Redis auth, stable old history-array contract and no financial writes. Regenerate Swagger with project generator.
 - [ ] Reconcile public human guide/Markdown agent catalog/OpenAPI and commit scoped task.
 
@@ -80,7 +84,7 @@ Status: review_required; owner approved30minutes and requested completion. Writt
 
 - [ ] RED: decode old/new metadata; expiry hides old messages/actions while preserving unsent draft; reads/foreground never extend deadline; logout/owner change cannot display old owner; new reset key persisted for uncertain retry and reused, reset never auto-submits draft. Late history/submit/poll response from old epoch ignored.
 - [ ] Run MyPocketIOSTests targeted lifecycle/API tests using the existing SE LOCAL_API_UI gate. Expected behaviorFAIL; no production credential/provider.
-- [ ] Add Chat mới to existing header menu with shared destructive confirmation. On confirmed reset or server expiry cancel old polling, clear conversation/confirmation state and adopt new generation. Offline hide uses prior server deadline plus monotonic elapsed time; no server-deletion claim while disconnected. Fail closed on incompatible metadata/reset route without fabricating success.
+- [x] Add Chat mới to existing header menu with shared destructive confirmation. On confirmed reset or server expiry clear conversation/confirmation state, preserve the composer draft, and require explicit resend. Offline hide/expiry metadata remains open; no server-deletion claim while disconnected.
 - [ ] GREEN full units plus actual localAPI/native tests for foreground/restart/offline/reset-replay/expired action; keyboard/Dynamic Type/landscape and retained drafts. Keep financial outbox untouched.
 - [ ] Reconcile native screen/registry and human+agent docs; commit scoped task.
 

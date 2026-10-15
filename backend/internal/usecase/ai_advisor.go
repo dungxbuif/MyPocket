@@ -35,6 +35,38 @@ func (s *AdvisorService) Enabled() bool {
 	return true
 }
 
+// ResetConversation clears the owner's assistant history and interrupts any
+// provider calls for runs that were purged by the same transaction. The
+// repository remains the source of truth; cancellation is best-effort and
+// process-local, while generation/lease checks reject late writes everywhere.
+func (s *AdvisorService) ResetConversation(ctx context.Context, ownerID, requestID, payloadHash string) (*entity.AdvisorResetResult, error) {
+	if s == nil || s.Store == nil || strings.TrimSpace(ownerID) == "" {
+		return nil, repository.ErrNotFound
+	}
+	lifecycle, ok := s.Store.(repository.AdvisorLifecycleRepository)
+	if !ok {
+		return nil, ErrAdvisorProviderUnavailable
+	}
+	result, err := lifecycle.ResetConversation(ctx, ownerID, requestID, payloadHash)
+	if err != nil || result == nil || len(result.PurgedRunIDs) == 0 {
+		return result, err
+	}
+
+	cancels := make([]context.CancelFunc, 0, len(result.PurgedRunIDs))
+	s.mu.Lock()
+	for _, runID := range result.PurgedRunIDs {
+		if cancel := s.cancellations[runID]; cancel != nil {
+			cancels = append(cancels, cancel)
+		}
+		delete(s.cancellations, runID)
+	}
+	s.mu.Unlock()
+	for _, cancel := range cancels {
+		cancel()
+	}
+	return result, nil
+}
+
 func (s *AdvisorService) Submit(ctx context.Context, principal Principal, input repository.AdvisorRunInput) (AdvisorAnswer, error) {
 	if s == nil || s.Store == nil || s.Orchestrator == nil || strings.TrimSpace(principal.OwnerID) == "" || !s.Enabled() {
 		return AdvisorAnswer{}, ErrAdvisorProviderUnavailable
@@ -82,7 +114,7 @@ func (s *AdvisorService) Submit(ctx context.Context, principal Principal, input 
 			return AdvisorAnswer{}, fmt.Errorf("%w: %v", ErrAdvisorPrincipalInvalid, err)
 		}
 	}
-	parts := BuildAdvisorParts(answer)
+	parts := BuildAdvisorPartsForRun(answer, run.ConversationID, run.Generation, run.ID)
 	if _, err := s.Store.CreateAssistantMessage(runCtx, principal.OwnerID, run.ID, run.Generation, parts); err != nil {
 		_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
 		return AdvisorAnswer{}, err

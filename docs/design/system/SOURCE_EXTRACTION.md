@@ -25,8 +25,12 @@ không lấy source legacy làm authority cao hơn contract hiện hành.
 
 ## Conflict resolutions
 
-- Export colors #4caf50/#22c55e/#27ae60/#10b981/#059669 không phải năm primary cạnh tranh. Chọn role brand/action/accent theo TOKENS; không copy màu theo màn.
-- Card 24px trong ảnh được supersede bởi giảm radius gần đây → current 12px. Pill/circle vẫn semantic exceptions.
+- Export colors are evidence, not competing primary palettes. The attached
+  Stitch contract (`stitch_my_pocket/financial_clarity_system/DESIGN.md`) now
+  fixes the shared roles: brand `#4caf50`, primary action `#006e1c`, and
+  selected/progress `#4caf50`; do not copy colors screen by screen.
+- Reference cards keep the Stitch 24px radius; controls remain 12px. Pill/circle
+  shapes remain semantic exceptions.
 - Tài liệu cũ nói tree đã collapse và đủ 28 bases: không đúng với code. Inventory mới ghi partial/planned.
 - Budget thresholds chưa thống nhất và chưa có budget API thật; giữ conflict để slice budget quyết định, không tự đổi nghiệp vụ.
 - Ảnh edit group là read-only state; HTML enable là alternate editable reference. Component dùng readOnly prop và rule backend, không “bật sửa system metadata”.

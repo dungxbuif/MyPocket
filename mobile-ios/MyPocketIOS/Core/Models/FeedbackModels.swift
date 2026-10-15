@@ -11,6 +11,10 @@ struct FeedbackModel: Codable, Identifiable, Sendable {
     var createdAt: String
     var updatedAt: String
     var screenshotAvailable: Bool
+    var resolved: Bool? = nil
+    var resolvedAt: String? = nil
+
+    var isResolved: Bool { resolved == true }
 }
 
 struct ChangelogModel: Codable, Identifiable, Sendable {

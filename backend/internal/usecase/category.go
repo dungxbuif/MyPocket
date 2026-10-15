@@ -52,14 +52,16 @@ func (u *CategoryInteractor) Create(ownerID string, input CategoryInput) (*entit
 	if err := u.repository.ValidateWallets(ownerID, input.WalletIDs); err != nil {
 		return nil, err
 	}
-	item := &entity.Category{ID: uuid.NewString(), Name: input.Name, Kind: input.Kind, ParentID: input.ParentID, IconKey: input.IconKey}
+	item := &entity.Category{ID: uuid.NewString(), Name: input.Name, Kind: input.Kind, ParentID: input.ParentID, IconKey: input.IconKey, WalletIDs: input.WalletIDs}
+	item.IsActive = true
 	if err := u.repository.Create(ownerID, item); err != nil {
 		return nil, err
 	}
-	if err := u.repository.ReplaceWallets(ownerID, item, input.WalletIDs); err != nil {
-		return nil, err
-	}
 	return item, nil
+}
+
+func (u *CategoryInteractor) SetActive(ownerID, id string, active bool) (*entity.Category, error) {
+	return u.repository.SetActive(ownerID, id, active)
 }
 
 func (u *CategoryInteractor) Update(ownerID, id string, input CategoryInput) (*entity.Category, error) {

@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mypocket/backend/internal/entity"
+	"github.com/mypocket/backend/internal/infrastructure/auth"
 	"github.com/mypocket/backend/internal/repository"
 	"github.com/mypocket/backend/internal/usecase"
 )
@@ -122,7 +123,7 @@ func TestRequireFeedbackAuthAcceptsScopedUserAPIKey(t *testing.T) {
 	}
 }
 
-func TestRequireFeedbackWriteAuthRejectsReadOnlyKey(t *testing.T) {
+func TestRequireFeedbackWriteAuthAcceptsLegacyReadKeyWithFullOwnerAccess(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	repo := &middlewareAPIKeyRepo{}
 	service := usecase.NewUserAPIKeyService(repo)
@@ -137,7 +138,31 @@ func TestRequireFeedbackWriteAuthRejectsReadOnlyKey(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/write", nil)
 	request.Header.Set("Authorization", "Bearer "+created.Secret)
 	engine.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusForbidden {
-		t.Fatalf("read-only feedback key must be denied for writes: %d %s", recorder.Code, recorder.Body.String())
+	if recorder.Code != http.StatusNoContent {
+		t.Fatalf("legacy feedback key must have full owner access: %d %s", recorder.Code, recorder.Body.String())
+	}
+}
+
+func TestRequireAuthAcceptsAPIKeyWithoutJWTTokenOrScope(t *testing.T) {
+	repo := &middlewareAPIKeyRepo{}
+	service := usecase.NewUserAPIKeyService(repo)
+	created, err := service.Create(context.Background(), usecase.APIKeyCreateInput{OwnerID: "owner-1", Name: "Legacy", Scopes: []string{entity.APIKeyScopeFeedbackRead}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	middleware := &AuthMiddleware{APIKeys: service, TokenSvc: auth.NewJWT("test-full-key-middleware-secret32bytes", time.Hour)}
+	engine := gin.New()
+	engine.POST("/financial", middleware.RequireAuth, func(c *gin.Context) {
+		if c.GetString(contextUserIDKey) != "owner-1" {
+			t.Fatal("owner lost")
+		}
+		c.Status(204)
+	})
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/financial", nil)
+	request.Header.Set("Authorization", "Bearer "+created.Secret)
+	engine.ServeHTTP(response, request)
+	if response.Code != 204 {
+		t.Fatalf("full owner key denied:%d", response.Code)
 	}
 }

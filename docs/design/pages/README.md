@@ -1,5 +1,10 @@
 # Page contracts
 
+Native iOS screens and opening controls are mapped in the
+[screen/presentation registry](../platforms/ios-screen-registry.md), including
+auth, More, recurring, credit, notifications and feedback native contracts.
+The web locations below are historical, not an instruction to maintain web.
+
 Page contracts are route-level specifications formerly stored under `screens/`.
 Each page documents route, composition, states, event → effect, validation, permissions,
 copy, API dependencies, proof, and known gaps. Runtime page entry points live in

@@ -27,7 +27,7 @@ import (
 //go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/controller/http,../../internal/usecase,../../internal/entity -o ../../docs --parseInternal
 
 // @title MyPocket API
-// @version 0.1.0
+// @version 1.1.0
 // @description Current implemented API surface for local development.
 // @host localhost:8080
 // @BasePath /
@@ -92,6 +92,7 @@ func main() {
 	})
 	authUc := usecase.NewAuthInteractor(userRepo, passwordSvc, jwtSvc, cacheRepo, googleOAuth)
 	authUc.RefreshTTL = cfg.RefreshTTL
+	authUc.Devices = repo.NewDeviceCredentialPostgresRepository(database)
 	authUc.MobileGoogleOAuth = mobileGoogleOAuth
 
 	authHandler := httpapi.NewAuthHandler(
@@ -121,7 +122,8 @@ func main() {
 	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, walletHandler, transactionHandler, middleware, cfg.CORSAllowedOrigins)
 	router.RegisterNotificationRoutes(&httpapi.NotificationHandler{Notifications: repo.NewNotificationPostgresRepository(database)})
 	router.RegisterAPIKeyRoutes(&httpapi.APIKeyHandler{Service: apiKeyService})
-	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: repo.NewBudgetPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Transactions: repo.NewTransactionPostgresRepository(database), Users: userRepo})
+	budgetRepository := repo.NewBudgetPostgresRepository(database)
+	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: budgetRepository, Wallets: walletRepository, Categories: categoryRepository, Transactions: repo.NewTransactionPostgresRepository(database), Users: userRepo})
 	router.RegisterJarRoutes(&httpapi.JarHandler{Jars: jarRepository, Users: userRepo})
 	router.RegisterMonthRoutes(&httpapi.MonthHandler{Users: userRepo, Transactions: transactionRepository, Categories: categoryRepository, Jars: jarRepository, Notes: monthNotes})
 	recurringRepository := repo.NewRecurringPostgresRepository(database)
@@ -166,7 +168,16 @@ func main() {
 		}
 	})
 	advisorService := usecase.NewAdvisorService(advisorStore, advisorOrchestrator)
-	router.RegisterAdvisorRoutes(&httpapi.AdvisorHandler{Service: advisorService, Users: userRepo, Finance: financeQueryService})
+	router.RegisterAdvisorRoutes(&httpapi.AdvisorHandler{
+		Service:      advisorService,
+		Users:        userRepo,
+		Finance:      financeQueryService,
+		Wallets:      walletRepository,
+		Jars:         jarRepository,
+		Budgets:      budgetRepository,
+		Categories:   categoryRepository,
+		Transactions: transactionRepository,
+	})
 	feedbackRepository := repo.NewFeedbackPostgresRepository(database)
 	changelogRepository := repo.NewChangelogPostgresRepository(database)
 	feedbackService := usecase.NewFeedbackServiceWithStorage(feedbackRepository, cacheRepo, feedbackStorage, time.Now)
@@ -176,6 +187,7 @@ func main() {
 	}
 	router.RegisterFeedbackRoutes(&httpapi.FeedbackHandler{Service: feedbackService}, &httpapi.ChangelogHandler{Service: changelogService}, httpapi.NewFeedbackAgentMiddleware(cfg.FeedbackAgentToken))
 	router.Engine.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	httpapi.RegisterPublicDocsRedirect(router.Engine)
 
 	if err := router.Engine.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("server failed: %v", err)

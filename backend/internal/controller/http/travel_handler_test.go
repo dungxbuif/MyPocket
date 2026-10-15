@@ -134,8 +134,8 @@ func TestCreateTransactionAutoAttachesActiveTravelEvent(t *testing.T) {
 	request := httptest.NewRequest(http.MethodPost, "/transactions", bytes.NewBufferString(`{"wallet_id":"wallet","category_id":"category","type":"expense","amount":1000,"occurred_at":"2026-10-01T10:00:00+07:00"}`))
 	request.Header.Set("Content-Type", "application/json")
 	response := httptest.NewRecorder()
-	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: "category", Kind: entity.TransactionTypeExpense}}}))
-	transactionsHandler := NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: "category", Kind: entity.TransactionTypeExpense}}})
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: "category", Kind: entity.TransactionTypeExpense, IsActive: true}}}))
+	transactionsHandler := NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: "category", Kind: entity.TransactionTypeExpense, IsActive: true}}})
 	transactionsHandler.Travel = travel
 	router = transactionTestRouter(transactionsHandler)
 	router.ServeHTTP(response, request)

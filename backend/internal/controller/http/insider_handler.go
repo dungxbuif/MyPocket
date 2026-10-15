@@ -19,7 +19,7 @@ type InsiderHandler struct {
 func (r *Router) RegisterInsiderRoutes(h *InsiderHandler) {
 	g := r.Engine.Group("/api/v1/reports")
 	// Reports are read-only finance data, so normal sessions and owner API keys
-	// with finance:read can consume the same owner-scoped contract.
+	// can consume the same owner-scoped contract without per-key scopes.
 	g.Use(r.AuthMiddleware.RequireAdvisorAuth)
 	g.GET("/insider", h.Get)
 }

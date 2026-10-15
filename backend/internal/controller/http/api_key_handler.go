@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/mypocket/backend/internal/entity"
+	"github.com/mypocket/backend/internal/repository"
 	"github.com/mypocket/backend/internal/usecase"
 )
 
@@ -16,9 +17,8 @@ const apiKeysRoute = "/api/v1/api-keys"
 type APIKeyHandler struct{ Service *usecase.UserAPIKeyService }
 
 type apiKeyCreateInput struct {
-	Name      string   `json:"name"`
-	Scopes    []string `json:"scopes"`
-	ExpiresAt string   `json:"expires_at,omitempty"`
+	Name      string `json:"name"`
+	ExpiresAt string `json:"expires_at,omitempty"`
 }
 
 type apiKeyCreatedResponse struct {
@@ -39,6 +39,7 @@ func (r *Router) RegisterAPIKeyRoutes(h *APIKeyHandler) {
 
 // APIKeyCreate godoc
 // @Summary Create a user API key
+// @Description Keys have full access to the authenticated owner's operations. No scopes are selected or enforced; old scope input is ignored. Expiry and revocation still apply.
 // @Tags API Keys
 // @Accept json
 // @Produce json
@@ -70,7 +71,7 @@ func (h *APIKeyHandler) Create(c *gin.Context) {
 		}
 		expiresAt = &parsed
 	}
-	created, err := h.Service.Create(c.Request.Context(), usecase.APIKeyCreateInput{OwnerID: owner, Name: input.Name, Scopes: input.Scopes, ExpiresAt: expiresAt})
+	created, err := h.Service.Create(c.Request.Context(), usecase.APIKeyCreateInput{OwnerID: owner, Name: input.Name, ExpiresAt: expiresAt})
 	if err != nil {
 		apiKeyFailure(c, err)
 		return
@@ -110,6 +111,8 @@ func (h *APIKeyHandler) List(c *gin.Context) {
 // @Security BearerAuth
 // @Param id path string true "API key ID"
 // @Success 204
+// @Failure 401 {object} Problem
+// @Failure 404 {object} Problem
 // @Router /api/v1/api-keys/{id} [delete]
 func (h *APIKeyHandler) Revoke(c *gin.Context) {
 	owner, ok := walletOwner(c)
@@ -141,6 +144,8 @@ func apiKeyFailure(c *gin.Context, err error) {
 		status, code = http.StatusServiceUnavailable, "api_key_unavailable"
 	} else if errors.Is(err, usecase.ErrAPIKeyInvalid) {
 		status, code = http.StatusUnauthorized, "api_key_invalid"
+	} else if errors.Is(err, repository.ErrAPIKeyNotFound) {
+		status, code = http.StatusNotFound, "api_key_not_found"
 	}
 	Fail(c, status, Problem{Code: code, Title: "API key request failed", Detail: "không thể xử lý API key"})
 }

@@ -16,7 +16,7 @@ export function WalletCard({ wallet, masked, onActivate }: { wallet: Wallet; mas
   const presentation = PRESENTATION[wallet.type];
   return (
     <BaseButton variant="row" size="row" className="flex w-full items-center gap-3" onClick={onActivate}>
-      <IconBadge icon={presentation.icon} tone={presentation.tone} />
+      <IconBadge icon={presentation.icon} size="lg" shape="circle" tone={presentation.tone} />
       <div className="min-w-0 flex-1">
         <Text weight="semibold" className="truncate">{wallet.name}</Text>
         <Text size="xs" tone="secondary" className="truncate">{wallet.description || presentation.label}</Text>

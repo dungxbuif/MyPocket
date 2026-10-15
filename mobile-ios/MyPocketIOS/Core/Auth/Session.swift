@@ -49,6 +49,10 @@ struct AccessSession: Codable, Equatable, Sendable {
         return expiry > date
     }
 
+    func hasSameCredentials(as other: AccessSession) -> Bool {
+        user.id == other.user.id && token == other.token && refreshToken == other.refreshToken
+    }
+
     private static func parseDate(_ value: String) -> Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -63,4 +67,11 @@ protocol SessionStore: Sendable {
     func load() -> AccessSession?
     func save(_ session: AccessSession) throws
     func clear()
+    func replace(_ session: AccessSession, ifCredentialsMatch original: AccessSession) throws -> Bool
+    func clear(ifCredentialsMatch original: AccessSession) -> Bool
+}
+
+extension SessionStore {
+    func replace(_ session: AccessSession, ifCredentialsMatch original: AccessSession) throws -> Bool { false }
+    func clear(ifCredentialsMatch original: AccessSession) -> Bool { false }
 }

@@ -15,9 +15,12 @@ import { fetchTransactions, signedTransactionAmount, type Transaction } from "..
 import { fetchWallets, type Wallet } from "../../services/wallets";
 import { useAccountTimezone } from "../../services/AccountTimezoneContext";
 import { accountMonthKey, formatAccountDateTime } from "../../services/accountTime";
+import { buildWeekReportTotals } from "../../services/weekReport";
 import { fetchMonthSummary, type MonthSummary } from "../../services/months";
 import { monthLabel } from "../../services/monthJarLogic";
 import { formatVND } from "../utils/format";
+import { fetchMoneyInsider, type InsiderSummary } from "../../services/insider";
+import { OverviewMoneyInsiderCard, OverviewReportCard } from "../molecules/OverviewReferenceCards";
 
 export function OverviewPanel({ masked, refreshKey = 0 }: { masked: boolean; refreshKey?: number }) {
   const navigate = useNavigate();
@@ -32,6 +35,7 @@ export function OverviewPanel({ masked, refreshKey = 0 }: { masked: boolean; ref
   const [monthLoading, setMonthLoading] = useState(true);
   const [monthError, setMonthError] = useState(false);
   const [monthRetry, setMonthRetry] = useState(0);
+  const [insider, setInsider] = useState<InsiderSummary | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -61,15 +65,26 @@ export function OverviewPanel({ masked, refreshKey = 0 }: { masked: boolean; ref
     return () => { cancelled = true; };
   }, [month, refreshKey, monthRetry]);
 
+  useEffect(() => {
+    let cancelled = false;
+    setInsider(null);
+    fetchMoneyInsider(month).then((value) => { if (!cancelled) setInsider(value); }).catch(() => { if (!cancelled) setInsider(null); });
+    return () => { cancelled = true; };
+  }, [month, refreshKey]);
+
   const walletNames = useMemo(() => new Map(wallets.map((wallet) => [wallet.id, wallet.name])), [wallets]);
   const categoryByID = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories]);
+  const weekTotals = useMemo(
+    () => buildWeekReportTotals(transactions, timezone),
+    [transactions, timezone],
+  );
 
   if (loading) return <StatusMessage>Đang tải tổng quan...</StatusMessage>;
   if (error) return <StatusMessage tone="danger">{error}</StatusMessage>;
 
   return (
     <>
-      <SurfaceCard padding="md">
+      <SurfaceCard radius="reference" padding="lg">
         <SectionTitle title="Tổng kết tháng" action="Xem chi tiết" onAction={() => void navigate({ to: "/months/$month", params: { month } })} />
         {monthLoading ? <StatusMessage variant="plain">Đang tải tổng kết tháng...</StatusMessage> : null}
         {monthError ? <div className="space-y-2"><StatusMessage tone="danger" variant="plain">Không tải được tổng kết tháng.</StatusMessage><BaseButton variant="ghost" size="sm" onClick={() => setMonthRetry((value) => value + 1)}>Thử lại</BaseButton></div> : null}
@@ -80,12 +95,15 @@ export function OverviewPanel({ masked, refreshKey = 0 }: { masked: boolean; ref
           <BaseButton variant="ghost" size="sm" className="mt-2" onClick={() => void navigate({ to: "/jars", search: { month } })}>Hũ tháng</BaseButton>
         </> : null}
       </SurfaceCard>
-      <SurfaceCard padding="md">
+      <SurfaceCard radius="reference" padding="lg">
         <SectionTitle title="Ví của tôi" action="Quản lý" onAction={() => void navigate({ to: "/account/wallets" })} />
         {wallets.length === 0 ? <StatusMessage variant="plain">Chưa có ví.</StatusMessage> : <div className="mt-3 divide-y divide-row">{wallets.slice(0, 3).map((wallet) => <WalletCard key={wallet.id} wallet={wallet} masked={masked} onActivate={() => void navigate({ to: "/account/wallets" })} />)}</div>}
       </SurfaceCard>
 
-      <SurfaceCard padding="md">
+      {insider ? <OverviewMoneyInsiderCard value={insider} masked={masked} onOpen={() => void navigate({ to: "/reports" })} /> : null}
+      {!monthLoading && !monthError && monthSummary ? <OverviewReportCard summary={monthSummary} week={weekTotals} masked={masked} onOpen={() => void navigate({ to: "/reports" })} /> : null}
+
+      <SurfaceCard radius="reference" padding="lg">
         <SectionTitle title="Giao dịch gần đây" action="Xem tất cả" onAction={() => void navigate({ to: "/transactions" })} />
         {transactions.length === 0 ? <StatusMessage variant="plain">Chưa có giao dịch.</StatusMessage> : <div className="mt-3 space-y-2">{transactions.slice(0, 4).map((transaction) => {
           const category = transaction.category_id ? categoryByID.get(transaction.category_id) : undefined;

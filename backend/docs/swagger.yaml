@@ -77,6 +77,17 @@ definitions:
       type:
         type: string
     type: object
+  entity.AdvisorResetResult:
+    properties:
+      conversation_id:
+        type: string
+      generation:
+        type: integer
+      replayed:
+        type: boolean
+      server_time:
+        type: string
+    type: object
   entity.AdvisorRun:
     properties:
       client_request_id:
@@ -155,6 +166,8 @@ definitions:
         type: string
       id:
         type: string
+      is_active:
+        type: boolean
       is_system:
         type: boolean
       kind:
@@ -227,6 +240,10 @@ definitions:
       fixed_at:
         type: string
       id:
+        type: string
+      resolved:
+        type: boolean
+      resolved_at:
         type: string
       screenshot_available:
         type: boolean
@@ -738,6 +755,38 @@ definitions:
       updated_at:
         type: string
     type: object
+  httpapi.CreateMutationMeta:
+    properties:
+      mutation:
+        $ref: '#/definitions/httpapi.CreateMutationMetadata'
+    type: object
+  httpapi.CreateMutationMetadata:
+    properties:
+      idempotency_key:
+        type: string
+      operation:
+        type: string
+      replayed:
+        type: boolean
+      status:
+        type: string
+    type: object
+  httpapi.CreateTransactionResponse:
+    properties:
+      data:
+        $ref: '#/definitions/entity.Transaction'
+      meta:
+        $ref: '#/definitions/httpapi.CreateMutationMeta'
+    type: object
+  httpapi.CreateTransferResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      meta:
+        $ref: '#/definitions/httpapi.CreateMutationMeta'
+    type: object
   httpapi.Problem:
     properties:
       code:
@@ -760,6 +809,25 @@ definitions:
       data: {}
       meta: {}
     type: object
+  httpapi.SyncCapabilitiesResponse:
+    properties:
+      contract_version:
+        type: integer
+      enabled:
+        type: boolean
+      idempotency_key_required_for_offline:
+        type: boolean
+      legacy_unkeyed_online:
+        type: boolean
+      operations:
+        items:
+          type: string
+        type: array
+      receipt_metadata:
+        type: string
+      transaction_create_context:
+        type: string
+    type: object
   httpapi.adjustmentInput:
     properties:
       amount:
@@ -772,6 +840,13 @@ definitions:
         type: string
       wallet_id:
         type: string
+    type: object
+  httpapi.advisorConfirmActionInput:
+    properties:
+      conversation_id:
+        type: string
+      generation:
+        type: integer
     type: object
   httpapi.advisorMessageInput:
     properties:
@@ -809,10 +884,6 @@ definitions:
         type: string
       name:
         type: string
-      scopes:
-        items:
-          type: string
-        type: array
     type: object
   httpapi.apiKeyCreatedResponse:
     properties:
@@ -866,6 +937,11 @@ definitions:
           type: string
         type: array
     type: object
+  httpapi.categoryStatusInput:
+    properties:
+      is_active:
+        type: boolean
+    type: object
   httpapi.categoryWalletInput:
     properties:
       wallet_ids:
@@ -910,6 +986,13 @@ definitions:
       source_wallet_id:
         type: string
     type: object
+  httpapi.deviceLoginRequest:
+    properties:
+      id:
+        type: string
+      secret:
+        type: string
+    type: object
   httpapi.feedbackInput:
     properties:
       description:
@@ -918,6 +1001,13 @@ definitions:
         type: string
       type:
         type: string
+    type: object
+  httpapi.feedbackResolutionInput:
+    properties:
+      resolved:
+        type: boolean
+    required:
+    - resolved
     type: object
   httpapi.feedbackStatusInput:
     properties:
@@ -1024,6 +1114,31 @@ definitions:
       timezone:
         type: string
     type: object
+  httpapi.transactionCreateInput:
+    properties:
+      amount:
+        type: integer
+      auto_link_travel:
+        description: False freezes explicit no-trip/selected-trip intent; omitted
+          keeps online defaults.
+        type: boolean
+      category_id:
+        type: string
+      included_in_reports:
+        type: boolean
+      jar_id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      travel_event_id:
+        type: string
+      type:
+        type: string
+      wallet_id:
+        type: string
+    type: object
   httpapi.transactionInput:
     properties:
       amount:
@@ -1112,6 +1227,24 @@ definitions:
       type:
         type: string
     type: object
+  usecase.DeviceCredentialOutput:
+    properties:
+      expires_at:
+        type: string
+      id:
+        type: string
+      secret:
+        type: string
+    type: object
+  usecase.DeviceEnrollmentInput:
+    properties:
+      device_id:
+        type: string
+      device_name:
+        type: string
+      password:
+        type: string
+    type: object
   usecase.HomeOutput:
     properties:
       greeting:
@@ -1159,7 +1292,7 @@ info:
   contact: {}
   description: Current implemented API surface for local development.
   title: MyPocket API
-  version: 0.1.0
+  version: 1.1.0
 paths:
   /api/v1/agent/feedback:
     get:
@@ -1204,6 +1337,52 @@ paths:
       summary: Get a short-lived feedback screenshot URL for the local agent
       tags:
       - Feedback Agent
+  /api/v1/ai/advisor/actions/{action_id}/confirm:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Persisted action identity
+        in: path
+        name: action_id
+        required: true
+        type: string
+      - description: Conversation binding
+        in: body
+        name: action
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.advisorConfirmActionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Confirm a persisted Finance Assistant action
+      tags:
+      - AI Advisor
   /api/v1/ai/advisor/capabilities:
     get:
       produces:
@@ -1221,6 +1400,9 @@ paths:
       - AI Advisor
   /api/v1/ai/advisor/conversation/messages:
     get:
+      description: The response keeps the message array in data. The envelope meta
+        may include server-authoritative conversation_id, generation, last_user_message_at,
+        expires_at and server_time.
       parameters:
       - description: Read messages before sequence
         in: query
@@ -1238,6 +1420,28 @@ paths:
       security:
       - BearerAuth: []
       summary: Read persisted Finance Assistant messages
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/conversation/reset:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stable reset request key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AdvisorResetResult'
+      security:
+      - BearerAuth: []
+      summary: Explicitly clear the owner's Finance Assistant conversation
       tags:
       - AI Advisor
   /api/v1/ai/advisor/messages:
@@ -1502,6 +1706,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: Keys have full access to the authenticated owner's operations.
+        No scopes are selected or enforced; old scope input is ignored. Expiry and
+        revocation still apply.
       parameters:
       - description: API key configuration
         in: body
@@ -1534,11 +1741,103 @@ paths:
       responses:
         "204":
           description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
       security:
       - BearerAuth: []
       summary: Revoke a current user's API key
       tags:
       - API Keys
+  /api/v1/auth/device-login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Device credential
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.deviceLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      summary: Exchange a remembered device credential for a new access/refresh session
+      tags:
+      - Authentication
+  /api/v1/auth/devices:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Device enrollment
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/usecase.DeviceEnrollmentInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.DeviceCredentialOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Remember a device for biometric sign-in (password confirmation required)
+      tags:
+      - Authentication
+  /api/v1/auth/devices/{id}:
+    delete:
+      parameters:
+      - description: Device credential ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Forget a remembered device owned by the authenticated user
+      tags:
+      - Authentication
   /api/v1/auth/google:
     get:
       parameters:
@@ -1611,6 +1910,32 @@ paths:
       summary: Complete Google OAuth login
       tags:
       - Authentication
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: JWT logout revokes its access/refresh family. API-key logout revokes
+        only that user key; no refresh token is needed for API keys.
+      parameters:
+      - description: Current refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.refreshRequest'
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Revoke the current access/refresh session family; keep remembered device
+        enrollment
+      tags:
+      - Authentication
   /api/v1/auth/mobile/google/exchange:
     post:
       consumes:
@@ -1647,6 +1972,10 @@ paths:
             additionalProperties:
               type: string
             type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
       summary: Exchange a native Google PKCE code for a MyPocket session
       tags:
       - Authentication
@@ -1945,6 +2274,46 @@ paths:
       summary: Update a personal category
       tags:
       - Categories
+  /api/v1/categories/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category active state
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.categoryStatusInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Archive or restore a personal category
+      tags:
+      - Categories
   /api/v1/categories/{id}/wallets:
     patch:
       consumes:
@@ -2142,7 +2511,8 @@ paths:
       - Credit
   /api/v1/feedback:
     get:
-      description: Accepts a normal JWT/session or a user API key with feedback:read.
+      description: Accepts a normal JWT/session or a full-owner user API key; legacy
+        scopes are ignored.
       produces:
       - application/json
       responses:
@@ -2160,7 +2530,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Accepts a normal JWT/session or a user API key with feedback:write.
+      description: Accepts a normal JWT/session or a full-owner user API key; legacy
+        scopes are ignored.
       parameters:
       - description: Feedback
         in: body
@@ -2182,7 +2553,8 @@ paths:
       - Feedback
   /api/v1/feedback/{id}:
     get:
-      description: Accepts a normal JWT/session or a user API key with feedback:read.
+      description: Accepts a normal JWT/session or a full-owner user API key; legacy
+        scopes are ignored.
       parameters:
       - description: Feedback ID
         in: path
@@ -2201,9 +2573,49 @@ paths:
       summary: Get one feedback item owned by the authenticated user
       tags:
       - Feedback
+  /api/v1/feedback/{id}/resolution:
+    patch:
+      consumes:
+      - application/json
+      description: Independent of developer status/changelog. JWT or full-owner user
+        API key; legacy scopes are ignored. Repeating the same value is idempotent.
+        Other owners' IDs return 404.
+      parameters:
+      - description: Feedback ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Owner confirmation
+        in: body
+        name: resolution
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.feedbackResolutionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Feedback'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Confirm or reopen the authenticated owner's feedback
+      tags:
+      - Feedback
   /api/v1/feedback/{id}/screenshot:
     get:
-      description: Accepts a normal JWT/session or a user API key with feedback:read.
+      description: Accepts a normal JWT/session or a full-owner user API key; legacy
+        scopes are ignored.
       parameters:
       - description: Feedback ID
         in: path
@@ -2326,6 +2738,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpapi.jarInput'
+      - description: Stable ASCII key (1-128 bytes) reused to replay a confirmed jar
+          write
+        in: header
+        name: Idempotency-Key
+        type: string
       produces:
       - application/json
       responses:
@@ -2871,6 +3288,33 @@ paths:
       summary: Read the deterministic Money Insider report
       tags:
       - Reports
+  /api/v1/sync/capabilities:
+    get:
+      description: JWT/session or full-owner API key required. This read-only endpoint
+        advertises configured implementation, not database health. Old-server404/disabled/unsupported
+        version must block outbox sends. No-header online creates remain legacy and
+        unsafe to retry.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httpapi.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/httpapi.SyncCapabilitiesResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Inspect durable offline-create contract support
+      tags:
+      - Transactions
   /api/v1/transactions:
     get:
       produces:
@@ -2894,20 +3338,32 @@ paths:
     post:
       consumes:
       - application/json
+      description: |-
+        auto_link_travel=false disables active-trip fallback; explicit travel_event_id remains owner-validated. Omitted/null/true preserves online auto-link behavior. Offline clients must freeze date/trip and send false.
+        Supply a stable Idempotency-Key for durable replay. Missing key is legacy online-only behavior, not safe automatic retry. Replay keeps the original data object and adds meta.mutation.
+        Accepts JWT/session or a full-owner user API key. Legacy scope metadata does not restrict access; owner/domain validation still applies.
       parameters:
-      - description: Transaction input
+      - description: Transaction create input
         in: body
         name: transaction
         required: true
         schema:
-          $ref: '#/definitions/httpapi.transactionInput'
+          $ref: '#/definitions/httpapi.transactionCreateInput'
+      - description: One ASCII key, 1-128 bytes, reused with the same typed request
+        in: header
+        name: Idempotency-Key
+        type: string
       produces:
       - application/json
       responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.CreateTransactionResponse'
         "201":
           description: Created
           schema:
-            $ref: '#/definitions/entity.Transaction'
+            $ref: '#/definitions/httpapi.CreateTransactionResponse'
         "400":
           description: Bad Request
           schema:
@@ -2918,6 +3374,14 @@ paths:
             $ref: '#/definitions/httpapi.Problem'
         "404":
           description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/httpapi.Problem'
       security:
@@ -3129,6 +3593,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: |-
+        Supply a stable Idempotency-Key for durable replay. Missing key is legacy online-only behavior, not safe automatic retry. Replay keeps the original data array and adds meta.mutation.
+        Accepts JWT/session or a full-owner user API key. Legacy scope metadata does not restrict access; owner/domain validation still applies.
       parameters:
       - description: Internal transfer input
         in: body
@@ -3136,15 +3603,21 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpapi.transferInput'
+      - description: One ASCII key, 1-128 bytes, reused with the same typed request
+        in: header
+        name: Idempotency-Key
+        type: string
       produces:
       - application/json
       responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.CreateTransferResponse'
         "201":
           description: Created
           schema:
-            items:
-              $ref: '#/definitions/entity.Transaction'
-            type: array
+            $ref: '#/definitions/httpapi.CreateTransferResponse'
         "400":
           description: Bad Request
           schema:
@@ -3157,8 +3630,16 @@ paths:
           description: Not Found
           schema:
             $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
         "501":
           description: Not Implemented
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/httpapi.Problem'
       security:
@@ -3420,6 +3901,11 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpapi.walletInput'
+      - description: Stable ASCII key (1-128 bytes) reused to replay a confirmed wallet
+          write
+        in: header
+        name: Idempotency-Key
+        type: string
       produces:
       - application/json
       responses:
@@ -3433,6 +3919,14 @@ paths:
             $ref: '#/definitions/httpapi.Problem'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
           schema:
             $ref: '#/definitions/httpapi.Problem'
       security:

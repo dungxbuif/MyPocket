@@ -17,6 +17,18 @@ trace:
 
 # Offline financial write/sync contract
 
+Implementation reconciliation2026-10-14: reuse migration22 transaction_mutations
+rather than a second table/migration30. Stored states pending/completed, resource
+data in response_json with retention timestamps; failed writes roll back receipts.
+[ADR018](../../decisions/ADR-018-reuse-durable-financial-receipts.md).
+Repository and keyed HTTP branch locally verified, not deployed. Replay metadata
+is meta.mutation, preserving transfer's data array. No-header requests remain legacy
+online-only during transition. Actual JWT/session/PostgreSQL/Redis integration
+verified, including expiry/logout before replay. New owner-approved full-key policy
+accepts JWT/session or active same-owner API key for writes/replay, without scopes;
+locally verified, production activation pending. Required-key rollout and
+cache/sync/UI remain gates; encrypted outbox/leases exist but are not connected.
+
 ## Decision requested
 
 Approve the contract below before implementation. The first delivery is an
@@ -38,6 +50,15 @@ rows are visible as pending and are never presented as server-confirmed totals.
 
 ## Source of truth and identity
 
+Frozen-create reconciliation2026-10-14: ordinary outbox intent stores fixed
+occurred_at/selected travel_event_id (or none) and auto_link_travel=false. Fresh
+server capability must advertise transaction_create_context=explicit_travel_v1;
+otherwise ordinary offline sends are blocked. Omitted/null/true online policy is
+unchanged; optional nil field omitted in hashing preserves existing receipts.
+Transfer has no automatic trip association. Local tests verified; cache/UI/sync
+integration and production activation remain open. API-key scope question below
+is superseded by owner-approved full same-account authority, now locally verified.
+
 - PostgreSQL remains the only financial source of truth.
 - The client generates one UUID `Idempotency-Key` per user intent and persists
   it before attempting the network call. It is never regenerated on retry.
@@ -58,30 +79,32 @@ X-Client-Platform: ios
 X-Client-Version: 1.0.0
 ```
 
-`Idempotency-Key` is required, ASCII, 1–128 bytes, and scoped by
-`(owner_id, operation, key)`. The existing transaction and transfer create
-routes are updated to reject a missing key with `400 MISSING_IDEMPOTENCY_KEY`.
+Offline clients must supply Idempotency-Key: one ASCII value,1–128bytes, scoped by
+owner/operation/key. Current transitional handlers protect supplied valid keys and
+reject explicit empty/duplicate/invalid headers, but absent header still runs legacy
+online behavior. Final coordinated key-required rollout/rejection of missing keys
+is NOT implemented; do not count this transition as that gate complete.
 
 The first request returns the normal resource envelope and:
 
 ```json
 {
-  "data": {
-    "id": "server-resource-id",
+  "data": {"id": "server-resource-id"},
+  "meta": {
     "mutation": {
+      "operation": "transaction.create",
       "idempotency_key": "2b8c6c98-...",
       "status": "applied",
       "replayed": false
     }
-  },
-  "meta": null
+  }
 }
 ```
 
-A byte-equivalent retry for the same owner/key returns the original resource,
-`200` (or the original success status), and `mutation.replayed=true`. It never
-calls the domain mutation a second time. Reusing a key with a different
-operation or request body returns:
+A typed-JSON-equivalent retry for the same owner/operation/key returns the original
+resource,200 and meta.mutation.replayed=true. JSON whitespace/order do not matter;
+changed decoded fields conflict. It never repeats the financial write. Distinct
+operations have independent key scopes; changed body within one scope returns:
 
 ```json
 {
@@ -98,7 +121,9 @@ or raw financial payload beyond the normal resource returned to the caller.
 
 ## Durable server receipt
 
-Add one PostgreSQL `financial_mutation_receipts` table (migration) with:
+The original table shape below is historical design, superseded for implementation
+by migration22 transaction_mutations above. Do not create this duplicate table or
+reuse an occupied migration number:
 
 | Column | Rule |
 | --- | --- |
@@ -170,6 +195,15 @@ operations offline. It will use `409 STALE_VERSION` and offer “Keep server” 
 
 ## Sync lifecycle
 
+Server gate: authenticated GET /api/v1/sync/capabilities must freshly advertise
+version1,enabled,requested known create operation,required-key policy and
+/meta/mutation before each network drain. Old404/unknown/disabled/malformed
+response blocks sending, without changing the persisted intent/key. Last-known
+capability may support offline draft UX but not authorize sends after rollback.
+This gate/helper, encrypted outbox and foreground runtime are locally wired and
+tested; full offline/recovery/device verification and production rollout remain
+open. Capability describes configured implementation, not DB health.
+
 1. Form validation runs locally and creates an outbox row atomically with the
    local pending projection.
 2. A foreground/network-reachability trigger starts the sync actor.
@@ -182,6 +216,13 @@ operations offline. It will use `409 STALE_VERSION` and offer “Keep server” 
 No background financial write is silently executed in V1. Background fetch may
 only wake the actor when the same account session is valid and iOS grants
 execution time; foreground retry remains the guaranteed path.
+
+Current V1 implementation does not register any background financial-write job.
+AppRoot owner/scene and SDK reachability gate the coordinator; inactive/path-loss
+suspends the actor generation and foreground timer without auth-block. Uncertain
+leases remain until expiry before same-key replay. Logout separately blocks auth.
+One FIFO wake follows retry/lease deadline; unsupported pending capability uses
+at least30s cooldown. See [local lifecycle evidence](../../work/tickets/OFFLINE-FOREGROUND-LIFECYCLE-20261014.md).
 
 ## Security and observability
 

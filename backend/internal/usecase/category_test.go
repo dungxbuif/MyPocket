@@ -32,6 +32,14 @@ func (s *categoryRepositoryStub) FindPersonal(_ string, id string) (*entity.Cate
 	}
 	return nil, errors.New("not found")
 }
+func (s *categoryRepositoryStub) SetActive(_ string, id string, active bool) (*entity.Category, error) {
+	item, err := s.FindPersonal("", id)
+	if err != nil {
+		return nil, err
+	}
+	item.IsActive = active
+	return item, nil
+}
 func (s *categoryRepositoryStub) Create(_ string, item *entity.Category) error {
 	s.created = item
 	s.items = append(s.items, *item)
@@ -136,5 +144,34 @@ func TestCategoryUpdateWalletsAllowsSystemCategory(t *testing.T) {
 	}
 	if len(item.WalletIDs) != 1 || item.WalletIDs[0] != "wallet" {
 		t.Fatalf("wallet ids = %v, want [wallet]", item.WalletIDs)
+	}
+}
+
+func TestCategorySetActiveArchivesAndRestoresPersonalCategory(t *testing.T) {
+	stub := &categoryRepositoryStub{items: []entity.Category{{ID: "personal", Name: "Cafe", IsActive: true}}}
+	interactor := NewCategoryInteractor(stub)
+
+	archived, err := interactor.SetActive("owner", "personal", false)
+	if err != nil {
+		t.Fatalf("archive category: %v", err)
+	}
+	if archived.IsActive {
+		t.Fatal("archived category is still active")
+	}
+
+	restored, err := interactor.SetActive("owner", "personal", true)
+	if err != nil {
+		t.Fatalf("restore category: %v", err)
+	}
+	if !restored.IsActive {
+		t.Fatal("restored category is inactive")
+	}
+}
+
+func TestCategorySetActiveRejectsSystemCategory(t *testing.T) {
+	stub := &categoryRepositoryStub{items: []entity.Category{{ID: "system", IsSystem: true, IsActive: true}}}
+	_, err := NewCategoryInteractor(stub).SetActive("owner", "system", false)
+	if err == nil {
+		t.Fatal("expected system category archive to be rejected")
 	}
 }

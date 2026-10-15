@@ -3,6 +3,7 @@ package httpapi
 import (
 	"bytes"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/mypocket/backend/internal/entity"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,24 @@ func (r *budgetRepoStub) List(string) ([]entity.Budget, error) { return []entity
 func (r *budgetRepoStub) Save(owner string, b *entity.Budget, creating bool) error {
 	r.saved = b
 	return nil
+}
+
+func TestCreateBudgetRejectsArchivedCategory(t *testing.T) {
+	categoryID := uuid.NewString()
+	repo := &budgetRepoStub{}
+	h := &BudgetHandler{Budgets: repo, Wallets: &transactionWalletRepositoryStub{}, Categories: &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: categoryID, Kind: entity.TransactionTypeExpense, IsActive: false}}}, Transactions: &transactionRepositoryStub{}}
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1") })
+	router.POST("/budgets", h.CreateBudget)
+	body := `{"name":"Food","limit_amount":1000,"category_id":"` + categoryID + `","start_date":"2026-09-01","end_date":"2026-09-30"}`
+	req := httptest.NewRequest("POST", "/budgets", bytes.NewBufferString(body))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != 400 || !bytes.Contains(res.Body.Bytes(), []byte(`"code":"category_inactive"`)) || repo.saved != nil {
+		t.Fatalf("archived category must not be assigned to a new budget: status=%d body=%s saved=%#v", res.Code, res.Body.String(), repo.saved)
+	}
 }
 func (r *budgetRepoStub) Delete(string, string) error { return nil }
 

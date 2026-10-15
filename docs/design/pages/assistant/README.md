@@ -1,8 +1,31 @@
 # AI transaction input and proposal review
 
-Scope: approved [AI-ENTRY-01 design](../../../work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md) and batch follow-up [AI-ENTRY-02](../../../work/tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md). Global entry from each primary tab; no separate route. Visual pattern follows the [Money Lover AI entry guide](https://moneylover.zendesk.com/hc/en-us/articles/42320025248409-Add-transactions-faster-and-easier-with-AI-feature): natural-language input, attachment/send actions and a clear grouped result. MyPocket keeps explicit review before ledger writes.
+Scope: approved [AI-ENTRY-01 design](../../../work/tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md) and batch follow-up [AI-ENTRY-02](../../../work/tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md). MyPocket's own one-shot input and editable proposal workflow require explicit review before ledger writes. Native UI/base contracts are authoritative; browser details below are historical, not maintained styling authority.
+
+Native Photos-first implementation is in review: AI entry's shared attachment
+action opens Ảnh/Tệp source selection (default Ảnh). JPEG/PNG/PDF still share the
+existing multipart submit,20 files total and5MiB per upload. Valid JPEG/PNG bytes
+are unchanged; HEIC/other supported photo representations convert to JPEG within
+that bound or show an error. Source images >25MiB are rejected for conversion.
+Cancel does not clear selected files; valid items from a partial photo batch append
+and failed items are reported. Loading is sequential with repeat/dismiss disabled.
+Photos/files switch and actual system cancellation pass; final local SE
+gate193/193 includes real stock-photo import, retained19 existing filenames,
+20-file bound and inspected thumbnail. Data-loader tests inject unavailable and
+invalid data at the media boundary, keeping valid items sequentially; mixed
+JPEG/PDF multipart preserves raw bytes and Vietnamese instruction/timezone.
+This is not a live iCloud/OCR/provider-quality or device-UAT claim. No OCR/provider/
+API changes or automatic financial writes; no release claim.
 
 ## Composition
+
+Native shell now uses `MPEditorScaffold(isBusy:header:fields:footer:)`: existing
+back/Save-all header and Analyze footer stay pinned around one scrolling input/
+result area. Busy processing/save-all disables header and fields; existing GET
+recovery and explicit approval semantics remain unchanged. Selected SE tests
+pass196/196, but visual acceptance is still open: floating Feedback can cover
+description input. This is a known in-development issue, not a released fix.
+See [completion evidence](../../../work/tickets/NATIVE-FULL-COMPLETION-20261014.md).
 
 | Region/state | Reused base and implementation |
 | --- | --- |
@@ -23,6 +46,8 @@ Review-first extraction: AI proposes every recognizable entry even when some fie
 Short Add opens unchanged manual entry. Hold 500ms opens the AI entry sheet; movement/cancel/blur/unmount cancel; hold consumes release click. A keyboard-accessible AI action is available in manual create mode. The sheet presents a single multi-line composer with optional files, followed by an AI result card containing editable transaction proposals. It does not render user/assistant message bubbles, a conversation log or a new-conversation action.
 
 The API adapter loads capabilities and wallets/categories, then submits one multipart request to `POST /api/v1/ai/entry/process`. After an ambiguous result it performs only `GET /api/v1/ai/entry/requests/{request_id}`; it never automatically resubmits. Proposal edits/decisions use their own APIs. The backend keeps an opaque owner-scoped processing record internally for idempotency, but exposes no session, message, history or latest-record API and does not write conversation messages.
+
+Native iOS follows the same recovery contract: transport/decoding and server (5xx) failures preserve the submitted request ID and draft, lock editing and attachments, and require a GET result check. A found request is resumed/rendered without another POST; a GET 404 explicitly clears the stale ID and allows the user to retry the preserved draft. Client errors known to be rejected do not enter the uncertain state. An ambiguous outcome never claims that ledger transactions were saved; proposal approval remains the only ledger-write action.
 
 Each pending row exposes prefilled type, amount, wallet, required applicable category, optional jar for an eligible expense, local date/time, note and report flag. Jar choices are loaded for the proposal's account-local month; extraction never guesses a jar. Wallet selection is mandatory: the sole supplied wallet is used by default, and multiple-wallet requests choose the most plausible supplied wallet while adding a question when the choice was inferred. No default date/amount is supplied for missing values. Paid invoices and purchase receipts, including OCR receipt images, are prefilled as expenses unless the source explicitly describes income, a refund or reimbursement received; the user still reviews every row. The first applicable category is prefilled when model output is unclear, and the user may replace it before approval. Save draft PATCHes with version; approval requires saved values and valid supported kind, wallet, positive integer amount, date and applicable category/jar. Changing scope never silently remaps category. Per the owner's follow-up, unknown candidates show “Chưa xác định — chọn loại” and allow explicit manual income/expense classification with no default; that change must be saved before approval. This supersedes the earlier unknown-type lock in the linked design. Transfer remains labeled and locked until paired ledger support exists, with no ordinary expense/income conversion. Approved/rejected rows show terminal state and saved values without controls. Only approval invokes onSaved to refresh wallet balances, transactions and budgets. Rejection requires explicit confirmation.
 
@@ -55,6 +80,6 @@ Commands from `app/` (run with `rtk`):
 | `npm run build` | PASS: TypeScript and Vite production bundle, 1,756 modules. |
 | `git diff --check` (repository root) | PASS. |
 
-Browser tests use real React components and Chrome input events with deterministic HTTP fixtures only in `app/tests/ai-entry.tsx`; runtime uses authenticated services with no mock fallback. Rendered 390×844 screenshot `/tmp/mypocket-ui-pIE4DC/ai-entry-final.png` was compared to Money Lover's composer/result reference: multiline input and file/send actions sit at the bottom; results appear as an editable grouped card; MyPocket's brand/primary theme is retained. Physical-device touch UAT, backend ownership/concurrency/ledger guarantees and live AI/OCR extraction are not proven by frontend HTTP fixtures.
+Historical browser tests used real React components and deterministic HTTP fixtures in `app/tests/ai-entry.tsx`; this is not evidence of current native rendering. Current iOS work uses shared MyPocket bases and separate native/runtime proof. Physical-device touch UAT and live AI/OCR extraction are not proven by old browser fixtures.
 
 Docs review: the screen spec and base inventory map the composer, upload and grouped result card. The API contract is one-shot and no-history; AI-ENTRY-02 remaining scope is live S3/OCR and browser attachment download UAT. Unsent text/files and unsaved row edits are local until submit/save; approved rows refresh wallet/transaction/budget data.

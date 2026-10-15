@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -11,6 +12,7 @@ import (
 	"github.com/mypocket/backend/internal/entity"
 	"github.com/mypocket/backend/internal/infrastructure/db"
 	repo "github.com/mypocket/backend/internal/infrastructure/repository"
+	"github.com/mypocket/backend/internal/repository"
 	"gorm.io/gorm"
 )
 
@@ -29,15 +31,28 @@ func main() {
 	interval := workerInterval()
 	once := workerOnce()
 	runner := repo.NewRecurringPostgresRepository(database)
+	advisorExpiry, _ := repo.NewAdvisorPostgresRepository(database).(repository.AdvisorExpiryRepository)
 	for {
 		if err := runRecurringPass(database, runner, time.Now().UTC()); err != nil {
 			log.Printf("recurring worker pass failed: %v", err)
+		}
+		if advisorExpiry != nil {
+			if _, err := runAdvisorExpiryPass(context.Background(), advisorExpiry, time.Now().UTC()); err != nil {
+				log.Printf("advisor expiry worker pass failed: %v", err)
+			}
 		}
 		if once {
 			return
 		}
 		time.Sleep(interval)
 	}
+}
+
+func runAdvisorExpiryPass(ctx context.Context, runner repository.AdvisorExpiryRepository, now time.Time) (int, error) {
+	if runner == nil {
+		return 0, nil
+	}
+	return runner.ExpireIdleBatch(ctx, now, 100)
 }
 
 func runRecurringPass(database *gorm.DB, runner interface {

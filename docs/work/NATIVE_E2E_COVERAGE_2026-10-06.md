@@ -16,7 +16,9 @@ native port can be considered behavior-complete.
 - month: save and delete a month note;
 - recurring: create, edit, run due, then delete the schedule; generated
   transactions are removed from the disposable fixture wallet during teardown;
-- travel: create, activate/deactivate, edit and delete an event;
+- travel: create, activate/deactivate, edit and delete an event; link and unlink
+  an ordinary transaction from native detail and verify persisted
+  `travel_event_id` after each API mutation;
 - notifications: render the owner-scoped inbox/empty state; mark-read is
   covered by the backend repository/API contract because this phase does not
   include a notification producer or fan-out worker;
@@ -31,6 +33,23 @@ The tests run against the disposable local API and PostgreSQL database with
 no production data or provider-backed credentials are used. Each test must
 assert rendered UI state after the API mutation, not only that a button can be
 tapped. Tests use the existing `MP*` accessibility labels and base controls.
+The API compilation condition must be built into a fresh `-derivedDataPath`
+before running `test-without-building`; reusing a default DerivedData bundle
+silently preserves the intentional `LOCAL_API_UI` skip branch.
+
+All `LocalAPIFixture` helpers and the app-under-test must use the explicitly
+isolated test API at `127.0.0.1:8081` (or `MYPOCKET_TEST_API_BASE_URL` for an
+equivalent disposable endpoint). Do not fall back to port 8080: the existing
+local service may use a different database. Run stateful UI tests only after
+checking the API's database identity and use a fresh DerivedData build with
+`MP_API_BASE_URL` set to the same isolated API.
+
+Redis isolation is mandatory as well. Do not assume logical DB 15 is empty:
+the shared local Redis can contain live expiring keys there. For new E2E runs,
+prefer a dedicated loopback-only Redis container bound to an unused local port,
+set `REDIS_URL` explicitly, and verify the API's database/Redis endpoints before
+launching the simulator. Never flush a shared Redis server or reuse a logical
+database unless it has been verified as disposable and empty for that run.
 
 ## Verification plan
 
@@ -59,6 +78,38 @@ tapped. Tests use the existing `MP*` accessibility labels and base controls.
   assertions after each mutation. No disposable wallet, recurring schedule,
   month note, budget, category, jar-month configuration or travel event was
   left by the targeted runs.
+
+## Travel transaction-link state proof — 2026-10-08
+
+- PASS: focused iPhone 16 `LOCAL_API_UI` test creates a Travel Mode, wallet and
+  ordinary transaction; selects the event in native transaction detail, then
+  clears it. The test reads the owner-scoped transactions API after each save
+  and asserts the exact event ID and subsequent null value.
+- Evidence: `/tmp/mypocket-travel-link-final-20261008.xcresult`.
+  Backend tests `TestCreateTransactionAutoAttachesActiveTravelEvent` and
+  `TestUpdateTransactionTravelClearsOrdinaryLink` pass 2/2.
+- Test isolation: API `127.0.0.1:8081` used cloned disposable database
+  `mypocket_travel_link_verify_20261008` and Redis DB 15. Teardown left zero
+  fixture wallets, travel events or transactions; API stopped and the exact
+  disposable database removed. Production and local API 8080 were not accessed.
+
+## Bounded continuation gate — 2026-10-07
+
+- PASS: the clean Manrope-enabled Debug test bundle ran 20 API-backed UI cases
+  in four bounded invocations on `MyPocket-iPhone-16`; result bundles report
+  4/4, 6/6, 5/5 and 5/5 with zero failures or skips. Coverage includes
+  feedback fallback, Assistant overview, AI-entry attachments/proposals,
+  ledger/report state, budget/category/jar/month mutations, recurring and
+  Travel Mode lifecycle, wallet detail/scope/editor, portfolio pricing,
+  credit statement/entry/payment and atomic transfer pairs.
+- PASS: a clean default test bundle ran the eleven non-fixture UI cases with
+  11/11 pass and no skips, including the Stitch add-form base-control
+  contract, More-route sweep, global add long press, suggested questions,
+  report reload and API-key editor controls.
+- PASS: disposable PostgreSQL version 29 teardown left zero fixture wallets,
+  transactions, budgets, categories, recurring schedules or travel events.
+  The seeded fixture user, empty jar definitions and persisted feedback rows
+  are expected local-fixture output.
 
 ### Final simulator gate after recurring run-due coverage — 2026-10-06 18:58–19:08 ICT
 

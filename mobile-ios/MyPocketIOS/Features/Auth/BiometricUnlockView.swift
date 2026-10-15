@@ -14,11 +14,10 @@ struct BiometricUnlockView: View {
             }
             if let errorMessage = model.errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
             MPButton("Xác thực để mở khóa") { Task { await model.unlock() } }
-            MPButton("Đăng xuất", style: .secondary, action: model.logout)
+            MPButton("Đăng xuất", style: .secondary, isLoading: model.isBusy) { Task { await model.logout() } }
             Spacer()
         }
         .padding(MPMetrics.pagePadding)
         .background(MPColor.canvas.ignoresSafeArea())
-        .accessibilityIdentifier("biometric-unlock-screen")
     }
 }

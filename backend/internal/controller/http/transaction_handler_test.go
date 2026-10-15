@@ -157,6 +157,9 @@ func (s *transactionCategoryRepositoryStub) FindVisible(_, id string) (*entity.C
 func (s *transactionCategoryRepositoryStub) FindPersonal(string, string) (*entity.Category, error) {
 	return nil, errors.New("not found")
 }
+func (s *transactionCategoryRepositoryStub) SetActive(string, string, bool) (*entity.Category, error) {
+	return nil, errors.New("not found")
+}
 func (s *transactionCategoryRepositoryStub) Create(string, *entity.Category) error { return nil }
 func (s *transactionCategoryRepositoryStub) Update(string, *entity.Category) error { return nil }
 func (s *transactionCategoryRepositoryStub) Delete(string, string) error           { return nil }
@@ -440,7 +443,7 @@ func TestUpdatingUnchangedJarAssignmentSurvivesTimezoneRebucketing(t *testing.T)
 	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
 		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
 	}}
-	handler := NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: categoryID, Kind: entity.TransactionTypeExpense}}})
+	handler := NewTransactionHandler(transactions, wallets, &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: categoryID, Kind: entity.TransactionTypeExpense, IsActive: true}}})
 	handler.Users, handler.Jars = users, jars
 	router := transactionTestRouter(handler)
 	body := fmt.Sprintf(`{"wallet_id":"wallet-1","category_id":%q,"type":"expense","amount":1200,"occurred_at":%q,"jar_id":%q,"note":"updated note"}`, categoryID, occurredAt.Format(time.RFC3339), jarID)
@@ -498,6 +501,38 @@ func TestCreateTransactionRequiresCategory(t *testing.T) {
 	}
 }
 
+func TestCreateTransactionRejectsArchivedCategory(t *testing.T) {
+	transactions := &transactionRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
+		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
+	}}
+	categories := &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: "archived", Kind: entity.TransactionTypeExpense, IsActive: false}}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, categories))
+	request := httptest.NewRequest(http.MethodPost, "/transactions", bytes.NewBufferString(`{"wallet_id":"wallet-1","category_id":"archived","type":"expense","amount":50000}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || !bytes.Contains(response.Body.Bytes(), []byte(`"code":"category_inactive"`)) || transactions.created != nil {
+		t.Fatalf("archived category must be rejected before persistence with a stable error code: status=%d body=%s transaction=%#v", response.Code, response.Body.String(), transactions.created)
+	}
+}
+
+func TestUpdateTransactionMayKeepItsArchivedCategory(t *testing.T) {
+	categoryID := "archived"
+	existing := &entity.Transaction{ID: "transaction-1", OwnerID: "owner-1", WalletID: "wallet-1", CategoryID: &categoryID, Type: entity.TransactionTypeExpense, Amount: 50000, OccurredAt: time.Now().UTC()}
+	transactions := &transactionRepositoryStub{existing: existing, updated: existing}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"wallet-1": {ID: "wallet-1", OwnerID: "owner-1", Type: entity.WalletTypeBasic}}}
+	categories := &transactionCategoryRepositoryStub{categories: []entity.Category{{ID: categoryID, Kind: entity.TransactionTypeExpense, IsActive: false}}}
+	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, categories))
+	request := httptest.NewRequest(http.MethodPatch, "/transactions/transaction-1", bytes.NewBufferString(`{"wallet_id":"wallet-1","category_id":"archived","type":"expense","amount":50000}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || transactions.updated == nil {
+		t.Fatalf("unchanged historical category should remain editable: status=%d body=%s transaction=%#v", response.Code, response.Body.String(), transactions.updated)
+	}
+}
+
 func TestUpdateTransactionRequiresCategory(t *testing.T) {
 	categoryID := "category-1"
 	transactions := &transactionRepositoryStub{existing: &entity.Transaction{ID: "transaction-1", OwnerID: "owner-1", WalletID: "wallet-1", CategoryID: &categoryID, Type: entity.TransactionTypeExpense, Amount: 50000, OccurredAt: time.Now().UTC()}}
@@ -522,7 +557,7 @@ func TestCreateTransactionAllowsCategoryWithoutWalletRestriction(t *testing.T) {
 		"wallet-1": {ID: "wallet-1", OwnerID: "owner-1"},
 	}}
 	categories := &transactionCategoryRepositoryStub{categories: []entity.Category{
-		{ID: "category-1", Kind: entity.TransactionTypeIncome, WalletIDs: []string{}},
+		{ID: "category-1", Kind: entity.TransactionTypeIncome, WalletIDs: []string{}, IsActive: true},
 	}}
 	router := transactionTestRouter(NewTransactionHandler(transactions, wallets, categories))
 	request := httptest.NewRequest(http.MethodPost, "/transactions", bytes.NewBufferString(`{"wallet_id":"wallet-1","category_id":"category-1","type":"income","amount":50000}`))
@@ -573,7 +608,7 @@ func TestGoalTransactionCategoryRules(t *testing.T) {
 		t.Run(tc.key+tc.kind+fmt.Sprint(tc.restricted), func(t *testing.T) {
 			transactions := &transactionRepositoryStub{}
 			wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"goal": {ID: "goal", OwnerID: "owner-1", Type: entity.WalletTypeGoal}}}
-			category := entity.Category{ID: "category", Kind: tc.kind, SystemKey: &tc.key, IsSystem: true}
+			category := entity.Category{ID: "category", Kind: tc.kind, SystemKey: &tc.key, IsSystem: true, IsActive: true}
 			if tc.restricted {
 				category.WalletIDs = []string{"other"}
 			}

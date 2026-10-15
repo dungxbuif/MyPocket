@@ -11,6 +11,14 @@ import (
 // prose remains separate from the query views, so the frontend never has to
 // parse amounts out of free text.
 func BuildAdvisorParts(answer AdvisorAnswer) []entity.AdvisorPart {
+	return BuildAdvisorPartsForRun(answer, "", 0, "")
+}
+
+// BuildAdvisorPartsForRun is the persisted-message variant used by the
+// orchestrator. Prepared action cards carry server-owned conversation/run
+// context so a later confirmation can be bound to the exact owner generation.
+// The context is additive and only attached to proposal views.
+func BuildAdvisorPartsForRun(answer AdvisorAnswer, conversationID string, generation int64, runID string) []entity.AdvisorPart {
 	parts := make([]entity.AdvisorPart, 0, 1+len(answer.Results))
 	if strings.TrimSpace(answer.Text) != "" {
 		parts = append(parts, entity.AdvisorPart{Type: "text", Text: answer.Text})
@@ -23,6 +31,13 @@ func BuildAdvisorParts(answer AdvisorAnswer) []entity.AdvisorPart {
 		var data any
 		if err := json.Unmarshal(result.View, &data); err != nil {
 			continue
+		}
+		if (result.ViewKind == "wallet_creation_proposal" || result.ViewKind == "jar_creation_proposal" || result.ViewKind == "jar_update_proposal" || result.ViewKind == "budget_creation_proposal" || result.ViewKind == "budget_update_proposal") && conversationID != "" && generation > 0 && runID != "" {
+			if view, ok := data.(map[string]any); ok {
+				view["conversation_id"] = conversationID
+				view["generation"] = generation
+				view["run_id"] = runID
+			}
 		}
 		parts = append(parts, entity.AdvisorPart{Type: partType, Data: map[string]any{
 			"view":     data,
@@ -57,6 +72,16 @@ func advisorPartType(viewKind string) (string, bool) {
 		return "jar_progress", true
 	case "wallet_creation_proposal":
 		return "wallet_confirmation", true
+	case "jar_creation_proposal":
+		return "jar_confirmation", true
+	case "jar_update_proposal":
+		return "jar_confirmation", true
+	case "budget_creation_proposal":
+		return "budget_confirmation", true
+	case "budget_update_proposal":
+		return "budget_confirmation", true
+	case "product_help":
+		return "product_help", true
 	default:
 		return "", false
 	}

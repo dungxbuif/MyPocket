@@ -66,10 +66,40 @@ func TestAdvisorOrchestratorPrependsProductHandbook(t *testing.T) {
 		t.Fatalf("advisor must prepend a system handbook: %+v", provider.request.Messages)
 	}
 	content := provider.request.Messages[0].Content
-	for _, required := range []string{"read-only", "Giao dịch", "tool", "create/edit/delete"} {
+	for _, required := range []string{"read-only", "Giao dịch", "tool", "edit or delete", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget", "xác nhận", "không có quyền", "không từ chối", "ĐƯỢC PHÉP chuẩn bị đề xuất tạo hũ"} {
 		if !strings.Contains(content, required) {
 			t.Fatalf("handbook missing %q: %s", required, content)
 		}
+	}
+	jarToolFound := false
+	for _, definition := range provider.request.Tools {
+		if definition.Name == "propose_create_jar" {
+			jarToolFound = true
+			if !strings.Contains(definition.Description, "never create it directly") {
+				t.Fatalf("jar proposal tool must advertise its non-mutating boundary: %q", definition.Description)
+			}
+		}
+	}
+	if !jarToolFound {
+		t.Fatalf("advisor request must expose propose_create_jar to the provider: %+v", provider.request.Tools)
+	}
+	if strings.Contains(content, "cannot directly create/edit/delete categories, budgets, jars") {
+		t.Fatalf("handbook still contradicts the implemented jar proposal tool: %s", content)
+	}
+}
+
+func TestAdvisorOrchestratorHandbookMatchesPrimaryAssistantTab(t *testing.T) {
+	provider := &capturingAdvisorProvider{response: AdvisorResponse{Text: "ok"}}
+	orchestrator := NewAdvisorOrchestrator(provider, NewAdvisorToolRegistry(NewFinanceQueryService(&financeReaderStub{})))
+	if _, err := orchestrator.Answer(context.Background(), Principal{OwnerID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}, []AdvisorChatMessage{{Role: "user", Content: "Trợ lý ở đâu?"}}); err != nil {
+		t.Fatal(err)
+	}
+	content := provider.request.Messages[0].Content
+	if !strings.Contains(content, "Trợ lý là tab chính") {
+		t.Fatalf("handbook must describe the primary Assistant tab: %s", content)
+	}
+	if strings.Contains(content, "More includes") || strings.Contains(content, "More chứa") {
+		t.Fatalf("handbook must not place Assistant under More: %s", content)
 	}
 }
 

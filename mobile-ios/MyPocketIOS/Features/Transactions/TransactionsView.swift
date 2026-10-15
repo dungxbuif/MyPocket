@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 
 enum TransactionEditorPolicy {
     static func applicableCategories(type: String, walletID: String, walletType: String, categories: [CategoryModel]) -> [CategoryModel] {
@@ -8,6 +9,10 @@ enum TransactionEditorPolicy {
     static func requiredCategoryID(type: String, walletID: String, walletType: String, categories: [CategoryModel], currentID: String) -> String {
         let valid = applicableCategories(type: type, walletID: walletID, walletType: walletType, categories: categories)
         if valid.contains(where: { $0.id == currentID }) { return currentID }
+        if let retained = categories.first(where: { $0.id == currentID && $0.isActive == false }),
+           retained.appliesIgnoringActivity(to: type, walletID: walletID, walletType: walletType) {
+            return retained.id
+        }
         return valid.first?.id ?? ""
     }
 
@@ -60,6 +65,81 @@ enum TransactionDetailPolicy {
     }
 }
 
+enum TransactionsPresentation {
+    struct DayGroup: Equatable {
+        let dayNumber: String
+        let weekday: String
+        let monthYear: String
+    }
+
+    static func dayGroup(_ key: String, timeZone: TimeZone) -> DayGroup? {
+        guard let date = MPFormat.parseCalendarDate(key, timeZone: timeZone) else { return nil }
+        func formatter(_ format: String) -> DateFormatter {
+            let formatter = DateFormatter()
+            formatter.calendar = Calendar(identifier: .gregorian)
+            formatter.locale = Locale(identifier: "vi_VN")
+            formatter.timeZone = timeZone
+            formatter.dateFormat = format
+            return formatter
+        }
+        return DayGroup(
+            dayNumber: formatter("d").string(from: date),
+            weekday: formatter("EEEE").string(from: date),
+            monthYear: formatter("MMMM yyyy").string(from: date)
+        )
+    }
+
+    static func newestWeekOffset(
+        transactions: [TransactionModel],
+        walletSelection: String,
+        accountTimezone: String,
+        now: Date = Date()
+    ) -> Int {
+        let timeZone = TimeZone(identifier: accountTimezone) ?? .current
+        let currentWeekStart = MPFormat.weekRange(now: now, timeZone: timeZone).start
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+
+        return transactions
+            .filter { walletSelection == "__all__" || $0.walletID == walletSelection }
+            .compactMap { transaction -> Int? in
+                guard let date = MPFormat.parseInstant(transaction.occurredAt) else { return nil }
+                let transactionWeekStart = MPFormat.weekRange(now: date, timeZone: timeZone).start
+                guard transactionWeekStart <= currentWeekStart else { return nil }
+                let days = calendar.dateComponents([.day], from: currentWeekStart, to: transactionWeekStart).day ?? 0
+                return min(0, days / 7)
+            }
+            .max() ?? 0
+    }
+}
+
+enum MPWalletScopePreference {
+    private static let keyPrefix = "mypocket.transaction-wallet-scope."
+
+    static func load(ownerID: String?, defaults: UserDefaults = .standard) -> String? {
+        guard let key = preferenceKey(ownerID: ownerID),
+              let walletID = defaults.string(forKey: key),
+              !walletID.isEmpty,
+              walletID != "__all__" else { return nil }
+        return walletID
+    }
+
+    static func store(_ walletID: String, ownerID: String?, defaults: UserDefaults = .standard) {
+        guard let key = preferenceKey(ownerID: ownerID) else { return }
+        if walletID.isEmpty || walletID == "__all__" {
+            defaults.removeObject(forKey: key)
+        } else {
+            defaults.set(walletID, forKey: key)
+        }
+    }
+
+    private static func preferenceKey(ownerID: String?) -> String? {
+        guard let ownerID = ownerID?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !ownerID.isEmpty else { return nil }
+        return keyPrefix + ownerID
+    }
+}
+
 @MainActor
 final class TransactionsViewModel: ObservableObject {
     @Published private(set) var transactions: [TransactionModel] = []
@@ -69,7 +149,11 @@ final class TransactionsViewModel: ObservableObject {
     @Published private(set) var isBulkDeleting = false
     @Published private(set) var bulkDeleteErrorMessage: String?
     @Published private(set) var errorMessage: String?
-    @Published var walletSelection: String
+    @Published private(set) var cachedAt: Date?
+    @Published private(set) var cacheWarning: String?
+    @Published var walletSelection: String {
+        didSet { MPWalletScopePreference.store(walletSelection, ownerID: ownerID, defaults: preferences) }
+    }
     @Published var periodSelection = "week"
     @Published var weekOffset = 0
     @Published var groupByCategory = false
@@ -78,9 +162,32 @@ final class TransactionsViewModel: ObservableObject {
     @Published private(set) var accountTimezone = TimeZone.current.identifier
 
     private let api: FinanceAPI
-    init(api: FinanceAPI, initialWalletID: String? = nil) {
+    private let ownerID: String?
+    private let snapshotCache: FinancialSnapshotCache?
+    private let preferences: UserDefaults
+    private let bulkDeleteOperation: @Sendable ([String]) async throws -> Void
+    private var hasResolvedInitialWeek = false
+
+    init(
+        api: FinanceAPI,
+        initialWalletID: String? = nil,
+        ownerID: String? = nil,
+        snapshotCache: FinancialSnapshotCache? = nil,
+        preferences: UserDefaults = .standard,
+        bulkDeleteOperation: (@Sendable ([String]) async throws -> Void)? = nil
+    ) {
         self.api = api
-        self.walletSelection = initialWalletID?.isEmpty == false ? (initialWalletID ?? "__all__") : "__all__"
+        self.ownerID = ownerID
+        self.snapshotCache = snapshotCache
+        self.preferences = preferences
+        self.bulkDeleteOperation = bulkDeleteOperation ?? { ids in
+            try await api.deleteTransactions(ids: ids)
+        }
+        let routeWalletID = initialWalletID?.isEmpty == false ? initialWalletID : nil
+        self.walletSelection = routeWalletID ?? MPWalletScopePreference.load(ownerID: ownerID, defaults: preferences) ?? "__all__"
+        if let routeWalletID {
+            MPWalletScopePreference.store(routeWalletID, ownerID: ownerID, defaults: preferences)
+        }
     }
 
     var filteredTransactions: [TransactionModel] {
@@ -210,31 +317,74 @@ final class TransactionsViewModel: ObservableObject {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
+        cacheWarning = nil
         defer { isLoading = false }
         do {
-            self.transactions = try await api.transactions()
+            self.transactions = try await api.transactions(ownerID: ownerID)
         } catch {
-            errorMessage = "Không thể tải giao dịch."
+            await recoverLoad(error, message: "Không thể tải giao dịch.")
             return
         }
         do {
-            self.wallets = try await api.wallets()
+            self.wallets = try await api.wallets(ownerID: ownerID)
         } catch {
-            errorMessage = "Không thể tải danh sách ví."
+            await recoverLoad(error, message: "Không thể tải danh sách ví.")
             return
         }
         if walletSelection != "__all__", !wallets.contains(where: { $0.id == walletSelection }) {
             walletSelection = "__all__"
         }
+        var referencesComplete = true
         do {
-            self.categories = try await api.categories()
+            self.categories = try await api.categories(ownerID: ownerID)
         } catch {
+            if SyncPolicy.isAuthFailure(error) { await recoverLoad(error, message: "Cần đăng nhập lại để tải dữ liệu."); return }
+            referencesComplete = false
             // Category labels are supplementary metadata for historical rows; the
             // ordinary editor still requires an applicable category on save.
             self.categories = []
         }
-        if let profile = try? await api.profile() {
+        do {
+            let profile = try await api.profile(ownerID: ownerID)
             accountTimezone = profile.timezone
+        } catch {
+            if SyncPolicy.isAuthFailure(error) { await recoverLoad(error, message: "Cần đăng nhập lại để tải dữ liệu."); return }
+            referencesComplete = false
+        }
+        cachedAt = nil
+        if referencesComplete, let snapshotCache, let ownerID {
+            do {
+                try await snapshotCache.save(FinancialSnapshot(ownerID: ownerID, fetchedAt: Date(), transactions: transactions,
+                    wallets: wallets, categories: categories, timezone: accountTimezone))
+            } catch { cacheWarning = "Đã tải dữ liệu, nhưng chưa lưu được bản xem khi mất mạng." }
+        }
+        resolveInitialWeek()
+    }
+
+    private func recoverLoad(_ error: Error, message: String) async {
+        if FinancialSnapshotCache.allowsFallback(error), let snapshotCache, let ownerID {
+            do {
+                if let snapshot = try await snapshotCache.load(ownerID: ownerID) {
+                    transactions = snapshot.transactions; wallets = snapshot.wallets; categories = snapshot.categories
+                    accountTimezone = snapshot.timezone; cachedAt = snapshot.fetchedAt
+                    errorMessage = nil
+                    resolveInitialWeek()
+                    return
+                }
+            } catch { cacheWarning = "Không thể đọc bản dữ liệu đã lưu trên thiết bị." }
+        }
+        transactions = []; wallets = []; categories = []; cachedAt = nil
+        errorMessage = message
+    }
+
+    private func resolveInitialWeek() {
+        if !hasResolvedInitialWeek, periodSelection == "week" {
+            weekOffset = TransactionsPresentation.newestWeekOffset(
+                transactions: transactions,
+                walletSelection: walletSelection,
+                accountTimezone: accountTimezone
+            )
+            hasResolvedInitialWeek = true
         }
     }
 
@@ -257,7 +407,7 @@ final class TransactionsViewModel: ObservableObject {
         isBulkDeleting = true
         defer { isBulkDeleting = false }
         do {
-            try await api.deleteTransactions(ids: uniqueIDs)
+            try await bulkDeleteOperation(uniqueIDs.sorted())
             transactions.removeAll { uniqueIDs.contains($0.id) }
             return true
         } catch {
@@ -278,33 +428,67 @@ final class TransactionsViewModel: ObservableObject {
 }
 
 struct TransactionsView: View {
+    @Environment(\.mpFinancialQueue) private var financialQueue
     @StateObject private var model: TransactionsViewModel
+    @Binding private var addRequested: Bool
+    @Environment(\.mpFinancialValuesMasked) private var masked
+    let onAIEntry: (() -> Void)?
+    let onOpenReports: (() -> Void)?
     @State private var editorPresented = false
     @State private var transferPresented = false
     @State private var transferEditID: String?
     @State private var adjustmentPresented = false
     @State private var selectedTransaction: TransactionModel?
     @State private var editTarget: TransactionModel?
+    @State private var queuedEditTarget: OutboxMutation?
     @State private var deleteTarget: TransactionModel?
     @State private var selectionMode = false
     @State private var selectedIDs = Set<String>()
     @State private var bulkDeleteConfirmation = false
 
-    init(api: FinanceAPI, initialWalletID: String? = nil) {
-        _model = StateObject(wrappedValue: TransactionsViewModel(api: api, initialWalletID: initialWalletID))
+    init(api: FinanceAPI, initialWalletID: String? = nil, ownerID: String? = nil, snapshotCache: FinancialSnapshotCache? = nil, addRequested: Binding<Bool> = .constant(false), onAIEntry: (() -> Void)? = nil, onOpenReports: (() -> Void)? = nil) {
+        _model = StateObject(wrappedValue: TransactionsViewModel(api: api, initialWalletID: initialWalletID, ownerID: ownerID, snapshotCache: snapshotCache))
+        _addRequested = addRequested
+        self.onAIEntry = onAIEntry
+        self.onOpenReports = onOpenReports
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Giao dịch", leading: { EmptyView() }, trailing: {
-                    HStack(spacing: 4) {
-                        if model.selectedWalletType == nil {
-                            MPOverflowMenu(label: "Tùy chọn giao dịch", actions: transactionMenuActions)
-                            MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
+        let selectedWallet = model.wallets.first(where: { $0.id == model.walletSelection })
+        Group {
+            if let selectedWallet, selectedWallet.type == "goal" {
+                // Goal detail owns its own savings-ledger ScrollView and fixed
+                // CTA. Keep it out of the transactions screen's outer scroller
+                // so its safe-area inset is anchored to the visible viewport.
+                AnyView(WalletDetailView(
+                    api: modelAPI,
+                    wallet: selectedWallet,
+                    embedded: true,
+                    onAIEntry: onAIEntry,
+                    onOpenReports: onOpenReports,
+                    onSelectWallet: { model.walletSelection = $0 ?? "__all__" },
+                    onBack: { model.walletSelection = "__all__" }
+                ))
+            } else {
+                AnyView(ScrollView {
+                    VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
+                if let financialQueue {
+                    MPFinancialQueueStatus(queue: financialQueue, onEdit: { item in
+                        queuedEditTarget = item; editorPresented = true
+                    }, onDiscarded: { Task { await model.load() } })
+                }
+                if model.selectedWalletType != "goal" {
+                    MPScreenHeader(title: "", leading: {
+                        MPWalletScopeSelector(wallets: model.wallets, selectionID: $model.walletSelection, centered: false)
+                    }, trailing: {
+                        HStack(spacing: 4) {
+                            if model.selectedWalletType != "credit" {
+                                MPOverflowMenu(label: "Tùy chọn giao dịch", actions: transactionMenuActions)
+                                MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
+                            }
                         }
-                    }
-                })
+                    })
+                }
                 if model.selectedWalletType != "goal", model.selectedWalletType != "credit" {
                     MPSegmentedControl(options: [("week", "Theo tuần"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
                     if model.periodSelection == "week" {
@@ -317,16 +501,13 @@ struct TransactionsView: View {
                     }
                 }
                 if model.selectedWalletType != "goal", model.selectedWalletType != "credit", model.periodSelection == "custom" {
-                    MPDateRangePicker(start: $model.customStart, end: $model.customEnd)
+                    MPDateRangePicker(start: $model.customStart, end: $model.customEnd, timeZone: model.accountTimezone)
                     if model.customRangeIsInvalid {
                         MPStatusMessage(text: "Ngày kết thúc phải sau hoặc bằng ngày bắt đầu.", tone: .danger)
                     }
                 }
-                MPOptionSelector(title: "Ví", options: [MPSelectionOption(id: "__all__", label: "Tổng cộng")] + model.wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $model.walletSelection, emptyLabel: "Tổng cộng")
-                if let selectedWallet = model.wallets.first(where: { $0.id == model.walletSelection }), selectedWallet.type == "credit" {
+                if let selectedWallet, selectedWallet.type == "credit" {
                     CreditView(api: modelAPI, onBack: { model.walletSelection = "__all__" }, preferredWalletID: selectedWallet.id)
-                } else if let selectedWallet = model.wallets.first(where: { $0.id == model.walletSelection }), selectedWallet.type == "goal" {
-                    WalletDetailView(api: modelAPI, wallet: selectedWallet) { model.walletSelection = "__all__" }
                 } else if selectionMode {
                     MPSurfaceCard {
                         VStack(alignment: .leading, spacing: 8) {
@@ -352,17 +533,23 @@ struct TransactionsView: View {
                     } else if let errorMessage = model.errorMessage, model.transactions.isEmpty {
                     MPErrorView(title: "Không tải được giao dịch", detail: errorMessage) { Task { await model.load() } }
                     } else {
+                    if let cachedAt = model.cachedAt {
+                        MPStatusMessage(text: "Dữ liệu đã lưu · \(cachedAt.formatted(date: .abbreviated, time: .shortened)). Chưa cập nhật từ máy chủ.")
+                            .accessibilityIdentifier("transactions-stale-data")
+                        MPButton("Tải lại", style: .secondary, isLoading: model.isLoading) { Task { await model.load() } }
+                    }
+                    if let warning = model.cacheWarning { MPStatusMessage(text: warning) }
                     MPSurfaceCard {
                         VStack(alignment: .leading, spacing: 10) {
                             HStack {
                                 MPText("Tiền vào")
                                 Spacer()
-                                MPText(MPFormat.money(model.totalIncome), style: .title)
+                                MPText(MPFormat.money(model.totalIncome, masked: masked), style: .title)
                             }
                             HStack {
                                 MPText("Tiền ra")
                                 Spacer()
-                                MPText(MPFormat.money(model.totalExpense), style: .title)
+                                MPText(MPFormat.money(model.totalExpense, masked: masked), style: .title)
                             }
                         }
                     }
@@ -372,11 +559,7 @@ struct TransactionsView: View {
                         ForEach(model.groupedTransactions, id: \.0) { day, transactions in
                             MPSurfaceCard {
                                 VStack(alignment: .leading, spacing: 0) {
-                                    HStack {
-                                        MPText(model.groupLabel(day), style: .secondary)
-                                        Spacer()
-                                        MPText(MPFormat.signedMoney(transactions.reduce(0) { $0 + model.signedAmount(for: $1) }), style: .secondary)
-                                    }
+                                    transactionGroupHeader(day, transactions: transactions)
                                         .padding(.bottom, 4)
                                     ForEach(transactions) { transaction in
                                         transactionRow(transaction)
@@ -387,31 +570,76 @@ struct TransactionsView: View {
                     }
                 }
                 }
+                }
+                .padding(MPMetrics.pagePadding)
+                })
             }
-            .padding(MPMetrics.pagePadding)
         }
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, TimeZone(identifier: model.accountTimezone) ?? .current)
-        .task { await model.load() }
+        .task {
+            if addRequested {
+                editTarget = nil
+                editorPresented = true
+                addRequested = false
+            }
+            await model.load()
+        }
         .onChange(of: model.walletSelection) { _, newValue in
-            model.periodSelection = model.wallets.first(where: { $0.id == newValue })?.type == "goal" || model.wallets.first(where: { $0.id == newValue })?.type == "credit" ? "all" : "week"
-            model.weekOffset = 0
+            let selectedType = model.wallets.first(where: { $0.id == newValue })?.type
+            model.periodSelection = selectedType == "goal" || selectedType == "credit" ? "all" : "week"
+            model.weekOffset = TransactionsPresentation.newestWeekOffset(
+                transactions: model.transactions,
+                walletSelection: newValue,
+                accountTimezone: model.accountTimezone
+            )
             model.groupByCategory = false
             selectedIDs.removeAll()
         }
         .onChange(of: model.periodSelection) { _, newValue in
             if newValue == "week" { model.weekOffset = 0 }
         }
+        .onChange(of: addRequested) { _, requested in
+            guard requested else { return }
+            editTarget = nil
+            editorPresented = true
+            addRequested = false
+        }
+        // The reference add/edit flow is a modal form surface. Present it
+        // above the shell so the persistent bottom navigation cannot occlude
+        // the save footer or make the editor look like part of the ledger.
+        .mpFullScreenCover(isPresented: $editorPresented) {
+            if let queuedEditTarget {
+                switch queuedEditTarget.payload {
+                case .transaction:
+                    TransactionEditorView(api: modelAPI, wallets: model.wallets, categories: model.categories, timezone: model.accountTimezone, queuedMutation: queuedEditTarget,
+                        onSaved: closeQueuedEditor, onCancel: closeQueuedEditor)
+                case .transfer:
+                    TransferEditorView(api: modelAPI, wallets: model.wallets, timezone: model.accountTimezone, queuedMutation: queuedEditTarget,
+                        onSaved: closeQueuedEditor, onCancel: closeQueuedEditor)
+                }
+            } else {
+            TransactionEditorView(api: modelAPI, wallets: model.wallets, categories: model.categories, timezone: model.accountTimezone, transaction: editTarget) {
+                editorPresented = false
+                editTarget = nil
+                Task { await model.load() }
+            } onCancel: {
+                editorPresented = false
+                editTarget = nil
+            } onAIEntry: {
+                editorPresented = false
+                editTarget = nil
+                onAIEntry?()
+            }
+            .background(MPColor.canvas.ignoresSafeArea())
+            }
+        }
         .refreshable { await model.load() }
+        .onReceive(financialQueue?.$revision.dropFirst().eraseToAnyPublisher() ?? Empty<Int, Never>().eraseToAnyPublisher()) { _ in
+            Task { await model.load() }
+        }
         .overlay {
-            if editorPresented {
-                TransactionEditorView(api: modelAPI, wallets: model.wallets, categories: model.categories, timezone: model.accountTimezone, transaction: editTarget) {
-                    editorPresented = false
-                    editTarget = nil
-                    Task { await model.load() }
-                } onCancel: { editorPresented = false; editTarget = nil }
-                .background(MPColor.canvas.ignoresSafeArea())
-            } else if transferPresented {
+            if transferPresented {
                 TransferEditorView(api: modelAPI, wallets: model.wallets, timezone: model.accountTimezone) {
                     transferPresented = false
                     Task { await model.load() }
@@ -459,10 +687,39 @@ struct TransactionsView: View {
                 }
             }
         }
-        .accessibilityIdentifier("transactions-screen")
     }
 
     private var modelAPI: FinanceAPI { model.apiForChild }
+
+    @ViewBuilder
+    private func transactionGroupHeader(_ key: String, transactions: [TransactionModel]) -> some View {
+        let total = MPFormat.signedMoney(transactions.reduce(0) { $0 + model.signedAmount(for: $1) }, masked: masked)
+        if model.groupByCategory {
+            HStack {
+                MPText(model.groupLabel(key), style: .secondary)
+                Spacer()
+                MPText(total, style: .secondary)
+            }
+        } else if let group = TransactionsPresentation.dayGroup(key, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current) {
+            HStack(alignment: .center, spacing: 12) {
+                MPText(group.dayNumber, style: .display)
+                VStack(alignment: .leading, spacing: 2) {
+                    MPText(group.weekday, style: .secondary)
+                    MPText(group.monthYear, style: .secondary)
+                }
+                Spacer()
+                MPText(total, style: .secondary)
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel("\(group.weekday), \(group.dayNumber) \(group.monthYear), tổng \(total)")
+        } else {
+            HStack {
+                MPText(key, style: .secondary)
+                Spacer()
+                MPText(total, style: .secondary)
+            }
+        }
+    }
 
     private var transactionMenuActions: [MPOverflowAction] {
         var actions: [MPOverflowAction] = []
@@ -485,13 +742,11 @@ struct TransactionsView: View {
     @ViewBuilder
     private func transactionRow(_ transaction: TransactionModel) -> some View {
         let selectable = TransactionsViewModel.bulkDeleteSelectable(transaction)
-        let title = model.categoryName(for: transaction) ?? (transaction.type == "income" ? "Khoản thu" : transaction.type == "adjustment" ? "Điều chỉnh số dư" : "Khoản chi")
-        let subtitle = [model.walletName(for: transaction), transaction.note].compactMap { $0?.isEmpty == false ? $0 : nil }.joined(separator: " · ")
         let row = MPTransactionRow(
-            title: title,
-            subtitle: subtitle.isEmpty ? MPFormat.shortDate(transaction.occurredAt, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current) : subtitle,
-            amount: MPFormat.signedMoney(model.signedAmount(for: transaction)),
-            isIncome: transaction.type == "income"
+            transaction: transaction,
+            category: model.categories.first(where: { $0.id == transaction.categoryID }),
+            timeZone: TimeZone(identifier: model.accountTimezone) ?? .current,
+            masked: masked
         )
         if selectionMode {
             MPButton(style: .plain, isDisabled: !selectable) {
@@ -509,6 +764,7 @@ struct TransactionsView: View {
                     row
                 }
             }
+            .accessibilityIdentifier("transaction-row-\(transaction.id)")
         } else {
             MPButton(style: .plain) {
                 selectedTransaction = transaction
@@ -516,7 +772,13 @@ struct TransactionsView: View {
                 .contextMenu {
                     MPButton("Xóa giao dịch", style: .destructive) { deleteTarget = transaction }
                 }
+                .accessibilityIdentifier("transaction-row-\(transaction.id)")
         }
+    }
+
+    private func closeQueuedEditor() {
+        editorPresented = false; queuedEditTarget = nil
+        Task { await model.load() }
     }
 }
 
@@ -525,18 +787,23 @@ private extension TransactionsViewModel {
 }
 
 struct TransactionEditorView: View {
+    @Environment(\.mpFinancialQueue) private var financialQueue
+    @State private var intentKey = UUID()
     let api: FinanceAPI
     let wallets: [WalletModel]
     let categories: [CategoryModel]
     let timezone: String
     let transaction: TransactionModel?
+    let queuedMutation: OutboxMutation?
     let onSaved: () -> Void
     let onCancel: () -> Void
+    let onAIEntry: (() -> Void)?
     @State private var type = "expense"
     @State private var amount = ""
     @State private var note = ""
     @State private var walletID = ""
     @State private var categoryID = ""
+    @State private var categoryPickerPresented = false
     @State private var jarID = ""
     @State private var includedInReports = true
     @State private var date = Date()
@@ -545,57 +812,149 @@ struct TransactionEditorView: View {
     @State private var jarLoadError: String?
     @State private var isSaving = false
     @State private var errorMessage: String?
+    @State private var showDetails = false
+    @State private var noteEditorPresented = false
+    @State private var noteDraft = ""
 
-    init(api: FinanceAPI, wallets: [WalletModel], categories: [CategoryModel], timezone: String = TimeZone.current.identifier, transaction: TransactionModel? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    init(api: FinanceAPI, wallets: [WalletModel], categories: [CategoryModel], timezone: String = TimeZone.current.identifier, transaction: TransactionModel? = nil, queuedMutation: OutboxMutation? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void, onAIEntry: (() -> Void)? = nil) {
         self.api = api
         self.wallets = wallets
         self.categories = categories
         self.timezone = timezone
         self.transaction = transaction
+        self.queuedMutation = queuedMutation
+        let draft: TransactionInputModel?
+        if let queuedMutation, case .transaction(let input) = queuedMutation.payload { draft = input } else { draft = nil }
         self.onSaved = onSaved
         self.onCancel = onCancel
-        _type = State(initialValue: transaction?.type ?? "expense")
-        _amount = State(initialValue: transaction.map { String($0.amount) } ?? "")
-        _note = State(initialValue: transaction?.note ?? "")
-        let initialWalletID = transaction?.walletID ?? TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? ""
+        self.onAIEntry = onAIEntry
+        _type = State(initialValue: draft?.type ?? transaction?.type ?? "expense")
+        _amount = State(initialValue: draft.map { String($0.amount) } ?? transaction.map { String($0.amount) } ?? "")
+        _note = State(initialValue: draft?.note ?? transaction?.note ?? "")
+        let initialWalletID = draft?.walletID ?? transaction?.walletID ?? TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? ""
         let initialWalletType = wallets.first(where: { $0.id == initialWalletID })?.type ?? "basic"
         _walletID = State(initialValue: initialWalletID)
-        _categoryID = State(initialValue: TransactionEditorPolicy.requiredCategoryID(type: transaction?.type ?? "expense", walletID: initialWalletID, walletType: initialWalletType, categories: categories, currentID: transaction?.categoryID ?? ""))
-        _jarID = State(initialValue: transaction?.jarID ?? "")
-        _includedInReports = State(initialValue: transaction?.includedInReports ?? true)
-        if let raw = transaction?.occurredAt, let date = MPFormat.parseInstant(raw) { _date = State(initialValue: date) }
+        _categoryID = State(initialValue: TransactionEditorPolicy.requiredCategoryID(type: draft?.type ?? transaction?.type ?? "expense", walletID: initialWalletID, walletType: initialWalletType, categories: categories, currentID: draft?.categoryID ?? transaction?.categoryID ?? ""))
+        _jarID = State(initialValue: draft?.jarID ?? transaction?.jarID ?? "")
+        _includedInReports = State(initialValue: draft?.includedInReports ?? transaction?.includedInReports ?? true)
+        _showDetails = State(initialValue: transaction != nil || queuedMutation != nil)
+        if let raw = draft?.occurredAt ?? transaction?.occurredAt, let date = MPFormat.parseInstant(raw) { _date = State(initialValue: date) }
     }
 
     var body: some View {
+        VStack(spacing: 0) {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: transaction == nil ? "Thêm giao dịch" : "Sửa giao dịch", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
-                MPSegmentedControl(options: [("expense", "Chi tiêu"), ("income", "Thu nhập")], selection: $type)
-                MPOptionSelector(title: "Ví", options: walletOptions, selectionID: $walletID)
-                MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID)
-                if canUseJar {
-                    MPOptionSelector(
-                        title: "Hũ chi tiêu",
-                        options: TransactionEditorPolicy.jarOptions(
-                            summary: jarSummary,
-                            selectedJarID: jarID,
-                            selectedJarName: transaction?.jarName
-                        ),
-                        selectionID: $jarID,
-                        emptyLabel: jarsLoading ? "Đang tải hũ..." : "Không chọn"
-                    )
-                    if let jarLoadError { MPStatusMessage(text: jarLoadError, tone: .danger) }
+            VStack(alignment: .leading, spacing: 12) {
+                MPReferenceScreenHeader(
+                    title: queuedMutation != nil ? "Sửa bản nháp" : transaction == nil ? "Thêm giao dịch" : "Sửa giao dịch",
+                    closeLabel: "Hủy",
+                    onClose: onCancel
+                )
+                if queuedMutation != nil {
+                    MPStatusMessage(text: "Hãy thay đổi thông tin rồi xác nhận. Bản cũ sẽ ngừng gửi; bản sửa dùng key mới và không sửa giao dịch đã có trên máy chủ.")
                 }
-                MPAmountField(title: "Số tiền", text: $amount)
-                MPDateTimeField(title: "Ngày và giờ", date: $date)
-                MPTextField(title: "Ghi chú", text: $note, placeholder: "Ví dụ: Ăn trưa")
-                MPBooleanSelector(title: "Tính vào báo cáo", value: $includedInReports, trueLabel: "Có", falseLabel: "Không")
+                MPSurfaceCard(style: .reference) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        MPSegmentedControl(
+                            options: [("expense", "Khoản chi"), ("income", "Khoản thu")],
+                            selection: $type,
+                            accessibilityIdentifier: "transaction-type-selector"
+                        )
+                        Divider().padding(.vertical, 8)
+                        MPOptionSelector(
+                            title: "Ví",
+                            options: walletOptions,
+                            selectionID: $walletID,
+                            iconName: "wallet.pass.fill",
+                            accessibilityIdentifier: "transaction-wallet-row"
+                        )
+                        Divider()
+                        MPAmountField(title: "Số tiền", text: $amount, presentation: .transaction)
+                        Divider().padding(.vertical, 8)
+                        MPFormRow(
+                            title: "Danh mục",
+                            iconName: selectedCategoryGlyph,
+                            value: selectedCategory?.name ?? "Chọn danh mục",
+                            accessibilityIdentifier: "transaction-category-row"
+                        ) { categoryPickerPresented = true }
+                        Divider()
+                        MPFormRow(
+                            title: "Ghi chú",
+                            iconName: "text.alignleft",
+                            value: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Thêm ghi chú" : note,
+                            accessibilityIdentifier: "transaction-note-row"
+                        ) {
+                            noteDraft = note
+                            noteEditorPresented = true
+                        }
+                        Divider()
+                        MPDateStepper(
+                            date: date,
+                            timeZone: timezone,
+                            onPrevious: { shiftDate(by: -1) },
+                            onNext: { shiftDate(by: 1) },
+                            onSelect: { date = $0 },
+                            accessibilityIdentifier: "transaction-date-stepper"
+                        )
+                        if canUseJar {
+                            Divider().padding(.vertical, 8)
+                            MPOptionSelector(
+                                title: "Hũ chi tiêu",
+                                options: TransactionEditorPolicy.jarOptions(
+                                    summary: jarSummary,
+                                    selectedJarID: jarID,
+                                    selectedJarName: transaction?.jarName
+                                ),
+                                selectionID: $jarID,
+                                emptyLabel: jarsLoading ? "Đang tải hũ..." : "Không chọn",
+                                iconName: "shippingbox.fill",
+                                accessibilityIdentifier: "transaction-jar-row"
+                            )
+                            if let jarLoadError { MPStatusMessage(text: jarLoadError, tone: .danger) }
+                        }
+                    }
+                }
+                MPButton(showDetails ? "Ẩn chi tiết" : "Thêm chi tiết", style: .secondary) {
+                    withAnimation(.easeInOut(duration: 0.18)) { showDetails.toggle() }
+                }
+                .accessibilityIdentifier("transaction-details-toggle")
+                if showDetails {
+                    MPSurfaceCard(style: .reference) {
+                        VStack(alignment: .leading, spacing: 12) {
+                            MPCheckboxRow(
+                                title: "Tính vào báo cáo",
+                                isSelected: includedInReports,
+                                accessibilityIdentifier: "transaction-include-reports-checkbox"
+                            ) {
+                                includedInReports.toggle()
+                            }
+                        }
+                    }
+                }
                 if let errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
-                MPButton(transaction == nil ? "Lưu giao dịch" : "Lưu thay đổi", isLoading: isSaving) { Task { await save() } }
+                Color.clear.frame(height: 16)
             }
-            .padding(MPMetrics.pagePadding)
+            .padding(.horizontal, MPMetrics.pagePadding)
+            .padding(.top, 8)
+            .padding(.bottom, 24)
+        }
+        HStack(spacing: 12) {
+            MPButton(queuedMutation != nil ? "Xác nhận bản sửa" : transaction == nil ? "Lưu giao dịch" : "Lưu thay đổi", isLoading: isSaving) {
+                Task { await save() }
+            }
+            .accessibilityIdentifier("transaction-save-footer")
+            if transaction == nil, let onAIEntry {
+                MPActionIconButton(systemName: "photo.on.rectangle.angled", label: "Nhập bằng AI từ ảnh hoặc nội dung", action: onAIEntry)
+                    .accessibilityIdentifier("transaction-ai-entry-button")
+            }
+        }
+        .padding(.horizontal, MPMetrics.pagePadding)
+        .padding(.vertical, 12)
+        .background(MPColor.canvas)
+        .safeAreaPadding(.bottom, 4)
         }
         .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
+        .background(MPColor.canvas.ignoresSafeArea())
         .task {
             if walletID.isEmpty { walletID = TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "" }
             clearInvalidCategory()
@@ -615,9 +974,49 @@ struct TransactionEditorView: View {
             if !canUseJar { jarID = "" }
         }
         .onChange(of: date) { _, _ in Task { await loadJarSummary() } }
+        .mpFormBottomSheet(
+            isPresented: $noteEditorPresented,
+            title: "Ghi chú giao dịch",
+            accessibilityIdentifier: "transaction-note-editor",
+            onClose: { noteEditorPresented = false }
+        ) {
+            MPTextEditor(title: "Ghi chú", text: $noteDraft, placeholder: "Ví dụ: Ăn trưa")
+        } footer: {
+            MPButton("Lưu ghi chú") {
+                note = noteDraft
+                noteEditorPresented = false
+            }
+            .accessibilityIdentifier("transaction-note-save")
+        }
+        .mpFormBottomSheet(
+            isPresented: $categoryPickerPresented,
+            title: "Chọn danh mục",
+            accessibilityIdentifier: "transaction-category-picker-sheet",
+            onClose: { categoryPickerPresented = false },
+            fields: {
+                MPCategoryPicker(
+                    categories: categories,
+                    kind: type,
+                    selectableIDs: Set(TransactionEditorPolicy.applicableCategories(
+                        type: type,
+                        walletID: selectedWallet?.id ?? "",
+                        walletType: selectedWallet?.type ?? "basic",
+                        categories: categories
+                    ).map(\.id)),
+                    selectedID: categoryID,
+                    clearLabel: nil,
+                    clearID: nil,
+                    onSelect: { categoryID = $0; categoryPickerPresented = false }
+                )
+            },
+            footer: {
+                MPButton("Đóng", style: .secondary) { categoryPickerPresented = false }
+            }
+        )
     }
 
     private func save() async {
+        guard !isSaving else { return }
         guard let wallet = wallets.first(where: { $0.id == walletID }), let parsed = MPFormat.parsePositiveInteger(amount) else {
             errorMessage = "Chọn ví và nhập số tiền hợp lệ."
             return
@@ -643,16 +1042,26 @@ struct TransactionEditorView: View {
         isSaving = true
         defer { isSaving = false }
         do {
-            let input = TransactionInputModel(walletID: wallet.id, categoryID: selectedCategory.id, jarID: jarID.isEmpty ? nil : jarID, type: type, amount: parsed, occurredAt: Self.timestamp(from: date, timezone: timezone), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: includedInReports, travelEventID: transaction?.travelEventID)
+            let occurredAt = queuedTransactionInput.flatMap { MPFormat.parseInstant($0.occurredAt) == date ? $0.occurredAt : nil } ?? Self.timestamp(from: date, timezone: timezone)
+            let input = TransactionInputModel(walletID: wallet.id, categoryID: selectedCategory.id, jarID: jarID.isEmpty ? nil : jarID, type: type, amount: parsed, occurredAt: occurredAt, note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: includedInReports, travelEventID: queuedTransactionInput?.travelEventID ?? transaction?.travelEventID)
             if let transaction { _ = try await api.updateTransaction(id: transaction.id, input: input) }
+            else if let queuedMutation {
+                guard let financialQueue else { throw APIError.missingSession }
+                _ = try await financialQueue.replaceRejected(id: queuedMutation.id, payload: .transaction(input), key: intentKey)
+            }
+            else if let financialQueue { _ = try await financialQueue.submit(.transaction(input), key: intentKey) }
             else { _ = try await api.createTransaction(input) }
             onSaved()
         } catch {
-            errorMessage = "Không thể lưu giao dịch."
+            errorMessage = queuedMutation == nil ? "Không thể lưu giao dịch." : "Hãy thay đổi thông tin hợp lệ và kiểm tra đúng tài khoản trước khi xác nhận bản sửa."
         }
     }
 
     private var selectedCategory: CategoryModel? { categories.first(where: { $0.id == categoryID }) }
+    private var queuedTransactionInput: TransactionInputModel? {
+        guard let queuedMutation, case .transaction(let input) = queuedMutation.payload else { return nil }
+        return input
+    }
     private var selectedWallet: WalletModel? { wallets.first(where: { $0.id == walletID }) }
     private var canUseJar: Bool {
         TransactionEditorPolicy.canUseJar(type: type, category: selectedCategory, walletType: selectedWallet?.type ?? "")
@@ -686,13 +1095,21 @@ struct TransactionEditorView: View {
     }
 
     private var walletOptions: [MPSelectionOption] { TransactionsViewModel.ordinaryTransactionWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) } }
-    private var categoryOptions: [MPSelectionOption] {
-        let valid = TransactionEditorPolicy.applicableCategories(type: type, walletID: selectedWallet?.id ?? "", walletType: selectedWallet?.type ?? "basic", categories: categories)
-        var options = valid.map { MPSelectionOption(id: $0.id, label: $0.name) }
-        if !categoryID.isEmpty, !options.contains(where: { $0.id == categoryID }), let current = categories.first(where: { $0.id == categoryID }) {
-            options.append(MPSelectionOption(id: current.id, label: current.name))
+    private var selectedCategoryGlyph: String {
+        guard !categoryID.isEmpty else { return "circle.fill" }
+        let category = categories.first(where: { $0.id == categoryID })
+        return MPTransactionPresentation.glyph(
+            systemKey: category?.systemKey ?? category?.iconKey,
+            type: type
+        ).systemName
+    }
+
+    private func shiftDate(by dayDelta: Int) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: timezone) ?? .current
+        if let shifted = calendar.date(byAdding: .day, value: dayDelta, to: date) {
+            date = shifted
         }
-        return options
     }
 
     private func clearInvalidCategory() {
@@ -715,11 +1132,12 @@ struct TransactionDetailView: View {
     @State private var travelEventID = ""
     @State private var travelError: String?
     @Environment(\.timeZone) private var timeZone
+    @Environment(\.mpFinancialValuesMasked) private var masked
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
             MPScreenHeader(title: "Chi tiết giao dịch", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onClose) }, trailing: { EmptyView() })
-            MPMetricCard(title: transaction.type == "income" ? "Thu nhập" : "Chi tiêu", value: MPFormat.money(transaction.amount))
+            MPMetricCard(title: transaction.type == "income" ? "Thu nhập" : "Chi tiêu", value: MPFormat.money(transaction.amount, masked: masked))
             MPSurfaceCard {
                 VStack(alignment: .leading, spacing: 8) {
                     MPText("Ngày: \(MPFormat.shortDate(transaction.occurredAt, timeZone: timeZone))")
@@ -758,6 +1176,12 @@ struct TransactionDetailView: View {
             Spacer()
         }
         .padding(MPMetrics.pagePadding)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("transaction-detail-overlay")
+        .safeAreaInset(edge: .bottom) {
+            MPBottomNavigationInset()
+                .accessibilityIdentifier("transaction-detail-shell-inset")
+        }
         .task {
             guard TransactionDetailPolicy.canLinkTravel(transaction, isCreditWallet: isCreditWallet) else { return }
             do {
@@ -769,11 +1193,14 @@ struct TransactionDetailView: View {
 }
 
 struct TransferEditorView: View {
+    @Environment(\.mpFinancialQueue) private var financialQueue
+    @State private var intentKey = UUID()
     let api: FinanceAPI
     let wallets: [WalletModel]
     let timezone: String
     let transactions: [TransactionModel]
     let existingTransferID: String?
+    let queuedMutation: OutboxMutation?
     let onSaved: () -> Void
     let onCancel: () -> Void
     @State private var sourceID = ""
@@ -784,37 +1211,56 @@ struct TransferEditorView: View {
     @State private var saving = false
     @State private var error: String?
 
-    init(api: FinanceAPI, wallets: [WalletModel], timezone: String = TimeZone.current.identifier, transactions: [TransactionModel] = [], existingTransferID: String? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
+    init(api: FinanceAPI, wallets: [WalletModel], timezone: String = TimeZone.current.identifier, transactions: [TransactionModel] = [], existingTransferID: String? = nil, queuedMutation: OutboxMutation? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void) {
         self.api = api
         self.wallets = wallets
         self.timezone = timezone
         self.transactions = transactions
         self.existingTransferID = existingTransferID
+        self.queuedMutation = queuedMutation
+        let draft: TransferInputModel?
+        if let queuedMutation, case .transfer(let input) = queuedMutation.payload { draft = input } else { draft = nil }
         self.onSaved = onSaved
         self.onCancel = onCancel
         let source = transactions.first(where: { $0.transferID == existingTransferID && $0.type == "expense" })
         let destination = transactions.first(where: { $0.transferID == existingTransferID && $0.type == "income" })
         let eligibleWallets = Self.transferWallets(wallets)
-        _sourceID = State(initialValue: source?.walletID ?? eligibleWallets.first?.id ?? "")
-        _destinationID = State(initialValue: destination?.walletID ?? eligibleWallets.dropFirst().first?.id ?? eligibleWallets.first?.id ?? "")
-        _amount = State(initialValue: source.map { String($0.amount) } ?? "")
-        _note = State(initialValue: source?.note ?? "")
-        _date = State(initialValue: source.flatMap { MPFormat.parseInstant($0.occurredAt) } ?? Date())
+        _sourceID = State(initialValue: draft?.sourceWalletID ?? source?.walletID ?? eligibleWallets.first?.id ?? "")
+        _destinationID = State(initialValue: draft?.destinationWalletID ?? destination?.walletID ?? eligibleWallets.dropFirst().first?.id ?? eligibleWallets.first?.id ?? "")
+        _amount = State(initialValue: draft.map { String($0.amount) } ?? source.map { String($0.amount) } ?? "")
+        _note = State(initialValue: draft?.note ?? source?.note ?? "")
+        _date = State(initialValue: draft.flatMap { MPFormat.parseInstant($0.occurredAt) } ?? source.flatMap { MPFormat.parseInstant($0.occurredAt) } ?? Date())
     }
 
     var body: some View {
         ScrollView { VStack(alignment: .leading, spacing: 16) {
-            MPScreenHeader(title: existingTransferID == nil ? "Chuyển tiền" : "Sửa chuyển tiền", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
+            MPScreenHeader(title: queuedMutation != nil ? "Sửa bản nháp chuyển ví" : existingTransferID == nil ? "Chuyển tiền" : "Sửa chuyển tiền", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onCancel) }, trailing: { EmptyView() })
             MPText("Chuyển tiền tạo cặp giao dịch nguyên tử giữa hai ví; không tính vào báo cáo.", style: .secondary)
-            MPOptionSelector(title: "Từ ví", options: walletOptions, selectionID: $sourceID)
-            MPOptionSelector(title: "Đến ví", options: walletOptions, selectionID: $destinationID)
+            if queuedMutation != nil { MPStatusMessage(text: "Hãy thay đổi thông tin rồi xác nhận bản sửa với key mới. Không sửa cặp giao dịch đã có trên máy chủ.") }
+            MPOptionSelector(
+                title: "Từ ví",
+                options: walletOptions,
+                selectionID: $sourceID,
+                accessibilityIdentifier: "transfer-source-wallet",
+                isEnabled: existingTransferID == nil
+            )
+            MPOptionSelector(
+                title: "Đến ví",
+                options: walletOptions,
+                selectionID: $destinationID,
+                accessibilityIdentifier: "transfer-destination-wallet",
+                isEnabled: existingTransferID == nil
+            )
             MPAmountField(title: "Số tiền", text: $amount)
-            MPDateField(title: "Ngày chuyển", date: $date)
+            MPDateField(title: "Ngày chuyển", date: $date, timeZone: timezone)
             MPTextField(title: "Ghi chú", text: $note)
             if let error { MPStatusMessage(text: error, tone: .danger) }
-            MPButton(existingTransferID == nil ? "Xác nhận chuyển" : "Lưu thay đổi", isLoading: saving) { Task { await save() } }
+            MPButton(queuedMutation != nil ? "Xác nhận bản sửa" : existingTransferID == nil ? "Xác nhận chuyển" : "Lưu thay đổi", isLoading: saving) { Task { await save() } }
         }.padding(MPMetrics.pagePadding) }
         .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
+        .safeAreaInset(edge: .bottom) {
+            MPBottomNavigationInset()
+        }
         .task {
             let eligibleWallets = Self.transferWallets(wallets)
             if sourceID.isEmpty { sourceID = eligibleWallets.first?.id ?? "" }
@@ -823,16 +1269,29 @@ struct TransferEditorView: View {
     }
 
     private func save() async {
+        guard !saving else { return }
         guard let from = wallets.first(where: { $0.id == sourceID }), let to = wallets.first(where: { $0.id == destinationID }), from.id != to.id, let parsed = MPFormat.parsePositiveInteger(amount) else { error = "Chọn hai ví khác nhau và nhập số tiền hợp lệ."; return }
         saving = true; defer { saving = false }
         do {
-            let occurredAt = Self.timestamp(date, timezone: timezone)
+            var occurredAt = Self.timestamp(date, timezone: timezone)
+            if let queuedMutation, case .transfer(let draft) = queuedMutation.payload, let original = MPFormat.parseInstant(draft.occurredAt) {
+                var calendar = Calendar(identifier: .gregorian)
+                calendar.timeZone = TimeZone(identifier: timezone) ?? .current
+                if calendar.isDate(original, inSameDayAs: date) { occurredAt = draft.occurredAt }
+            }
             let trimmedNote = note.trimmingCharacters(in: .whitespacesAndNewlines)
             if let existingTransferID { _ = try await api.updateTransfer(id: existingTransferID, input: TransferUpdateInputModel(amount: parsed, occurredAt: occurredAt, note: trimmedNote.isEmpty ? nil : trimmedNote)) }
-            else { _ = try await api.createTransfer(TransferInputModel(sourceWalletID: from.id, destinationWalletID: to.id, amount: parsed, occurredAt: occurredAt, note: trimmedNote.isEmpty ? nil : trimmedNote)) }
+            else {
+                let input = TransferInputModel(sourceWalletID: from.id, destinationWalletID: to.id, amount: parsed, occurredAt: occurredAt, note: trimmedNote.isEmpty ? nil : trimmedNote)
+                if let queuedMutation {
+                    guard let financialQueue else { throw APIError.missingSession }
+                    _ = try await financialQueue.replaceRejected(id: queuedMutation.id, payload: .transfer(input), key: intentKey)
+                } else if let financialQueue { _ = try await financialQueue.submit(.transfer(input), key: intentKey) }
+                else { _ = try await api.createTransfer(input) }
+            }
             onSaved()
         }
-        catch { self.error = "Không thể chuyển tiền. Số dư hoặc ví có thể không hợp lệ." }
+        catch { self.error = queuedMutation == nil ? "Không thể chuyển tiền. Số dư hoặc ví có thể không hợp lệ." : "Hãy thay đổi thông tin hợp lệ và kiểm tra đúng tài khoản trước khi xác nhận bản sửa." }
     }
     private var walletOptions: [MPSelectionOption] { Self.transferWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) } }
     static func transferWallets(_ wallets: [WalletModel]) -> [WalletModel] { wallets.filter { $0.type != "credit" } }
@@ -877,6 +1336,9 @@ struct AdjustmentEditorView: View {
             if let error { MPStatusMessage(text: error, tone: .danger) }
             MPButton("Lưu điều chỉnh", isLoading: saving) { Task { await save() } }
         }.padding(MPMetrics.pagePadding) }
+        .safeAreaInset(edge: .bottom) {
+            MPBottomNavigationInset()
+        }
         .task { if walletID.isEmpty { walletID = ledgerWallets.first?.id ?? "" } }
     }
     private var ledgerWallets: [WalletModel] { wallets.filter { $0.type != "credit" } }

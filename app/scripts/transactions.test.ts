@@ -17,6 +17,13 @@ test("a category without wallet restrictions applies to every wallet", () => {
   assert.equal(categoryAppliesToTransaction({ ...category, wallet_ids: [] }, "expense", "wallet-2"), true);
 });
 
+test("archived categories stay readable but cannot be newly selected", () => {
+  assert.equal(categoryAppliesToTransaction({ ...category, is_active: false }, "expense", "wallet-1"), false);
+  assert.equal(categoryAppliesToTransaction({ ...category, is_active: true }, "expense", "wallet-1"), true);
+  // Older cached API payloads omitted this additive field and remain active.
+  assert.equal(categoryAppliesToTransaction(category, "expense", "wallet-1"), true);
+});
+
 test("signed transaction amount follows ledger direction", () => {
   assert.equal(signedTransactionAmount({ type: "income", amount: 125000 }), 125000);
   assert.equal(signedTransactionAmount({ type: "expense", amount: 125000 }), -125000);

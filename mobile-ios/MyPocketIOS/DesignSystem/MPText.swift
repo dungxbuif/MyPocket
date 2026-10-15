@@ -1,10 +1,13 @@
 import SwiftUI
 
 enum MPTextStyle {
+    case display
     case title
     case body
     case secondary
     case emphasis
+    case action
+    case danger
 }
 
 struct MPText: View {
@@ -19,19 +22,32 @@ struct MPText: View {
     var body: some View {
         Text(value)
             .font(font)
-            .foregroundStyle(MPColor.ink)
+            .foregroundStyle(color)
     }
 
     private var font: Font {
         switch style {
+        case .display:
+            return MPFont.display
         case .title:
-            return .title2.weight(.bold)
+            return MPFont.headline
         case .body:
-            return .body
+            return MPFont.body
         case .secondary:
-            return .subheadline
+            return MPFont.bodySmall
         case .emphasis:
-            return .body.weight(.semibold)
+            return MPFont.bodyEmphasis
+        case .action, .danger:
+            return MPFont.bodySmall
+        }
+    }
+
+    private var color: Color {
+        switch style {
+        case .secondary: return MPColor.secondary
+        case .action: return MPColor.action
+        case .danger: return MPColor.danger
+        default: return MPColor.ink
         }
     }
 }
@@ -162,11 +178,11 @@ struct MPMarkdown: View {
         switch block {
         case .heading(let level, let text):
             Text(markdownText(text))
-                .font(level == 1 ? .title3.weight(.bold) : .headline.weight(.semibold))
+                .font(level == 1 ? MPFont.headline : MPFont.subheadline)
                 .foregroundStyle(MPColor.ink)
         case .paragraph(let text):
             Text(markdownText(text))
-                .font(.body)
+                .font(MPFont.body)
                 .foregroundStyle(MPColor.ink)
                 .fixedSize(horizontal: false, vertical: true)
         case .list(let ordered, let items):
@@ -174,10 +190,10 @@ struct MPMarkdown: View {
                 ForEach(Array(items.enumerated()), id: \.offset) { index, item in
                     HStack(alignment: .top, spacing: 6) {
                         Text(ordered ? "\(index + 1)." : "•")
-                            .font(.body.weight(.semibold))
+                            .font(MPFont.bodyEmphasis)
                             .foregroundStyle(MPColor.secondary)
                         Text(markdownText(item))
-                            .font(.body)
+                            .font(MPFont.body)
                             .foregroundStyle(MPColor.ink)
                             .fixedSize(horizontal: false, vertical: true)
                     }
@@ -188,7 +204,7 @@ struct MPMarkdown: View {
                 Grid(alignment: .leading, horizontalSpacing: 12, verticalSpacing: 0) {
                     GridRow {
                         ForEach(Array(headers.enumerated()), id: \.offset) { _, header in
-                            Text(markdownText(header)).font(.caption.weight(.semibold)).foregroundStyle(MPColor.secondary)
+                            Text(markdownText(header)).font(MPFont.labelSmall).foregroundStyle(MPColor.secondary)
                                 .padding(.vertical, 6)
                         }
                     }
@@ -196,7 +212,7 @@ struct MPMarkdown: View {
                         GridRow {
                             ForEach(0..<headers.count, id: \.self) { column in
                                 Text(markdownText(column < row.count ? row[column] : ""))
-                                    .font(.caption)
+                                    .font(MPFont.bodySmall)
                                     .foregroundStyle(MPColor.ink)
                                     .padding(.vertical, 6)
                             }
@@ -210,7 +226,7 @@ struct MPMarkdown: View {
         case .code(let text):
             ScrollView(.horizontal, showsIndicators: false) {
                 Text(text)
-                    .font(.caption.monospaced())
+                    .font(MPFont.bodySmall.monospaced())
                     .foregroundStyle(MPColor.ink)
                     .padding(8)
             }

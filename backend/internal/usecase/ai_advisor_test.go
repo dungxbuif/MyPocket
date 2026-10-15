@@ -68,6 +68,24 @@ type advisorStoreStub struct {
 	status    string
 }
 
+type advisorResetStore struct {
+	advisorStoreStub
+	result *entity.AdvisorResetResult
+	err    error
+}
+
+func (s *advisorResetStore) ResetConversation(context.Context, string, string, string) (*entity.AdvisorResetResult, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	result := *s.result
+	// A real repository only reports purged runs for the first reset. This
+	// fixture mirrors replay semantics so the service test proves that a
+	// replay cannot cancel a newer provider run with a reused ledger result.
+	s.result = &entity.AdvisorResetResult{ConversationID: result.ConversationID, Generation: result.Generation, ServerTime: result.ServerTime, Replayed: true}
+	return &result, nil
+}
+
 type advisorAvailabilityProvider struct{ available bool }
 
 func (p advisorAvailabilityProvider) Available() bool { return p.available }
@@ -160,6 +178,34 @@ func TestAdvisorServiceCancelInterruptsInFlightProvider(t *testing.T) {
 	}
 	if err := <-done; err == nil {
 		t.Fatal("cancelled submit must return an error")
+	}
+}
+
+func TestAdvisorServiceResetInterruptsPurgedProviderRunsOnlyOnce(t *testing.T) {
+	cancelled := make(chan struct{})
+	store := &advisorResetStore{result: &entity.AdvisorResetResult{ConversationID: "conversation-1", Generation: 2, PurgedRunIDs: []string{"run-reset"}}}
+	service := NewAdvisorService(store, NewAdvisorOrchestrator(advisorAvailabilityProvider{available: true}, NewAdvisorToolRegistry(NewFinanceQueryService(&financeReaderStub{}))))
+	service.cancellations["run-reset"] = func() { close(cancelled) }
+
+	first, err := service.ResetConversation(context.Background(), "owner-1", "reset-1", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.Replayed || first.PurgedRunIDs == nil {
+		t.Fatalf("first reset must carry internal purge IDs: %+v", first)
+	}
+	select {
+	case <-cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("reset did not interrupt the purged provider run")
+	}
+
+	second, err := service.ResetConversation(context.Background(), "owner-1", "reset-1", "hash")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !second.Replayed || len(second.PurgedRunIDs) != 0 {
+		t.Fatalf("reset replay must not report runs for cancellation: %+v", second)
 	}
 }
 

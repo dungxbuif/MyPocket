@@ -23,6 +23,10 @@ Reports là trung tâm xem số liệu; Money Insider là phần phân tích t�
 
 Report luôn thể hiện kỳ, bộ lọc, timezone và thời điểm dữ liệu. Drilldown mở đúng tập giao dịch tạo nên chỉ số. Khi lấy dữ liệu offline/cache phải có trạng thái chưa cập nhật. Dữ liệu lịch sử được query lại khi giao dịch thay đổi.
 
+Ở màn hình native, trường tháng dùng khóa `YYYY-MM` và chỉ chấp nhận tháng
+`01`–`12`. Giá trị sai được báo ngay trước khi gọi API; dữ liệu của kỳ trước
+được xóa khỏi màn hình để không hiển thị số liệu cũ dưới phạm vi mới.
+
 ## Danh sách report và trang xem
 
 | Report / view | Nội dung | Drilldown |

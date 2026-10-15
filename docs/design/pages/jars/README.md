@@ -1,5 +1,21 @@
 # Quản lý hũ
 
+Native override (2026-10-14): Tài khoản → Hũ chi tiêu. Add/edit replaces the list
+with `MPEditorScaffold`, one scroll and pinned Save. `MPAmountField` handles fixed
+money and `MPNumberField(.percentage)` handles percentages. Pending disables
+repeated saves/cancel; failures retain the draft. Historical web presentation
+below is not the native UI authority. Hủy does not save; reopening the same jar
+within the same month/screen resumes the input. Changing month clears target and
+draft, even when returning to the original month. Leaving/restarting does not
+guarantee draft persistence. Month-leak regression reproduced after menu-scrolling
+correction; reset implemented and verified in final188/188 regression gate.
+
+Native percentage allocation uses `MPNumberField(.percentage)` and shared
+comma→dot normalization, preserving raw invalid drafts. Generic input range is
+0…100; jar validation still requires positive allocation with at most2 decimal
+places. Fixed allocation remains a monetary field. No API type/schema changes.
+[Number input guide](../../../guides/numeric-input-ios.md).
+
 Route `/jars`; implements [TICKET-04](../../../work/tickets/TICKET-04-hu-chi-tieu.md) and [CORE-03](../../../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md). Status: implementation in progress.
 
 ## Composition

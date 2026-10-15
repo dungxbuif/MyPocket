@@ -1,7 +1,9 @@
 # Advisor: fresh chat after30 idle minutes
 
-Status: review_required. Owner approved30-minute behavior; this written lifecycle
-contract awaits review before implementation. [Work item](../../work/tickets/NATIVE-ADVISOR-IDLE-RESET-20261015.md).
+Status: implemented_locally. Owner approved30-minute behavior; the lifecycle
+contract is now reflected in the local backend reset/expiry and native Chat mới
+slice. Production rollout and real PostgreSQL expiry proof remain open.
+[Work item](../../work/tickets/NATIVE-ADVISOR-IDLE-RESET-20261015.md).
 
 ## Outcome and boundaries
 
@@ -39,9 +41,11 @@ raw prompts/answers/tool facts may remain in those retained fields. Failed purge
 rolls back entirely; never expose partial reset or run the model on stale content.
 
 Answer/event/fact writes must lock/read the current conversation and reject
-generation mismatch or terminal purged run. Old provider work may finish remotely,
-but cannot repopulate history or become a native action card. Use existing
-lease-lost semantics for stale writes, without logging private content.
+generation mismatch or terminal purged run. An explicit reset also cancels
+queued/running provider contexts in the current process; work already executing
+in another process/provider may finish remotely, but cannot repopulate history or
+become a native action card. Use existing lease-lost semantics for stale writes,
+without logging private content.
 
 Worker processes at most100 expired conversations per bounded transaction batch,
 using SKIP LOCKED and a deadline. Continue batches in subsequent passes. Expiry
@@ -61,7 +65,8 @@ optional for compatibility with old production until coordinated rollout.
 
 `POST /api/v1/ai/advisor/conversation/reset` resets this owner's chat immediately;
 requires Idempotency-Key, records only minimal replay metadata. Repeating a reset
-must return the original reset outcome, never erase messages accepted afterward.
+must return the original reset outcome (including its server timestamp), never
+erase messages accepted afterward.
 Do not invent a fake finance run/user message to represent reset. Use a dedicated
 minimal reset-request ledger with owner+idempotency key unique, request hash,
 result generation and timestamps; no content. Reset records are not purged by

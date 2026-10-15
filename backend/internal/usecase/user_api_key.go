@@ -17,7 +17,6 @@ import (
 
 var (
 	ErrAPIKeyInvalid       = errors.New("api key is invalid")
-	ErrAPIKeyScopeDenied   = errors.New("api key scope denied")
 	ErrAPIKeyUnavailable   = errors.New("api key service unavailable")
 	ErrAPIKeyNameInvalid   = errors.New("api key name is invalid")
 	ErrAPIKeyExpiryInvalid = errors.New("api key expiry is invalid")
@@ -31,7 +30,7 @@ type UserAPIKeyService struct {
 type APIKeyCreateInput struct {
 	OwnerID   string
 	Name      string
-	Scopes    []string
+	Scopes    []string // Deprecated input ignored; all keys have full same-owner access.
 	ExpiresAt *time.Time
 }
 
@@ -56,10 +55,6 @@ func (s *UserAPIKeyService) Create(ctx context.Context, input APIKeyCreateInput)
 	if input.ExpiresAt != nil && !input.ExpiresAt.After(now) {
 		return APIKeyCreated{}, ErrAPIKeyExpiryInvalid
 	}
-	scopes, err := entity.NormalizeAPIKeyScopes(input.Scopes)
-	if err != nil {
-		return APIKeyCreated{}, err
-	}
 	lookupBytes := make([]byte, 10)
 	secretBytes := make([]byte, 32)
 	if _, err := rand.Read(lookupBytes); err != nil {
@@ -70,14 +65,15 @@ func (s *UserAPIKeyService) Create(ctx context.Context, input APIKeyCreateInput)
 	}
 	lookup := base64.RawURLEncoding.EncodeToString(lookupBytes)
 	secret := "mpk_" + lookup + "." + base64.RawURLEncoding.EncodeToString(secretBytes)
-	key := entity.UserAPIKey{ID: uuid.NewString(), OwnerID: input.OwnerID, LookupID: lookup, Name: name, SecretHash: hashAPIKey(secret), Scopes: scopes, ExpiresAt: input.ExpiresAt, CreatedAt: now, UpdatedAt: now}
+	key := entity.UserAPIKey{ID: uuid.NewString(), OwnerID: input.OwnerID, LookupID: lookup, Name: name, SecretHash: hashAPIKey(secret), Scopes: []string{}, ExpiresAt: input.ExpiresAt, CreatedAt: now, UpdatedAt: now}
 	if err := s.Keys.Create(ctx, &key); err != nil {
 		return APIKeyCreated{}, err
 	}
 	return APIKeyCreated{Key: key, Secret: secret}, nil
 }
 
-func (s *UserAPIKeyService) Authenticate(ctx context.Context, secret string, requiredScopes []string) (Principal, error) {
+// The final legacy argument is ignored; there is no scope authorization model.
+func (s *UserAPIKeyService) Authenticate(ctx context.Context, secret string, _ []string) (Principal, error) {
 	if s == nil || s.Keys == nil {
 		return Principal{}, ErrAPIKeyUnavailable
 	}
@@ -94,13 +90,8 @@ func (s *UserAPIKeyService) Authenticate(ctx context.Context, secret string, req
 	if err != nil || key == nil || subtle.ConstantTimeCompare([]byte(key.SecretHash), []byte(hashAPIKey(secret))) != 1 || !key.ActiveAt(s.now()) {
 		return Principal{}, ErrAPIKeyInvalid
 	}
-	for _, scope := range requiredScopes {
-		if !key.HasScope(scope) {
-			return Principal{}, ErrAPIKeyScopeDenied
-		}
-	}
 	_ = s.Keys.TouchLastUsed(ctx, key.ID, s.now())
-	return Principal{OwnerID: key.OwnerID, CredentialID: key.ID, CredentialKind: "user_api_key", ExpiresAt: valueOrZero(key.ExpiresAt), Scopes: append([]string(nil), key.Scopes...)}, nil
+	return Principal{OwnerID: key.OwnerID, CredentialID: key.ID, CredentialKind: "user_api_key", ExpiresAt: valueOrZero(key.ExpiresAt)}, nil
 }
 
 // ValidatePrincipal re-reads the credential so long-running advisor work does
@@ -120,7 +111,11 @@ func (s *UserAPIKeyService) List(ctx context.Context, ownerID string) ([]entity.
 	if s == nil || s.Keys == nil || strings.TrimSpace(ownerID) == "" {
 		return nil, ErrAPIKeyUnavailable
 	}
-	return s.Keys.ListByOwner(ctx, ownerID)
+	keys, err := s.Keys.ListByOwner(ctx, ownerID)
+	for index := range keys {
+		keys[index].Scopes = []string{}
+	}
+	return keys, err
 }
 
 func (s *UserAPIKeyService) Revoke(ctx context.Context, ownerID, id string) error {

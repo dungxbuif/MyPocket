@@ -4,6 +4,74 @@ import XCTest
 
 @MainActor
 final class FinanceModelTests: XCTestCase {
+    func testReportsMonthPolicyAcceptsOnlyRealCalendarMonths() {
+        XCTAssertTrue(ReportsMonthPolicy.isValid("2026-01"))
+        XCTAssertTrue(ReportsMonthPolicy.isValid("2026-12"))
+        XCTAssertFalse(ReportsMonthPolicy.isValid("2026-00"))
+        XCTAssertFalse(ReportsMonthPolicy.isValid("2026-13"))
+        XCTAssertFalse(ReportsMonthPolicy.isValid("2026-99"))
+        XCTAssertFalse(ReportsMonthPolicy.isValid("26-01"))
+        XCTAssertFalse(ReportsMonthPolicy.isValid("2026/01"))
+        XCTAssertFalse(ReportsMonthPolicy.isValid(""))
+    }
+
+    func testPortfolioQuantityAcceptsLocalizedDecimalWithoutAcceptingUnicodeNumerals() {
+        XCTAssertTrue(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "1,5", unitPrice: "10000", fee: ""))
+        XCTAssertFalse(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "١.٥", unitPrice: "10000", fee: ""), "Backend quantity contract accepts ASCII decimal digits only.")
+        XCTAssertFalse(PortfolioTradeDraftValidator.isValid(side: "buy", quantity: "1,000.5", unitPrice: "10000", fee: ""), "Do not reinterpret an ambiguous pasted quantity.")
+    }
+
+    func testRecurringIntervalDoesNotUseCurrencyThousandsGrouping() {
+        XCTAssertFalse(RecurringDraftValidator.isValid(
+            name: "Monthly coffee", amount: "15000", interval: "1.000",
+            type: "expense", frequency: "monthly", nextRunDate: Date(),
+            endsAtEnabled: false, endsAtDate: Date()
+        ), "A count must not silently reinterpret decimal-looking input as one thousand periods.")
+    }
+    func testSharedTransactionRowKeepsCategoryIconAndNoteAcrossScreens() {
+        var item = transaction(id: "coffee", occurredAt: "2026-10-13T01:00:00Z")
+        item.categoryID = "coffee"
+        item.note = "  Highlands sáng  "
+        let category = CategoryModel(id: "coffee", ownerID: "owner", parentID: nil, kind: "expense", name: "Cà phê", systemKey: nil, iconKey: "cup.and.saucer.fill", isSystem: false, walletIDs: [])
+        let row = MPTransactionRow(transaction: item, category: category, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!, masked: false)
+        XCTAssertEqual(row.title, "Cà phê")
+        XCTAssertEqual(row.subtitle, "Highlands sáng")
+        XCTAssertEqual(row.iconName, "cup.and.saucer.fill")
+        XCTAssertEqual(row.amount, MPFormat.signedMoney(-10_000))
+        XCTAssertEqual(row.amountTone, .expense)
+    }
+
+    func testSharedTransactionRowNeutralTransferAdjustmentAndMaskedAmounts() {
+        var item = transaction(id: "transfer", occurredAt: "2026-10-13T01:00:00Z")
+        item.transferID = "transfer-pair"
+        item.type = "income"
+        let transfer = MPTransactionRow(transaction: item, timeZone: .gmt, masked: false)
+        XCTAssertEqual(transfer.title, "Nhận chuyển ví")
+        XCTAssertEqual(transfer.iconName, "arrow.left.arrow.right")
+        XCTAssertEqual(transfer.amountTone, .neutral)
+        XCTAssertEqual(transfer.amount, MPFormat.signedMoney(10_000))
+        item.transferID = nil
+        item.type = "adjustment"
+        item.adjustmentDirection = "increase"
+        let adjustment = MPTransactionRow(transaction: item, timeZone: .gmt, masked: false)
+        XCTAssertEqual(adjustment.title, "Điều chỉnh số dư")
+        XCTAssertEqual(adjustment.amountTone, .neutral)
+        XCTAssertEqual(adjustment.amount, MPFormat.signedMoney(10_000))
+        let masked = MPTransactionRow(transaction: item, timeZone: .gmt, masked: true)
+        XCTAssertEqual(masked.amount, MPFormat.maskedValue)
+    }
+
+    func testSharedTransactionRowUsesAccountDateAndCreditDirection() {
+        var item = transaction(id: "refund", occurredAt: "2026-10-12T18:00:00Z")
+        item.creditKind = "refund"
+        item.note = "  "
+        let row = MPTransactionRow(transaction: item, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!, masked: false)
+        XCTAssertEqual(row.title, MPSelectionLabels.creditKind("refund"))
+        XCTAssertEqual(row.subtitle, "13/10/2026")
+        XCTAssertEqual(row.amountTone, .income)
+        XCTAssertEqual(row.amount, MPFormat.signedMoney(10_000))
+    }
+
     func testSystemCategoryAllowsOnlyWalletScopeMutation() {
         let system = CategoryModel(id: "system", ownerID: nil, parentID: nil, kind: "expense", name: "Ăn uống", systemKey: "food", iconKey: "fork.knife", isSystem: true, walletIDs: [])
         let personal = CategoryModel(id: "personal", ownerID: "owner", parentID: nil, kind: "expense", name: "Cà phê", systemKey: nil, iconKey: "cup.and.saucer", isSystem: false, walletIDs: [])
@@ -40,6 +108,23 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(MPFormat.savingsProgress(balance: -10, target: 0), MPSavingsProgress(remaining: 0, percentage: 0, reached: false))
     }
 
+    func testSavingsQueueEditAllowsTransferWithoutCategoriesButGuardsTransactions() {
+        let transfer = OutboxPayload.transfer(TransferInputModel(
+            sourceWalletID: "source", destinationWalletID: "goal", amount: 12_500,
+            occurredAt: "2026-10-15T00:00:00Z", note: "pending"
+        ))
+        let transaction = OutboxPayload.transaction(TransactionInputModel(
+            walletID: "goal", categoryID: "food", jarID: nil, type: "expense", amount: 12_500,
+            occurredAt: "2026-10-15T00:00:00Z", note: "pending", includedInReports: true,
+            travelEventID: nil
+        ))
+
+        XCTAssertTrue(WalletQueueEditPolicy.canEdit(transfer, walletType: "goal", detailsReady: false))
+        XCTAssertFalse(WalletQueueEditPolicy.canEdit(transaction, walletType: "goal", detailsReady: false))
+        XCTAssertTrue(WalletQueueEditPolicy.canEdit(transaction, walletType: "goal", detailsReady: true))
+        XCTAssertFalse(WalletQueueEditPolicy.canEdit(transfer, walletType: "credit", detailsReady: true))
+    }
+
     func testSavingsTargetDayUsesAccountTimezoneAndCalendarDate() {
         let timezone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
         let now = ISO8601DateFormatter().date(from: "2026-10-05T16:30:00Z")!
@@ -61,6 +146,314 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(draft?.description, "Mô tả lỗi")
         XCTAssertNil(FeedbackDraftValidator.normalized(type: "other", title: "Lỗi", description: "Mô tả"))
         XCTAssertNil(FeedbackDraftValidator.normalized(type: "bug", title: " \n", description: "Mô tả"))
+    }
+
+    func testFeedbackOwnerResolutionSurvivesWireRoundTripIndependentlyOfDevStatus() throws {
+        let input = Data(#"{"id":"fb","type":"bug","title":"Lỗi","description":"Mô tả","status":"open","resolved":true,"resolved_at":"2026-10-14T00:00:00Z","created_at":"2026-10-14T00:00:00Z","updated_at":"2026-10-14T00:00:00Z","screenshot_available":false}"#.utf8)
+        let item = try JSONDecoder.mypocket.decode(FeedbackModel.self, from: input)
+        let encoded = try XCTUnwrap(JSONSerialization.jsonObject(with: JSONEncoder.mypocket.encode(item)) as? [String: Any])
+        XCTAssertEqual(encoded["resolved"] as? Bool, true)
+        XCTAssertEqual(encoded["resolved_at"] as? String, "2026-10-14T00:00:00Z")
+        XCTAssertEqual(item.status, "open")
+    }
+
+    func testFeedbackPresentationResolvesFixedChangelogAndStatusCopy() {
+        let fixed = FeedbackModel(
+            id: "feedback-1",
+            type: "bug",
+            title: "Không lưu",
+            description: "Mô tả",
+            status: "fixed",
+            fixedAt: "2026-10-07T10:00:00Z",
+            changelogID: "release-1",
+            createdAt: "2026-10-06T10:00:00Z",
+            updatedAt: "2026-10-07T10:00:00Z",
+            screenshotAvailable: false
+        )
+        let release = ChangelogModel(id: "release-1", version: "1.0.0", title: "Sửa lỗi", description: "Đã sửa.", publishedAt: "2026-10-07T11:00:00Z")
+
+        XCTAssertEqual(FeedbackPresentation.statusLabel(for: fixed.status), "Đã xử lý")
+        XCTAssertEqual(FeedbackPresentation.changelogVersion(for: fixed, in: [release]), "1.0.0")
+        XCTAssertTrue(FeedbackPresentation.shouldShowChangelog(for: fixed, in: [release]))
+        XCTAssertEqual(FeedbackPresentation.statusLabel(for: "unknown"), "unknown")
+    }
+
+    func testMonthPresentationUsesReadableInclusiveDatesWithoutTimezoneIdentifiers() {
+        let timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        XCTAssertEqual(
+            MonthsPresentation.reportPeriod(startAt: "2026-09-30T17:00:00Z", nextStartAt: "2026-10-31T17:00:00Z", timeZone: timeZone),
+            "01/10/2026 – 31/10/2026"
+        )
+        XCTAssertEqual(MonthsPresentation.timezoneLabel("Asia/Ho_Chi_Minh"), "theo múi giờ tài khoản")
+    }
+
+    func testTransactionDayGroupPresentationMatchesWebHierarchyAndTimezone() {
+        let timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        XCTAssertEqual(
+            TransactionsPresentation.dayGroup("2026-10-07", timeZone: timeZone),
+            TransactionsPresentation.DayGroup(dayNumber: "7", weekday: "Thứ Tư", monthYear: "tháng 10 2026")
+        )
+        XCTAssertNil(TransactionsPresentation.dayGroup("not-a-date", timeZone: timeZone))
+    }
+
+    func testLedgerRowSubtitleUsesNoteWithoutRedundantWalletName() {
+        let timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        XCTAssertEqual(
+            MPTransactionPresentation.rowSubtitle(
+                note: "Cà phê",
+                occurredAt: "2026-10-13T01:00:00Z",
+                timeZone: timeZone
+            ),
+            "Cà phê"
+        )
+        XCTAssertEqual(
+            MPTransactionPresentation.rowSubtitle(
+                note: nil,
+                occurredAt: "2026-10-13T01:00:00Z",
+                timeZone: timeZone
+            ),
+            MPFormat.shortDate("2026-10-13T01:00:00Z", timeZone: timeZone)
+        )
+    }
+
+    func testTransactionGlyphPresentationFollowsWebCategoryRegistry() {
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: "fork.knife", type: "expense"),
+            MPTransactionPresentation.Glyph(systemName: "fork.knife", tone: "categoryOrange")
+        )
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: "expense_food_coffee", type: "expense"),
+            MPTransactionPresentation.Glyph(systemName: "cup.and.saucer.fill", tone: "categoryAmber")
+        )
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: "income_salary", type: "income"),
+            MPTransactionPresentation.Glyph(systemName: "banknote.fill", tone: "categoryIncome")
+        )
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: nil, type: "adjustment"),
+            MPTransactionPresentation.Glyph(systemName: "arrow.up.and.down", tone: "categorySlate")
+        )
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: "unknown", type: "expense"),
+            MPTransactionPresentation.Glyph(systemName: "tag.fill", tone: "categorySlate")
+        )
+    }
+
+    func testCategoryIconCatalogMatchesWebPickerKeysAndFallback() {
+        XCTAssertEqual(MPCategoryIconCatalog.options.count, 10)
+        XCTAssertEqual(MPCategoryIconCatalog.option(for: "expense_food").label, "Ăn uống")
+        XCTAssertEqual(MPCategoryIconCatalog.option(for: "expense_travel").systemName, "airplane")
+        XCTAssertEqual(MPCategoryIconCatalog.option(for: "unknown").id, "tag")
+    }
+
+    func testCategoryListFiltersKindWalletAndSearchWhilePreservingTreeContext() {
+        let root = category(id: "root-food", name: "Ăn uống", kind: "expense")
+        let coffee = category(id: "coffee", name: "Cà phê", kind: "expense", parentID: root.id, walletIDs: ["wallet-a"])
+        let bakery = category(id: "bakery", name: "Tiệm bánh", kind: "expense", parentID: root.id, walletIDs: ["wallet-b"])
+        let income = category(id: "salary", name: "Lương", kind: "income")
+        let items = [income, bakery, root, coffee]
+
+        let filtered = CategoryListPresentation.nodes(
+            items: items,
+            kind: "expense",
+            walletID: "wallet-a",
+            search: "CA PHE"
+        )
+
+        XCTAssertEqual(filtered.map(\.item.id), ["root-food", "coffee"])
+        XCTAssertEqual(filtered.map(\.depth), [0, 1])
+        XCTAssertEqual(filtered.map(\.isSelectable), [true, true])
+        XCTAssertEqual(filtered.map(\.isHierarchyContext), [true, false])
+    }
+
+    func testCategoryListRootSearchShowsEligibleChildrenInStableTreeOrder() {
+        let root = category(id: "root-food", name: "Ăn uống", kind: "expense")
+        let coffee = category(id: "coffee", name: "Cà phê", kind: "expense", parentID: root.id)
+        let bakery = category(id: "bakery", name: "Tiệm bánh", kind: "expense", parentID: root.id)
+
+        let filtered = CategoryListPresentation.nodes(
+            items: [bakery, root, coffee],
+            kind: "expense",
+            walletID: nil,
+            search: "ăn uống"
+        )
+
+        XCTAssertEqual(filtered.map(\.item.id), ["root-food", "bakery", "coffee"])
+        XCTAssertEqual(filtered.map(\.isHierarchyContext), [false, false, false])
+    }
+
+    func testCategoryListRetainsInapplicableParentOnlyAsContextForEligibleChild() {
+        let root = category(id: "root-food", name: "Ăn uống", kind: "expense", walletIDs: ["wallet-b"])
+        let coffee = category(id: "coffee", name: "Cà phê", kind: "expense", parentID: root.id, walletIDs: ["wallet-a"])
+
+        let filtered = CategoryListPresentation.nodes(
+            items: [root, coffee],
+            kind: "expense",
+            walletID: "wallet-a",
+            search: ""
+        )
+
+        XCTAssertEqual(filtered.map(\.item.id), ["root-food", "coffee"])
+        XCTAssertEqual(filtered.map(\.isSelectable), [false, true])
+        XCTAssertEqual(filtered.map(\.isHierarchyContext), [true, false])
+    }
+
+    func testArchivedCategoryIsHiddenByDefaultButCanBeShownAndRestored() {
+        var archived = category(id: "old", name: "Nhóm cũ", kind: "expense")
+        archived.isActive = false
+        let hidden = CategoryListPresentation.nodes(items: [archived], kind: "expense", walletID: nil, search: "")
+        XCTAssertTrue(hidden.isEmpty)
+
+        let shown = CategoryListPresentation.nodes(items: [archived], kind: "expense", walletID: nil, search: "", includeInactive: true)
+        XCTAssertEqual(shown.map(\.item.id), ["old"])
+        XCTAssertFalse(shown[0].isHierarchyContext)
+        XCTAssertFalse(CategoryEditPolicy.canSelect(archived))
+        XCTAssertTrue(CategoryEditPolicy.canArchive(archived))
+    }
+
+    func testArchivedParentRemainsContextWhenActiveChildIsSelectable() {
+        var parent = category(id: "parent", name: "Nhóm cha", kind: "expense")
+        parent.isActive = false
+        let child = category(id: "child", name: "Nhóm con", kind: "expense", parentID: parent.id)
+        let nodes = CategorySelectionPresentation.nodes(items: [parent, child], kind: "expense", search: "")
+        XCTAssertEqual(nodes.map(\.item.id), ["parent", "child"])
+        XCTAssertEqual(nodes.map(\.isHierarchyContext), [true, false])
+    }
+
+    func testTransactionEditRetainsOnlyMatchingArchivedCategory() {
+        var archived = category(id: "old", name: "Nhóm cũ", kind: "expense")
+        archived.isActive = false
+        let active = category(id: "active", name: "Nhóm mới", kind: "expense")
+        XCTAssertEqual(TransactionEditorPolicy.requiredCategoryID(type: "expense", walletID: "wallet", walletType: "basic", categories: [archived, active], currentID: "old"), "old")
+        XCTAssertEqual(TransactionEditorPolicy.requiredCategoryID(type: "income", walletID: "wallet", walletType: "basic", categories: [archived, active], currentID: "old"), "")
+    }
+
+    func testCategoryPickerFiltersByKindAndSelectableIDsWhileRetainingParentContext() {
+        let root = category(id: "root-food", name: "Ăn uống", kind: "expense")
+        let coffee = category(id: "coffee", name: "Cà phê", kind: "expense", parentID: root.id)
+        let bakery = category(id: "bakery", name: "Tiệm bánh", kind: "expense", parentID: root.id)
+        let income = category(id: "salary", name: "Lương", kind: "income")
+
+        let selected = CategorySelectionPresentation.nodes(
+            items: [income, bakery, root, coffee],
+            kind: "expense",
+            selectableIDs: [coffee.id],
+            search: ""
+        )
+
+        XCTAssertEqual(selected.map(\.item.id), [root.id, coffee.id])
+        XCTAssertEqual(selected.map(\.isHierarchyContext), [true, false])
+        XCTAssertEqual(selected.map(\.depth), [0, 1])
+    }
+
+    func testCategoryPickerPartitionsSeparateRootCardsWithoutLosingParentContext() {
+        let food = category(id: "food", name: "Ăn uống", kind: "expense")
+        let coffee = category(id: "coffee", name: "Cà phê", kind: "expense", parentID: food.id)
+        let transport = category(id: "transport", name: "Đi lại", kind: "expense")
+        let bus = category(id: "bus", name: "Xe buýt", kind: "expense", parentID: transport.id)
+
+        let groups = CategorySelectionPresentation.groups(
+            items: [food, coffee, transport, bus],
+            kind: "expense",
+            selectableIDs: [coffee.id, bus.id],
+            search: ""
+        )
+
+        XCTAssertEqual(groups.map { $0.root.item.id }, [food.id, transport.id])
+        XCTAssertEqual(groups.map { $0.children.map(\.item.id) }, [[coffee.id], [bus.id]])
+        XCTAssertTrue(groups.allSatisfy { $0.root.isHierarchyContext })
+        XCTAssertTrue(groups.allSatisfy { $0.children.allSatisfy { !$0.isHierarchyContext } })
+    }
+
+    func testCategoryPickerSearchKeepsMatchingChildAndOnlyItsAncestry() {
+        let food = category(id: "food", name: "Ăn uống", kind: "expense")
+        let coffee = category(id: "coffee", name: "Cà phê", kind: "expense", parentID: food.id)
+        let lunch = category(id: "lunch", name: "Cơm trưa", kind: "expense", parentID: food.id)
+        let transport = category(id: "transport", name: "Đi lại", kind: "expense")
+
+        let results = CategorySelectionPresentation.nodes(
+            items: [transport, lunch, food, coffee],
+            kind: "expense",
+            selectableIDs: [coffee.id],
+            search: "CA PHE"
+        )
+
+        XCTAssertEqual(results.map(\.item.id), [food.id, coffee.id])
+        XCTAssertEqual(results.map(\.isHierarchyContext), [true, false])
+    }
+
+    func testCategoryPickerSubtitlesMatchSelectableSystemAndPersonalCategories() {
+        XCTAssertEqual(CategorySelectionPresentation.subtitle(isSystem: true, isSelectable: true), "Nhóm mặc định")
+        XCTAssertEqual(CategorySelectionPresentation.subtitle(isSystem: false, isSelectable: true), "Nhóm cá nhân")
+        XCTAssertEqual(CategorySelectionPresentation.subtitle(isSystem: false, isSelectable: false), "Không áp dụng cho lựa chọn này")
+    }
+
+    private func category(
+        id: String,
+        name: String,
+        kind: String,
+        parentID: String? = nil,
+        walletIDs: [String] = []
+    ) -> CategoryModel {
+        CategoryModel(
+            id: id,
+            ownerID: "owner",
+            parentID: parentID,
+            kind: kind,
+            name: name,
+            systemKey: nil,
+            iconKey: "tag",
+            isSystem: false,
+            walletIDs: walletIDs
+        )
+    }
+
+    func testAmountCalculatorUsesIntegerVNDArithmeticWithoutEval() {
+        XCTAssertEqual(MPAmountCalculator.calculate("1000000+500000"), 1_500_000)
+        XCTAssertEqual(MPAmountCalculator.calculate("1000000+500000×2"), 2_000_000)
+        XCTAssertEqual(MPAmountCalculator.calculate("1000000÷4"), 250_000)
+        XCTAssertEqual(MPAmountCalculator.calculate("1000000-500000"), 500_000)
+        XCTAssertNil(MPAmountCalculator.calculate("1000000÷0"))
+        XCTAssertNil(MPAmountCalculator.calculate("1000000÷3"))
+        XCTAssertNil(MPAmountCalculator.calculate("1000000,"))
+        XCTAssertNil(MPAmountCalculator.calculate("1+"))
+        XCTAssertNil(MPAmountCalculator.calculate("999999999999999999999999"))
+        XCTAssertNil(MPAmountCalculator.calculate("-1"))
+    }
+
+    func testEndedBudgetUsesReadOnlyPreviewAction() {
+        XCTAssertEqual(BudgetPresentation.actionTitle(ended: false), "Sửa")
+        XCTAssertEqual(BudgetPresentation.actionTitle(ended: true), "Xem / Xóa")
+        XCTAssertTrue(BudgetPresentation.isReadOnly(ended: true))
+        XCTAssertFalse(BudgetPresentation.isReadOnly(ended: false))
+    }
+
+    func testWalletRowUsesDescriptionFallbackAndDangerToneForNegativeBalance() {
+        XCTAssertEqual(MPWalletRowPolicy.subtitle(description: "  Tiền lương  ", type: "basic"), "Tiền lương")
+        XCTAssertEqual(MPWalletRowPolicy.subtitle(description: "  ", type: "goal"), "Tiết kiệm")
+        XCTAssertEqual(MPWalletRowPolicy.balanceTone(isNegative: true), .danger)
+        XCTAssertEqual(MPWalletRowPolicy.balanceTone(isNegative: false), .ink)
+    }
+
+    func testWalletManagementGroupsIncludedAndExcludedAndTotalsOnlyIncludedBalances() {
+        let included = WalletModel(
+            id: "included", name: "Ví chính", type: "basic", currency: "VND",
+            openingBalance: 120_000, currentBalance: 150_000, availableCredit: nil,
+            isInTotal: true, description: nil, targetAmount: nil, targetDate: nil,
+            creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil
+        )
+        let excluded = WalletModel(
+            id: "excluded", name: "Ví riêng", type: "basic", currency: "VND",
+            openingBalance: 80_000, currentBalance: 200_000, availableCredit: nil,
+            isInTotal: false, description: nil, targetAmount: nil, targetDate: nil,
+            creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil
+        )
+
+        let sections = MPWalletManagementPolicy.sections(from: [included, excluded])
+        XCTAssertEqual(sections.map(\.id), ["included", "excluded"])
+        XCTAssertEqual(sections.map(\.wallets), [[included], [excluded]])
+        XCTAssertEqual(MPWalletManagementPolicy.totalBalance(from: [included, excluded]), 150_000)
+        XCTAssertEqual(MPWalletManagementPolicy.totalBalance(from: [excluded]), 0)
     }
 
     func testSnakeCaseFinancialPayloadDecodesAcronyms() throws {
@@ -105,6 +498,19 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertFalse(TransactionsViewModel.bulkDeleteSelectable(transfer))
         XCTAssertFalse(TransactionsViewModel.bulkDeleteSelectable(adjustment))
         XCTAssertFalse(TransactionsViewModel.bulkDeleteSelectable(credit))
+    }
+
+    func testBulkDeleteCallsBackendExactlyOnceWithUniqueIDs() async {
+        let recorder = BulkDeleteRecorder()
+        let viewModel = TransactionsViewModel(api: FinanceAPI()) { ids in
+            await recorder.record(ids)
+        }
+
+        let deleted = await viewModel.deleteMany(["tx-2", "tx-1", "tx-2"])
+
+        XCTAssertTrue(deleted)
+        let calls = await recorder.snapshot()
+        XCTAssertEqual(calls, [["tx-1", "tx-2"]])
     }
 
     func testOrdinaryTransactionWalletsExcludeCreditWallets() {
@@ -197,8 +603,8 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertFalse(refundCategory.applies(to: "income", walletID: "other-wallet", walletType: "credit"))
     }
 
-    func testNativeGoogleFixtureExchangeEncodesIOSPKCEContract() throws {
-        let request = MobileGoogleExchangeRequest(
+    func testLocalAuthFixtureExchangeEncodesIOSRequestContract() throws {
+        let request = LocalAuthFixtureExchangeRequest(
             code: "fixture",
             codeVerifier: "fixture",
             redirectURI: "mypocket://oauth/callback",
@@ -277,6 +683,31 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(AIEntryProposalReview.activeJars(from: summary).map(\.jarID), ["active"])
     }
 
+    func testAIEntryRecoveryTreatsOnlyPossiblyAcceptedRequestsAsUncertain() {
+        XCTAssertTrue(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .transport("offline")))
+        XCTAssertTrue(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .decoding("invalid response")))
+        XCTAssertTrue(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .http(status: 503)))
+        XCTAssertTrue(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .problem(ProblemDetails(
+            title: "Unavailable", status: 503, detail: nil, instance: nil, code: nil, requestID: nil
+        ))))
+        XCTAssertTrue(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .problem(ProblemDetails(
+            title: "Unknown", status: nil, detail: nil, instance: nil, code: nil, requestID: nil
+        ))))
+
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .http(status: 400)))
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .unauthorized))
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .invalidURL))
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .missingSession))
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.needsResultRefresh(after: .accountMismatch), "Never resolve an old owner's request with the new account")
+    }
+
+    func testAIEntryRecoveryBlocksResubmissionUntilRequestIsResolved() {
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: true, isProcessing: false))
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: false, isProcessing: true))
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: true, isProcessing: true))
+        XCTAssertTrue(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: false, isProcessing: false))
+    }
+
     func testWalletInputEncodesGoalAndCreditMetadata() throws {
         let input = WalletModelInput(name: "Credit", type: "credit", openingBalance: 0, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: 3_000_000, lastStatementBalance: 250_000, statementDay: 15, paymentDueDay: 5)
         let json = String(decoding: try JSONEncoder.mypocket.encode(input), as: UTF8.self)
@@ -307,8 +738,9 @@ final class FinanceModelTests: XCTestCase {
 
     func testCategoryInputPreservesMultipleWalletScopes() throws {
         let input = CategoryModelInput(name: "Highlands", kind: "expense", parentID: "food", walletIDs: ["wallet-1", "wallet-2"], iconKey: "tag")
-        let decoded = try JSONDecoder.mypocket.decode(CategoryModelInput.self, from: JSONEncoder.mypocket.encode(input))
-        XCTAssertEqual(decoded.walletIDs, ["wallet-1", "wallet-2"])
+        let encoded = try JSONEncoder.mypocket.encode(input)
+        let json = String(decoding: encoded, as: UTF8.self)
+        XCTAssertTrue(json.contains("\"wallet_ids\":[\"wallet-1\",\"wallet-2\"]"), "Category API must receive wallet_ids, not a synthesized acronym variant: \(json)")
     }
 
     func testRecurringInputUsesRFC3339InstantAndNote() throws {
@@ -407,6 +839,55 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(previous.map(\.id), ["previous"])
     }
 
+    func testInitialLedgerWeekFallsBackToNewestWeekContainingSelectedWalletTransactions() {
+        let now = MPFormat.parseInstant("2026-10-13T09:00:00+07:00")!
+        let transactions = [
+            transaction(id: "older", occurredAt: "2026-09-28T01:00:00Z", walletID: "wallet-b"),
+            transaction(id: "newest", occurredAt: "2026-10-06T01:00:00Z", walletID: "wallet-a")
+        ]
+        XCTAssertEqual(
+            TransactionsPresentation.newestWeekOffset(
+                transactions: transactions,
+                walletSelection: "wallet-a",
+                accountTimezone: "Asia/Ho_Chi_Minh",
+                now: now
+            ),
+            -1
+        )
+        XCTAssertEqual(
+            TransactionsPresentation.newestWeekOffset(
+                transactions: transactions,
+                walletSelection: "wallet-b",
+                accountTimezone: "Asia/Ho_Chi_Minh",
+                now: now
+            ),
+            -2
+        )
+        XCTAssertEqual(
+            TransactionsPresentation.newestWeekOffset(
+                transactions: [],
+                walletSelection: "__all__",
+                accountTimezone: "Asia/Ho_Chi_Minh",
+                now: now
+            ),
+            0
+        )
+    }
+
+    func testWalletScopePreferencePersistsPerOwnerAndClearsAggregateSelection() {
+        let suite = "MyPocketIOSTests.wallet-scope.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+
+        XCTAssertNil(MPWalletScopePreference.load(ownerID: "owner-a", defaults: defaults))
+        MPWalletScopePreference.store("wallet-a", ownerID: "owner-a", defaults: defaults)
+        XCTAssertEqual(MPWalletScopePreference.load(ownerID: "owner-a", defaults: defaults), "wallet-a")
+        XCTAssertNil(MPWalletScopePreference.load(ownerID: "owner-b", defaults: defaults))
+        MPWalletScopePreference.store("__all__", ownerID: "owner-a", defaults: defaults)
+        XCTAssertNil(MPWalletScopePreference.load(ownerID: "owner-a", defaults: defaults))
+        XCTAssertNil(MPWalletScopePreference.load(ownerID: nil, defaults: defaults))
+    }
+
     func testAdjustmentTimestampUsesAccountLocalCalendarDay() {
         let source = ISO8601DateFormatter().date(from: "2026-10-01T00:30:00Z")!
         let raw = AdjustmentEditorView.timestamp(source, timezone: "America/Los_Angeles")
@@ -425,6 +906,26 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(MPFormat.calendarDateString(range.start, timeZone: timeZone), "2026-10-05")
         XCTAssertEqual(MPFormat.calendarDateString(range.endExclusive, timeZone: timeZone), "2026-10-12")
         XCTAssertEqual(MPFormat.weekRangeLabel(start: range.start, endExclusive: range.endExclusive, timeZone: timeZone), "05/10/2026 – 11/10/2026")
+    }
+
+    func testOverviewWeekReportTotalsUseAccountWeekAndExcludeNonReportRows() {
+        let timeZone = TimeZone(identifier: "Asia/Ho_Chi_Minh")!
+        let now = MPFormat.parseInstant("2026-10-11T18:00:00Z")!
+        let rows = [
+            reportTransaction(id: "expense-start", type: "expense", amount: 120_000, occurredAt: "2026-10-11T17:00:00Z"),
+            reportTransaction(id: "income-start", type: "income", amount: 500_000, occurredAt: "2026-10-11T17:00:00Z"),
+            reportTransaction(id: "before-week", type: "expense", amount: 1_000_000, occurredAt: "2026-10-11T16:59:59Z"),
+            reportTransaction(id: "income-end", type: "income", amount: 200_000, occurredAt: "2026-10-18T16:59:59Z"),
+            reportTransaction(id: "after-week", type: "expense", amount: 2_000_000, occurredAt: "2026-10-18T17:00:00Z"),
+            reportTransaction(id: "excluded", type: "expense", amount: 900_000, occurredAt: "2026-10-13T03:00:00+07:00", includedInReports: false),
+            reportTransaction(id: "transfer", type: "transfer", amount: 700_000, occurredAt: "2026-10-14T10:00:00+07:00", transferID: "transfer-1"),
+            reportTransaction(id: "adjustment", type: "adjustment", amount: 600_000, occurredAt: "2026-10-15T10:00:00+07:00"),
+        ]
+
+        let totals = MPWeekReportData.totals(transactions: rows, now: now, timeZone: timeZone)
+
+        XCTAssertEqual(totals.income, 700_000)
+        XCTAssertEqual(totals.expense, 120_000)
     }
 
     func testTransactionCustomPeriodRejectsReversedDateRange() {
@@ -510,6 +1011,31 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(viewModel.signedAmount(for: adjustment), 10_000)
     }
 
+    func testAssistantHistoryExpiryRecognizesTypedGoneProblemOnly() {
+        let expired = APIError.problem(ProblemDetails(
+            title: "Gone",
+            status: 410,
+            detail: "history expired",
+            instance: "/api/v1/ai/advisor/messages",
+            code: "advisor_history_expired",
+            requestID: "request-1"
+        ))
+        let otherGone = APIError.problem(ProblemDetails(
+            title: "Gone",
+            status: 410,
+            detail: "other resource",
+            instance: "/api/v1/other",
+            code: "other_gone",
+            requestID: "request-2"
+        ))
+        XCTAssertTrue(AssistantHistoryExpiryPolicy.isExpired(expired))
+        XCTAssertTrue(AssistantHistoryExpiryPolicy.isExpired(otherGone), "HTTP 410 remains a safe signal to clear stale local chat")
+        XCTAssertTrue(AssistantHistoryExpiryPolicy.isExpired(APIError.http(status: 410)))
+        XCTAssertFalse(AssistantHistoryExpiryPolicy.isExpired(APIError.problem(ProblemDetails(
+            title: "Bad Request", status: 400, detail: "invalid", instance: "/api/v1/ai/advisor/messages", code: "advisor_invalid", requestID: nil
+        ))))
+    }
+
     func testAssistantMarkdownParserBuildsReadableBlocks() {
         let content = """
         ## Tổng quan
@@ -534,11 +1060,11 @@ final class FinanceModelTests: XCTestCase {
         )
     }
 
-    private func transaction(id: String, occurredAt: String) -> TransactionModel {
+    private func transaction(id: String, occurredAt: String, walletID: String = "wallet") -> TransactionModel {
         TransactionModel(
             id: id,
             ownerID: "owner",
-            walletID: "wallet",
+            walletID: walletID,
             categoryID: nil,
             jarID: nil,
             jarName: nil,
@@ -555,5 +1081,47 @@ final class FinanceModelTests: XCTestCase {
             createdAt: occurredAt,
             updatedAt: occurredAt
         )
+    }
+
+    private func reportTransaction(
+        id: String,
+        type: String,
+        amount: Int64,
+        occurredAt: String,
+        includedInReports: Bool = true,
+        transferID: String? = nil
+    ) -> TransactionModel {
+        TransactionModel(
+            id: id,
+            ownerID: "owner",
+            walletID: "wallet",
+            categoryID: nil,
+            jarID: nil,
+            jarName: nil,
+            type: type,
+            amount: amount,
+            adjustmentDirection: nil,
+            creditKind: nil,
+            creditPaymentID: nil,
+            travelEventID: nil,
+            occurredAt: occurredAt,
+            note: nil,
+            includedInReports: includedInReports,
+            transferID: transferID,
+            createdAt: occurredAt,
+            updatedAt: occurredAt
+        )
+    }
+}
+
+private actor BulkDeleteRecorder {
+    private(set) var calls: [[String]] = []
+
+    func record(_ ids: [String]) {
+        calls.append(ids)
+    }
+
+    func snapshot() -> [[String]] {
+        calls
     }
 }

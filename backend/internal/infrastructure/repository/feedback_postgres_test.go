@@ -67,6 +67,26 @@ func TestFeedbackPostgresOwnerScopeAndChangelogAtomicity(t *testing.T) {
 	if err != nil || fixed.Status != entity.FeedbackStatusFixed || fixed.ChangelogID == nil || *fixed.ChangelogID != changelog.ID || fixed.FixedAt == nil {
 		t.Fatalf("feedback was not finalized: %+v err=%v", fixed, err)
 	}
+	now := time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC)
+	resolved, err := feedbackRepo.UpdateResolution(context.Background(), owner, first.ID, true, now)
+	if err != nil || !resolved.Resolved || resolved.ResolvedAt == nil || !resolved.ResolvedAt.Equal(now) || resolved.Status != fixed.Status || *resolved.ChangelogID != *fixed.ChangelogID {
+		t.Fatalf("resolution changed dev lifecycle or did not persist: %+v err=%v", resolved, err)
+	}
+	repeat, err := feedbackRepo.UpdateResolution(context.Background(), owner, first.ID, true, now.Add(time.Hour))
+	if err != nil || repeat.ResolvedAt == nil || !repeat.ResolvedAt.Equal(now) {
+		t.Fatalf("retry not idempotent: %+v %v", repeat, err)
+	}
+	if _, err := feedbackRepo.UpdateResolution(context.Background(), other, first.ID, false, now); err == nil {
+		t.Fatal("cross-owner resolution must fail")
+	}
+	reopened, err := feedbackRepo.UpdateResolution(context.Background(), owner, first.ID, false, now.Add(2*time.Hour))
+	if err != nil || reopened.Resolved || reopened.ResolvedAt != nil || reopened.Status != fixed.Status || reopened.FixedAt == nil {
+		t.Fatalf("reopen lost developer history: %+v %v", reopened, err)
+	}
+	persisted, err := feedbackRepo.FindByOwner(context.Background(), owner, first.ID)
+	if err != nil || persisted.Resolved || persisted.ResolvedAt != nil {
+		t.Fatalf("reopen did not persist: %+v %v", persisted, err)
+	}
 	if err := changelogRepo.Publish(context.Background(), &entity.Changelog{ID: uuid.NewString(), Version: version, Title: "Duplicate", Description: "Duplicate", PublishedAt: time.Now().UTC()}, []string{second.ID}); err == nil {
 		t.Fatal("duplicate changelog version must fail")
 	}

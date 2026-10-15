@@ -49,3 +49,21 @@ Tests: calendar month/leap/year boundaries, calculator valid/invalid expressions
 ## Reconciliation
 
 Updated [transaction page](../../design/pages/transactions/README.md), [budget page](../../design/pages/budgets/README.md), [assistant page](../../design/pages/assistant/README.md), [base contract](../../design/system/BASE_COMPONENTS.md), [validation](../VALIDATION_MATRIX.md), [context](../../CONTEXT.md), [backlog](../BACKLOG.md), and [release](../../releases/CHANGELOG.md). Existing ADR-002/003 govern visual enforcement; API/ERD unchanged. Browser and screenshot proof are complete; owner visual UAT remains pending, so status is `in_review`.
+
+## Native Stitch parity follow-up — 2026-10-08
+
+The authenticated native editor capture showed one remaining shared-base visual
+gap against `image.png_2`: Stitch places a compact VND chip before a large,
+unboxed amount value, while the generic native amount field placed VND after a
+48pt bordered input. The correction is a transaction-only presentation variant
+of `MPAmountField`; all other amount-field consumers keep the standard control
+presentation. The existing shared segmented-control reference variant is
+already the contract for the expense/income selector and must remain a white
+active pill on the muted track.
+
+Verification: the in-memory authenticated transaction editor UI contract asserts that the VND chip
+precedes the amount input and that the visible value uses Vietnamese thousands
+grouping, then captures the authenticated/editor state on the iPhone 16
+simulator. The transaction-specific base presentation formats display text
+only; its bound value and persisted API payload remain integer digits. No API,
+schema, or persistence behavior changes; public API docs do not need changes.

@@ -31,13 +31,18 @@ final class APIClient: @unchecked Sendable {
     }
 
     func send<Response: Decodable>(_ request: APIRequest<Response>) async throws -> Response {
+        try await sendEnvelope(request).data
+    }
+
+    func sendEnvelope<Response: Decodable>(_ request: APIRequest<Response>) async throws -> APIEnvelope<Response> {
         let requestID = UUID().uuidString
         do {
-            return try await execute(request, requestID: requestID, sessionOverride: nil)
+            return try await executeEnvelope(request, requestID: requestID, sessionOverride: nil)
         } catch APIError.unauthorized {
             guard case .session = request.auth else { throw APIError.unauthorized }
+            try validateExpectedOwner(request)
             let refreshed = try await refreshCoordinator.refreshIfNeeded()
-            return try await execute(request, requestID: requestID, sessionOverride: refreshed)
+            return try await executeEnvelope(request, requestID: requestID, sessionOverride: refreshed)
         }
     }
 
@@ -101,7 +106,7 @@ final class APIClient: @unchecked Sendable {
             guard let http = response as? HTTPURLResponse else { throw APIError.transport("Phản hồi không hợp lệ") }
             guard (200..<300).contains(http.statusCode) else {
                 if http.statusCode == 401 { throw APIError.unauthorized }
-                if let problem = try? JSONDecoder().decode(ProblemDetails.self, from: data) { throw APIError.problem(problem) }
+                if let problem = try? JSONDecoder().decode(ProblemDetails.self, from: data) { throw APIError.problem(problem.withHTTPStatus(http.statusCode)) }
                 throw APIError.http(status: http.statusCode)
             }
             if http.statusCode == 204 {
@@ -120,6 +125,15 @@ final class APIClient: @unchecked Sendable {
         requestID: String,
         sessionOverride: AccessSession?
     ) async throws -> Response {
+        try await executeEnvelope(request, requestID: requestID, sessionOverride: sessionOverride).data
+    }
+
+    private func executeEnvelope<Response: Decodable>(
+        _ request: APIRequest<Response>,
+        requestID: String,
+        sessionOverride: AccessSession?
+    ) async throws -> APIEnvelope<Response> {
+        try validateExpectedOwner(request)
         let url = try makeURL(path: request.path)
         var urlRequest = URLRequest(url: url)
         urlRequest.httpMethod = request.method.rawValue
@@ -142,18 +156,27 @@ final class APIClient: @unchecked Sendable {
             guard let session = sessionOverride ?? sessionStore.load() else {
                 throw APIError.missingSession
             }
+            if let expectedOwnerID = request.expectedOwnerID, session.user.id != expectedOwnerID { throw APIError.accountMismatch }
             urlRequest.setValue("Bearer \(session.token)", forHTTPHeaderField: "Authorization")
         }
 
         do {
+#if DEBUG
+            print("[API] -> \(request.method.rawValue) [\(requestID)]")
+#endif
             let (data, response) = try await transport.data(for: urlRequest)
+            try validateExpectedOwner(request)
             guard let http = response as? HTTPURLResponse else {
                 throw APIError.transport("Phản hồi không hợp lệ")
             }
+#if DEBUG
+            // URLs and error bodies may contain financial data or credentials.
+            print("[API] <- \(request.method.rawValue) \(http.statusCode) [\(requestID)]")
+#endif
             guard (200..<300).contains(http.statusCode) else {
                 if http.statusCode == 401 { throw APIError.unauthorized }
                 if let problem = try? JSONDecoder().decode(ProblemDetails.self, from: data) {
-                    throw APIError.problem(problem)
+                    throw APIError.problem(problem.withHTTPStatus(http.statusCode))
                 }
                 throw APIError.http(status: http.statusCode)
             }
@@ -161,10 +184,10 @@ final class APIClient: @unchecked Sendable {
                 guard let empty = EmptyResponse() as? Response else {
                     throw APIError.decoding("Phản hồi 204 không phù hợp với kiểu dữ liệu yêu cầu")
                 }
-                return empty
+                return APIEnvelope(data: empty, meta: nil)
             }
             do {
-                return try JSONDecoder.mypocket.decode(APIEnvelope<Response>.self, from: data).data
+                return try JSONDecoder.mypocket.decode(APIEnvelope<Response>.self, from: data)
             } catch {
                 throw APIError.decoding(error.localizedDescription)
             }
@@ -173,6 +196,11 @@ final class APIClient: @unchecked Sendable {
         } catch {
             throw APIError.transport(error.localizedDescription)
         }
+    }
+
+    private func validateExpectedOwner<Response>(_ request: APIRequest<Response>) throws {
+        guard let owner = request.expectedOwnerID else { return }
+        guard case .session = request.auth, !owner.isEmpty, sessionStore.load()?.user.id == owner else { throw APIError.accountMismatch }
     }
 
     private func makeURL(path: String) throws -> URL {
@@ -203,15 +231,24 @@ final class APIClient: @unchecked Sendable {
         do {
             output = try await execute(request, requestID: UUID().uuidString, sessionOverride: nil)
         } catch APIError.unauthorized {
+            try validateRefreshIdentity(current)
             if invalidateOnUnauthorized {
-                sessionStore.clear()
+                guard sessionStore.clear(ifCredentialsMatch: current) else { throw APIError.accountMismatch }
                 onSessionInvalidated?()
             }
             throw APIError.unauthorized
         }
         let session = output.session
-        try sessionStore.save(session)
+        try validateRefreshIdentity(current)
+        guard session.user.id == current.user.id else { throw APIError.accountMismatch }
+        guard try sessionStore.replace(session, ifCredentialsMatch: current) else { throw APIError.accountMismatch }
         return session
+    }
+
+    private func validateRefreshIdentity(_ original: AccessSession) throws {
+        guard sessionStore.load()?.hasSameCredentials(as: original) == true else {
+            throw APIError.accountMismatch
+        }
     }
 
     func refreshSessionForRestore() async throws -> AccessSession {

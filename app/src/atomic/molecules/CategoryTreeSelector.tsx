@@ -13,7 +13,7 @@ export function CategoryTreeSelector({ categories, selectableIDs, selectedID, on
 }) {
   const [query, setQuery] = useState("");
   const groups = useMemo(() => {
-    const selectable = new Set(selectableIDs ?? categories.map(category => category.id));
+    const selectable = new Set(selectableIDs ?? categories.filter(category => category.is_active !== false).map(category => category.id));
     const normalized = query.toLocaleLowerCase("vi").trim();
     const byID = new Map(categories.map(category => [category.id, category]));
     const roots = categories.filter(category => !category.parent_id || !byID.has(category.parent_id));

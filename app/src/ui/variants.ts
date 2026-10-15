@@ -23,6 +23,7 @@ export const SURFACE_CARD_RADIUS = {
   sm: BASE_COMPONENT_RADIUS,
   md: BASE_COMPONENT_RADIUS,
   lg: BASE_COMPONENT_RADIUS,
+  reference: "rounded-reference-card",
 } as const;
 
 export const ICON_BADGE_SIZES = {

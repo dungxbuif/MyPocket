@@ -6,7 +6,10 @@ Source IMG-03, code.html and editable enable.html reference: [extraction](../../
 
 PageBackHeader → metadata SurfaceCard → read-only explanation → ApplicableWalletsCard → actions/status.
 CategoryEditForm owns name/kind/parent/icon/wallet selections; InlineControlRow slots own geometry, BaseTextInput title and BaseSelect inline own field styling. Icon picker opens BaseBottomSheet; selected IconButton has base-owned ring.
-Wallet row uses IconBadge and BaseCheckbox; all colors come from shared catalog.
+Wallet applicability uses the shared native `MPWalletApplicabilityCard` and
+`MPCheckboxRow`, not a collapsed menu. The card owns empty-means-all display and
+selection-summary copy; feature code supplies owner wallets and selected IDs.
+All colors come from the shared catalog.
 
 ## Behavior
 

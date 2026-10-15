@@ -74,7 +74,13 @@ func (r *TransactionPostgresRepository) Create(transaction *entity.Transaction) 
 	if transaction == nil || ((transaction.Type == entity.TransactionTypeIncome || transaction.Type == entity.TransactionTypeExpense) && (transaction.CategoryID == nil || strings.TrimSpace(*transaction.CategoryID) == "")) {
 		return transactionrepo.ErrTransactionCategoryRequired
 	}
+	includedInReports := transaction.IncludedInReports
 	return r.db.Transaction(func(tx *gorm.DB) error {
+		if transaction.CategoryID != nil {
+			if err := validateActiveCategoryAssignment(tx, transaction.OwnerID, *transaction.CategoryID, transaction.Type); err != nil {
+				return err
+			}
+		}
 		if transaction != nil && transaction.TravelEventID != nil {
 			var event entity.TravelEvent
 			if err := tx.Where("id = ? AND owner_id = ?", *transaction.TravelEventID, transaction.OwnerID).First(&event).Error; err != nil {
@@ -84,7 +90,19 @@ func (r *TransactionPostgresRepository) Create(transaction *entity.Transaction) 
 		if err := validateJarAssignment(tx, transaction.OwnerID, transaction.JarID, transaction.OccurredAt, nil); err != nil {
 			return err
 		}
-		return tx.Create(transaction).Error
+		if err := tx.Create(transaction).Error; err != nil {
+			return err
+		}
+		// The column defaults to true; GORM's Create omits a false bool field
+		// tagged with a database default. Persist the caller's explicit choice,
+		// including false, just as WalletPostgresRepository.Create does.
+		if err := tx.Model(&entity.Transaction{}).
+			Where("id = ? AND owner_id = ?", transaction.ID, transaction.OwnerID).
+			UpdateColumn("included_in_reports", includedInReports).Error; err != nil {
+			return err
+		}
+		transaction.IncludedInReports = includedInReports
+		return nil
 	})
 }
 
@@ -143,11 +161,14 @@ func (r *TransactionPostgresRepository) CreateCreditEntry(ownerID string, input 
 		}
 		if input.CategoryID != nil {
 			var category entity.Category
-			if err := tx.Where("id = ? AND (is_system = true OR owner_id = ?)", *input.CategoryID, ownerID).First(&category).Error; err != nil {
+			if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ? AND (is_system = true OR owner_id = ?)", *input.CategoryID, ownerID).First(&category).Error; err != nil {
 				if errors.Is(err, gorm.ErrRecordNotFound) {
 					return transactionrepo.ErrCreditInvalid
 				}
 				return err
+			}
+			if !category.IsActive {
+				return transactionrepo.ErrCategoryInactive
 			}
 			if category.Kind != txnType {
 				return transactionrepo.ErrCreditInvalid
@@ -566,16 +587,19 @@ func (r *TransactionPostgresRepository) reserveMutation(tx *gorm.DB, ownerID, op
 	if result.RowsAffected == 1 {
 		return mutation, true, nil
 	}
-	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND operation = ? AND idempotency_key = ?", ownerID, operation, key).First(&mutation).Error; err != nil {
+	// The candidate ID was generated for INSERT. Reading into that same struct
+	// makes GORM add its primary key to the lookup and miss the winning receipt.
+	var persisted entity.TransactionMutation
+	if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND operation = ? AND idempotency_key = ?", ownerID, operation, key).First(&persisted).Error; err != nil {
 		return entity.TransactionMutation{}, false, err
 	}
-	if mutation.RequestHash != requestHash {
+	if persisted.RequestHash != requestHash {
 		return entity.TransactionMutation{}, false, transactionrepo.ErrMutationConflict
 	}
-	if mutation.Status != transactionrepo.TransactionMutationCompleted {
+	if persisted.Status != transactionrepo.TransactionMutationCompleted {
 		return entity.TransactionMutation{}, false, transactionrepo.ErrMutationPending
 	}
-	return mutation, false, nil
+	return persisted, false, nil
 }
 
 func (r *TransactionPostgresRepository) completeMutation(tx *gorm.DB, id string, response any) error {
@@ -669,6 +693,15 @@ func (r *TransactionPostgresRepository) Update(ownerID, id string, updates map[s
 			return err
 		}
 		next := existing
+		if categoryID, ok := updates["category_id"].(*string); ok && categoryID != nil && (existing.CategoryID == nil || *existing.CategoryID != *categoryID) {
+			kind := existing.Type
+			if value, valid := updates["type"].(string); valid {
+				kind = value
+			}
+			if err := validateActiveCategoryAssignment(tx, ownerID, *categoryID, kind); err != nil {
+				return err
+			}
+		}
 		if value, ok := updates["jar_id"]; ok {
 			next.JarID = optionalString(value)
 		}
@@ -694,6 +727,20 @@ func (r *TransactionPostgresRepository) Update(ownerID, id string, updates map[s
 		return nil, err
 	}
 	return &updated, nil
+}
+
+func validateActiveCategoryAssignment(tx *gorm.DB, ownerID, categoryID, kind string) error {
+	var category entity.Category
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ? AND (is_system = true OR owner_id = ?)", categoryID, ownerID).First(&category).Error; err != nil {
+		return err
+	}
+	if !category.IsActive {
+		return transactionrepo.ErrCategoryInactive
+	}
+	if category.Kind != kind {
+		return transactionrepo.ErrTransactionCategoryRequired
+	}
+	return nil
 }
 
 func (r *TransactionPostgresRepository) Delete(ownerID, id string) error {

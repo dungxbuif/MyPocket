@@ -71,9 +71,12 @@ func (h *WalletHandler) ListWallets(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param wallet body walletInput true "Wallet input"
+// @Param Idempotency-Key header string false "Stable ASCII key (1-128 bytes) reused to replay a confirmed wallet write"
 // @Success 201 {object} entity.Wallet
 // @Failure 400 {object} Problem
 // @Failure 401 {object} Problem
+// @Failure 409 {object} Problem
+// @Failure 503 {object} Problem
 // @Router /api/v1/wallets [post]
 func (h *WalletHandler) CreateWallet(c *gin.Context) {
 	owner, ok := walletOwner(c)
@@ -97,6 +100,45 @@ func (h *WalletHandler) CreateWallet(c *gin.Context) {
 	if input.TargetDate != nil && *input.TargetDate != "" {
 		parsed, _ := entity.ParseCalendarDate(*input.TargetDate)
 		wallet.TargetDate = &parsed
+	}
+	keyHeaders := c.Request.Header.Values("Idempotency-Key")
+	if len(keyHeaders) > 1 {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Idempotency-Key không hợp lệ."})
+		return
+	}
+	idempotencyKey := ""
+	if len(keyHeaders) == 1 {
+		idempotencyKey = strings.TrimSpace(keyHeaders[0])
+	}
+	validIdempotencyKey := len(idempotencyKey) <= 128
+	for _, character := range idempotencyKey {
+		if character < 32 || character > 126 {
+			validIdempotencyKey = false
+		}
+	}
+	if !validIdempotencyKey {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Idempotency-Key không hợp lệ."})
+		return
+	}
+	if idempotencyKey != "" {
+		mutator, ok := h.Wallets.(walletrepo.WalletCreateMutationRepository)
+		if !ok {
+			Fail(c, http.StatusServiceUnavailable, Problem{Code: "mutation_unavailable", Title: problemTitleInternalServer, Detail: "Chưa thể xử lý yêu cầu có khóa chống trùng."})
+			return
+		}
+		persisted, replayed, err := mutator.CreateIdempotent(wallet, idempotencyKey, hashMutationInput(input))
+		if err != nil {
+			if !createReceiptFailure(c, err) {
+				Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeWalletSaveFailed, Title: problemTitleInternalServer, Detail: walletSaveErrorMessage})
+			}
+			return
+		}
+		if replayed {
+			OK(c, persisted)
+			return
+		}
+		Created(c, persisted)
+		return
 	}
 	if err := h.Wallets.Create(wallet); err != nil {
 		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeWalletSaveFailed, Title: problemTitleInternalServer, Detail: walletSaveErrorMessage})

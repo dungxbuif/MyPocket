@@ -74,6 +74,16 @@ Proof run: the Stage v1 baseline applied cleanly to a fresh disposable PostgreSQ
 
 - Follow-up after [AI-ENTRY-01](TICKET-09-01-ENTRY-DETAIL_DESIGN.md): the signed GET issue is fixed; live S3 readback and OCR now pass, and strict JSON Schema LLM evaluation passes 5/5 synthetic cases. Latest timings and scores are recorded in the [validation matrix](../VALIDATION_MATRIX.md#ai-entry-01-openai-compatible-json-schema-resolution--2026-09-22). Browser attachment/download owner UAT remains pending.
 
+## Native-port provider revalidation — 2026-10-08
+
+The opt-in live evaluation was rerun against the configured OCR, private S3
+and DeepSeek endpoint using a generated synthetic receipt. S3 put/readback and
+deferred deletion passed; OCR recognized 45,000 VND; the model scored 24/24
+expected fields across five cases. No MyPocket transaction or proposal was
+written. This does not substitute for native photo-picker, proposal review,
+approval/linking or authenticated attachment-download UI acceptance; those
+remain distinct port requirements.
+
 ## Alternatives rejected
 
 - Browser direct-to-S3 upload: would expose credentials/policy complexity and bypass server validation.

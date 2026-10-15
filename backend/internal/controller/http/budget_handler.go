@@ -81,6 +81,7 @@ func (h *BudgetHandler) ListBudgets(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param budget body budgetInput true "Budget input"
+// @Param Idempotency-Key header string false "Stable ASCII key reused to replay a confirmed budget write"
 // @Success 201 {object} entity.Budget
 // @Failure 400 {object} Problem
 // @Failure 409 {object} Problem
@@ -122,6 +123,13 @@ func (h *BudgetHandler) save(c *gin.Context, creating bool) {
 	}
 	input.WalletID = normalizeOptional(input.WalletID)
 	input.CategoryID = normalizeOptional(input.CategoryID)
+	id := c.Param("id")
+	if creating {
+		id = uuid.NewString()
+	} else if _, err := uuid.Parse(id); err != nil {
+		budgetBadRequest(c, "Ngân sách không hợp lệ.")
+		return
+	}
 	if input.WalletID != nil {
 		if _, err := uuid.Parse(*input.WalletID); err != nil {
 			budgetBadRequest(c, "Ví không hợp lệ.")
@@ -143,15 +151,69 @@ func (h *BudgetHandler) save(c *gin.Context, creating bool) {
 			budgetBadRequest(c, "Chọn nhóm chi thuộc tài khoản.")
 			return
 		}
-	}
-	id := c.Param("id")
-	if creating {
-		id = uuid.NewString()
-	} else if _, err := uuid.Parse(id); err != nil {
-		budgetBadRequest(c, "Ngân sách không hợp lệ.")
-		return
+		if !category.IsActive {
+			keepHistoricalCategory := false
+			if !creating {
+				budgets, listErr := h.Budgets.List(owner)
+				if listErr != nil {
+					budgetFailure(c, listErr)
+					return
+				}
+				for _, current := range budgets {
+					if current.ID == id && current.CategoryID != nil && *current.CategoryID == category.ID {
+						keepHistoricalCategory = true
+						break
+					}
+				}
+			}
+			if !keepHistoricalCategory {
+				categoryInactive(c)
+				return
+			}
+		}
 	}
 	budget := entity.Budget{ID: id, OwnerID: owner, Name: input.Name, LimitAmount: input.LimitAmount, WalletID: input.WalletID, CategoryID: input.CategoryID, StartDate: start, EndDate: end}
+	if creating {
+		keyHeaders := c.Request.Header.Values("Idempotency-Key")
+		if len(keyHeaders) > 1 {
+			Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Idempotency-Key không hợp lệ."})
+			return
+		}
+		idempotencyKey := ""
+		if len(keyHeaders) == 1 {
+			idempotencyKey = strings.TrimSpace(keyHeaders[0])
+		}
+		validKey := len(idempotencyKey) <= 128
+		for _, character := range idempotencyKey {
+			if character < 32 || character > 126 {
+				validKey = false
+			}
+		}
+		if !validKey {
+			Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Idempotency-Key không hợp lệ."})
+			return
+		}
+		if idempotencyKey != "" {
+			mutator, ok := h.Budgets.(repository.BudgetCreateMutationRepository)
+			if !ok {
+				Fail(c, http.StatusServiceUnavailable, Problem{Code: "mutation_unavailable", Title: problemTitleInternalServer, Detail: "Chưa thể xử lý yêu cầu có khóa chống trùng."})
+				return
+			}
+			persisted, replayed, createErr := mutator.CreateIdempotent(owner, &budget, idempotencyKey, hashMutationInput(input))
+			if createErr != nil {
+				if !createReceiptFailure(c, createErr) {
+					budgetFailure(c, createErr)
+				}
+				return
+			}
+			if replayed {
+				OK(c, persisted)
+				return
+			}
+			Created(c, persisted)
+			return
+		}
+	}
 	if err := h.Budgets.Save(owner, &budget, creating); err != nil {
 		budgetFailure(c, err)
 		return
@@ -191,6 +253,10 @@ func budgetBadRequest(c *gin.Context, message string) {
 	Fail(c, 400, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: message})
 }
 func budgetFailure(c *gin.Context, err error) {
+	if errors.Is(err, repository.ErrCategoryInactive) {
+		categoryInactive(c)
+		return
+	}
 	status, code, message := http.StatusInternalServerError, "BUDGET_FAILED", "Không thể xử lý ngân sách. Vui lòng thử lại."
 	if errors.Is(err, repository.ErrBudgetConflict) {
 		status = 409

@@ -33,6 +33,11 @@ connectors remain out of scope.
   sharing a `transfer_id`, with `included_in_reports=false` and no jar.
 - A transfer is editable/deletable as two linked rows only in a follow-up
   ticket; the existing single-row editor must not mutate a linked pair.
+- The current pair-update API changes only `amount`, `occurred_at`, and `note`.
+  Source and destination wallets remain fixed for the transfer ID. Edit UI must
+  show those wallets as non-editable values instead of selectors that appear to
+  save. Moving a transfer to different wallets requires a separately designed
+  atomic API operation.
 - Wallet balances derive from the two rows. Reports and jar totals already
   exclude the system transfer categories and the report flag.
 
@@ -80,6 +85,10 @@ connectors remain out of scope.
   `npm run test:transfer:integrated`.
 - Run migration version/clean checks and update the validation matrix, API,
   ERD/architecture notes, context, backlog, and changelog.
+
+Current native UI verification also exercises create → paired edit → delete
+against a disposable local API. It asserts edit mode keeps the selected source
+and destination fixed while amount/note updates persist on both rows.
 
 Approval: owner instruction “Implement còn lại” authorizes this bounded core
 ledger slice; worker/recurring and other high-risk slices still require their

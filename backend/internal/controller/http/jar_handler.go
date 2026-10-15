@@ -71,6 +71,7 @@ func (h *JarHandler) List(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param jar body jarInput true "Jar configuration"
+// @Param Idempotency-Key header string false "Stable ASCII key (1-128 bytes) reused to replay a confirmed jar write"
 // @Success 201 {object} entity.JarMonthConfig
 // @Router /api/v1/jars [post]
 func (h *JarHandler) Create(c *gin.Context) {
@@ -92,6 +93,45 @@ func (h *JarHandler) Create(c *gin.Context) {
 	name, mode, amount, bps, err := validateJarInput(input)
 	if err != nil {
 		jarFail(c, err)
+		return
+	}
+	keyHeaders := c.Request.Header.Values("Idempotency-Key")
+	if len(keyHeaders) > 1 {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Idempotency-Key không hợp lệ."})
+		return
+	}
+	idempotencyKey := ""
+	if len(keyHeaders) == 1 {
+		idempotencyKey = strings.TrimSpace(keyHeaders[0])
+	}
+	validKey := len(idempotencyKey) <= 128
+	for _, character := range idempotencyKey {
+		if character < 32 || character > 126 {
+			validKey = false
+		}
+	}
+	if !validKey {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: "Idempotency-Key không hợp lệ."})
+		return
+	}
+	if idempotencyKey != "" {
+		mutator, ok := h.Jars.(repository.JarCreateMutationRepository)
+		if !ok {
+			Fail(c, http.StatusServiceUnavailable, Problem{Code: "mutation_unavailable", Title: problemTitleInternalServer, Detail: "Chưa thể xử lý yêu cầu có khóa chống trùng."})
+			return
+		}
+		persisted, replayed, createErr := mutator.CreateIdempotent(owner, month, timezone, name, mode, amount, bps, idempotencyKey, hashMutationInput(input))
+		if createErr != nil {
+			if !createReceiptFailure(c, createErr) {
+				jarFail(c, createErr)
+			}
+			return
+		}
+		if replayed {
+			OK(c, persisted)
+			return
+		}
+		Created(c, persisted)
 		return
 	}
 	config, err := h.Jars.Create(owner, month, timezone, name, mode, amount, bps)

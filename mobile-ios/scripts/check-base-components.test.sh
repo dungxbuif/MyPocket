@@ -20,4 +20,13 @@ done
 rm -f "$ROOT/MyPocketIOS/Features/GuardFixture/BadView.swift"
 rmdir "$ROOT/MyPocketIOS/Features/GuardFixture"
 
+mkdir -p "$ROOT/MyPocketIOS/Features/GuardFixture"
+printf '%s\n' 'import SwiftUI' 'struct BadFontView: View { var body: some View { MPText("bad").font(.body) } }' > "$ROOT/MyPocketIOS/Features/GuardFixture/BadFontView.swift"
+if bash "$GUARD" >/dev/null 2>&1; then
+  echo "guard failed to detect a feature system-font override" >&2
+  exit 1
+fi
+rm -f "$ROOT/MyPocketIOS/Features/GuardFixture/BadFontView.swift"
+rmdir "$ROOT/MyPocketIOS/Features/GuardFixture"
+
 echo "native ios base-component tests passed"

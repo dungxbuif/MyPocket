@@ -7,7 +7,7 @@ Route `/months/{YYYY-MM}`; implements the data/note portions of [TICKET-07-04](.
 | Region | Base | Behavior |
 | --- | --- | --- |
 | Header and month navigation | `PageBackHeader`, `FormField`, `BaseSelect`, `Text` | Selects an account-local `YYYY-MM`; title shows a localized month label. |
-| Completion state and totals | `SurfaceCard`, `Text`, `StatusMessage` | Shows server-derived current/completed state, included income, expense and net difference, with timezone/range disclosure. |
+| Completion state and totals | `SurfaceCard`, `Text`, `StatusMessage` | Shows server-derived current/completed state, included income, expense and net difference. The range is shown as inclusive local calendar dates, with a short “theo múi giờ tài khoản” disclosure instead of raw timestamps or an IANA timezone identifier. |
 | Category and jar context | `SurfaceCard`, `Text`, `Progress`, `BaseButton`, `StatusMessage` | Uses only report-provided aggregates; links to `/jars?month=...`. Empty sections are omitted or described plainly. |
 | User note | `SurfaceCard`, `FormField`, `BaseTextArea`, `BaseButton`, `StatusMessage` | Draft is saved/deleted explicitly for this account and month; it is independent from calculated totals and any AI output. |
 
@@ -35,8 +35,14 @@ Only existing bases are used. No local palette, custom card, disabled month-clos
 
 ## Copy and proof
 
-Use `Tổng kết tháng`, `Đã hoàn tất` / `Đang diễn ra`, `Ghi chú của tôi`, `Lưu ghi chú`, and `Bỏ thay đổi`. Clearly label account timezone and the report range; use shared VND formatting.
+Use `Tổng kết tháng`, `Đã hoàn tất` / `Đang diễn ra`, `Ghi chú của tôi`, `Lưu ghi chú`, and `Bỏ thay đổi`. Display the report range as inclusive dates in the account timezone, without time-of-day or raw timezone identifiers; keep the calculation's underlying half-open API interval unchanged. Use shared VND formatting.
 
 Implementation update: `/months/{YYYY-MM}` is connected to the real report/note APIs. It shows account-local period boundaries, live totals, category and jar context, and explicit note save/discard/delete; edits remain available after a month is complete.
 
 Automated proof covers month boundary/completion, PostgreSQL note owner-isolation/clear behavior, date navigation helpers, design guards and production build. Runtime/browser proof for persisted total recalculation and the note editor remains; owner UAT is pending. AI-generated monthly narrative, events/travel context, and freeze/close behavior are not implemented here.
+
+Native iOS parity proof (2026-10-08): the simulator UI test adds one expense to
+a disposable wallet, verifies the owner-scoped month API aggregate delta, and
+asserts the updated total is rendered in `MonthsView`. Evidence and fixture
+cleanup are recorded in `docs/work/VALIDATION_MATRIX.md`. This does not replace
+web/browser validation or owner visual UAT.

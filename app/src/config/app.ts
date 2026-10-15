@@ -7,6 +7,7 @@ export const APP_ROUTES = {
 } as const;
 
 export const API_ROUTES = {
+  LOGIN: "/api/v1/login",
   START_GOOGLE_AUTH: "/api/v1/auth/google",
   GOOGLE_CALLBACK: "/api/v1/auth/google/callback",
   REFRESH: "/api/v1/auth/refresh",

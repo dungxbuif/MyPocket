@@ -41,7 +41,7 @@ func (r *RecurringPostgresRepository) Create(ownerID string, schedule *entity.Re
 		if err := validateRecurringWallet(tx, ownerID, schedule.WalletID); err != nil {
 			return err
 		}
-		if err := validateRecurringCategory(tx, ownerID, schedule.CategoryID, schedule.Type); err != nil {
+		if err := validateRecurringCategory(tx, ownerID, schedule.CategoryID, schedule.Type, false); err != nil {
 			return err
 		}
 		return tx.Create(schedule).Error
@@ -64,7 +64,8 @@ func (r *RecurringPostgresRepository) Update(ownerID, id string, updates recurri
 		if err := validateRecurringWallet(tx, ownerID, current.WalletID); err != nil {
 			return err
 		}
-		if err := validateRecurringCategory(tx, ownerID, updates.CategoryID, updates.Type); err != nil {
+		keepHistoricalCategory := current.CategoryID != nil && updates.CategoryID != nil && *current.CategoryID == *updates.CategoryID
+		if err := validateRecurringCategory(tx, ownerID, updates.CategoryID, updates.Type, keepHistoricalCategory); err != nil {
 			return err
 		}
 		updates.AnchorDay = updates.NextRunAt.In(time.UTC).Day()
@@ -182,12 +183,12 @@ func validateRecurringWallet(tx *gorm.DB, ownerID, walletID string) error {
 	return nil
 }
 
-func validateRecurringCategory(tx *gorm.DB, ownerID string, categoryID *string, kind string) error {
+func validateRecurringCategory(tx *gorm.DB, ownerID string, categoryID *string, kind string, allowInactive bool) error {
 	if categoryID == nil || *categoryID == "" {
 		return recurringrepo.ErrRecurringCategoryInvalid
 	}
 	var category entity.Category
-	if err := tx.Where("id = ? AND (owner_id = ? OR owner_id IS NULL)", *categoryID, ownerID).First(&category).Error; err != nil || category.Kind != kind {
+	if err := tx.Clauses(clause.Locking{Strength: "SHARE"}).Where("id = ? AND (owner_id = ? OR owner_id IS NULL)", *categoryID, ownerID).First(&category).Error; err != nil || category.Kind != kind || (!category.IsActive && !allowInactive) {
 		return recurringrepo.ErrRecurringCategoryInvalid
 	}
 	return nil

@@ -13,3 +13,9 @@ type BudgetRepository interface {
 	Save(owner string, budget *entity.Budget, creating bool) error
 	Delete(owner, id string) error
 }
+
+// BudgetCreateMutationRepository adds replay-safe creation for confirmed
+// assistant/offline actions without widening the ordinary budget contract.
+type BudgetCreateMutationRepository interface {
+	CreateIdempotent(ownerID string, budget *entity.Budget, idempotencyKey, requestHash string) (*entity.Budget, bool, error)
+}

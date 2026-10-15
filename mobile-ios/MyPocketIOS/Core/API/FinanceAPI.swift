@@ -22,8 +22,30 @@ final class FinanceAPI: @unchecked Sendable {
         )
     }
 
-    func wallets() async throws -> [WalletModel] {
-        try await client.send(APIRequest(path: "/wallets"))
+    func wallets(ownerID: String? = nil) async throws -> [WalletModel] {
+        try await client.send(APIRequest(path: "/wallets", expectedOwnerID: ownerID))
+    }
+
+    func syncCapabilities(ownerID: String? = nil) async throws -> OfflineSyncCapabilitiesModel {
+        try await client.send(APIRequest(path: "/sync/capabilities", expectedOwnerID: ownerID))
+    }
+
+    func enrollDevice(password: String, deviceID: String, deviceName: String) async throws -> DeviceEnrollmentResponse {
+        struct Input: Encodable { let password: String; let deviceID: String; let deviceName: String }
+        return try await client.send(APIRequest(path: "/auth/devices", method: .post, body: try body(Input(password: password, deviceID: deviceID, deviceName: deviceName))))
+    }
+
+    func loginWithDevice(id: String, secret: String) async throws -> LoginOutput {
+        struct Input: Encodable { let id: String; let secret: String }
+        return try await client.send(APIRequest(path: "/auth/device-login", method: .post, body: try body(Input(id: id, secret: secret)), auth: .none))
+    }
+
+    func revokeDevice(id: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/auth/devices/\(id)", method: .delete))
+    }
+
+    func logout(refreshToken: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/auth/logout", method: .post, body: try body(RefreshRequest(refreshToken: refreshToken))))
     }
 
     func notifications() async throws -> [NotificationModel] {
@@ -34,8 +56,8 @@ final class FinanceAPI: @unchecked Sendable {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/notifications/\(id)/read", method: .post))
     }
 
-    func createWallet(_ input: WalletModelInput) async throws -> WalletModel {
-        try await client.send(APIRequest(path: "/wallets", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    func createWallet(_ input: WalletModelInput, idempotencyKey: String? = nil) async throws -> WalletModel {
+        try await client.send(APIRequest(path: "/wallets", method: .post, body: try body(input), idempotencyKey: idempotencyKey ?? UUID().uuidString))
     }
 
     func updateWallet(id: String, input: WalletModelInput) async throws -> WalletModel {
@@ -46,8 +68,8 @@ final class FinanceAPI: @unchecked Sendable {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/wallets/\(id)", method: .delete))
     }
 
-    func categories() async throws -> [CategoryModel] {
-        try await client.send(APIRequest(path: "/categories"))
+    func categories(ownerID: String? = nil) async throws -> [CategoryModel] {
+        try await client.send(APIRequest(path: "/categories", expectedOwnerID: ownerID))
     }
 
     func createCategory(_ input: CategoryModelInput) async throws -> CategoryModel {
@@ -68,12 +90,49 @@ final class FinanceAPI: @unchecked Sendable {
         )
     }
 
+    func setCategoryActive(id: String, active: Bool) async throws -> CategoryModel {
+        try await client.send(
+            APIRequest(
+                path: "/categories/\(id)/status",
+                method: .patch,
+                body: try body(["is_active": active])
+            )
+        )
+    }
+
     func deleteCategory(id: String) async throws {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/categories/\(id)", method: .delete))
     }
 
-    func transactions() async throws -> [TransactionModel] {
-        try await client.send(APIRequest(path: "/transactions"))
+    func transactions(ownerID: String? = nil) async throws -> [TransactionModel] {
+        try await client.send(APIRequest(path: "/transactions", expectedOwnerID: ownerID))
+    }
+
+    func applyOutbox(_ mutation: OutboxMutation) async throws -> [String] {
+        guard mutation.state == .sending, mutation.leaseID != nil,
+              let expires = mutation.leaseExpiresAt, expires > Date() else {
+            throw OutboxAcknowledgementError.invalidLease
+        }
+        try mutation.payload.validate()
+        switch mutation.payload {
+        case .transaction(let input):
+            guard input.autoLinkTravel == false else { throw OutboxStoreError.invalidPayload }
+            let response: APIEnvelope<TransactionModel> = try await client.sendEnvelope(APIRequest(
+                path: "/transactions", method: .post, body: try outboxBody(input),
+                idempotencyKey: mutation.idempotencyKey, expectedOwnerID: mutation.accountID))
+            return try OutboxAcknowledgement.validate(mutation, resources: [response.data], meta: response.meta)
+        case .transfer(let input):
+            let response: APIEnvelope<[TransactionModel]> = try await client.sendEnvelope(APIRequest(
+                path: "/transactions/transfer", method: .post, body: try outboxBody(input),
+                idempotencyKey: mutation.idempotencyKey, expectedOwnerID: mutation.accountID))
+            return try OutboxAcknowledgement.validate(mutation, resources: response.data, meta: response.meta)
+        }
+    }
+
+    private func outboxBody<T: Encodable>(_ input: T) throws -> Data {
+        let encoder = JSONEncoder.mypocket
+        encoder.outputFormatting = [.sortedKeys]
+        return try encoder.encode(input)
     }
 
     func createTransaction(_ input: TransactionInputModel) async throws -> TransactionModel {
@@ -214,7 +273,13 @@ final class FinanceAPI: @unchecked Sendable {
     }
 
     func updateTravelEvent(id: String, input: TravelEventInputModel) async throws -> TravelEventModel {
-        try await client.send(APIRequest(path: "/travel/events/\(id)", method: .patch, body: try body(input)))
+        // This adapter submits the complete editor, not a sparse PATCH. The
+        // existing server preserves omitted/null fields; empty strings clear.
+        var fullForm = input
+        fullForm.context = input.context ?? ""
+        fullForm.startsOn = input.startsOn ?? ""
+        fullForm.endsOn = input.endsOn ?? ""
+        return try await client.send(APIRequest(path: "/travel/events/\(id)", method: .patch, body: try body(fullForm)))
     }
 
     func deleteTravelEvent(id: String) async throws {
@@ -267,6 +332,10 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/feedback"))
     }
 
+    func setFeedbackResolution(id: String, resolved: Bool) async throws -> FeedbackModel {
+        try await client.send(APIRequest(path: "/feedback/\(id)/resolution", method: .patch, body: try body(["resolved": resolved])))
+    }
+
     func createFeedback(_ input: FeedbackInputModel) async throws -> FeedbackModel {
         try await client.send(APIRequest(path: "/feedback", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
     }
@@ -316,14 +385,30 @@ final class FinanceAPI: @unchecked Sendable {
     }
 
     func advisorMessages(conversationID: String, beforeSequence: Int? = nil) async throws -> [AdvisorMessageModel] {
+        try await advisorHistory(conversationID: conversationID, beforeSequence: beforeSequence).messages
+    }
+
+    func advisorHistory(conversationID: String, beforeSequence: Int? = nil) async throws -> AdvisorHistoryPageModel {
         var components = URLComponents()
         components.queryItems = [URLQueryItem(name: "conversation_id", value: conversationID)]
         if let beforeSequence, beforeSequence > 0 {
             components.queryItems?.append(URLQueryItem(name: "before_seq", value: String(beforeSequence)))
         }
         let query = components.percentEncodedQuery ?? ""
-        let messages: [AdvisorMessageModel] = try await client.send(APIRequest(path: "/ai/advisor/conversation/messages?\(query)"))
-        return messages.sorted { $0.seq < $1.seq }
+        let envelope: APIEnvelope<[AdvisorMessageModel]> = try await client.sendEnvelope(APIRequest(path: "/ai/advisor/conversation/messages?\(query)"))
+        return AdvisorHistoryPageModel(
+            messages: envelope.data.sorted { $0.seq < $1.seq },
+            meta: AdvisorHistoryMetaModel(json: envelope.meta)
+        )
+    }
+
+    func resetAdvisorConversation(idempotencyKey: String, body: Data = Data()) async throws -> AdvisorResetModel {
+        try await client.send(APIRequest(
+            path: "/ai/advisor/conversation/reset",
+            method: .post,
+            body: body.isEmpty ? nil : body,
+            idempotencyKey: idempotencyKey
+        ))
     }
 
     func advisorRun(id: String) async throws -> AdvisorRunModel {
@@ -334,6 +419,64 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/advisor/messages", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
     }
 
+    /// Confirms a server-persisted assistant action. Financial fields are
+    /// deliberately absent from this request: the backend resolves the
+    /// proposal by owner, conversation, generation, and action ID, then
+    /// applies its durable idempotency boundary.
+    func confirmAdvisorWalletAction(actionID: String, conversationID: String, generation: Int64) async throws -> WalletModel {
+        struct Input: Encodable {
+            let conversationID: String
+            let generation: Int64
+
+            enum CodingKeys: String, CodingKey {
+                case conversationID = "conversation_id"
+                case generation
+            }
+        }
+        let escapedActionID = actionID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? actionID
+        return try await client.send(APIRequest(
+            path: "/ai/advisor/actions/\(escapedActionID)/confirm",
+            method: .post,
+            body: try body(Input(conversationID: conversationID, generation: generation))
+        ))
+    }
+
+    func confirmAdvisorJarAction(actionID: String, conversationID: String, generation: Int64) async throws -> JarConfigModel {
+        struct Input: Encodable {
+            let conversationID: String
+            let generation: Int64
+
+            enum CodingKeys: String, CodingKey {
+                case conversationID = "conversation_id"
+                case generation
+            }
+        }
+        let escapedActionID = actionID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? actionID
+        return try await client.send(APIRequest(
+            path: "/ai/advisor/actions/\(escapedActionID)/confirm",
+            method: .post,
+            body: try body(Input(conversationID: conversationID, generation: generation))
+        ))
+    }
+
+    func confirmAdvisorBudgetAction(actionID: String, conversationID: String, generation: Int64) async throws -> BudgetModel {
+        struct Input: Encodable {
+            let conversationID: String
+            let generation: Int64
+
+            enum CodingKeys: String, CodingKey {
+                case conversationID = "conversation_id"
+                case generation
+            }
+        }
+        let escapedActionID = actionID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? actionID
+        return try await client.send(APIRequest(
+            path: "/ai/advisor/actions/\(escapedActionID)/confirm",
+            method: .post,
+            body: try body(Input(conversationID: conversationID, generation: generation))
+        ))
+    }
+
     func cancelAdvisorRun(id: String) async throws {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/ai/advisor/runs/\(id)/cancel", method: .post, idempotencyKey: UUID().uuidString))
     }
@@ -342,8 +485,8 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/entry/proposals/\(id)", method: .patch, body: try body(EntryProposalEditBody(version: version, draft: draft))))
     }
 
-    func profile() async throws -> ProfileModel {
-        try await client.send(APIRequest(path: "/auth/profile"))
+    func profile(ownerID: String? = nil) async throws -> ProfileModel {
+        try await client.send(APIRequest(path: "/auth/profile", expectedOwnerID: ownerID))
     }
 
     func updateTimezone(_ timezone: String) async throws -> ProfileModel {
@@ -354,8 +497,8 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/api-keys"))
     }
 
-    func createAPIKey(name: String, scopes: [String], expiresAt: String? = nil) async throws -> APIKeyCreatedModel {
-        try await client.send(APIRequest(path: "/api-keys", method: .post, body: try body(APIKeyCreateBody(name: name, scopes: scopes, expiresAt: expiresAt)), idempotencyKey: UUID().uuidString))
+    func createAPIKey(name: String, expiresAt: String? = nil) async throws -> APIKeyCreatedModel {
+        try await client.send(APIRequest(path: "/api-keys", method: .post, body: try body(APIKeyCreateBody(name: name, expiresAt: expiresAt)), idempotencyKey: UUID().uuidString))
     }
 
     func revokeAPIKey(id: String) async throws {
@@ -372,7 +515,6 @@ private struct EntryProposalEditBody: Encodable, Sendable {
 
 private struct APIKeyCreateBody: Encodable, Sendable {
     var name: String
-    var scopes: [String]
     var expiresAt: String?
 }
 
@@ -391,12 +533,22 @@ struct WalletModelInput: Codable, Sendable {
     var goalNotificationsEnabled: Bool = false
 }
 
-struct CategoryModelInput: Codable, Sendable {
+struct CategoryModelInput: Encodable, Sendable {
     var name: String
     var kind: String
     var parentID: String?
     var walletIDs: [String]
     var iconKey: String
+
+    private enum CodingKeys: String, CodingKey {
+        case name
+        case kind
+        case parentID
+        // JSONEncoder.convertToSnakeCase splits the consecutive capitals in
+        // `IDs` as `i_ds`. Use the lower-camel wire stem so it emits wallet_ids.
+        case walletIDs = "walletIds"
+        case iconKey
+    }
 }
 
 struct RecurringInputModel: Codable, Sendable {

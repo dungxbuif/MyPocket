@@ -20,7 +20,10 @@ type Problem struct {
 	RequestID string `json:"request_id,omitempty"`
 }
 
-func OK(c *gin.Context, data any)      { c.JSON(http.StatusOK, Response{Data: data, Meta: nil}) }
+func OK(c *gin.Context, data any) { c.JSON(http.StatusOK, Response{Data: data, Meta: nil}) }
+func OKWithMeta(c *gin.Context, data any, meta any) {
+	c.JSON(http.StatusOK, Response{Data: data, Meta: meta})
+}
 func Created(c *gin.Context, data any) { c.JSON(http.StatusCreated, Response{Data: data, Meta: nil}) }
 func NoContent(c *gin.Context)         { c.Status(http.StatusNoContent) }
 func Fail(c *gin.Context, status int, problem Problem) {

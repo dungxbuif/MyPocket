@@ -2,7 +2,7 @@
 
 ## Cập nhật implementation mới nhất
 
-BaseSelect đã thay tương tác picker loại khi tạo. Danh sách đã dùng WalletSelectionList: Đóng/Chọn Ví/Sửa, Tổng cộng, hai nhóm tính/không tính vào tổng và card hành động. Sửa bật chế độ chọn ví để edit; xóa nằm trong edit. Chạm vào dòng ví là hành động chọn phạm vi và mở sổ giao dịch với ví đó đã được lọc, giống web; action phụ “Chi tiết” mở WalletDetailPanel/CreditWalletPanel khi cần xem số dư, tiến độ hoặc dư nợ. Goal hỗ trợ target_date qua API và UI. Sổ giao dịch có select đầu màn hình cho `Tổng cộng` hoặc từng ví; ví thường dùng cùng layout/kỳ với `Tổng cộng` và chỉ lọc giao dịch của ví được chọn. Xem [savings](../savings/README.md).
+BaseSelect đã thay tương tác picker loại khi tạo. Danh sách ví iOS và web dùng cùng contract WalletSelectionList: header “Chọn Ví” với Sửa/Xong; dòng “Tổng cộng” chỉ cộng ví có `is_in_total=true`; hai nhóm ví tính/không tính vào tổng; card hành động Thêm ví và Liên kết dịch vụ (disabled). Ở chế độ thường, chạm dòng ví mở sổ giao dịch đã lọc; chạm “Chi tiết” mở WalletDetailPanel/CreditWalletPanel. Ở chế độ Sửa, chạm dòng mở form sửa; xác nhận xóa nằm trong form sửa. Goal giữ progress/target, credit giữ hạn mức khả dụng ở dòng ví. Khi không có ví, vẫn hiện hành động Thêm ví. Goal hỗ trợ target_date qua API và UI. Sổ giao dịch có select đầu màn hình cho `Tổng cộng` hoặc từng ví; ví thường dùng cùng layout/kỳ với `Tổng cộng` và chỉ lọc giao dịch của ví được chọn. Xem [savings](../savings/README.md).
 
 ## Quyết định hiện hành
 
@@ -12,8 +12,10 @@ Owner chốt dùng **FormField + BaseSelect** chọn loại khi tạo: Ví thư�
 
 | Vùng | Base | Contract |
 | --- | --- | --- |
-| Header quản lý | PageBackHeader hoặc BaseLink + Heading/Text | Quay lại Tài khoản, tiêu đề, Thêm ví |
-| Danh sách ví | SurfaceCard, IconBadge, Text, BaseButton | Tên, nhãn loại tiếng Việt, số dư thực, chọn để mở sổ giao dịch scoped; action chi tiết/sửa/xóa; chỉ dữ liệu owner |
+| Header quản lý | `MPSelectionScreenHeader` | Tựa đề Chọn Ví căn giữa; Đóng và Sửa/Xong là capsule cân hai bên theo Stitch; hành động quay lại và edit-mode giữ nguyên |
+| Danh sách ví | MPWalletSelectionList + MPSurfaceCard + MPWalletRow + MPButton | Tổng cộng dùng globe badge tone teal và chỉ cộng ví được bật; chia hai nhóm `is_in_total`; mỗi row xếp tên và số dư theo cột, đánh dấu scope đang chọn; chọn dòng mở ledger scope; native `Chi tiết` là action trailing gọn trên cùng hàng và giữ route detail; goal/credit giữ thông tin chuyên loại |
+| Hành động danh sách | MPWalletSelectionList + MPButton | Thêm ví luôn hiện kể cả danh sách rỗng; Liên kết dịch vụ disabled |
+| Chế độ sửa | MPWalletSelectionList + WalletEditorView | Tap dòng mở sửa; xóa trong form sửa và có xác nhận; Sửa/Xong không đổi API |
 | Thêm ví | BaseBottomSheet presentation=form | Hủy / Thêm Ví / Lưu; focus trap, Escape, khôi phục focus |
 | Loại ví | FormField + BaseSelect | Chỉ chọn trong draft tạo; không dùng ảnh Chọn Ví làm picker loại |
 | Thông tin chung | SurfaceCard, Divider, BaseTextInput, IconBadge | Tên, VND cố định, số dư đầu phù hợp loại; không ghi chú khi tạo |
@@ -22,7 +24,7 @@ Owner chốt dùng **FormField + BaseSelect** chọn loại khi tạo: Ví thư�
 | Thông báo ví tiết kiệm | BaseSwitch + SurfaceCard / MPBooleanSelector | Goal wallets persist `goal_notifications_enabled`; mặc định tắt và hiện trong inbox nội bộ |
 | Trạng thái | StatusMessage | Empty plain; lỗi alert; giữ draft khi lỗi |
 
-Màu, font, bo góc theo [tokens](../../system/TOKENS.md) và [base contracts](../../system/BASE_COMPONENTS.md), không copy CSS/device frame từ ảnh. Liên kết dịch vụ hiện disabled với giải thích chưa hỗ trợ.
+Màu, font, bo góc theo [tokens](../../system/TOKENS.md) và [base contracts](../../system/BASE_COMPONENTS.md), không copy CSS/device frame từ ảnh. Liên kết dịch vụ hiện disabled với giải thích chưa hỗ trợ. Backend mặc định tính ví mới vào tổng; khi request truyền rõ `is_in_total=false`, repository phải giữ nguyên false thay vì để GORM áp default true.
 
 ## Hành vi riêng từng loại
 
@@ -34,7 +36,9 @@ Màu, font, bo góc theo [tokens](../../system/TOKENS.md) và [base contracts](.
 
 Không suy diễn số dư sao kê bằng dư nợ hiện tại. Màn chi tiết theo loại cần contract và proof riêng trước khi coi hoàn thành; các trường dữ liệu mới cần detail design API/schema.
 
-Ví tín dụng hiện đã có sổ nợ và API ghi mua/hoàn/phí/lãi, thanh toán cặp nguyên tử, hạn mức khả dụng, metadata kỳ sao kê/ngày đến hạn, amount due/status và danh sách statement. Phân bổ thanh toán với dữ liệu sao kê ngân hàng thật chưa được triển khai; UI chỉ dùng metadata người dùng cung cấp.
+Ví tín dụng hiện đã có sổ nợ và API ghi mua/hoàn/phí/lãi, thanh toán cặp nguyên tử, hạn mức khả dụng, metadata kỳ sao kê/ngày đến hạn, amount due/status và danh sách statement. Form ghi bút toán tín dụng dùng cây danh mục tìm kiếm được trong cùng action sheet; mua/phí/lãi chỉ chọn nhóm chi phù hợp ví, hoàn tiền chỉ chọn nhóm thu phù hợp ví. Chọn nhóm giữ nguyên loại, số tiền và ghi chú đang nhập. Thanh toán thẻ không đổi. Phân bổ thanh toán với dữ liệu sao kê ngân hàng thật chưa được triển khai; UI chỉ dùng metadata người dùng cung cấp.
+
+Trong native, các action **Thêm giao dịch** và **Thanh toán thẻ** mở `MPFormBottomSheet` — presentation chung cho form dạng sheet; trường nhập/selector và nút lưu vẫn dùng base components. Hủy hoặc kéo đóng không ghi dữ liệu; khi đang lưu không cho dismiss; khi lưu lỗi giữ form và bản nháp; thành công đóng form rồi tải lại sổ. API, category rules và cặp bút toán thanh toán không thay đổi. Automated UI proof covers both sheet routes; visual screenshot/device acceptance remains open.
 
 Du lịch hiện là `Travel Mode`/sự kiện gắn giao dịch theo [TICKET-05-03](../../../work/tickets/TICKET-05-03-su-kien-travel-mode.md), không phải loại ví thứ tư. Runtime web và native đã có màn quản lý sự kiện, active state, khoảng ngày, gắn/gỡ giao dịch thường và xác nhận xóa; báo cáo narrative riêng theo chuyến và offline/backfill vẫn là gap. Không hiển thị nhãn “ví du lịch” hoặc hứa rằng số dư ví thuộc riêng chuyến đi. Khi thiết kế màn chuyến đi, cần phân biệt tổng thu/chi của giao dịch liên kết với số dư của các ví nguồn.
 
@@ -63,7 +67,7 @@ Khóa loại sau tạo là quyết định MyPocket, không gán cho Money Lover
 
 ## Acceptance và khoảng trống
 
-Runtime dùng WalletTypePicker cho loại ví, WalletDetailPanel cho basic/goal và CreditWalletPanel cho credit. Chọn dòng ví phải route về sổ giao dịch scoped; action “Chi tiết” là luồng detail riêng. Proof cần bổ sung visual UAT cho detail basic/goal/credit, chọn `Tổng cộng`/ví trong sổ giao dịch, create/edit khóa loại, validation theo loại, switch tổng, save/error/cancel và keyboard/mobile. Chạy check:design, test:design, build khi môi trường frontend có Node.
+Runtime dùng WalletTypePicker cho loại ví, WalletDetailPanel cho basic/goal và CreditWalletPanel cho credit. Chọn dòng ví route về sổ giao dịch scoped; chọn Tổng cộng route về toàn bộ ledger; action “Chi tiết” là luồng detail riêng. `MPWalletSelectionList` sở hữu nhóm/tổng hợp/list actions ở native và `WalletSelectionList` ở web. Native policy + repository persistence regression pass; API-backed iPhone 16 UI test verifies included/excluded groups, aggregate total/route, edit, detail and footer actions. Linked-service integration and real-bank statement allocation remain product gaps. Chạy check:design, test:design, build khi môi trường frontend có Node.
 
 [Backlog](../../../work/BACKLOG.md) · [Validation](../../../work/VALIDATION_MATRIX.md) · [Ticket](../../../work/tickets/TICKET-01-02-quan-ly-vi.md) · [Release](../../../releases/CHANGELOG.md).
 

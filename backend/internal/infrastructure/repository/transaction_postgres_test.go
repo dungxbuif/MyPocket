@@ -151,6 +151,54 @@ func TestCreateTransferPersistsExactlyTwoLinkedRows(t *testing.T) {
 	}
 }
 
+func TestCreatePersistsExplicitReportExclusion(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("requires migrated local TEST_DATABASE_URL")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := uuid.NewString()
+	if err := db.Create(&entity.User{ID: owner, Email: owner + "@report-scope.test", GoogleSubject: owner, Timezone: "Asia/Ho_Chi_Minh"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	wallet := entity.Wallet{ID: uuid.NewString(), OwnerID: owner, Name: "Report Scope", Type: entity.WalletTypeBasic, Currency: entity.WalletCurrencyVND}
+	if err := db.Create(&wallet).Error; err != nil {
+		t.Fatal(err)
+	}
+	var category entity.Category
+	if err := db.Where("is_system = ? AND system_key = ?", true, "expense_general").First(&category).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		db.Where("owner_id = ?", owner).Delete(&entity.Transaction{})
+		db.Where("owner_id = ?", owner).Delete(&entity.Wallet{})
+		db.Where("id = ?", owner).Delete(&entity.User{})
+	})
+
+	repo := NewTransactionPostgresRepository(db)
+	for _, included := range []bool{false, true} {
+		id := uuid.NewString()
+		tx := &entity.Transaction{
+			ID: id, OwnerID: owner, WalletID: wallet.ID, CategoryID: &category.ID,
+			Type: entity.TransactionTypeExpense, Amount: 1200, OccurredAt: time.Now().UTC(),
+			IncludedInReports: included,
+		}
+		if err := repo.Create(tx); err != nil {
+			t.Fatalf("create transaction included_in_reports=%t: %v", included, err)
+		}
+		var persisted entity.Transaction
+		if err := db.Where("id = ? AND owner_id = ?", id, owner).First(&persisted).Error; err != nil {
+			t.Fatalf("read transaction included_in_reports=%t: %v", included, err)
+		}
+		if persisted.IncludedInReports != included {
+			t.Fatalf("included_in_reports was not persisted: requested=%t persisted=%t", included, persisted.IncludedInReports)
+		}
+	}
+}
+
 func TestUpdateTransferMutatesBothRowsAndRejectsWrongOwnerOrMalformedPair(t *testing.T) {
 	db, repo, owner, transferID, sourceID, destinationID := transferFixture(t)
 	updatedAt := time.Date(2026, time.September, 25, 5, 0, 0, 0, time.UTC)

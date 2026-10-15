@@ -19,8 +19,1269 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-10-06
+updated: 2026-10-15
 ---
+
+## Current checkpoint — 2026-10-15 22:10 +0700
+
+Latest authoritative state: release tag `v1.1.0` is deployed and
+`mypocket-api` plus `mypocket-worker` both run
+`registry.dungxbuif.com/mypocket-api:release-1.1.0-20261015-2212` at digest
+`sha256:bef8040e7a372774234fd96d69e690215dd5d823f4520f901fd5cf1638fb37d2`.
+The public health endpoint is 200. Production Swagger JSON and UI return 200,
+`/docs/` redirects to the versioned UI, and the public path set is 77/77 equal
+to local generated Swagger. Sync capabilities, advisor reset/confirm and
+feedback-resolution routes are mounted behind auth (unauthenticated probes
+return 401, not 404). The capability body is still unverified without a valid
+owner credential, so native offline sending remains fail-closed.
+
+The jar feedback hardening is deployed: the v1.3 advisor handbook explicitly
+states that the model is allowed to prepare `propose_create_jar` proposals and
+must render a confirmation card; direct writes still require owner confirmation.
+Feedback remains open pending owner-authenticated UAT. Backend full tests and
+vet pass; the focused native queue/cache/design suite passed 123/123 at
+`/tmp/mypocket-goal-contracts-20261015/Logs/Test/Test-MyPocketIOS-2026.10.15_22-01-14-+0700.xcresult`.
+The savings 422 E2E artifact is present and reports 1/1 passed at
+`/tmp/mypocket-offline-savings-20261015e/Logs/Test/Test-MyPocketIOS-2026.10.15_20-37-31-+0700.xcresult`.
+
+Remaining release gates are unchanged: authenticated production capability and
+AI UAT, synchronous first-request cancellation UX, signed iPhone build and
+visual/device acceptance, APNs, and configuration-dependent Google/Travel/
+Insider/Credit provider paths. These are not inferred as complete from local
+tests or unauthenticated probes.
+
+## Historical checkpoint — 2026-10-15 (superseded)
+
+Latest local gate re-run against the current worktree: backend `go test ./...`
+295/295 and `go vet ./...` passed; web design contracts, TypeScript and Vite
+production build passed with only the existing chunk-size advisory.
+The backend race suite also passed 295/295 across 16 packages with no race
+reports.
+The focused HTTP contract suite passed 22/22 under the race detector,
+covering capability advertisement, full-owner API keys, feedback resolution,
+advisor lifecycle/cancellation and device/offline auth boundaries.
+An additional 15 focused race tests for Google exchange classification, Travel
+Mode, Money Insider and Credit validation passed; missing provider/configuration
+remains an intentional runtime gate rather than an unhandled write or panic.
+The full native scheme then passed on the iPhone 16 simulator with 330 passed,
+64 documented skips, 0 failures and 0 runtime warnings; artifact:
+`/tmp/mypocket-native-current-20261015/Logs/Test/Test-MyPocketIOS-2026.10.15_20-51-59-+0700.xcresult`.
+The focused offline capability suite passed 3/3, proving the client rejects
+404/disabled/unknown capability policies and preserves pending writes without
+leasing or sending them until a compatible backend advertises support:
+`/tmp/mypocket-offline-capability-20261015/Logs/Test/Test-MyPocketIOS-2026.10.15_21-04-22-+0700.xcresult`.
+An unsigned physical-device build also completed for the online iPhone with
+`CODE_SIGNING_ALLOWED=NO`, producing an arm64 app under
+`/tmp/mypocket-ios-device-nosign-20261015/Build/Products/Debug-iphoneos/`.
+This separates source/build correctness from the missing provisioning profile;
+the app was not installed.
+The stricter Release device build also passed with warnings treated as errors
+and signing disabled; it produced the Release app under
+`/tmp/mypocket-ios-device-release-nosign-20261015/Build/Products/Release-iphoneos/`.
+The API and worker were also cross-compiled locally for `linux/amd64` with
+static ELF output; hashes and non-deployed status are recorded in
+`docs/operations/DEPLOYMENT.md`. No registry push or production mutation was
+performed.
+Read-only SSH to vm100 confirms the running tasks are still API
+`auth-12572c87` and worker `release-73c4c37`; vm100 is a Swarm worker and cannot
+inspect or update services. Manager-level rollout remains intentionally open.
+
+Continuation verification: backend `go test ./...` passed 295 tests across 16
+packages, `go test -race ./...` passed 295/295 and `go vet ./...` passed; the
+focused feedback refresh/resolution race regression passed at
+`/tmp/mypocket-feedback-race-green-20261015/Logs/Test/Test-MyPocketIOS-2026.10.15_21-14-02-+0700.xcresult`.
+Refresh families now also carry an absolute expiry locally; rotation/logout
+TTL tests pass and the static Linux artifacts are staged but not deployed.
+Read-only production probes remain unchanged: sync capabilities 404, versioned
+Swagger 200, legacy `/docs/` 404 and `/api/v1/openapi.json` 404. No production,
+database or device state changed.
+The public Swagger `doc.json` exposes 72 paths versus 77 locally; the five
+local-only paths are advisor action confirmation, advisor conversation reset,
+category status, feedback resolution and sync capabilities. This is the exact
+backend/docs rollout delta, not an unverified assumption.
+The configured-provider synthetic overlap smoke passed 1/1 at
+`/tmp/mypocket-live-provider-overlap-20261015.log` with no DB/ledger writes.
+The follow-up live provider contract probes passed 3/3 at
+`/tmp/mypocket-live-provider-contract-20261015.log`: extraction, forced
+tool-calling schema and five JSON-schema transaction cases all passed against
+`DeepSeek-V4-Flash` using synthetic inputs only. No financial rows were written.
+The opt-in product-help grounding probe also passed at
+`/tmp/mypocket-live-rag-grounding-20261015.log`: the provider selected
+`get_product_help` and grounded a Vietnamese answer on a synthetic handbook
+result. This is provider/tool-result grounding, not live document retrieval or
+production UAT.
+OCR/PDF remains unrun because `OCR_API_KEY` is empty; external live document
+retrieval/RAG still has no configured evaluation fixture.
+The env audit found only `backend/.env.example` and `backend/.env.local`; both
+declare the OCR variable, and both leave it empty. No additional project env
+file provides a credential.
+The installed Apple Development identity/team is present, but a device build
+still stops before compilation because no provisioning profile matches
+`com.mypocket.ios`; connected iPhones are offline. No provisioning update or
+Apple account/device mutation was attempted.
+The latest device probe at 20:50 +0700 sees `DungxBuif` online, but the local
+provisioning-profile directory is still empty, so signed installation remains
+blocked by signing configuration rather than device connectivity.
+The 21:09 +0700 follow-up is unchanged: the Apple Development identity is
+valid, `DungxBuif` is online, the second phone is offline, and no provisioning
+profile exists. The unsigned arm64 device build remains the latest build proof.
+
+Authoritative scope/status: [native reconciliation](work/tickets/NATIVE-RECONCILIATION-20261015.md).
+Follow-up audit reran the non-environment gates after the latest native fixes:
+backend `go test ./...` and `go vet ./...`, web type/design/transaction checks,
+native project/base-component guards, and `git diff --check` all pass. No local
+service was restarted and no production/device state changed. The approved
+savings 422 UI rerun is now green against the disposable local
+PostgreSQL/API/fault-proxy stack; the authoritative 1/1 artifact is recorded
+below. The earlier `127.0.0.1:55434` fixture failure and the run that bypassed
+the fault proxy are historical harness failures, not current product evidence.
+Auth error classification is now corrected locally: user-store lookup/create
+failures from Google exchange return `503 GOOGLE_USER_STORE_UNAVAILABLE` with a
+generic detail, while invalid OAuth data remains `401`; use-case/HTTP tests and
+regenerated Swagger pass. The already-running API process was not restarted,
+so its old response must not be used to judge the new contract.
+Finance Assistant prepared jar actions are now implemented locally: the
+read-only `propose_create_jar` tool validates month/name/allocation, persisted
+cards map to `jar_confirmation`, and the owner/generation-bound confirmation
+dispatcher reuses the existing mutation ledger with `jar.create`. Backend
+full tests/vet and the iOS simulator build pass after this slice. The fresh
+unit-test invocation reached CoreSimulator diagnostics and was stopped after
+the runner stalled; this is an environment gate, not a test pass. No service,
+production, migration or device state was changed; rollout/UAT remain open.
+The same local slice now includes `propose_update_jar`: it validates a UUID
+jar ID and monthly replacement fields, maps to the existing confirmation card,
+and dispatches to the owner-scoped jar PUT handler without creating a second
+jar. Focused Go contracts and DesignSystemTests (90/90) pass; production,
+device and provider-backed UAT remain open.
+The advisor action slice now also includes `propose_create_budget` and
+`propose_update_budget`: strict
+budget/date/scope validation, a native `budget_confirmation` card and a
+server-bound `budget.create` mutation ledger protect confirmation retries.
+Focused backend tests and DesignSystemTests 90/90 pass; no production or
+device state changed.
+After the card copy assertion, the signed simulator full native suite passed
+294/294 with no runtime warnings at
+`/tmp/mypocket-full-native-signed-20261015.xcresult`. The unsigned simulator
+attempt's four Keychain `-34018` failures were reproduced as a signing-mode
+environment issue and passed 4/4 under signed execution; no source workaround
+or entitlement weakening was introduced.
+The advisor system handbook had stale wording that told the model it could not
+create jars at all. Local source now explicitly tells the model it is allowed
+to prepare a `propose_create_jar` proposal, instead of saying “không có quyền”;
+the provider request also asserts that this non-mutating tool is exposed.
+Focused provider-handbook, tool-definition and full backend tests are green.
+The prompt-hardening API image was rolled out without a migration or database
+change as `ai-jar-capability-20261015-215712` (`1/1`, public health `200`);
+owner UAT and feedback resolution remain open.
+The Feedback shell anchor was also corrected locally: obstacle-driven movement
+is gone, the bubble stays in the lower-right dock above footer clearance, and
+the scroll viewport is not reserved for it. The focused regression and full
+DesignSystem target (90/90) plus warnings-as-errors build/guards pass; populated
+screen and device acceptance remain open.
+Assistant numeric/card safety is also reconciled locally: seven focused signed
+simulator regressions pass for exact money/progress/count conversion, nontrapping
+fallback formatting and privacy masking. Evidence is
+`/tmp/mypocket-numeric-safety-20261015/Logs/Test/Test-MyPocketIOS-2026.10.15_20-23-53-+0700.xcresult`;
+physical-device/UAT and release acceptance remain open.
+Read-only production probing also confirms `/api/v1/docs/index.html` serves
+Swagger UI (GET 200), but `/docs/` and `/api/v1/sync/capabilities` still return
+404. The local redirect/capability implementation has not been deployed; no
+authenticated data or production mutation was performed.
+Category helper/API-first/last-drag correction280/280PASS; numeric/chat287/287PASS.
+Full12business+279unit regression11171 passed291/291,0skip,0 runtime warnings
+after the local helper/fixture corrections. Evidence:
+`/tmp/mypocket-reconcile-full-green-20261015.xcresult`. Category keyboard
+boundary, nested credit container selection and recurring fixture wallet proof
+are now green. This is a local simulator/API gate, not production or device
+acceptance; broader product/lifecycle/release gates remain open.
+Fresh realPG/Redis full Go race32091PASS and vetPASS. Production APIauth-12572c87
+healthy, workerrelease-73c4c37; sync capability404, no new-client install before
+matching backend rollout. vm100 read SSH works; manager pi requires1Password.
+48openfeedback freshly fetched, newest6assessed. Note editor/device-auth status
+corrected; [new feedback design](work/tickets/NATIVE-FEEDBACK-NEW-20261015-DETAIL_DESIGN.md)
+remains review-gated. The advisor idle-retention foundation is now local:
+`000033`, generation-safe access purge, bounded worker pass and `410` mapping;
+native expiry metadata, real database proof and production rollout remain open.
+The explicit Chat mới reset is implemented locally through migration `000034`,
+an owner-scoped content-free idempotency ledger, and the native overflow action.
+The reset service also cancels queued/running provider contexts in this process;
+replayed reset keys do not cancel newer runs. History reads now expose optional
+server-authoritative lifecycle metadata (`conversation_id`, `generation`,
+`last_user_message_at`, `expires_at`, `server_time`) without changing the
+message array or extending TTL; backend/native contract tests and a warnings-as-
+errors simulator build pass locally. No new deployment/history deletion/
+financial reset/feedback resolution/release.
+Full original goal remains in_progress, not complete. Web production build and
+design/type checks are green; browser tests requiring a live Vite/fixture remain
+environment-gated and are not claimed as passed.
+
+Portfolio bounded slice: empty assets now expose a shared-confirmed
+`portfolio-delete-{assetID}` action backed by the existing owner-scoped delete
+route; assets with trades remain append-only. Debug simulator build passed at
+`/tmp/mypocket-portfolio-delete-build-20261015`. The first API-backed delete
+rerun is pending because the disposable PostgreSQL fixture port
+`127.0.0.1:55434` was unavailable, so the fixture login returned
+`GOOGLE_MOBILE_LOGIN_INVALID` before the UI was reached. No environment was
+changed to work around it.
+
+Reports invalid-month bug fixed locally: `ReportsMonthPolicy` rejects malformed
+or out-of-range `YYYY-MM` before network calls, and invalid/failed loads clear
+the previous summary/detail/trend instead of showing stale content. Unit and
+authenticated UI regressions pass. Overview/Reports now also reuse the encrypted
+owner-scoped snapshot for transient offline reads; exact-month report fallback,
+cache merge and Overview recovery are covered by 9 focused tests and a Debug
+build. PostgreSQL-backed UI, device UAT and production rollout remain separate.
+
+Advisor cancellation reconciliation: the deterministic PostgreSQL stale-status
+insert race is fixed locally using the approved conversation→run lock/recheck;
+the focused real-DB suite is 4/4 and the full Go race suite is green. This does
+not claim that the initial native Stop control can interrupt the synchronous
+submit request, nor that the patch is deployed. Those remain separate code and
+rollout gates.
+
+Savings queue follow-up: the shared queue menu now evaluates edit eligibility
+per item. Goal-wallet transfer drafts can open `Sửa bản nháp` with wallet data
+alone; ordinary transaction drafts still wait for categories. Policy unit proof
+is `/tmp/mypocket-goal-queue-policy-green-20261015.xcresult`. The approved
+fault-injected savings 422 UI rerun is green against disposable local PostgreSQL
+version 34 and an API→fault-proxy stack: pending 100,000 đ / remaining 900,000
+đ stay unchanged, restart restores the draft, editing to 22,500 đ commits one
+transfer pair, reloads 122,500 đ / 877,500 đ, and leaves reports unchanged.
+Evidence: `/tmp/mypocket-offline-savings-20261015e/Logs/Test/Test-MyPocketIOS-2026.10.15_20-37-31-+0700.xcresult`.
+The earlier failure was discarded as a harness misconfiguration where the app
+bypassed the fault proxy and received 201. No production, device or release
+state changed.
+
+### Historical checkpoint log — superseded by the matrix above
+
+20261015 owner asks reconcile+finish all. [Current matrix](work/tickets/NATIVE-RECONCILIATION-20261015.md)
+supersedes stale snapshots: note editor implemented; device auth backend already
+deployed; offline engine/outbox/foreground locally implemented but production
+capability freshly404/public OpenAPI absent. Current native ordinary creates use
+queue, so NO further new-client install before compatible backend rollout. Prior
+installed candidate must not be treated as proof of production offline readiness.
+vm100 private-key read-only SSH works, APIauth-12572c87healthy/workerrelease-73c4c37;
+Swarm managerfalse. Manager pi rejects known local homelab identity,1Password
+agent needed; do not alter trust/permissions/promote node. Category reviewed
+API-first lazy-row pass25223 running; first13913 compile-only await correction,
+no behavioral result claimed. Fullscope remains open; no prod mutation/release.
+
+20261015 final local numeric/chat48656exit0:287/287PASS0skip/no runtime warnings,
+279units+8chatUI. Numeric range/goal percentage and fallback privacy sensitivity
+RED→GREEN; captures inspected, base guards/tests/project/diffPASS. Human/agent
+guide/catalog/screen reconciled. Business pinned-save probe/wallet CRUD/transaction
+PASS, category remainsRED after3renewed helper attempts, stopped for review.
+Actual checkbox fixture previously selected3wallets; now singleton selection is
+explicit, but latest run stops at post-save lazy-name wait before API readback.
+No fourth attempt before review. Idle lifecycle spec9ab9248d review pending,
+30minapproved but deletion not implemented. Releasebuild18960 waiting codesign,
+iPhone now unavailable; previous installed candidate unchanged. No release/DB
+reset/backend deploy/feedback resolution. Fullgoal still unachieved.
+
+20261015 human “Chốt” resumes work:30-minute idle interval plus bounded numeric/
+privacy fix and pinned/AX helper refinement approved. Numeric native boundary
+RED→GREEN; first expanded unit run277PASS/1FAIL caused only expected literal
+regular-space versus existing formatter NBSP, corrected test expectation without
+changing shared formatter. Current full units+4actualAPI/UI business gate running
+`/tmp/mypocket-approved-business-numeric-20261015.xcresult`, no final claim yet.
+Idle lifecycle written spec committed9ab9248d, awaiting review before implementation.
+No production/chat deletion, new device install or release publication this turn.
+
+20261015 resumed goal blocked audit: quick iPhone candidate delivered, not full
+completion. Idle TTL and other specific design gates unanswered across current
+user turn+two automatic continuations; independent native RED/replay investigation
+already complete. No live build/test/codesign/proxy; SSH identities0. Remaining
+product changes cross explicit review/loop guards. Goal blocked pending human/
+access state change, not paused/complete. No repeated known-green tests, release
+publication, history deletion or production financial mutation. Preserve fullgoal.
+
+20261015 next resumed goal: prior design-only TTL question was no-progress; now
+new actual native numeric regression RED1/1 at `/tmp/mypocket-native-progress-range-red-20261015.xcresult`
+proves unsafe progress amount acceptance, no product fix. Idle-reset investigation
+found replay depends on old user messages and generation is not yet enforced
+against current conversation on answer insert: do not blindly delete history.
+[Idle lifecycle work](work/tickets/NATIVE-ADVISOR-IDLE-RESET-20261015.md) records
+scope, timing and required tests;30min/24h still unanswered. iPhone installed
+candidate unchanged, no production/history/finance writes. Whole goal remains open.
+
+20261015 candidate DELIVERED: Release com.mypocket.ios installed in place on
+connected iPhone15Plus00008120-001C28C02131A01E; launched PID22311 and confirmed
+running from the new installation path. Production API Info.plist verified,
+health200. Initial codesign sealed temporary-file reference corrected by re-sign;
+strict/deep verificationPASS before final install. Evidence `/tmp/mypocket-stable-device-install-verified-20261015.json`
+and `/tmp/mypocket-stable-device-launch-20261015.json`. BinarySHA256
+e09f3884c4fa54d3639c218462890d2c5642f9ee71000a524338e0d4c6e7c379.
+No uninstall/reset/DB mutation; owner UAT pending, not full stable-release signoff.
+Backend cancellation fix remains local/not deployed; known numeric/privacy and
+other backlog gates retained. No release note publication before owner acceptance.
+
+20261015 owner requests quick production-connected iPhone candidate, not full
+backlog completion. Approved cancellation conversation→run lock/recheck applied
+locally: real PostgreSQL gate4/4PASS (previously3/1RED), full `go test -race ./...`
+PASS, fresh native273/273PASS0skip/no runtime warnings. Base/project/diff guards
+PASS. Release build uses production API; signing/install verification in progress.
+Backend patch is NOT deployed; financial data unchanged. Numeric/privacy,
+business test refinements, initial Stop and broader gates remain open. No release
+publication or feedback acceptance before owner UAT.
+
+20261015 goal blocked audit: full objective retained, not complete/paused. No live
+test/proxy/go-test; SSH agent has no identities. Same specific design review
+condition persists over >=3consecutive goal turns despite independent proof work.
+Await numeric/privacy, cancellation transaction and pinned/AX test refinement
+answers; Feedback/cache/goal422/transport decisions remain separate. Do not repeat
+known green gates as replacement for product fixes. Latest actual proofs:chat8/8,
+history274/274, business273/2RED, cancellation3/1RED. No production/install/release.
+[Full audit](work/tickets/NATIVE-FULL-COMPLETION-20261014.md).
+
+Latest20261015 cancellation realDB70798exit1:3PASS/1raceFAIL0skip,
+`/tmp/mypocket-advisor-cancel-db-red-20261015.log`. Actual controlled conversation
+lock proves late assistant insert after cancellation commit. Sequential/owner/
+new-run and blocking-provider stubservice PASS, not universal cancellation proof.
+Exact synthetic-owner teardown0remaining. Bounded lock/recheck design sent, pending;
+no product/backend/runtime patch. Source also shows syncPOST returns runID too late
+for initial native Stop; separate transport/UI verification needed. Human+agent
+guide/catalog corrected stale no-late-answer/Stop claims. Fullgoal active, no
+prod/device/release; numeric/business/Feedback/cache reviews remain pending.
+
+20261015 persisted native history E2E27531exit0:274/274PASS0skip/no runtime warnings
+(273unit+1actual DB/API/UI), `/tmp/mypocket-advisor-history-final-20261015.xcresult`.
+51synthetic messages prove latest50/older1/native nojump/scrollback/restart/API
+unchanged. First40442 failed offscreenAX assumption, corrected test only; no
+product patch. Capture76D78B35 inspected. Exact fixture cleanup0convo/0run/0msg;
+normal8081 defaultlaunch47423, guards/project/diff pass. Human+agent history guide/
+screen/ticket/ledger reconciled, no API/auth/schema/release/prod/device action.
+Fullgoal active; live cancellation/races/numeric/business/Feedback/cache gates open.
+
+20261015 native advisor wire coverage added (tests only). Target24082 PASS2/2;
+final72133exit0 native273/273PASS0skip/no runtime warnings,
+`/tmp/mypocket-advisor-wire-units-20261015.xcresult`. History request cursor/auth/
+chronological decoded parts and cancel exactPOST/noresubmission checked through
+real client+adapter with transport-only fake. Characterization, not productfix
+or native history/cancel/provider E2E. Guards/tests/project/diff pass. No tests
+running, product/API/prod/device unchanged. Publicdocs no change (wire unchanged).
+Numeric/business/Feedback/cache review gates and full objective remain open.
+
+20261015 current-helper chat88653exit0:8/8PASS0skip/no runtime warnings,
+`/tmp/mypocket-chat-current-helper-20261015.xcresult`. Current keyboard/AX/
+landscape/draft/APIoverview regressions pass. CapturesA80B6F81/FD268710/F165D9F3
+inspected: landscapeconvo63pt, screenshotcrop persists, AXFeedback oversized/text
+overlap unaccepted. Not populatedhistory/cancel/provider proof. History source
+limit50 coherent; cancellation task-overlap risk source-only, needs actual race
+reproduction. No product/test source changed. Fullgoal active; numeric/business/
+Feedback/cache review gates remain, no release/prod/device action.
+
+Latest numeric diagnostics20261015: actual Envelope.swift JSON decode→raw fallback
+12500PASS/1e100SIGTRAP; extracted actual count helper42PASS/Double(Int.max)SIGTRAP;
+actual progressTarget admits unrepresentable Double(Int64.max). Swift CLI proof,
+not iOS render/E2E or fix. Fallback branches ignore masked in source; guide human+
+agent/catalog/screen now state limitation instead of overclaiming universalprivacy.
+Numeric design pending; no product/test code, provider/prod/device change. No live
+UI/fault process confirmed. Prior goal turn progress; fullgoal active.
+
+Independent20261015 numeric-safety audit: actual source money/progress/count and
+JSONValue.prettyDescription can truncate/trap; Swift diagnostic confirms max
+Double guard admits nonrepresentable Int64, finite1e100 JSON and1.5→1. Not actual
+card crash reproduction. Bounded [design](work/tickets/NATIVE-AI-CARD-NUMERIC-SAFETY-20261015.md)
+sent, approval pending; no product/test implementation. Previous goal turn is
+progress, no live tests/proxy; fullgoal active, business refinement review pending.
+
+Latest20261015 regression80693terminal65:273PASS/2FAIL0skip/no runtime warnings;
+all271units+literalprobe+walletCRUD PASS. Category exact create/API scope PASS,
+UI test reads subtitle in label instead of base accessibilityValue; later filter/
+edit failures require independent proof. Transaction helper flags pinned saves
+outside shell611 but inside window667; not financial-write failure proof.
+Stop further guesses, bounded pinned-control/AX-filter test refinement sent for
+review; no third fix yet. [Ticket](work/tickets/NATIVE-CURRENT-BUSINESS-SWEEP-20261014.md).
+No tests running; full business remains RED/fullgoal active, goal422 separately
+blocked. Public API/human/agent docs unchanged (test-only); no release/prod/device.
+
+2026-10-15 owner approved semantic E2E reveal correction (test-only). Draft-only
+RED54467 isolates appended names to twenty helper swipes on QuickType ScrollView
+(0,407,375,44), before focus/save. No product autocorrection root proven; leave
+base/API/keyboard settings unchanged. Existing targets resolve their scroll
+ancestor by ID/label, lazy targets use only app viewport, ambiguity fails with
+geometry. Probe46637 preserves names but full swipe overshoots139pt viewport;
+bounded content drag probe34635exit0,1/1PASS0skip, no runtime warnings. No save in
+probe. Exact persisted assertions retained; units+wallet/category/transaction
+CRUD80693 now running. Captures inspected; compressed wallet form/Feedback still
+not visually accepted. Guards/guardtests/project/diff pass.
+Goal422 menu remains separately blocked; no production/device/release action.
+
+Latest2026-10-15 diagnostic7487exit65:272PASS/2FAIL0skip (271unit+correct-wallet
+transactionCRUD PASS), no runtime warnings. Category/wallet names match directly
+after typing but append prose after focus/save; source/AX/videos recorded. No
+product keyboard fix guessed; literal-name-only design sent for owner decision,
+notes/chat unchanged. Normal8081 simulator defaultlaunch25086; proxy20834 stopped,
+18081no listener, no running test sessions. Guards/tests/project/diff pass.
+Business sweep still RED; goal422 menu review blocked, goal503+strong credit
+locally verified. Confirmation-summary design pending; fullgoal remains active.
+
+2026-10-15 terminal sweep86110:280PASS/3FAIL0skip (271unit+9UI), no runtime
+warnings. Category root type assertion wrong; category/wallet names have appended
+prose not in typed literals; transaction test tapped first Chi tiết of wrong
+wallet. Source/AX/video inspected, not product-input root cause resolved.
+Normal diagnostic7487 running with exact-name assertions and explicit fixture
+detail ID; no keyboard/product fix guessed. [Sweep](work/tickets/NATIVE-CURRENT-BUSINESS-SWEEP-20261014.md).
+
+Approved goal rerun94298 terminal65:273PASS/1FAIL0skip,271unit+strong credit+
+goal503 PASS. Selector review fixed test assumption; goal503 same-key recovery,
+API/rendered112500/remaining887500 and unchanged report proved. Credit explicit
+source, pair, both balance deltas and unchanged report proved. Goal422 menu tap
+opens ordinary Add; now blocked for root/design review, no fourth placement fix.
+Captures98B2E756/76F1A2EF inspected; full visual/credit-label config audit remains.
+Proxy20834 stopped after cwd/command verification; normal8081 diagnostic running.
+First combined build26896 optional test-balance compile failure fixed via
+XCTUnwrap, not a financial-value fallback. No prod/device/install/reset/release.
+
+Current business sweep86110 confirmed running (normal8081 SE):271native units+
+12critical API/UI scenarios, `/tmp/mypocket-current-business-sweep-20261014.xcresult`.
+Credit test-source audit found default-source assumption; updated test only to
+unique/select explicit source, pair/balance/month-report readbacks and scoped
+cleanup. Current sweep compiled older test; updated credit must run separately.
+Owner explicitly approved savings test-helper correction; implemented selector
+name check/current-goal fallback without weakening assertions. Goal fault gates
+will run only after current simulator owner finishes; no concurrent UI runners.
+Confirmation-summary design still pending. No product/backend/prod/install/reset.
+
+AI next-step audit: full confirmation-summary design sent, awaiting owner reply;
+no summary implementation yet. Focused Go advisor/proposal race tests92901exit0
+in two packages, log `/tmp/mypocket-advisor-current-audit-20261014.log`. The
+versioned handbook now has a bounded deterministic `get_product_help` retrieval
+slice and native/web `product_help` cards; it is still not live RAG or arbitrary
+document retrieval. Its navigation was reconciled on 2026-10-15 to describe
+Trợ lý as the primary tab; the stale Assistant-in-More wording is covered by a
+provider regression. Catalog now reflects current8tool/6provider per-run safety
+bounds instead of4; no user usage quota introduced. Stub tests are not liveLLM/
+real-DB/prod proof. The approved wallet confirmation summary is now implemented
+locally with a focused goal/credit contract; next safe work is durable action
+replay or design/reproduction of remaining AI correctness gaps.
+
+AI wallet-proposal validation local in_review: actual rendered RED four invalid
+cards offered confirmation (150.5pt vs86pt invalid status). Strict shared decoder
+now used by card; no coercion of invalid type/money, validates target/credit/date/
+day and safe exact integer range, retains valid defaults/nulls. Final8709exit0,
+279/279PASS0skip (271unit+8chatUI), no runtime warnings; guards/project/diff pass.
+[Work](work/tickets/NATIVE-AI-WALLET-PROPOSAL-VALIDATION-20261014.md). Human/agent
+guide/catalog/screen reconciled. The wallet confirmation summary and persisted
+proposal `action_id` replay boundary are now implemented locally; the full
+prepared-action dispatcher and unsafe numeric conversions elsewhere remain open.
+No live creation/provider/prod/device/release or fullgoal claim.
+
+Rejected transfer editor independently verified:52081exit0,269/269PASS0skip
+(268unit+1actualAPI UI), no runtime warnings. Restart/unchanged-confirm refusal,
+changed22500/newkey, one pair, source77500/destination122500, unchanged monthly
+report and scoped detail pass; capture0134D5FF inspected, guards pass.
+[Work](work/tickets/OFFLINE-RECOVERY-E2E-20261014.md). No product fix needed.
+Savings-specific queue still blocked. Proxy8206 stopped; normal8081 build15493
+exit0, installed without reset and default launch9608. APIhealth200;18081 no
+listener confirmed. AI catalog corrected: nine non-mutating
+tools including wallet proposal; UI confirmation now has a persisted proposal
+identity, but is not proof of a general prepared-action dispatcher. No
+prod/install-to-iPhone/release/whole-goal completion.
+
+Owner approved adaptive chat. Implementation is now local in_review: keyboard hides
+shell tabs without reserving their height, overview moves to header, explicit
+dismissal preserves draft; accessibility navigation uses shared full-label menu.
+New interaction RED verified (tabs still present/missing dismiss action before
+code). Final20967exit0:276/276PASS0skip (268units+8UI), no runtime warnings,
+`/tmp/mypocket-chat-approved-final-20261014.xcresult`. AX menu Account→Assistant
+and normal tab roundtrip retain draft; actual API landscape conversation63pt.
+Guards/project/diff pass; captures inspected with crop/transition limits in ticket.
+No production/device/whole-goal completion claim.
+This supersedes the pending-approval wording in the historical evidence below.
+
+Adaptive chat RED:26992 landscape7pt; one-line cap10130 unchanged7pt, reverted.
+82726actualAPIoverview0pt (fake diagnostic absentframe bug corrected). Final88928
+exit65,272PASS/2landscapeFAIL0skip,268units+4otherchatUI pass,
+`/tmp/mypocket-chat-adaptive-final-diagnostic-20261014.xcresult`. Frame9E8C4D1E
+composer y103.5/h53 overlaps tab y129/h37, convo0; fake7pt.843995F5 inspected.
+Largest-text focusedcontrol PASS but tabglyph/label overflow notaccepted.
+[Work](work/tickets/NATIVE-CHAT-ADAPTIVE-20261014.md) blocked for bounded design
+review: keyboard tabs hide/explicitdismiss/overviewheader; AX navigation full-label
+menu throughexistingbase. No approval yet/no newUIcode.4invocations,1reverted
+productattempt, no further guesses. Guards/project/diffpass, simulatorportrait
+normal8081launch99198. No prod/device/reset/release/fullgoalclaim; cache/goalqueue/
+Feedback review gates unchanged. Publichuman/agent guide+registry updatedlimits.
+
+Readcache manualRED: DeviceHub exactSE/localDEBUGfixture→Reports2026-10 then
+2026-99+View. Both GETs40023:02:55; oldsummary/zerochart retained, no visibleerror.
+Inspected `/tmp/mypocket-report-invalid-month-repro-20261014.png`.
+Confirms invalidscope hiddenerror/stale retention only, not nonzero corruption/
+offline/Months note incident. ReturnedfixtureOverview, no financialwrites/reset/
+production/newbuild. [Audit](work/tickets/OFFLINE-READ-SCOPE-AUDIT-20261014.md).
+Typed coherent snapshot approach approval stillpending→spec/plan; no codechange.
+
+Read-cache audit: Overview has no cache injection, sequential partial publication;
+Reports keeps old summary ahead of error while month input mutates, optional
+metadata/rows fail into empty output; Months retains old summary/note on read
+failure. Code risks, not runtime-reproduced incidents. [Audit](work/tickets/OFFLINE-READ-SCOPE-AUDIT-20261014.md).
+Owner asked to approve typed query-scoped encrypted coherent snapshots, not local
+report recomputation/generic HTTP cache; approach response pending. Architectural
+brainstorming gate: then written spec/reviewed plan, no implementation this audit.
+Fullgoal unchanged, no prod/device/reset/release; goalqueue/Feedback blocks remain.
+
+Featureprivacy correction: APIError shared allowlist class/status;6featureprints
+and localfixturedebuglabel no arbitraryreflection. RED93397 3/3→GREEN66267exit0,
+272/272PASS0skip (268units+4chatUI), no runtime warnings,
+`/tmp/mypocket-feature-privacy-green-20261014.xcresult`. Guards/project/diffpass,
+APIhealth200. [Work](work/tickets/NATIVE-FEATURE-LOG-PRIVACY-20261014.md).
+97F7C806 keyboardrender inspected, usablecomposer; tabbar height UX observation,
+not defect/approval to hide (plan requires usable navigation). No per-screen
+fault-injection/liveLLM/wholeUI acceptance inferred. Publichuman/agent guide+
+architecture reconciled. Goalqueue/Feedback blocks unchanged, no prod/device/
+reset/release/fullgoalclaim. Next independent cache/auth/AIactions/help/APNs gates.
+
+Independent native HTTP privacy: actualstdout200/422 body/query RED39064→DEBUG
+metadata-only. Final92498exit0,267/267PASS0skip (265units+ordinarycreate/update+
+transferCRUD APIUI), no runtime warnings; base guards/project/diffpass,APIhealth200.
+Bundle `/tmp/mypocket-http-privacy-green-20261014.xcresult`.
+[Work](work/tickets/NATIVE-HTTP-LOG-PRIVACY-20261014.md). Assistant/Budgets/local
+fixture reflected-error logs still open; APIClient fix is not wholeapp privacy.
+Goalqueue/Feedback review blocks unchanged. No prod/install/release/fullgoalclaim.
+
+Goal queue checkpoint blocked for Rule10 review: baseline94206 RED, compiler
+11119/88671 failures resolved by typed editor factoring58326 buildPASS;27662
+263unitPASS/2goalUIFAIL0skip. Both UI failures: restart retains selected goal,
+test incorrectly requires aggregate transaction-wallet-selector. Proposed
+test-only helper correction needs review before another cycle; financial refresh/
+rejected-transfer editor gates still unverified. [Work](work/tickets/OFFLINE-GOAL-QUEUE-20261014.md).
+No product reset/prod/device/release/fullgoal claim.
+
+Latest recoveryE2E: ordinary422/409 changed-only/newkey/date, rejected/committed
+discard and transfer503/drop onepair/correctbalances/unchangedmonthlyreport
+verified. Proxy5/5; recovery28248 3/3,transfer4135 2/2,regression32155 267/2670skip.
+Scoped detail37055 2UIRED/263unitPASS exposed5 siblingIDs; existingcontain pattern
+on detailroot→35239exit0,265/2650skip,uniquegroup/scopednote for ordinary409/transfer
+drop,/tmp/mypocket-recovery-contained-final-20261014.xcresult. B8F61E91 inspected
+22500/day13/note, unchangedstyle. Finalnormal44956exit0,265/2650skip (263unit+2
+APIUI) /tmp/mypocket-recovery-normal-final-20261014.xcresult. Guards/project/diff
+pass; normal8081build restored, ownedproxy67789 stopped. [Work](work/tickets/OFFLINE-RECOVERY-E2E-20261014.md).
+Next rejectedtransfereditor/goalqueue/cache/report/auth/a11y/AIactions/help/APNs/
+prod/device. UnderlyingledgerAX visibility + Feedback stillopen; no prod/device/
+reset/release/fullgoalclaim.
+
+Latest foreground lifecycle: AppRoot owner/scene + defaultSDK NWPathMonitor→
+queue, one FIFO retry/lease timer; inactive/path loss suspends enginegeneration,
+preservesuncertainlease/key, logoutseparateauthblock. RED72468 startup/network/
+timer→258units; pauseRED18554 lateack+nextwrite→85017exit0,263/263 (261unit+2APIUI).
+FinalUI13577exit0,3/3PASS0skip,/tmp/mypocket-lifecycle-ui-final-20261014.xcresult:
+Home/serverrecovery no backgroundwrite, foregroundautoapply, restart/menuRetry,
+commitdrop replay all exact1serverrow/key. Finalunits94868exit0,263/263PASS0skip,
+/tmp/mypocket-lifecycle-unit-final-20261014.xcresult includes earlylease/FIFO/
+cooldown/auth/stalewake gates. Guards/project/diffpass; normal8081build restored,
+ownedproxy stopped. AppliedD63C86B9 inspected; Feedback stillcovers row, blocked.
+[Work](work/tickets/OFFLINE-FOREGROUND-LIFECYCLE-20261014.md). Next fullrecovery/
+transferfault/goalqueue/overviewreportcache/auth/a11y/AIactions/help/APNs/prod/device.
+No production/install/release/fullgoalclaim.
+
+Latest validation/transfer checkpoint: RED67864 missingcategory allowed at new
+enqueue/replacement; compatibilityRED69099 localinvalidPayload before legacy
+HTTP. validateNewIntent now creation-only, frozen replay semantics unchanged.
+Final40360exit0,256/256PASS0skip (255unit+1realAPI native transferUI),
+/tmp/mypocket-category-compat-final-20261014.xcresult. Explicit source/destination,
+balances100000→87500/112500→77500/122500→100000, reportflagsfalse and serverpair
+deletion verified. No aggregate report UI proof inferred. Guards/project/diffpass,
+APIhealth200. [Work](work/tickets/OFFLINE-CATEGORY-VALIDATION-20261014.md).
+Publichuman+agent/design reconciled. Foreground/reachability/timer/backgroundpause
+wiring still next, not implemented; fullgoal open, no prod/install/release.
+
+Latest fault/compact checkpoint: owner approved three-dot recovery menu, existing
+MPOverflowMenu44pt + card/text/badge retained. RED34418 missingmenu; GREEN23703
+1/2 exposed known Feedback tap interception, not a new placement fix. Recovery
+test scrolls clear without hiding overlay; final73398exit0,2/2PASS0skip,
+/tmp/mypocket-compact-green2-20261014.xcresult. Real503 and committed-lost-response
+restart/retry prove oneintent/key and one ledger row; commit/drop201/200/200.
+Proxy3/3 and guards/project/diffpass. Pending375pt screenshot3CF00F85 inspected;
+short rows compact, Feedback still overlays selector (blocked). Publichuman+
+agent/screen docs updated. [Work](work/tickets/OFFLINE-FAULT-E2E-20261014.md).
+Finalunit29293exit0,252/252PASS0skip,/tmp/mypocket-compact-unit-20261014.xcresult;
+normal8081build restored, temporaryproxy stopped, APIhealth200.
+No prod/install/release/fullgoalclaim; scheduler/fullrecovery/a11y/device remain.
+
+Newestrecovery localcheckpoint: retryNow/discard/atomicreplaceRejected + optional
+encrypted supersedesID. RED93734/6944→248units; coordinatorRED88919→251units;
+timestampsemanticRED46389→252units. Final5403exit0,252/252units0skip,
+/tmp/mypocket-recovery-editor-20261014.xcresult. SQLiteinsertfailure rollback and
+twostoreidempotent replacement proven; state/owner/key/content checks. Sharedqueue
+Retry/Edit/Discard+warning, reused prefilledordinary/transfer editors/confirmnewkey,
+preserveoriginaldate when unchanged. Guards/project/diffpass. [Work](work/tickets/OFFLINE-QUEUE-RECOVERY-20261014.md).
+Normalcreate/editUI58897exit0,1/1PASS0skip,
+/tmp/mypocket-recovery-normal-ui-20261014.xcresult; pending/conflict/date/retry/discard/accessibility/
+restart/networkE2E not yet proved. Goal-scopedqueuevisibility stillgap. Nextthese
+gates + foreground/network/background/auth/allremaininggaps. No prod/install/release.
+
+Newestqueue runtime: defaultAuth/root/env→sharedcreateforms StateUUID/durablequeue,
+separatependingbaseUI/acknowledgedrevision ledger+overview subscriptions. RED3560
+→242units; actualcreate/editUI45495exit0,1/1 /tmp/mypocket-queue-create-ui-20261014.xcresult,
+APIreads category/amount/note. TestappSQLite1row/sealed563bytes container449392A1,
+no decryption. Screenshot4685B100detail inspected, not pendingUIproof. Concurrency
+RED41241→drainEpoch, final23701exit0,243/243units0skip,
+/tmp/mypocket-queue-final-20261014.xcresult. Guards/project/diffpass.
+[Work](work/tickets/OFFLINE-RUNTIME-QUEUE-20261014.md). Nextperitemrecovery/pending
+E2E/network/background scheduler/authlifecycle/remaincache/fullnativegaps. Matching
+backend rollout required, no prod/install/release/goalclaim.
+
+Newestcache checkpoint: AESGCM/atomic/Keychain owner+server snapshot, default
+Auth→Transactions injection, ownerboundreads and transientonlyfallback/cachedAt
+sharedstatus+retry. RED95867cache/90809model/41489HTTPstatus;503{} exposed optional
+ProblemDetails.status bug, JSON/multipart now preserve authoritativeHTTPstatus.
+Final13769exit0,239/239(238units+actualAPIkeyUI)0skip,
+/tmp/mypocket-cache-final-20261014.xcresult. LedgerUI17267exit0,1/1PASS0skip,
+/tmp/mypocket-cache-ledger-ui-20261014.xcresult. Screenshot59D42ADA inspected,
+Feedback stillcovers lastamount knownblockeddesign. Syntheticlastknowncache may
+retain testrows afterservercleanup. Guards/project/diffpass, XcodeGennewfiles.
+[Work](work/tickets/OFFLINE-FINANCIAL-CACHE-20261014.md),
+[publichuman+agent guide](guides/offline-sync-api.md). Next fullruntimeoutbox/forms/
+queue/foreground/auth/refetch, overview/reportcache and staleUIaccessibility proof.
+No offlinewriteactivation/prod/sign/install/release/fullgoalclaim.
+
+Newest syncengine localcheckpoint: Task5 actor/policy implemented, not composed
+into app. RuntimeRED45673→228unitGREEN; lifecycle exposed unsortedJSONwire body
+regression24753, deterministicRED80149→outboxonly sortedencoder. Final52696exit0
+232/232unitPASS0skip,/tmp/mypocket-sync-engine-final2-20261014.xcresult. Fresh
+ownerboundcapability, FIFOleaseCAS, retry/permanent/conflict/auth, explicit
+sameownerresume/logoutlatecallback, actualAPIClientadapter/SQLite timeoutreplay
+with externalHTTPfake. GoRace22266exit0,guards/project/diffpass. XcodeGen newfiles.
+[Work](work/tickets/OFFLINE-SYNC-ENGINE-20261014.md). Coalescing+engine401live
+integration proof pending; invalidationcallback not realrefetch. Next runtime/
+cache/outboxUI/foregroundevents and fullnativegoal. No prod/sign/install/release.
+
+Newest offline acknowledgement checkpoint: FinanceAPI.applyOutbox uses persisted
+lease/key/frozen payload and expected-owner transport. Receipt/resource validator
+checks ordinary owner/wallet/category/jar/trip/type/amount/report/date instant,
+transfer distinct paired source/destination excluded rows. Valid runtimeRED63069
+and38814, final70626exit0,223/223unitPASS0skip, bundle
+/tmp/mypocket-ack-http-final-20261014.xcresult. RealSQLitelease/APIClient with
+externalHTTPdouble, not live financial backendE2E. Base/guardtests/projectpass.
+[Work](work/tickets/OFFLINE-CLIENT-ACK-20261014.md),
+[human/agent guide](guides/offline-sync-api.md). No new backendwire/schema/package.
+Next sync actor/backoff/capability/lifecycle, then cache/UI/events and all gaps.
+No offline activation/prod/install/release/wholegoal completion.
+
+Newest local runtime/APIUI and owner-refresh checkpoint: API8081 rebuilt from
+current source, PID19887/session46368; dedicatedPG55434/Redis16379, prod untouched.
+ActualUI keycreate/copy/revoke pass; extended51955RED reproduced stale secret and
+revoked row resurrection,70976GREEN212/212 after transient keyID/filter fix.
+Owner envelope/refresh RED18476fivecases; CAS RED86604twoactualstore cases. Final
+58452exit0,219/2190skip(218unit+actualAPIUI), bundle
+/tmp/mypocket-owner-session-cas-final-20261014.xcresult. Keychain16contenders one
+winner; old refresh never overwrites new same/otherowner login or cleared session.
+sendEnvelope retainsmeta, expectedOwnerID localguard, no new owner wire field.
+[Work](work/tickets/OFFLINE-CLIENT-ACK-20261014.md), [ADR022](decisions/ADR-022-owner-bound-native-refresh.md).
+Actual account re-open render FF8AB1F2 inspected: revoked key/secret absent,
+Feedback over timezone control confirms known blocked design. Guard/project/diff
+pass;0active synthetic testkeys/0wallet/0tx/schema32false. Next Finance outbox
+receipt+resource validator, then sync actor/cache/UI/events and all other gaps.
+No financial adapter/sync activation/prod/install/release/fullgoal completion.
+
+Owner full-key decision implemented local: common RequireAuth JWT/activeownerkey,
+no advisor/feedback scope gates, create no scopes, old SQL arrays ignored/preserved,
+metadata compatibility[] only. APIkeylogout selfrevoke, JWTlogout unchanged.
+Native selector removed/shared warning. FinalGoRace18813/vet0; native97143exit0
+212/2120skip211unit+1UI. [Work](work/tickets/API-KEY-FULL-ACCESS-20261014.md),
+[guide](guides/api-keys.md), [ADR021](decisions/ADR-021-full-owner-api-keys.md).
+ActualDB write/replay/transfer/owner/keymanagement/expiry/revoke proof. Inspected
+SE screenshot has Feedback covering helper; known design block, not visual UAT.
+No APIrestart/prod/install/release. Next updatedlocalAPI/accountmutationUI proof,
+then sync/cache/UI and entire remaining goal. No transactions:write question.
+
+FrozenTravel gate locally verified: optional create-only auto_link_travel=false
+prevents delayed active-trip fallback; omitted/null/true online unchanged. Old
+canonical receipt hash preserved, changed policy409, explicit inactive owner trip
+accepted/deleted or foreign new intent404; completed replay before lookup retains
+original date/trip without resurrection. Cap explicit_travel_v1 mandatory for
+iOS ordinary offline writes; outbox freezes false before persisting. Native
+211/2110skip59173; fullGoRace51567/vet0 after regeneratedSwagger. [Ticket](work/tickets/OFFLINE-FROZEN-TRAVEL-20261014.md).
+No production/install/release/API-key change. Next implement owner's full-key
+decision, then sync actor/cache/UI/session and remaining all-gap objective.
+
+Newest owner decision: remove all per-key scopes; user API key must support the
+same account operations as JWT. [Full-key design](work/tickets/API-KEY-FULL-ACCESS-20261014.md)
+ready, implementation next after current Travel gate. No key permission code or
+production activation yet. Preserve owner isolation/expiry/revocation/password
+confirmation and service-token boundary; old scopes do not constrain target.
+Do not ask again for transactions:write; that question is superseded.
+
+Encrypted outbox now implemented locally, no screen/sync instantiation. SQLite3
+WAL/FULL/IMMEDIATE + AES-GCM + per-account/server device-only Keychain key. Stable
+enqueue/FIFO/isolation/lost-key refusal and transactional leases/outcomes/auth
+block/resume verified. RuntimeRED70442 six missing-persistence tests,43035 four
+missing-lease tests; final88836 exit0,209/209units0skip at
+`/tmp/mypocket-outbox-store-final-20261014.xcresult`,16store cases. Base guards,
+project verification and diff pass. [Ticket](work/tickets/OFFLINE-ENCRYPTED-STORE-20261014.md),
+[ADR020](decisions/ADR-020-encrypted-native-outbox.md). No prod/install/release/API
+change. Next: freeze entry-time Travel contract/capability, implement sync/cache/
+UI/session integration; retain full AI actions/RAG/APNs/UI/rollout/device goal.
+Typed markOutcome replaces four planned setters, not sync retry policy. Missing
+Keychain key never causes ciphertext wipe/replacement. Full task/goal still open.
+
+Latest: GET /sync/capabilities + typed iOS getter/fail-closed policy implemented
+local, no sync wiring/prod activation. Backend404 RED76809, focused1027/full Go
+race41946/vet pass; actual JWT/Redis200beforelogout/401after. Native runtimeRED
+2fail/1pass with fail-closed scaffold, final193/1930skip terminal77223 bundle
+`/tmp/mypocket-sync-capability-native-final-20261014.xcresult`. Tests known2create
+operations/version1/key/meta policy and old4041GET/no mutation; unknown/disabled
+blocks. OpenAPI inspected, guide/API/spec reconciled; guard/project/diff pass.
+DB fixture/Redis namespace0/schema32false; no restart/prod/install/release. Next
+encrypted account-scoped cache/outbox store and actual sync actor consuming fresh
+capability, while transactions:write security choice and all UI/AI/prod gates stay
+open. [Capability work](work/tickets/OFFLINE-SERVER-CAPABILITY-20261014.md).
+
+Latest auth proof: actual NewRouter/bcrypt/JWT + PostgreSQL55434/Redis16379,
+full Go race48372/vet0. Owner create/replay; other owner404, missing/bad/expired
+JWT401, real Redis session expiry401, logout/family revocation401 before receipt.
+Valid finance:read key authenticates in service, but financial routes JWT-only
+deny its write/replay401; wrong scope/expired/revoked key state verified. No
+positive API-key financial-write support claim. New transactions:write choice
+requested, security policy unchanged. DB fixtures/Redis test namespace0/schema
+32false; full suite also exercises Redis audit stream. [Work](work/tickets/OFFLINE-AUTH-HTTP-20261014.md).
+No prod/schema/install/release; continue capability/native encrypted outbox/sync
+while write-scope decision pending. Full UI/AI/prod/device goal unchanged.
+
+Latest: keyed create HTTP receipt branch implemented and locally verified;
+201 first/200 replay, unchanged data object/array + meta.mutation, typed request
+hash excludes generated defaults, receipt lookup before mutable catalog checks.
+No-header legacy path unchanged/unprotected: required-key rollout not complete.
+HTTP/DB validRED56514 then4cases pass, final full Go race45501/vet0. Covers
+archive/delete retry/no resurrection,8-concurrent pair exactly2excludedrows,
+invalid keys/owner isolation/context auth/legacy/failclosed. Actual JWT/API-key
+middleware E2E still open. Native189/1890skip compatibility units terminal70137
+pass (object+2-row array metadata), not an offline UI test. Swagger regenerated/
+inspected; public human+agent guide/docs reconciled. Local fixture owners0/schema
+32false. No API restart/prod/sign/install/release. Next native durable key/cache/
+outbox/sync, server-capability/activation gate and remaining full UI/AI/prod scope.
+
+Latest offline prerequisite: shared SQL logger privacy locally verified, not
+deployed. Default constructor leaked bound values + cast-error text (validRED2).
+Filter-only wrapper failed because GORM Scan recorder expands SQL first; class-only
+Trace + sanitized SQLSTATE/generic errors now passes4 actual read-only DB tests,
+including LogMode, Row/generic events and not-found semantics. Final full Go race
+6719 exit0 and vet/diff pass. [Work](work/tickets/SQL-LOG-PRIVACY-20261014.md),
+[ADR019](decisions/ADR-019-financial-sql-log-redaction.md). No route/auth/schema/
+app UI or production changes, no historic log deletion. Next remains HTTP key/
+metadata/hash contract + integration before encrypted cache/outbox/sync; full UI/
+AI actions/RAG/APNs/prod/device objective active.
+
+Latest backend offline prerequisite: reusable create receipt capability added
+without HTTP wiring or migrations. Reuses transaction_mutations22; fixes existing
+GORM candidate-ID lookup bug affecting all shared receipt replays. Real DB5cases
+cover replay/conflict/owner/concurrency/rollback/pair exclusion and old patch/delete
+after deletion without resurrection. Full Go suite86668, focused race73167 and
+final full Go race85540 pass; vet0. Local fixture owners0/schema32false. No API
+restart/production changes, no offline availability claim. [Work](work/tickets/OFFLINE-CREATE-RECEIPTS-20261014.md),
+[ADR018](decisions/ADR-018-reuse-durable-financial-receipts.md).
+Next: freeze HTTP header compatibility/array-safe metadata/hash, financial SQL
+logging privacy gate, route integration before encrypted native cache/outbox/sync.
+UI blocked bubble design/provider/a11y/full-device/prod scope remains active.
+
+Latest portfolio density slice: asset position values now reuse MPMetric compact
+like summary; section/grid rhythm uses8pt token, no fields/unknown prices/history
+hidden, no base font/palette/API changes. Real UI RED66252: asset cost line27.5pt
+versus compact20.5pt; final71961 terminal0,
+`/tmp/mypocket-portfolio-metric-density-green-20261014.xcresult`191/191 PASS0skip
+(188unit+3API UI: metric consistency, asset error/cancel/create, price readback).
+CaptureF514F91B inspected: values consistent and price/history reachable, but
+Feedback covers asset title/quantity. This is the already blocked content-region
+avoidance issue; do not make fourth placement attempt or accept whole screen.
+Task1/6 density/all-screen gates still open; no prod/sign/install/release.
+
+Latest independent navigation slice: removed duplicate More advisor item while
+retaining typed route; primary Assistant tab keeps unsent input across tab changes
+through volatile shell binding (standalone routes local fallback). RED7177
+duplicate and96308 lost-draft observed. Initial195/196 failed only because test
+keyboard helper inserted Return/newline; corrected test switches tab directly.
+Final41071 terminal0, `/tmp/mypocket-assistant-navigation-final-20261014.xcresult`
+196/196 PASS0skip (188unit+8UI), includes all remaining More destinations/back,
+secondary shell, actual API overview, suggestions, keyboard and draft. Retained
+draft screenshot inspected; auth error in fake-token fixture is expected and not
+provider/prod evidence. Guard/project/diff pass. No signed install/prod/release;
+full goal and previously blocked bubble-design slice remain open.
+
+Newest checkpoint: AI-entry pinning/avoidance gate
+`/tmp/mypocket-floating-complete-controls2-20261014.xcresult` completed196/196,
+0 failures/skips (188 units+8 selected UI). Exported and inspected header/footer,
+proposal and actual imported-photo captures. Header/Analyze/Save-all and preview/
+remove/approval controls are protected in these cases. However the proposal render
+places Feedback over the description text field placeholder. This is NOT visual
+acceptance. Third product-fix pass exhausted: this avoidance slice is blocked for
+design review under Rule10; do not add another speculative placement patch.
+Other work remains active: Task3 evidence gaps, Task1/5/6 full-screen conformance,
+offline/AI actions/RAG/APNs/prod/device scope. No signed install/prod/release.
+Independent management regression completed55284 exit0,7/7 PASS,0skip at
+`/tmp/mypocket-management-current-regression-20261014.xcresult`: budget CRUD,
+ended-budget no-write/delete-cancel, jar month/draft CRUD, recurring CRUD/run-due,
+travel CRUD/toggle, optional date/context clear and transaction link/unlink.
+Read summary and each test node; create-error/all-screen visual/a11y remain open.
+
+Latest: UI plan Task4 locally complete, ledger script75502 terminal0 and final
+`/tmp/mypocket-task4-complete-20261014.xcresult`193/193,0skip (187unit+6UI),
+after prior identical193/193 gate. Real stock Photos image appended without
+replacing19 prior files, full20 bound; actual Photos/Files cancel/switch, uncertain
+request recovery and disabled capability preserved. Data-loader characterization
+refactor proves2valid/2errors/cap4/one active load/cap0; mixed normalized JPEG/PDF
+wire preserves raw bytes and Vietnamese filter/timezone/session. No OCR/model/
+financial writes. Screenshot of imported flower thumbnail inspected.
+Unsigned prod-URL Release compile46172 exit0; do not install unsigned output.
+Guards/project/diff pass. Human+agent-readable native/public docs reconciled;
+no new API/schema/auth changes, no signing/install/prod/release, no live handles.
+Next: Task3 remaining create/error/capture proofs, then Task1/5/6 all-screen
+conformance/provider/keyboard/accessibility; AI entry header/Save-all scrolls out
+and Feedback partly covers process CTA (captured Task6 finding). Full offline/
+AI actions/RAG/APNs/prod/device objective remains active, not a UI-only completion.
+
+Next active slice: Task6 AI-entry pinned header/Save-all/Analyze, detail approved
+under common-family plan. Tests0/2 validRED terminal61061 at
+`/tmp/mypocket-ai-entry-pinned-red-20261014.xcresult`; no scaffold implementation
+changed yet. Reuse MPEditorScaffold via typed custom-header initializer, preserving
+all existing title/onCancel consumers. Additional assertion now protects last
+attachment remove action from bubble displacement; this assertion not yet run.
+Do not fix CTA overlap by blocking that X or adding a reserved lane. Shared
+compact-control avoidance may be needed; contract before code. No live handles.
+
+Newest continuation: Task4 Photos-first source base/image policy implemented.
+Source default/switch/count20/removal/cancel and actual Photos+Files system cancel
+now pass; blank body root was unbounded EmptyView footer covering sheet fields,
+fixed by explicit zero-height absent footer within base. Button-host/timing
+hypotheses alone failed; final185units+4UI189/189 zero skips terminal53512,
+`/tmp/mypocket-photos-footer-bounds-20261014.xcresult`. All3 source/system
+screenshots inspected. Real selected-photo append/partial-cloud/mixed upload
+proof and device acceptance remain open, so Task4 is not complete.
+Portfolio/price/trade+credit route regression4/5 initially passed; credit failed
+old purchase label plus payment transfergeneric title. Shared row payment title
+RED→GREEN; final credit UI verifies amounts/category/pair/report exclusion.
+Synthetic local trade fixture removed exactly after test; no prod mutation.
+Guards/project/diff pass. No live test/signing/install or release publication.
+Next: actual photo import/partial/multipart proof, remaining Task3 create/error/
+capture evidence, then all-screen/chat provider/accessibility and broader goal.
+
+New continuation: canceled-edit loss reproduced4/4, resume guards implemented
+for budgets/jars/recurring/travel with fresh target metadata. Subsequent gate
+184/185 passes180units, Budget/Recurring/Travel retention and ended-budget preview;
+Jar month selector needed native menu scrolling. Corrected test then reproduced
+real cross-month draft retention; month-change resets target/inputs now. Final
+180unit+8UI gate20421 terminal exit0,188/188 PASS,0 skipped at
+`/tmp/mypocket-draft-retention-final-20261014.xcresult`. Ended screenshot inspected;
+final check compares every decoded transaction field, not IDs only. No live tests.
+SSH retry14936 terminal255
+still SSH-agent signing communication error; no prod change. Goal remains active.
+
+Latest continuation: management budgets/jars/recurring/travel now use the shared
+editor route/scaffold; travel dates use optional account-timezone calendars.
+Full-form travel PATCH explicitly sends empty strings to clear optional fields;
+omitted/null still preserves them on backend. Footer reports floating clearance;
+Feedback hides while typing and returns after keyboard dismissal, without lane.
+Mixed API gate185/186 and recovery183/184 are NOT green suites: recurring was
+recovered, remaining expanded Travel context test had unsafe keyboard gestures.
+Its date-clear and180-unit wire checks pass independently. Selection-menu test
+correction passed1/1 at `/tmp/mypocket-travel-selection-20261014.xcresult`:
+create/context/date and clear/context/date actual API readbacks pass.
+Aggregate unit/management/keyboard gate terminal94622 exit0:187/187,0 skipped
+at `/tmp/mypocket-management-aggregate-20261014.xcresult`. Jar selector was
+misspelled; explicit test terminal53497 exit0,1/1 PASS,0 skips at
+`/tmp/mypocket-jar-explicit-20261014.xcresult`. No test process remains live.
+Earlier pending retention/ended-budget proof is superseded by188/188 above.
+No new signing/install/prod mutation or release publication.
+
+Latest: UI-plan Task2 implemented/verified, uncommitted under scoped-worktree
+ruling. Typed quantity/count/percent fields, locale-safe decimal normalization,
+strict recurrence count, dedicated note editor. Full179 units pass; actual API
+fractional trade/recurrence, report exclusion, note persistence/cancel proofs pass.
+Task3 portfolio slice implemented: shared MPEditorScaffold, separate asset/trade
+editors, short price sheet, flat asset metrics/history, busy guard and retained
+draft on failure/cancel. API create/error/cancel/trade/price readbacks pass;
+keyboard/footer and retry screenshots inspected. Release prod-URL compile passes
+unsigned, not installed. Remaining Task3 budgets/jars/recurring/travel editors,
+Task1 broader flattening/density, Photos, chat provider/accessibility, final sweep,
+offline/AI actions/RAG/APNs/prod rollout/device acceptance remain mandatory.
+See [validation](work/VALIDATION_MATRIX.md) for mixed-run failure and final proofs.
+
+Owner approved ALL listed gaps. Execution is active, not awaiting plan review;
+full scope in [completion matrix](work/tickets/NATIVE-FULL-COMPLETION-20261014.md).
+Chat slice implemented: shared1–4-line composer, pinned compact overview/details,
+flat assistant messages/trailing user bubbles, feedback clearance without lane,
+hidden raised Add on Assistant. Local draft remains editable when service is
+unavailable; submission remains gated. SE UI3/3 and actual local API overview1/1
+plus full units171/171 passed. No live-provider/physical acceptance claim.
+Task1 common card insets and flat metrics now in progress; final full-screen
+sweep, offline/AI V2/RAG/APNs, prod activation and device build remain open.
+See validation for exact evidence. Old signing process for stale source was
+cancelled; do not install its product. No release/status publication.
+
+Task1 partial: asymmetric surface padding12horizontal/8vertical and flat AI
+metrics verified, full units173/173 on SE. Task2 note slice: dedicated shared
+editor with save/cancel draft semantics; UI2/2, actual API create/update+DB note
+readback passes on iPhone16. Combined iPhone16 run exposed3 ambient-device-state
+AuthRestore failures; test-only preferences/device-store isolation fixes them,
+full units173/173 on same simulator now pass without warnings. At that checkpoint numeric fields,
+remaining flat-card consumers/editor routes and all-screen acceptance still open.
+Unsigned Release verification passes with existing orientation packaging warning;
+generated product is unsigned and must NOT be installed. Final signed app not built/installed.
+Fresh prod read-only SSH attempt still failed SSH-agent communication, no change.
+
+Owner approved retaining current palette and applying the five-family guideline
+throughout iOS. [Execution plan](superpowers/plans/2026-10-14-native-ui-system-consolidation.md)
+has six tasks and is approved/executing; inline/native execution is
+the preserved method. No new product code/API/schema change in this planning
+checkpoint. Don't re-ask palette/style questions; keep approved Manrope/colors.
+Existing feedback API activation/signing approvals remain separate blockers.
+
+Current priority: [native UI system audit](work/tickets/NATIVE-UI-SYSTEM-AUDIT-20261014.md).
+Prod intake now42 reports (latest8 recorded). [Native screen/presentation registry](design/platforms/ios-screen-registry.md)
+and [five-family guideline draft](design/platforms/ios-base-guideline.md) created;
+six missing native screen specs added. This is source/navigation coverage, not
+completed rendered all-screen UAT. Duplicate More account/notifications entries
+removed with RED/GREEN UI1/1; broader guideline now approved and executing.
+
+Owner-resolution feedback implemented locally: counted tabs, reversible
+checkbox, independent of dev status/history. Backend current+isolated candidate
+race suites pass; native171 units + sequential API UI1/1 pass; stale refresh
+race independently reviewed/reproduced/fixed. [Rollout checkpoint](work/tickets/FEEDBACK-OWNER-RESOLUTION.md).
+Backend candidate1f6a7f7d pushed/image built; prod migration32 applied after
+validated backup with unchanged content hashes/counts (42feedback). **API image
+activation blocked by pi SSH/1Password agent**, existing healthy auth image
+remains running. Final device build waits codesign/Keychain; not installed yet.
+Owner asked to approve SSH and guideline. Do not claim route deployed or publish
+release notes; preserve installed density build and financial data.
+
+Urgent installed-build density feedback: owner requests smaller card/item heights
+and immediate reinstall without tests. Shared card padding is now8, controls44,
+transaction/wallet glyph32 with no outside vertical padding, category row min44,
+profile single identity row, section gaps8/row gaps4; disabled Account FAB hidden.
+Fonts and financial/API logic unchanged. Prior173+8 evidence predates this pass;
+updated geometry assertions are not executed at owner's request. Release signing/
+installation and physical acceptance must be recorded separately after completion.
+
+Density replacement now compiled Release successfully, strict signature verified,
+production API URL checked and installed without uninstalling on owner's iPhone.
+Tests deliberately skipped; no release publication. Owner checks compactness.
+
+Native feedback finish pass uses flat 12pt-padded shared cards, compact medium
+typography, unified transaction rows, horizontal profile, 8pt button corners,
+ledger wallet selector in the header and optional feedback photo choose/remove/
+replace. The old feedback dock is removed: an explicitly sized content viewport
+ends at the 56pt navbar, with the 52pt bubble overlaid and no reserved lane.
+169 unit + 4 compact UI tests pass; 8 API-backed UI tests pass, including actual
+Face ID enrollment/logout/device-login, row consistency, reports/month state,
+wallet scope, key copy/revoke and feedback. See [validation](work/VALIDATION_MATRIX.md).
+
+Authenticated production queue fetch succeeded: 34 open records, no screenshots;
+all are classified in [audit](work/tickets/NATIVE-FEEDBACK-PROD-AUDIT-20261014.md).
+Do not repeat earlier 404/401 intake conclusions or claim all 34 fixed. Note-editor
+separation, durable offline/cache, AI V2 writes/product RAG and remote push remain
+open. A dim disabled Account-tab add circle also needs a focused reachability/
+visual follow-up. No production feedback statuses or release notes changed.
+
+Owner approved additive backend deployment preserving data. Auth-only commit
+`12572c87` is pushed and deployed; migrations 29→31 clean, validated backup and
+unchanged financial counts/checksums. API health200/API1/1/worker1/1/web0/0.
+See [rollout](work/tickets/NATIVE-DEVICE-AUTH-ROLLOUT-20261014.md). Legacy session
+logout can sign out other pre-upgrade sessions once; new session families remain
+independent. No financial records or passwords were reset.
+
+Paired iPhone 15 Plus uses a current Personal Team profile through 2026-10-20.
+After owner Mac unlock, repaired the stale interrupted-signing manifest with the
+same identity; strict/deep verification passed. Production-API Release app was
+installed without uninstall and devicectl launch succeeded. Hardware Face ID
+and owner visual UAT remain pending. Do not weaken Keychain or treat installation
+as acceptance of every feature.
+Keep unrelated dirty web/backend edits untouched; active branch remains
+`codex/native-ios-port`. Release publication awaits owner acceptance.
+
+## Historical checkpoints
+
+2026-10-13 owner clarified reduced rounding means buttons, not cards.
+Native shared button radius is now 8pt rather than 999pt, preserving 48pt
+height/44pt hit targets and circular feedback actions. Token RED reproduced
+999 versus 8; full native unit suite passes 164/164 on iPhone SE at
+`/tmp/mypocket-button-radius-green-20261013.xcresult`. This is not completion
+of the feedback audit: owner now wants scroll content to reach the navbar
+without a reserved feedback lane, and reports excessive card/content density.
+Those follow-ups remain open; do not claim all feedback fixed or publish
+release notes before owner review.
+
+2026-10-13 owner explicitly redirected follow-up work to the native iOS app,
+not ongoing web maintenance. The remaining mobile feedback audit/fix loop is
+active under [NATIVE-MOBILE-FEEDBACK-20261013](work/tickets/NATIVE-MOBILE-FEEDBACK-20261013.md).
+Worktree contains unrelated uncommitted web/backend/design changes; preserve
+them and scope implementation to `mobile-ios/` plus native design/work docs.
+Native iOS feedback fixes now cover ledger row copy, global amount masking,
+report inclusion control, month-period copy, remembered wallet scope, newest
+populated week fallback, segmented-control motion, and Assistant card
+elevation. Unit suite passes 156/156 (fresh result:
+`/tmp/mypocket-ios-feedback-unit-final7-20261013.xcresult`) and focused UI
+regressions pass. Release warnings-as-errors build and project/base guards pass.
+The broad UI scheme stalled on More;
+remaining screenshot-dependent polish, Face ID/logout intent, and queue
+completeness still require resolution.
+The direct production feedback URL returned 404 in this turn, so the previous
+authenticated intake is usable but queue completeness is not established. Do
+not publish changelog/release notes until owner approval. Re-fetch the queue
+before claiming all reports are exhausted.
+
+2026-10-08 native category picker visual parity: each root has its own shared
+card and row copy/clear action match web. Eligibility is independent of
+hierarchy context. API-backed budget, recurring and transaction flows verify
+selection/persistence; full native unit/contract is 144/144. Release
+warnings-as-errors, project/base guards and diff check pass. Local disposable
+DB/API only; no endpoint/schema changes. Physical-device/owner acceptance and
+feedback bubble collision remain open; owner selected option A (dedicated
+shell dock), and its detailed layout/spacer migration is awaiting review.
+Evidence is in `work/VALIDATION_MATRIX.md`.
+
+2026-10-08 current-source verification refresh: backend without DB config
+passes 240 tests across 16 packages. After applying existing migration 000030
+to the local stage DB only (version 29 → 30, additive; no reset),
+`go test -race ./... -count=1` passes 265 tests across 16 packages against
+both local stage and a fresh disposable database; the disposable DB was
+removed. Production was not accessed. Native iOS unit/contract target passes
+142/142 with zero skips/failures on iPhone 16 Simulator, and Release
+warnings-as-errors plus base/project guards pass. The feedback collision UI
+regression remains unresolved and its dock detail design awaits owner review.
+Physical iPhone 15 Plus currently reports unavailable, so this checkpoint is
+Simulator-only. Evidence is recorded in `work/VALIDATION_MATRIX.md`.
+
+2026-10-08 native category-list visual parity: API-backed iPhone capture
+exposed wrong add/kind order, per-row pencil/delete controls and category-kind
+subtitles. Native now follows the web action order, opens the editor from the
+whole row, keeps delete in the editor, and derives `Áp dụng tất cả ví` /
+`Hoạt động trong N ví` from the existing API `wallet_ids`. Focused API UI
+passes 1/1, unit/contract tests 138/138, Release warnings-as-errors and base
+guards pass. No backend/API/schema update was needed because scope data already
+exists. Category screenshots and proof are in `work/VALIDATION_MATRIX.md`;
+overall device UAT remains open, including the feedback bubble overlapping a
+long-list row, now tracked in
+`work/bugs/NATIVE-LIST-FEEDBACK-BUBBLE-COLLISION.md`.
+
+2026-10-08 native category editor parity is implemented: create/edit now uses
+a dedicated route with visible reusable wallet checkbox rows. The iPhone API
+flow uncovered a real wire bug: Swift encoded `walletIDs` as `wallet_i_ds`, so
+the Go API silently treated selected scope as empty/all. `CategoryModelInput`
+now explicitly emits `wallet_ids`; category plus owner-validated wallet links
+are persisted atomically. Wire test, repository test and API-backed iPhone CRUD
+pass. No endpoint/schema/migration changed. Continue the remaining category
+parity audit; screenshot/device acceptance and inactive-category semantics stay
+open. All backend verification is on isolated local stage, never production.
+
+2026-10-08 native credit entry now uses the shared searchable category tree
+inside its existing action sheet. Type/wallet eligibility and draft values are
+preserved; API-backed iPhone UI verifies the selected category ID after save.
+The existing Go credit/category contract already satisfies the flow, so no
+backend/schema change is required. Continue the native port audit with the next
+unresolved behavior/visual parity item; production data remains out of scope.
+
+2026-10-08 port audit found one explicit web/Stitch vs native discrepancy not
+captured as an open backlog item: category create/edit is a dedicated route on
+web but inline above the tree on native, and wallet applicability is a visible
+card on web/Stitch vs a menu on native. CRUD remains implemented and API-backed;
+existing proof does not cover visual/route parity. A draft backlog item and
+validation record were created. This audit snapshot is superseded by the
+implementation entry above: the owner authorized the dedicated route and it is
+now implemented with API-backed proof.
+
+2026-10-08 native wallet management parity: the iOS list now matches web
+grouping and aggregate semantics, Sửa/Xong, row-to-edit, in-form delete, add
+and disabled service actions while retaining Chi tiết. Simulator UI verifies
+included/excluded wallets, included-only total, unscoped aggregate routing and
+confirmed API deletion.
+That test found GORM was converting explicitly excluded wallets to included;
+repository creation now persists false transactionally. Backend `go test ./...`,
+native 130/130, API UI 1/1, Release warnings-as-errors and base/project guards
+pass. Stage fixtures were cleaned; temporary 8081 stopped and existing 8080
+untouched. Owner visual/device acceptance remains open; no API/schema change.
+
+2026-10-08 native wallet row visual parity: compared the Stitch capture and
+web WalletSelectionList directly. Native selection rows now stack wallet name
+over current balance and show the selected aggregate/wallet check through a
+shared base row. API-backed iPhone 16 regression passed 1/1; screenshot and
+RED/GREEN evidence are recorded in the port audit and validation matrix. Native
+Chi tiết is retained as a compact trailing row action, while goal/credit details
+remain. Pixel-level physical-device approval and wallet-glyph artwork parity
+remain open; no public API docs were changed.
+
+Wallet aggregate icon is now distinct from a basic wallet: native uses the
+globe/categoryTeal treatment specified by the web contract. The API-backed
+iPhone 16 regression and screenshot pass; remaining wallet-specific icon art
+and authenticated device visual acceptance remain open.
+
+2026-10-08 native notification inbox proof: the seeded unread-item UI path now
+passes against an isolated local stage API on port 8081, including persisted
+owner-scoped mark-read verification. The full native unit/contract target is
+127/127; project/base guards and web design/type/build checks pass. The test
+fixture was deleted and the temporary API stopped. The already-running API on
+8080 was found to use its local default `postgres` database, so test work now
+uses the explicit stage API rather than that service. The configured
+DeepSeek-V4-Flash synthetic text extraction, tool-call wire probe and
+provider-backed Finance Assistant send/history flow pass; usage keys are
+persisted and the synthetic conversation was cleaned. Local OCR and S3
+credentials are missing, so image/PDF live proof is blocked. Authenticated
+visual/device acceptance remains open.
+
+Native API fixture helpers are now explicitly routed to the same isolated
+stage API by default (`127.0.0.1:8081`, overridable with
+`MYPOCKET_TEST_API_BASE_URL`). A wallet create/edit simulator flow passed 1/1
+with the app configured for that endpoint; its synthetic wallets were absent
+after teardown. The temporary API was stopped and the existing port 8080
+service was left untouched.
+
+Portfolio write-path UAT exposed a real native history gap: the backend's
+aggregate portfolio summary calculates positions from trades but returns an
+empty history field. Native now loads each asset's immutable history from the
+existing owner-scoped trades endpoint. The iPhone 16 simulator passed a buy,
+position/history refresh and fresh API verification of fractional quantity,
+price and fee (1/1); native unit contracts remain 127/127 and Release
+warnings-as-errors plus project/base guards pass. The exact synthetic asset
+and immutable trade were removed from stage DB after testing. Device visual
+approval and live OCR/S3 remain open.
+
+2026-10-07 native goal-wallet savings-ledger parity: the scoped goal route
+now switches from the generic transaction shell to a Stitch-style savings
+surface with shared compact wallet/search/overflow controls, centered balance
+and remaining target, deadline/progress/advice, owner-scoped month ledger and
+add-transaction CTA. The ledger ordering now places the transaction scope
+between the centered balance and progress block through shared base views. The
+focused API-backed simulator proof is 2/2 at
+`/tmp/mypocket-goal-focused-final-4/Logs/Test/Test-MyPocketIOS-2026.10.07_17-15-08-+0700.xcresult` (2/2);
+visual inspection is recorded
+in the validation matrix, with the ordering regression at
+`/tmp/mypocket-goal-order-green4/Logs/Test/`. Device/provider/OCR/Google UAT remains open.
+
+2026-10-07 native goal CTA shell clearance: a red simulator regression caught
+the scoped goal ledger's green “Thêm giao dịch” label underneath the shell's
+raised add affordance. The CTA now uses a nested safe-area region around the
+shared `MPButton` with a 104pt bottom cushion and 56pt visual lift. The
+focused API-backed route is green 1/1 at
+`/tmp/mypocket-goal-cta-green3/Logs/Test/`, with inspected screenshot
+`/tmp/mypocket-goal-cta-green3-attachments/603309EC-18BF-451E-BAB3-FB1D3F7732B7.png`.
+The post-fix full native unit/contract target is 110/110 at
+`/tmp/mypocket-goal-cta-full-unit/Logs/Test/`; Release
+warnings-as-errors and project/base/diff guards pass. Physical-device,
+provider/OCR/Google and production UAT remain open.
+
+2026-10-08 populated goal-ledger verification found that the previous CTA proof
+used an empty ledger. On the Transactions route, an outer transactions
+`ScrollView` wrapped the goal detail's own `ScrollView`; its bottom CTA was
+therefore laid out against content rather than the visible viewport and
+overlapped the shell with a persisted row present. The goal detail is now
+rendered as the Transactions screen root. iPhone 16 API-backed scoped-ledger
+and explicit-detail tests pass (2/2); the scoped test scrolls the real row fully
+above the fixed CTA and checks both shell boundaries. Result:
+`/tmp/mypocket-goal-ledger-reachability-final-20261008.xcresult`; inspected
+capture: `/tmp/mypocket-goal-ledger-reachability-attachments/D2901CC9-C45F-4EEC-8CED-92C14702B4F5.png`.
+The local fixture cleanup was verified (zero matching wallets/transactions).
+Native unit/contract tests pass 142/142; ordinary weekly ledger and wallet
+selection regressions pass 2/2; Release warnings-as-errors, project/base
+guards and diff check pass. No API, schema, migration, backend, production data
+or endpoint changed. Full API-backed UI suite and owner/device visual UAT remain
+open.
+
+2026-10-07 native authenticated visual capture: More/account and transaction
+editor screenshots were exported and inspected against the supplied Stitch
+reference. The actionable editor mismatch was fixed by presenting transaction
+forms full-screen above shell navigation; the shared `MPReferenceScreenHeader`
+now owns the close capsule and `MPActionIconButton` exposes the existing AI
+receipt-entry route from the save footer. Focused editor smoke and local
+API-fixture editor smoke both pass 1/1 at `/tmp/mypocket-transaction-editor-guarded`
+and `/tmp/mypocket-transaction-api-guarded`; the full native unit target is
+110/110 at `/tmp/mypocket-visual-full-tests-2`, with Release/base/project/web
+guards green. Physical-device pixel approval and live
+provider/OCR/Google/production feedback remain open.
+
+The More visual follow-up also added the shared `MPCenteredScreenHeader` so
+`Mở rộng` stays centered beside the support pill; the focused More route smoke
+passes 1/1 at `/tmp/mypocket-more-centered-header`.
+
+2026-10-07 native Auth layout parity: `AuthView` now matches the web/Stitch
+AuthGate anatomy with shared `MPBrandMark`, direct canvas title/subtitle, flat
+fields, full-width email sign-in, divider and compact Google action. Copy is
+centralized in `AuthReferenceCopy`; password/refresh/Google PKCE behavior and
+IDs are unchanged. Focused contract and unauthenticated UI pass, full native
+unit target is 109/109, Release/guards pass, and screenshot evidence is
+`/tmp/mypocket-auth-parity.png`. Real Google/device exchange and authenticated
+pixel-level UAT remain open.
+
+2026-10-07 native wallet glyph parity: `MPWalletRow` now composes the shared
+`MPWalletGlyph` base with 48pt geometry and web-aligned basic/goal/credit
+warning/success/teal tones. Wallet API/data/accessibility are unchanged; full
+native tests are 110/110 and Release/base/web guards pass. Bespoke Stitch bank
+artwork remains an explicit visual-UAT gap.
+
+2026-10-07 native credit summary-card parity: the native Credit route now uses
+one shared reference card for current debt, available credit, limit and payment
+status/due details, with web-equivalent entry/payment action IDs. The focused
+contract is 1/1, the full native unit gate is 108/108, and Release/base/web
+checks pass. The bounded authenticated credit API UI smoke passes 1/1;
+the follow-up keeps actions before the statement and renders the empty credit
+message as plain text outside the list card. Pixel-level visual UAT remains
+open. No API, schema, migration or production data changed.
+
+2026-10-07 native portfolio summary-card parity: Portfolio now shows the web
+supporting subtitle and a shared `Tổng danh mục` reference card around headline
+cost/value/P&L metrics. The focused contract is 1/1, the full native unit gate
+is 108/108 and Release/base/web checks pass. A new disposable UI rerun hit the
+known Xcode runner hang; prior mutation proof remains recorded and authenticated
+visual UAT is still open. No API, schema, migration or production data changed.
+
+2026-10-07 native account API-key UI proof: the disposable local API flow for
+creating and revoking a key passed 1/1 on the iPhone 16 Simulator at
+`/tmp/mypocket-account-key-ui/Logs/Test/Test-MyPocketIOS-2026.10.07_15-40-22-+0700.xcresult`.
+No production credential was created or revoked; production credential UAT
+remains open.
+
+2026-10-07 native Reports API UI proof: the disposable local API flow for
+Money Insider summary/detail passed 1/1 on the iPhone 16 Simulator at
+`/tmp/mypocket-reports-ui/Logs/Test/Test-MyPocketIOS-2026.10.07_15-41-41-+0700.xcresult`.
+Report APIs and owner scope are unchanged; authenticated visual UAT remains
+open.
+
+2026-10-07 native Finance Assistant overview API UI proof: the disposable local
+API route passed 1/1 on the iPhone 16 Simulator at
+`/tmp/mypocket-assistant-overview-ui/Logs/Test/Test-MyPocketIOS-2026.10.07_15-42-43-+0700.xcresult`.
+Provider-backed send/history/action behavior remains an external UAT gate; no
+model/provider call was made by this proof.
+
+2026-10-07 native feedback submit API UI proof: the floating bubble and submit
+flow passed 1/1 against the disposable local API at
+`/tmp/mypocket-feedback-ui/Logs/Test/Test-MyPocketIOS-2026.10.07_15-43-30-+0700.xcresult`,
+with screenshot storage unavailable. Production credential/storage UAT remains
+open.
+
+2026-10-07 native AI-entry attachment UI proof: the deterministic 20-file
+fixture renders thumbnails, disables the picker at capacity and re-enables it
+after removal; the UI test passed 1/1 at
+`/tmp/mypocket-ai-entry-attachments-ui/Logs/Test/Test-MyPocketIOS-2026.10.07_15-45-02-+0700.xcresult`.
+Live OCR/provider decision UAT remains open.
+
+2026-10-07 native AI-entry proposal review proof: the simulator fixture
+requires explicit income/expense selection before saving and passed 1/1 at
+`/tmp/mypocket-ai-entry-review-ui/Logs/Test/Test-MyPocketIOS-2026.10.07_15-45-57-+0700.xcresult`.
+No proposal is auto-approved; live provider/OCR decision UAT remains open.
+
+2026-10-07 notification persistence proof: `TestNotificationPostgresOwnerScopeAndIdempotentRead`
+passes against the isolated local `mypocket_stage_v1` database, covering
+owner-scoped list/read, idempotent mark-read retry and cross-owner rejection.
+No notification-create route or production mutation was introduced; seeded
+inbox UI UAT remains open.
+
+2026-10-07 release-wide parity verification: backend `go test -race ./...`
+passed with the isolated local stage DB; native unit/contract target passed
+108/108 at `/tmp/mypocket-native-release-audit/Logs/Test/Test-MyPocketIOS-2026.10.07_15-50-40-+0700.xcresult`;
+native Release warnings-as-errors, web typecheck/build/design and project/base/
+diff guards pass. Provider/OCR, production credentials, physical signing and
+pixel-level authenticated UAT remain open.
+
+2026-10-07 portfolio action-anatomy follow-up: the native Portfolio route now
+matches the web card structure for refresh, asset creation and trade entry;
+the full native unit/contract gate is 107/107 and the Release/base/web guards
+pass. The bounded unauthenticated launch smoke is green, while the disposable
+authenticated portfolio API mutation and pixel-level visual UAT remain open.
+
+2026-10-07 native Stitch port checkpoint: the supplied archive is recorded as
+the visual reference while web/API contracts remain authoritative. Native
+SwiftUI routes cover the implemented web capabilities and compose shared base
+components; the final iPhone 16 Simulator unit/contract gate is 83/83 and the
+warnings-as-errors Release build passes. Authenticated provider/OCR,
+production feedback credentials, physical-device signing and pixel-level
+owner UAT remain release gates rather than silently inferred completion.
 
 2026-10-06 production backend rollout: a validated pre-migration custom-format
 backup was retained on `vm100-prod`; the live database advanced from migration
@@ -49,13 +1310,15 @@ asset price refresh. Portfolio and wallet fixtures were removed after the run.
 This is simulator-only evidence; production authentication/deployment and a
 physical device remain external gates.
 
-2026-10-06 native auth decision: the iOS login surface now uses the existing
-`POST /api/v1/login` email/password contract; “username” means the normalized
-account email. Targeted password API/session XCTest, the full native unit suite,
-base-component guard and the unauthenticated iPhone 16 launch test pass. The
-native Google button is removed, but backend Google routes remain during the
-migration window so browser users and rollback are not broken. No production
-password was seeded or printed, and production deployment remains unverified.
+2026-10-07 native auth reconciliation: the iOS login surface uses the existing
+`POST /api/v1/login` email/password contract ("username" means normalized
+account email) and now also exposes the existing Google PKCE client through
+`/auth/mobile/google/exchange`. The same access/refresh session store is used
+for both paths; a placeholder iOS client ID fails locally without a provider
+call. The final native unit/contract gate is 83/83, the focused auth launch/unit
+smoke is 2/2, and the Release warnings-as-errors simulator build passes. Real
+Google Cloud redirect registration, provider exchange and physical-device UAT
+remain external gates. No production password was seeded or printed.
 
 2026-10-06 wallet-scope reconciliation complete: web routes a wallet selection
 to `/transactions?wallet_id=...`; native wallet management now uses the same
@@ -389,7 +1652,77 @@ to `/transactions?wallet_id=<id>`; the transactions page consumes the optional
 query and resets to the current week. The route contract is covered by
 `npm run test:wallet-scope` and the transaction page design contract.
 
+Native ledger visual capture now proves ordinary transaction rows remain
+reachable above the persistent shell after scrolling; evidence is recorded in
+`docs/work/VALIDATION_MATRIX.md` and the ledger capture plan. Secondary native
+routes now share `MPBottomNavigationInset` for Categories, Portfolio, Credit
+and Notifications, and the secondary host hides SwiftUI's duplicate default
+back button so the custom Stitch header remains singular. Local red/green
+evidence is recorded in the validation matrix; device and production visual
+UAT remain open.
+
+The dedicated Notifications shell smoke is green, and the seeded inbox test now
+proves unread state → native mark-read tap → persisted `read_at` through the
+owner-scoped API. No public create route was added; test data is inserted and
+removed only in the disposable local stage DB. Pixel-level owner/device UAT
+remains open.
+
+The follow-up shell audit found and fixed missing bottom insets on the
+scrollable Finance Assistant, AI Entry, Feedback and Account routes. A red
+focused regression reproduced the gap and the green route check now passes for
+all four using the shared base; no screen-local spacer or API change was added.
+
+The same geometry audit fixed the Wallets list/editor branch: the shared inset
+now keeps the wallet save footer above the persistent shell. The focused
+simulator contract is recorded in the validation matrix.
+
+Transaction overflow forms for chuyển tiền and điều chỉnh số dư now also use
+the shared shell inset; a focused simulator smoke opens both forms and passes.
+
+The AI entry proposal editor overlay now also owns a scoped
+`MPBottomNavigationInset`; a RED/green focused test proved that the editor's
+save action stays above the persistent shell. The screenshot is deterministic
+local fixture evidence only; live OCR/provider and device visual UAT remain
+open.
+
+The wallet transaction-detail overlay now follows the same scoped shell
+contract. An API-backed mutation flow reproduced the missing inset, then passed
+after `TransactionDetailView` composed the shared base spacer; the captured
+frame is local fixture evidence, not production data.
+
+2026-10-08 native secondary-route visual checkpoint: all 15 More destinations
+were captured after navigation against the isolated local API on iPhone 16
+(1/1 UI test; empty stage account). No network-error placeholders appeared.
+The Account screenshot revealed the global feedback bubble covering the end of
+the Face ID explanation; its text now wraps clear of the button and the focused
+API-backed simulator assertion passes.
+Populated-state comparison, Stitch/web pixel review, and owner device acceptance
+remain open, so the 100% native port is not signed off.
+
+2026-10-08 OCR gate recheck: earlier notes claimed credentials were missing,
+but the ignored canonical backend environment has OCR, private S3 and model
+credentials. The opt-in synthetic evaluation passes S3 private PUT/readback and
+cleanup, OCR recognition of 45,000 VND, and 24/24 expected DeepSeek fields over
+five cases. It created no proposals or ledger records. iOS attachment picker,
+approval/download and owner device UAT remain open; see the validation matrix.
+
 ## Open Questions
+
+- 2026-10-13 native API-key copy feedback: Account's one-time secret card now
+  reuses shared MP bases and offers explicit local-only clipboard copy with a
+  five-minute expiry and visible/VoiceOver confirmation. Native suite 150/150
+  and API-backed UI regression 1/1 pass. Physical iPhone install is blocked by
+  missing Xcode team sign-in/provisioning profile; no install was attempted.
+  Owner device review and release-note approval remain open. See the API-key
+  copy detail design and validation matrix.
+
+- Native category-list parity is in progress: the management screen now has
+  kind/wallet/search filters and a shared tree over the existing API contract;
+  transaction/budget/recurring pickers also use a searchable tree and their
+  selected IDs were verified in API-backed UI, including the generated ledger
+  transaction. Web list wallet/search remain. Inactive-category semantics still
+  need a product/API decision and must not be inferred from local usage. No
+  backend migration was necessary for these flows.
 
 - WORKER-01 month-end semantics: CORE-03 says live/recalculable report and derived completion; the new request names a cron job that closes/generates a report. Decide whether any stored artifact is authoritative or merely rebuildable/cache output. Recurring month-end/catch-up/duplicate prevention/timezone changes also need rules.
 - Deletion of linked objects and paired-wallet effects; Travel Mode for backdated/offline/delayed confirmation.

@@ -1,14 +1,15 @@
 import SwiftUI
 
-enum MoreDestination: String, CaseIterable, Identifiable {
+enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
     // Keep account near the top of the menu. The shell owns a persistent
     // bottom tab bar, so placing it last makes its hit target overlap that
     // bar on compact phones.
-    case budgets, reports, categories, jars, months, recurring, travel, portfolio, credit, aiEntry, account, feedback, notifications, assistant
+    case wallets, budgets, reports, categories, jars, months, recurring, travel, portfolio, credit, aiEntry, account, feedback, notifications, assistant
 
     var id: String { rawValue }
     var title: String {
         switch self {
+        case .wallets: return "Ví của tôi"
         case .budgets: return "Ngân sách"
         case .reports: return "Báo cáo"
         case .categories: return "Danh mục"
@@ -28,6 +29,7 @@ enum MoreDestination: String, CaseIterable, Identifiable {
 
     var icon: String {
         switch self {
+        case .wallets: return "wallet.pass.fill"
         case .budgets: return "chart.pie.fill"
         case .reports: return "chart.bar.xaxis"
         case .categories: return "folder.fill"
@@ -49,51 +51,139 @@ enum MoreDestination: String, CaseIterable, Identifiable {
 struct MoreView: View {
     let api: FinanceAPI
     @ObservedObject var auth: AuthViewModel
-    @State private var destination: MoreDestination?
+    let masked: Bool
+    let onOpenTransactions: (String?) -> Void
+    let onOpenAIEntry: () -> Void
+    let requestedWalletID: String?
+    @Binding private var requestedDestination: MoreDestination?
+    @State private var navigationPath: [MoreDestination] = []
+
+    private let sections: [(title: String, items: [MoreDestination])] = [
+        ("Phản hồi", [.feedback]),
+        ("Ví của tôi", [.wallets, .credit, .portfolio]),
+        ("Kế hoạch", [.budgets, .jars, .months]),
+        ("Giao dịch", [.categories, .recurring, .travel, .reports]),
+        ("Trợ lý", [.aiEntry])
+    ]
+
+    init(
+        api: FinanceAPI,
+        auth: AuthViewModel,
+        masked: Bool = false,
+        requestedDestination: Binding<MoreDestination?> = .constant(nil),
+        requestedWalletID: String? = nil,
+        onOpenTransactions: @escaping (String?) -> Void = { _ in },
+        onOpenAIEntry: @escaping () -> Void = {}
+    ) {
+        self.api = api
+        self.auth = auth
+        self.masked = masked
+        self.onOpenTransactions = onOpenTransactions
+        self.onOpenAIEntry = onOpenAIEntry
+        self.requestedWalletID = requestedWalletID
+        _requestedDestination = requestedDestination
+    }
 
     var body: some View {
-        Group {
-            if let destination {
-                SecondaryScreen(destination: destination, api: api, auth: auth, onOpenJars: { self.destination = .jars }) { self.destination = nil }
-            } else {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        MPScreenHeader(title: "Thêm", leading: { EmptyView() }, trailing: { EmptyView() })
+        NavigationStack(path: $navigationPath) {
+            ScrollView {
+                VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
+                    MPCenteredScreenHeader(
+                        title: "Mở rộng",
+                        accessibilityIdentifier: "screen-title-Thêm",
+                        trailing: {
+                            MPHeaderSupportButton {
+                                navigationPath = [.feedback]
+                            }
+                        }
+                    )
+                    MPProfileCard(
+                        name: accountName,
+                        email: accountEmail,
+                        accountSubtitle: "Hồ sơ tài khoản",
+                        accessibilityIdentifier: "more-profile-account"
+                    ) {
+                        navigationPath = [.account]
+                    }
+                    ForEach(sections, id: \.title) { section in
                         MPSurfaceCard {
-                            VStack(spacing: 0) {
-                                ForEach(MoreDestination.allCases) { item in
-                                    MPButton(style: .plain) { destination = item } label: {
-                                        HStack(spacing: 12) {
-                                            MPIcon(systemName: item.icon, size: MPMetrics.hitTarget)
-                                            MPText(item.title, style: .emphasis)
-                                            Spacer()
-                                            MPIcon(systemName: "chevron.right", color: MPColor.secondary)
-                                        }
-                                        .accessibilityElement(children: .ignore)
-                                        .accessibilityLabel(item.title)
+                            VStack(alignment: .leading, spacing: 0) {
+                                MPText(section.title, style: .secondary)
+                                    .padding(.horizontal, 8)
+                                    .padding(.bottom, 4)
+                                ForEach(section.items) { item in
+                                    MPMenuRow(
+                                        title: item.title,
+                                        systemName: item.icon,
+                                        accessibilityIdentifier: "more-destination-\(item.id)"
+                                    ) {
+                                        navigationPath = [item]
                                     }
                                 }
                             }
                         }
-                        MPButton("Đăng xuất", style: .destructive, action: auth.logout)
                     }
-                    .padding(MPMetrics.pagePadding)
-                    // Leave room for the shell's bottom navigation so the
-                    // final destinations remain tappable instead of being
-                    // covered by the persistent tab bar.
-                    .padding(.bottom, MPMetrics.hitTarget * 2)
+                    MPButton("Đăng xuất", style: .destructive, isLoading: auth.isBusy) { Task { await auth.logout() } }
+                    if let message = auth.errorMessage { MPStatusMessage(text: message, tone: .danger) }
                 }
-                .background(MPColor.canvas.ignoresSafeArea())
-                // The shell's persistent tab bar sits outside this screen's
-                // scroll view. Reserve its hit area so the last menu rows are
-                // reported as non-hittable until XCTest/users scroll them
-                // into view, rather than receiving a tap on the tab bar.
-                .safeAreaInset(edge: .bottom) {
-                    Color.clear.frame(height: MPMetrics.hitTarget * 2)
+                .padding(MPMetrics.pagePadding)
+            }
+            .background(MPColor.canvas.ignoresSafeArea())
+            .navigationDestination(for: MoreDestination.self) { destination in
+                SecondaryScreen(
+                    destination: destination,
+                    api: api,
+                    auth: auth,
+                    masked: masked,
+                    initialWalletID: requestedWalletID,
+                    onOpenJars: {
+                        navigationPath = [.jars]
+                    },
+                    onOpenTransactions: { walletID in
+                        navigationPath.removeAll()
+                        requestedDestination = nil
+                        onOpenTransactions(walletID)
+                    },
+                    onOpenAIEntry: onOpenAIEntry
+                ) {
+                    closeDestination()
                 }
             }
+            .toolbar(.hidden, for: .navigationBar)
         }
-        .accessibilityIdentifier("more-screen")
+        .onAppear {
+            if let requestedDestination, navigationPath.last != requestedDestination {
+                navigationPath = [requestedDestination]
+            }
+        }
+        .onChange(of: requestedDestination) { _, destination in
+            if let destination, navigationPath.last != destination {
+                navigationPath = [destination]
+            } else if destination == nil {
+                if !navigationPath.isEmpty { navigationPath.removeAll() }
+            }
+        }
+        .onChange(of: navigationPath) { _, path in
+            let destination = path.last
+            if requestedDestination != destination {
+                requestedDestination = destination
+            }
+        }
+    }
+
+    private var accountName: String {
+        if case .authenticated(let session) = auth.phase, let name = session.user.name, !name.isEmpty { return name }
+        return "Tài khoản MyPocket"
+    }
+
+    private var accountEmail: String {
+        if case .authenticated(let session) = auth.phase { return session.user.email ?? "" }
+        return ""
+    }
+
+    private func closeDestination() {
+        navigationPath.removeAll()
+        requestedDestination = nil
     }
 }
 
@@ -101,23 +191,35 @@ struct SecondaryScreen: View {
     let destination: MoreDestination
     let api: FinanceAPI
     @ObservedObject var auth: AuthViewModel
+    let masked: Bool
+    let initialWalletID: String?
     let onOpenJars: () -> Void
+    let onOpenTransactions: (String?) -> Void
+    let onOpenAIEntry: () -> Void
     let onBack: () -> Void
 
     var body: some View {
         Group {
             switch destination {
-            case .budgets: BudgetsView(api: api, onBack: onBack)
-            case .reports: ReportsView(api: api, onBack: onBack)
+            case .wallets:
+                WalletsView(
+                    api: api,
+                    initialWalletID: initialWalletID,
+                    onSelectWallet: { onOpenTransactions($0) },
+                    onBack: onBack,
+                    onAIEntry: onOpenAIEntry
+                )
+            case .budgets: BudgetsView(api: api, onBack: onBack, masked: masked)
+            case .reports: ReportsView(api: api, onBack: onBack, masked: masked, ownerID: assistantOwnerID, snapshotCache: auth.financialCache)
             case .categories: CategoriesView(api: api, onBack: onBack)
-            case .jars: JarsView(api: api, onBack: onBack)
-            case .months: MonthsView(api: api, onBack: onBack, onOpenJars: onOpenJars)
+            case .jars: JarsView(api: api, onBack: onBack, masked: masked)
+            case .months: MonthsView(api: api, onBack: onBack, onOpenJars: onOpenJars, masked: masked)
             case .recurring: RecurringView(api: api, onBack: onBack)
             case .travel: TravelView(api: api, onBack: onBack)
             case .portfolio: PortfolioView(api: api, onBack: onBack)
             case .credit: CreditView(api: api, onBack: onBack)
             case .notifications: NotificationsView(api: api, onBack: onBack, timeZone: accountTimeZone)
-            case .assistant: AssistantView(api: api, onBack: onBack, ownerID: assistantOwnerID)
+            case .assistant: AssistantView(api: api, onBack: onBack, ownerID: assistantOwnerID, masked: masked)
             case .aiEntry: AIEntryView(api: api, onBack: onBack)
             case .feedback: FeedbackView(api: api, onBack: onBack)
             case .account: AccountView(auth: auth, onBack: onBack)
@@ -127,6 +229,9 @@ struct SecondaryScreen: View {
         // explicit identity SwiftUI may reuse the previous route's offset,
         // hiding the header/back action after navigating from a long screen.
         .id(destination.id)
+        // Secondary routes own the Stitch/web reference back capsule. Do not
+        // render a second native navigation bar back button above it.
+        .navigationBarBackButtonHidden(true)
     }
 
     private var assistantOwnerID: String {

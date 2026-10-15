@@ -81,6 +81,11 @@ export function FinanceAssistantPart({ type, data, masked = false, onCreateWalle
   if (normalizedType === "wallet_confirmation") {
     return <WalletCreationConfirmation view={view} onCreateWallet={onCreateWallet} />;
   }
+  if (normalizedType === "product_help") {
+    const sources = Array.isArray(view.sources) ? view.sources.slice(0, 5).map(record).filter((item): item is UnknownRecord => !!item && typeof item.id === "string" && typeof item.title === "string" && typeof item.excerpt === "string") : [];
+    const version = typeof view.version === "string" ? view.version.slice(0, 32) : "";
+    return <SurfaceCard padding="sm" className="space-y-2"><div className="flex items-center justify-between gap-2"><Heading as="h3" size="field">Hướng dẫn trong ứng dụng</Heading>{version ? <Text size="micro" tone="secondary">v{version}</Text> : null}</div>{sources.length === 0 ? <Text size="xs" tone="secondary">Chưa tìm thấy hướng dẫn phù hợp.</Text> : <div className="space-y-2">{sources.map(item => <div className="rounded-lg bg-row p-2" key={String(item.id)}><Text weight="semibold" size="xs">{String(item.title).slice(0, 160)}</Text><Text size="xs" tone="secondary">{String(item.excerpt).slice(0, 480)}</Text><Text size="micro" tone="secondary">{String(item.id).slice(0, 128)}</Text></div>)}</div>}</SurfaceCard>;
+  }
   return <SurfaceCard tone="muted" padding="sm"><Text size="xs">Dữ liệu {type} đã có nhưng giao diện hiện tại chưa hỗ trợ hiển thị.</Text></SurfaceCard>;
 }
 

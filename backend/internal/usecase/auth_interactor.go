@@ -18,6 +18,11 @@ import (
 
 var ErrInvalidCredentials = errors.New("email hoặc mật khẩu không đúng")
 var ErrInvalidGoogleProfile = errors.New("thông tin Google không hợp lệ")
+
+// ErrGoogleUserStore distinguishes a valid OAuth profile from a persistence
+// failure while looking up or creating the owner. Callers must not report a
+// database outage as a client-side Google credential error.
+var ErrGoogleUserStore = errors.New("google user store unavailable")
 var ErrInvalidRefreshToken = errors.New("refresh token không hợp lệ hoặc đã hết hạn")
 var ErrInvalidTimezone = errors.New("múi giờ IANA không hợp lệ")
 
@@ -30,6 +35,7 @@ type AuthInteractor struct {
 	GoogleOAuth       GoogleOAuthProvider
 	MobileGoogleOAuth MobileGoogleOAuthProvider
 	RefreshTTL        time.Duration
+	Devices           repository.DeviceCredentialRepository
 }
 
 func NewAuthInteractor(
@@ -69,7 +75,7 @@ func (a *AuthInteractor) LoginWithGoogle(ctx context.Context, profile entity.Goo
 	}
 	user, err := a.UserRepo.FindOrCreateGoogleUser(profile)
 	if err != nil {
-		return nil, ErrInvalidGoogleProfile
+		return nil, fmt.Errorf("%w: %w", ErrGoogleUserStore, err)
 	}
 	return a.buildLoginOutput(ctx, user)
 }
@@ -117,33 +123,83 @@ func (a *AuthInteractor) Refresh(ctx context.Context, rawToken string) (*LoginOu
 	if err != nil || !ok {
 		return nil, ErrInvalidRefreshToken
 	}
-	var record struct {
-		UserID string `json:"user_id"`
-	}
+	var record refreshRecord
 	if json.Unmarshal([]byte(value), &record) != nil || strings.TrimSpace(record.UserID) == "" {
 		return nil, ErrInvalidRefreshToken
+	}
+	if record.FamilyID == "" {
+		record.FamilyID = legacySessionFamily(record.UserID)
+	}
+	familyExpiresAt := record.FamilyExpiresAt
+	if familyExpiresAt.IsZero() {
+		// Legacy refresh records have no family deadline. Give the migrated
+		// family one bounded lifetime instead of allowing every rotation to
+		// extend it indefinitely.
+		familyExpiresAt = time.Now().Add(a.refreshTTL())
+	}
+	if !familyExpiresAt.After(time.Now()) {
+		return nil, ErrInvalidRefreshToken
+	}
+	if record.FamilyID != "" {
+		if _, revoked, cacheErr := a.CacheRepo.Get(familyRevocationKey(record.FamilyID)); cacheErr != nil || revoked {
+			return nil, ErrInvalidRefreshToken
+		}
 	}
 	user, err := a.UserRepo.FindByID(record.UserID)
 	if err != nil {
 		return nil, ErrInvalidRefreshToken
 	}
-	return a.buildLoginOutput(ctx, user)
+	return a.buildSessionOutputWithFamilyExpiry(ctx, user, record.FamilyID, familyExpiresAt)
 }
 
 func (a *AuthInteractor) buildLoginOutput(ctx context.Context, user *entity.User) (*LoginOutput, error) {
+	return a.buildSessionOutputWithFamilyExpiry(ctx, user, "", time.Time{})
+}
+
+func (a *AuthInteractor) buildSessionOutput(ctx context.Context, user *entity.User, familyID string) (*LoginOutput, error) {
+	return a.buildSessionOutputWithFamilyExpiry(ctx, user, familyID, time.Time{})
+}
+
+func (a *AuthInteractor) buildSessionOutputWithFamilyExpiry(ctx context.Context, user *entity.User, familyID string, familyExpiresAt time.Time) (*LoginOutput, error) {
 	_ = ctx
+	now := time.Now()
 	sessionID := uuid.NewString()
+	if familyID == "" {
+		familyID = uuid.NewString()
+	}
+	if familyExpiresAt.IsZero() {
+		familyExpiresAt = now.Add(a.refreshTTL())
+	}
+	if !familyExpiresAt.After(now) {
+		return nil, ErrInvalidRefreshToken
+	}
 	token, exp, err := a.TokenSvc.Generate(user.ID, user.Email, user.Name, sessionID)
 	if err != nil {
 		return nil, err
 	}
 	key := a.sessionKey(sessionID)
-	if err := a.CacheRepo.Set(key, user.ID, time.Until(exp)); err != nil {
+	record, err := json.Marshal(sessionRecord{UserID: user.ID, FamilyID: familyID, ExpiresAt: exp, FamilyExpiresAt: familyExpiresAt})
+	if err != nil {
+		return nil, err
+	}
+	if err := a.CacheRepo.Set(key, string(record), time.Until(exp)); err != nil {
 		return nil, fmt.Errorf("set session cache: %w", err)
 	}
-	refreshToken, refreshExp, err := a.issueRefreshToken(user.ID)
+	refreshToken, refreshExp, err := a.issueRefreshToken(user.ID, familyID, familyExpiresAt)
 	if err != nil {
 		return nil, fmt.Errorf("set refresh token: %w", err)
+	}
+	// Issuance may overlap logout after Refresh's initial check. Do not return
+	// credentials minted after its revocation marker. If logout occurs after
+	// this final check, its TTL starts later than these credentials' TTLs.
+	_, revoked, cacheErr := a.CacheRepo.Get(familyRevocationKey(familyID))
+	if cacheErr != nil || revoked {
+		_ = a.CacheRepo.Delete(key)
+		_ = a.CacheRepo.Delete(refreshTokenKey(refreshToken))
+		if cacheErr != nil {
+			return nil, fmt.Errorf("check session revocation: %w", cacheErr)
+		}
+		return nil, ErrInvalidRefreshToken
 	}
 	return &LoginOutput{
 		Token:            token,
@@ -161,10 +217,14 @@ func (a *AuthInteractor) buildLoginOutput(ctx context.Context, user *entity.User
 	}, nil
 }
 
-func (a *AuthInteractor) issueRefreshToken(userID string) (string, time.Time, error) {
-	refreshTTL := a.RefreshTTL
-	if refreshTTL <= 0 {
-		refreshTTL = 30 * 24 * time.Hour
+func (a *AuthInteractor) issueRefreshToken(userID, familyID string, familyExpiresAt time.Time) (string, time.Time, error) {
+	refreshTTL := a.refreshTTL()
+	remaining := time.Until(familyExpiresAt)
+	if remaining <= 0 {
+		return "", time.Time{}, ErrInvalidRefreshToken
+	}
+	if remaining < refreshTTL {
+		refreshTTL = remaining
 	}
 	raw := make([]byte, 32)
 	if _, err := rand.Read(raw); err != nil {
@@ -172,13 +232,18 @@ func (a *AuthInteractor) issueRefreshToken(userID string) (string, time.Time, er
 	}
 	token := "mpr_" + base64.RawURLEncoding.EncodeToString(raw)
 	expiresAt := time.Now().Add(refreshTTL)
-	record, err := json.Marshal(struct {
-		UserID string `json:"user_id"`
-	}{UserID: userID})
+	if familyExpiresAt.Before(expiresAt) {
+		expiresAt = familyExpiresAt
+	}
+	cacheTTL := time.Until(expiresAt)
+	if cacheTTL <= 0 {
+		return "", time.Time{}, ErrInvalidRefreshToken
+	}
+	record, err := json.Marshal(refreshRecord{UserID: userID, FamilyID: familyID, FamilyExpiresAt: familyExpiresAt})
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	if err := a.CacheRepo.Set(refreshTokenKey(token), string(record), refreshTTL); err != nil {
+	if err := a.CacheRepo.Set(refreshTokenKey(token), string(record), cacheTTL); err != nil {
 		return "", time.Time{}, err
 	}
 	return token, expiresAt, nil
@@ -298,14 +363,25 @@ func (a *AuthInteractor) sessionKey(sessionID string) string {
 
 func (a *AuthInteractor) VerifySession(ctx context.Context, sessionID string) (string, error) {
 	key := a.sessionKey(sessionID)
-	userID, ok, err := a.CacheRepo.Get(key)
+	value, ok, err := a.CacheRepo.Get(key)
 	if err != nil {
 		return "", err
 	}
-	if !ok || userID == "" {
+	if !ok || value == "" {
 		return "", ErrInvalidCredentials
 	}
-	return userID, nil
+	record, err := decodeSessionRecord(value)
+	if err != nil || record.UserID == "" {
+		return "", ErrInvalidCredentials
+	}
+	if record.FamilyID != "" {
+		if _, revoked, cacheErr := a.CacheRepo.Get(familyRevocationKey(record.FamilyID)); cacheErr != nil {
+			return "", cacheErr
+		} else if revoked {
+			return "", ErrInvalidCredentials
+		}
+	}
+	return record.UserID, nil
 }
 
 func (a *AuthInteractor) IsGoogleAuthReady() bool {

@@ -55,6 +55,12 @@ type transactionInput struct {
 	TravelEventID     *string `json:"travel_event_id"`
 }
 
+type transactionCreateInput struct {
+	transactionInput
+	// False freezes explicit no-trip/selected-trip intent; omitted keeps online defaults.
+	AutoLinkTravel *bool `json:"auto_link_travel,omitempty"`
+}
+
 func NewTransactionHandler(transactions transactionrepo.TransactionRepository, wallets walletrepo.WalletRepository, categories categoryrepo.CategoryRepository) *TransactionHandler {
 	handler := &TransactionHandler{Transactions: transactions, Wallets: wallets, Categories: categories}
 	if transfers, ok := transactions.(transactionrepo.TransferRepository); ok {
@@ -95,16 +101,22 @@ type travelTransactionInput struct {
 
 // CreateTransfer godoc
 // @Summary Create an atomic internal wallet transfer
+// @Description Supply a stable Idempotency-Key for durable replay. Missing key is legacy online-only behavior, not safe automatic retry. Replay keeps the original data array and adds meta.mutation.
+// @Description Accepts JWT/session or a full-owner user API key. Legacy scope metadata does not restrict access; owner/domain validation still applies.
 // @Tags Transactions
 // @Accept json
 // @Produce json
 // @Security BearerAuth
 // @Param transfer body transferInput true "Internal transfer input"
-// @Success 201 {array} entity.Transaction
+// @Param Idempotency-Key header string false "One ASCII key, 1-128 bytes, reused with the same typed request"
+// @Success 201 {object} CreateTransferResponse
+// @Success 200 {object} CreateTransferResponse
 // @Failure 400 {object} Problem
 // @Failure 401 {object} Problem
 // @Failure 404 {object} Problem
 // @Failure 501 {object} Problem
+// @Failure 409 {object} Problem
+// @Failure 503 {object} Problem
 // @Router /api/v1/transactions/transfer [post]
 func (h *TransactionHandler) CreateTransfer(c *gin.Context) {
 	owner, ok := transactionOwner(c)
@@ -119,6 +131,10 @@ func (h *TransactionHandler) CreateTransfer(c *gin.Context) {
 	var input transferInput
 	if err := c.ShouldBindJSON(&input); err != nil {
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	receipt, handled := h.prepareCreateReceipt(c, owner, "transfer.create", input)
+	if handled {
 		return
 	}
 	input.SourceWalletID, input.DestinationWalletID = strings.TrimSpace(input.SourceWalletID), strings.TrimSpace(input.DestinationWalletID)
@@ -173,12 +189,27 @@ func (h *TransactionHandler) CreateTransfer(c *gin.Context) {
 	transferID := uuid.NewString()
 	source := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: sourceWallet.ID, CategoryID: &sourceCategoryID, Type: entity.TransactionTypeExpense, Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: false, TransferID: &transferID}
 	destination := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: destinationWallet.ID, CategoryID: &destinationCategoryID, Type: entity.TransactionTypeIncome, Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: false, TransferID: &transferID}
-	if err := h.Transfers.CreateTransfer(owner, source, destination); err != nil {
+	var rows []entity.Transaction
+	var replayed bool
+	var createErr error
+	if receipt != nil {
+		rows, replayed, createErr = receipt.repository.CreateTransferIdempotent(owner, source, destination, receipt.key, receipt.hash)
+	} else {
+		createErr = h.Transfers.CreateTransfer(owner, source, destination)
+	}
+	if err := createErr; err != nil {
+		if createReceiptFailure(c, err) {
+			return
+		}
 		if errors.Is(err, transactionrepo.ErrTransferWalletInvalid) || errors.Is(err, transactionrepo.ErrTransferInvalid) {
 			transactionBadRequest(c, "Chuyển ví không hợp lệ.")
 			return
 		}
 		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		return
+	}
+	if receipt != nil {
+		receipt.respond(c, rows, replayed)
 		return
 	}
 	Created(c, []*entity.Transaction{source, destination})
@@ -343,15 +374,22 @@ func (h *TransactionHandler) ListTransactions(c *gin.Context) {
 
 // CreateTransaction godoc
 // @Summary Create an income or expense transaction
+// @Description auto_link_travel=false disables active-trip fallback; explicit travel_event_id remains owner-validated. Omitted/null/true preserves online auto-link behavior. Offline clients must freeze date/trip and send false.
+// @Description Supply a stable Idempotency-Key for durable replay. Missing key is legacy online-only behavior, not safe automatic retry. Replay keeps the original data object and adds meta.mutation.
+// @Description Accepts JWT/session or a full-owner user API key. Legacy scope metadata does not restrict access; owner/domain validation still applies.
 // @Tags Transactions
 // @Accept json
 // @Produce json
 // @Security BearerAuth
-// @Param transaction body transactionInput true "Transaction input"
-// @Success 201 {object} entity.Transaction
+// @Param transaction body transactionCreateInput true "Transaction create input"
+// @Param Idempotency-Key header string false "One ASCII key, 1-128 bytes, reused with the same typed request"
+// @Success 201 {object} CreateTransactionResponse
+// @Success 200 {object} CreateTransactionResponse
 // @Failure 400 {object} Problem
 // @Failure 401 {object} Problem
 // @Failure 404 {object} Problem
+// @Failure 409 {object} Problem
+// @Failure 503 {object} Problem
 // @Router /api/v1/transactions [post]
 func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 	owner, ok := transactionOwner(c)
@@ -359,7 +397,16 @@ func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 		transactionUnauthorized(c)
 		return
 	}
-	input, occurredAt, valid := h.bindAndValidate(c, owner, nil)
+	var rawInput transactionCreateInput
+	if err := c.ShouldBindJSON(&rawInput); err != nil {
+		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
+		return
+	}
+	receipt, handled := h.prepareCreateReceipt(c, owner, "transaction.create", rawInput)
+	if handled {
+		return
+	}
+	input, occurredAt, valid := h.validateTransactionInput(c, owner, nil, rawInput.transactionInput)
 	if !valid {
 		return
 	}
@@ -368,18 +415,36 @@ func (h *TransactionHandler) CreateTransaction(c *gin.Context) {
 		included = *input.IncludedInReports
 	}
 	travelEventID := input.TravelEventID
-	if travelEventID == nil && h.Travel != nil {
+	if travelEventID == nil && h.Travel != nil && (rawInput.AutoLinkTravel == nil || *rawInput.AutoLinkTravel) {
 		if active, activeErr := h.Travel.Active(owner); activeErr == nil && active != nil {
 			travelEventID = &active.ID
 		}
 	}
 	transaction := &entity.Transaction{ID: uuid.NewString(), OwnerID: owner, WalletID: input.WalletID, CategoryID: input.CategoryID, JarID: input.JarID, Type: input.Type, Amount: input.Amount, OccurredAt: occurredAt, Note: normalizeOptional(input.Note), IncludedInReports: included, TravelEventID: travelEventID}
-	if err := h.Transactions.Create(transaction); err != nil {
+	var replayed bool
+	var createErr error
+	if receipt != nil {
+		transaction, replayed, createErr = receipt.repository.CreateIdempotent(transaction, receipt.key, receipt.hash)
+	} else {
+		createErr = h.Transactions.Create(transaction)
+	}
+	if err := createErr; err != nil {
+		if createReceiptFailure(c, err) {
+			return
+		}
+		if errors.Is(err, transactionrepo.ErrCategoryInactive) {
+			categoryInactive(c)
+			return
+		}
 		if errors.Is(err, transactionrepo.ErrTransactionCategoryRequired) {
 			transactionBadRequest(c, transactionCategoryRequiredMessage)
 			return
 		}
 		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionSaveFailed, Title: problemTitleInternalServer, Detail: transactionSaveMessage})
+		return
+	}
+	if receipt != nil {
+		receipt.respond(c, transaction, replayed)
 		return
 	}
 	Created(c, transaction)
@@ -556,6 +621,10 @@ func (h *TransactionHandler) UpdateTransaction(c *gin.Context) {
 	}
 	transaction, err := h.Transactions.Update(owner, c.Param("id"), updates)
 	if err != nil {
+		if errors.Is(err, transactionrepo.ErrCategoryInactive) {
+			categoryInactive(c)
+			return
+		}
 		Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
 		return
 	}
@@ -655,6 +724,10 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string, exist
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
 		return transactionInput{}, time.Time{}, false
 	}
+	return h.validateTransactionInput(c, owner, existing, input)
+}
+
+func (h *TransactionHandler) validateTransactionInput(c *gin.Context, owner string, existing *entity.Transaction, input transactionInput) (transactionInput, time.Time, bool) {
 	input.WalletID, input.Type = strings.TrimSpace(input.WalletID), strings.TrimSpace(input.Type)
 	if input.Amount <= 0 {
 		transactionBadRequest(c, transactionAmountMessage)
@@ -677,6 +750,14 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string, exist
 	if input.CategoryID == nil {
 		transactionBadRequest(c, transactionCategoryRequiredMessage)
 		return transactionInput{}, time.Time{}, false
+	}
+	category, categoryErr := h.Categories.FindVisible(owner, *input.CategoryID)
+	if categoryErr == nil && category != nil && !category.IsActive {
+		keepHistoricalCategory := existing != nil && existing.CategoryID != nil && *existing.CategoryID == category.ID
+		if !keepHistoricalCategory {
+			categoryInactive(c)
+			return transactionInput{}, time.Time{}, false
+		}
 	}
 	if !h.categoryValid(owner, *input.CategoryID, input.Type, input.WalletID, wallet.Type) {
 		transactionBadRequest(c, transactionCategoryMessage)

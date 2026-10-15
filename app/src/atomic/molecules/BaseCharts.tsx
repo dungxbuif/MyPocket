@@ -15,3 +15,28 @@ export function BaseDonutChart({ shares, center }: { shares: { name: string; val
     <div className="min-w-0 flex-1 space-y-2">{shares.map(share => <div key={share.name} className="flex items-center gap-2"><span aria-hidden className="h-3 w-3 rounded-full" style={{ background: share.color }} /><Text as="span" className="min-w-0 flex-1 truncate">{share.name}</Text><Text as="strong">{share.value}%</Text></div>)}</div>
   </div>;
 }
+
+type TrendPoint = { day: string; income: number; expense: number };
+
+export function BaseTrendChart({ points }: { points: TrendPoint[] }) {
+  if (points.length === 0) {
+    return <div role="status" aria-label="Xu hướng chi tiêu" className="mt-4"><Text size="sm" tone="secondary">Chưa có giao dịch được tính vào xu hướng.</Text></div>;
+  }
+  const maximum = Math.max(1, ...points.flatMap(point => [point.income, point.expense]));
+  const polyline = (key: "income" | "expense") => points.map((point, index) => {
+    const x = points.length === 1 ? 0 : index / (points.length - 1) * 100;
+    const y = 40 - Math.min(1, Math.max(0, point[key] / maximum)) * 40;
+    return `${x},${y}`;
+  }).join(" ");
+  return <div role="img" aria-label="Xu hướng thu chi" className="mt-4 space-y-2">
+    <div className="flex items-center gap-4 text-xs text-secondary"><span className="inline-flex items-center gap-1"><span aria-hidden className="h-2 w-2 rounded-full bg-action" />Thu</span><span className="inline-flex items-center gap-1"><span aria-hidden className="h-2 w-2 rounded-full bg-danger" />Chi</span></div>
+    <svg viewBox="0 0 100 40" preserveAspectRatio="none" className="h-36 w-full" aria-hidden>
+      <line x1="0" y1="0" x2="100" y2="0" stroke="var(--color-line)" strokeOpacity="0.45" />
+      <line x1="0" y1="20" x2="100" y2="20" stroke="var(--color-line)" strokeOpacity="0.45" />
+      <line x1="0" y1="40" x2="100" y2="40" stroke="var(--color-line)" strokeOpacity="0.45" />
+      <polyline points={polyline("income")} fill="none" stroke="var(--color-action)" strokeWidth="1.4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+      <polyline points={polyline("expense")} fill="none" stroke="var(--color-danger)" strokeWidth="1.4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+    <div className="flex items-center justify-between gap-2 text-xs text-secondary" aria-hidden>{points.map(point => <span key={point.day}>{point.day.slice(-2)}</span>)}</div>
+  </div>;
+}

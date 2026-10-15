@@ -29,10 +29,18 @@ func (s *creditCategoryRepositoryStub) EnsurePersonalDefaults(string) error { re
 func (s *creditCategoryRepositoryStub) ListVisible(string) ([]entity.Category, error) {
 	return s.categories, nil
 }
-func (s *creditCategoryRepositoryStub) FindVisible(string, string) (*entity.Category, error) {
-	return nil, errors.New("not implemented")
+func (s *creditCategoryRepositoryStub) FindVisible(_, id string) (*entity.Category, error) {
+	for i := range s.categories {
+		if s.categories[i].ID == id {
+			return &s.categories[i], nil
+		}
+	}
+	return nil, errors.New("not found")
 }
 func (s *creditCategoryRepositoryStub) FindPersonal(string, string) (*entity.Category, error) {
+	return nil, errors.New("not implemented")
+}
+func (s *creditCategoryRepositoryStub) SetActive(string, string, bool) (*entity.Category, error) {
 	return nil, errors.New("not implemented")
 }
 func (s *creditCategoryRepositoryStub) Create(string, *entity.Category) error {
@@ -86,7 +94,7 @@ func creditTestRouter(handler *CreditHandler) *gin.Engine {
 func TestCreateCreditEntryUsesDedicatedWalletFlow(t *testing.T) {
 	repo := &creditRepositoryStub{}
 	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"credit-1": {ID: "credit-1", OwnerID: "owner-1", Type: entity.WalletTypeCredit, CreditLimit: int64Ptr(10000000)}}}
-	categories := &creditCategoryRepositoryStub{categories: []entity.Category{{ID: "food", Kind: entity.TransactionTypeExpense}}}
+	categories := &creditCategoryRepositoryStub{categories: []entity.Category{{ID: "food", Kind: entity.TransactionTypeExpense, IsActive: true}}}
 	response := httptest.NewRecorder()
 	request := httptest.NewRequest(http.MethodPost, "/credit/wallets/credit-1/entries", bytes.NewBufferString(`{"kind":"purchase","category_id":"food","amount":125000}`))
 	request.Header.Set("Content-Type", "application/json")
@@ -130,6 +138,19 @@ func TestCreateCreditEntryRejectsInapplicableCategory(t *testing.T) {
 	creditTestRouter(&CreditHandler{Credits: repo, Wallets: wallets, Categories: categories}).ServeHTTP(response, request)
 	if response.Code != http.StatusBadRequest || repo.entry != nil {
 		t.Fatalf("expected category scope rejection: status=%d body=%s entry=%#v", response.Code, response.Body.String(), repo.entry)
+	}
+}
+
+func TestCreateCreditEntryRejectsArchivedCategory(t *testing.T) {
+	repo := &creditRepositoryStub{}
+	wallets := &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{"credit-1": {ID: "credit-1", OwnerID: "owner-1", Type: entity.WalletTypeCredit, CreditLimit: int64Ptr(10000000)}}}
+	categories := &creditCategoryRepositoryStub{categories: []entity.Category{{ID: "archived", Kind: entity.TransactionTypeExpense, IsActive: false}}}
+	response := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/credit/wallets/credit-1/entries", bytes.NewBufferString(`{"kind":"purchase","category_id":"archived","amount":125000}`))
+	request.Header.Set("Content-Type", "application/json")
+	creditTestRouter(&CreditHandler{Credits: repo, Wallets: wallets, Categories: categories}).ServeHTTP(response, request)
+	if response.Code != http.StatusBadRequest || !bytes.Contains(response.Body.Bytes(), []byte(`"code":"category_inactive"`)) || repo.entry != nil {
+		t.Fatalf("archived category must be rejected before credit-ledger mutation: status=%d body=%s entry=%#v", response.Code, response.Body.String(), repo.entry)
 	}
 }
 

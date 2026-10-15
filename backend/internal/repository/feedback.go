@@ -21,4 +21,5 @@ type FeedbackRepository interface {
 	FindByID(context.Context, string) (*entity.Feedback, error)
 	ListForAgent(context.Context, string, int) ([]entity.Feedback, error)
 	UpdateStatus(context.Context, string, string, time.Time) (*entity.Feedback, error)
+	UpdateResolution(context.Context, string, string, bool, time.Time) (*entity.Feedback, error)
 }

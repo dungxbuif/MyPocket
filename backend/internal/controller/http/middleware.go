@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/mypocket/backend/internal/entity"
 	"github.com/mypocket/backend/internal/repository"
 	"github.com/mypocket/backend/internal/usecase"
 )
@@ -52,6 +51,10 @@ func (m *AuthMiddleware) RequireAuth(c *gin.Context) {
 		c.Abort()
 		return
 	}
+	if token := strings.TrimSpace(parts[1]); strings.HasPrefix(token, "mpk_") {
+		m.authenticateUserAPIKey(c, token)
+		return
+	}
 	claims, err := m.TokenSvc.Verify(parts[1])
 	if err != nil {
 		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeTokenInvalid, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
@@ -73,86 +76,31 @@ func (m *AuthMiddleware) RequireAuth(c *gin.Context) {
 	c.Next()
 }
 
-// RequireAdvisorAuth accepts the normal JWT/session or a user API key. A
-// value that looks like an API key never falls back to JWT verification.
-// The first gate is finance:read; endpoint handlers add advisor:read/chat.
+// All authenticated user operations accept a full-owner API key or JWT/session.
 func (m *AuthMiddleware) RequireAdvisorAuth(c *gin.Context) {
 	startedAt := time.Now()
 	defer func() { m.recordAdvisorAudit(c, startedAt) }()
-	header := strings.TrimSpace(c.GetHeader(authHeader))
-	parts := strings.SplitN(header, " ", 2)
-	if len(parts) != 2 || parts[0] != authScheme || strings.TrimSpace(parts[1]) == "" {
-		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthInvalidFormat, Title: problemTitleUnauthorized, Detail: invalidAuthFormatMsg})
-		c.Abort()
-		return
-	}
-	token := strings.TrimSpace(parts[1])
-	if strings.HasPrefix(token, "mpk_") {
-		if m == nil || m.APIKeys == nil {
-			Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeTokenInvalid, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
-			c.Abort()
-			return
-		}
-		principal, err := m.APIKeys.Authenticate(c.Request.Context(), token, []string{entity.APIKeyScopeFinanceRead})
-		if err != nil {
-			status := http.StatusUnauthorized
-			code := problemCodeTokenInvalid
-			if errors.Is(err, usecase.ErrAPIKeyScopeDenied) {
-				status = http.StatusForbidden
-				code = "api_key_scope_denied"
-			}
-			Fail(c, status, Problem{Code: code, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
-			c.Abort()
-			return
-		}
-		c.Set(contextUserIDKey, principal.OwnerID)
-		c.Set(contextAdvisorPrincipalKey, principal)
-		c.Next()
-		return
-	}
 	m.RequireAuth(c)
 }
 
-// RequireFeedbackReadAuth accepts the normal JWT/session or a user API key
-// with the feedback:read scope. API keys remain owner-scoped through the
-// authenticated principal stored in contextUserIDKey.
+// Compatibility route aliases; neither enforces legacy scopes.
 func (m *AuthMiddleware) RequireFeedbackReadAuth(c *gin.Context) {
-	m.requireUserAPIOrSession(c, entity.APIKeyScopeFeedbackRead)
+	m.RequireAuth(c)
 }
 
-// RequireFeedbackWriteAuth accepts the normal JWT/session or a user API key
-// with the feedback:write scope.
 func (m *AuthMiddleware) RequireFeedbackWriteAuth(c *gin.Context) {
-	m.requireUserAPIOrSession(c, entity.APIKeyScopeFeedbackWrite)
+	m.RequireAuth(c)
 }
 
-func (m *AuthMiddleware) requireUserAPIOrSession(c *gin.Context, scope string) {
-	header := strings.TrimSpace(c.GetHeader(authHeader))
-	parts := strings.SplitN(header, " ", 2)
-	if len(parts) != 2 || parts[0] != authScheme || strings.TrimSpace(parts[1]) == "" {
-		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeAuthInvalidFormat, Title: problemTitleUnauthorized, Detail: invalidAuthFormatMsg})
-		c.Abort()
-		return
-	}
-	token := strings.TrimSpace(parts[1])
-	if !strings.HasPrefix(token, "mpk_") {
-		m.RequireAuth(c)
-		return
-	}
+func (m *AuthMiddleware) authenticateUserAPIKey(c *gin.Context, token string) {
 	if m == nil || m.APIKeys == nil {
 		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeTokenInvalid, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
 		c.Abort()
 		return
 	}
-	principal, err := m.APIKeys.Authenticate(c.Request.Context(), token, []string{scope})
+	principal, err := m.APIKeys.Authenticate(c.Request.Context(), token, nil)
 	if err != nil {
-		status := http.StatusUnauthorized
-		code := problemCodeTokenInvalid
-		if errors.Is(err, usecase.ErrAPIKeyScopeDenied) {
-			status = http.StatusForbidden
-			code = "api_key_scope_denied"
-		}
-		Fail(c, status, Problem{Code: code, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeTokenInvalid, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
 		c.Abort()
 		return
 	}

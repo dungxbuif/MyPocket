@@ -11,7 +11,7 @@ import (
 
 func NewPostgres(databaseURL string) (*gorm.DB, error) {
 	cfg := &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Info),
+		Logger: financialSQLLogger{Interface: logger.Default.LogMode(logger.Info)},
 	}
 	database, err := gorm.Open(postgres.Open(databaseURL), cfg)
 	if err != nil {

@@ -84,6 +84,10 @@ func (h *CreditHandler) CreateEntry(c *gin.Context) {
 		transactionBadRequest(c, transactionCategoryRequiredMessage)
 		return
 	}
+	if category, categoryErr := h.Categories.FindVisible(owner, *input.CategoryID); categoryErr == nil && category != nil && !category.IsActive {
+		categoryInactive(c)
+		return
+	}
 	if !h.creditCategoryValid(owner, *input.CategoryID, creditEntryTransactionType(input.Kind), wallet.ID) {
 		transactionBadRequest(c, transactionCategoryMessage)
 		return
@@ -211,6 +215,9 @@ func (h *CreditHandler) creditCategoryValid(owner, categoryID, transactionType, 
 		if category.ID != categoryID || category.Kind != transactionType {
 			continue
 		}
+		if !category.IsActive {
+			return false
+		}
 		if len(category.WalletIDs) == 0 {
 			return true
 		}
@@ -258,6 +265,8 @@ func parseCreditRange(fromRaw, toRaw string) (*time.Time, *time.Time, bool) {
 
 func creditMapError(c *gin.Context, err error) {
 	switch {
+	case errors.Is(err, transactionrepo.ErrCategoryInactive):
+		categoryInactive(c)
 	case errors.Is(err, transactionrepo.ErrCreditWalletInvalid):
 		creditWalletNotFound(c)
 	case errors.Is(err, transactionrepo.ErrCreditInvalid), errors.Is(err, transactionrepo.ErrCreditPaymentInvalid):

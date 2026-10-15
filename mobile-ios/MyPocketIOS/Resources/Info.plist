@@ -2,39 +2,41 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CFBundleIdentifier</key>
-	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-	<key>CFBundleExecutable</key>
-	<string>$(EXECUTABLE_NAME)</string>
-	<key>CFBundlePackageType</key>
-	<string>APPL</string>
-	<key>CFBundleShortVersionString</key>
-	<string>1.0</string>
-	<key>CFBundleVersion</key>
-	<string>1</string>
 	<key>CFBundleDisplayName</key>
 	<string>MyPocket</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 	<key>CFBundleName</key>
 	<string>MyPocket</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
 			<key>CFBundleTypeRole</key>
-			<string>Editor</string>
+			<string>Viewer</string>
+			<key>CFBundleURLName</key>
+			<string>com.mypocket.ios.routes</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
 				<string>mypocket</string>
 			</array>
 		</dict>
 	</array>
-	<key>NSFaceIDUsageDescription</key>
-	<string>Dùng Face ID để mở khóa phiên MyPocket đang còn hiệu lực.</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.1.0</string>
+	<key>CFBundleVersion</key>
+	<string>2</string>
 	<key>MP_API_BASE_URL</key>
 	<string>$(MP_API_BASE_URL)</string>
-	<key>MP_GOOGLE_CLIENT_ID</key>
-	<string>$(MP_GOOGLE_CLIENT_ID)</string>
-	<key>MP_GOOGLE_REDIRECT_URI</key>
-	<string>$(MP_GOOGLE_REDIRECT_URI)</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Dùng Face ID để mở khóa phiên MyPocket đang còn hiệu lực.</string>
+	<key>UIAppFonts</key>
+	<array>
+		<string>Manrope-Variable.ttf</string>
+	</array>
 	<key>UILaunchScreen</key>
 	<dict/>
 </dict>

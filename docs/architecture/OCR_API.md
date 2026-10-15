@@ -21,7 +21,7 @@ trace:
   phases: []
   tickets_or_bugs: []
   detail_designs: []
-  test_verification: not-run-docs-only
+  test_verification: backend OCR wait-mode and AI-entry contract checks
   docs_review: docs/architecture/API.md
   adrs: []
   release_notes: not-required-unreleased
@@ -338,5 +338,5 @@ Suggested MyPocket internal data additions:
 
 ## Linked Decisions
 
-- [Two-flow AI review plan](../work/tickets/TICKET-09-DETAIL_DESIGN.md): OCR-first/text-only model input, source provenance, private upload and retention proposals. Review pending; no integration implemented by this docs update.
+- [Two-flow AI review plan](../work/tickets/TICKET-09-DETAIL_DESIGN.md): OCR-first/text-only model input, source provenance and private upload/retention contract. The MyPocket backend adapter is implemented locally and validated against the provider wait-mode contract; provider credentials, live image UAT and retention cleanup remain deployment gates.
 - No ADR yet. Create an ADR when the team approves OCR Platform as the durable OCR provider or when secrets/runtime architecture is finalized.

@@ -26,7 +26,7 @@ func ValidateAIEntryDraft(d entity.AIEntryDraft, wallet entity.Wallet, category 
 	if d.CategoryID == nil || strings.TrimSpace(*d.CategoryID) == "" {
 		return errors.New("hãy chọn nhóm cho giao dịch")
 	}
-	if category == nil || category.ID != *d.CategoryID || category.Kind != d.Type {
+	if category == nil || category.ID != *d.CategoryID || category.Kind != d.Type || !category.IsActive {
 		return errors.New("nhóm không phù hợp giao dịch")
 	}
 	if wallet.Type == entity.WalletTypeGoal {

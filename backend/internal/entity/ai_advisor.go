@@ -8,6 +8,7 @@ import (
 )
 
 const (
+	AdvisorIdleTTL       = 30 * time.Minute
 	AdvisorRoleUser      = "user"
 	AdvisorRoleAssistant = "assistant"
 
@@ -32,18 +33,84 @@ type AdvisorPart struct {
 }
 
 type AdvisorConversation struct {
-	ID                string    `json:"id" gorm:"primaryKey"`
-	OwnerID           string    `json:"owner_id" gorm:"not null;uniqueIndex"`
-	Generation        int64     `json:"generation" gorm:"not null;default:1"`
-	NextMessageSeq    int64     `json:"next_message_seq" gorm:"not null;default:1"`
-	Summary           any       `json:"summary" gorm:"serializer:json;type:jsonb"`
-	SummaryThroughSeq int64     `json:"summary_through_seq" gorm:"not null;default:0"`
-	SummaryVersion    int64     `json:"summary_version" gorm:"not null;default:0"`
-	CreatedAt         time.Time `json:"created_at"`
-	UpdatedAt         time.Time `json:"updated_at"`
+	ID                string     `json:"id" gorm:"primaryKey"`
+	OwnerID           string     `json:"owner_id" gorm:"not null;uniqueIndex"`
+	Generation        int64      `json:"generation" gorm:"not null;default:1"`
+	NextMessageSeq    int64      `json:"next_message_seq" gorm:"not null;default:1"`
+	Summary           any        `json:"summary" gorm:"serializer:json;type:jsonb"`
+	SummaryThroughSeq int64      `json:"summary_through_seq" gorm:"not null;default:0"`
+	SummaryVersion    int64      `json:"summary_version" gorm:"not null;default:0"`
+	LastUserMessageAt *time.Time `json:"last_user_message_at,omitempty" gorm:"index"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+}
+
+// AdvisorHistoryMeta is additive lifecycle metadata for history reads. The
+// message array remains the response data contract; these fields let clients
+// suppress stale local state without using a device clock as authority.
+type AdvisorHistoryMeta struct {
+	ConversationID    string     `json:"conversation_id"`
+	Generation        int64      `json:"generation"`
+	LastUserMessageAt *time.Time `json:"last_user_message_at,omitempty"`
+	ExpiresAt         *time.Time `json:"expires_at,omitempty"`
+	ServerTime        time.Time  `json:"server_time"`
+}
+
+func (c AdvisorConversation) HistoryMeta(serverTime time.Time) AdvisorHistoryMeta {
+	return AdvisorHistoryMeta{
+		ConversationID:    c.ID,
+		Generation:        c.Generation,
+		LastUserMessageAt: c.LastUserMessageAt,
+		ExpiresAt:         c.IdleExpiresAt(),
+		ServerTime:        serverTime.UTC(),
+	}
+}
+
+// AdvisorResetRequest is a content-free idempotency ledger for an explicit
+// conversation reset. Keeping this separate from advisor runs means a reset
+// never masquerades as a finance question or gets replayed through the model.
+type AdvisorResetRequest struct {
+	OwnerID         string    `json:"owner_id" gorm:"primaryKey"`
+	ClientRequestID string    `json:"client_request_id" gorm:"primaryKey"`
+	PayloadHash     string    `json:"-" gorm:"not null"`
+	ConversationID  string    `json:"conversation_id" gorm:"not null"`
+	Generation      int64     `json:"generation" gorm:"not null"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+func (AdvisorResetRequest) TableName() string { return "advisor_reset_requests" }
+
+// AdvisorResetResult is the stable, content-free result returned to a client.
+type AdvisorResetResult struct {
+	ConversationID string    `json:"conversation_id"`
+	Generation     int64     `json:"generation"`
+	ServerTime     time.Time `json:"server_time"`
+	Replayed       bool      `json:"replayed"`
+	// PurgedRunIDs is an in-process coordination detail. It is deliberately
+	// omitted from the wire response: clients only need the reset result while
+	// the service uses these IDs to interrupt provider work handled locally.
+	PurgedRunIDs []string `json:"-"`
 }
 
 func (AdvisorConversation) TableName() string { return "advisor_conversations" }
+
+// IdleExpiresAt returns the server-authoritative expiry boundary for the
+// conversation. Assistant responses, history reads and polling never move
+// this timestamp; only an accepted user message does.
+func (c AdvisorConversation) IdleExpiresAt() *time.Time {
+	if c.LastUserMessageAt == nil {
+		return nil
+	}
+	expires := c.LastUserMessageAt.UTC().Add(AdvisorIdleTTL)
+	return &expires
+}
+
+// IsIdleExpired uses an inclusive boundary so exactly 30 minutes without an
+// accepted user message starts a fresh conversation generation.
+func (c AdvisorConversation) IsIdleExpired(now time.Time) bool {
+	expires := c.IdleExpiresAt()
+	return expires != nil && !now.UTC().Before(*expires)
+}
 
 type AdvisorMessage struct {
 	ID             string        `json:"id" gorm:"primaryKey"`

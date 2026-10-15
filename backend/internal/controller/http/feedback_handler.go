@@ -28,9 +28,50 @@ type feedbackStatusInput struct {
 	Status string `json:"status"`
 }
 
+type feedbackResolutionInput struct {
+	Resolved *bool `json:"resolved" binding:"required"`
+}
+
+// SetFeedbackResolution godoc
+// @Summary Confirm or reopen the authenticated owner's feedback
+// @Description Independent of developer status/changelog. JWT or full-owner user API key; legacy scopes are ignored. Repeating the same value is idempotent. Other owners' IDs return 404.
+// @Tags Feedback
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Feedback ID"
+// @Param resolution body feedbackResolutionInput true "Owner confirmation"
+// @Success 200 {object} entity.Feedback
+// @Failure 400 {object} Problem
+// @Failure 404 {object} Problem
+// @Router /api/v1/feedback/{id}/resolution [patch]
+func (h *FeedbackHandler) SetResolution(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		feedbackUnauthorized(c)
+		return
+	}
+	if h.Service == nil {
+		feedbackFailure(c, errors.New("feedback service unavailable"))
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 4096)
+	var input feedbackResolutionInput
+	if c.ShouldBindJSON(&input) != nil || input.Resolved == nil {
+		feedbackBadRequest(c)
+		return
+	}
+	row, err := h.Service.SetResolution(feedbackContext(c, "user"), owner, c.Param("id"), *input.Resolved)
+	if err != nil {
+		feedbackFailure(c, err)
+		return
+	}
+	OK(c, row)
+}
+
 // ListFeedback godoc
 // @Summary List the authenticated user's feedback
-// @Description Accepts a normal JWT/session or a user API key with feedback:read.
+// @Description Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.
 // @Tags Feedback
 // @Produce json
 // @Security BearerAuth
@@ -56,7 +97,7 @@ func (h *FeedbackHandler) List(c *gin.Context) {
 
 // CreateFeedback godoc
 // @Summary Create owner-scoped feedback
-// @Description Accepts a normal JWT/session or a user API key with feedback:write.
+// @Description Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.
 // @Tags Feedback
 // @Accept json
 // @Produce json
@@ -123,7 +164,7 @@ func parseFeedbackInput(c *gin.Context) (usecase.FeedbackInput, error) {
 
 // GetFeedback godoc
 // @Summary Get one feedback item owned by the authenticated user
-// @Description Accepts a normal JWT/session or a user API key with feedback:read.
+// @Description Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.
 // @Tags Feedback
 // @Produce json
 // @Security BearerAuth
@@ -150,7 +191,7 @@ func (h *FeedbackHandler) Get(c *gin.Context) {
 
 // GetFeedbackScreenshot godoc
 // @Summary Get a short-lived private feedback screenshot URL
-// @Description Accepts a normal JWT/session or a user API key with feedback:read.
+// @Description Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.
 // @Tags Feedback
 // @Produce json
 // @Security BearerAuth

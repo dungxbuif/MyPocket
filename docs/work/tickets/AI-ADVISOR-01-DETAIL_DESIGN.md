@@ -26,6 +26,14 @@ Trace: [intake FB-004](../FEEDBACK_LOG.md), [ticket hỏi đáp](TICKET-09-02-ho
 
 Owner follow-up “Writing plan chi tiết và chỉ dẫn kỹ thuật” được đáp ứng bằng [Technical Implementation Guide](../../superpowers/plans/2026-09-22-finance-assistant-technical-guide.md). Các contract SSE/recovery/Redis-audit vẫn là release gate; runtime hiện tại deliberately dùng synchronous JSON để khóa vertical slice trước. API-key contract đã được implement locally, nhưng chưa có public deployment claim.
 
+Local V2 action checkpoint: the typed confirmation dispatcher now covers wallet
+creation, spending-jar creation/monthly update and budget creation.
+`propose_update_jar` and `propose_create_budget` never write from the model
+loop; cards bind owner/conversation/generation and confirmation delegates to
+the existing owner-scoped domain routes with replay protection. Transaction and
+delete proposals remain separate typed slices and are not implied by this
+checkpoint.
+
 ### Implementation checkpoint — 2026-09-22
 
 - **Đã chạy local:** semantic finance query layer (owner scope, report semantics, keyset search, category subtree, zero baseline, wallet/goal/budget/jar read views), migrations `000018_advisor_conversations` and `000019_user_api_keys`, durable conversation/run repository, tám read-only tools, OpenAI-compatible provider adapter, bounded orchestration loop, JWT/API-key JSON routes và `/assistant` tab.

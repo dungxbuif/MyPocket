@@ -105,6 +105,18 @@ export async function loginWithGoogleCode(code: string): Promise<LoginOutput> {
   });
 }
 
+/**
+ * Email/password login used by the web compatibility gate and native clients.
+ * The backend owns password policy and session rotation; the browser only
+ * forwards the credentials over the current origin and receives LoginOutput.
+ */
+export async function loginWithPassword(email: string, password: string): Promise<LoginOutput> {
+  return apiRequest<LoginOutput>(API_ROUTES.LOGIN, {
+    method: "POST",
+    body: JSON.stringify({ email: email.trim(), password }),
+  });
+}
+
 export async function loginWithGoogleFixture(query: URLSearchParams): Promise<LoginOutput> {
   const subject = query.get("subject")?.trim() ?? "";
   const email = query.get("email")?.trim() ?? "";

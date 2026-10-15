@@ -55,6 +55,7 @@ type Category struct {
 	SystemKey *string   `json:"system_key,omitempty" gorm:"uniqueIndex"`
 	IconKey   string    `json:"icon_key" gorm:"not null;default:tag"`
 	IsSystem  bool      `json:"is_system" gorm:"not null;default:false"`
+	IsActive  bool      `json:"is_active" gorm:"not null;default:true"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 	WalletIDs []string  `json:"wallet_ids" gorm:"-"`

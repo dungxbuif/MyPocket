@@ -1,5 +1,11 @@
 # MyPocket Design Contract
 
+Native iOS current-source audit: [screen/presentation registry](platforms/ios-screen-registry.md).
+Approved common-family consolidation: [native guideline](platforms/ios-base-guideline.md)
+(execution underway; full runtime visual sweep pending). Web is archived, not
+the native styling authority. Each native screen/state links its own spec in
+the registry; raw-control lint is not proof of visual/workflow consistency.
+
 Đây là gateway UI bắt buộc. Đọc theo thứ tự: [system](system/DESIGN.md) → [tokens](system/TOKENS.md) → [base contracts](system/BASE_COMPONENTS.md) → [inventory](INDEX.md) → đặc tả component/màn đang làm.
 
 ## Base-first bắt buộc

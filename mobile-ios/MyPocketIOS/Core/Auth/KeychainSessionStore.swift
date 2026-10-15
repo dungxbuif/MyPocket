@@ -2,6 +2,8 @@ import Foundation
 import Security
 
 final class KeychainSessionStore: SessionStore, @unchecked Sendable {
+    // Shared by all instances: logout/login and refresh may use separate stores.
+    private static let lock = NSRecursiveLock()
     private let service: String
     private let account: String
 
@@ -11,6 +13,8 @@ final class KeychainSessionStore: SessionStore, @unchecked Sendable {
     }
 
     func load() -> AccessSession? {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -25,6 +29,8 @@ final class KeychainSessionStore: SessionStore, @unchecked Sendable {
     }
 
     func save(_ session: AccessSession) throws {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
         let data = try JSONEncoder.mypocket.encode(session)
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
@@ -44,12 +50,30 @@ final class KeychainSessionStore: SessionStore, @unchecked Sendable {
     }
 
     func clear() {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: account,
         ]
         SecItemDelete(query as CFDictionary)
+    }
+
+    func replace(_ session: AccessSession, ifCredentialsMatch original: AccessSession) throws -> Bool {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        guard load()?.hasSameCredentials(as: original) == true, session.user.id == original.user.id else { return false }
+        try save(session)
+        return true
+    }
+
+    func clear(ifCredentialsMatch original: AccessSession) -> Bool {
+        Self.lock.lock()
+        defer { Self.lock.unlock() }
+        guard load()?.hasSameCredentials(as: original) == true else { return false }
+        clear()
+        return true
     }
 }
 

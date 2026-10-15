@@ -10,7 +10,15 @@ shared_fields: [status, links]
 
 # MyPocket Docs Guide
 
+Native iOS: [hướng dẫn trợ lý tài chính](guides/finance-assistant-ios.md), gồm
+giao diện chat, bản nháp, lịch sử và tham chiếu endpoint đọc được cho AI agents.
+Thêm [đầu tư](guides/portfolio-ios.md) và [nhập số đúng loại](guides/numeric-input-ios.md);
+các trang Markdown đều có tham chiếu cho AI agents, không yêu cầu thư viện chat.
+
 Hướng dẫn sử dụng sổ giao dịch: [lọc theo ví, tuần và khoảng ngày](guides/transactions.md). Trang Markdown này cũng có bảng contract ngắn cho AI agent; tính năng chỉ lọc hiển thị, không thay đổi API hoặc dữ liệu.
+
+[API giao dịch có khóa chống trùng](guides/offline-sync-api.md): contract cho người
+đọc và AI agents; mới kiểm chứng local, chưa deploy hay có offline iOS hoàn chỉnh.
 
 Finance Assistant design and execution record: [design](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md), [V1 implementation plan](superpowers/plans/2026-09-22-finance-assistant-v1.md), and the implemented [tool catalog](architecture/AI_ADVISOR_TOOLS.md). These are plain Markdown for humans and agents. The local advisor is a JWT/API-key synchronous JSON pilot with best-effort Redis access audit; it is not yet a public streaming/durable-audit release.
 
@@ -336,3 +344,9 @@ Before any work is called done:
 - [ ] `work/BACKLOG.md` updated.
 - [ ] Trace links updated.
 - [ ] Release notes/changelog checked.
+
+## API key policy — 2026-10-14 local implementation
+
+[Human and AI-agent guide](guides/api-keys.md): keys have full same-account
+JWT-equivalent user operations, no per-key scopes. Expiry/revocation/owner checks
+remain. Production rollout pending; old valid keys gain full access at rollout.

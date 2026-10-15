@@ -1,4 +1,41 @@
 import Foundation
+import SwiftUI
+
+/// Syntax/locale normalization only; domain validators still own positivity,
+/// scale and range restrictions particular to each financial operation.
+enum MPNumberInputKind: Sendable {
+    case decimal
+    case integer
+    case percentage
+
+    func normalized(_ raw: String) -> String? {
+        let value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return "" }
+        let normalized = value.replacingOccurrences(of: ",", with: ".")
+        let parts = normalized.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count <= (self == .integer ? 1 : 2),
+              parts.allSatisfy({ part in
+                  !part.isEmpty && part.utf8.allSatisfy { (48...57).contains($0) }
+              }) else { return nil }
+        if self == .percentage {
+            let whole = parts[0].drop(while: { $0 == "0" })
+            guard whole.count <= 3, let number = Int(whole.isEmpty ? "0" : String(whole)), number <= 100 else { return nil }
+            if number == 100 && parts.count == 2 && !parts[1].allSatisfy({ $0 == "0" }) { return nil }
+        }
+        return normalized
+    }
+}
+
+private struct MPFinancialValuesMaskedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var mpFinancialValuesMasked: Bool {
+        get { self[MPFinancialValuesMaskedKey.self] }
+        set { self[MPFinancialValuesMaskedKey.self] = newValue }
+    }
+}
 
 struct MPSavingsProgress: Equatable, Sendable {
     let remaining: Int64
@@ -7,6 +44,8 @@ struct MPSavingsProgress: Equatable, Sendable {
 }
 
 enum MPFormat {
+    static let maskedValue = "••••••"
+
     static let currency: NumberFormatter = {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
@@ -37,6 +76,10 @@ enum MPFormat {
         currency.string(from: NSNumber(value: value)) ?? "(value) ₫"
     }
 
+    static func money(_ value: Int64, masked: Bool) -> String {
+        masked ? maskedValue : money(value)
+    }
+
     /// Parses the integer contract used by money fields without mutating the
     /// user's draft. Financial input must contain ASCII decimal digits only;
     /// malformed characters are rejected instead of silently filtered out.
@@ -56,6 +99,10 @@ enum MPFormat {
     static func signedMoney(_ value: Int64) -> String {
         if value == 0 { return money(0) }
         return (value > 0 ? "+" : "−") + money(abs(value))
+    }
+
+    static func signedMoney(_ value: Int64, masked: Bool) -> String {
+        masked ? maskedValue : signedMoney(value)
     }
 
     static func savingsProgress(balance: Int64, target: Int64) -> MPSavingsProgress {

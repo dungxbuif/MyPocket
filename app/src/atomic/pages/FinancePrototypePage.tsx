@@ -1,6 +1,7 @@
 import { StatusMessage } from "../atoms/StatusMessage";
 import { Text } from "../atoms/Text";
 import { BaseButton } from "../atoms/BaseButton";
+import { BaseTextInput, FormField } from "../atoms/FormField";
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "@tanstack/react-router";
 import { AccountPanel } from "../organisms/AccountPanel";
@@ -33,6 +34,7 @@ import {
   getStoredToken,
   HomeOutput,
   isAuthCallbackPath,
+  loginWithPassword,
   loginWithGoogleCode,
   loginWithGoogleFixture,
   writeSession,
@@ -67,6 +69,8 @@ export function FinancePrototypePage() {
   const [transactionRefresh, setTransactionRefresh] = useState(0);
   const [feedbackRefresh, setFeedbackRefresh] = useState(0);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
 
   useEffect(() => {
     let cancelled = false;
@@ -157,6 +161,24 @@ export function FinancePrototypePage() {
     setIsLoggingIn(false);
   };
 
+  const handlePasswordLogin = async (): Promise<void> => {
+    if (isLoggingIn || !loginEmail.trim() || !loginPassword) return;
+    setIsLoggingIn(true);
+    setAuth((current) => ({ ...current, errorMessage: "" }));
+    try {
+      await acceptLogin(await loginWithPassword(loginEmail, loginPassword));
+      setLoginPassword("");
+    } catch (error) {
+      setAuth((current) => ({
+        ...current,
+        phase: "unauthenticated",
+        errorMessage: error instanceof Error ? error.message : "Không thể đăng nhập bằng email và mật khẩu",
+      }));
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
   const handleLogout = (): void => {
     clearSession();
     setAuth({
@@ -172,7 +194,16 @@ export function FinancePrototypePage() {
   }
 
   if (auth.phase === "unauthenticated") {
-    return <AuthGateScreen isLoading={isLoggingIn} errorMessage={auth.errorMessage} onGoogleLogin={handleGoogleLogin} />;
+    return <AuthGateScreen
+      email={loginEmail}
+      password={loginPassword}
+      isLoading={isLoggingIn}
+      errorMessage={auth.errorMessage}
+      onEmailChange={setLoginEmail}
+      onPasswordChange={setLoginPassword}
+      onPasswordLogin={handlePasswordLogin}
+      onGoogleLogin={handleGoogleLogin}
+    />;
   }
 
   const userName = auth.user?.name || "Người dùng";
@@ -239,12 +270,22 @@ function AuthLoadingScreen() {
 }
 
 function AuthGateScreen({
+  email,
+  password,
   isLoading,
   errorMessage,
+  onEmailChange,
+  onPasswordChange,
+  onPasswordLogin,
   onGoogleLogin,
 }: {
+  email: string;
+  password: string;
   isLoading: boolean;
   errorMessage: string;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onPasswordLogin: () => void;
   onGoogleLogin: () => void;
 }) {
   return (
@@ -252,15 +293,42 @@ function AuthGateScreen({
       <div className="mx-auto flex min-h-screen max-w-[430px] flex-col items-center justify-center gap-4 px-6">
         <div className="grid h-16 w-16 place-items-center rounded-full bg-action text-2xl font-bold text-card">M</div>
         <Text as="h1" size="2xl" weight="bold" className="text-center">MyPocket</Text>
-        <Text size="sm" tone="secondary" className="text-center">Đăng nhập bằng Google để dùng đầy đủ tính năng.</Text>
+        <Text size="sm" tone="secondary" className="text-center">Đăng nhập bằng email và mật khẩu để tiếp tục.</Text>
         {errorMessage ? <StatusMessage tone="danger">{errorMessage}</StatusMessage> : null}
-        <BaseButton variant="primary" size="md"
-          type="button"
-          onClick={() => void onGoogleLogin()}
-          className="mt-2"
-          disabled={isLoading}
-        >
-          {isLoading ? "Đang đăng nhập..." : "Đăng nhập bằng Google"}
+        <form className="mt-2 flex w-full flex-col gap-3" onSubmit={(event) => { event.preventDefault(); onPasswordLogin(); }}>
+          <FormField label="Email">
+            <BaseTextInput
+              aria-label="Email"
+              autoComplete="username"
+              inputMode="email"
+              required
+              value={email}
+              onChange={(event) => onEmailChange(event.target.value)}
+              placeholder="you@example.com"
+            />
+          </FormField>
+          <FormField label="Mật khẩu">
+            <BaseTextInput
+              aria-label="Mật khẩu"
+              autoComplete="current-password"
+              required
+              type="password"
+              value={password}
+              onChange={(event) => onPasswordChange(event.target.value)}
+              placeholder="Nhập mật khẩu"
+            />
+          </FormField>
+          <BaseButton variant="primary" size="md" type="submit" disabled={isLoading} loading={isLoading}>
+            Đăng nhập
+          </BaseButton>
+        </form>
+        <div className="flex w-full items-center gap-3 py-1" aria-hidden="true">
+          <span className="h-px flex-1 bg-line" />
+          <Text size="xs" tone="muted">hoặc</Text>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+        <BaseButton variant="secondary" size="md" type="button" onClick={onGoogleLogin} disabled={isLoading}>
+          Đăng nhập bằng Google
         </BaseButton>
       </div>
     </main>

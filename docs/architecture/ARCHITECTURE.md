@@ -10,6 +10,28 @@ shared_fields: [status, linked_decisions]
 
 # Architecture
 
+## Current native runtime — 2026-10-14
+
+The maintained client is native SwiftUI under `mobile-ios/`; the web client is
+archived and the older browser-specific sections below are historical, not
+current UI/runtime authority. Go/Gin remains the domain API, PostgreSQL the
+financial source of truth and Redis the live-session/cache boundary. Native
+email/password, refresh and device credentials replace the old Google-first
+client flow. Owner API keys are designed for full owner JWT capability locally;
+production activation/version must be verified separately.
+
+Local offline composition: AppRoot owner+scene identity and SDK NWPathMonitor
+feed FinancialMutationQueue. It persists encrypted intents, then invokes the
+existing SyncEngine only active+reachable with fresh capability/auth checks.
+One cancellable timer follows FIFO retry/lease deadline; unsupported pending
+capability uses at least30s cooldown. Inactive/path loss suspends generation,
+preserving uncertain lease/key; logout is separate owner auth-block. No native
+background financial-write job. Receipt+CAS invalidates confirmed reads, never
+adds pending amounts to authoritative balances. These are local implementation
+facts, not a production rollout/full offline acceptance claim.
+[Lifecycle work](../work/tickets/OFFLINE-FOREGROUND-LIFECYCLE-20261014.md),
+[human/agent contract](../guides/offline-sync-api.md).
+
 ## Field Ownership
 
 - Human owns approved boundaries, constraints, and tradeoff approvals.
@@ -17,7 +39,10 @@ shared_fields: [status, linked_decisions]
 
 ## Overview
 
-MyPocket is currently a modular monolith: a Vite/React mobile-first client calls a Gin HTTP API. The API follows a clean-architecture split between HTTP controllers, use cases, repository interfaces and PostgreSQL/Redis infrastructure. Google OAuth is handled server-side; the browser receives a JWT-backed session result.
+MyPocket is a modular monolith: the maintained SwiftUI client calls a Gin HTTP API.
+The API separates HTTP controllers, use cases, repository interfaces and
+PostgreSQL/Redis infrastructure. Browser-specific details below describe the
+archived client and must not be used to configure current native authentication.
 
 ## System Boundaries
 
