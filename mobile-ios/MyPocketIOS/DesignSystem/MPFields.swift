@@ -417,7 +417,7 @@ private struct MPNumberPadTextField: UIViewRepresentable {
                 field.layer.shadowRadius = focused ? 3 : 0
             case .transactionAmount:
                 field.backgroundColor = .clear
-                field.font = UIFont(name: "Manrope-SemiBold", size: 34) ?? UIFont.systemFont(ofSize: 34, weight: .semibold)
+                field.font = UIFont.systemFont(ofSize: 34, weight: .semibold)
                 field.layer.cornerRadius = 0
                 field.layer.borderWidth = 0
                 field.layer.borderColor = UIColor.clear.cgColor

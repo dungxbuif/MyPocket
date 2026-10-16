@@ -49,10 +49,10 @@ enum MPMetrics {
     static let bottomNavigationHeight: CGFloat = 56
 }
 
-/// Reference typography shared by native base components. The Stitch export
-/// names Manrope; the OFL-licensed variable font is bundled in the app
-/// resources and remains behind this single base so screens cannot drift to
-/// unrelated system faces.
+/// Reference typography shared by native base components. Use the iOS system
+/// face so native text metrics, Vietnamese diacritics, Dynamic Type, and the
+/// platform chrome match the device reference. Keeping the decision here
+/// prevents individual screens from drifting to unrelated font families.
 enum MPFont {
     static let display = custom(size: 28, relativeTo: .largeTitle, weight: .bold).leading(.tight)
     static let headline = custom(size: 18, relativeTo: .title2, weight: .semibold)
@@ -64,13 +64,13 @@ enum MPFont {
     static let labelSmall = custom(size: 12, relativeTo: .caption, weight: .medium)
     static let currency = custom(size: 20, relativeTo: .title, weight: .semibold).monospacedDigit()
 
-    /// UIKit-backed fields use the same registered family as SwiftUI. The
-    /// fallback keeps tests/preview hosts usable before UIAppFonts is loaded.
-    static let uiBody: UIFont = UIFont(name: "Manrope", size: 16)
-        ?? UIFont(name: "Manrope-Regular", size: 16)
-        ?? UIFont.systemFont(ofSize: 16)
+    /// UIKit-backed fields use the same system family as SwiftUI and preserve
+    /// the device's native text metrics.
+    static let uiBody: UIFont = UIFont.systemFont(ofSize: 16)
 
     private static func custom(size: CGFloat, relativeTo style: Font.TextStyle, weight: Font.Weight = .regular) -> Font {
-        Font.custom("Manrope", size: size, relativeTo: style).weight(weight)
+        // SwiftUI exposes the system face with explicit sizes on the iOS
+        // deployment target; the shared token sizes preserve our hierarchy.
+        Font.system(size: size, weight: weight, design: .default)
     }
 }
