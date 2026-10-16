@@ -5128,3 +5128,18 @@ close the remaining port audit or owner UAT.
   entered.
 - This is a build/guard refresh only. It does not resolve feedback-dock
   overlap, authenticated visual UAT, or complete the native port.
+
+## Native visual parity checkpoint — 2026-10-16
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Shared-base audit | `git diff --check`; feature scan for screen-local fonts/colors/radii/interactive declarations | PASS; no screen-local typography/color/radius declarations found in feature views |
+| Full native unit suite | `xcodebuild test ... -only-testing:MyPocketIOSTests -parallel-testing-enabled NO` | PASS; exit 0 at `/tmp/mypocket-parity-full-unit2-20261016` |
+| Simulator Release | `xcodebuild build ... -configuration Release` with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` | PASS at `/tmp/mypocket-parity-release-sim-20261016` |
+| Personal-team device Release | Generic iOS Release with `DEVELOPMENT_TEAM=AU442S3MN3`, `CODE_SIGN_ENTITLEMENTS=MyPocketIOS/Signing/MyPocketIOS.personal.entitlements` | PASS; signature TeamIdentifier `AU442S3MN3` |
+| Physical device install | `devicectl device install app` on iPhone 15 Plus `00008120-001C28C02131A01E` | PASS; bundle `com.mypocket.ios` installed |
+| Physical device launch | `devicectl device process launch --terminate-existing` | BLOCKED by device lock screen; no app/data mutation and no screenshot claimed |
+
+This checkpoint is a build/install gate, not a claim of 100% reference parity.
+The physical launch/screenshot gate remains open until the owner unlocks the
+iPhone; the reference survey keeps all unvisited Money Lover branches explicit.

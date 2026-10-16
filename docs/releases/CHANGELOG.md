@@ -10,6 +10,20 @@ shared_fields: [status]
 
 # Changelog
 
+## Native parity checkpoint — 2026-10-16 (unreleased)
+
+- Added shared native SF Pro typography/icon tokens, selected-tab surface pill,
+  centered add geometry and stable feedback dock.
+- Aligned Account/More with the observed reference anatomy using shared
+  profile/card/menu bases, including a clearly disabled informational bank-link
+  row; preserved all MyPocket routes and permissions.
+- Added the dedicated 34pt Overview balance token and `MPFinanceCard` for
+  budgets, savings and report surfaces; auth/Face ID/feedback continue to use
+  shared reference cards and existing API contracts.
+- Verification: full `MyPocketIOSTests` passes; Release Simulator and
+  personal-team iPhone builds pass with warnings-as-errors; iPhone install
+  succeeds. Physical launch remains pending device unlock.
+
 ## 1.1.0 patch — 2026-10-16
 
 - Deploy API and worker image `release-20261016-7846945` (digest

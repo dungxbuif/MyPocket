@@ -22,6 +22,19 @@ shared_fields:
 updated: 2026-10-16
 ---
 
+## Native parity checkpoint — 2026-10-16
+
+The approved native Money Lover visual-parity plan is implemented through Tasks
+1–6 on `codex/native-ios-port`: shared tokens/icons and shell geometry,
+Account profile/bank-link anatomy, larger Overview balance hierarchy, shared
+`MPFinanceCard` for planning/report surfaces, and shared auth/Face ID/feedback
+contracts. Full `MyPocketIOSTests` passes after the compact-profile regression
+fix; simulator and personal-team Release builds pass with warnings treated as
+errors. The iPhone artifact is signed by `AU442S3MN3`, with the documented
+personal entitlements fallback, and installation succeeds. A physical launch
+attempt is currently blocked only by the iPhone lock screen; no data or backend
+state was changed.
+
 ## Current checkpoint — 2026-10-16: Savings/Budget and physical automation
 
 Owner delegated financial design details and requested implementation. Local

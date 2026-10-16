@@ -32,6 +32,18 @@ Reason: evidence inventory only; no product source or business behavior change.
 Impact checked: API=no, DB=no, Security=no, Runtime=no, Standards=no.
 Automation helper setup is a separately owned developer-tool operation.
 
+## Native parity checkpoint — 2026-10-16
+
+The observed Account reference (`/tmp/moneylover-account.png`) is now mapped
+to the native shell and shared bases: SF Pro system typography, selected tab
+surface pill, centered add action, stable feedback dock, profile/account card,
+disabled bank-link placeholder, grouped menu rows, and the existing MyPocket
+routes. Overview balance now uses the dedicated 34pt balance hierarchy token.
+The iPhone Release artifact was signed with personal team `AU442S3MN3`,
+installed successfully, and launch was attempted; `devicectl` reported the
+physical device was locked, so no authenticated device screenshot is claimed.
+The remaining reference survey rows below are still intentionally open.
+
 ## Survey policy and verification plan
 
 1. Discover the installed reference app by device inventory; never guess its
