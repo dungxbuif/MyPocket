@@ -4989,6 +4989,19 @@ production or physical-device state changed. The sample reference app remains
 separate from MyPocket's test fixture; its remaining phone-only branches are
 listed in the reference-survey ledger.
 
+## Reference wave 3 integration gate — 2026-10-16
+
+Categories and Recurring now use compact reference surfaces while preserving
+the existing category tree, CRUD, recurrence editor and overflow actions.
+Focused signed simulator tests for all reference waves pass 14/14 with no
+failures, skips or runtime warnings at
+`/tmp/mypocket-reference-wave3-focused-20261016/Logs/Test/`.
+
+The complete native unit target passes 331/331 at
+`/tmp/mypocket-reference-wave3-unit-20261016`, and the Release simulator
+build passes with warnings treated as errors at
+`/tmp/mypocket-reference-wave3-release-20261016`.
+
 ## Native AI-entry uncertain request recovery — 2026-10-08
 
 | Check | Command / evidence | Result |

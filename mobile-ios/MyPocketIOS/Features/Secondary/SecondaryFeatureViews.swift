@@ -704,35 +704,42 @@ struct CategoriesView: View {
     private var categoryList: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
-                MPScreenHeader(title: "Danh mục", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
-                MPSegmentedControl(
-                    options: [
-                        (id: "expense", title: "Khoản chi"),
-                        (id: "income", title: "Khoản thu"),
-                        (id: "debt", title: "Vay-Nợ")
-                    ],
-                    selection: $listKind,
-                    accessibilityIdentifier: CategoriesReferenceCopy.kindFilterAccessibilityID
-                )
-                MPButton(CategoriesReferenceCopy.addAction, systemName: "plus.circle", style: .outline) { beginCreating() }
-                    .accessibilityIdentifier(CategoriesReferenceCopy.addActionAccessibilityID)
-                MPOptionSelector(
-                    title: "Phạm vi ví",
-                    options: [MPSelectionOption(id: "__all__", label: "Tất cả ví")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) },
-                    selectionID: $walletScopeID,
-                    emptyLabel: "Tất cả ví",
-                    accessibilityIdentifier: CategoriesReferenceCopy.walletFilterAccessibilityID
-                )
-                MPTextField(
-                    title: "Tìm danh mục",
-                    text: $searchText,
-                    placeholder: "Nhập tên nhóm",
-                    accessibilityIdentifier: CategoriesReferenceCopy.searchAccessibilityID
-                )
-                MPButton(showInactiveCategories ? "Đang hiển thị nhóm không hoạt động" : "Hiển thị nhóm không hoạt động", systemName: showInactiveCategories ? "checkmark.circle.fill" : "circle", style: .secondary) {
-                    showInactiveCategories.toggle()
+                MPScreenHeader(title: "Danh mục", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
+                    MPIconButton(systemName: "plus", label: CategoriesReferenceCopy.addAction, action: beginCreating)
+                        .accessibilityIdentifier(CategoriesReferenceCopy.addActionAccessibilityID)
+                })
+                // One compact filter group mirrors the reference category
+                // route while keeping all selection primitives shared.
+                MPSurfaceCard(style: .reference) {
+                    VStack(alignment: .leading, spacing: 10) {
+                        MPSegmentedControl(
+                            options: [
+                                (id: "expense", title: "Khoản chi"),
+                                (id: "income", title: "Khoản thu"),
+                                (id: "debt", title: "Vay-Nợ")
+                            ],
+                            selection: $listKind,
+                            accessibilityIdentifier: CategoriesReferenceCopy.kindFilterAccessibilityID
+                        )
+                        MPOptionSelector(
+                            title: "Phạm vi ví",
+                            options: [MPSelectionOption(id: "__all__", label: "Tất cả ví")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) },
+                            selectionID: $walletScopeID,
+                            emptyLabel: "Tất cả ví",
+                            accessibilityIdentifier: CategoriesReferenceCopy.walletFilterAccessibilityID
+                        )
+                        MPTextField(
+                            title: "Tìm danh mục",
+                            text: $searchText,
+                            placeholder: "Nhập tên nhóm",
+                            accessibilityIdentifier: CategoriesReferenceCopy.searchAccessibilityID
+                        )
+                        MPButton(showInactiveCategories ? "Nhóm không hoạt động đang hiển thị" : "Hiển thị nhóm không hoạt động", systemName: showInactiveCategories ? "checkmark.circle.fill" : "circle", style: .secondary) {
+                            showInactiveCategories.toggle()
+                        }
+                        .accessibilityIdentifier("category-show-inactive")
+                    }
                 }
-                .accessibilityIdentifier("category-show-inactive")
                 if loading && items.isEmpty { MPLoadingView(label: "Đang tải danh mục...") }
                 else if let error, items.isEmpty { MPErrorView(title: "Không tải được danh mục", detail: error) { Task { await load() } } }
                 else if categoryTreeItems.isEmpty {
@@ -1451,31 +1458,59 @@ struct RecurringView: View {
                 if let result { MPStatusMessage(text: result, tone: .success) }
                 if let error { MPStatusMessage(text: error, tone: .danger) }
                 if items.isEmpty { MPEmptyView(title: "Chưa có lịch định kỳ", detail: "Lịch định kỳ chỉ tạo giao dịch khi bạn chủ động chạy.") }
-                ForEach(items) { item in
-                    MPSurfaceCard {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack {
-                                MPText(item.name)
-                                Spacer()
-                                MPStatusBadge(text: item.active ? "Đang bật" : "Tạm dừng", tone: MPStatusBadge.tone(for: item.active))
-                            }
-                            MPText("\(item.type == "expense" ? "Khoản chi" : "Khoản thu") · \(frequencyLabel(item.frequency, interval: item.interval)) · \(MPFormat.money(item.amount, masked: masked))", style: .secondary)
-                            MPText("Ví: \(walletName(for: item.walletID))", style: .secondary)
-                            MPText("Lần chạy kế tiếp: \(MPFormat.shortDateTime(item.nextRunAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
-                            if let note = item.note, !note.isEmpty { MPText(note, style: .secondary) }
-                            HStack {
-                                MPButton("Sửa", style: .secondary) { beginEditing(item) }
-                                    .accessibilityIdentifier("recurring-edit-\(item.id)")
-                                MPButton("Xóa", style: .destructive) { deleteTarget = item }
-                                    .accessibilityIdentifier("recurring-delete-\(item.id)")
+                if !items.isEmpty {
+                    MPSurfaceCard(style: .reference) {
+                        VStack(spacing: 0) {
+                            ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                                if index > 0 { MPDivider() }
+                                recurringRow(item)
                             }
                         }
                     }
+                    .accessibilityIdentifier("recurring-list")
                 }
 
             }
             .padding(MPMetrics.pagePadding)
         }
+    }
+
+    /// Compact schedule row shared by the populated list. The overflow action
+    /// keeps the Money Lover-style list density without removing CRUD access.
+    private func recurringRow(_ item: RecurringModel) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            MPTransactionGlyph(
+                systemName: item.type == "expense" ? "arrow.down.left" : "arrow.up.right",
+                tone: item.type == "expense" ? "categoryRose" : "categoryIncome",
+                size: 32
+            )
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    MPText(item.name, style: .emphasis)
+                        .lineLimit(2)
+                    MPStatusBadge(text: item.active ? "Đang bật" : "Tạm dừng", tone: MPStatusBadge.tone(for: item.active))
+                }
+                MPText("\(item.type == "expense" ? "Khoản chi" : "Khoản thu") · \(frequencyLabel(item.frequency, interval: item.interval))", style: .secondary)
+                MPText("\(walletName(for: item.walletID)) · Kỳ tới \(MPFormat.shortDateTime(item.nextRunAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
+                if let note = item.note, !note.isEmpty {
+                    MPText(note, style: .secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 4)
+            VStack(alignment: .trailing, spacing: 4) {
+                MPText(MPFormat.money(item.amount, masked: masked), style: .emphasis)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.75)
+                MPOverflowMenu(label: "Tùy chọn \(item.name)", actions: [
+                    MPOverflowAction(title: "Sửa") { beginEditing(item) },
+                    MPOverflowAction(title: "Xóa") { deleteTarget = item }
+                ])
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: MPMetrics.hitTarget, alignment: .leading)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("recurring-row-\(item.id)")
     }
 
     private var editorContent: some View {

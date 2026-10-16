@@ -45,6 +45,9 @@ shared_fields: [status]
 - Extend the same shared composition to populated Overview and Wallets
   surfaces, including compact income/expense metrics and the selection versus
   management title contract.
+- Compact populated Categories and Recurring screens into shared reference
+  surfaces while retaining parent-child CRUD, recurrence editing and overflow
+  actions.
 - Stabilize JSON request bytes with sorted keys so identical budget-series
   retries remain idempotency-safe and reproducible. Focused native tests and
   Release simulator build pass; physical-device owner UAT remains pending.
