@@ -5040,6 +5040,8 @@ uses the same reference radius token.
 
 The focused signed simulator run passed 3/3 with no failures, skips or runtime
 warnings at `/tmp/mypocket-reference-wave6-focused-20261016/Logs/Test/`.
+The complete native unit target passes 340/340 with no failures, skips or
+runtime warnings at `/tmp/mypocket-reference-wave6-unit-20261016/Logs/Test/`.
 The Release simulator build passed with
 `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` at
 `/tmp/mypocket-reference-wave6-release-20261016`.

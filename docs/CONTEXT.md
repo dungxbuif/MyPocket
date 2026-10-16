@@ -66,7 +66,7 @@ own the reference radius, compact metric grid, adaptive daily rows, masking
 and accessibility reading order; screen code only supplies data. Focused
 signed simulator tests pass 14/14 for waves 1–3, 2/2 for wave 4 and 4/4 for
 wave 5, the
-native unit target passes 331/331 before wave 4, and
+native unit target now passes 340/340, and
 the wave 6 focused set passes 3/3 and the latest Release simulator build passes
 with warnings treated as errors. A
 deterministic sorted-key encoder was added so identical budget-series retries

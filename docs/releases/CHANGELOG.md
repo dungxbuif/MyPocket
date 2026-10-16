@@ -43,8 +43,9 @@ shared_fields: [status]
   actions; preserve all existing API, owner-scope, masking and mutation
   behavior. Recurring's intro surface now uses the shared reference radius.
 - Add `BillsDebtTravelReferenceTests`; signed simulator focused tests pass
-  3/3 and the Release simulator build passes with warnings treated as errors.
-  No backend, database, production or physical-device state changed.
+  3/3, the complete native unit target passes 340/340, and the Release
+  simulator build passes with warnings treated as errors. No backend,
+  database, production or physical-device state changed.
 
 - Continue native Money Lover reference parity with populated transaction
   ledger, savings report and budget report compositions. Shared reference
