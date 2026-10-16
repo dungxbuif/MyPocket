@@ -182,6 +182,10 @@ notification banners are excluded from retained reference evidence.
 | ML-71 | Tools → tip calculator | Amount, five-person glyph selection with More, five-heart tip selection with More, Calculate | `tools-tip-calculator.png` visually inspected |
 | ML-72 | Tip → person / tip More | Each expands inline native wheel beneath its row | AX; no real transaction data entered |
 | ML-73 | Tip → Calculate at defaults | Pure calculator result shows total paid/tip/people/per-person and Add Transaction CTA | AX; no Add Transaction; result/edit/close navigation inspected |
+| ML-74 | Account → Manage account | Premium profile header; change-password action; device list with 2/5 count; current iPhone and Web Browser rows; per-device delete; logout/reset/delete account actions | AX; read-only inspection, no account mutation |
+| ML-75 | Account → Settings | Display, system, database sections; number format/date/language/total-wallet currency/week start/month start/year start/future period/overview mode; report-exclusion and daily-reminder switches; security/CSV/exchange-rate rows | AX; no setting changed |
+| ML-76 | Settings → Number display | Preview amount; compact-number and currency-unit switches; decimal precision choices; decimal separator choices; positive/negative style choices | AX; current values retained, no selection saved |
+| ML-77 | Settings → Language | Scrollable language list with English, Vietnamese, Thai, Chinese, Japanese, European and other locales; current Vietnamese checkmark | AX; no language changed |
 
 Connection checkpoint 21:33–21:36 +0700: after closing the tip form, MCP
 hierarchy calls stopped returning. Direct `mobilecli agent status` still
@@ -191,6 +195,12 @@ output. Read-only `xcrun devicectl device info lockState --device ...` returns
 before further UI work. No passcode attempt was made. Sample mode remains
 active until the next successful `Tắt` action; restoration is not yet claimed.
 No reference financial record was created, changed, paid or deleted.
+
+Connection checkpoint 22:34–22:36 +0700: owner device was unlocked and the
+read-only survey resumed. Account → Manage account, Account → Settings,
+Number display and Language were opened and inspected. Current sample mode and
+Vietnamese settings were preserved; no password, device, locale, currency,
+security or database action was submitted.
 The pending direct snapshot eventually exited with
 `RPC call device.dump.ui failed: Post "http://localhost:8100/rpc": context deadline exceeded`.
 
