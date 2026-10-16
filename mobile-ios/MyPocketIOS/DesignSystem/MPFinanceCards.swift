@@ -1,5 +1,27 @@
 import SwiftUI
 
+enum MPFinanceCardPolicy {
+    static let surfaceStyle: MPSurfaceCardStyle = .reference
+    static let contentSpacing = MPMetrics.sectionSpacing
+}
+
+/// Domain card wrapper for budgets, reports and specialized wallet surfaces.
+/// Feature screens provide content only; spacing and reference surface geometry
+/// stay centralized here so a report cannot drift into a one-off card style.
+struct MPFinanceCard<Content: View>: View {
+    @ViewBuilder let content: () -> Content
+
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        MPSurfaceCard(style: MPFinanceCardPolicy.surfaceStyle) {
+            VStack(alignment: .leading, spacing: MPFinanceCardPolicy.contentSpacing, content: content)
+        }
+    }
+}
+
 /// User prose has a trailing bubble; assistant prose and structured finance
 /// cards remain flat so a response never adds a second card around each card.
 struct MPChatMessage<Content: View>: View {

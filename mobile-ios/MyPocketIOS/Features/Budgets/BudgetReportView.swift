@@ -24,34 +24,28 @@ struct BudgetReportView: View {
                         if let error { MPErrorView(title: "Không tải được báo cáo", detail: error) { Task { await load() } } }
                         if let report {
                             MPText("\(report.startDate) → \(report.endDate) · \(report.timezone)", style: .secondary)
-                            MPSurfaceCard(style: .reference) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    MPMetricGrid(items: [
-                                        metric("Giới hạn gốc", report.baseLimitAmount),
-                                        metric("Chuyển dư từ kỳ trước", report.carryoverAmount),
-                                        metric("Giới hạn hiệu lực", report.effectiveLimitAmount),
-                                        metric("Đã chi", report.spent), metric("Còn lại", report.remaining)
-                                    ], masked: masked)
-                                }
+                            MPFinanceCard {
+                                MPMetricGrid(items: [
+                                    metric("Giới hạn gốc", report.baseLimitAmount),
+                                    metric("Chuyển dư từ kỳ trước", report.carryoverAmount),
+                                    metric("Giới hạn hiệu lực", report.effectiveLimitAmount),
+                                    metric("Đã chi", report.spent), metric("Còn lại", report.remaining)
+                                ], masked: masked)
                             }
-                            MPSurfaceCard(style: .reference) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    MPText(report.forecast.statusLabel, style: .emphasis)
-                                    MPMetricGrid(items: forecastMetrics(report), masked: masked)
-                                    if report.forecast.overBudget == true { MPStatusBadge(text: report.forecast.status == "actual" ? "Đã vượt ngân sách" : "Có thể vượt ngân sách", tone: .danger) }
-                                    MPText("\(report.forecast.elapsedDays) / \(report.forecast.totalDays) ngày · Bao gồm ngày không chi.", style: .secondary)
-                                    if report.forecast.status == "estimated" { MPText("Ước tính tuyến tính từ chi tiêu thực tế; không phải cam kết hoặc tư vấn AI.", style: .secondary) }
-                                }
+                            MPFinanceCard {
+                                MPText(report.forecast.statusLabel, style: .emphasis)
+                                MPMetricGrid(items: forecastMetrics(report), masked: masked)
+                                if report.forecast.overBudget == true { MPStatusBadge(text: report.forecast.status == "actual" ? "Đã vượt ngân sách" : "Có thể vượt ngân sách", tone: .danger) }
+                                MPText("\(report.forecast.elapsedDays) / \(report.forecast.totalDays) ngày · Bao gồm ngày không chi.", style: .secondary)
+                                if report.forecast.status == "estimated" { MPText("Ước tính tuyến tính từ chi tiêu thực tế; không phải cam kết hoặc tư vấn AI.", style: .secondary) }
                             }
                             .accessibilityIdentifier("budget-report-forecast")
                             MPButton("Xem giao dịch ngân sách", style: .secondary) { showingTransactions = true }
-                            MPSurfaceCard(style: .reference) {
-                                VStack(alignment: .leading, spacing: 8) {
-                                    MPText("Chi tiêu từng ngày", style: .emphasis)
-                                    if report.daily.isEmpty { MPText("Chưa có ngày đã bắt đầu trong kỳ.", style: .secondary) }
-                                    ForEach(report.daily) { day in
-                                        MPMetricRow(title: day.date, value: MPFormat.money(day.spent), masked: masked)
-                                    }
+                            MPFinanceCard {
+                                MPText("Chi tiêu từng ngày", style: .emphasis)
+                                if report.daily.isEmpty { MPText("Chưa có ngày đã bắt đầu trong kỳ.", style: .secondary) }
+                                ForEach(report.daily) { day in
+                                    MPMetricRow(title: day.date, value: MPFormat.money(day.spent), masked: masked)
                                 }
                             }
                             MPText("Cập nhật: \(report.asOf)", style: .secondary)

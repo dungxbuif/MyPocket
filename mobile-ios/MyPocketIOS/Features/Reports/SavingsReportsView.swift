@@ -21,7 +21,7 @@ struct SavingsReportsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
                         MPScreenHeader(title: "Báo cáo tiết kiệm", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
-                        MPSurfaceCard(style: .reference) {
+                        MPFinanceCard {
                             VStack(alignment: .leading, spacing: 8) {
                                 MPTextField(title: "Tháng (YYYY-MM)", text: $month, accessibilityIdentifier: "savings-report-month")
                                 MPOptionSelector(title: "Ví mục tiêu", options: [MPSelectionOption(id: "__all__", label: "Tất cả ví mục tiêu")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID, emptyLabel: "Tất cả ví mục tiêu")
@@ -33,7 +33,7 @@ struct SavingsReportsView: View {
                         if let error { MPErrorView(title: "Không tải được báo cáo tiết kiệm", detail: error) { Task { await load() } } }
                         if let report {
                             MPText("\(report.month) · \(report.timezone) · Cập nhật \(report.asOf)", style: .secondary)
-                            MPSurfaceCard(style: .reference) {
+                            MPFinanceCard {
                                 VStack(alignment: .leading, spacing: 8) {
                                     MPText("Ví mục tiêu", style: .emphasis)
                                     MPMetricGrid(items: goalSummaryMetrics(report), masked: masked)
@@ -44,7 +44,7 @@ struct SavingsReportsView: View {
                             .accessibilityIdentifier("savings-report-goals")
                             if report.goals.items.isEmpty { MPEmptyView(title: "Chưa có ví mục tiêu", detail: "Tạo ví mục tiêu để theo dõi số dư tiết kiệm.") }
                             ForEach(report.goals.items) { goal in
-                                MPSurfaceCard(style: .reference) {
+                                MPFinanceCard {
                                     VStack(alignment: .leading, spacing: 8) {
                                         MPText(goal.name, style: .emphasis)
                                         MPMetricGrid(items: goalMetrics(goal), masked: masked)
@@ -60,7 +60,7 @@ struct SavingsReportsView: View {
                                     }
                                 }
                             }
-                            MPSurfaceCard(style: .reference) {
+                            MPFinanceCard {
                                 VStack(alignment: .leading, spacing: 8) {
                                     MPText("Thặng dư thu / chi · Toàn tài khoản", style: .emphasis)
                                     MPMetricGrid(items: surplusMetrics(report), masked: masked)

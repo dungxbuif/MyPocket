@@ -3,6 +3,11 @@ import XCTest
 
 @MainActor
 final class JarsMonthsReferenceTests: XCTestCase {
+    func testPlanningAndReportScreensUseOneReferenceFinanceCardBase() {
+        XCTAssertEqual(MPFinanceCardPolicy.surfaceStyle, .reference)
+        XCTAssertEqual(MPFinanceCardPolicy.contentSpacing, MPMetrics.sectionSpacing)
+    }
+
     func testJarsKeepStableCreateActionAndMonthReportCopy() {
         XCTAssertEqual(JarsReferenceCopy.addAction, "Thêm hũ")
         XCTAssertEqual(JarsReferenceCopy.addActionAccessibilityID, "jar-add-month")
