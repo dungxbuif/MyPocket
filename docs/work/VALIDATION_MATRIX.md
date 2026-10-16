@@ -16,6 +16,22 @@ shared_fields:
 updated: 2026-10-16
 ---
 
+## 2026-10-16 native parity merge gate
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Backend regression | `go test ./...` in `backend` | PASS: 343 tests across 16 packages |
+| Backend static analysis | `go vet ./...` in `backend` | PASS |
+| Web type/design/build | `npm run typecheck`, `npm run check:design`, `npm run build` in `app` | PASS; 229 local links and production Vite build |
+| Native base/project guards | `mobile-ios/scripts/check-base-components.test.sh`, `verify-project.sh` | PASS |
+| Native unit target | `xcodebuild test -only-testing:MyPocketIOSTests` on iOS Simulator | PASS; exit 0 |
+| Remote integration | `feature/wallet-management` fast-forwarded to `7df8772c` and pushed | PASS; no production/database mutation |
+
+The physical iPhone artifact remains installed but requires the device to be
+unlocked before launch; this is a device-state gate, not a code or signing
+failure. Production API-only routing and web rollback behavior are documented
+in [DEPLOYMENT.md](../operations/DEPLOYMENT.md).
+
 ## 2026-10-16 Savings/Budget implementation — local candidate
 
 Scope: [delegated design](../superpowers/specs/2026-10-16-savings-budget-design.md)

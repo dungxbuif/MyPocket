@@ -35,6 +35,11 @@ personal entitlements fallback, and installation succeeds. A physical launch
 attempt is currently blocked only by the iPhone lock screen; no data or backend
 state was changed.
 
+Post-merge verification on `feature/wallet-management` passed backend tests
+(343), `go vet`, web typecheck/design/build, native base/project guards and the
+full native unit target. The parity branch was fast-forwarded and pushed at
+`7df8772c`; the docs-only production API-only reconciliation is `20e6fc5`.
+
 ## Current checkpoint — 2026-10-16: Savings/Budget and physical automation
 
 Owner delegated financial design details and requested implementation. Local
