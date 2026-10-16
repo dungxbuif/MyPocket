@@ -52,6 +52,10 @@ enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
 /// grouped surface per section; feature destinations remain unchanged so deep
 /// links and owner-scoped secondary routes keep their existing behavior.
 enum MoreReferencePresentation {
+    enum BankLinkStyle: Equatable {
+        case informationalDisabled
+    }
+
     struct Section: Identifiable, Equatable {
         let title: String
         let items: [MoreDestination]
@@ -69,6 +73,11 @@ enum MoreReferencePresentation {
     static let surfaceStyle: MPSurfaceCardStyle = .reference
     static let rowSpacing: CGFloat = 0
     static let sectionSpacing: CGFloat = MPMetrics.sectionSpacing
+    static let profileBadgeTitle = "TÀI KHOẢN MYPOCKET"
+    static let bankLinkTitle = "Liên kết ngân hàng"
+    static let bankLinkStyle: BankLinkStyle = .informationalDisabled
+    static let profileAccessibilityIdentifier = "more-profile-account"
+    static let logoutAccessibilityIdentifier = "more-logout"
 }
 
 struct MoreView: View {
@@ -115,10 +124,20 @@ struct MoreView: View {
                     MPProfileCard(
                         name: accountName,
                         email: accountEmail,
+                        badgeTitle: MoreReferencePresentation.profileBadgeTitle,
                         accountSubtitle: "Hồ sơ tài khoản",
-                        accessibilityIdentifier: "more-profile-account"
+                        accessibilityIdentifier: MoreReferencePresentation.profileAccessibilityIdentifier
                     ) {
                         navigationPath = [.account]
+                    }
+                    MPSurfaceCard(style: MoreReferencePresentation.surfaceStyle) {
+                        MPMenuRow(
+                            title: MoreReferencePresentation.bankLinkTitle,
+                            subtitle: "Tính năng liên kết ngân hàng đang được phát triển.",
+                            systemName: MPReferenceIcon.bankLink,
+                            accessibilityIdentifier: "more-bank-link",
+                            isEnabled: false
+                        ) {}
                     }
                     ForEach(MoreReferencePresentation.sections) { section in
                         VStack(alignment: .leading, spacing: 4) {
@@ -141,6 +160,7 @@ struct MoreView: View {
                         }
                     }
                     MPButton("Đăng xuất", style: .destructive, isLoading: auth.isBusy) { Task { await auth.logout() } }
+                        .accessibilityIdentifier(MoreReferencePresentation.logoutAccessibilityIdentifier)
                     if let message = auth.errorMessage { MPStatusMessage(text: message, tone: .danger) }
                 }
                 .padding(MPMetrics.pagePadding)

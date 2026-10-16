@@ -18,6 +18,14 @@ final class MoreFeedbackReferenceTests: XCTestCase {
         XCTAssertEqual(MoreReferencePresentation.sectionSpacing, MPMetrics.sectionSpacing)
     }
 
+    func testAccountReferenceAnatomyKeepsProfileBadgeAndBankLinkInformational() {
+        XCTAssertEqual(MoreReferencePresentation.profileBadgeTitle, "TÀI KHOẢN MYPOCKET")
+        XCTAssertEqual(MoreReferencePresentation.bankLinkTitle, "Liên kết ngân hàng")
+        XCTAssertEqual(MoreReferencePresentation.bankLinkStyle, .informationalDisabled)
+        XCTAssertEqual(MoreReferencePresentation.logoutAccessibilityIdentifier, "more-logout")
+        XCTAssertEqual(MoreReferencePresentation.profileAccessibilityIdentifier, "more-profile-account")
+    }
+
     func testFeedbackTabsKeepOwnerResolutionMeaningAndLabels() {
         XCTAssertEqual(FeedbackReferencePresentation.tabID(forResolved: false), "unresolved")
         XCTAssertEqual(FeedbackReferencePresentation.tabID(forResolved: true), "resolved")

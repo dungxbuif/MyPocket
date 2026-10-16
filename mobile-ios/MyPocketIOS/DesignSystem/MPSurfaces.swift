@@ -785,6 +785,7 @@ struct MPWalletRow: View {
 struct MPProfileCard: View {
     let name: String
     let email: String
+    let badgeTitle: String?
     let accountSubtitle: String
     let onManage: () -> Void
     let accessibilityIdentifier: String
@@ -792,12 +793,14 @@ struct MPProfileCard: View {
     init(
         name: String,
         email: String,
+        badgeTitle: String? = nil,
         accountSubtitle: String = "Hồ sơ tài khoản",
         accessibilityIdentifier: String = "more-profile-account",
         onManage: @escaping () -> Void
     ) {
         self.name = name
         self.email = email
+        self.badgeTitle = badgeTitle
         self.accountSubtitle = accountSubtitle
         self.accessibilityIdentifier = accessibilityIdentifier
         self.onManage = onManage
@@ -809,37 +812,40 @@ struct MPProfileCard: View {
 
     var body: some View {
         MPSurfaceCard(style: .reference) {
-            MPButton(style: .plain, accessibilityIdentifier: accessibilityIdentifier, action: onManage) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack(spacing: 8) {
                     Text(initial)
                         .font(MPFont.headline)
                         .foregroundStyle(.white)
-                        .frame(width: 36, height: 36)
+                        .frame(width: 40, height: 40)
                         .background(MPColor.brand, in: Circle())
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 2) {
-                        MPText(name, style: .emphasis)
-                            .lineLimit(1)
-                        HStack(spacing: 4) {
-                            MPText(accountSubtitle, style: .secondary)
-                                .font(MPFont.labelSmall)
-                                .lineLimit(1)
-                            Text("·")
-                                .font(MPFont.labelSmall)
-                                .foregroundStyle(MPColor.secondary)
-                                .accessibilityHidden(true)
-                            MPText(email.isEmpty ? "Chưa có email" : email, style: .secondary)
-                                .font(MPFont.labelSmall)
-                                .lineLimit(1)
-                        }
+                        MPText(name, style: .emphasis).lineLimit(1)
+                        MPText(email.isEmpty ? "Chưa có email" : email, style: .secondary).lineLimit(1)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    MPIcon(systemName: "chevron.right", color: MPColor.secondary)
-                        .accessibilityHidden(true)
                 }
-                .frame(maxWidth: .infinity)
+                if let badgeTitle {
+                    Text(badgeTitle)
+                        .font(MPFont.labelSmall)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(MPColor.warning, in: Capsule())
+                        .accessibilityIdentifier("more-profile-badge")
+                }
+                MPDivider()
+                MPButton(style: .plain, accessibilityIdentifier: accessibilityIdentifier, action: onManage) {
+                    HStack {
+                        MPText("Quản lý tài khoản", style: .emphasis)
+                        Spacer()
+                        MPIcon(systemName: "chevron.right", color: MPColor.secondary)
+                            .accessibilityHidden(true)
+                    }
+                }
+                .accessibilityLabel("Quản lý tài khoản: \(name), \(accountSubtitle), \(email)")
             }
-            .accessibilityLabel("Quản lý tài khoản: \(name), \(accountSubtitle), \(email)")
         }
     }
 }

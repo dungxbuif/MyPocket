@@ -681,6 +681,7 @@ struct MPMenuRow: View {
     let subtitle: String?
     let systemName: String
     let accessibilityIdentifier: String
+    let isEnabled: Bool
     let action: () -> Void
 
     init(
@@ -688,12 +689,14 @@ struct MPMenuRow: View {
         subtitle: String? = nil,
         systemName: String,
         accessibilityIdentifier: String,
+        isEnabled: Bool = true,
         action: @escaping () -> Void
     ) {
         self.title = title
         self.subtitle = subtitle
         self.systemName = systemName
         self.accessibilityIdentifier = accessibilityIdentifier
+        self.isEnabled = isEnabled
         self.action = action
     }
 
@@ -718,6 +721,8 @@ struct MPMenuRow: View {
             .contentShape(Rectangle())
         }
         .contentShape(Rectangle())
+        .disabled(!isEnabled)
+        .opacity(isEnabled ? 1 : 0.55)
         .accessibilityLabel(title)
         .accessibilityIdentifier(accessibilityIdentifier)
     }

@@ -49,6 +49,14 @@ feedback presentation. Shell-hosted routes must not add a duplicate
 `MPBottomNavigationInset`; retain that base only for independent sheets,
 full-screen editors and overlays that own their own presentation boundary.
 
+The Account/More landing screen follows the reference anatomy through shared
+bases: `MPProfileCard` owns the identity, account badge and management action;
+`MPSurfaceCard` groups menu sections; and `MPMenuRow` owns row geometry while
+rendering the bank-link placeholder as disabled/informational. The placeholder
+is not a banking integration and performs no write. Logout keeps the stable
+`more-logout` accessibility identifier and the profile action keeps
+`more-profile-account` for route/UI automation.
+
 `MPWalletRow` composes `MPWalletGlyph`, a shared 48pt circular badge whose
 SF Symbol and semantic tone mirror the web `WalletCard`: basic wallets use the
 warning tone, goal wallets success, and credit wallets teal. Wallet data and
