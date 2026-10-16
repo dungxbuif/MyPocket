@@ -38,6 +38,16 @@ shared_fields: [status]
 
 ## Unreleased — native Stitch parity continuation
 
+- Harden native Reports owner scoping and fail closed when the month summary
+  cannot be loaded (`089fd656`); signed simulator tests pass 307/307.
+- Add offline transfer receipt replay assertions and document the remaining
+  credential-gated production UAT (`54087c8`).
+- Add deterministic AI/OCR fixtures for duplicate rows, missing dates, wallet
+  inference and no-auto-approval, and explicitly mark savings reports and
+  budget recurrence/forecast as partial until their API contracts exist
+  (`982f8c48`). No production deployment or schema migration was performed
+  for these local hardening changes.
+
 - Native Reports now scopes `monthSummary` and Money Insider reads to the
   current owner through the existing `expectedOwnerID` guard. A month-summary
   failure now fails closed for the whole report instead of rendering insider

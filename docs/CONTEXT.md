@@ -22,7 +22,7 @@ shared_fields:
 updated: 2026-10-16
 ---
 
-## Current checkpoint — 2026-10-16 20:35 +0700
+## Current checkpoint — 2026-10-16 20:45 +0700
 
 The async advisor and AI-entry multi-image context fixes are now deployed to
 production. API and worker run
@@ -43,6 +43,17 @@ document boundary before model extraction. It does not claim provider OCR
 accuracy; owner-authenticated AI-entry UAT with the configured provider remains
 open. The web service remains `0/0` by the native-only rollout decision, and
 the final signed-device/Face ID/visual gates remain open.
+
+Gap-closure verification then completed locally. Native Reports now carries
+the owner guard and fails closed when the month summary is unavailable
+(`089fd656`); signed iOS Simulator XCTest passed 307/307. Offline transfer
+receipt replay coverage was added (`54087c8`) and deterministic AI/OCR
+fixtures plus the savings/budget scope audit were added (`982f8c48`). Backend
+`go test ./...`, `go test -race ./...`, and `go vet ./...` pass. The fixtures
+cover duplicate OCR rows, missing dates, wallet inference, owner-safe tool
+arguments, and no-auto-approval. Savings reports and budget recurrence /
+forecast remain explicitly partial because no stable API contract exists yet;
+no new migration or production behavior was introduced by these local commits.
 
 ## Previous checkpoint — 2026-10-16 19:46 +0700
 

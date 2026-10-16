@@ -36,6 +36,10 @@ date: 2026-10-16
   authenticated sync capabilities route.
 - The production worker no longer reports the missing
   `last_user_message_at` column after the migration catch-up.
+- Local gap-closure verification: backend tests, race tests and vet pass;
+  signed iOS Simulator XCTest passes 307/307. Reports owner scoping,
+  offline transfer receipt replay assertions and deterministic AI/OCR fixtures
+  are local follow-up commits and were not deployed to production.
 
 ## Remaining acceptance gates
 
