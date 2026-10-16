@@ -45,7 +45,8 @@ updates assertions but skips test execution at the owner's explicit request.
 
 Native typography is centralized in `MPFont`: display 28, headline 18,
 subheadline 16, body 15 (medium), metadata 13 (medium), labels 14/12 and currency
-20 points. UIKit form input text stays 16pt. SwiftUI text follows Dynamic Type;
+20 points, with the overview balance using the dedicated 34pt `MPFont.balance`
+hierarchy token. UIKit form input text stays 16pt. SwiftUI text follows Dynamic Type;
 transaction amounts move below copy at accessibility sizes. Shared cards use
 12pt horizontal/8pt vertical padding, 12pt corners and no shadow; default transaction/wallet rows use a
 32pt glyph with no outer vertical padding and 44pt minimum content height.

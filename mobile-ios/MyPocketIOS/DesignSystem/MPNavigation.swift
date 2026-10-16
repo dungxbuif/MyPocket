@@ -530,7 +530,7 @@ struct MPBalanceHeader: View {
             VStack(alignment: .leading, spacing: 2) {
                 HStack(alignment: .firstTextBaseline, spacing: 4) {
                     MPText(masked ? "••••••••" : totalBalance, style: .emphasis)
-                        .font(MPFont.display.monospacedDigit())
+                        .font(MPFont.balance)
                         .accessibilityLabel(masked ? "Đã ẩn tổng số dư" : "Tổng số dư: \(totalBalance)")
                     MPIconButton(
                         systemName: masked ? "eye.slash" : "eye",

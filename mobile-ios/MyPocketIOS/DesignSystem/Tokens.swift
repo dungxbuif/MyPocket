@@ -47,6 +47,7 @@ enum MPMetrics {
     static let sectionSpacing: CGFloat = 8
     static let rowSpacing: CGFloat = 4
     static let bottomNavigationHeight: CGFloat = 56
+    static let balanceTextSize: CGFloat = 34
 }
 
 /// Reference typography shared by native base components. Use the iOS system
@@ -55,6 +56,7 @@ enum MPMetrics {
 /// prevents individual screens from drifting to unrelated font families.
 enum MPFont {
     static let display = custom(size: 28, relativeTo: .largeTitle, weight: .bold).leading(.tight)
+    static let balance = custom(size: MPMetrics.balanceTextSize, relativeTo: .largeTitle, weight: .bold).monospacedDigit()
     static let headline = custom(size: 18, relativeTo: .title2, weight: .semibold)
     static let subheadline = custom(size: 16, relativeTo: .headline, weight: .semibold)
     static let body = custom(size: 15, relativeTo: .body, weight: .medium)

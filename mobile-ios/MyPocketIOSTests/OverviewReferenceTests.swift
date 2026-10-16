@@ -3,6 +3,10 @@ import XCTest
 
 @MainActor
 final class OverviewReferenceTests: XCTestCase {
+    func testOverviewBalanceUsesDedicatedReferenceHierarchyToken() {
+        XCTAssertEqual(MPMetrics.balanceTextSize, 34)
+    }
+
     func testOverviewMonthSummaryUsesCompactMetricLabels() {
         let items = [
             MPMetricItem(title: "Thu", value: MPFormat.money(32_500_000)),
