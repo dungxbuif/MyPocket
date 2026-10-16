@@ -252,7 +252,8 @@ struct FeedbackView: View {
                     }
                 MPButton(showChangelog ? "Ẩn changelog" : "Xem changelog", style: .plain) { showChangelog.toggle() }
                 if showChangelog {
-                MPAssistantCard(title: "Changelog") {
+                MPSurfaceCard(style: .reference) {
+                    MPText("Changelog", style: .emphasis)
                     ForEach(model.changelog) { item in
                         VStack(alignment: .leading, spacing: 4) {
                             MPText("v\(item.version) — \(item.title)", style: .emphasis)

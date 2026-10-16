@@ -61,6 +61,9 @@ shared_fields: [status]
   reference surfaces while preserving report scope, travel linkage, transfer
   actions, masking and mutation rules. Focused tests pass 3/3 and the native
   unit target passes 344/344; no backend or production state changed.
+- Align biometric unlock and Feedback changelog with the grouped reference
+  surface family without changing auth, Face ID or feedback behavior.
+  Auth/feedback focused tests pass 9/9; no backend or production state changed.
 
 - Continue native Money Lover reference parity with populated transaction
   ledger, savings report and budget report compositions. Shared reference

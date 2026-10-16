@@ -5076,6 +5076,16 @@ simulator build passes with warnings treated as errors at
 `/tmp/mypocket-account-wallet-release-20261016`.
 No API, database, provider, production or physical-device state changed.
 
+## Reference wave 10 integration gate — 2026-10-16
+
+Biometric unlock and Feedback's changelog section now use the grouped
+reference surface family. Sign-in, Face ID enrollment, logout, feedback
+resolution and changelog API behavior remain unchanged. Existing auth/feedback
+focused tests pass 9/9; base-component/project guards and `git diff --check` pass.
+The Release simulator build passes with warnings treated as errors at
+`/tmp/mypocket-auth-feedback-release-20261016`.
+No API, database, provider, production or physical-device state changed.
+
 ## Reference wave 9 integration gate — 2026-10-16
 
 Reports, savings drilldown and transaction detail now use the shared reference
