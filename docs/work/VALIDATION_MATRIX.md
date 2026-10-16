@@ -5048,6 +5048,20 @@ The Release simulator build passed with
 Base-component and project guards plus `git diff --check` pass. No API,
 database, provider, production or physical-device state changed.
 
+## Reference wave 7 integration gate — 2026-10-16
+
+Jars and Months now use grouped reference surfaces and the shared adaptive
+metric grid. Monthly allocation rows, cumulative jar report, category summary,
+month notes, timezone period text, CRUD and masking behavior remain intact.
+The focused signed simulator test passes 2/2 with no failures, skips or
+runtime warnings at `/tmp/mypocket-jars-months-focused-20261016/Logs/Test/`.
+The complete native unit target passes 342/342 with no failures, skips or
+runtime warnings at `/tmp/mypocket-jars-months-unit-20261016/Logs/Test/`.
+The Release simulator build passes with warnings treated as errors at
+`/tmp/mypocket-jars-months-release-verify-20261016`. Base-component and
+project guards plus `git diff --check` pass. No API, database, provider,
+production or device state changed.
+
 ## Native AI-entry uncertain request recovery — 2026-10-08
 
 | Check | Command / evidence | Result |

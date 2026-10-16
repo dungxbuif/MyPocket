@@ -21,6 +21,7 @@
 		22BB6A2E48EB82D70C21860E /* RefreshCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = FD52BBEB98763E1968763956 /* RefreshCoordinator.swift */; };
 		2451AD57783AAB655D568AB5 /* TransactionsReferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3902C5CD4EC1AA0CC5B3DDAA /* TransactionsReferenceTests.swift */; };
 		24C787F114A1420FFAE253D3 /* BiometricUnlockView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9E62438EBE24C18C8C893575 /* BiometricUnlockView.swift */; };
+		2803484A8E245DC63C8A307F /* JarsMonthsReferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 64C86136B430A28FF9F19E63 /* JarsMonthsReferenceTests.swift */; };
 		294A3E2B0E3D97ACDA8AA605 /* AIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5538D1540DC36C708A32D692 /* AIModels.swift */; };
 		2AE426DFDBCDDBA89B1EE9D4 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 615C4A51829E4935FA4F94CF /* MoreView.swift */; };
 		2CC673F9D78975D9F0B3ED6F /* Manrope-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 636AC06D79CA2D4C7DAB987C /* Manrope-Variable.ttf */; };
@@ -139,6 +140,7 @@
 		615C4A51829E4935FA4F94CF /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
 		62EB1C4C8DD824002B72A996 /* MPFinancialQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPFinancialQueue.swift; sourceTree = "<group>"; };
 		636AC06D79CA2D4C7DAB987C /* Manrope-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-Variable.ttf"; sourceTree = "<group>"; };
+		64C86136B430A28FF9F19E63 /* JarsMonthsReferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarsMonthsReferenceTests.swift; sourceTree = "<group>"; };
 		68646A0098E8C401829641F2 /* MPIcon.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPIcon.swift; sourceTree = "<group>"; };
 		711B8F5EE726E4B38C0EDB1C /* Envelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Envelope.swift; sourceTree = "<group>"; };
 		74C0D9FC2644AA2A6D2E8AC0 /* Tokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tokens.swift; sourceTree = "<group>"; };
@@ -319,6 +321,7 @@
 				88D769DADC37190893BC1354 /* FinanceModelTests.swift */,
 				DB1220C8997F353268CDCA3A /* FinancialMutationQueueTests.swift */,
 				12092C4382E0470B1C174A46 /* FinancialSnapshotCacheTests.swift */,
+				64C86136B430A28FF9F19E63 /* JarsMonthsReferenceTests.swift */,
 				DFBE0D747A7706441286E58C /* MoreFeedbackReferenceTests.swift */,
 				49E57ACB480ABA75FE900D63 /* OutboxStoreTests.swift */,
 				86181FC7F1539738541F39CC /* OverviewReferenceTests.swift */,
@@ -693,6 +696,7 @@
 				5080A60AB4A01657C7679B28 /* FinanceModelTests.swift in Sources */,
 				19E9A1A952F359BEB4613EFE /* FinancialMutationQueueTests.swift in Sources */,
 				1621FE0919F5CAE19232200C /* FinancialSnapshotCacheTests.swift in Sources */,
+				2803484A8E245DC63C8A307F /* JarsMonthsReferenceTests.swift in Sources */,
 				442CE53D73C0D52BE7783333 /* MoreFeedbackReferenceTests.swift in Sources */,
 				177EA376529F2E9B3F109900 /* OutboxStoreTests.swift in Sources */,
 				2E55F27BF80C827272EADA3B /* OverviewReferenceTests.swift in Sources */,

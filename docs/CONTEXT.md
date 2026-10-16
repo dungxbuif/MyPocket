@@ -58,16 +58,16 @@ recording actual and unvisited states in the
 Extended MyPocket functions are preserved. Survey completion and 100% UI
 reproduction are separate acceptance gates, neither is claimed yet.
 
-Reference waves 1–6 are now implemented locally for populated overview,
+Reference waves 1–7 are now implemented locally for populated overview,
 wallets, savings/budget reports, transaction ledger, credit and notifications.
-More and Feedback are included in the same audit; Travel Mode and Portfolio
-are now included in the compact secondary-route pass. Shared surfaces
+More and Feedback are included in the same audit; Travel Mode, Portfolio,
+Jars and Months are now included in the compact secondary-route pass. Shared surfaces
 own the reference radius, compact metric grid, adaptive daily rows, masking
 and accessibility reading order; screen code only supplies data. Focused
 signed simulator tests pass 14/14 for waves 1–3, 2/2 for wave 4 and 4/4 for
 wave 5, the
-native unit target now passes 340/340, and
-the wave 6 focused set passes 3/3 and the latest Release simulator build passes
+native unit target now passes 342/342, and
+the wave 6 focused set passes 3/3, wave 7 passes 2/2 and the latest Release simulator build passes
 with warnings treated as errors. A
 deterministic sorted-key encoder was added so identical budget-series retries
 produce identical request bytes. The unscoped full xcodebuild run was stopped

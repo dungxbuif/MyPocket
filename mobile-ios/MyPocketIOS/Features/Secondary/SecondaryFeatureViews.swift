@@ -470,7 +470,7 @@ struct ReportsView: View {
             SavingsReportsView(api: api, ownerID: ownerID, masked: masked, onBack: { showingSavings = false }, month: month)
         } else {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
                 MPScreenHeader(title: "Báo cáo", leading: {
                     MPButton(style: .plain, fullWidth: false, action: onBack) {
                         Label("Quay lại", systemImage: "chevron.left")
@@ -1010,11 +1010,13 @@ struct JarsView: View {
                 MPOptionSelector(title: "Tháng", options: MPFormat.monthOptions(around: month, timeZone: TimeZone(identifier: accountTimezone) ?? .current).map { MPSelectionOption(id: $0, label: MPFormat.monthLabel($0)) }, selectionID: $month)
                 if loading { MPLoadingView(label: "Đang tải hũ tháng này...") }
                 if let summary {
-                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                        MPMetricCard(title: "Thu thực tế", value: MPFormat.money(summary.actualIncome, masked: masked))
-                        MPMetricCard(title: "Chi thực tế", value: MPFormat.money(summary.totalSpent, masked: masked))
-                        MPMetricCard(title: "Đã phân bổ", value: MPFormat.money(summary.totalAllocated, masked: masked))
-                        MPMetricCard(title: "Chi chưa gắn hũ", value: MPFormat.money(summary.unassignedSpent, masked: masked))
+                    MPSurfaceCard(style: .reference) {
+                        MPMetricGrid(items: [
+                            MPMetricItem(title: "Thu thực tế", value: MPFormat.money(summary.actualIncome, masked: masked)),
+                            MPMetricItem(title: "Chi thực tế", value: MPFormat.money(summary.totalSpent, masked: masked)),
+                            MPMetricItem(title: "Đã phân bổ", value: MPFormat.money(summary.totalAllocated, masked: masked)),
+                            MPMetricItem(title: "Chi chưa gắn hũ", value: MPFormat.money(summary.unassignedSpent, masked: masked))
+                        ], masked: false)
                     }
                     if summary.overIncome || summary.overOneHundredPercent {
                         MPStatusMessage(text: "Tổng phân bổ vượt thu thực tế. Đây là cảnh báo, không chặn giao dịch.", tone: .danger)
@@ -1031,27 +1033,39 @@ struct JarsView: View {
                         .accessibilityIdentifier(JarsReferenceCopy.addActionAccessibilityID)
                     }
                     if summary.items.isEmpty { MPEmptyView(title: "Chưa có hũ cho tháng này", detail: "Chi tiêu vẫn được ghi nhận bình thường.") }
-                    ForEach(summary.items) { item in
-                        MPSurfaceCard {
-                            VStack(alignment: .leading, spacing: 8) {
-                                MPText(item.name)
-                                if let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil) {
-                                    MPProgressBar(progress: Double(item.spent) / Double(max(1, allocation)), label: "Đã chi \(MPFormat.money(item.spent, masked: masked)) / \(MPFormat.money(allocation, masked: masked))")
-                                } else {
-                                    MPText("Chưa đặt phân bổ · Đã chi \(MPFormat.money(item.spent, masked: masked))", style: .secondary)
-                                }
-                                if item.active {
-                                    HStack {
-                                        MPButton("Sửa tháng này", style: .secondary) { beginEditing(item) }
-                                        MPButton("Gỡ khỏi tháng", style: .destructive) { Task { await remove(item) } }
+                    if !summary.items.isEmpty {
+                        MPSurfaceCard(style: .reference) {
+                            VStack(alignment: .leading, spacing: 0) {
+                                ForEach(Array(summary.items.enumerated()), id: \.element.id) { index, item in
+                                    if index > 0 { MPDivider() }
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        HStack(alignment: .firstTextBaseline) {
+                                            MPText(item.name, style: .emphasis).lineLimit(2)
+                                            Spacer(minLength: 8)
+                                            MPText(MPFormat.money(item.spent, masked: masked), style: .secondary)
+                                        }
+                                        if let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil) {
+                                            MPProgressBar(progress: Double(item.spent) / Double(max(1, allocation)), label: "Đã chi / phân bổ")
+                                        } else {
+                                            MPText("Chưa đặt phân bổ", style: .secondary)
+                                        }
+                                        if item.active {
+                                            HStack(spacing: 8) {
+                                                MPButton("Sửa tháng này", style: .secondary, fullWidth: false) { beginEditing(item) }
+                                                MPButton("Gỡ khỏi tháng", style: .destructive, fullWidth: false) { Task { await remove(item) } }
+                                            }
+                                        } else {
+                                            MPText("Cấu hình lịch sử; giao dịch vẫn được giữ.", style: .secondary)
+                                        }
                                     }
-                                } else {
-                                    MPText("Cấu hình lịch sử; giao dịch vẫn được giữ.", style: .secondary)
+                                    .padding(.vertical, 8)
                                 }
                             }
                         }
                     }
-                    MPAssistantCard(title: "Cộng dồn") {
+                    MPSurfaceCard(style: .reference) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            MPText("Cộng dồn", style: .emphasis)
                         if summary.jars.isEmpty {
                             MPEmptyView(title: "Chưa có hũ", detail: "Tạo hũ để xem chi tiêu cộng dồn.")
                         } else {
@@ -1059,15 +1073,16 @@ struct JarsView: View {
                             if reportLoading { MPLoadingView(label: "Đang tải báo cáo cộng dồn...") }
                             if let reportError { MPStatusMessage(text: reportError, tone: .info) }
                             if let report {
-                                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                                    MPMetricCard(title: "Chi thực tế", value: MPFormat.money(report.totalSpent, masked: masked))
-                                    MPMetricCard(title: "Đã phân bổ", value: MPFormat.money(report.totalAllocated, masked: masked))
-                                }
+                                MPMetricGrid(items: [
+                                    MPMetricItem(title: "Chi thực tế", value: MPFormat.money(report.totalSpent, masked: masked)),
+                                    MPMetricItem(title: "Đã phân bổ", value: MPFormat.money(report.totalAllocated, masked: masked))
+                                ], masked: false)
                                 MPText("\(MPFormat.monthLabel(report.fromMonth)) → \(MPFormat.monthLabel(report.toMonth)) · Không cộng dồn số dư.", style: .secondary)
                                 ForEach(report.months, id: \.month) { item in
                                     HStack { MPText(MPFormat.monthLabel(item.month)); Spacer(); MPText(MPFormat.money(item.spent, masked: masked), style: .secondary) }
                                 }
                             }
+                        }
                         }
                     }
                 } else if let error { MPErrorView(title: "Không tải được hũ", detail: error) { Task { await load() } } }
@@ -1181,7 +1196,7 @@ struct MonthsView: View {
                 MPOptionSelector(title: "Tháng", options: MPFormat.monthOptions(around: month, timeZone: TimeZone(identifier: accountTimezone) ?? .current).map { MPSelectionOption(id: $0, label: MPFormat.monthLabel($0)) }, selectionID: monthSelection)
                 if loading && summary == nil { MPLoadingView(label: "Đang tải tổng kết...") }
                 if let summary {
-                    MPSurfaceCard {
+                        MPSurfaceCard(style: .reference) {
                         VStack(alignment: .leading, spacing: 10) {
                             let reportTimeZone = TimeZone(identifier: summary.timezone) ?? accountTimezoneValue
                             HStack {
@@ -1192,16 +1207,18 @@ struct MonthsView: View {
                                 Spacer()
                                 MPButton("Hũ tháng", style: .secondary, action: onOpenJars)
                             }
-                            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                                MPMetricCard(title: "Thu", value: MPFormat.money(summary.income, masked: masked))
-                                MPMetricCard(title: "Chi", value: MPFormat.money(summary.expense, masked: masked))
-                                MPMetricCard(title: "Chênh lệch", value: MPFormat.signedMoney(summary.net, masked: masked))
-                                MPMetricCard(title: "Giao dịch", value: "\(summary.transactionCount)")
-                            }
+                            MPMetricGrid(items: [
+                                MPMetricItem(title: "Thu", value: MPFormat.money(summary.income, masked: masked)),
+                                MPMetricItem(title: "Chi", value: MPFormat.money(summary.expense, masked: masked)),
+                                MPMetricItem(title: "Chênh lệch", value: MPFormat.signedMoney(summary.net, masked: masked)),
+                                MPMetricItem(title: "Giao dịch", value: "\(summary.transactionCount)")
+                            ], masked: false)
                             MPText("Kỳ báo cáo: \(MonthsPresentation.reportPeriod(startAt: summary.startAt, nextStartAt: summary.nextStartAt, timeZone: reportTimeZone))", style: .secondary)
                         }
                     }
-                    MPAssistantCard(title: "Theo nhóm") {
+                    MPSurfaceCard(style: .reference) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            MPText("Theo nhóm", style: .emphasis)
                         if summary.categories.isEmpty {
                             MPEmptyView(title: "Chưa có giao dịch", detail: "Tháng này chưa có dữ liệu.")
                         } else {
@@ -1216,8 +1233,11 @@ struct MonthsView: View {
                                 }
                             }
                         }
+                        }
                     }
-                    MPAssistantCard(title: "Hũ chi tiêu") {
+                    MPSurfaceCard(style: .reference) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            MPText("Hũ chi tiêu", style: .emphasis)
                         if let jarSummary = summary.jarSummary, !jarSummary.items.isEmpty {
                             ForEach(jarSummary.items) { item in
                                 let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil)
@@ -1231,13 +1251,17 @@ struct MonthsView: View {
                         } else {
                             MPEmptyView(title: "Chưa có hũ", detail: "Quản lý hũ cho tháng này nếu cần.")
                         }
+                        }
                     }
-                    MPAssistantCard(title: "Ghi chú của tôi") {
+                    MPSurfaceCard(style: .reference) {
+                        VStack(alignment: .leading, spacing: 10) {
+                            MPText("Ghi chú của tôi", style: .emphasis)
                         MPTextEditor(title: "Ghi chú tháng", text: $note, placeholder: "Điều bạn muốn ghi nhớ về tháng này")
                         HStack {
                             MPButton("Lưu ghi chú", style: .secondary, isDisabled: note == savedNote) { Task { await saveNote() } }
                             MPButton("Bỏ thay đổi", style: .secondary, isDisabled: note == savedNote) { note = savedNote }
                             if !savedNote.isEmpty { MPButton("Xóa ghi chú", style: .destructive) { Task { await deleteNote() } } }
+                        }
                         }
                     }
                 } else if let error {

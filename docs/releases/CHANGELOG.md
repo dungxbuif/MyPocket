@@ -46,6 +46,12 @@ shared_fields: [status]
   3/3, the complete native unit target passes 340/340, and the Release
   simulator build passes with warnings treated as errors. No backend,
   database, production or physical-device state changed.
+- Compact Jars and Months with grouped reference surfaces and the shared
+  adaptive metric grid while retaining monthly allocation, cumulative reports,
+  notes, timezone and owner-scoped behavior. `JarsMonthsReferenceTests` passes
+  2/2, the native unit target passes 342/342, and the Release simulator build
+  passes with warnings treated as errors; no backend, database or production
+  state changed.
 
 - Continue native Money Lover reference parity with populated transaction
   ledger, savings report and budget report compositions. Shared reference
