@@ -78,11 +78,11 @@
 - Consumes: Task 1/2 bases and existing `MoreDestination`, `AccountView`, feedback routing, and auth session data.
 - Produces: Account tab with reference profile/premium card, grouped wallet/group rows, a clearly informational/disabled bank-link row (no unsupported fake write), events/recurring/bills group, and preserved MyPocket-only destinations behind the same routes.
 
-- [ ] Step 1: Add failing assertions for section order, profile-card data source, premium badge visibility, bank-link row style, grouped separators, feedback bubble position, and logout/auth accessibility identifiers.
-- [ ] Step 2: Run focused tests and confirm the current Account/More implementation fails the reference anatomy assertions.
-- [ ] Step 3: Implement the screen using only shared `MPProfileCard`, `MPSurfaceCard`, `MPMenuRow`, `MPButton`, and `MPIcon`; map supported actions to existing MyPocket routes and render unsupported Money Lover actions as informational/disabled without fake writes.
-- [ ] Step 4: Run focused XCTest/UI smoke with long names, masked state, logout, and route navigation.
-- [ ] Step 5: Capture iPhone 15 Plus screenshot, compare against `/tmp/moneylover-account.png`, record remaining deltas, and commit `feat(native): align account reference screen`.
+- [x] Step 1: Add failing assertions for section order, profile-card data source, premium badge visibility, bank-link row style, grouped separators, feedback bubble position, and logout/auth accessibility identifiers.
+- [x] Step 2: Run focused tests and confirm the current Account/More implementation fails the reference anatomy assertions.
+- [x] Step 3: Implement the screen using only shared `MPProfileCard`, `MPSurfaceCard`, `MPMenuRow`, `MPButton`, and `MPIcon`; map supported actions to existing MyPocket routes and render unsupported Money Lover actions as informational/disabled without fake writes.
+- [x] Step 4: Run focused XCTest/UI smoke with long names, masked state, logout, and route navigation.
+- [x] Step 5: Capture iPhone 15 Plus screenshot, compare against `/tmp/moneylover-account.png`, record remaining deltas, and commit `feat(native): align account reference screen`.
 
 ### Task 4: Align overview, transactions, wallets, and add flow
 
