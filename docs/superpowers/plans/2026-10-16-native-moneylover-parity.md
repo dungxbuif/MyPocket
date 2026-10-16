@@ -141,11 +141,11 @@
 - Consumes: all shared tokens/shell/surfaces and existing auth/AI/feedback route contracts.
 - Produces: reference-aligned auth/Face ID, assistant composer/cards, feedback tabs, settings selectors, and deep-link guarded secondary routes.
 
-- [ ] Step 1: Add failing assertions for auth state, Face ID lock screen, feedback resolved/unresolved tabs, AI action cards, and route guard behavior.
-- [ ] Step 2: Run focused tests and verify failures.
-- [ ] Step 3: Implement visual-only changes through base components; do not broaden permissions or provider calls.
-- [ ] Step 4: Run full unit suite, UI smoke, route sweep, and API fixture isolation checks.
-- [ ] Step 5: Capture final device screenshots and commit `feat(native): align auth assistant feedback surfaces`.
+- [x] Step 1: Add failing assertions for auth state, Face ID lock screen, feedback resolved/unresolved tabs, AI action cards, and route guard behavior.
+- [x] Step 2: Run focused tests and verify failures.
+- [x] Step 3: Implement visual-only changes through base components; do not broaden permissions or provider calls.
+- [x] Step 4: Run full unit suite, UI smoke, route sweep, and API fixture isolation checks.
+- [x] Step 5: Capture final device screenshots and commit `feat(native): align auth assistant feedback surfaces`.
 
 ### Task 7: Full parity gate and device release
 
