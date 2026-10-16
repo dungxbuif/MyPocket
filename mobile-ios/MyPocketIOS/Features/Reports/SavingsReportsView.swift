@@ -19,9 +19,9 @@ struct SavingsReportsView: View {
                 ReportTransactionsView(api: api, ownerID: ownerID, masked: masked, scope: drilldown, onBack: { self.drilldown = nil })
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 8) {
+                    VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
                         MPScreenHeader(title: "Báo cáo tiết kiệm", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
-                        MPSurfaceCard {
+                        MPSurfaceCard(style: .reference) {
                             VStack(alignment: .leading, spacing: 8) {
                                 MPTextField(title: "Tháng (YYYY-MM)", text: $month, accessibilityIdentifier: "savings-report-month")
                                 MPOptionSelector(title: "Ví mục tiêu", options: [MPSelectionOption(id: "__all__", label: "Tất cả ví mục tiêu")] + wallets.map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID, emptyLabel: "Tất cả ví mục tiêu")
@@ -195,7 +195,7 @@ struct ReportTransactionsView: View {
                 if let page {
                     if page.items.isEmpty { MPEmptyView(title: "Không có giao dịch phù hợp", detail: "Phạm vi giống báo cáo đã chọn.") }
                     else {
-                        MPSurfaceCard {
+                        MPSurfaceCard(style: .reference) {
                             VStack(spacing: 8) {
                                 ForEach(page.items) { item in
                                     MPTransactionRow(transaction: item, category: categories.first { $0.id == item.categoryID }, timeZone: TimeZone(identifier: page.timezone ?? "") ?? .current, masked: masked)

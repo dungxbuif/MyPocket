@@ -503,7 +503,8 @@ struct ReportsView: View {
                     }
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("reports-section-summary")
-                    MPAssistantCard(title: "Xu hướng chi tiêu") {
+                    MPSurfaceCard(style: .reference) {
+                        MPText("Xu hướng chi tiêu", style: .emphasis)
                         MPTrendChart(
                             points: MPTrendData.points(
                                 transactions: transactions,
@@ -515,7 +516,8 @@ struct ReportsView: View {
                     }
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("reports-section-trend")
-                    MPAssistantCard(title: "Theo nhóm") {
+                    MPSurfaceCard(style: .reference) {
+                        MPText("Theo nhóm", style: .emphasis)
                         if let categories = monthDetail?.categories, !categories.isEmpty {
                             ForEach(categories, id: \.stableID) { item in
                                 HStack {
@@ -533,7 +535,8 @@ struct ReportsView: View {
                     }
                     .accessibilityElement(children: .contain)
                     .accessibilityIdentifier("reports-section-breakdown")
-                    MPAssistantCard(title: "Hoạt động trong tháng") {
+                    MPSurfaceCard(style: .reference) {
+                        MPText("Hoạt động trong tháng", style: .emphasis)
                         MPText("\(monthDetail?.transactionCount ?? 0) giao dịch được tính vào báo cáo. Chuyển ví và điều chỉnh số dư không làm tăng thu/chi.", style: .secondary)
                         MPText("Số liệu được tính lại từ sổ giao dịch theo múi giờ tài khoản.", style: .secondary)
                     }

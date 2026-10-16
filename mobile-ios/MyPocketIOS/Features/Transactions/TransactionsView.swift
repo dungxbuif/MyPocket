@@ -1180,10 +1180,12 @@ struct TransactionDetailView: View {
     @Environment(\.mpFinancialValuesMasked) private var masked
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
             MPScreenHeader(title: "Chi tiết giao dịch", leading: { MPIconButton(systemName: "xmark", label: "Đóng", action: onClose) }, trailing: { EmptyView() })
-            MPMetricCard(title: transaction.type == "income" ? "Thu nhập" : "Chi tiêu", value: MPFormat.money(transaction.amount, masked: masked))
-            MPSurfaceCard {
+            MPSurfaceCard(style: .reference) {
+                MPMetric(title: transaction.type == "income" ? "Thu nhập" : "Chi tiêu", value: MPFormat.money(transaction.amount, masked: masked))
+            }
+            MPSurfaceCard(style: .reference) {
                 VStack(alignment: .leading, spacing: 8) {
                     MPText("Ngày: \(MPFormat.shortDate(transaction.occurredAt, timeZone: timeZone))")
                     if let note = transaction.note, !note.isEmpty { MPText("Ghi chú: \(note)") }

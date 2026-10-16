@@ -5076,6 +5076,19 @@ simulator build passes with warnings treated as errors at
 `/tmp/mypocket-account-wallet-release-20261016`.
 No API, database, provider, production or physical-device state changed.
 
+## Reference wave 9 integration gate — 2026-10-16
+
+Reports, savings drilldown and transaction detail now use the shared reference
+surface family. Trend/breakdown/activity sections and transaction amount/detail
+cards are compact without changing owner scope, report inclusion, travel-link,
+transfer or mutation semantics. `TransactionsReferenceTests` passes 3/3 at
+`/tmp/mypocket-reports-transaction-focused-20261016/Logs/Test/`; the complete
+native unit target passes 344/344 at
+`/tmp/mypocket-reports-transaction-unit-20261016/Logs/Test/`.
+Base-component/project guards and `git diff --check` pass. Release build with
+warnings-as-errors passes at `/tmp/mypocket-reports-transaction-release-20261016`.
+No API, database, provider, production or physical-device state changed.
+
 ## Native AI-entry uncertain request recovery — 2026-10-08
 
 | Check | Command / evidence | Result |

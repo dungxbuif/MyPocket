@@ -57,6 +57,10 @@ shared_fields: [status]
   logout, ledger, credit, queue, editor and masking behavior.
   `AccountWalletReferenceTests` passes 2/2 and the native unit target passes
   344/344; no backend or production state changed.
+- Compact Reports, savings drilldown and Transaction Detail with grouped
+  reference surfaces while preserving report scope, travel linkage, transfer
+  actions, masking and mutation rules. Focused tests pass 3/3 and the native
+  unit target passes 344/344; no backend or production state changed.
 
 - Continue native Money Lover reference parity with populated transaction
   ledger, savings report and budget report compositions. Shared reference
