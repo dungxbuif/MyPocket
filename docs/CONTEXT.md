@@ -35,10 +35,14 @@ the existing run resource. The iOS simulator unit target passes 304/304 with
 zero skips, failures, or runtime warnings at
 `/tmp/mypocket-async-unit-20261016.xcresult`.
 
-This slice is local and uncommitted at the checkpoint. Production still serves
-the previously deployed 77-path image; no production rollout, database change,
-provider call, or device install was performed for the async endpoint. Owner-
-authenticated production UAT and physical-device acceptance remain open.
+The async slice is committed locally as `fc173237`. A follow-up AI-entry
+multi-image context fix is also committed locally as `6b616f6`: model-facing OCR
+blocks now preserve request order and carry document markers, while persistence
+maps text by attachment ID. Backend tests pass 299/299 after that fix. Production
+still serves the previously deployed 77-path image; no production rollout,
+database change, provider call, or device install was performed for either local
+slice. Owner-authenticated production UAT and physical-device acceptance remain
+open.
 
 ## Previous checkpoint — 2026-10-15 22:54 +0700
 
