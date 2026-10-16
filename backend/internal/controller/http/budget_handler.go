@@ -18,6 +18,7 @@ type BudgetHandler struct {
 	Categories   repository.CategoryRepository
 	Transactions repository.TransactionRepository
 	Users        repository.UserRepository
+	Series       repository.BudgetSeriesRepository
 }
 type budgetInput struct {
 	Name        string  `json:"name"`
@@ -41,6 +42,13 @@ func (h *BudgetHandler) ListBudgets(c *gin.Context) {
 	if !ok {
 		transactionUnauthorized(c)
 		return
+	}
+	now := time.Now()
+	if h.Series != nil {
+		if _, err := h.Series.Ensure(owner, now); err != nil {
+			budgetFailure(c, err)
+			return
+		}
 	}
 	budgets, err := h.Budgets.List(owner)
 	if err != nil {
@@ -71,7 +79,12 @@ func (h *BudgetHandler) ListBudgets(c *gin.Context) {
 		budgetFailure(c, err)
 		return
 	}
-	OK(c, entity.CalculateBudgetsInLocation(budgets, transactions, categories, time.Now(), location))
+	summary, err := entity.CalculateBudgetsChecked(budgets, transactions, categories, now, location)
+	if err != nil {
+		budgetFailure(c, err)
+		return
+	}
+	OK(c, summary)
 }
 
 // CreateBudget godoc
@@ -258,6 +271,16 @@ func budgetFailure(c *gin.Context, err error) {
 		return
 	}
 	status, code, message := http.StatusInternalServerError, "BUDGET_FAILED", "Không thể xử lý ngân sách. Vui lòng thử lại."
+	if errors.Is(err, repository.ErrBudgetSeriesManaged) {
+		status = 409
+		code = "BUDGET_SERIES_MANAGED"
+		message = "Ngân sách thuộc chu kỳ. Sửa hoặc dừng chu kỳ để thay đổi kỳ tiếp theo."
+	}
+	if errors.Is(err, entity.ErrBudgetMoneyOverflow) {
+		status = 422
+		code = "BUDGET_AMOUNT_OVERFLOW"
+		message = "Tổng ngân sách vượt giới hạn số tiền được hỗ trợ."
+	}
 	if errors.Is(err, repository.ErrBudgetConflict) {
 		status = 409
 		code = "BUDGET_OVERLAP"

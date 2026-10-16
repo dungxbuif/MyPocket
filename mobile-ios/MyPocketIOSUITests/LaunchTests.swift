@@ -874,6 +874,88 @@ private struct BudgetList: Decodable, Sendable {
 
 private struct EmptyFixtureResponse: Decodable {}
 
+// Raw wire fixtures intentionally stay separate from app models: API readback
+// must independently verify what the native UI persisted and displayed.
+private struct SavingsBudgetSeriesFixture: Decodable, Sendable {
+    struct Config: Decodable, Sendable {
+        let name: String
+        let limit_amount: Int64
+        let wallet_id: String?
+        let carryover_enabled: Bool
+        let effective_start_date: String
+    }
+    let id: String
+    let cadence: String
+    let active: Bool
+    let version: Int64
+    let current_config: Config
+    let pending_config: Config?
+}
+
+private struct SavingsBudgetPeriodFixture: Decodable, Sendable {
+    let id: String
+    let name: String
+    let series_id: String?
+    let limit_amount: Int64
+    let effective_limit_amount: Int64?
+}
+
+private struct SavingsBudgetListFixture<Item: Decodable & Sendable>: Decodable, Sendable {
+    let items: [Item]
+}
+
+private struct SavingsReportFixture: Decodable, Sendable {
+    struct Goals: Decodable, Sendable {
+        let opening_balance: Int64
+        let closing_balance: Int64
+        let deposits: Int64
+        let internal_transfers: Int64
+    }
+    struct Surplus: Decodable, Sendable {
+        let income: Int64
+        let expense: Int64
+        let net: Int64
+    }
+    let goals: Goals
+    let surplus: Surplus
+}
+
+private struct SavingsBudgetReportFixture: Decodable, Sendable {
+    struct Forecast: Decodable, Sendable {
+        let status: String
+        let elapsed_days: Int64
+        let total_days: Int64
+        let projected_spent: Int64?
+    }
+    struct Day: Decodable, Sendable { let spent: Int64 }
+    let base_limit_amount: Int64
+    let carryover_amount: Int64
+    let effective_limit_amount: Int64
+    let spent: Int64
+    let remaining: Int64
+    let forecast: Forecast
+    let daily: [Day]
+}
+
+private struct SavingsBudgetPageFixture: Decodable, Sendable {
+    let items: [FixtureTransaction]
+    let total: Int
+}
+
+private extension LocalAPIFixture {
+    static func savingsBudgetRead<Value: Decodable & Sendable>(_ path: String, as type: Value.Type) async throws -> Value {
+        try await request(path: path, method: "GET", token: loginToken(), body: nil,
+                          decode: FixtureEnvelope<Value>.self).data
+    }
+
+    static func savingsBudgetTransfer(source: String, destination: String, amount: Int64, note: String) async throws {
+        _ = try await request(path: "/transactions/transfer", method: "POST", token: loginToken(),
+            body: JSONSerialization.data(withJSONObject: ["source_wallet_id": source, "destination_wallet_id": destination,
+                "amount": amount, "occurred_at": ISO8601DateFormatter().string(from: Date().addingTimeInterval(-60)), "note": note]),
+            decode: FixtureEnvelope<[FixtureTransaction]>.self)
+    }
+}
+
 private extension XCUIElement {
     func clearAndType(_ text: String) {
         // SwiftUI can leave a different field focused after a scroll/reveal.
@@ -3395,6 +3477,215 @@ final class LaunchTests: XCTestCase {
         }
 #endif
     }
+
+    func testAPIBackedSavingsReportSeparatesGoalTransfersAndAccountSurplus() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Requires disposable local API with LOCAL_API_UI.")
+#else
+        XCUIDevice.shared.orientation = .portrait
+        let suffix = String(UUID().uuidString.prefix(8))
+        let source = try await LocalAPIFixture.wallet(name: "SB Cash \(suffix)", type: "basic")
+        let goal = try await LocalAPIFixture.wallet(name: "SB Goal \(suffix)", type: "goal")
+        addTeardownBlock {
+            try? await LocalAPIFixture.deleteTransferPairs(walletIDs: [source.wallet.id, goal.wallet.id])
+            try? await LocalAPIFixture.deleteTransactions(walletID: source.wallet.id)
+            try? await LocalAPIFixture.delete(source)
+            try? await LocalAPIFixture.delete(goal)
+        }
+        let incomeCategory = try await LocalAPIFixture.category(kind: "income", walletID: source.wallet.id)
+        let expenseCategory = try await LocalAPIFixture.category(kind: "expense", walletID: source.wallet.id)
+        let income = try await LocalAPIFixture.transaction(walletID: source.wallet.id, categoryID: incomeCategory.id,
+            amount: 20_000_000, note: "SB Income \(suffix)", type: "income")
+        let expense = try await LocalAPIFixture.transaction(walletID: source.wallet.id, categoryID: expenseCategory.id,
+            amount: 12_000_000, note: "SB Expense \(suffix)")
+        let transferNote = "SB Transfer \(suffix)"
+        try await LocalAPIFixture.savingsBudgetTransfer(source: source.wallet.id, destination: goal.wallet.id,
+                                                       amount: 5_000_000, note: transferNote)
+        let month = LocalAPIFixture.currentMonth()
+        let report = try await LocalAPIFixture.savingsBudgetRead("/reports/savings?month=\(month)", as: SavingsReportFixture.self)
+        XCTAssertEqual(report.goals.opening_balance, 100_000)
+        XCTAssertEqual(report.goals.closing_balance, 5_100_000)
+        XCTAssertEqual(report.goals.deposits, 0, "Paired transfer is separate from ordinary deposits")
+        XCTAssertEqual(report.goals.internal_transfers, 5_000_000)
+        XCTAssertEqual(report.surplus.income, 20_000_000)
+        XCTAssertEqual(report.surplus.expense, 12_000_000)
+        XCTAssertEqual(report.surplus.net, 8_000_000)
+        let goalRows = try await LocalAPIFixture.savingsBudgetRead("/reports/savings/transactions?month=\(month)&section=goals", as: SavingsBudgetPageFixture.self)
+        let surplusRows = try await LocalAPIFixture.savingsBudgetRead("/reports/savings/transactions?month=\(month)&section=surplus", as: SavingsBudgetPageFixture.self)
+        XCTAssertEqual(goalRows.total, 1)
+        XCTAssertEqual(goalRows.items.map(\.amount), [5_000_000])
+        XCTAssertEqual(Set(surplusRows.items.map(\.id)), Set([income.id, expense.id]))
+        XCTAssertEqual(surplusRows.total, 2)
+
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
+        app.launch()
+        openMore(app)
+        let reports = app.buttons["more-destination-reports"]
+        XCTAssertTrue(reports.waitForExistence(timeout: 10)); reveal(reports, in: app); reports.tap()
+        let savings = app.buttons["reports-open-savings"]
+        XCTAssertTrue(savings.waitForExistence(timeout: 10)); reveal(savings, in: app); savings.tap()
+        XCTAssertTrue(app.textFields["savings-report-month"].waitForExistence(timeout: 10))
+        XCTAssertEqual(app.textFields["savings-report-month"].value as? String, month)
+        assertSavingsBudgetMetric("Số dư cuối kỳ", amount: report.goals.closing_balance, in: app)
+        assertSavingsBudgetMetric("Chuyển ví (thuần)", amount: report.goals.internal_transfers, in: app)
+        attachScreenshot(app, named: "savings-goal-balances-and-transfer-separation")
+        let goalDrilldown = app.buttons["Giao dịch ví mục tiêu"]
+        reveal(goalDrilldown, in: app); goalDrilldown.tap()
+        assertSavingsBudgetNote(transferNote, in: app)
+        XCTAssertTrue(app.staticTexts["1–1 / 1 giao dịch"].exists)
+        attachScreenshot(app, named: "savings-goal-api-matching-transfer-row")
+        app.buttons["Quay lại"].firstMatch.tap()
+        let surplusTitle = app.staticTexts["Thặng dư thu / chi · Toàn tài khoản"]
+        XCTAssertTrue(surplusTitle.waitForExistence(timeout: 10)); reveal(surplusTitle, in: app)
+        assertSavingsBudgetMetric("Thặng dư", amount: report.surplus.net, in: app)
+        attachScreenshot(app, named: "savings-account-surplus-distinct-section")
+        let surplusDrilldown = app.buttons["Giao dịch thu / chi"]
+        reveal(surplusDrilldown, in: app); surplusDrilldown.tap()
+        assertSavingsBudgetNote(try XCTUnwrap(income.note), in: app)
+        assertSavingsBudgetNote(try XCTUnwrap(expense.note), in: app)
+        XCTAssertTrue(app.staticTexts["1–2 / 2 giao dịch"].exists)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", transferNote)).firstMatch.exists)
+        attachScreenshot(app, named: "savings-surplus-api-matching-income-expense-rows")
+#endif
+    }
+
+    func testAPIBackedRecurringBudgetCreateForecastEditNextAndStop() async throws {
+#if !LOCAL_API_UI
+        throw XCTSkip("Requires disposable local API with LOCAL_API_UI.")
+#else
+        XCUIDevice.shared.orientation = .portrait
+        let suffix = String(UUID().uuidString.prefix(8))
+        let wallet = try await LocalAPIFixture.wallet(name: "SB Budget Wallet \(suffix)", type: "basic")
+        addTeardownBlock {
+            try? await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
+            try? await LocalAPIFixture.delete(wallet)
+        }
+        let category = try await LocalAPIFixture.category(kind: "expense", walletID: wallet.wallet.id)
+        let first = try await LocalAPIFixture.transaction(walletID: wallet.wallet.id, categoryID: category.id,
+            amount: 120_000, note: "SB Budget First \(suffix)")
+        let second = try await LocalAPIFixture.transaction(walletID: wallet.wallet.id, categoryID: category.id,
+            amount: 180_000, note: "SB Budget Second \(suffix)")
+        let excluded = try await LocalAPIFixture.transaction(walletID: wallet.wallet.id, categoryID: category.id,
+            amount: 90_000, note: "SB Budget Excluded \(suffix)", includedInReports: false)
+        let name = "SB Monthly \(suffix)"
+        let nextName = "SB Next \(suffix)"
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
+        app.launch(); openMore(app)
+        let budgets = app.buttons["more-destination-budgets"]
+        XCTAssertTrue(budgets.waitForExistence(timeout: 10)); reveal(budgets, in: app); budgets.tap()
+        let add = app.buttons["budget-add"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10)); reveal(add, in: app); add.tap()
+        let nameField = app.textFields["Tên"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 10)); nameField.clearAndType(name); dismissKeyboard(app)
+        let limit = app.textFields["Giới hạn"]
+        reveal(limit, in: app); limit.clearAndType("1000000"); dismissKeyboard(app)
+        let recurring = app.buttons["budget-recurring-toggle"]
+        reveal(recurring, in: app); recurring.tap()
+        let carry = app.buttons["budget-carryover-toggle"]
+        XCTAssertTrue(carry.waitForExistence(timeout: 5)); reveal(carry, in: app); carry.tap()
+        let walletScope = app.buttons["form-row-Phạm vi ví"]
+        reveal(walletScope, in: app); walletScope.tap()
+        let walletChoice = app.buttons[wallet.wallet.name]
+        XCTAssertTrue(walletChoice.waitForExistence(timeout: 5)); walletChoice.tap()
+        XCTAssertTrue(walletScope.label.contains(wallet.wallet.name))
+        app.buttons["Lưu"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts[name].firstMatch.waitForExistence(timeout: 15), "Native create must leave editor after real API success")
+
+        let seriesList = try await LocalAPIFixture.savingsBudgetRead("/budget-series", as: SavingsBudgetListFixture<SavingsBudgetSeriesFixture>.self)
+        let series = try XCTUnwrap(seriesList.items.first { $0.current_config.name == name })
+        XCTAssertEqual(series.cadence, "monthly"); XCTAssertTrue(series.active)
+        XCTAssertTrue(series.current_config.carryover_enabled)
+        XCTAssertEqual(series.current_config.wallet_id, wallet.wallet.id)
+        XCTAssertEqual(series.current_config.limit_amount, 1_000_000)
+        let periods = try await LocalAPIFixture.savingsBudgetRead("/budgets", as: SavingsBudgetListFixture<SavingsBudgetPeriodFixture>.self)
+        let period = try XCTUnwrap(periods.items.first { $0.series_id == series.id })
+        let report = try await LocalAPIFixture.savingsBudgetRead("/budgets/\(period.id)/report", as: SavingsBudgetReportFixture.self)
+        let rows = try await LocalAPIFixture.savingsBudgetRead("/budgets/\(period.id)/transactions", as: SavingsBudgetPageFixture.self)
+        XCTAssertEqual(report.base_limit_amount, 1_000_000); XCTAssertEqual(report.carryover_amount, 0)
+        XCTAssertEqual(report.effective_limit_amount, 1_000_000); XCTAssertEqual(report.spent, 300_000)
+        XCTAssertEqual(report.remaining, 700_000)
+        XCTAssertEqual(report.daily.reduce(0) { $0 + $1.spent }, report.spent)
+        XCTAssertEqual(report.forecast.status, "estimated")
+        let elapsed = report.forecast.elapsed_days
+        XCTAssertGreaterThan(elapsed, 0)
+        XCTAssertEqual(report.forecast.projected_spent, (report.spent * report.forecast.total_days + elapsed - 1) / elapsed)
+        XCTAssertEqual(rows.total, 2); XCTAssertEqual(Set(rows.items.map(\.id)), Set([first.id, second.id]))
+        XCTAssertEqual(rows.items.reduce(0) { $0 + $1.amount }, report.spent)
+        let reportButton = app.buttons["budget-report-\(period.id)"]
+        XCTAssertTrue(reportButton.waitForExistence(timeout: 10)); reveal(reportButton, in: app); reportButton.tap()
+        assertSavingsBudgetMetric("Đã chi", amount: report.spent, in: app)
+        assertSavingsBudgetMetric("Chi tiêu cuối kỳ", amount: try XCTUnwrap(report.forecast.projected_spent), in: app)
+        attachScreenshot(app, named: "recurring-budget-api-matching-forecast")
+        let transactions = app.buttons["Xem giao dịch ngân sách"]
+        reveal(transactions, in: app); transactions.tap()
+        assertSavingsBudgetNote(try XCTUnwrap(first.note), in: app)
+        assertSavingsBudgetNote(try XCTUnwrap(second.note), in: app)
+        XCTAssertFalse(app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", try XCTUnwrap(excluded.note))).firstMatch.exists)
+        XCTAssertTrue(app.staticTexts["1–2 / 2 giao dịch"].exists)
+        attachScreenshot(app, named: "recurring-budget-drilldown-matches-spent-excludes-hidden")
+        app.buttons["Quay lại"].firstMatch.tap()
+        app.buttons["Quay lại"].firstMatch.tap()
+        let edit = app.buttons["Sửa chu kỳ"].firstMatch
+        XCTAssertTrue(edit.waitForExistence(timeout: 10)); reveal(edit, in: app); edit.tap()
+        XCTAssertTrue(app.staticTexts["Sửa chu kỳ ngân sách"].waitForExistence(timeout: 5))
+        app.textFields["Tên"].clearAndType(nextName); dismissKeyboard(app)
+        reveal(app.textFields["Giới hạn"], in: app)
+        app.textFields["Giới hạn"].clearAndType("2000000"); dismissKeyboard(app)
+        app.buttons["Lưu"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["budget-report-\(period.id)"].waitForExistence(timeout: 15))
+        let editedList = try await LocalAPIFixture.savingsBudgetRead("/budget-series", as: SavingsBudgetListFixture<SavingsBudgetSeriesFixture>.self)
+        let edited = try XCTUnwrap(editedList.items.first { $0.id == series.id })
+        XCTAssertEqual(edited.version, series.version + 1)
+        XCTAssertEqual(edited.current_config.name, name)
+        XCTAssertEqual(edited.current_config.limit_amount, 1_000_000)
+        XCTAssertEqual(edited.pending_config?.name, nextName)
+        XCTAssertEqual(edited.pending_config?.limit_amount, 2_000_000)
+        let pendingLabel = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@ AND label CONTAINS %@", "Thay đổi từ", nextName)).firstMatch
+        XCTAssertTrue(pendingLabel.waitForExistence(timeout: 10)); reveal(pendingLabel, in: app)
+        attachScreenshot(app, named: "recurring-budget-next-boundary-pending-config")
+        let stop = app.buttons["Dừng chu kỳ"].firstMatch
+        reveal(stop, in: app); stop.tap()
+        let confirm = app.alerts.buttons["Dừng"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5)); confirm.tap()
+        let stoppedLabel = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", "Đã dừng")).firstMatch
+        XCTAssertTrue(stoppedLabel.waitForExistence(timeout: 15), "Confirm stop must persist inactive series and update UI")
+        let stoppedList = try await LocalAPIFixture.savingsBudgetRead("/budget-series", as: SavingsBudgetListFixture<SavingsBudgetSeriesFixture>.self)
+        let stopped = try XCTUnwrap(stoppedList.items.first { $0.id == series.id })
+        XCTAssertFalse(stopped.active); XCTAssertEqual(stopped.version, edited.version + 1)
+        let after = try await LocalAPIFixture.savingsBudgetRead("/budgets", as: SavingsBudgetListFixture<SavingsBudgetPeriodFixture>.self)
+        XCTAssertEqual(after.items.first { $0.id == period.id }?.limit_amount, 1_000_000)
+        let unchangedRows = try await LocalAPIFixture.savingsBudgetRead("/budgets/\(period.id)/transactions", as: SavingsBudgetPageFixture.self)
+        XCTAssertEqual(Set(unchangedRows.items.map(\.id)), Set(rows.items.map(\.id)))
+        attachScreenshot(app, named: "recurring-budget-stop-preserves-generated-period")
+#endif
+    }
+
+#if LOCAL_API_UI
+    private func assertSavingsBudgetMetric(_ title: String, amount: Int64, in app: XCUIApplication) {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency; formatter.currencyCode = "VND"; formatter.currencySymbol = "₫"
+        formatter.maximumFractionDigits = 0; formatter.locale = Locale(identifier: "vi_VN")
+        let formatted = formatter.string(from: NSNumber(value: amount))!
+        let metric = app.staticTexts["\(title): \(formatted)"].firstMatch
+        guard metric.waitForExistence(timeout: 10) else {
+            XCTFail("Expected server amount \(title): \(formatted)")
+            return
+        }
+        reveal(metric, in: app)
+        XCTAssertTrue(metric.exists)
+    }
+
+    private func assertSavingsBudgetNote(_ note: String, in app: XCUIApplication) {
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", note)).firstMatch
+        guard row.waitForExistence(timeout: 10) else {
+            XCTFail("Drilldown must expose real API row: \(note)")
+            return
+        }
+        reveal(row, in: app)
+    }
+#endif
 
     func testAPIBackedBudgetCreateUpdateDeleteFromNativeUI() async throws {
 #if !LOCAL_API_UI

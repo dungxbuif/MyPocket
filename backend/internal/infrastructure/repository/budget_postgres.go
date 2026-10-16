@@ -34,6 +34,9 @@ func (r *BudgetPostgresRepository) saveInTx(tx *gorm.DB, owner string, budget *e
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND id = ?", owner, budget.ID).First(&existing).Error; err != nil {
 			return err
 		}
+		if existing.SeriesID != nil {
+			return contract.ErrBudgetSeriesManaged
+		}
 		var user entity.User
 		if err := tx.Where("id = ?", owner).First(&user).Error; err != nil {
 			return err
@@ -72,7 +75,12 @@ func (r *BudgetPostgresRepository) saveInTx(tx *gorm.DB, owner string, budget *e
 	}
 	budget.OwnerID = owner
 	if creating {
-		return tx.Create(budget).Error
+		if err := tx.Create(budget).Error; err != nil {
+			return err
+		}
+		budget.BaseLimitAmount = budget.LimitAmount
+		budget.EffectiveLimitAmount = budget.LimitAmount
+		return nil
 	}
 	result := tx.Model(&entity.Budget{}).Where("id = ? AND owner_id = ?", budget.ID, owner).Updates(map[string]any{"name": budget.Name, "limit_amount": budget.LimitAmount, "wallet_id": budget.WalletID, "category_id": budget.CategoryID, "start_date": budget.StartDate, "end_date": budget.EndDate})
 	if result.Error != nil {
@@ -81,7 +89,12 @@ func (r *BudgetPostgresRepository) saveInTx(tx *gorm.DB, owner string, budget *e
 	if result.RowsAffected == 0 {
 		return gorm.ErrRecordNotFound
 	}
-	return tx.Where("id = ? AND owner_id = ?", budget.ID, owner).First(budget).Error
+	if err := tx.Where("id = ? AND owner_id = ?", budget.ID, owner).First(budget).Error; err != nil {
+		return err
+	}
+	budget.BaseLimitAmount = budget.LimitAmount
+	budget.EffectiveLimitAmount = budget.LimitAmount
+	return nil
 }
 
 // CreateIdempotent atomically creates a budget and records the response in the
@@ -143,6 +156,13 @@ func (r *BudgetPostgresRepository) Delete(owner, id string) error {
 		var user entity.User
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ?", owner).First(&user).Error; err != nil {
 			return err
+		}
+		var budget entity.Budget
+		if err := tx.Where("owner_id = ? AND id = ?", owner, id).First(&budget).Error; err != nil {
+			return err
+		}
+		if budget.SeriesID != nil {
+			return contract.ErrBudgetSeriesManaged
 		}
 		result := tx.Where("owner_id = ? AND id = ?", owner, id).Delete(&entity.Budget{})
 		if result.Error != nil {

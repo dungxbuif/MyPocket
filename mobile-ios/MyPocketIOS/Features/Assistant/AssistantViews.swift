@@ -690,11 +690,12 @@ enum AssistantCardType {
     }
 
     /// Resolve the target used by both budget and jar progress cards. Jars
-    /// use `allocation_amount`; budgets use `limit_amount` (or the legacy
+    /// use `allocation_amount`; budgets prefer `effective_limit_amount` including
+    /// carryover, falling back to `limit_amount` (or the legacy
     /// calculated allocation fallback). A zero target is valid input and is
     /// rendered as 0% rather than silently borrowing another field.
     static func progressTarget(_ item: [String: JSONValue]) -> Double? {
-        for key in ["allocation_amount", "limit_amount", "calculated_allocation"] {
+        for key in ["allocation_amount", "effective_limit_amount", "limit_amount", "calculated_allocation"] {
             guard let amount = monetaryValue(item[key]), amount >= 0 else { continue }
             return Double(amount)
         }

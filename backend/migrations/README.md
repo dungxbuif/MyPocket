@@ -1,5 +1,19 @@
 # Stage v1 migrations
 
+## 000035 — recurring budgets (local candidate)
+
+Adds owner-scoped series/revision tables, optional series/carry snapshot fields
+and a unique generated-period index. Wallet/category deletion triggers stop
+series only when the deleted scope is needed by the next ungenerated period
+or a later revision. Historical superseded references do not stop unrelated
+future configuration. Existing ledger/budget rows are not rewritten.
+
+Apply after a validated production backup before starting the new API/worker;
+production remains at version 34 until this rollout is performed. Fresh
+disposable PostgreSQL 17 and real repository/HTTP race tests exercise version 35.
+Do not edit migration 035 after production has applied it; later fixes require
+a new forward migration. [ADR-023](../../docs/decisions/ADR-023-ledger-savings-recurring-budgets.md).
+
 - `000032_feedback_owner_resolution.up.sql` adds independent owner confirmation
   (`resolved` false by default, nullable `resolved_at`); no existing feedback is
   automatically accepted and dev status/changelog/financial records are unchanged.

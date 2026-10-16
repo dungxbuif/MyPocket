@@ -10,6 +10,26 @@ shared_fields: [status, trace]
 
 # ERD
 
+## Recurring budget series — migration000035 (local candidate)
+
+`budget_series`: owner FK, cadence, first/next calendar dates, active flag,
+optimistic version, generation error and timestamps. `budget_series_configs`
+stores effective-date revisions with name, positive safe-integer base limit,
+wallet/category scope snapshots and optional carryover. Unique revision key:
+`(series_id,effective_start_date)`.
+
+`budgets` gains nullable `series_id` and `carryover_enabled` snapshot; a partial
+unique index enforces one instance per `(series_id,start_date)`. Series FK is
+deferrable so owner cleanup can remove configuration and periods in one
+transaction. Scope deletion triggers stop affected series instead of turning
+their revisions into all-wallet/all-category configurations. Existing budget
+scope cascade behavior remains; transactions are untouched.
+
+Carryover, effective limit, spent, savings reports and forecast remain derived
+read fields, not stored counters or financial snapshots.
+[ADR-023](../decisions/ADR-023-ledger-savings-recurring-budgets.md),
+[design](../superpowers/specs/2026-10-16-savings-budget-design.md).
+
 ## Implemented calendar, jar, and month schema — Stage v1 baseline
 
 The Stage v1 baseline adds `user.timezone` and `timezone_confirmed`, converts `wallets.target_date` to `date`, replaces budget timestamp bounds with account-calendar `start_date`/`end_date` date columns, and creates owner-scoped jars, month records, per-month configurations, month notes and nullable `transactions.transfer_id`. A fresh staging database reports migration version 1, `dirty=false`; repository integration tests use PostgreSQL. Month figures are derived from live ledger data; no report snapshot/close table or cron job exists. [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md) is proposed; [CORE-03](../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md) is in progress pending UAT and reconciliation.

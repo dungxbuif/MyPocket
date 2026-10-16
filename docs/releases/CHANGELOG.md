@@ -38,6 +38,17 @@ shared_fields: [status]
 
 ## Unreleased — native Stitch parity continuation
 
+- Add local Savings Report with separate goal-wallet activity and account-wide
+  surplus, month/wallet filters and paged transaction drilldown. Initial wallet
+  balances enter history at creation and are shown separately from ledger rows.
+- Add weekly/monthly/quarterly/yearly budget series with versioned next-period
+  edits, stop, safe replay and unique worker/API catch-up. Optional positive
+  carryover resets on wallet/category changes; past edits recalculate totals.
+- Add deterministic budget forecast, daily spend and identical transaction
+  scope; native screens reuse shared bases and preserve existing API decoding.
+- Add migration035 locally and generated OpenAPI. Production rollout and
+  owner/device acceptance are pending; no release announcement is implied.
+
 - Harden native Reports owner scoping and fail closed when the month summary
   cannot be loaded (`089fd656`); signed simulator tests pass 307/307.
 - Add offline transfer receipt replay assertions and document the remaining

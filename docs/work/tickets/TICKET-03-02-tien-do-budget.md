@@ -17,11 +17,13 @@ Ticket lớn: [Theo dõi budget](TICKET-03-budget.md).
 
 Real ledger-derived progress, descendant matching, deduplicated active summary, daily allowance and on-screen threshold notices implemented in [API-SCREENS-01](API-SCREENS-01-DETAIL_DESIGN.md). Forecasts, notification delivery and full owner acceptance remain pending.
 
-**Gap-closure status 2026-10-16:** The current API contract is one explicit
-inclusive calendar-date interval. Recurrence/scheduled period generation,
-server forecast fields, producer-driven budget notifications and a dedicated
-budget transaction drilldown are **partial**; no new interval semantics are
-introduced by this audit.
+**Implementation status 2026-10-16:** The local candidate includes recurring
+periods, effective limits with carryover, deterministic server forecast/daily
+breakdown and matching paged transaction drilldown. Read
+[forecast API](../../guides/budget-report-api.md),
+[design](../../superpowers/specs/2026-10-16-savings-budget-design.md), and
+[validation](../VALIDATION_MATRIX.md). Scheduled notification producers and
+production/device acceptance remain pending.
 
 Xem đã chi/còn lại, cảnh báo, dự báo và giao dịch của budget.
 

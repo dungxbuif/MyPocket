@@ -1279,6 +1279,237 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/budget-series": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Budget series"
+                ],
+                "summary": "List recurring budget series and current/pending revisions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.budgetSeriesList"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Budget series"
+                ],
+                "summary": "Create a recurring budget series with canonical calendar periods",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stable ASCII mutation key",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Series configuration",
+                        "name": "series",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.budgetSeriesInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.BudgetSeries"
+                        }
+                    },
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/entity.BudgetSeries"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/budget-series/{id}": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Budget series"
+                ],
+                "summary": "Replace next-period recurring configuration with version protection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Series ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Stable ASCII mutation key",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Complete configuration and version; cadence/start_date omitted",
+                        "name": "series",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.budgetSeriesInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.BudgetSeries"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/budget-series/{id}/stop": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Budget series"
+                ],
+                "summary": "Stop future generation while preserving existing budget periods",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Series ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Stable ASCII mutation key",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "Current version",
+                        "name": "series",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.budgetSeriesInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.BudgetSeries"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/budgets": {
             "get": {
                 "security": [
@@ -1333,6 +1564,12 @@ const docTemplate = `{
                         "schema": {
                             "$ref": "#/definitions/httpapi.budgetInput"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Stable ASCII key reused to replay a confirmed budget write",
+                        "name": "Idempotency-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
@@ -1444,6 +1681,120 @@ const docTemplate = `{
                     },
                     "409": {
                         "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/budgets/{id}/report": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Budgets"
+                ],
+                "summary": "Read deterministic budget forecast and daily spend",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owned budget UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.BudgetReport"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/budgets/{id}/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Budgets"
+                ],
+                "summary": "List transactions matching exactly the budget report scope",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Owned budget UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Page size 1..100, default 50",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Offset, default 0",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.BudgetTransactionPage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/httpapi.Problem"
                         }
@@ -3237,6 +3588,155 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/reports/savings": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Report monthly goal-wallet activity and separate account-wide surplus",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account-local YYYY-MM; defaults to current month",
+                        "name": "month",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Owned goal wallet; only filters goals",
+                        "name": "wallet_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.SavingsReport"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/savings/transactions": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Page transactions using the same savings report scope and predicates",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Account-local YYYY-MM",
+                        "name": "month",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Owned goal wallet (goals only)",
+                        "name": "wallet_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "goals or surplus",
+                        "name": "section",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "all, deposit, withdrawal, adjustment, transfer, income, expense",
+                        "name": "kind",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "1..100; default 50",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Nonnegative; default 0",
+                        "name": "offset",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.SavingsTransactionPage"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/sync/capabilities": {
             "get": {
                 "security": [
@@ -4532,6 +5032,15 @@ const docTemplate = `{
         "entity.Budget": {
             "type": "object",
             "properties": {
+                "base_limit_amount": {
+                    "type": "integer"
+                },
+                "carryover_amount": {
+                    "type": "integer"
+                },
+                "carryover_enabled": {
+                    "type": "boolean"
+                },
                 "category_id": {
                     "type": "string"
                 },
@@ -4539,6 +5048,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "days_remaining": {
+                    "type": "integer"
+                },
+                "effective_limit_amount": {
                     "type": "integer"
                 },
                 "end_date": {
@@ -4559,6 +5071,9 @@ const docTemplate = `{
                 "owner_id": {
                     "type": "string"
                 },
+                "series_id": {
+                    "type": "string"
+                },
                 "spent": {
                     "type": "integer"
                 },
@@ -4566,6 +5081,148 @@ const docTemplate = `{
                     "$ref": "#/definitions/entity.CalendarDate"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.BudgetDailySpend": {
+            "type": "object",
+            "properties": {
+                "date": {
+                    "type": "string"
+                },
+                "spent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.BudgetForecast": {
+            "type": "object",
+            "properties": {
+                "elapsed_days": {
+                    "type": "integer"
+                },
+                "method": {
+                    "type": "string"
+                },
+                "over_budget": {
+                    "type": "boolean"
+                },
+                "projected_remaining": {
+                    "type": "integer"
+                },
+                "projected_spent": {
+                    "type": "integer"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "total_days": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.BudgetReport": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "base_limit_amount": {
+                    "type": "integer"
+                },
+                "budget_id": {
+                    "type": "string"
+                },
+                "carryover_amount": {
+                    "type": "integer"
+                },
+                "daily": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.BudgetDailySpend"
+                    }
+                },
+                "effective_limit_amount": {
+                    "type": "integer"
+                },
+                "end_date": {
+                    "$ref": "#/definitions/entity.CalendarDate"
+                },
+                "forecast": {
+                    "$ref": "#/definitions/entity.BudgetForecast"
+                },
+                "remaining": {
+                    "type": "integer"
+                },
+                "spent": {
+                    "type": "integer"
+                },
+                "start_date": {
+                    "$ref": "#/definitions/entity.CalendarDate"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.BudgetSeries": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "cadence": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "current_config": {
+                    "$ref": "#/definitions/entity.BudgetSeriesConfig"
+                },
+                "generation_error": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "owner_id": {
+                    "type": "string"
+                },
+                "pending_config": {
+                    "$ref": "#/definitions/entity.BudgetSeriesConfig"
+                },
+                "start_date": {
+                    "$ref": "#/definitions/entity.CalendarDate"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.BudgetSeriesConfig": {
+            "type": "object",
+            "properties": {
+                "carryover_enabled": {
+                    "type": "boolean"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "effective_start_date": {
+                    "$ref": "#/definitions/entity.CalendarDate"
+                },
+                "limit_amount": {
+                    "type": "integer"
+                },
+                "name": {
                     "type": "string"
                 },
                 "wallet_id": {
@@ -5318,6 +5975,166 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.SavingsGoalItem": {
+            "type": "object",
+            "properties": {
+                "adjustments": {
+                    "type": "integer"
+                },
+                "closing_balance": {
+                    "type": "integer"
+                },
+                "deposits": {
+                    "type": "integer"
+                },
+                "initial_balance_added": {
+                    "type": "integer"
+                },
+                "internal_transfers": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "net_change": {
+                    "type": "integer"
+                },
+                "opening_balance": {
+                    "type": "integer"
+                },
+                "progress_bps": {
+                    "type": "integer"
+                },
+                "reached": {
+                    "type": "boolean"
+                },
+                "remaining": {
+                    "type": "integer"
+                },
+                "target_amount": {
+                    "type": "integer"
+                },
+                "target_date": {
+                    "$ref": "#/definitions/entity.CalendarDate"
+                },
+                "transaction_count": {
+                    "type": "integer"
+                },
+                "wallet_id": {
+                    "type": "string"
+                },
+                "withdrawals": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.SavingsGoals": {
+            "type": "object",
+            "properties": {
+                "adjustments": {
+                    "type": "integer"
+                },
+                "closing_balance": {
+                    "type": "integer"
+                },
+                "deposits": {
+                    "type": "integer"
+                },
+                "initial_balance_added": {
+                    "type": "integer"
+                },
+                "internal_transfers": {
+                    "type": "integer"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.SavingsGoalItem"
+                    }
+                },
+                "net_change": {
+                    "type": "integer"
+                },
+                "opening_balance": {
+                    "type": "integer"
+                },
+                "withdrawals": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.SavingsReport": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "goals": {
+                    "$ref": "#/definitions/entity.SavingsGoals"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "surplus": {
+                    "$ref": "#/definitions/entity.SavingsSurplus"
+                },
+                "timezone": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.SavingsSurplus": {
+            "type": "object",
+            "properties": {
+                "expense": {
+                    "type": "integer"
+                },
+                "income": {
+                    "type": "integer"
+                },
+                "net": {
+                    "type": "integer"
+                },
+                "savings_rate_bps": {
+                    "type": "integer"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "transaction_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.SavingsTransactionPage": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.Transaction"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "entity.Transaction": {
             "type": "object",
             "properties": {
@@ -5506,6 +6323,35 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.BudgetTransactionPage": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "budget_id": {
+                    "type": "string"
+                },
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.Transaction"
+                    }
+                },
+                "limit": {
+                    "type": "integer"
+                },
+                "offset": {
+                    "type": "integer"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
         "httpapi.CreateMutationMeta": {
             "type": "object",
             "properties": {
@@ -5638,6 +6484,20 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.advisorAsyncSubmitResponse": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.advisorConfirmActionInput": {
             "type": "object",
             "properties": {
@@ -5673,20 +6533,6 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "text": {
-                    "type": "string"
-                }
-            }
-        },
-        "httpapi.advisorAsyncSubmitResponse": {
-            "type": "object",
-            "properties": {
-                "conversation_id": {
-                    "type": "string"
-                },
-                "run_id": {
-                    "type": "string"
-                },
-                "status": {
                     "type": "string"
                 }
             }
@@ -5764,6 +6610,46 @@ const docTemplate = `{
                 },
                 "wallet_id": {
                     "type": "string"
+                }
+            }
+        },
+        "httpapi.budgetSeriesInput": {
+            "type": "object",
+            "properties": {
+                "cadence": {
+                    "type": "string"
+                },
+                "carryover_enabled": {
+                    "type": "boolean"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "limit_amount": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "start_date": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.budgetSeriesList": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.BudgetSeries"
+                    }
                 }
             }
         },

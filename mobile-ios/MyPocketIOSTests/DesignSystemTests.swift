@@ -809,6 +809,7 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
     }
 
     func testAssistantProgressTargetPrefersJarAllocationAndRejectsInvalidTargets() {
+        XCTAssertEqual(AssistantCardType.progressTarget(["limit_amount": .number(4_000_000), "effective_limit_amount": .number(5_000_000)]), 5_000_000)
         XCTAssertEqual(
             AssistantCardType.progressTarget([
                 "allocation_amount": .number(2_000),

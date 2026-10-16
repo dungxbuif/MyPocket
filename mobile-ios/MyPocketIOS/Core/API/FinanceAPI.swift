@@ -177,8 +177,8 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/transactions/adjustment", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
     }
 
-    func budgets() async throws -> BudgetSummaryModel {
-        try await client.send(APIRequest(path: "/budgets"))
+    func budgets(ownerID: String? = nil) async throws -> BudgetSummaryModel {
+        try await client.send(APIRequest(path: "/budgets", expectedOwnerID: ownerID))
     }
 
     func createBudget(_ input: BudgetInputModel) async throws -> BudgetModel {
@@ -191,6 +191,49 @@ final class FinanceAPI: @unchecked Sendable {
 
     func deleteBudget(id: String) async throws {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/budgets/\(id)", method: .delete))
+    }
+
+    func savingsReport(month: String, walletID: String? = nil, ownerID: String?) async throws -> SavingsReportModel {
+        var query = [URLQueryItem(name: "month", value: month)]
+        if let walletID { query.append(URLQueryItem(name: "wallet_id", value: walletID)) }
+        return try await client.send(APIRequest(path: reportPath("/reports/savings", query: query), expectedOwnerID: ownerID))
+    }
+
+    func savingsTransactions(month: String, walletID: String? = nil, section: String, kind: String, offset: Int, ownerID: String?) async throws -> ReportTransactionPageModel {
+        var query = [URLQueryItem(name: "month", value: month), URLQueryItem(name: "section", value: section), URLQueryItem(name: "kind", value: kind), URLQueryItem(name: "limit", value: "50"), URLQueryItem(name: "offset", value: String(offset))]
+        if let walletID { query.append(URLQueryItem(name: "wallet_id", value: walletID)) }
+        return try await client.send(APIRequest(path: reportPath("/reports/savings/transactions", query: query), expectedOwnerID: ownerID))
+    }
+
+    func budgetReport(id: String, ownerID: String?) async throws -> BudgetReportModel {
+        try await client.send(APIRequest(path: "/budgets/\(id)/report", expectedOwnerID: ownerID))
+    }
+
+    func budgetSeries(ownerID: String?) async throws -> BudgetSeriesListModel {
+        try await client.send(APIRequest(path: "/budget-series", expectedOwnerID: ownerID))
+    }
+
+    func createBudgetSeries(_ input: BudgetSeriesCreateInput, idempotencyKey: String, ownerID: String?) async throws -> BudgetSeriesModel {
+        try await client.send(APIRequest(path: "/budget-series", method: .post, body: try body(input), idempotencyKey: idempotencyKey, expectedOwnerID: ownerID))
+    }
+
+    func updateBudgetSeries(id: String, input: BudgetSeriesUpdateInput, idempotencyKey: String, ownerID: String?) async throws -> BudgetSeriesModel {
+        try await client.send(APIRequest(path: "/budget-series/\(id)", method: .patch, body: try body(input), idempotencyKey: idempotencyKey, expectedOwnerID: ownerID))
+    }
+
+    func stopBudgetSeries(id: String, version: Int64, idempotencyKey: String, ownerID: String?) async throws -> BudgetSeriesModel {
+        struct Input: Encodable { let version: Int64 }
+        return try await client.send(APIRequest(path: "/budget-series/\(id)/stop", method: .post, body: try body(Input(version: version)), idempotencyKey: idempotencyKey, expectedOwnerID: ownerID))
+    }
+
+    func budgetTransactions(id: String, offset: Int, ownerID: String?) async throws -> ReportTransactionPageModel {
+        try await client.send(APIRequest(path: "/budgets/\(id)/transactions?limit=50&offset=\(offset)", expectedOwnerID: ownerID))
+    }
+
+    private func reportPath(_ path: String, query: [URLQueryItem]) -> String {
+        var components = URLComponents()
+        components.queryItems = query
+        return path + "?" + (components.percentEncodedQuery ?? "")
     }
 
     func monthSummary(month: String, ownerID: String? = nil) async throws -> MonthSummaryModel {

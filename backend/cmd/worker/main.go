@@ -31,10 +31,14 @@ func main() {
 	interval := workerInterval()
 	once := workerOnce()
 	runner := repo.NewRecurringPostgresRepository(database)
+	budgetSeries := repo.NewBudgetSeriesPostgresRepository(database)
 	advisorExpiry, _ := repo.NewAdvisorPostgresRepository(database).(repository.AdvisorExpiryRepository)
 	for {
 		if err := runRecurringPass(database, runner, time.Now().UTC()); err != nil {
 			log.Printf("recurring worker pass failed: %v", err)
+		}
+		if err := runBudgetSeriesPass(database, budgetSeries, time.Now().UTC()); err != nil {
+			log.Printf("budget series worker pass failed: %v", err)
 		}
 		if advisorExpiry != nil {
 			if _, err := runAdvisorExpiryPass(context.Background(), advisorExpiry, time.Now().UTC()); err != nil {
@@ -46,6 +50,20 @@ func main() {
 		}
 		time.Sleep(interval)
 	}
+}
+
+func runBudgetSeriesPass(database *gorm.DB, runner repository.BudgetSeriesRepository, now time.Time) error {
+	var owners []string
+	if err := database.Model(&entity.BudgetSeries{}).Where("active = true").Distinct("owner_id").Pluck("owner_id", &owners).Error; err != nil {
+		return err
+	}
+	var first error
+	for _, owner := range owners {
+		if _, err := runner.Ensure(owner, now); err != nil && first == nil {
+			first = fmt.Errorf("one or more owner budget series failed: %w", err)
+		}
+	}
+	return first
 }
 
 func runAdvisorExpiryPass(ctx context.Context, runner repository.AdvisorExpiryRepository, now time.Time) (int, error) {

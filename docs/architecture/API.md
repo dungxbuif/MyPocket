@@ -10,6 +10,28 @@ shared_fields: [status, trace]
 
 # API
 
+## Local candidate: savings, recurring budget and forecast — 2026-10-16
+
+Owner JWT and full-owner API keys use the same authorization for these
+additive routes; the authenticated owner is never supplied by request payload.
+
+| Method | Path | Contract |
+| --- | --- | --- |
+| GET | `/api/v1/reports/savings` | Goal balances/activity and separate account-wide surplus |
+| GET | `/api/v1/reports/savings/transactions` | Section/kind/month/wallet-scoped pagination |
+| GET, POST | `/api/v1/budget-series` | List revisions or create canonical recurring periods |
+| PATCH | `/api/v1/budget-series/{id}` | Replace next-period configuration using version + idempotency key |
+| POST | `/api/v1/budget-series/{id}/stop` | Stop future generation and preserve existing periods |
+| GET | `/api/v1/budgets/{id}/report` | Effective limit, linear forecast and daily spend |
+| GET | `/api/v1/budgets/{id}/transactions` | Same expense/descendant/date predicates as report |
+
+References: [savings](../guides/savings-report-api.md),
+[recurrence](../guides/budget-recurrence-api.md),
+[forecast](../guides/budget-report-api.md), [ADR-023](../decisions/ADR-023-ledger-savings-recurring-budgets.md).
+These Markdown guides and generated OpenAPI are the agent-readable contracts.
+Migration035 and new runtime surfaces are verified locally; production rollout
+is pending. Existing interval budgets keep their base `limit_amount` semantics.
+
 ## Offline implementation status — 2026-10-15
 
 Offline is not available on iOS yet and the native client still fails closed

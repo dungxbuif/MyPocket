@@ -19,11 +19,14 @@ Owner requested implementation from supplied savings screens. [Active design/pro
 
 Đặt mục tiêu/hạn cho ví tiết kiệm, nạp/rút và xem tiến độ.
 
-**Gap-closure status 2026-10-16:** Goal progress and the existing paired
-transfer/single-wallet entry contracts are covered by current API/native tests.
-Scheduled savings advice, forecast, notification fan-out and a dedicated
-savings report remain **partial** because no current API/entity contract
-defines them; this ticket does not infer those behaviors from the goal fields.
+**Implementation status 2026-10-16:** The local candidate adds a dedicated
+savings report and paged drilldown. Goal balances/activity and account-wide
+surplus are separate, with shared ledger predicates and account-local months.
+The configured baseline enters at wallet creation, not before it. See
+[API](../../guides/savings-report-api.md),
+[design](../../superpowers/specs/2026-10-16-savings-budget-design.md), and
+[validation](../VALIDATION_MATRIX.md). Scheduled savings advice, completion-date
+forecast, notification fan-out and owner/device acceptance remain pending.
 
 ## Tiêu chí nghiệm thu
 

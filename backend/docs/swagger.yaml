@@ -115,11 +115,19 @@ definitions:
     type: object
   entity.Budget:
     properties:
+      base_limit_amount:
+        type: integer
+      carryover_amount:
+        type: integer
+      carryover_enabled:
+        type: boolean
       category_id:
         type: string
       created_at:
         type: string
       days_remaining:
+        type: integer
+      effective_limit_amount:
         type: integer
       end_date:
         $ref: '#/definitions/entity.CalendarDate'
@@ -133,11 +141,106 @@ definitions:
         type: string
       owner_id:
         type: string
+      series_id:
+        type: string
       spent:
         type: integer
       start_date:
         $ref: '#/definitions/entity.CalendarDate'
       updated_at:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.BudgetDailySpend:
+    properties:
+      date:
+        type: string
+      spent:
+        type: integer
+    type: object
+  entity.BudgetForecast:
+    properties:
+      elapsed_days:
+        type: integer
+      method:
+        type: string
+      over_budget:
+        type: boolean
+      projected_remaining:
+        type: integer
+      projected_spent:
+        type: integer
+      status:
+        type: string
+      total_days:
+        type: integer
+    type: object
+  entity.BudgetReport:
+    properties:
+      as_of:
+        type: string
+      base_limit_amount:
+        type: integer
+      budget_id:
+        type: string
+      carryover_amount:
+        type: integer
+      daily:
+        items:
+          $ref: '#/definitions/entity.BudgetDailySpend'
+        type: array
+      effective_limit_amount:
+        type: integer
+      end_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      forecast:
+        $ref: '#/definitions/entity.BudgetForecast'
+      remaining:
+        type: integer
+      spent:
+        type: integer
+      start_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      timezone:
+        type: string
+    type: object
+  entity.BudgetSeries:
+    properties:
+      active:
+        type: boolean
+      cadence:
+        type: string
+      created_at:
+        type: string
+      current_config:
+        $ref: '#/definitions/entity.BudgetSeriesConfig'
+      generation_error:
+        type: string
+      id:
+        type: string
+      owner_id:
+        type: string
+      pending_config:
+        $ref: '#/definitions/entity.BudgetSeriesConfig'
+      start_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      updated_at:
+        type: string
+      version:
+        type: integer
+    type: object
+  entity.BudgetSeriesConfig:
+    properties:
+      carryover_enabled:
+        type: boolean
+      category_id:
+        type: string
+      effective_start_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      limit_amount:
+        type: integer
+      name:
         type: string
       wallet_id:
         type: string
@@ -631,6 +734,111 @@ definitions:
       wallet_id:
         type: string
     type: object
+  entity.SavingsGoalItem:
+    properties:
+      adjustments:
+        type: integer
+      closing_balance:
+        type: integer
+      deposits:
+        type: integer
+      initial_balance_added:
+        type: integer
+      internal_transfers:
+        type: integer
+      name:
+        type: string
+      net_change:
+        type: integer
+      opening_balance:
+        type: integer
+      progress_bps:
+        type: integer
+      reached:
+        type: boolean
+      remaining:
+        type: integer
+      target_amount:
+        type: integer
+      target_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      transaction_count:
+        type: integer
+      wallet_id:
+        type: string
+      withdrawals:
+        type: integer
+    type: object
+  entity.SavingsGoals:
+    properties:
+      adjustments:
+        type: integer
+      closing_balance:
+        type: integer
+      deposits:
+        type: integer
+      initial_balance_added:
+        type: integer
+      internal_transfers:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/entity.SavingsGoalItem'
+        type: array
+      net_change:
+        type: integer
+      opening_balance:
+        type: integer
+      withdrawals:
+        type: integer
+    type: object
+  entity.SavingsReport:
+    properties:
+      as_of:
+        type: string
+      goals:
+        $ref: '#/definitions/entity.SavingsGoals'
+      month:
+        type: string
+      surplus:
+        $ref: '#/definitions/entity.SavingsSurplus'
+      timezone:
+        type: string
+    type: object
+  entity.SavingsSurplus:
+    properties:
+      expense:
+        type: integer
+      income:
+        type: integer
+      net:
+        type: integer
+      savings_rate_bps:
+        type: integer
+      scope:
+        type: string
+      transaction_count:
+        type: integer
+    type: object
+  entity.SavingsTransactionPage:
+    properties:
+      as_of:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      limit:
+        type: integer
+      month:
+        type: string
+      offset:
+        type: integer
+      timezone:
+        type: string
+      total:
+        type: integer
+    type: object
   entity.Transaction:
     properties:
       adjustment_direction:
@@ -755,6 +963,25 @@ definitions:
       updated_at:
         type: string
     type: object
+  httpapi.BudgetTransactionPage:
+    properties:
+      as_of:
+        type: string
+      budget_id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      timezone:
+        type: string
+      total:
+        type: integer
+    type: object
   httpapi.CreateMutationMeta:
     properties:
       mutation:
@@ -841,6 +1068,15 @@ definitions:
       wallet_id:
         type: string
     type: object
+  httpapi.advisorAsyncSubmitResponse:
+    properties:
+      conversation_id:
+        type: string
+      run_id:
+        type: string
+      status:
+        type: string
+    type: object
   httpapi.advisorConfirmActionInput:
     properties:
       conversation_id:
@@ -864,15 +1100,6 @@ definitions:
       status:
         type: string
       text:
-        type: string
-    type: object
-  httpapi.advisorAsyncSubmitResponse:
-    properties:
-      conversation_id:
-        type: string
-      run_id:
-        type: string
-      status:
         type: string
     type: object
   httpapi.aiProposalDecision:
@@ -923,6 +1150,32 @@ definitions:
         type: string
       wallet_id:
         type: string
+    type: object
+  httpapi.budgetSeriesInput:
+    properties:
+      cadence:
+        type: string
+      carryover_enabled:
+        type: boolean
+      category_id:
+        type: string
+      limit_amount:
+        type: integer
+      name:
+        type: string
+      start_date:
+        type: string
+      version:
+        type: integer
+      wallet_id:
+        type: string
+    type: object
+  httpapi.budgetSeriesList:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/entity.BudgetSeries'
+        type: array
     type: object
   httpapi.bulkDeleteInput:
     properties:
@@ -2098,6 +2351,153 @@ paths:
       summary: Rotate a refresh token and issue a new login session
       tags:
       - Authentication
+  /api/v1/budget-series:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.budgetSeriesList'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List recurring budget series and current/pending revisions
+      tags:
+      - Budget series
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stable ASCII mutation key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Series configuration
+        in: body
+        name: series
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetSeriesInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetSeries'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.BudgetSeries'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a recurring budget series with canonical calendar periods
+      tags:
+      - Budget series
+  /api/v1/budget-series/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Series ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stable ASCII mutation key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Complete configuration and version; cadence/start_date omitted
+        in: body
+        name: series
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetSeriesInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetSeries'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Replace next-period recurring configuration with version protection
+      tags:
+      - Budget series
+  /api/v1/budget-series/{id}/stop:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Series ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stable ASCII mutation key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Current version
+        in: body
+        name: series
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetSeriesInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetSeries'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Stop future generation while preserving existing budget periods
+      tags:
+      - Budget series
   /api/v1/budgets:
     get:
       produces:
@@ -2126,6 +2526,10 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpapi.budgetInput'
+      - description: Stable ASCII key reused to replay a confirmed budget write
+        in: header
+        name: Idempotency-Key
+        type: string
       produces:
       - application/json
       responses:
@@ -2203,6 +2607,78 @@ paths:
       security:
       - BearerAuth: []
       summary: Replace budget configuration before its interval has ended
+      tags:
+      - Budgets
+  /api/v1/budgets/{id}/report:
+    get:
+      parameters:
+      - description: Owned budget UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetReport'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Read deterministic budget forecast and daily spend
+      tags:
+      - Budgets
+  /api/v1/budgets/{id}/transactions:
+    get:
+      parameters:
+      - description: Owned budget UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page size 1..100, default 50
+        in: query
+        name: limit
+        type: integer
+      - description: Offset, default 0
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.BudgetTransactionPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List transactions matching exactly the budget report scope
       tags:
       - Budgets
   /api/v1/categories:
@@ -3322,6 +3798,101 @@ paths:
       security:
       - BearerAuth: []
       summary: Read the deterministic Money Insider report
+      tags:
+      - Reports
+  /api/v1/reports/savings:
+    get:
+      parameters:
+      - description: Account-local YYYY-MM; defaults to current month
+        in: query
+        name: month
+        type: string
+      - description: Owned goal wallet; only filters goals
+        in: query
+        name: wallet_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.SavingsReport'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Report monthly goal-wallet activity and separate account-wide surplus
+      tags:
+      - Reports
+  /api/v1/reports/savings/transactions:
+    get:
+      parameters:
+      - description: Account-local YYYY-MM
+        in: query
+        name: month
+        type: string
+      - description: Owned goal wallet (goals only)
+        in: query
+        name: wallet_id
+        type: string
+      - description: goals or surplus
+        in: query
+        name: section
+        required: true
+        type: string
+      - description: all, deposit, withdrawal, adjustment, transfer, income, expense
+        in: query
+        name: kind
+        type: string
+      - description: 1..100; default 50
+        in: query
+        name: limit
+        type: integer
+      - description: Nonnegative; default 0
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.SavingsTransactionPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Page transactions using the same savings report scope and predicates
       tags:
       - Reports
   /api/v1/sync/capabilities:

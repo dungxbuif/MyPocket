@@ -459,9 +459,8 @@ func (r *FinanceQueryPostgresRepository) readGoalProgress(ctx context.Context, t
 
 func (r *FinanceQueryPostgresRepository) readBudgetProgress(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery) (entity.FinanceResult, error) {
 	budgetQuery := tx.WithContext(ctx).Where("owner_id = ?", ownerID).Order("start_date ASC, id ASC")
-	if len(query.ObjectIDs) > 0 {
-		budgetQuery = budgetQuery.Where("id IN ?", query.ObjectIDs)
-	}
+	// Prior periods are needed to derive carryover, even for a single-budget tool
+	// query. Apply output selection only after the full owned chain is calculated.
 	var budgets []entity.Budget
 	if err := budgetQuery.Find(&budgets).Error; err != nil {
 		return entity.FinanceResult{}, err
@@ -483,9 +482,53 @@ func (r *FinanceQueryPostgresRepository) readBudgetProgress(ctx context.Context,
 		if err != nil {
 			return entity.FinanceResult{}, entity.ErrFinanceDateInvalid
 		}
-		now = parsed
+		// A date-only selection includes that whole local day, not just midnight.
+		now = parsed.AddDate(0, 0, 1).Add(-time.Nanosecond)
 	}
-	summary := entity.CalculateBudgetsInLocation(budgets, transactions, categories, now, location)
+	visibleRows := transactions[:0]
+	for _, row := range transactions {
+		if !row.OccurredAt.After(asOf) {
+			visibleRows = append(visibleRows, row)
+		}
+	}
+	transactions = visibleRows
+	summary, err := entity.CalculateBudgetsChecked(budgets, transactions, categories, now, location)
+	if err != nil {
+		return entity.FinanceResult{}, err
+	}
+	if len(query.ObjectIDs) > 0 {
+		selected := make(map[string]bool, len(query.ObjectIDs))
+		for _, id := range query.ObjectIDs {
+			selected[id] = true
+		}
+		items := []entity.Budget{}
+		summary.LimitAmount, summary.Spent = 0, 0
+		counted := map[string]bool{}
+		label := now.In(location).Format("2006-01-02")
+		for _, budget := range summary.Items {
+			if !selected[budget.ID] {
+				continue
+			}
+			items = append(items, budget)
+			if budget.StartDate.Format("2006-01-02") <= label && label <= budget.EndDate.Format("2006-01-02") {
+				if summary.LimitAmount > entity.MaxSafeMoneyAmount-budget.EffectiveLimitAmount {
+					return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
+				}
+				summary.LimitAmount += budget.EffectiveLimitAmount
+				for _, row := range entity.MatchBudgetTransactions(budget, transactions, categories, now, location) {
+					if counted[row.ID] {
+						continue
+					}
+					counted[row.ID] = true
+					if row.Amount < 0 || summary.Spent > entity.MaxSafeMoneyAmount-row.Amount {
+						return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
+					}
+					summary.Spent += row.Amount
+				}
+			}
+		}
+		summary.Items = items
+	}
 	encoded, err := json.Marshal(summary)
 	if err != nil {
 		return entity.FinanceResult{}, err

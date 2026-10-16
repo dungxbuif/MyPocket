@@ -284,6 +284,187 @@ struct BudgetModel: Codable, Identifiable, Equatable, Sendable {
     var spent: Int64
     var daysRemaining: Int
     var ended: Bool
+    var seriesID: String? = nil
+    var baseLimitAmount: Int64? = nil
+    var carryoverAmount: Int64? = nil
+    var effectiveLimitAmount: Int64? = nil
+
+    var displayLimitAmount: Int64 { effectiveLimitAmount ?? limitAmount }
+    var isSeriesManaged: Bool { seriesID?.isEmpty == false }
+}
+
+enum BudgetCadence: String, Codable, CaseIterable, Sendable {
+    case weekly, monthly, quarterly, yearly
+
+    var label: String {
+        switch self {
+        case .weekly: "Hàng tuần"
+        case .monthly: "Hàng tháng"
+        case .quarterly: "Hàng quý"
+        case .yearly: "Hàng năm"
+        }
+    }
+
+    func canonicalStart(_ date: Date, timeZone: TimeZone) -> String {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        var components = calendar.dateComponents([.year, .month, .day], from: date)
+        switch self {
+        case .weekly:
+            let weekday = calendar.component(.weekday, from: date)
+            let monday = calendar.date(byAdding: .day, value: -((weekday + 5) % 7), to: date) ?? date
+            return MPFormat.calendarDateString(monday, timeZone: timeZone)
+        case .monthly: components.day = 1
+        case .quarterly: components.month = (((components.month ?? 1) - 1) / 3) * 3 + 1; components.day = 1
+        case .yearly: components.month = 1; components.day = 1
+        }
+        return MPFormat.calendarDateString(calendar.date(from: components) ?? date, timeZone: timeZone)
+    }
+}
+
+struct SavingsReportModel: Decodable, Sendable {
+    let month: String
+    let timezone: String
+    let asOf: String
+    let goals: SavingsGoalsModel
+    let surplus: SavingsSurplusModel
+}
+
+struct SavingsGoalsModel: Decodable, Sendable {
+    let openingBalance: Int64
+    let closingBalance: Int64
+    let deposits: Int64
+    let withdrawals: Int64
+    let adjustments: Int64
+    let netChange: Int64
+    let internalTransfers: Int64
+    let initialBalanceAdded: Int64?
+    let items: [SavingsGoalItemModel]
+}
+
+struct SavingsGoalItemModel: Decodable, Identifiable, Sendable {
+    var id: String { walletID }
+    let walletID: String
+    let name: String
+    let openingBalance: Int64
+    let closingBalance: Int64
+    let deposits: Int64
+    let withdrawals: Int64
+    let adjustments: Int64
+    let netChange: Int64
+    let internalTransfers: Int64
+    let initialBalanceAdded: Int64?
+    let targetAmount: Int64?
+    let targetDate: String?
+    let remaining: Int64
+    let progressBPS: Int64?
+    let reached: Bool
+    let transactionCount: Int
+}
+
+struct SavingsSurplusModel: Decodable, Sendable {
+    let scope: String
+    let income: Int64
+    let expense: Int64
+    let net: Int64
+    let savingsRateBPS: Int64?
+    let transactionCount: Int
+}
+
+struct ReportTransactionPageModel: Decodable, Sendable {
+    let items: [TransactionModel]
+    let total: Int
+    let limit: Int
+    let offset: Int
+    let month: String?
+    let timezone: String?
+    let asOf: String?
+}
+
+struct BudgetReportModel: Decodable, Sendable {
+    let budgetID: String
+    let timezone: String
+    let asOf: String
+    let startDate: String
+    let endDate: String
+    let baseLimitAmount: Int64
+    let carryoverAmount: Int64
+    let effectiveLimitAmount: Int64
+    let spent: Int64
+    let remaining: Int64
+    let forecast: BudgetForecastModel
+    let daily: [BudgetDailyModel]
+}
+
+struct BudgetForecastModel: Decodable, Sendable {
+    let status: String
+    let method: String
+    let elapsedDays: Int
+    let totalDays: Int
+    let projectedSpent: Int64?
+    let projectedRemaining: Int64?
+    let overBudget: Bool?
+
+    var statusLabel: String {
+        switch status {
+        case "estimated": "Ước tính theo nhịp chi hiện tại"
+        case "actual": "Đã kết thúc · Chi tiêu thực tế"
+        case "not_started": "Chưa bắt đầu · Chưa có dự báo"
+        default: "Dự báo chưa khả dụng"
+        }
+    }
+}
+
+struct BudgetDailyModel: Decodable, Identifiable, Sendable {
+    var id: String { date }
+    let date: String
+    let spent: Int64
+}
+
+struct BudgetSeriesListModel: Decodable, Sendable {
+    let items: [BudgetSeriesModel]
+}
+
+struct BudgetSeriesModel: Decodable, Identifiable, Sendable {
+    let id: String
+    let ownerID: String
+    let cadence: BudgetCadence
+    let startDate: String
+    let active: Bool
+    let version: Int64
+    let generationError: String?
+    let currentConfig: BudgetSeriesConfigModel
+    let pendingConfig: BudgetSeriesConfigModel?
+
+    var editableConfig: BudgetSeriesConfigModel { pendingConfig ?? currentConfig }
+}
+
+struct BudgetSeriesConfigModel: Decodable, Sendable {
+    let effectiveStartDate: String
+    let name: String
+    let limitAmount: Int64
+    let walletID: String?
+    let categoryID: String?
+    let carryoverEnabled: Bool
+}
+
+struct BudgetSeriesCreateInput: Encodable, Sendable {
+    let name: String
+    let limitAmount: Int64
+    let walletID: String?
+    let categoryID: String?
+    let cadence: BudgetCadence
+    let startDate: String
+    let carryoverEnabled: Bool
+}
+
+struct BudgetSeriesUpdateInput: Encodable, Sendable {
+    let version: Int64
+    let name: String
+    let limitAmount: Int64
+    let walletID: String?
+    let categoryID: String?
+    let carryoverEnabled: Bool
 }
 
 struct BudgetSummaryModel: Codable, Sendable {

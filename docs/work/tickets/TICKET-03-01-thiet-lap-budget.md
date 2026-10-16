@@ -15,7 +15,15 @@ Ticket lớn: [Theo dõi budget](TICKET-03-budget.md).
 
 ## Mục tiêu và phạm vi
 
-Explicit-interval CRUD implemented and API-verified in [API-SCREENS-01](API-SCREENS-01-DETAIL_DESIGN.md), with overlap protection and ended-period read/delete only. Recurring/fixed-period choices and owner acceptance remain pending; full ticket not complete.
+Explicit-interval CRUD is implemented with overlap protection and ended-period
+read/delete only. The 2026-10-16 local candidate also implements canonical
+weekly/monthly/quarterly/yearly recurring series with versioned next-period
+configuration, stop, idempotency and optional positive carryover. Generated
+periods are managed through their series. See the
+[design](../../superpowers/specs/2026-10-16-savings-budget-design.md),
+[API](../../guides/budget-recurrence-api.md) and
+[validation](../VALIDATION_MATRIX.md). Production rollout and owner/device
+acceptance remain pending; the full ticket is not marked done.
 
 Tạo/sửa/xóa budget theo ví, danh mục, kỳ và lựa chọn lặp.
 

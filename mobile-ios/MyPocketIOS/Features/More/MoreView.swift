@@ -209,7 +209,7 @@ struct SecondaryScreen: View {
                     onBack: onBack,
                     onAIEntry: onOpenAIEntry
                 )
-            case .budgets: BudgetsView(api: api, onBack: onBack, masked: masked)
+            case .budgets: BudgetsView(api: api, onBack: onBack, masked: masked, ownerID: assistantOwnerID)
             case .reports: ReportsView(api: api, onBack: onBack, masked: masked, ownerID: assistantOwnerID, snapshotCache: auth.financialCache)
             case .categories: CategoriesView(api: api, onBack: onBack)
             case .jars: JarsView(api: api, onBack: onBack, masked: masked)

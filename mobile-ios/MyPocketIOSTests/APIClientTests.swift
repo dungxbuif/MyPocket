@@ -36,6 +36,62 @@ private func captureHTTPStandardOutput(_ action: () async throws -> Void) async 
 }
 
 final class APIClientTests: XCTestCase {
+    func testSavingsAndBudgetReportsPreserveServerScopeAndPagination() async throws {
+        let page = #"{"data":{"items":[],"total":125,"limit":50,"offset":50,"month":"2026-10","timezone":"Asia/Ho_Chi_Minh","as_of":"2026-10-16T12:00:00Z"}}"#
+        let transport = SavingsBudgetContractTransport(payload: page)
+        let api = FinanceAPI(client: APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: transport, sessionStore: TestSessionStore(session: testSession)))
+        let result = try await api.savingsTransactions(month: "2026-10", walletID: "goal", section: "goals", kind: "transfer", offset: 50, ownerID: testSession.user.id)
+        XCTAssertEqual(result.total, 125)
+        XCTAssertEqual(result.offset, 50)
+        _ = try await api.budgetTransactions(id: "budget", offset: 50, ownerID: testSession.user.id)
+        let requests = await transport.requests
+        let savingsURL = try XCTUnwrap(requests.first?.url)
+        let query = Dictionary(uniqueKeysWithValues: URLComponents(url: savingsURL, resolvingAgainstBaseURL: false)!.queryItems!.map { ($0.name, $0.value!) })
+        XCTAssertEqual(savingsURL.path, "/api/v1/reports/savings/transactions")
+        XCTAssertEqual(query, ["month":"2026-10", "wallet_id":"goal", "section":"goals", "kind":"transfer", "limit":"50", "offset":"50"])
+        XCTAssertEqual(requests.last?.url?.path, "/api/v1/budgets/budget/transactions")
+        XCTAssertEqual(requests.last?.url?.query, "limit=50&offset=50")
+    }
+
+    func testVersionedSeriesMutationsSendStableKeyAndFullConfiguration() async throws {
+        let payload = #"{"data":{"id":"series","owner_id":"owner","cadence":"monthly","start_date":"2026-10-01","active":true,"version":3,"generation_error":null,"current_config":{"effective_start_date":"2026-10-01","name":"Food","limit_amount":5000000,"wallet_id":null,"category_id":null,"carryover_enabled":false},"pending_config":null}}"#
+        let transport = SavingsBudgetContractTransport(payload: payload)
+        let api = FinanceAPI(client: APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: transport, sessionStore: TestSessionStore(session: testSession)))
+        let input = BudgetSeriesUpdateInput(version: 2, name: "New", limitAmount: 6_000_000, walletID: "wallet", categoryID: "category", carryoverEnabled: true)
+        _ = try await api.updateBudgetSeries(id: "series", input: input, idempotencyKey: "same-retry-key", ownerID: testSession.user.id)
+        _ = try await api.updateBudgetSeries(id: "series", input: input, idempotencyKey: "same-retry-key", ownerID: testSession.user.id)
+        _ = try await api.stopBudgetSeries(id: "series", version: 3, idempotencyKey: "stop-key", ownerID: testSession.user.id)
+        let requests = await transport.requests
+        XCTAssertEqual(requests[0].httpMethod, "PATCH")
+        XCTAssertEqual(requests[0].url?.path, "/api/v1/budget-series/series")
+        XCTAssertEqual(requests[0].httpBody, requests[1].httpBody)
+        XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Idempotency-Key"), "same-retry-key")
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), "same-retry-key")
+        let body = try XCTUnwrap(JSONSerialization.jsonObject(with: requests[0].httpBody!) as? [String: Any])
+        XCTAssertEqual(body["version"] as? Int, 2)
+        XCTAssertEqual(body["limit_amount"] as? Int, 6_000_000)
+        XCTAssertEqual(body["wallet_id"] as? String, "wallet")
+        XCTAssertEqual(body["category_id"] as? String, "category")
+        XCTAssertEqual(body["carryover_enabled"] as? Bool, true)
+        XCTAssertNil(body["cadence"])
+        XCTAssertNil(body["start_date"])
+        XCTAssertEqual(requests[2].url?.path, "/api/v1/budget-series/series/stop")
+        XCTAssertEqual(requests[2].httpMethod, "POST")
+        let stopBody = try XCTUnwrap(JSONSerialization.jsonObject(with: requests[2].httpBody!) as? [String: Int])
+        XCTAssertEqual(stopBody, ["version": 3])
+    }
+
+    func testSavingsReportOldServerAndWrongOwnerFailWithoutFabricatedPayload() async throws {
+        let transport = SavingsBudgetContractTransport(payload: #"{"detail":"Not found"}"#, statusCode: 404)
+        let api = FinanceAPI(client: APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: transport, sessionStore: TestSessionStore(session: testSession)))
+        do { _ = try await api.savingsReport(month: "2026-10", ownerID: testSession.user.id); XCTFail("Missing route must fail") }
+        catch { XCTAssertNotNil(error as? APIError) }
+        do { _ = try await api.savingsReport(month: "2026-10", ownerID: "another-owner"); XCTFail("Wrong account must fail") }
+        catch { XCTAssertEqual(error as? APIError, .accountMismatch) }
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 1, "Wrong-owner reads never reach the network")
+    }
+
     func testAdvisorHistoryPreservesCursorAndChronologicalStructuredMessages() async throws {
         let transport = AdvisorContractTransport(payloads: [
             try advisorHistoryPayload(sequences: [54, 53, 52]),
@@ -818,6 +874,17 @@ final class APIClientTests: XCTestCase {
         let data = ScreenSnapshot.pngData(for: image)
         XCTAssertNotNil(data)
         XCTAssertLessThanOrEqual(data?.count ?? Int.max, 1 << 20)
+    }
+}
+
+private actor SavingsBudgetContractTransport: HTTPTransport {
+    let payload: String
+    let statusCode: Int
+    private(set) var requests: [URLRequest] = []
+    init(payload: String, statusCode: Int = 200) { self.payload = payload; self.statusCode = statusCode }
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        requests.append(request)
+        return (Data(payload.utf8), HTTPURLResponse(url: request.url!, statusCode: statusCode, httpVersion: nil, headerFields: nil)!)
     }
 }
 

@@ -4,6 +4,73 @@ import XCTest
 
 @MainActor
 final class FinanceModelTests: XCTestCase {
+    func testOldBudgetResponseKeepsBaseLimitWithoutInventingCarry() throws {
+        let data = Data(#"{"id":"b","name":"Food","limit_amount":5000000,"start_date":"2026-10-01","end_date":"2026-10-31","spent":1000000,"days_remaining":15,"ended":false}"#.utf8)
+        let budget = try JSONDecoder.mypocket.decode(BudgetModel.self, from: data)
+        XCTAssertNil(budget.seriesID)
+        XCTAssertNil(budget.carryoverAmount)
+        XCTAssertEqual(budget.displayLimitAmount, 5_000_000)
+        XCTAssertFalse(budget.isSeriesManaged)
+    }
+
+    func testGeneratedBudgetUsesEffectiveLimitForPresentation() throws {
+        let data = Data(#"{"id":"b","name":"Food","limit_amount":5000000,"base_limit_amount":5000000,"carryover_amount":2000000,"effective_limit_amount":7000000,"series_id":"series","start_date":"2026-10-01","end_date":"2026-10-31","spent":1000000,"days_remaining":15,"ended":false}"#.utf8)
+        let budget = try JSONDecoder.mypocket.decode(BudgetModel.self, from: data)
+        XCTAssertEqual(budget.displayLimitAmount, 7_000_000)
+        XCTAssertTrue(budget.isSeriesManaged)
+    }
+
+    func testSavingsSeparatesSurplusAndGoalBalancesAndKeepsNullRate() throws {
+        let data = Data(#"{"month":"2026-10","timezone":"Asia/Ho_Chi_Minh","as_of":"2026-10-16T12:00:00Z","goals":{"opening_balance":0,"closing_balance":5000000,"deposits":0,"withdrawals":0,"adjustments":0,"net_change":5000000,"internal_transfers":5000000,"items":[]},"surplus":{"scope":"account","income":20000000,"expense":12000000,"net":8000000,"savings_rate_bps":4000,"transaction_count":2}}"#.utf8)
+        let report = try JSONDecoder.mypocket.decode(SavingsReportModel.self, from: data)
+        XCTAssertEqual(report.goals.closingBalance, 5_000_000)
+        XCTAssertEqual(report.surplus.net, 8_000_000)
+        XCTAssertEqual(report.surplus.savingsRateBPS, 4000)
+        let zero = Data(#"{"scope":"account","income":0,"expense":1,"net":-1,"savings_rate_bps":null,"transaction_count":1}"#.utf8)
+        XCTAssertNil(try JSONDecoder.mypocket.decode(SavingsSurplusModel.self, from: zero).savingsRateBPS)
+    }
+
+    func testBudgetForecastDistinguishesEstimateAndUnavailableFuture() throws {
+        let data = Data(#"{"status":"estimated","method":"linear_daily_v1","elapsed_days":3,"total_days":30,"projected_spent":3000000,"projected_remaining":2000000,"over_budget":false}"#.utf8)
+        let estimate = try JSONDecoder.mypocket.decode(BudgetForecastModel.self, from: data)
+        XCTAssertEqual(estimate.projectedSpent, 3_000_000)
+        XCTAssertEqual(estimate.statusLabel, "Ước tính theo nhịp chi hiện tại")
+        let future = Data(#"{"status":"not_started","method":"linear_daily_v1","elapsed_days":0,"total_days":30,"projected_spent":null,"projected_remaining":null,"over_budget":null}"#.utf8)
+        let forecast = try JSONDecoder.mypocket.decode(BudgetForecastModel.self, from: future)
+        XCTAssertNil(forecast.projectedSpent)
+        XCTAssertNil(forecast.overBudget)
+        XCTAssertEqual(forecast.statusLabel, "Chưa bắt đầu · Chưa có dự báo")
+    }
+
+    func testBudgetCadenceCanonicalStartUsesAccountCalendar() throws {
+        let zone = try XCTUnwrap(TimeZone(identifier: "Asia/Ho_Chi_Minh"))
+        let date = try XCTUnwrap(MPFormat.parseCalendarDate("2026-10-16", timeZone: zone))
+        XCTAssertEqual(BudgetCadence.monthly.canonicalStart(date, timeZone: zone), "2026-10-01")
+        XCTAssertEqual(BudgetCadence.quarterly.canonicalStart(date, timeZone: zone), "2026-10-01")
+        XCTAssertEqual(BudgetCadence.yearly.canonicalStart(date, timeZone: zone), "2026-01-01")
+        XCTAssertEqual(BudgetCadence.weekly.canonicalStart(date, timeZone: zone), "2026-10-12")
+    }
+
+    func testSeriesPendingConfigurationIsEditableWithoutReplacingCurrentSnapshot() throws {
+        let data = Data(#"{"items":[{"id":"series","owner_id":"owner","cadence":"monthly","start_date":"2026-10-01","active":true,"version":2,"generation_error":null,"current_config":{"effective_start_date":"2026-10-01","name":"Food","limit_amount":5000000,"wallet_id":null,"category_id":null,"carryover_enabled":false},"pending_config":{"effective_start_date":"2026-11-01","name":"Food next","limit_amount":6000000,"wallet_id":null,"category_id":null,"carryover_enabled":true}}]}"#.utf8)
+        let item = try XCTUnwrap(JSONDecoder.mypocket.decode(BudgetSeriesListModel.self, from: data).items.first)
+        XCTAssertEqual(item.version, 2)
+        XCTAssertEqual(item.currentConfig.limitAmount, 5_000_000)
+        XCTAssertEqual(item.editableConfig.limitAmount, 6_000_000)
+        XCTAssertEqual(item.editableConfig.effectiveStartDate, "2026-11-01")
+        XCTAssertTrue(item.editableConfig.carryoverEnabled)
+    }
+
+    func testSavingsGoalProgressBasisPointsAndLedgerActivityDecode() throws {
+        let data = Data(#"{"wallet_id":"goal","name":"Trip","opening_balance":1000000,"closing_balance":6000000,"deposits":2000000,"withdrawals":1000000,"adjustments":-1000000,"net_change":5000000,"internal_transfers":5000000,"target_amount":10000000,"target_date":"2027-01-01","remaining":4000000,"progress_bps":6000,"reached":false,"transaction_count":5}"#.utf8)
+        let goal = try JSONDecoder.mypocket.decode(SavingsGoalItemModel.self, from: data)
+        XCTAssertEqual(goal.walletID, "goal")
+        XCTAssertEqual(goal.progressBPS, 6000)
+        XCTAssertEqual(goal.internalTransfers, 5_000_000)
+        XCTAssertEqual(goal.adjustments, -1_000_000)
+        XCTAssertFalse(goal.reached)
+    }
+
     func testReportsMonthPolicyAcceptsOnlyRealCalendarMonths() {
         XCTAssertTrue(ReportsMonthPolicy.isValid("2026-01"))
         XCTAssertTrue(ReportsMonthPolicy.isValid("2026-12"))
