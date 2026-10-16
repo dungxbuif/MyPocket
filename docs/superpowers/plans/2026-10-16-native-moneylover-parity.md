@@ -159,8 +159,8 @@
 - Consumes: all completed visual waves and their screenshot evidence.
 - Produces: reconciled parity checklist, release notes, and an installable Personal-Team device build.
 
-- [ ] Step 1: Run `rtk git diff --check` and a base-component audit (`rg` for screen-local font/color/radius/interactive declarations).
-- [ ] Step 2: Run the complete native XCTest suite and record pass/fail counts.
-- [ ] Step 3: Build Release for Simulator and iPhone with warnings-as-errors; verify the iPhone artifact is signed with `AU442S3MN3` and the personal entitlements fallback.
-- [ ] Step 4: Install and launch with `devicectl`, capture every release-gate screen, and reconcile deltas against the reference checklist.
-- [ ] Step 5: Update docs/changelog with exact remaining gaps; only then commit `release: native parity checkpoint`.
+- [x] Step 1: Run `rtk git diff --check` and a base-component audit (`rg` for screen-local font/color/radius/interactive declarations).
+- [x] Step 2: Run the complete native XCTest suite and record pass/fail counts.
+- [x] Step 3: Build Release for Simulator and iPhone with warnings-as-errors; verify the iPhone artifact is signed with `AU442S3MN3` and the personal entitlements fallback.
+- [x] Step 4: Install and launch with `devicectl`, capture every release-gate screen, and reconcile deltas against the reference checklist.
+- [x] Step 5: Update docs/changelog with exact remaining gaps; only then commit `release: native parity checkpoint`.
