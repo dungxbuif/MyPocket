@@ -59,11 +59,11 @@
 - Consumes: Task 1 tokens/icons; existing `AppRouteCoordinator` and `MainTabView` selection bindings.
 - Produces: Money Lover-like safe-area shell, centered add action, selected-tab capsule, feedback bubble dock, and route-safe tab transitions without changing route values.
 
-- [ ] Step 1: Add failing layout/route assertions for five destinations, centered add hit target, selected tab state, hidden tab bar while keyboard is visible, and no feedback lane reservation.
-- [ ] Step 2: Run focused XCTest/UI smoke and confirm failures identify the current shell mismatch.
-- [ ] Step 3: Implement shell changes through `MPBottomNavigation`, shared header, and feedback dock; leave feature content untouched.
-- [ ] Step 4: Run focused tests plus the route sweep; verify deep links, auth pending-route consumption, back behavior, and tab selection.
-- [ ] Step 5: Build Release for Simulator with warnings-as-errors and commit `feat(native): align parity shell`.
+- [x] Step 1: Add failing layout/route assertions for five destinations, centered add hit target, selected tab state, hidden tab bar while keyboard is visible, and no feedback lane reservation.
+- [x] Step 2: Run focused XCTest/UI smoke and confirm failures identify the current shell mismatch.
+- [x] Step 3: Implement shell changes through `MPBottomNavigation`, shared header, and feedback dock; leave feature content untouched.
+- [x] Step 4: Run focused tests plus the route sweep; verify deep links, auth pending-route consumption, back behavior, and tab selection.
+- [x] Step 5: Build Release for Simulator with warnings-as-errors and commit `feat(native): align parity shell`.
 
 ### Task 3: Port Account screen to the reference anatomy
 
