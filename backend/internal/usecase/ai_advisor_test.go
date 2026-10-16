@@ -181,6 +181,33 @@ func TestAdvisorServiceCancelInterruptsInFlightProvider(t *testing.T) {
 	}
 }
 
+func TestAdvisorServiceBeginReturnsRunBeforeProviderCompletes(t *testing.T) {
+	provider := &blockingAdvisorProvider{started: make(chan struct{}), cancelled: make(chan struct{})}
+	store := &cancellableAdvisorStore{run: &entity.AdvisorRun{ID: "run-async", OwnerID: "owner-1", ConversationID: "conversation-1", Generation: 1, Status: entity.AdvisorStatusQueued}, message: &entity.AdvisorMessage{ID: "msg-1", Parts: []entity.AdvisorPart{{Type: "text", Text: "question"}}}}
+	service := NewAdvisorService(store, NewAdvisorOrchestrator(provider, NewAdvisorToolRegistry(NewFinanceQueryService(&financeReaderStub{}))))
+
+	run, replay, err := service.Begin(context.Background(), Principal{OwnerID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}, repository.AdvisorRunInput{RequestID: "req-async", PayloadHash: "hash", Parts: []entity.AdvisorPart{{Type: "text", Text: "question"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if replay || run == nil || run.ID != "run-async" {
+		t.Fatalf("begin must return the queued run immediately: run=%+v replay=%v", run, replay)
+	}
+	select {
+	case <-provider.started:
+	case <-time.After(time.Second):
+		t.Fatal("async begin did not start provider")
+	}
+	if err := service.Cancel(context.Background(), "owner-1", run.ID); err != nil {
+		t.Fatal(err)
+	}
+	select {
+	case <-provider.cancelled:
+	case <-time.After(time.Second):
+		t.Fatal("async cancellation did not interrupt provider")
+	}
+}
+
 func TestAdvisorServiceResetInterruptsPurgedProviderRunsOnlyOnce(t *testing.T) {
 	cancelled := make(chan struct{})
 	store := &advisorResetStore{result: &entity.AdvisorResetResult{ConversationID: "conversation-1", Generation: 2, PurgedRunIDs: []string{"run-reset"}}}

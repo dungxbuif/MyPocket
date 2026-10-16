@@ -419,6 +419,12 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/advisor/messages", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
     }
 
+    /// Starts the advisor run without waiting for provider completion. The
+    /// returned run ID lets the UI cancel even the first request.
+    func beginAdvisorMessage(_ input: AdvisorMessageInputModel) async throws -> AdvisorAsyncSubmitModel {
+        try await client.send(APIRequest(path: "/ai/advisor/messages/async", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
     /// Confirms a server-persisted assistant action. Financial fields are
     /// deliberately absent from this request: the backend resolves the
     /// proposal by owner, conversation, generation, and action ID, then

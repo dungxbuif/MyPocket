@@ -548,17 +548,11 @@ struct AssistantView: View {
         guard AssistantComposerPolicy.canSend(enabled: capabilities?.enabled == true, text: text, activeRunID: activeRunID) else { return }
         sending = true; error = nil; defer { sending = false }
         do {
-            let result = try await api.submitAdvisorMessage(AdvisorMessageInputModel(clientRequestID: UUID().uuidString, text: text))
+            let result = try await api.beginAdvisorMessage(AdvisorMessageInputModel(clientRequestID: UUID().uuidString, text: text))
             conversationID = result.conversationID
             UserDefaults.standard.set(result.conversationID, forKey: Self.conversationKey(ownerID: ownerID))
             activeRunID = result.runID
             input = ""
-            if result.status == "purged" {
-                input = text
-                clearExpiredConversation()
-                self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
-                return
-            }
             if result.status == "queued" || result.status == "running" {
                 var completed = false
                 for _ in 0..<60 {

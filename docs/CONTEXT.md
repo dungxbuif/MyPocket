@@ -22,7 +22,25 @@ shared_fields:
 updated: 2026-10-15
 ---
 
-## Current checkpoint — 2026-10-15 22:54 +0700
+## Current checkpoint — 2026-10-16 19:46 +0700
+
+The local async Finance Assistant cancellation slice is now verified. Backend
+`go test ./...` and `go test -race ./...` both pass 296/296 across 16 packages;
+`go vet ./...` is clean. The local OpenAPI surface is 78 paths and includes
+`POST /api/v1/ai/advisor/messages/async`. The synchronous advisor endpoint is
+unchanged; the async endpoint reserves an owner-scoped run before provider work
+and returns `202`, allowing the first request to be cancelled through the
+existing run-cancel route. The native composer now uses this endpoint and polls
+the existing run resource. The iOS simulator unit target passes 304/304 with
+zero skips, failures, or runtime warnings at
+`/tmp/mypocket-async-unit-20261016.xcresult`.
+
+This slice is local and uncommitted at the checkpoint. Production still serves
+the previously deployed 77-path image; no production rollout, database change,
+provider call, or device install was performed for the async endpoint. Owner-
+authenticated production UAT and physical-device acceptance remain open.
+
+## Previous checkpoint — 2026-10-15 22:54 +0700
 
 Latest authoritative state: release tag `v1.1.0` is deployed and
 `mypocket-api` plus `mypocket-worker` both run

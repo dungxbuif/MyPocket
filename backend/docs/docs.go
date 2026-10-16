@@ -292,6 +292,50 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/ai/advisor/messages/async": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Queue a Finance Assistant question and return its run immediately",
+                "parameters": [
+                    {
+                        "description": "Question",
+                        "name": "message",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.advisorMessageInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Idempotent replay",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.advisorAsyncSubmitResponse"
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.advisorAsyncSubmitResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ai/advisor/overview": {
             "get": {
                 "security": [
@@ -5629,6 +5673,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "text": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.advisorAsyncSubmitResponse": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "string"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "status": {
                     "type": "string"
                 }
             }

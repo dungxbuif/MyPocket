@@ -67,6 +67,44 @@ func (s *AdvisorService) ResetConversation(ctx context.Context, ownerID, request
 	return result, nil
 }
 
+// Begin reserves a run and starts the bounded provider loop asynchronously.
+// The returned run is visible to the caller before provider work completes, so
+// the caller can cancel the first request through the run endpoint.
+func (s *AdvisorService) Begin(ctx context.Context, principal Principal, input repository.AdvisorRunInput) (*entity.AdvisorRun, bool, error) {
+	if s == nil || s.Store == nil || s.Orchestrator == nil || strings.TrimSpace(principal.OwnerID) == "" || !s.Enabled() {
+		return nil, false, ErrAdvisorProviderUnavailable
+	}
+	terminalCtx := context.WithoutCancel(ctx)
+	if s.Orchestrator.Validator != nil {
+		if err := s.Orchestrator.Validator.Validate(ctx, principal); err != nil {
+			return nil, false, fmt.Errorf("%w: %v", ErrAdvisorPrincipalInvalid, err)
+		}
+	}
+	input.OwnerID = principal.OwnerID
+	run, userMessage, replay, err := s.Store.StartRun(ctx, input)
+	if err != nil {
+		return nil, false, err
+	}
+	if replay {
+		return run, true, nil
+	}
+	runCtx, cancel := context.WithCancel(terminalCtx)
+	s.registerCancellation(run.ID, cancel)
+	if err := s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusRunning, s.now()); err != nil {
+		s.unregisterCancellation(run.ID)
+		cancel()
+		return nil, false, err
+	}
+	run.Status = entity.AdvisorStatusRunning
+	go func() {
+		defer s.unregisterCancellation(run.ID)
+		if _, err := s.completeRun(runCtx, terminalCtx, principal, run, userMessage); err != nil {
+			_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
+		}
+	}()
+	return run, false, nil
+}
+
 func (s *AdvisorService) Submit(ctx context.Context, principal Principal, input repository.AdvisorRunInput) (AdvisorAnswer, error) {
 	if s == nil || s.Store == nil || s.Orchestrator == nil || strings.TrimSpace(principal.OwnerID) == "" || !s.Enabled() {
 		return AdvisorAnswer{}, ErrAdvisorProviderUnavailable
@@ -88,12 +126,16 @@ func (s *AdvisorService) Submit(ctx context.Context, principal Principal, input 
 		}
 		return AdvisorAnswer{}, repository.ErrAdvisorBusy
 	}
-	runCtx, cancel := context.WithCancel(ctx)
+	runCtx, cancel := context.WithCancel(terminalCtx)
 	s.registerCancellation(run.ID, cancel)
 	defer s.unregisterCancellation(run.ID)
 	if err := s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusRunning, s.now()); err != nil {
 		return AdvisorAnswer{}, err
 	}
+	return s.completeRun(runCtx, terminalCtx, principal, run, userMessage)
+}
+
+func (s *AdvisorService) completeRun(runCtx, terminalCtx context.Context, principal Principal, run *entity.AdvisorRun, userMessage *entity.AdvisorMessage) (AdvisorAnswer, error) {
 	messages, err := s.Store.ListMessages(runCtx, principal.OwnerID, run.ConversationID, 0, 50)
 	if err != nil {
 		_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
@@ -109,7 +151,7 @@ func (s *AdvisorService) Submit(ctx context.Context, principal Principal, input 
 		return AdvisorAnswer{}, err
 	}
 	if s.Orchestrator.Validator != nil {
-		if err := s.Orchestrator.Validator.Validate(ctx, principal); err != nil {
+		if err := s.Orchestrator.Validator.Validate(terminalCtx, principal); err != nil {
 			_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
 			return AdvisorAnswer{}, fmt.Errorf("%w: %v", ErrAdvisorPrincipalInvalid, err)
 		}

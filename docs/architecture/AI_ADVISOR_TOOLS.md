@@ -115,6 +115,18 @@ still hides expired content. The local native header now exposes an explicit
 idempotent “Chat mới” reset; history metadata is additive, and the reset/expiry
 routes are present in the current production OpenAPI; owner-authenticated production UAT remains open.
 
+### Async initial-run cancellation (implemented locally; production rollout open)
+
+The synchronous `POST /messages` contract remains unchanged. A separate
+`POST /messages/async` contract reserves and returns the owner-scoped
+`run_id` before provider work starts (`202 Accepted`), so the client can call
+`POST /runs/{id}/cancel` during the first request. The server will execute the
+same bounded tool loop in the background, persist the same message/event/usage
+records, and keeps idempotent `client_request_id` replay semantics. The native
+composer uses this endpoint and polls the existing run resource. Tests prove
+immediate run visibility, cancellation before provider completion, and
+unchanged synchronous behavior; owner-authenticated production UAT remains.
+
 All listed routes use the same owner credential authority. Create/list/revoke keys through `/api/v1/api-keys` with JWT or owner key; secret is shown once and only its hash persists. See [full-key guide](../guides/api-keys.md). Advisor auth still audits best-effort to Redis stream `mypocket:audit:advisor` with request/credential ID, route, status, decision and latency; no prompts, notes, tokens or monetary rows. `POST /messages` waits for the bounded provider/tool loop and returns JSON. SSE, lost-POST recovery, conversation clear, fact-bundle drilldown and durable audit delivery remain separate gates.
 
 The native Assistant loads recent messages, exposes “Tải tin cũ” when another

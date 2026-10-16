@@ -44,6 +44,12 @@ type advisorSubmitResponse struct {
 	Status         string `json:"status"`
 }
 
+type advisorAsyncSubmitResponse struct {
+	RunID          string `json:"run_id"`
+	ConversationID string `json:"conversation_id"`
+	Status         string `json:"status"`
+}
+
 type advisorConfirmActionInput struct {
 	ConversationID string `json:"conversation_id"`
 	Generation     int64  `json:"generation"`
@@ -57,6 +63,7 @@ func (r *Router) RegisterAdvisorRoutes(h *AdvisorHandler) {
 	g.GET("/conversation/messages", h.Messages)
 	g.POST("/conversation/reset", h.ResetConversation)
 	g.POST("/messages", h.MessagesPost)
+	g.POST("/messages/async", h.MessagesPostAsync)
 	g.POST("/actions/:action_id/confirm", h.ConfirmAction)
 	g.GET("/runs/:id", h.Run)
 	g.POST("/runs/:id/cancel", h.Cancel)
@@ -452,6 +459,68 @@ func (h *AdvisorHandler) MessagesPost(c *gin.Context) {
 		return
 	}
 	OK(c, advisorSubmitResponse{RunID: run.ID, ConversationID: run.ConversationID, Text: answer.Text, Status: run.Status})
+}
+
+// AdvisorMessagesPostAsync godoc
+// @Summary Queue a Finance Assistant question and return its run immediately
+// @Tags AI Advisor
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param message body advisorMessageInput true "Question"
+// @Success 202 {object} advisorAsyncSubmitResponse
+// @Success 200 {object} advisorAsyncSubmitResponse "Idempotent replay"
+// @Router /api/v1/ai/advisor/messages/async [post]
+func (h *AdvisorHandler) MessagesPostAsync(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Service == nil || h.Users == nil {
+		advisorFailure(c, errors.New("advisor unavailable"))
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16*1024)
+	var input advisorMessageInput
+	if c.ShouldBindJSON(&input) != nil || strings.TrimSpace(input.Text) == "" || len(input.Text) > 8192 {
+		advisorBadRequest(c)
+		return
+	}
+	if strings.TrimSpace(input.ClientRequestID) == "" {
+		input.ClientRequestID = uuid.NewString()
+	}
+	if len(input.ClientRequestID) > 128 {
+		advisorBadRequest(c)
+		return
+	}
+	user, err := h.Users.FindByID(owner)
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	hash := sha256.Sum256([]byte(input.Text))
+	principal := advisorPrincipal(c, owner)
+	principal.Timezone = user.Timezone
+	run, replay, err := h.Service.Begin(c.Request.Context(), principal, repository.AdvisorRunInput{
+		OwnerID: owner, CredentialKind: principal.CredentialKind, CredentialID: principal.CredentialID,
+		ExpiresAt: timePtr(principal.ExpiresAt), RequestID: input.ClientRequestID,
+		PayloadHash: hex.EncodeToString(hash[:]), Parts: []entity.AdvisorPart{{Type: "text", Text: input.Text}},
+	})
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	response := advisorAsyncSubmitResponse{RunID: run.ID, ConversationID: run.ConversationID, Status: run.Status}
+	if replay {
+		if run.Status != entity.AdvisorStatusCompleted {
+			advisorFailure(c, repository.ErrAdvisorBusy)
+			return
+		}
+		OK(c, response)
+		return
+	}
+	c.JSON(http.StatusAccepted, Response{Data: response, Meta: nil})
 }
 
 // AdvisorRun godoc

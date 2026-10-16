@@ -866,6 +866,15 @@ definitions:
       text:
         type: string
     type: object
+  httpapi.advisorAsyncSubmitResponse:
+    properties:
+      conversation_id:
+        type: string
+      run_id:
+        type: string
+      status:
+        type: string
+    type: object
   httpapi.aiProposalDecision:
     properties:
       version:
@@ -1465,6 +1474,33 @@ paths:
       security:
       - BearerAuth: []
       summary: Submit a Finance Assistant read-only question
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/messages/async:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Question
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.advisorMessageInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Idempotent replay
+          schema:
+            $ref: '#/definitions/httpapi.advisorAsyncSubmitResponse'
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/httpapi.advisorAsyncSubmitResponse'
+      security:
+      - BearerAuth: []
+      summary: Queue a Finance Assistant question and return its run immediately
       tags:
       - AI Advisor
   /api/v1/ai/advisor/overview:

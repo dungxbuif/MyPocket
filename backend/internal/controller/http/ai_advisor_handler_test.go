@@ -145,6 +145,7 @@ func TestAdvisorRoutesExposeConversationSurface(t *testing.T) {
 		"GET /api/v1/ai/advisor/capabilities",
 		"GET /api/v1/ai/advisor/overview",
 		"POST /api/v1/ai/advisor/messages",
+		"POST /api/v1/ai/advisor/messages/async",
 		"GET /api/v1/ai/advisor/conversation/messages",
 		"POST /api/v1/ai/advisor/conversation/reset",
 		"GET /api/v1/ai/advisor/runs/:id",

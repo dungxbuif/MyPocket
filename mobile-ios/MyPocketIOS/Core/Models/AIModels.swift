@@ -96,6 +96,12 @@ struct AdvisorSubmitModel: Codable, Sendable {
     var status: String
 }
 
+struct AdvisorAsyncSubmitModel: Codable, Sendable {
+    var runID: String
+    var conversationID: String
+    var status: String
+}
+
 struct AdvisorResetModel: Codable, Sendable {
     var conversationID: String
     var generation: Int64
