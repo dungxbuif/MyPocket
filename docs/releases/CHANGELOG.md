@@ -938,6 +938,21 @@ This file is the first-release baseline for the current MyPocket snapshot. Earli
 development notes remain available in Git history and are intentionally not presented
 as active release entries here.
 
+## [Unreleased] - 2026-10-13
+
+### Changed
+
+- Production now routes `money.dungxbuif.com` directly to the Go API and keeps
+  the deployed web service scaled to zero. The iOS app's `/api/v1` base path,
+  API health, and Swagger docs remain available.
+
+### Verification
+
+- Production API and worker are 1/1; web is 0/0. Public health and Swagger UI
+  return HTTP 200; the origin root no longer serves the web bundle.
+- No database, schema, migration, credential, or financial data operation was
+  performed.
+
 ## [Unreleased] - 2026-10-07
 
 ### Fixed

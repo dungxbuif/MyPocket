@@ -1,5 +1,15 @@
 # Deployment
 
+## API-only production mode — 2026-10-13
+
+The production origin routes directly to the Go API. `mypocket-api` and
+`mypocket-worker` remain 1/1; `mypocket-web` is intentionally 0/0. The mobile
+base URL remains `https://money.dungxbuif.com/api/v1`; health is
+`/api/v1/health` and Swagger is `/api/v1/docs/index.html`. No database,
+schema, migration, credential, or financial data operation is part of this
+topology change. Restore the web route/service only with explicit owner
+approval, using the recorded rollback backup below.
+
 ## SQL diagnostics privacy — local implementation, rollout pending
 
 The shared Go PostgreSQL adapter now keeps only statement class (SELECT/INSERT/
@@ -35,16 +45,24 @@ announcement.
 
 | Surface | Target |
 | --- | --- |
-| Web/API | `https://money.dungxbuif.com` |
+| API origin | `https://money.dungxbuif.com` |
 | Edge | Traefik on the gateway host, routed through the homelab Swarm edge |
 | Runtime node | Swarm node `vm100-prod` (`linux/amd64`) |
-| Services | `mypocket-api`, `mypocket-worker`, `mypocket-web` |
+| Services | `mypocket-api` (1/1), `mypocket-worker` (1/1), `mypocket-web` (0/0) |
 | Image registry | `registry.dungxbuif.com` |
 | Database | PostgreSQL database `mypocket`, reached by the API through `pgbouncer` |
 
-The API and Web images must be built for `linux/amd64` because the production
-service is constrained to `vm100-prod`. Use an immutable tag containing the
-release commit; never deploy a mutable `latest` tag.
+The API and worker images must be built for `linux/amd64` because production
+services are constrained to `vm100-prod`. Production is API-only: the Traefik
+host router forwards directly to `tasks.mypocket-api:8080`; the web source and
+image are retained for rollback but the web service is scaled to zero. Use an
+immutable tag containing the release commit; never deploy a mutable `latest`
+tag.
+
+The mobile app continues to use `https://money.dungxbuif.com/api/v1`. Health is
+available at `/api/v1/health`; interactive API docs are at
+`/api/v1/docs/index.html`. The origin root `/` intentionally does not serve a
+web application.
 
 ### Local release-candidate preflight — 2026-10-15
 
@@ -143,16 +161,31 @@ rollout above, with no migration or web update in that rollout.
    checks, typecheck and production build.
 2. Commit and push the release branch.
 3. Build and push `mypocket-api:<release-tag>` and
-   `mypocket-web:<release-tag>` to the private registry on the amd64 build
-   node. The frontend image build runs its own design/typecheck/build gate.
+   `mypocket-worker:<release-tag>` to the private registry on the amd64 build
+   node. Run frontend design/typecheck/build gates locally when changing web
+   source, but do not deploy the web service in API-only mode.
 4. For a normal release, run the forward migration command from the API image
    on `homelab-net`, `data-net` and `mypocket-net` before updating the API.
 5. Update the API and worker Swarm services with the immutable image tag and
    registry auth; the API uses `/app/api` and the worker uses
    `--entrypoint /app/worker`. Wait until API and worker each report `1/1`.
-6. Verify `GET /api/v1/health` returns HTTP 200, run a bounded
-   `WORKER_ONCE=true` smoke service on `vm100-prod`, and smoke-test the public
-   web origin.
+6. Verify `GET /api/v1/health` and `/api/v1/docs/index.html` return HTTP 200;
+   verify `/` does not serve the web bundle.
+
+## API-only routing change — 2026-10-13
+
+The public Traefik dynamic config routes `money.dungxbuif.com` directly to the
+Go API. A timestamped rollback backup was created on the gateway host before
+the route switch at
+`/home/dungxbuif/edge/traefik/dynamic.yml.bak-mypocket-api-only-20261013`.
+The API and worker remain 1/1; only `mypocket-web` was
+scaled to 0. No database, schema, migration, credential, or financial data
+operation was performed.
+
+To restore the web UI, restore the saved gateway dynamic config (or set the
+MoneyPocket upstream back to `http://tasks.mypocket-web:80`), then scale
+`mypocket-web` to 1 replica on the Swarm manager. Verify the public root serves
+the web app and API health remains 200.
 
 ### 2026-10-06 production rollout note
 
@@ -212,7 +245,17 @@ docker service ps mypocket-web
 
 The production health endpoint is intentionally unauthenticated and only
 returns service status. All financial endpoints remain protected by the
-normal auth/API-key middleware.
+normal auth/API-key middleware. In API-only mode, `mypocket-web` is expected to
+show `0/0` and `/` is expected not to return the web UI.
+
+## Security follow-up — 2026-10-13
+
+A diagnostic inspection during the rollout emitted production service
+environment values into operator output. Treat affected production credentials
+as exposed and rotate them in a controlled window, including database/cache,
+session/signing, object storage, OAuth, model/OCR, feedback-agent and
+push-notification credentials. No secret values are recorded in this
+repository, and no credentials were changed during the API-only rollout.
 
 ### Web/API routing dependency (2026-10-13)
 

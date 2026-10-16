@@ -3120,6 +3120,18 @@ identity/subtitle and support-pill accessibility contract.
 
 # Validation Matrix
 
+## OPS-API-ONLY — 2026-10-13
+
+| Proof | Result |
+| --- | --- |
+| Traefik-to-API network probe before route switch | PASS: `tasks.mypocket-api:8080/api/v1/health` returned service status from the edge container |
+| Public health after route switch and web scale-down | PASS: `https://money.dungxbuif.com/api/v1/health` HTTP 200 |
+| Public Swagger UI | PASS: `/api/v1/docs/index.html` HTTP 200; `/api/v1/docs/` without `index.html` returns 404 by current router behavior |
+| Public origin root | PASS: `/` is no longer the web UI (HTTP 404, `text/plain`) |
+| Swarm services | PASS: API 1/1, worker 1/1, web 0/0 |
+| Database/schema/data operations | NOT PERFORMED |
+| Rollback | READY: timestamped Traefik config backup recorded in deployment runbook; web can be restored to 1 replica |
+
 ## Native simulator and local integration regression — 2026-10-06
 
 Latest rerun: the first unsigned simulator UI invocation exposed a harness

@@ -10,6 +10,16 @@ shared_fields: [status, trace]
 
 # API
 
+## Production access — 2026-10-13
+
+The production API base URL is `https://money.dungxbuif.com/api/v1`. The
+production host now routes directly to the Go API; the root URL `/` does not
+serve the web application. Health is available at `/api/v1/health`, and the
+interactive Swagger UI is `/api/v1/docs/index.html`. This is a deployment
+topology change only: existing API paths, authentication, and request/response
+contracts are unchanged. The native app should continue using the same API base
+URL. See the [production runbook](../operations/DEPLOYMENT.md).
+
 ## Local candidate: savings, recurring budget and forecast — 2026-10-16
 
 Owner JWT and full-owner API keys use the same authorization for these

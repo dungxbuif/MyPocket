@@ -1470,6 +1470,16 @@ UI harness.
 
 # Project Context
 
+## Production runtime — 2026-10-13
+
+Owner-approved API-only production mode is active. Traefik routes
+`money.dungxbuif.com` directly to the Go API; `mypocket-api` and
+`mypocket-worker` are 1/1 and `mypocket-web` is 0/0. Public health and
+`/api/v1/docs/index.html` return 200; `/` no longer serves the web UI. The
+mobile API base path is unchanged. No database, schema, migration, credential,
+or financial data operation occurred. Rollback config backup and steps are in
+[DEPLOYMENT.md](operations/DEPLOYMENT.md).
+
 2026-10-06 native simulator auth fixture correction: the API-backed UI harness
 now uses a DEBUG-only in-memory session store when launched with
 `-UITestAuthenticatedAPI`. The previous unsigned `CODE_SIGNING_ALLOWED=NO`
@@ -1686,6 +1696,8 @@ The independent UI-FORMS-03/AI flows still use the base-first contracts: `Catego
 - OCR Platform docs have been captured in `docs/architecture/OCR_API.md` for future receipt OCR implementation against `https://ocr.dungxbuif.com/`.
 
 ## Next Steps
+
+- Production web shutdown is complete; no further deploy action is pending. Restore the web route/service only if the owner explicitly requests it.
 
 Native Travel Mode parity was restored on 2026-10-06: active context/date
 scope, safe deletion confirmation, and the ordinary-income/expense-only

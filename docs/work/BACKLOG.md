@@ -20,6 +20,14 @@ updated: 2026-10-15
 
 # Backlog
 
+2026-10-13: Owner approved production API-only routing and stopping the web
+service. [OPS-API-ONLY](tickets/OPS-API-ONLY-DETAIL_DESIGN.md) records the
+runtime-only scope and rollback. Keep API/docs, worker, and persisted data
+available; do not reset or migrate the database for this change.
+
+The API-only production change is deployed and verified; [OPS-API-ONLY](tickets/OPS-API-ONLY-DETAIL_DESIGN.md) is complete. No web rebuild is required unless the owner later requests restoring the web client.
+Security follow-up: rotate production credentials after an unfiltered runtime inspection emitted environment values into task output; no credentials were changed during the web shutdown.
+
 ## Current additions — 2026-10-16
 
 Owner selected both goal-wallet activity and account-wide surplus and delegated
@@ -865,6 +873,7 @@ Mark risk flags in the `Risk Flags` column when relevant:
 
 | Rank | ID | Type | Lane | Title | Priority | Status | Links | Risk Flags | Next Artifact | Notes |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| done | OPS-API-ONLY | operations | high-risk | Route production host to API and stop deployed web UI | Owner approved | done | [Design and rollout](tickets/OPS-API-ONLY-DETAIL_DESIGN.md), [Runbook](../operations/DEPLOYMENT.md) | Deployment/runtime, Existing behavior | None; restore web only on explicit owner request | API 1/1, worker 1/1, web 0/0; public health/docs 200; root no longer serves web UI. |
 | active | AI-ADVISOR-01 | product | high-risk | Dedicated Finance Assistant: persistent chat, semantic tools and interactive cards | Owner Implement | in_progress | [Design](tickets/AI-ADVISOR-01-DETAIL_DESIGN.md), [V1 plan](../superpowers/plans/2026-09-22-finance-assistant-v1.md), [Page](../design/pages/finance-assistant/README.md), [User keys](tickets/TICKET-10-01-quan-ly-api-key.md) | Authorization, Data model, Public contract/API, External system/provider, Multi-domain | Add SSE/recovery, durable audit delivery, provider browser proof and full UAT | Local read-only vertical slice plus typed tool/card/lifecycle fixes and same-process cancellation are implemented/tested; cross-process cancellation, V2 writes and public release gates remain. |
 | historical | UI-FORMS-03 | product | normal | Prior web form consolidation (not active native implementation authority) | Owner request | in_review | [Historical design](tickets/UI-FORMS-03-DETAIL_DESIGN.md), [Current native Assistant](../design/pages/assistant/README.md), [Native reconciliation](tickets/NATIVE-RECONCILIATION-20261015.md) | Existing behavior, Weak proof | Use current native plan/owner UAT | Retain old proof, but use the app's own native base guideline and current screen contracts; no archived web maintenance |
 | active | AI-ENTRY-01 | product | high-risk | Hold Add → AI input → edit/approve/reject list | Owner request | in_review | [Design/proof](tickets/TICKET-09-01-ENTRY-DETAIL_DESIGN.md), [ADR-005](../decisions/ADR-005-ai-entry-review.md) | External system/provider, Authorization, Weak proof | Owner UAT with live app; expand evaluation beyond synthetic cases | Production path now uses strict JSON Schema; live synthetic benchmark 5/5, 24/24 fields. Human review of real proposals remains required; no auto-approval. |
