@@ -5029,6 +5029,23 @@ icon with `MPIcon`; the final Release simulator build with warnings treated as
 errors passes at `/tmp/mypocket-reference-wave5-release-20261016`.
 No API, database, provider, production or device state changed.
 
+## Reference wave 6 integration gate — 2026-10-16
+
+Bills/debt-adjacent credit, Travel Mode and Portfolio now use the shared
+reference-density surfaces. Travel rows retain stable toggle/edit/delete
+accessibility identifiers and existing event semantics. Portfolio keeps the
+owner-scoped asset/trade actions, masking and history while using the shared
+metric grid and compact row composition. Recurring's introductory surface now
+uses the same reference radius token.
+
+The focused signed simulator run passed 3/3 with no failures, skips or runtime
+warnings at `/tmp/mypocket-reference-wave6-focused-20261016/Logs/Test/`.
+The Release simulator build passed with
+`SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` at
+`/tmp/mypocket-reference-wave6-release-20261016`.
+Base-component and project guards plus `git diff --check` pass. No API,
+database, provider, production or physical-device state changed.
+
 ## Native AI-entry uncertain request recovery — 2026-10-08
 
 | Check | Command / evidence | Result |

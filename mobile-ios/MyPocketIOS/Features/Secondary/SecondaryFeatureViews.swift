@@ -1438,7 +1438,7 @@ struct RecurringView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Giao dịch định kỳ", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
-                MPSurfaceCard {
+                MPSurfaceCard(style: .reference) {
                     VStack(alignment: .leading, spacing: 8) {
                         HStack {
                             MPText("Giao dịch định kỳ", style: .title)
@@ -1631,9 +1631,9 @@ struct TravelView: View {
         }
     }
     private var listContent: some View {
-        ScrollView { VStack(alignment: .leading, spacing: 16) {
+        ScrollView { VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
             MPScreenHeader(title: "Travel Mode", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
-            MPSurfaceCard {
+            MPSurfaceCard(style: .reference) {
                 VStack(alignment: .leading, spacing: 8) {
                     HStack {
                         MPText("Travel Mode", style: .title)
@@ -1656,31 +1656,58 @@ struct TravelView: View {
             }
             if let error { MPErrorView(title: "Không tải được Travel Mode", detail: error) { Task { await load() } } }
             if events.isEmpty { MPEmptyView(title: "Chưa có chuyến đi", detail: "Tạo một sự kiện để gắn giao dịch du lịch.") }
-            ForEach(events) { event in
-                MPSurfaceCard {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 4) {
-                                MPText(event.name)
-                                MPText(event.active ? "Đang bật" : "Đã tắt", style: .secondary)
-                            }
-                            Spacer()
-                            MPButton(event.active ? "Tắt" : "Bật", style: event.active ? .destructive : .secondary) { Task { await toggle(event) } }
-                                .accessibilityIdentifier("travel-toggle-\(event.id)")
-                        }
-                        MPText(eventDateLabel(event), style: .secondary)
-                        if let context = event.context, !context.isEmpty { MPText(context, style: .secondary) }
-                        HStack {
-                            MPButton("Sửa", style: .secondary) { beginEditing(event) }
-                                .accessibilityIdentifier("travel-edit-\(event.id)")
-                            MPButton("Xóa", style: .destructive) { deleteTarget = event }
-                                .accessibilityIdentifier("travel-delete-\(event.id)")
+            if !events.isEmpty {
+                MPSurfaceCard(style: .reference) {
+                    VStack(spacing: 0) {
+                        ForEach(Array(events.enumerated()), id: \.element.id) { index, event in
+                            if index > 0 { MPDivider() }
+                            travelRow(event)
                         }
                     }
                 }
+                .accessibilityIdentifier("travel-events-list")
             }
 
         }.padding(MPMetrics.pagePadding) }
+    }
+
+    private func travelRow(_ event: TravelEventModel) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            MPTransactionGlyph(
+                systemName: event.active ? "airplane" : "mappin.and.ellipse",
+                tone: event.active ? "categoryIncome" : "categoryNeutral",
+                size: 32
+            )
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    MPText(event.name, style: .emphasis).lineLimit(2)
+                    MPStatusBadge(text: event.active ? "Đang bật" : "Đã tắt", tone: event.active ? .success : .muted)
+                }
+                MPText(eventDateLabel(event), style: .secondary)
+                if let context = event.context?.trimmingCharacters(in: .whitespacesAndNewlines), !context.isEmpty {
+                    MPText(context, style: .secondary).lineLimit(1)
+                }
+            }
+            Spacer(minLength: 4)
+            VStack(alignment: .trailing, spacing: 4) {
+                MPButton(event.active ? "Tắt" : "Bật", style: event.active ? .destructive : .secondary, fullWidth: false) { Task { await toggle(event) } }
+                    .accessibilityIdentifier("travel-toggle-\(event.id)")
+                HStack(spacing: 4) {
+                    MPButton("Sửa", style: .plain, fullWidth: false) { beginEditing(event) }
+                        .accessibilityIdentifier("travel-edit-\(event.id)")
+                    MPButton("Xóa", style: .plain, fullWidth: false) { deleteTarget = event }
+                        .accessibilityIdentifier("travel-delete-\(event.id)")
+                    MPOverflowMenu(label: "Tùy chọn \(event.name)", actions: [
+                        MPOverflowAction(title: "Sửa") { beginEditing(event) },
+                        MPOverflowAction(title: "Xóa") { deleteTarget = event }
+                    ])
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, minHeight: MPMetrics.hitTarget, alignment: .leading)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("travel-row-\(event.id)")
     }
 
     private var editorContent: some View {
@@ -1858,14 +1885,16 @@ struct PortfolioView: View {
     @ViewBuilder
     private func portfolioAssetCard(_ asset: PortfolioAssetModel, position: PortfolioPositionModel?, trades: [PortfolioTradeModel]) -> some View {
         let assetTrades = Self.tradesForAsset(trades, assetID: asset.id)
-        MPAssistantCard(title: "\(asset.symbol) · \(asset.name)") {
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    MPText("Số lượng: \(position?.quantity ?? "0")")
+        MPSurfaceCard(style: .reference) {
+            HStack(alignment: .top, spacing: 10) {
+                MPTransactionGlyph(systemName: "chart.line.uptrend.xyaxis", tone: "categoryIncome", size: 32)
+                VStack(alignment: .leading, spacing: 3) {
+                    MPText("\(asset.symbol) · \(asset.name)", style: .emphasis).lineLimit(2)
+                    MPText("Số lượng: \(position?.quantity ?? "0")", style: .secondary)
                     MPText(asset.latestPrice.map { "Giá hiện tại: \(MPFormat.money($0, masked: masked))" } ?? "Chưa có giá", style: .secondary)
                 }
-                Spacer()
-                MPButton("Giao dịch", style: .secondary) {
+                Spacer(minLength: 4)
+                MPButton("Giao dịch", style: .secondary, fullWidth: false) {
                     tradeAssetID = asset.id
                     tradeSide = "buy"
                     tradeQuantity = ""
@@ -1876,21 +1905,27 @@ struct PortfolioView: View {
                     tradeEditorPresented = true
                 }
             }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: MPMetrics.sectionSpacing) {
-                MPMetric(title: "Giá vốn", value: MPFormat.money(position?.costBasis ?? 0, masked: masked), compact: true)
-                MPMetric(title: "Bình quân", value: MPFormat.money(position?.averageCost ?? 0, masked: masked), compact: true)
-                MPMetric(title: "Đã thực hiện", value: MPFormat.signedMoney(position?.realizedPnL ?? 0, masked: masked), compact: true)
-                MPMetric(title: "Giá trị hiện tại", value: position?.marketValue.map { MPFormat.money($0, masked: masked) } ?? "Chưa có giá", compact: true)
-                MPMetric(title: "Lãi/lỗ chưa thực hiện", value: position?.unrealizedPnL.map { MPFormat.signedMoney($0, masked: masked) } ?? "Chưa có giá", compact: true)
+            MPMetricGrid(items: [
+                MPMetricItem(title: "Giá vốn", value: MPFormat.money(position?.costBasis ?? 0, masked: masked)),
+                MPMetricItem(title: "Bình quân", value: MPFormat.money(position?.averageCost ?? 0, masked: masked)),
+                MPMetricItem(title: "Đã thực hiện", value: MPFormat.signedMoney(position?.realizedPnL ?? 0, masked: masked)),
+                MPMetricItem(title: "Giá trị hiện tại", value: position?.marketValue.map { MPFormat.money($0, masked: masked) } ?? "Chưa có giá"),
+                MPMetricItem(title: "Lãi/lỗ chưa thực hiện", value: position?.unrealizedPnL.map { MPFormat.signedMoney($0, masked: masked) } ?? "Chưa có giá")
+            ], masked: false)
+            HStack(spacing: 8) {
+                MPButton("Cập nhật giá", style: .secondary, fullWidth: false) { error = nil; priceTarget = asset }
+                    .accessibilityIdentifier("portfolio-price-update-\(asset.id)")
+                if assetTrades.isEmpty {
+                    MPButton("Xóa tài sản", style: .destructive, fullWidth: false) { error = nil; deleteTarget = asset }
+                        .accessibilityIdentifier("portfolio-delete-\(asset.id)")
+                }
             }
-            MPButton("Cập nhật giá", style: .secondary) { error = nil; priceTarget = asset }
-                .accessibilityIdentifier("portfolio-price-update-\(asset.id)")
-            if assetTrades.isEmpty {
-                MPButton("Xóa tài sản", style: .destructive) { error = nil; deleteTarget = asset }
-                    .accessibilityIdentifier("portfolio-delete-\(asset.id)")
-            }
-            VStack(alignment: .leading, spacing: 8) {
-                MPText("Lịch sử mua bán", style: .emphasis)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .firstTextBaseline) {
+                    MPText("Lịch sử mua bán", style: .emphasis)
+                    Spacer(minLength: 8)
+                    MPText(PortfolioTradePresentation.countLabel(assetTrades.count), style: .secondary)
+                }
                 if assetTrades.isEmpty {
                     MPText("Chưa có giao dịch mua bán.", style: .secondary)
                 } else {
@@ -1904,6 +1939,13 @@ struct PortfolioView: View {
                     }
                 }
             }
+        }
+        .accessibilityIdentifier("portfolio-asset-\(asset.id)")
+    }
+
+    enum PortfolioTradePresentation {
+        static func countLabel(_ count: Int) -> String {
+            count == 1 ? "1 giao dịch" : "\(count) giao dịch"
         }
     }
 
