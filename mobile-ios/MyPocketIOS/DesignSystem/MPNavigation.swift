@@ -89,7 +89,7 @@ enum MPFeedbackBubbleLayout {
     static let coordinateSpace = "mp-feedback-viewport"
 
     static func frame(in viewport: CGRect, clearance: CGFloat, obstacles: [CGRect]) -> CGRect? {
-        let side: CGFloat = 52
+        let side = MPShellNavigation.feedbackBubbleDiameter
         guard viewport.width >= side, viewport.height >= side,
               viewport.minX.isFinite, viewport.minY.isFinite,
               viewport.maxX.isFinite, viewport.maxY.isFinite else { return nil }
@@ -485,6 +485,10 @@ extension View {
 /// web MobileAppShell; secondary finance surfaces remain reachable from
 /// Tài khoản so the bottom bar stays stable across platforms.
 enum MPShellNavigation {
+    enum TabSelectionStyle: Equatable {
+        case surfacePill
+    }
+
     static let primaryItems: [(id: String, title: String, systemName: String)] = [
         ("overview", "Tổng quan", "house.fill"),
         ("transactions", "Giao dịch", "list.bullet.rectangle"),
@@ -493,6 +497,11 @@ enum MPShellNavigation {
     ]
 
     static let addActionAccessibilityID = "add-transaction-button"
+    static let selectedTabStyle: TabSelectionStyle = .surfacePill
+    static let bottomNavigationCornerRadius: CGFloat = 28
+    static let selectedTabCornerRadius: CGFloat = 22
+    static let addButtonDiameter: CGFloat = 56
+    static let feedbackBubbleDiameter: CGFloat = 52
 }
 
 struct MPBalanceHeader: View {
@@ -609,6 +618,15 @@ struct MPBottomNavigation: View {
                             Text(item.title).font(MPFont.labelSmall)
                         }
                         .frame(maxWidth: .infinity, minHeight: MPMetrics.hitTarget)
+                        .padding(.horizontal, 4)
+                        .padding(.vertical, 2)
+                        .background(
+                            selection == item.id ? MPColor.row : .clear,
+                            in: RoundedRectangle(
+                                cornerRadius: MPShellNavigation.selectedTabCornerRadius,
+                                style: .continuous
+                            )
+                        )
                     }
                     .buttonStyle(.plain)
                     .foregroundStyle(selection == item.id ? MPColor.action : MPColor.secondary)
@@ -622,7 +640,13 @@ struct MPBottomNavigation: View {
             .padding(.horizontal, 8)
             .padding(.top, 6)
             .padding(.bottom, 2)
-            .background(MPColor.surface, in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .background(
+                MPColor.surface,
+                in: RoundedRectangle(
+                    cornerRadius: MPShellNavigation.bottomNavigationCornerRadius,
+                    style: .continuous
+                )
+            )
             .shadow(color: MPColor.ink.opacity(0.08), radius: 14, y: 4)
             .padding(.horizontal, 16)
             .padding(.bottom, 4)
@@ -722,7 +746,10 @@ struct MPBottomAddButton: View {
         } label: {
             Image(systemName: "plus")
                 .font(MPFont.headline)
-                .frame(width: 56, height: 56)
+                .frame(
+                    width: MPShellNavigation.addButtonDiameter,
+                    height: MPShellNavigation.addButtonDiameter
+                )
                 .foregroundStyle(.white)
                 .background(MPColor.brand, in: Circle())
                 .shadow(color: MPColor.brandHover.opacity(0.25), radius: 10, y: 5)
@@ -863,7 +890,10 @@ struct MPFeedbackBubble: View {
     var body: some View {
         MPIconButton(systemName: "bubble.left.and.bubble.right.fill", label: "Gửi phản hồi", avoidsFeedback: false, action: action)
             .accessibilityIdentifier("floating-feedback-bubble")
-            .padding(4)
+            .frame(
+                width: MPShellNavigation.feedbackBubbleDiameter,
+                height: MPShellNavigation.feedbackBubbleDiameter
+            )
             .background(MPColor.surface, in: Circle())
             .overlay(Circle().stroke(MPColor.line, lineWidth: MPMetrics.inputBorderWidth))
             .foregroundStyle(MPColor.secondary)

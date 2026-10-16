@@ -281,6 +281,14 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(MPShellNavigation.addActionAccessibilityID, "add-transaction-button")
     }
 
+    func testBottomNavigationUsesReferenceSelectedPillAndSharedGeometry() {
+        XCTAssertEqual(MPShellNavigation.selectedTabStyle, .surfacePill)
+        XCTAssertEqual(MPShellNavigation.bottomNavigationCornerRadius, 28)
+        XCTAssertEqual(MPShellNavigation.selectedTabCornerRadius, 22)
+        XCTAssertEqual(MPShellNavigation.addButtonDiameter, 56)
+        XCTAssertEqual(MPShellNavigation.feedbackBubbleDiameter, 52)
+    }
+
     func testReferenceSegmentedControlUsesSelectedSurfacePill() {
         XCTAssertEqual(MPSegmentedControl.buttonStyle(isSelected: true), .segmentedSelected)
         XCTAssertEqual(MPSegmentedControl.buttonStyle(isSelected: false), .plain)

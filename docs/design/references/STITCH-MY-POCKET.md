@@ -74,7 +74,7 @@ corners remain valid for fields and compact controls.
 | Category management (`img_7793`) | `GroupManagementPanel`, `SegmentedControl`, `BaseCategoryTree` | `CategoriesView` + planned shared category-tree base; Stitch also shows a wallet-scope filter and search |
 | Category edit | `CategoryEditForm`, `BaseTextInput`, `BaseSelect`, `BaseButton` | shared `MPTextField`, `MPOptionSelector`, `MPButton` |
 | Global add | `BaseFab` / shared shell action | `MPBottomAddButton` |
-| Primary navigation | `BottomNavigation` | `MPBottomNavigation` (inset rounded surface, blur/shadow, centered add) |
+| Primary navigation | `BottomNavigation` | `MPBottomNavigation` (inset rounded surface, selected surface pill, blur/shadow, centered add) |
 
 Segmented controls use a muted line track with a white active pill and
 action-colored label. Native owns this in `MPSegmentedControl` plus the shared
