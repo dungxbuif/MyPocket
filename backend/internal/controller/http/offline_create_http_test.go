@@ -207,6 +207,9 @@ func TestOfflineTransferHTTPConcurrentReplayKeepsExactlyOneExcludedPair(t *testi
 		if len(rows) != 2 || rows[0].TransferID == nil || rows[1].TransferID == nil {
 			t.Fatal("missing pair identity")
 		}
+		if envelope.Meta.Mutation.Operation != "transfer.create" || envelope.Meta.Mutation.Key != key || envelope.Meta.Mutation.Status != "applied" {
+			t.Fatalf("transfer receipt metadata mismatch: %+v", envelope.Meta.Mutation)
+		}
 		if pairID == "" {
 			pairID = *rows[0].TransferID
 		}
@@ -228,6 +231,9 @@ func TestOfflineTransferHTTPConcurrentReplayKeepsExactlyOneExcludedPair(t *testi
 	var count int64
 	if err := f.db.Model(&entity.Transaction{}).Where("owner_id = ?", f.owner).Count(&count).Error; err != nil || count != 2 {
 		t.Fatalf("want2 rows, got%d err%v", count, err)
+	}
+	if err := f.db.Model(&entity.TransactionMutation{}).Where("owner_id = ? AND operation = ? AND idempotency_key = ?", f.owner, "transfer.create", key).Count(&count).Error; err != nil || count != 1 {
+		t.Fatalf("want1 transfer receipt, got%d err%v", count, err)
 	}
 }
 

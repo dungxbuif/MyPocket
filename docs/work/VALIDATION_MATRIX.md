@@ -16,6 +16,25 @@ shared_fields:
 updated: 2026-10-15
 ---
 
+## 2026-10-16 offline/sync contract verification
+
+The focused backend command
+`go test ./internal/controller/http -run 'Test(SyncCapabilities|Offline|FullAPIKey)' -count=1`
+passes in the current worktree. Its PostgreSQL/Redis-backed cases are skipped
+when `TEST_DATABASE_URL` or `TEST_REDIS_URL` is not supplied; this run therefore
+proves package compilation and test discovery only, not real database receipt
+persistence or Redis session expiry. The selected contract tests cover
+capability enablement/authentication, receipt metadata and replay, changed-body
+idempotency conflicts, concurrent transfer retry, explicit travel-context
+replay, and JWT/API-key owner isolation. The transfer regression also asserts
+exactly one durable receipt for concurrent retries.
+
+No owner credential was available for an authenticated production capability
+probe, and no signed physical-device XCTest was run in this backend-only slice.
+Production capability payload/UAT and physical-device acceptance remain
+pending; the client must stay fail-closed until the authenticated response is
+verified.
+
 ## 2026-10-15 offline queue/cache regression recheck
 
 The focused simulator contract run passed 123/123 tests with 0 failures on

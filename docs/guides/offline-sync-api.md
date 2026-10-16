@@ -7,6 +7,17 @@ Capability phải được đọc bằng phiên owner trước mỗi drain. Nế
 `enabled:false` hoặc thiếu operation/version/meta thì app phải giữ hàng đợi,
 không gửi tự động. Không giả định server cũ hỗ trợ chỉ vì nó chấp nhận header.
 
+## Trạng thái kiểm chứng — 2026-10-16
+
+Bộ kiểm tra HTTP offline/sync hiện có bao phủ capability, receipt metadata,
+replay cùng khóa, xung đột khi đổi nội dung, retry chuyển ví đồng thời, ngữ cảnh
+chuyến đi cố định và cô lập owner qua JWT/API key. Regression chuyển ví cũng
+kiểm tra một receipt bền vững cho nhiều lần retry cùng khóa. Lần chạy backend
+local này không có `TEST_DATABASE_URL`/`TEST_REDIS_URL`, nên các ca cần
+PostgreSQL/Redis bị bỏ qua; đây không phải bằng chứng cho UAT production hoặc
+thiết bị thật. Cần owner-authenticated capability payload và signed-device UAT
+trước khi coi việc gửi offline đã sẵn sàng.
+
 ## Xem giao dịch khi mất mạng — bản native đang phát triển
 
 Màn Giao dịch lưu bản dữ liệu đã tải thành công dưới dạng mã hóa, riêng theo tài
