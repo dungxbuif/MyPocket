@@ -42,6 +42,12 @@ final class MoreFeedbackReferenceTests: XCTestCase {
         )
     }
 
+    func testAuthAndFeedbackSurfacesUseSharedReferenceContracts() {
+        XCTAssertEqual(AuthReferencePresentation.cardStyle, .reference)
+        XCTAssertEqual(AuthReferencePresentation.contentSpacing, MPMetrics.sectionSpacing)
+        XCTAssertEqual(FeedbackReferencePresentation.surfaceStyle, .reference)
+    }
+
     func testReferenceIconRegistryKeepsAccountGlyphsOnNativeSymbols() {
         XCTAssertEqual(MPReferenceIcon.account, "person.crop.circle")
         XCTAssertEqual(MPReferenceIcon.wallet, "wallet.pass.fill")

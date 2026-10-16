@@ -6,8 +6,8 @@ struct BiometricUnlockView: View {
     var body: some View {
         VStack(spacing: 16) {
             Spacer()
-            MPSurfaceCard(style: .reference) {
-                VStack(alignment: .leading, spacing: 10) {
+            MPSurfaceCard(style: AuthReferencePresentation.cardStyle) {
+                VStack(alignment: .leading, spacing: AuthReferencePresentation.contentSpacing + 2) {
                     MPText("Mở khóa MyPocket", style: .title)
                     MPText("Phiên đăng nhập vẫn còn lưu an toàn. Xác thực Face ID hoặc mã khóa để tiếp tục.", style: .secondary)
                 }

@@ -73,6 +73,10 @@ endpoints in [AUTH_API](../../architecture/AUTH_API.md). Credentials are
 biometryCurrentSet/ThisDeviceOnly protected, never saved passwords. Server-side Google OAuth remains available
 to existing web clients.
 
+Auth lock/unlock uses the same reference-card contract as Feedback and account
+surfaces (`MPSurfaceCard(.reference)` plus shared `MPButton`), while AI action
+cards remain confirmation-driven and provider/tool permissions are unchanged.
+
 The native transaction editor uses `MPFormRow`/`MPDateStepper` inside the
 reference surface: wallet, category, note and account-local date navigation
 share the same icon/value/chevron base. Its `MPAmountField` transaction variant

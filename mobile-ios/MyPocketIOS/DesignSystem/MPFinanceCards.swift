@@ -83,6 +83,11 @@ enum AuthReferenceCopy {
     static let passwordPlaceholder = "Nhập mật khẩu"
 }
 
+enum AuthReferencePresentation {
+    static let cardStyle: MPSurfaceCardStyle = .reference
+    static let contentSpacing = MPMetrics.sectionSpacing
+}
+
 /// The brand mark is a base component so feature screens do not invent their
 /// own logo geometry, color, or accessibility contract.
 struct MPBrandMark: View {
