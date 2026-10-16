@@ -10,6 +10,18 @@ shared_fields: [status]
 
 # Changelog
 
+## 1.1.0 patch — 2026-10-16
+
+- Deploy API and worker image `release-20261016-7846945` (digest
+  `sha256:71fdd4b4155972f3e6380ae02de846264e503347ab63b9693f65d2f0c713db43`).
+- Expose the async Finance Assistant submit route so the first provider run
+  can be cancelled immediately, while preserving the synchronous contract.
+- Preserve multi-image upload order and delimit each OCR document before model
+  extraction; no database migration or financial-data mutation was performed.
+- Production smoke: health `200`, API/worker `1/1`, Swagger `78` paths.
+- Known gates: authenticated provider/OCR UAT, native offline sender, and
+  physical-device acceptance remain open.
+
 ## 1.1.0 — 2026-10-15
 
 - Freeze the current native iOS and finance-platform snapshot as the first
