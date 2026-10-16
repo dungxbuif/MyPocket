@@ -120,11 +120,11 @@
 - Consumes: shared surfaces and navigation from Tasks 1–4; existing report/budget/jar/credit models and API contracts.
 - Produces: consistent cards, charts, selectors, empty/error states, and specialized wallet detail surfaces.
 
-- [ ] Step 1: Add failing reference assertions for card hierarchy, chart labels, selector states, and action confirmations.
-- [ ] Step 2: Run focused tests and verify failures.
-- [ ] Step 3: Replace local visual variants with shared bases and preserve all write confirmations and owner scoping.
-- [ ] Step 4: Run the complete native unit suite and Release build.
-- [ ] Step 5: Capture representative device screens and commit `feat(native): align planning and reports surfaces`.
+- [x] Step 1: Add failing reference assertions for card hierarchy, chart labels, selector states, and action confirmations.
+- [x] Step 2: Run focused tests and verify failures.
+- [x] Step 3: Replace local visual variants with shared bases and preserve all write confirmations and owner scoping.
+- [x] Step 4: Run the complete native unit suite and Release build.
+- [x] Step 5: Capture representative device screens and commit `feat(native): align planning and reports surfaces`.
 
 ### Task 6: Align settings, auth, AI, feedback, and route states
 
