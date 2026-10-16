@@ -48,6 +48,9 @@ shared_fields: [status]
 - Compact populated Categories and Recurring screens into shared reference
   surfaces while retaining parent-child CRUD, recurrence editing and overflow
   actions.
+- Align Credit and Notifications populated states with shared compact surfaces,
+  including masked credit metrics, statement rows, unread/read grouping and
+  mark-read actions.
 - Stabilize JSON request bytes with sorted keys so identical budget-series
   retries remain idempotency-safe and reproducible. Focused native tests and
   Release simulator build pass; physical-device owner UAT remains pending.

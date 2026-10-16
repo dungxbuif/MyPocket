@@ -5002,6 +5002,20 @@ The complete native unit target passes 331/331 at
 build passes with warnings treated as errors at
 `/tmp/mypocket-reference-wave3-release-20261016`.
 
+## Reference wave 4 integration gate — 2026-10-16
+
+Credit and Notifications now use shared compact metric/row surfaces. Credit
+summary masking, statement counts, owner-scoped payment state, unread/read
+grouping and mark-read actions remain unchanged. The agent-owned signed
+focused run passes 2/2 at
+`/tmp/mypocket-credit-notifications-20261016/Logs/Test/Test-MyPocketIOS-2026.10.16_22-01-17-+0700.xcresult`.
+
+The integrated Release simulator build passes with warnings treated as errors
+at `/tmp/mypocket-reference-wave4-release-final-20261016`. A second local test
+invocation was stopped after Xcode remained in `simctl diagnose` cleanup for
+over three minutes; this is an environment runner hang, not a product test
+failure. No API, data or production state changed.
+
 ## Native AI-entry uncertain request recovery — 2026-10-08
 
 | Check | Command / evidence | Result |

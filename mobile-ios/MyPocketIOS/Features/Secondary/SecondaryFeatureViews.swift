@@ -2069,6 +2069,24 @@ enum CreditLedgerCopy {
     static let paymentActionAccessibilityID = "credit-add-payment"
 }
 
+/// Pure presentation rules for the populated credit reference screen. The
+/// view owns loading and mutations; this type keeps section labels and
+/// compact summaries deterministic and testable without a live API.
+enum CreditLedgerPresentation {
+    static func statementCountLabel(_ count: Int) -> String {
+        count == 1 ? "1 giao dịch" : "\(count) giao dịch"
+    }
+
+    static func summaryItems(_ statement: CreditStatementModel, masked: Bool) -> [MPMetricItem] {
+        [
+            MPMetricItem(title: "Dư nợ", value: MPFormat.money(abs(statement.balance), masked: masked)),
+            MPMetricItem(title: "Còn khả dụng", value: MPFormat.money(statement.availableCredit, masked: masked)),
+            MPMetricItem(title: "Hạn mức", value: MPFormat.money(statement.creditLimit, masked: masked)),
+            MPMetricItem(title: "Kỳ này cần trả", value: MPFormat.money(statement.amountDue, masked: masked))
+        ]
+    }
+}
+
 enum CreditLedgerReferenceSection: String, CaseIterable {
     case header
     case walletSelector
@@ -2122,24 +2140,10 @@ struct CreditView: View {
                 if let statement {
                     MPSurfaceCard(style: .reference) {
                         VStack(alignment: .leading, spacing: 12) {
-                            HStack(spacing: 12) {
-                                creditMetric(label: "Dư nợ hiện tại", value: MPFormat.money(abs(statement.balance), masked: masked))
-                                creditMetric(label: "Còn khả dụng", value: MPFormat.money(statement.availableCredit, masked: masked), tone: statement.availableCredit < 0 ? .danger : .action)
-                            }
-                            Divider().overlay(MPColor.line)
-                            HStack {
-                                MPText("Hạn mức", style: .secondary)
-                                Spacer()
-                                MPText(MPFormat.money(statement.creditLimit, masked: masked), style: .emphasis)
-                            }
+                            MPMetricGrid(items: CreditLedgerPresentation.summaryItems(statement, masked: masked), masked: false)
                             if statement.paymentStatus == "not_configured" {
                                 MPText("Chưa cấu hình dư nợ sao kê và ngày đến hạn.", style: .secondary)
                             } else {
-                                HStack {
-                                    MPText("Kỳ này cần trả", style: .secondary)
-                                    Spacer()
-                                    MPText(MPFormat.money(statement.amountDue, masked: masked), style: .emphasis)
-                                }
                                 MPText(
                                     paymentStatusText(statement),
                                     style: statement.paymentStatus == "overdue" ? .danger : .secondary
@@ -2158,9 +2162,22 @@ struct CreditView: View {
                         MPText(CreditLedgerCopy.emptyStatement, style: .secondary)
                             .accessibilityIdentifier("credit-empty-statement")
                     } else {
-                        MPAssistantCard(title: "Giao dịch tín dụng") {
-                            ForEach(statement.items) { item in
-                                MPTransactionRow(transaction: item, category: categories.first(where: { $0.id == item.categoryID }), timeZone: TimeZone(identifier: accountTimezone) ?? .current, masked: masked)
+                        MPSurfaceCard(style: .reference) {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack(alignment: .firstTextBaseline) {
+                                    MPText("Giao dịch tín dụng", style: .emphasis)
+                                    Spacer(minLength: 8)
+                                    MPText(CreditLedgerPresentation.statementCountLabel(statement.items.count), style: .secondary)
+                                }
+                                ForEach(Array(statement.items.enumerated()), id: \.element.id) { index, item in
+                                    if index > 0 { Divider().overlay(MPColor.line) }
+                                    MPTransactionRow(
+                                        transaction: item,
+                                        category: categories.first(where: { $0.id == item.categoryID }),
+                                        timeZone: TimeZone(identifier: accountTimezone) ?? .current,
+                                        masked: masked
+                                    )
+                                }
                             }
                         }
                     }
@@ -2221,15 +2238,6 @@ struct CreditView: View {
             }
         )
     }
-    @ViewBuilder
-    private func creditMetric(label: String, value: String, tone: MPTextStyle = .emphasis) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            MPText(label, style: .secondary)
-            MPText(value, style: tone)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-    }
-
     private func paymentStatusText(_ statement: CreditStatementModel) -> String {
         let status = MPSelectionLabels.display(for: statement.paymentStatus)
         guard let paymentDueAt = statement.paymentDueAt else { return status }
@@ -2318,6 +2326,20 @@ struct CreditView: View {
     private func pay() async { guard !selectedID.isEmpty, let amount = MPFormat.parsePositiveInteger(entryAmount), !sourceWalletID.isEmpty else { error = "Chọn nguồn thanh toán và nhập số tiền."; return }; do { _ = try await api.createCreditPayment(walletID: selectedID, input: CreditPaymentInputModel(sourceWalletID: sourceWalletID, amount: amount, occurredAt: MPFormat.instantString(Date()), note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines))); cancelAction(); await loadStatement() } catch { self.error = "Không thể tạo thanh toán tín dụng." } }
 }
 
+enum NotificationsPresentation {
+    static func unread(_ items: [NotificationModel]) -> [NotificationModel] {
+        items.filter { $0.readAt == nil }
+    }
+
+    static func read(_ items: [NotificationModel]) -> [NotificationModel] {
+        items.filter { $0.readAt != nil }
+    }
+
+    static func sectionTitle(unread: Bool, count: Int) -> String {
+        unread ? "Chưa đọc · \(count)" : "Đã đọc · \(count)"
+    }
+}
+
 struct NotificationsView: View {
     let api: FinanceAPI
     let onBack: () -> Void
@@ -2337,22 +2359,13 @@ struct NotificationsView: View {
                 } else if items.isEmpty {
                     MPEmptyView(title: "Chưa có thông báo", detail: "Thông báo trong ứng dụng sẽ xuất hiện tại đây.")
                 } else {
-                    ForEach(items) { item in
-                        MPSurfaceCard {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    MPText(item.title, style: .emphasis)
-                                    Spacer()
-                                    if item.readAt == nil { Circle().fill(MPColor.action).frame(width: 8, height: 8).accessibilityHidden(true) }
-                                }
-                                MPText(item.body, style: .secondary)
-                                MPText(MPFormat.shortDate(item.createdAt, timeZone: timeZone), style: .secondary)
-                                if item.readAt == nil {
-                                    MPButton("Đánh dấu đã đọc", style: .secondary) { Task { await markRead(item) } }
-                                        .accessibilityIdentifier("notification-mark-read-\(item.id)")
-                                }
-                            }
-                        }
+                    let unreadItems = NotificationsPresentation.unread(items)
+                    let readItems = NotificationsPresentation.read(items)
+                    if !unreadItems.isEmpty {
+                        notificationSection(title: NotificationsPresentation.sectionTitle(unread: true, count: unreadItems.count), items: unreadItems)
+                    }
+                    if !readItems.isEmpty {
+                        notificationSection(title: NotificationsPresentation.sectionTitle(unread: false, count: readItems.count), items: readItems)
                     }
                 }
             }
@@ -2361,6 +2374,41 @@ struct NotificationsView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .task { await load() }
         .refreshable { await load() }
+    }
+
+    @ViewBuilder
+    private func notificationSection(title: String, items: [NotificationModel]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            MPText(title, style: .secondary)
+                .accessibilityAddTraits(.isHeader)
+            ForEach(items) { item in
+                MPSurfaceCard(style: .reference) {
+                    HStack(alignment: .top, spacing: 10) {
+                        MPIcon(
+                            systemName: item.readAt == nil ? "bell.badge.fill" : "bell.fill",
+                            color: item.readAt == nil ? MPColor.action : MPColor.secondary,
+                            size: 32
+                        )
+                            .background(item.readAt == nil ? MPColor.successSoft : MPColor.row, in: Circle())
+                        VStack(alignment: .leading, spacing: 3) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                MPText(item.title, style: .emphasis)
+                                if item.readAt == nil {
+                                    Circle().fill(MPColor.action).frame(width: 7, height: 7).accessibilityHidden(true)
+                                }
+                            }
+                            MPText(item.body, style: .secondary)
+                            MPText(MPFormat.shortDate(item.createdAt, timeZone: timeZone), style: .secondary)
+                        }
+                        Spacer(minLength: 0)
+                        if item.readAt == nil {
+                            MPIconButton(systemName: "checkmark", label: "Đánh dấu đã đọc") { Task { await markRead(item) } }
+                                .accessibilityIdentifier("notification-mark-read-\(item.id)")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     private func load() async {
