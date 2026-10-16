@@ -19,10 +19,26 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-10-15
+updated: 2026-10-16
 ---
 
-## Current checkpoint — 2026-10-16 19:46 +0700
+## Current checkpoint — 2026-10-16 20:20 +0700
+
+The async advisor and AI-entry multi-image context fixes are now deployed to
+production. API and worker run
+`registry.dungxbuif.com/mypocket-api:release-20261016-7846945` at digest
+`sha256:71fdd4b4155972f3e6380ae02de846264e503347ab63b9693f65d2f0c713db43`;
+both services are `1/1`, health returns `200`, and production Swagger reports
+78 paths including `POST /api/v1/ai/advisor/messages/async`. The authenticated
+sync capability route is present. No migration or financial data mutation ran.
+
+The multi-image fix preserves request order and wraps each OCR result in a
+document boundary before model extraction. It does not claim provider OCR
+accuracy; owner-authenticated AI-entry UAT with the configured provider remains
+open. The web service remains `0/0` by the native-only rollout decision, and
+the final signed-device/Face ID/visual gates remain open.
+
+## Previous checkpoint — 2026-10-16 19:46 +0700
 
 The local async Finance Assistant cancellation slice is now verified. Backend
 `go test ./...` and `go test -race ./...` both pass 296/296 across 16 packages;

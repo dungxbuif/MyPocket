@@ -14,9 +14,8 @@ shared_fields: [status, trace]
 
 Offline is not available on iOS yet and the native client still fails closed
 until it sees an authenticated capability response. The server contract is now
-deployed in the v1.1.0 API/worker image
-`release-1.1.0-20261015-2212` at digest
-`sha256:bef8040e7a372774234fd96d69e690215dd5d823f4520f901fd5cf1638fb37d2`.
+deployed in API/worker image `release-20261016-7846945` at digest
+`sha256:71fdd4b4155972f3e6380ae02de846264e503347ab63b9693f65d2f0c713db43`.
 Local HTTP/DB
 tests now verify create requests with Idempotency-Key: first201, replay200, unchanged
 data object/array plus meta.mutation (operation/key/status/replayed). Typed JSON
@@ -28,10 +27,10 @@ automatically retry. Real router/PostgreSQL/Redis verification confirms JWT/sess
 owner binding and expiry/logout rejection before replay. Per owner's2026-10-14
 decision, all user routes now also accept full-owner API keys, including financial
 writes/replay; no per-key scopes. Revocation/expiry/owner isolation remain enforced.
-The server route is deployed, but required-key rollout and native cache/sync/UI
-remain gates; encrypted outbox storage/leases are implemented local. An
-owner-authenticated production capability response is still required before
-enabling the native sender.
+The server route is deployed and production returns it behind auth; required-key
+rollout and native cache/sync/UI remain gates; encrypted outbox storage/leases
+are implemented locally. An owner-authenticated production capability response
+is still required before enabling the native sender.
 [Human/agent guide](../guides/offline-sync-api.md), [auth proof](../work/tickets/OFFLINE-AUTH-HTTP-20261014.md).
 
 GET /api/v1/sync/capabilities is locally implemented under JWT/session or owner key

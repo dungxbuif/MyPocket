@@ -1,6 +1,11 @@
 # Finance Assistant V1 — tool catalog
 
-Status: JWT/API-key pilot, synchronous JSON transport. This catalog describes the implemented non-mutating tool boundary (finance reads, product-help retrieval and prepared wallet/jar proposals). Production now runs the v1.1.0 API/worker image `release-1.1.0-20261015-2212` with explicit jar-proposal capability wording; owner-authenticated create-jar UAT is still required before closing feedback. Streaming and durable audit readiness remain separate gates.
+Status: JWT/API-key pilot, synchronous and async JSON transport. This catalog
+describes the implemented non-mutating tool boundary (finance reads,
+product-help retrieval and prepared wallet/jar proposals). Production runs
+API/worker image `release-20261016-7846945`; owner-authenticated proposal and
+provider UAT are still required before closing the release gate. Streaming,
+durable audit delivery and cross-process cancellation remain separate gates.
 
 Native presentation correction2026-10-15 (local, not installed update): exact
 signed finance-safe money; invalid values show unavailable, not fabricated zero.
@@ -115,7 +120,7 @@ still hides expired content. The local native header now exposes an explicit
 idempotent “Chat mới” reset; history metadata is additive, and the reset/expiry
 routes are present in the current production OpenAPI; owner-authenticated production UAT remains open.
 
-### Async initial-run cancellation (implemented locally; production rollout open)
+### Async initial-run cancellation (deployed 2026-10-16)
 
 The synchronous `POST /messages` contract remains unchanged. A separate
 `POST /messages/async` contract reserves and returns the owner-scoped
@@ -125,7 +130,8 @@ same bounded tool loop in the background, persist the same message/event/usage
 records, and keeps idempotent `client_request_id` replay semantics. The native
 composer uses this endpoint and polls the existing run resource. Tests prove
 immediate run visibility, cancellation before provider completion, and
-unchanged synchronous behavior; owner-authenticated production UAT remains.
+unchanged synchronous behavior. Production Swagger exposes the route; an
+owner-authenticated provider run is still required for end-to-end UAT.
 
 All listed routes use the same owner credential authority. Create/list/revoke keys through `/api/v1/api-keys` with JWT or owner key; secret is shown once and only its hash persists. See [full-key guide](../guides/api-keys.md). Advisor auth still audits best-effort to Redis stream `mypocket:audit:advisor` with request/credential ID, route, status, decision and latency; no prompts, notes, tokens or monetary rows. `POST /messages` waits for the bounded provider/tool loop and returns JSON. SSE, lost-POST recovery, conversation clear, fact-bundle drilldown and durable audit delivery remain separate gates.
 

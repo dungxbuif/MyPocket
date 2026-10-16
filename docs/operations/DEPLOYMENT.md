@@ -81,6 +81,27 @@ not redeployed for this native-focused release. Physical iPhone signing is
 still blocked by the missing Xcode account/profile; the unsigned Release
 iphoneos artifact is recorded in the release note.
 
+### Async advisor and AI-entry context rollout — 2026-10-16
+
+The API and worker were updated to immutable image
+`registry.dungxbuif.com/mypocket-api:release-20261016-7846945` at digest
+`sha256:71fdd4b4155972f3e6380ae02de846264e503347ab63b9693f65d2f0c713db43`.
+The image includes the first-request async advisor cancellation endpoint and
+the multi-image OCR context/order fix. No migration ran and no financial data
+was modified. Post-rollout checks returned API health `200`, API/worker `1/1`,
+and production Swagger exposes 78 paths including
+`POST /api/v1/ai/advisor/messages/async` and
+`GET /api/v1/sync/capabilities` (the latter remains authenticated).
+
+The production API briefly remained at `0/1` while its health check warmed;
+the task became healthy before the Swarm update converged. The web service
+remains intentionally `0/0` for the native-focused rollout.
+
+The OCR fix is context assembly only: validated image bytes still go through
+the server-side OCR contract, and the model receives ordered, explicitly
+delimited OCR documents. A configured OCR provider and owner-authenticated
+AI-entry UAT are still required to certify recognition quality.
+
 ### AI jar proposal hotfix — 2026-10-15
 
 The owner-requested feedback fix updated only `mypocket-api` to immutable image
