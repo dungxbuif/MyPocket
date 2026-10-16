@@ -32,6 +32,11 @@ unlocked before launch; this is a device-state gate, not a code or signing
 failure. Production API-only routing and web rollback behavior are documented
 in [DEPLOYMENT.md](../operations/DEPLOYMENT.md).
 
+The backlog reconciliation also closes BL-003 (OCR adapter implementation) and
+BL-004 (project standards). Provider/production OCR quality and owner/device
+visual acceptance remain explicit external gates and are not inferred from the
+local deterministic suite.
+
 ## 2026-10-16 Savings/Budget implementation — local candidate
 
 Scope: [delegated design](../superpowers/specs/2026-10-16-savings-budget-design.md)
