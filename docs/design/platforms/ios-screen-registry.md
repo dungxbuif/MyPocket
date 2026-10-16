@@ -4,7 +4,12 @@ Audit date: 2026-10-14. Scope: all named feature View declarations and opening
 controls in `mobile-ios/MyPocketIOS/Features`, including private editor states.
 This is a source/navigation audit, **not** a claim that every rendered state,
 orientation, keyboard and populated production screen has been visually tested.
-No Money Lover/web parity is an authority; these are MyPocket's own contracts.
+On 2026-10-16 the owner explicitly selected the installed Money Lover app as a
+visual reference again. Observed per-screen evidence in the
+[physical-device survey](../reference-survey/2026-10-16-money-lover-iphone.md)
+guides subsequent base/layout changes; MyPocket business contracts and extended
+features remain authoritative for behavior. Existing rows are not proof of
+reference fidelity or of unvisited screens.
 
 Shared proposed guideline: [native base families](ios-base-guideline.md).
 Work: [new feedback audit](../../work/tickets/NATIVE-UI-SYSTEM-AUDIT-20261014.md).

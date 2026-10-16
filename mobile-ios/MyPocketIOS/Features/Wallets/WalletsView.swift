@@ -35,6 +35,17 @@ enum WalletEditorReferenceSection: String, CaseIterable {
     ]
 }
 
+/// Copy contract for the two populated wallet surfaces: the selector keeps
+/// the centered scope title, while management uses the reference-app label.
+enum WalletsReferenceCopy {
+    static let selectionTitle = "Chọn Ví"
+    static let managementTitle = "Ví Của Tôi"
+
+    static func title(isEditing: Bool) -> String {
+        isEditing ? managementTitle : selectionTitle
+    }
+}
+
 @MainActor
 final class WalletsViewModel: ObservableObject {
     @Published private(set) var wallets: [WalletModel] = []
@@ -146,7 +157,7 @@ struct WalletsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 16) {
                 MPSelectionScreenHeader(
-                    title: "Chọn Ví",
+                    title: WalletsReferenceCopy.title(isEditing: isEditing),
                     closeTitle: "Đóng",
                     closeAccessibilityLabel: "Quay lại",
                     closeAccessibilityIdentifier: "screen-back",

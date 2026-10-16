@@ -16,7 +16,35 @@ shared_fields:
 updated: 2026-10-16
 ---
 
-## 2026-10-16 savings and budget scope audit
+## 2026-10-16 Savings/Budget implementation — local candidate
+
+Scope: [delegated design](../superpowers/specs/2026-10-16-savings-budget-design.md)
+and [implementation plan](../superpowers/plans/2026-10-16-savings-budget-implementation.md).
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Fresh additive schema | Disposable PostgreSQL 17 at localhost:55436, migrations through035 | PASS; no production schema change |
+| Backend with real PostgreSQL | `TEST_DATABASE_URL=<disposable> go test -race ./... -count=1` | PASS; Redis-dependent tests still need separate fixture |
+| Savings/report API integration | `TestSavingsBudgetReportsRealLedgerAndOwnerKey` through real PostgreSQL and owner API-key middleware | PASS; 20M−12M=8M surplus,5M goal transfer separate, budget/report pages agree |
+| Recurrence persistence | Repository+HTTP race tests,8-way generation/mutation replay, revision/overlap/deletion cases | PASS |
+| Review regressions | Wallet baseline creation boundaries; superseded scope deletion; selected AI budget carry chain | PASS |
+| Signed native unit | `/tmp/mypocket-savings-native-20261016/Logs/Test/Test-MyPocketIOS-2026.10.16_21-24-27-+0700.xcresult` | PASS 317/317 after review follow-ups |
+| Native Release build | `/tmp/mypocket-savings-native-release.log` | BUILD SUCCEEDED; warnings treated as errors |
+| API-backed UI | [live UI evidence](tickets/SAVINGS-BUDGET-UI-EVIDENCE-20261016.md), `/tmp/mypocket-savings-budget-ui-fifth-20261016.xcresult` | PASS 2/2; real server stop confirmed before teardown |
+| Device automation | [separate signed helper](../operations/IOS-AUTOMATION-INSTALL-20261016.md), physical MCP UI read | PASS; not product acceptance |
+| Production/new iPhone candidate | New routes/schema/native install | Pending |
+
+Personal Team Release artifact also builds successfully with a documented
+developer-only Universal Links entitlement override. `codesign --verify --deep
+--strict` passes; application identifier remains `com.mypocket.ios`, team
+`AU442S3MN3`. It has not been installed over the owner's existing app.
+[Personal build instructions](../operations/IOS-PERSONAL-BUILD.md).
+
+Public human+agent references: [savings](../guides/savings-report-api.md),
+[recurrence](../guides/budget-recurrence-api.md), [forecast](../guides/budget-report-api.md),
+and generated Swagger. Scheduled push/goal completion forecast remain separate.
+
+## Earlier 2026-10-16 savings and budget scope audit (superseded above)
 
 The existing contracts are now covered by focused backend tests for account-
 local inclusive budget date boundaries, one explicit `start_date`/`end_date`
@@ -4920,6 +4948,46 @@ returns an owner-scoped wallet-link array, initialized to `[]` when empty.
   warnings-as-errors, `verify-project.sh`, both base-component scripts and
   `git diff --check` pass. The full API-backed UI suite and device/owner visual
   sign-off remain open for the overall port.
+
+## Reference wave integration gate — 2026-10-16
+
+The native source now composes the populated ledger, savings report and budget
+report with the shared reference bases. A focused signed simulator run passed
+7/7 (`ReferenceDisplayTests` + `TransactionsReferenceTests`) and the Release
+simulator build passed with `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES` at
+`/tmp/mypocket-reference-wave1-release-20261016`.
+
+The full unit target passed after making the shared JSON encoder use sorted
+keys. This stabilizes identical retry bodies for versioned budget-series
+mutations and fixes the deterministic idempotency assertion; it does not alter
+the JSON schema or business payload. Artifact/log:
+`/tmp/mypocket-reference-wave1-unit2-20261016` and
+`/tmp/mypocket-reference-wave1-unit2.log`.
+
+After Overview/Wallets integration, the complete native unit target passes
+329/329 with zero failures, skips or runtime warnings at
+`/tmp/mypocket-reference-wave2-unit-20261016`.
+
+An unscoped `xcodebuild test` was stopped after it remained in simulator
+launch orchestration for more than three minutes. This is an environmental
+runner issue, not a passing full UI-suite claim. The existing API-backed
+populated savings/budget evidence remains the authoritative live fixture proof;
+new reference UI screens still require a separately configured fixture run for
+screenshots.
+
+## Reference wave 2 integration gate — 2026-10-16
+
+Overview and Wallets now consume the shared compact metric grid and the shared
+wallet-selection title contract. Focused signed simulator tests for reference
+display, ledger, overview and wallets passed 12/12 with no failures, skips or
+runtime warnings. Artifact:
+`/tmp/mypocket-reference-wave2-focused-20261016/Logs/Test/`.
+
+The Release simulator build passed with warnings treated as errors at
+`/tmp/mypocket-reference-wave2-release-20261016`. No API, database, provider,
+production or physical-device state changed. The sample reference app remains
+separate from MyPocket's test fixture; its remaining phone-only branches are
+listed in the reference-survey ledger.
 
 ## Native AI-entry uncertain request recovery — 2026-10-08
 

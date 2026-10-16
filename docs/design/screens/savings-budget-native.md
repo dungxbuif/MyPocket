@@ -32,6 +32,46 @@ Parent owns public guide, API/architecture/requirements reconciliation and
 context/backlog/validation/release artifacts. This Markdown is the internal and
 AI-readable native screen contract; no separate native public surface is needed.
 
+## Reference display composition — 2026-10-16
+
+Approved [reference wave](../../work/tickets/NATIVE-REFERENCE-WAVE1-20261016-DETAIL_DESIGN.md)
+uses the observed report label/value pairs and budget grouped metrics. Savings
+goal totals, individual goal activity, surplus and budget limit/forecast each
+compose one `MPSurfaceCard(style: .reference)` with flat `MPMetricGrid` content.
+The base owns two equal compact columns at ordinary text size, one column on
+narrow widths or accessibility Dynamic Type, row-major reading order, full
+labels/values and amount masking. Consumers supply `MPMetricItem` lists; no
+per-screen font, color, radius, height ceiling or cloned metric layout.
+`MPMetricRow` owns compact date/value daily spend rows and moves the amount
+below its label when horizontal content cannot fit or accessibility text grows.
+Reference cards use the existing 24pt reference-radius token; standard and
+elevated surfaces keep their existing 12pt radius and flat treatment.
+
+No API, report calculations, scope, paging, forecast availability, wallet
+activity, loading/error or action behavior changes. Verification: focused
+rendered XCTest compares normal two-column content height with narrow and
+accessibility layouts, exercises long labels/maximum money and masked spoken
+values; compile plus parent-coordinated populated screenshots confirm fidelity.
+Public/API docs need no update for this display-only slice; this contract is
+also its plain Markdown agent-readable surface.
+
+Display implementation verification: five `ReferenceDisplayTests` and two
+ledger-reference tests pass together (7/7, zero failures/skips/runtime warnings):
+
+```sh
+rtk proxy xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS -destination 'platform=iOS Simulator,id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' -derivedDataPath /tmp/mypocket-reference-bases-20261016 -only-testing:MyPocketIOSTests/ReferenceDisplayTests -only-testing:MyPocketIOSTests/TransactionsReferenceTests test -quiet
+```
+
+Artifact: `/tmp/mypocket-reference-bases-20261016/Logs/Test/Test-MyPocketIOS-2026.10.16_21-36-46-+0700.xcresult`.
+Rendered hosting tests cover two-column normal metrics, one-column narrow and
+accessibility metrics, long labels/maximum integer money, masked display/spoken
+values, and adaptive daily rows. Base guard, guard regression tests and generated
+project verification pass. Earlier compile attempts overlapped the ledger
+worker's expected test-first missing helpers; the integrated focused run above
+is authoritative. The native unit target and Release simulator build also pass
+after integration. Populated screen screenshots remain a visual acceptance
+gate; a host sizing test alone is not visual acceptance.
+
 ## Implementation and evidence — 2026-10-16
 
 Implemented with the named existing bases in `SavingsReportsView.swift`,

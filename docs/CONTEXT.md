@@ -22,7 +22,55 @@ shared_fields:
 updated: 2026-10-16
 ---
 
-## Current checkpoint — 2026-10-16 20:45 +0700
+## Current checkpoint — 2026-10-16: Savings/Budget and physical automation
+
+Owner delegated financial design details and requested implementation. Local
+candidate now has both Savings Report sections (goal-wallet activity and
+account-wide surplus), paged source transactions, versioned recurring budgets
+for week/month/quarter/year, optional positive carryover and deterministic
+budget forecast/daily detail. Migration 035 is additive and verified on a
+disposable PostgreSQL 17 database. Generated OpenAPI contains 85 paths.
+Full backend race suite runs against that real database and passes; native
+signed unit target passes 317 tests and Release warnings-as-errors build passes.
+API-backed native UI verification passes 2/2 with unique synthetic data and
+real state readback, including the Stop confirmation. Review follow-up native
+unit rerun also passes 317/317. A Personal Team signed Release device artifact
+builds and verifies its signature with a documented Universal Links entitlement
+override; the owner's installed app remains unchanged.
+
+Independent review fixed wallet-baseline chronology and deletion of superseded
+scope revisions. Scope changes reset carryover. AI single-budget read now loads
+the prior owned chain before selecting output so carryover stays consistent.
+See [design](superpowers/specs/2026-10-16-savings-budget-design.md),
+[plan](superpowers/plans/2026-10-16-savings-budget-implementation.md),
+[ADR-023](decisions/ADR-023-ledger-savings-recurring-budgets.md).
+Production still runs the previous 78-path image and migration 34; the new
+runtime/schema and native candidate have not been deployed or installed.
+
+Physical automation is now working on the owner's paired iPhone. Device Kit
+0.0.34 is separately signed and installed; MCP UI reads pass. Existing
+MyPocket 1.1.0 (2) remains installed. Helper profile expires October 23;
+[installation evidence](operations/IOS-AUTOMATION-INSTALL-20261016.md).
+The owner explicitly reintroduced Money Lover as the native visual reference;
+an agent is visiting individual functions/drafts/pickers on that device,
+recording actual and unvisited states in the
+[reference ledger](design/reference-survey/2026-10-16-money-lover-iphone.md).
+Extended MyPocket functions are preserved. Survey completion and 100% UI
+reproduction are separate acceptance gates, neither is claimed yet.
+
+Reference waves 1–2 are now implemented locally for populated overview,
+wallets, savings/budget reports and the transaction ledger. Shared surfaces
+own the reference radius, compact metric grid, adaptive daily rows, masking
+and accessibility reading order; screen code only supplies data. Focused
+signed simulator tests pass 12/12, the native unit target passes, and the
+Release simulator build passes with warnings treated as errors. A
+deterministic sorted-key encoder was added so identical budget-series retries
+produce identical request bytes. The unscoped full xcodebuild run was stopped
+after a simulator-launch hang, so no full UI-suite pass is claimed. See the
+reference-wave detail design and the validation matrix for evidence and
+remaining populated-screen capture work.
+
+## Previous checkpoint — 2026-10-16 20:45 +0700
 
 The async advisor and AI-entry multi-image context fixes are now deployed to
 production. API and worker run

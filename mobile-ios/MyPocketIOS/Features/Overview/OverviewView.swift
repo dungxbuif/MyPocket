@@ -255,10 +255,13 @@ struct OverviewView: View {
                         "\(MPFormat.monthLabel(summary.month)) · \(summary.isComplete ? "Đã hoàn tất" : "Đang diễn ra")",
                         style: .secondary
                     )
-                    HStack(spacing: 24) {
-                        MPMetric(title: "Thu", value: MPFormat.money(summary.income), masked: masked, compact: true)
-                        MPMetric(title: "Chi", value: MPFormat.money(summary.expense), masked: masked, compact: true)
-                    }
+                    MPMetricGrid(
+                        items: [
+                            MPMetricItem(title: "Thu", value: MPFormat.money(summary.income)),
+                            MPMetricItem(title: "Chi", value: MPFormat.money(summary.expense))
+                        ],
+                        masked: masked
+                    )
                     if !summary.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                         MPText(summary.note, style: .secondary).lineLimit(2)
                     }

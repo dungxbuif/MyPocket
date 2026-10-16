@@ -24,20 +24,20 @@ struct BudgetReportView: View {
                         if let error { MPErrorView(title: "Không tải được báo cáo", detail: error) { Task { await load() } } }
                         if let report {
                             MPText("\(report.startDate) → \(report.endDate) · \(report.timezone)", style: .secondary)
-                            MPSurfaceCard {
+                            MPSurfaceCard(style: .reference) {
                                 VStack(alignment: .leading, spacing: 8) {
-                                    metric("Giới hạn gốc", report.baseLimitAmount)
-                                    metric("Chuyển dư từ kỳ trước", report.carryoverAmount)
-                                    metric("Giới hạn hiệu lực", report.effectiveLimitAmount)
-                                    metric("Đã chi", report.spent)
-                                    metric("Còn lại", report.remaining)
+                                    MPMetricGrid(items: [
+                                        metric("Giới hạn gốc", report.baseLimitAmount),
+                                        metric("Chuyển dư từ kỳ trước", report.carryoverAmount),
+                                        metric("Giới hạn hiệu lực", report.effectiveLimitAmount),
+                                        metric("Đã chi", report.spent), metric("Còn lại", report.remaining)
+                                    ], masked: masked)
                                 }
                             }
-                            MPSurfaceCard {
+                            MPSurfaceCard(style: .reference) {
                                 VStack(alignment: .leading, spacing: 8) {
                                     MPText(report.forecast.statusLabel, style: .emphasis)
-                                    if let amount = report.forecast.projectedSpent { metric("Chi tiêu cuối kỳ", amount) }
-                                    if let amount = report.forecast.projectedRemaining { metric("Còn lại cuối kỳ", amount) }
+                                    MPMetricGrid(items: forecastMetrics(report), masked: masked)
                                     if report.forecast.overBudget == true { MPStatusBadge(text: report.forecast.status == "actual" ? "Đã vượt ngân sách" : "Có thể vượt ngân sách", tone: .danger) }
                                     MPText("\(report.forecast.elapsedDays) / \(report.forecast.totalDays) ngày · Bao gồm ngày không chi.", style: .secondary)
                                     if report.forecast.status == "estimated" { MPText("Ước tính tuyến tính từ chi tiêu thực tế; không phải cam kết hoặc tư vấn AI.", style: .secondary) }
@@ -45,11 +45,13 @@ struct BudgetReportView: View {
                             }
                             .accessibilityIdentifier("budget-report-forecast")
                             MPButton("Xem giao dịch ngân sách", style: .secondary) { showingTransactions = true }
-                            MPSurfaceCard {
+                            MPSurfaceCard(style: .reference) {
                                 VStack(alignment: .leading, spacing: 8) {
                                     MPText("Chi tiêu từng ngày", style: .emphasis)
                                     if report.daily.isEmpty { MPText("Chưa có ngày đã bắt đầu trong kỳ.", style: .secondary) }
-                                    ForEach(report.daily) { day in metric(day.date, day.spent) }
+                                    ForEach(report.daily) { day in
+                                        MPMetricRow(title: day.date, value: MPFormat.money(day.spent), masked: masked)
+                                    }
                                 }
                             }
                             MPText("Cập nhật: \(report.asOf)", style: .secondary)
@@ -63,8 +65,15 @@ struct BudgetReportView: View {
         .task { await load() }
     }
 
-    private func metric(_ title: String, _ value: Int64) -> some View {
-        MPMetric(title: title, value: MPFormat.money(value, masked: masked))
+    private func metric(_ title: String, _ value: Int64) -> MPMetricItem {
+        MPMetricItem(title: title, value: MPFormat.money(value))
+    }
+
+    private func forecastMetrics(_ report: BudgetReportModel) -> [MPMetricItem] {
+        var items: [MPMetricItem] = []
+        if let amount = report.forecast.projectedSpent { items.append(metric("Chi tiêu cuối kỳ", amount)) }
+        if let amount = report.forecast.projectedRemaining { items.append(metric("Còn lại cuối kỳ", amount)) }
+        return items
     }
 
     private func load() async {

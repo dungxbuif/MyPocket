@@ -38,6 +38,17 @@ shared_fields: [status]
 
 ## Unreleased — native Stitch parity continuation
 
+- Continue native Money Lover reference parity with populated transaction
+  ledger, savings report and budget report compositions. Shared reference
+  surfaces now own compact metrics, adaptive daily rows, masking and Dynamic
+  Type/accessibility reading order; no API or financial calculation changes.
+- Extend the same shared composition to populated Overview and Wallets
+  surfaces, including compact income/expense metrics and the selection versus
+  management title contract.
+- Stabilize JSON request bytes with sorted keys so identical budget-series
+  retries remain idempotency-safe and reproducible. Focused native tests and
+  Release simulator build pass; physical-device owner UAT remains pending.
+
 - Add local Savings Report with separate goal-wallet activity and account-wide
   surplus, month/wallet filters and paged transaction drilldown. Initial wallet
   balances enter history at creation and are shown separately from ledger rows.

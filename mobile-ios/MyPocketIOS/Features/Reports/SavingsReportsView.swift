@@ -33,17 +33,10 @@ struct SavingsReportsView: View {
                         if let error { MPErrorView(title: "Không tải được báo cáo tiết kiệm", detail: error) { Task { await load() } } }
                         if let report {
                             MPText("\(report.month) · \(report.timezone) · Cập nhật \(report.asOf)", style: .secondary)
-                            MPSurfaceCard {
+                            MPSurfaceCard(style: .reference) {
                                 VStack(alignment: .leading, spacing: 8) {
                                     MPText("Ví mục tiêu", style: .emphasis)
-                                    metric("Số dư đầu tháng", report.goals.openingBalance)
-                                    metric("Số dư cuối kỳ", report.goals.closingBalance)
-                                    if let initial = report.goals.initialBalanceAdded, initial != 0 { metric("Số dư khi tạo ví trong kỳ", initial) }
-                                    metric("Nạp ngoài chuyển ví", report.goals.deposits)
-                                    metric("Rút ngoài chuyển ví", report.goals.withdrawals)
-                                    metric("Điều chỉnh", report.goals.adjustments)
-                                    metric("Chuyển ví (thuần)", report.goals.internalTransfers)
-                                    metric("Thay đổi số dư", report.goals.netChange)
+                                    MPMetricGrid(items: goalSummaryMetrics(report), masked: masked)
                                     MPText("Chuyển giữa các ví mục tiêu đang chọn bù trừ nhau. Mục tiêu dưới đây dùng cấu hình hiện tại.", style: .secondary)
                                     MPButton("Giao dịch ví mục tiêu", style: .secondary) { openTransactions(section: "goals") }
                                 }
@@ -51,21 +44,10 @@ struct SavingsReportsView: View {
                             .accessibilityIdentifier("savings-report-goals")
                             if report.goals.items.isEmpty { MPEmptyView(title: "Chưa có ví mục tiêu", detail: "Tạo ví mục tiêu để theo dõi số dư tiết kiệm.") }
                             ForEach(report.goals.items) { goal in
-                                MPSurfaceCard {
+                                MPSurfaceCard(style: .reference) {
                                     VStack(alignment: .leading, spacing: 8) {
                                         MPText(goal.name, style: .emphasis)
-                                        metric("Số dư đầu tháng", goal.openingBalance)
-                                        metric("Số dư", goal.closingBalance)
-                                        if let initial = goal.initialBalanceAdded, initial != 0 { metric("Số dư khi tạo ví trong kỳ", initial) }
-                                        metric("Nạp", goal.deposits)
-                                        metric("Rút", goal.withdrawals)
-                                        metric("Điều chỉnh", goal.adjustments)
-                                        metric("Chuyển ví (thuần)", goal.internalTransfers)
-                                        metric("Thay đổi số dư", goal.netChange)
-                                        if let target = goal.targetAmount {
-                                            metric("Mục tiêu hiện tại", target)
-                                            metric("Còn thiếu", goal.remaining)
-                                        }
+                                        MPMetricGrid(items: goalMetrics(goal), masked: masked)
                                         if let progress = goal.progressBPS {
                                             MPProgressBar(progress: Double(progress) / 10_000, label: masked ? MPFormat.maskedValue : String(format: "%.2f%%", Double(progress) / 100))
                                         }
@@ -78,15 +60,11 @@ struct SavingsReportsView: View {
                                     }
                                 }
                             }
-                            MPSurfaceCard {
+                            MPSurfaceCard(style: .reference) {
                                 VStack(alignment: .leading, spacing: 8) {
                                     MPText("Thặng dư thu / chi · Toàn tài khoản", style: .emphasis)
-                                    metric("Thu nhập", report.surplus.income)
-                                    metric("Chi tiêu", report.surplus.expense)
-                                    metric("Thặng dư", report.surplus.net)
-                                    if let rate = report.surplus.savingsRateBPS {
-                                        MPMetric(title: "Tỷ lệ thặng dư / thu nhập", value: masked ? MPFormat.maskedValue : String(format: "%.2f%%", Double(rate) / 100))
-                                    } else {
+                                    MPMetricGrid(items: surplusMetrics(report), masked: masked)
+                                    if report.surplus.savingsRateBPS == nil {
                                         MPText("Chưa có thu nhập dương để tính tỷ lệ.", style: .secondary)
                                     }
                                     MPText("Không cộng thặng dư vào số dư ví mục tiêu. Bộ lọc ví chỉ áp dụng phần mục tiêu.", style: .secondary)
@@ -106,8 +84,41 @@ struct SavingsReportsView: View {
         .onChange(of: walletID) { _, _ in report = nil; error = nil }
     }
 
-    private func metric(_ title: String, _ value: Int64) -> some View {
-        MPMetric(title: title, value: MPFormat.money(value, masked: masked))
+    private func metric(_ title: String, _ value: Int64) -> MPMetricItem {
+        MPMetricItem(title: title, value: MPFormat.money(value))
+    }
+
+    private func goalSummaryMetrics(_ report: SavingsReportModel) -> [MPMetricItem] {
+        let goal = report.goals
+        var items = [metric("Số dư đầu tháng", goal.openingBalance), metric("Số dư cuối kỳ", goal.closingBalance)]
+        if let initial = goal.initialBalanceAdded, initial != 0 { items.append(metric("Số dư khi tạo ví trong kỳ", initial)) }
+        items += [
+            metric("Nạp ngoài chuyển ví", goal.deposits), metric("Rút ngoài chuyển ví", goal.withdrawals),
+            metric("Điều chỉnh", goal.adjustments), metric("Chuyển ví (thuần)", goal.internalTransfers),
+            metric("Thay đổi số dư", goal.netChange)
+        ]
+        return items
+    }
+
+    private func goalMetrics(_ goal: SavingsGoalItemModel) -> [MPMetricItem] {
+        var items = [metric("Số dư đầu tháng", goal.openingBalance), metric("Số dư", goal.closingBalance)]
+        if let initial = goal.initialBalanceAdded, initial != 0 { items.append(metric("Số dư khi tạo ví trong kỳ", initial)) }
+        items += [
+            metric("Nạp", goal.deposits), metric("Rút", goal.withdrawals), metric("Điều chỉnh", goal.adjustments),
+            metric("Chuyển ví (thuần)", goal.internalTransfers), metric("Thay đổi số dư", goal.netChange)
+        ]
+        if let target = goal.targetAmount {
+            items += [metric("Mục tiêu hiện tại", target), metric("Còn thiếu", goal.remaining)]
+        }
+        return items
+    }
+
+    private func surplusMetrics(_ report: SavingsReportModel) -> [MPMetricItem] {
+        var items = [metric("Thu nhập", report.surplus.income), metric("Chi tiêu", report.surplus.expense), metric("Thặng dư", report.surplus.net)]
+        if let rate = report.surplus.savingsRateBPS {
+            items.append(MPMetricItem(title: "Tỷ lệ thặng dư / thu nhập", value: String(format: "%.2f%%", Double(rate) / 100)))
+        }
+        return items
     }
 
     private func openTransactions(section: String) {

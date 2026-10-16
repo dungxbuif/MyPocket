@@ -72,6 +72,26 @@ enum TransactionsPresentation {
         let monthYear: String
     }
 
+    static func scopeBalance(wallets: [WalletModel], selectionID: String) -> Int64? {
+        guard !wallets.isEmpty else { return nil }
+        if selectionID == "__all__" {
+            return MPWalletManagementPolicy.totalBalance(from: wallets)
+        }
+        return wallets.first(where: { $0.id == selectionID })?.currentBalance
+    }
+
+    static func dayHeading(_ key: String, timeZone: TimeZone, now: Date = Date()) -> String {
+        if key == MPFormat.calendarDateString(now, timeZone: timeZone) { return "Hôm nay" }
+        return dayGroup(key, timeZone: timeZone)?.weekday ?? key
+    }
+
+    static func categoryRowDate(_ occurredAt: String, timeZone: TimeZone, now: Date = Date()) -> String {
+        guard let instant = MPFormat.parseInstant(occurredAt) else { return MPFormat.shortDate(occurredAt, timeZone: timeZone) }
+        let key = MPFormat.calendarDateString(instant, timeZone: timeZone)
+        guard let day = dayGroup(key, timeZone: timeZone) else { return key }
+        return "\(day.dayNumber) \(day.monthYear), \(dayHeading(key, timeZone: timeZone, now: now))"
+    }
+
     static func dayGroup(_ key: String, timeZone: TimeZone) -> DayGroup? {
         guard let date = MPFormat.parseCalendarDate(key, timeZone: timeZone) else { return nil }
         func formatter(_ format: String) -> DateFormatter {
@@ -432,6 +452,7 @@ struct TransactionsView: View {
     @StateObject private var model: TransactionsViewModel
     @Binding private var addRequested: Bool
     @Environment(\.mpFinancialValuesMasked) private var masked
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let onAIEntry: (() -> Void)?
     let onOpenReports: (() -> Void)?
     @State private var editorPresented = false
@@ -479,17 +500,26 @@ struct TransactionsView: View {
                 }
                 if model.selectedWalletType != "goal" {
                     MPScreenHeader(title: "", leading: {
-                        MPWalletScopeSelector(wallets: model.wallets, selectionID: $model.walletSelection, centered: false)
+                        if model.selectedWalletType != "credit" {
+                            MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
+                        }
                     }, trailing: {
-                        HStack(spacing: 4) {
-                            if model.selectedWalletType != "credit" {
-                                MPOverflowMenu(label: "Tùy chọn giao dịch", actions: transactionMenuActions)
-                                MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
-                            }
+                        MPWalletScopeSelector(wallets: model.wallets, selectionID: $model.walletSelection)
+                        if model.selectedWalletType != "credit" {
+                            MPOverflowMenu(label: "Tùy chọn giao dịch", actions: transactionMenuActions)
                         }
                     })
                 }
                 if model.selectedWalletType != "goal", model.selectedWalletType != "credit" {
+                    if let balance = TransactionsPresentation.scopeBalance(wallets: model.wallets, selectionID: model.walletSelection) {
+                        VStack(spacing: 4) {
+                            MPText("Số dư", style: .secondary)
+                            MPText(MPFormat.money(balance, masked: masked), style: .emphasis)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .accessibilityElement(children: .combine)
+                        .accessibilityIdentifier("transactions-scope-balance")
+                    }
                     MPSegmentedControl(options: [("week", "Theo tuần"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
                     if model.periodSelection == "week" {
                         MPWeekNavigator(
@@ -508,8 +538,9 @@ struct TransactionsView: View {
                 }
                 if let selectedWallet, selectedWallet.type == "credit" {
                     CreditView(api: modelAPI, onBack: { model.walletSelection = "__all__" }, preferredWalletID: selectedWallet.id)
-                } else if selectionMode {
-                    MPSurfaceCard {
+                } else {
+                    if selectionMode {
+                    MPSurfaceCard(style: .reference) {
                         VStack(alignment: .leading, spacing: 8) {
                             HStack {
                                 MPText("Đã chọn \(selectedIDs.count)/100")
@@ -527,7 +558,7 @@ struct TransactionsView: View {
                             }
                         }
                     }
-                } else {
+                    }
                     if model.isLoading && model.transactions.isEmpty {
                     MPLoadingView(label: "Đang tải giao dịch...")
                     } else if let errorMessage = model.errorMessage, model.transactions.isEmpty {
@@ -539,33 +570,34 @@ struct TransactionsView: View {
                         MPButton("Tải lại", style: .secondary, isLoading: model.isLoading) { Task { await model.load() } }
                     }
                     if let warning = model.cacheWarning { MPStatusMessage(text: warning) }
-                    MPSurfaceCard {
-                        VStack(alignment: .leading, spacing: 10) {
-                            HStack {
-                                MPText("Tiền vào")
-                                Spacer()
-                                MPText(MPFormat.money(model.totalIncome, masked: masked), style: .title)
-                            }
-                            HStack {
-                                MPText("Tiền ra")
-                                Spacer()
-                                MPText(MPFormat.money(model.totalExpense, masked: masked), style: .title)
-                            }
+                    VStack(alignment: .leading, spacing: 4) {
+                        MPMetricRow(title: "Tiền vào", value: MPFormat.signedMoney(model.totalIncome, masked: masked), masked: masked, tone: .income)
+                        MPMetricRow(title: "Tiền ra", value: MPFormat.signedMoney(-model.totalExpense, masked: masked), masked: masked, tone: .expense)
+                        MPDivider()
+                        MPMetricRow(title: "Chênh lệch", value: MPFormat.signedMoney(model.totalIncome - model.totalExpense, masked: masked), masked: masked)
+                        if let onOpenReports {
+                            MPTextLinkButton("Xem báo cáo", action: onOpenReports)
+                                .frame(maxWidth: .infinity)
+                                .accessibilityIdentifier("transactions-open-reports")
                         }
                     }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier("transactions-cashflow-summary")
                     if model.filteredTransactions.isEmpty {
                         MPEmptyView(title: "Không có giao dịch", detail: "Thử đổi khoảng thời gian hoặc thêm giao dịch mới.")
                     } else {
                         ForEach(model.groupedTransactions, id: \.0) { day, transactions in
-                            MPSurfaceCard {
+                            MPSurfaceCard(style: .reference) {
                                 VStack(alignment: .leading, spacing: 0) {
                                     transactionGroupHeader(day, transactions: transactions)
-                                        .padding(.bottom, 4)
+                                        .padding(.bottom, 8)
                                     ForEach(transactions) { transaction in
                                         transactionRow(transaction)
+                                            .padding(.vertical, 4)
                                     }
                                 }
                             }
+                            .accessibilityIdentifier("transactions-group-\(day)")
                         }
                     }
                 }
@@ -696,19 +728,26 @@ struct TransactionsView: View {
         let total = MPFormat.signedMoney(transactions.reduce(0) { $0 + model.signedAmount(for: $1) }, masked: masked)
         if model.groupByCategory {
             HStack {
-                MPText(model.groupLabel(key), style: .secondary)
+                VStack(alignment: .leading, spacing: 2) {
+                    MPText(model.groupLabel(key), style: .emphasis)
+                    MPText("\(transactions.count) giao dịch", style: .secondary)
+                }
                 Spacer()
-                MPText(total, style: .secondary)
+                MPText(total, style: .emphasis)
             }
         } else if let group = TransactionsPresentation.dayGroup(key, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current) {
+            let heading = TransactionsPresentation.dayHeading(key, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current)
+            VStack(alignment: .leading, spacing: 4) {
             HStack(alignment: .center, spacing: 12) {
                 MPText(group.dayNumber, style: .display)
                 VStack(alignment: .leading, spacing: 2) {
-                    MPText(group.weekday, style: .secondary)
+                    MPText(heading, style: .secondary)
                     MPText(group.monthYear, style: .secondary)
                 }
                 Spacer()
-                MPText(total, style: .secondary)
+                if !dynamicTypeSize.isAccessibilitySize { MPText(total, style: .emphasis) }
+            }
+            if dynamicTypeSize.isAccessibilitySize { MPText(total, style: .emphasis) }
             }
             .accessibilityElement(children: .combine)
             .accessibilityLabel("\(group.weekday), \(group.dayNumber) \(group.monthYear), tổng \(total)")
@@ -742,12 +781,18 @@ struct TransactionsView: View {
     @ViewBuilder
     private func transactionRow(_ transaction: TransactionModel) -> some View {
         let selectable = TransactionsViewModel.bulkDeleteSelectable(transaction)
-        let row = MPTransactionRow(
+        let presentedRow = MPTransactionRow(
             transaction: transaction,
             category: model.categories.first(where: { $0.id == transaction.categoryID }),
             timeZone: TimeZone(identifier: model.accountTimezone) ?? .current,
             masked: masked
         )
+        let row = model.groupByCategory ? MPTransactionRow(
+            title: TransactionsPresentation.categoryRowDate(transaction.occurredAt, timeZone: TimeZone(identifier: model.accountTimezone) ?? .current),
+            subtitle: presentedRow.subtitle, amount: presentedRow.amount,
+            iconName: presentedRow.iconName, iconTone: presentedRow.iconTone,
+            amountTone: presentedRow.amountTone
+        ) : presentedRow
         if selectionMode {
             MPButton(style: .plain, isDisabled: !selectable) {
                 if selectable {

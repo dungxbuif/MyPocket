@@ -300,6 +300,8 @@ extension JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         encoder.keyEncodingStrategy = .convertToSnakeCase
+        // Stable wire bytes make retries and idempotency diagnostics reproducible.
+        encoder.outputFormatting = [.sortedKeys]
         return encoder
     }
 }

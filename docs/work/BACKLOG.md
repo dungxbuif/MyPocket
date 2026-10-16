@@ -20,6 +20,23 @@ updated: 2026-10-15
 
 # Backlog
 
+## Current additions — 2026-10-16
+
+Owner selected both goal-wallet activity and account-wide surplus and delegated
+remaining budget recurrence/forecast decisions. [Design](../superpowers/specs/2026-10-16-savings-budget-design.md)
+and [plan](../superpowers/plans/2026-10-16-savings-budget-implementation.md)
+are implemented locally: additive migration035, versioned series, positive
+carryover, deterministic forecast and matching transaction pages, native views.
+Real PostgreSQL race suites pass; signed native unit and Release build pass.
+Native API-backed UI evidence is being collected. Production new-route/schema
+rollout, physical candidate install and owner acceptance remain pending.
+
+Owner also requested a physical Money Lover visual survey and subsequent native
+UI reproduction, preserving MyPocket extensions. [Survey](../design/reference-survey/2026-10-16-money-lover-iphone.md)
+tracks each visited subfunction and blocked branch. Automation helper is signed
+and installed, UI reads verified. Survey completion is not visual parity proof;
+UI implementation and per-screen comparison follow observed base mappings.
+
 ## Authoritative native queue — 2026-10-15
 
 [Reconciliation matrix](tickets/NATIVE-RECONCILIATION-20261015.md) is the active

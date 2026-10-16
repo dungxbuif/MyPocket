@@ -4,6 +4,10 @@ enum MPSurfaceCardStyle: Equatable {
     case standard
     case elevated
     case reference
+
+    var cornerRadius: CGFloat {
+        self == .reference ? MPMetrics.referenceCornerRadius : MPMetrics.cornerRadius
+    }
 }
 
 struct MPSurfaceCard<Content: View>: View {
@@ -22,7 +26,7 @@ struct MPSurfaceCard<Content: View>: View {
             .padding(.horizontal, MPMetrics.cardHorizontalPadding)
             .padding(.vertical, MPMetrics.cardVerticalPadding)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
+            .background(MPColor.surface, in: RoundedRectangle(cornerRadius: style.cornerRadius))
             .accessibilityElement(children: .contain)
     }
 }
@@ -34,22 +38,144 @@ struct MPMetric: View {
     var masked: Bool = false
     var compact: Bool = false
 
+    var displayValue: String { masked ? MPFormat.maskedValue : value }
+    var spokenValue: String { masked ? "Đã ẩn số tiền" : value }
+
     var body: some View {
             VStack(alignment: .leading, spacing: 4) {
                 Text(title)
                     .font(MPFont.bodySmall)
                     .foregroundStyle(MPColor.secondary)
-                Text(masked ? "••••••" : value)
+                Text(displayValue)
                     .font(compact ? MPFont.bodyEmphasis.monospacedDigit() : MPFont.currency)
                     .foregroundStyle(MPColor.ink)
-                    .accessibilityLabel(masked ? "Đã ẩn số tiền" : "\(title): \(value)")
                 if let detail {
                     Text(detail)
                         .font(MPFont.bodySmall)
                         .foregroundStyle(MPColor.secondary)
                 }
             }
+            .fixedSize(horizontal: false, vertical: true)
             .frame(maxWidth: .infinity, alignment: .leading)
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(title)
+            .accessibilityValue([spokenValue, detail].compactMap { $0 }.joined(separator: ". "))
+    }
+}
+
+/// Features supply labels and formatted values; this flat base owns density,
+/// reflow and reading order without creating an individual card per metric.
+struct MPMetricItem: Identifiable {
+    let title: String
+    let value: String
+    var detail: String? = nil
+    var id: String { title }
+}
+
+struct MPMetricGrid: View {
+    let items: [MPMetricItem]
+    var masked: Bool = false
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var body: some View {
+        MPMetricGridLayout(accessibility: dynamicTypeSize.isAccessibilitySize) {
+            ForEach(items) { item in
+                MPMetric(title: item.title, value: item.value, detail: item.detail, masked: masked, compact: true)
+            }
+        }
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private struct MPMetricGridLayout: Layout {
+    let accessibility: Bool
+
+    private func columns(for width: CGFloat) -> Int {
+        accessibility || width < MPMetrics.hitTarget * 6 + MPMetrics.sectionSpacing ? 1 : 2
+    }
+
+    private func rowHeights(width: CGFloat, subviews: Subviews) -> [CGFloat] {
+        let columns = columns(for: width)
+        let cellWidth = max(0, (width - CGFloat(columns - 1) * MPMetrics.sectionSpacing) / CGFloat(columns))
+        return stride(from: 0, to: subviews.count, by: columns).map { start in
+            (start..<min(start + columns, subviews.count)).map { index in
+                subviews[index].sizeThatFits(ProposedViewSize(width: cellWidth, height: nil)).height
+            }.max() ?? 0
+        }
+    }
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard !subviews.isEmpty else { return .zero }
+        let width = proposal.width ?? subviews.map { $0.sizeThatFits(.unspecified).width }.max() ?? 0
+        let heights = rowHeights(width: width, subviews: subviews)
+        return CGSize(width: width, height: heights.reduce(0, +) + CGFloat(max(0, heights.count - 1)) * MPMetrics.sectionSpacing)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        let columns = columns(for: bounds.width)
+        let cellWidth = max(0, (bounds.width - CGFloat(columns - 1) * MPMetrics.sectionSpacing) / CGFloat(columns))
+        let heights = rowHeights(width: bounds.width, subviews: subviews)
+        var y = bounds.minY
+        for (row, height) in heights.enumerated() {
+            for column in 0..<columns {
+                let index = row * columns + column
+                guard index < subviews.count else { break }
+                subviews[index].place(
+                    at: CGPoint(x: bounds.minX + CGFloat(column) * (cellWidth + MPMetrics.sectionSpacing), y: y),
+                    anchor: .topLeading,
+                    proposal: ProposedViewSize(width: cellWidth, height: height)
+                )
+            }
+            y += height + MPMetrics.sectionSpacing
+        }
+    }
+}
+
+/// Flat compact label/value row used by daily reports and ledger summaries.
+/// The full value participates in fitting, so long money never shrinks/clips.
+struct MPMetricRow: View {
+    let title: String
+    let value: String
+    var masked: Bool = false
+    var tone: MPTransactionAmountTone = .neutral
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    var displayValue: String { masked ? MPFormat.maskedValue : value }
+    var spokenValue: String { masked ? "Đã ẩn số tiền" : value }
+
+    var body: some View {
+        Group {
+            if dynamicTypeSize.isAccessibilitySize {
+                stacked
+            } else {
+                ViewThatFits(in: .horizontal) {
+                    HStack(alignment: .firstTextBaseline, spacing: MPMetrics.sectionSpacing) {
+                        MPText(title, style: .secondary).fixedSize()
+                        Spacer(minLength: 0)
+                        amount.fixedSize()
+                    }
+                    stacked
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(title)
+        .accessibilityValue(spokenValue)
+    }
+
+    private var amount: some View {
+        Text(displayValue)
+            .font(MPFont.bodyEmphasis.monospacedDigit())
+            .foregroundStyle(tone == .neutral ? MPColor.ink : tone.color)
+            .fixedSize(horizontal: false, vertical: true)
+    }
+
+    private var stacked: some View {
+        VStack(alignment: .leading, spacing: MPMetrics.rowSpacing) {
+            MPText(title, style: .secondary).fixedSize(horizontal: false, vertical: true)
+            amount
+        }
     }
 }
 

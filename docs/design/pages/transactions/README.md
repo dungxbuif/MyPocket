@@ -1,5 +1,41 @@
 # Transactions — list and basic income/expense editor
 
+## Native physical-reference composition — 2026-10-16
+
+[Approved wave design](../../../work/tickets/NATIVE-REFERENCE-WAVE1-20261016-DETAIL_DESIGN.md)
+maps the actually observed ledger, category-group and overflow captures to these
+existing native bases before implementation:
+
+| Reference region | Native composition | Preserved behavior |
+| --- | --- | --- |
+| Wallet identity and balance | `MPWalletScopeSelector`, `MPText` | Centered owner-wallet scope; balance is the selected wallet's API balance, or the existing `is_in_total` aggregate policy. Money respects privacy masking. |
+| Period strip | `MPSegmentedControl`, `MPWeekNavigator`, `MPDateRangePicker` | Existing Monday–Sunday week/custom range and future-week guard; no sample-account day-5 rule. |
+| Cashflow and report action | Flat `MPMetricRow` label/value rows, `MPDivider`, `MPTextLinkButton` | Real filtered income, expense and net; existing Reports callback only when supplied. The action says “Xem báo cáo” because the existing route does not accept a week/custom period. No pending-outbox amounts. |
+| Day/category group | One `MPSurfaceCard(.reference)` per group, existing `MPText` day heading | Account-local day number, today/weekday and month/year, signed group total; category grouping retains title and row count. |
+| Transaction row | Existing `MPTransactionRow` inside `MPButton(.plain)` | Date grouping keeps category/note/amount semantics; category grouping shows account-local date and note below its category/count header. Existing amount/glyph mapping, detail route and bulk-selection eligibility remain shared. |
+| Secondary actions | Existing `MPOverflowMenu` and `MPIconButton` add | Group/range/reload/bulk/transfer/adjustment stay available. Search is not an existing supported native action and no inert search control is added. |
+
+This slice changes layout only. Goal and credit retain their specialized ledger
+surfaces; offline recovery, owner guards, editor/detail/transfer actions and
+account timezone remain authoritative. The bulk-selection panel must coexist
+with the grouped rows so selection is reachable. Screen modifiers are layout
+only; all typography, color, shapes and control hit targets remain base-owned.
+
+Verification planned: focused balance/day-presentation unit tests, native
+base/project guards, signed simulator unit target and Release compile, followed
+by populated normal/large-text simulator screenshots compared with the actual
+reference. Physical-device acceptance remains a separate gate. API/schema and
+public setup/reference docs need no update because their contracts are unchanged;
+this Markdown screen contract is the agent-readable implementation surface.
+
+Local implementation checkpoint: `bash mobile-ios/scripts/check-base-components.test.sh`
+and `git diff --check` pass. New `TransactionsReferenceTests` cover selected vs
+included aggregate balance, local today/weekday, and category-row local date.
+Test-first compilation captured missing presentation helpers; concurrent base
+tests were also intentionally red while their shared implementations were being
+added. The parent integration run owns signed unit/build results and populated
+normal/large-text screenshots; visual completion is not claimed here.
+
 ## Native queued creates — 2026-10-14
 
 DefaultAuth/root injects FinancialMutationQueue into shared ordinary/transfer
