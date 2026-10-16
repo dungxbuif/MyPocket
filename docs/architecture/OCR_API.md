@@ -37,6 +37,7 @@ trace:
 ## Status
 
 - 2026-09-23 runtime update: one-shot AI upload accepts JPEG/PNG/PDF. Backend validates the uploaded bytes and stores the original in private environment-qualified MyPocket S3. It sends validated image bytes as Base64 to OCR Platform and uses OCR Platform's private presign flow for PDFs; it no longer submits a MyPocket signed URL as an OCR source because OCR Platform only treats its own `s3://` source URLs as app-owned. MyPocket now submits `mode: "wait"` with `waitTimeoutMs: 15000`; a terminal `200` response is consumed inline, while a timeout `202` receipt continues through the existing bounded poll loop. OCR completes before text extraction; the LLM receives only user/OCR text (never file bytes, base64, URL or image input). Unit coverage verifies both inline and queued responses.
+- 2026-10-16 multi-image context update: the backend preserves request order for model-facing OCR blocks and wraps each block with an ordinal/document marker plus filename. Persisted attachment OCR text is mapped back by attachment ID because database rows remain deterministically ID-ordered. OCR still returns text only; markers preserve boundaries but do not add layout coordinates or guarantee provider recognition accuracy.
 - ID: API-OCR-001
 - Status: implemented locally and live wait-mode contract validated against the OCR provider
 - Owner: shared

@@ -393,6 +393,49 @@ func TestOCRBeforeModel(t *testing.T) {
 	}
 }
 
+func TestExtractionMarksEachOCRDocumentBoundary(t *testing.T) {
+	var submissions atomic.Int32
+	var modelSource string
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			index := submissions.Add(1)
+			text := "OCR-A"
+			if index == 2 {
+				text = "OCR-B"
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"documentId":"doc","status":"completed","result":{"text":"`+text+`"}}`)
+		case "/v1/chat/completions":
+			var request struct {
+				Messages []chatMessage `json:"messages"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			modelSource = request.Messages[1].Content
+			modelResponse(w, `{"reply":"review","drafts":[]}`)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	first := pngImage(t)
+	first.Name = "statement-page-1.png"
+	second := pngImage(t)
+	second.Name = "statement-page-2.png"
+	if _, err := c.Extract(context.Background(), Input{Images: []Image{first, second}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"OCR document 1", "statement-page-1.png", "OCR document 2", "statement-page-2.png"} {
+		if !strings.Contains(modelSource, want) {
+			t.Fatalf("model source missing document marker %q: %s", want, modelSource)
+		}
+	}
+	if strings.Index(modelSource, "OCR-A") > strings.Index(modelSource, "OCR-B") {
+		t.Fatalf("OCR blocks were reordered: %s", modelSource)
+	}
+}
+
 func TestOCRWaitModeFallsBackOnlyForUnknownMode(t *testing.T) {
 	var submissions atomic.Int32
 	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
@@ -483,7 +526,7 @@ func TestPDFIsUploadedToOCRPrivatelyBeforeTextOnlyModel(t *testing.T) {
 	defer server.Close()
 	c := NewClient(Config{BaseURL: server.URL + "/v1/", APIKey: "test-model-key", Model: "test-model", OCRURL: server.URL, OCRKey: "test-ocr-key"})
 	out, err := c.Extract(context.Background(), Input{Images: []Image{{Name: "statement.pdf", MIMEType: "application/pdf", Base64: base64.StdEncoding.EncodeToString(pdf)}}})
-	if err != nil || out.SourceText != "Transfer 35000 VND" || uploads.Load() != 1 || ocrSubmissions.Load() != 1 || models.Load() != 1 {
+	if err != nil || !strings.Contains(out.SourceText, "Transfer 35000 VND") || !strings.Contains(out.SourceText, "OCR document 1") || uploads.Load() != 1 || ocrSubmissions.Load() != 1 || models.Load() != 1 {
 		t.Fatalf("PDF OCR flow failed: out=%+v err=%v upload=%d submit=%d model=%d", out, err, uploads.Load(), ocrSubmissions.Load(), models.Load())
 	}
 }
@@ -674,7 +717,7 @@ func TestModelFailurePreservesOCRSource(t *testing.T) {
 		}
 	})
 	out, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}})
-	if err == nil || out.SourceText != "source evidence" || len(out.Drafts) != 0 {
+	if err == nil || !strings.Contains(out.SourceText, "source evidence") || !strings.Contains(out.SourceText, "OCR document 1") || len(out.Drafts) != 0 {
 		t.Fatal("lost OCR evidence or produced drafts on model failure")
 	}
 }

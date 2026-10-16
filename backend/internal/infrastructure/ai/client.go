@@ -259,7 +259,7 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	}
 	source := input.Text
 	attachmentTexts := make([]string, 0, len(input.Images))
-	for _, img := range input.Images {
+	for index, img := range input.Images {
 		ocrStarted := time.Now()
 		slog.Info("AI OCR started", "attachment_index", len(attachmentTexts), "mime_type", img.MIMEType, "bytes", len(img.Base64))
 		extracted, err := c.ocr(ctx, img)
@@ -274,10 +274,7 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		}
 		slog.Info("AI OCR completed", "attachment_index", len(attachmentTexts), "text_bytes", len(extracted), "latency_ms", time.Since(ocrStarted).Milliseconds())
 		attachmentTexts = append(attachmentTexts, extracted)
-		if source != "" {
-			source += "\n\n"
-		}
-		source += extracted
+		source = appendOCRDocument(source, index+1, img.Name, extracted)
 		if len(source) > maxSourceBytes {
 			return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: true}, errors.New("OCR source text exceeds limit")
 		}
@@ -381,6 +378,20 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		"total_tokens", modelUsageInt(modelUsage, "total_tokens"),
 	)
 	return out, err
+}
+
+func appendOCRDocument(source string, index int, filename, text string) string {
+	metadata, err := json.Marshal(struct {
+		Filename string `json:"filename"`
+	}{Filename: filename})
+	if err != nil {
+		metadata = []byte(`{"filename":""}`)
+	}
+	block := fmt.Sprintf("[OCR document %d metadata=%s]\n%s\n[/OCR document %d]", index, metadata, text, index)
+	if source == "" {
+		return block
+	}
+	return source + "\n\n" + block
 }
 
 func buildMessages(input Input, source string) ([]chatMessage, error) {

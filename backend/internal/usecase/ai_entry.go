@@ -98,6 +98,7 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 		slog.Info("AI entry replay returned", "process_id", id)
 		return s.Entries.Session(ctx, owner, id)
 	}
+	var ocrAttachments []entity.AIEntryAttachment
 	if len(in.Images) > 0 {
 		if s.Storage == nil {
 			slog.Warn("AI entry storage unavailable", "process_id", id, "stage", "storage", "code", "storage_not_configured")
@@ -119,12 +120,14 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 			return nil, ErrAIStorage
 		}
 		in.Images = prepared
+		ocrAttachments = attachments
 	}
 	providerCtx, cancel := context.WithTimeout(ctx, aiProviderTimeout)
 	defer cancel()
 	out, err := s.Extractor.Extract(providerCtx, entity.AIExtractInput{Text: in.Text, Instruction: in.Text, Timezone: in.Timezone, Now: accountNow, Wallets: wallets, Categories: categories, Images: in.Images})
 	if len(in.Images) > 0 {
-		if updateErr := s.Entries.UpdateAttachmentOCR(ctx, owner, id, out.AttachmentTexts, out.OCRComplete); updateErr != nil {
+		ocrTexts := alignOCRTexts(in.Images, ocrAttachments, out.AttachmentTexts)
+		if updateErr := s.Entries.UpdateAttachmentOCR(ctx, owner, id, ocrTexts, out.OCRComplete); updateErr != nil {
 			slog.Warn("AI entry OCR metadata failed", "process_id", id, "stage", "persistence", "code", "ocr_metadata_failed", "attachment_count", len(out.AttachmentTexts))
 			s.fail(owner, id, token, "")
 			return nil, ErrAIProvider
@@ -310,6 +313,28 @@ func mergeExactAIDrafts(drafts []entity.AIExtractDraft) []entity.AIExtractDraft 
 	return result
 }
 
+// alignOCRTexts keeps the model-facing OCR order independent from the
+// database's attachment ordering. Attachments are persisted in ID order for
+// deterministic repository updates, while the model must see the user's
+// original upload order so date/account context and overlap boundaries remain
+// meaningful.
+func alignOCRTexts(images []entity.AIImage, attachments []entity.AIEntryAttachment, texts []string) []string {
+	if len(attachments) == 0 {
+		return append([]string(nil), texts...)
+	}
+	byAttachmentID := make(map[string]string, len(texts))
+	for index, image := range images {
+		if index < len(texts) && image.AttachmentID != "" {
+			byAttachmentID[image.AttachmentID] = texts[index]
+		}
+	}
+	ordered := make([]string, len(attachments))
+	for index, attachment := range attachments {
+		ordered[index] = byAttachmentID[attachment.ID]
+	}
+	return ordered
+}
+
 func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string, files []entity.AIImage) ([]entity.AIImage, []entity.AIEntryAttachment, error) {
 	prepared := make([]entity.AIImage, 0, len(files))
 	attachments := make([]entity.AIEntryAttachment, 0, len(files))
@@ -345,8 +370,10 @@ func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string,
 		// adapter. The adapter's output boundary still sends only OCR text to the LLM.
 		prepared = append(prepared, entity.AIImage{Name: file.Name, MIMEType: file.MIMEType, Base64: file.Base64, AttachmentID: id})
 	}
+	// Keep model input in request order. The repository receives attachments in
+	// deterministic ID order, and alignOCRTexts maps OCR results back to that
+	// persistence order after extraction.
 	sort.Slice(attachments, func(i, j int) bool { return attachments[i].ID < attachments[j].ID })
-	sort.Slice(prepared, func(i, j int) bool { return prepared[i].AttachmentID < prepared[j].AttachmentID })
 	return prepared, attachments, nil
 }
 

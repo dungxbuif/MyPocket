@@ -26,6 +26,15 @@ Persist an owner-scoped process/idempotency record, proposals and request identi
 
 Manual Add remains normal click. Long press opens a one-shot AI entry sheet; financial Q&A is not a mode in this entry UI. Image/PDF input goes through backend OCR then a text-only model adapter. This bounded slice uses synchronous requests and a two-minute processing lease; no automatic provider POST retries. Approved attachment retention is defined by [ADR-006](ADR-006-private-ai-attachments.md).
 
+2026-10-16 multi-image correction: preserve the user's attachment order for
+model context, while keeping the repository's deterministic attachment-ID order
+for OCR metadata updates through an explicit ID-to-text mapping. Each OCR result
+is wrapped in an ordinal/document marker and filename before the text-only model
+request. The marker is backend-owned metadata; OCR text and filename remain
+untrusted evidence. This prevents overlapping statement screenshots from
+silently losing page/account boundaries before the model performs review-first
+deduplication. No provider, public request schema or approval rule changes.
+
 ## Alternatives and consequences
 
 - Client-only drafts would be easier, but closing/reloading would lose review state and could bypass confirmation replay protection.

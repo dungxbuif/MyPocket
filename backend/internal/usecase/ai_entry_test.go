@@ -1,12 +1,17 @@
 package usecase
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"github.com/mypocket/backend/internal/entity"
 	port "github.com/mypocket/backend/internal/repository"
+	"image"
+	"image/png"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -201,6 +206,67 @@ func TestAIEntryStoresOriginalPrivatelyAndPassesValidatedBytesToOCR(t *testing.T
 	if len(seen.Images) != 1 || seen.Images[0].Base64 != base64.StdEncoding.EncodeToString(fileBytes) || seen.Images[0].SourceURL != "" {
 		t.Fatalf("OCR input must carry validated bytes and no MyPocket storage URL: %+v", seen.Images)
 	}
+}
+
+func TestAIEntryKeepsSubmittedImageOrderForOCR(t *testing.T) {
+	storage := &orderedAttachmentStoreStub{}
+	service := &AIEntryService{Storage: storage}
+	files := make([]entity.AIImage, 10)
+	want := make([]string, len(files))
+	for i := range files {
+		files[i] = entity.AIImage{Name: fmt.Sprintf("page-%02d.png", i), MIMEType: "image/png", Base64: base64.StdEncoding.EncodeToString(pngBytes(t))}
+		want[i] = files[i].Name
+	}
+	got, attachments, err := service.storeForOCR(context.Background(), "owner", "session", files)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != len(want) || len(attachments) != len(want) {
+		t.Fatalf("stored image count mismatch: images=%d attachments=%d want=%d", len(got), len(attachments), len(want))
+	}
+	attachmentNames := make(map[string]bool, len(attachments))
+	for _, attachment := range attachments {
+		attachmentNames[attachment.Filename] = true
+	}
+	for i := range want {
+		if got[i].Name != want[i] {
+			t.Fatalf("submitted image order changed at %d: image=%q want=%q", i, got[i].Name, want[i])
+		}
+		if !attachmentNames[want[i]] {
+			t.Fatalf("stored attachment missing submitted file %q", want[i])
+		}
+	}
+}
+
+func TestAIEntryAlignsOCRTextToAttachmentPersistenceOrder(t *testing.T) {
+	images := []entity.AIImage{{Name: "page-a.png", AttachmentID: "a"}, {Name: "page-z.png", AttachmentID: "z"}}
+	attachments := []entity.AIEntryAttachment{{ID: "z"}, {ID: "a"}}
+	texts := []string{"OCR page a", "OCR page z"}
+	got := alignOCRTexts(images, attachments, texts)
+	want := []string{"OCR page z", "OCR page a"}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("OCR text was not aligned to attachment persistence order: got=%v want=%v", got, want)
+	}
+}
+
+func pngBytes(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+type orderedAttachmentStoreStub struct{}
+
+func (*orderedAttachmentStoreStub) Key(_, _, _, filename string) (string, error) {
+	return "private/" + filename, nil
+}
+func (*orderedAttachmentStoreStub) Put(context.Context, string, string, []byte) error { return nil }
+func (*orderedAttachmentStoreStub) Delete(context.Context, string) error              { return nil }
+func (*orderedAttachmentStoreStub) SignedGet(context.Context, string) (string, error) {
+	return "", nil
 }
 
 type attachmentStoreStub struct {
