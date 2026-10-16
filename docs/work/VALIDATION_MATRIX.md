@@ -5016,6 +5016,19 @@ invocation was stopped after Xcode remained in `simctl diagnose` cleanup for
 over three minutes; this is an environment runner hang, not a product test
 failure. No API, data or production state changed.
 
+## Reference wave 5 integration gate — 2026-10-16
+
+More and Feedback now use grouped reference surfaces. Feedback keeps the
+unresolved/resolved tabs, explicit tick/un-tick flow, changelog status and
+owner-scoped API; submission uses the shared editor scaffold and keyboard-safe
+footer. The focused signed test set passes 4/4 with no failures or skips in
+the agent's recorded run.
+
+Base-component and project guards pass after replacing the new notification
+icon with `MPIcon`; the final Release simulator build with warnings treated as
+errors passes at `/tmp/mypocket-reference-wave5-release-20261016`.
+No API, database, provider, production or device state changed.
+
 ## Native AI-entry uncertain request recovery — 2026-10-08
 
 | Check | Command / evidence | Result |

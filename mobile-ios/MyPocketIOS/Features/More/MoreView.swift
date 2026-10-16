@@ -48,6 +48,29 @@ enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
     }
 }
 
+/// Reference account navigation contract. The More route uses one named
+/// grouped surface per section; feature destinations remain unchanged so deep
+/// links and owner-scoped secondary routes keep their existing behavior.
+enum MoreReferencePresentation {
+    struct Section: Identifiable, Equatable {
+        let title: String
+        let items: [MoreDestination]
+        var id: String { title }
+    }
+
+    static let sections: [Section] = [
+        Section(title: "Phản hồi", items: [.feedback]),
+        Section(title: "Ví của tôi", items: [.wallets, .credit, .portfolio]),
+        Section(title: "Kế hoạch", items: [.budgets, .jars, .months]),
+        Section(title: "Giao dịch", items: [.categories, .recurring, .travel, .reports]),
+        Section(title: "Trợ lý", items: [.aiEntry])
+    ]
+
+    static let surfaceStyle: MPSurfaceCardStyle = .reference
+    static let rowSpacing: CGFloat = 0
+    static let sectionSpacing: CGFloat = MPMetrics.sectionSpacing
+}
+
 struct MoreView: View {
     let api: FinanceAPI
     @ObservedObject var auth: AuthViewModel
@@ -57,14 +80,6 @@ struct MoreView: View {
     let requestedWalletID: String?
     @Binding private var requestedDestination: MoreDestination?
     @State private var navigationPath: [MoreDestination] = []
-
-    private let sections: [(title: String, items: [MoreDestination])] = [
-        ("Phản hồi", [.feedback]),
-        ("Ví của tôi", [.wallets, .credit, .portfolio]),
-        ("Kế hoạch", [.budgets, .jars, .months]),
-        ("Giao dịch", [.categories, .recurring, .travel, .reports]),
-        ("Trợ lý", [.aiEntry])
-    ]
 
     init(
         api: FinanceAPI,
@@ -105,19 +120,21 @@ struct MoreView: View {
                     ) {
                         navigationPath = [.account]
                     }
-                    ForEach(sections, id: \.title) { section in
-                        MPSurfaceCard {
-                            VStack(alignment: .leading, spacing: 0) {
-                                MPText(section.title, style: .secondary)
-                                    .padding(.horizontal, 8)
-                                    .padding(.bottom, 4)
-                                ForEach(section.items) { item in
-                                    MPMenuRow(
-                                        title: item.title,
-                                        systemName: item.icon,
-                                        accessibilityIdentifier: "more-destination-\(item.id)"
-                                    ) {
-                                        navigationPath = [item]
+                    ForEach(MoreReferencePresentation.sections) { section in
+                        VStack(alignment: .leading, spacing: 4) {
+                            MPText(section.title, style: .secondary)
+                                .padding(.horizontal, 4)
+                            MPSurfaceCard(style: MoreReferencePresentation.surfaceStyle) {
+                                VStack(alignment: .leading, spacing: MoreReferencePresentation.rowSpacing) {
+                                    ForEach(Array(section.items.enumerated()), id: \.element) { index, item in
+                                        if index > 0 { MPDivider() }
+                                        MPMenuRow(
+                                            title: item.title,
+                                            systemName: item.icon,
+                                            accessibilityIdentifier: "more-destination-\(item.id)"
+                                        ) {
+                                            navigationPath = [item]
+                                        }
                                     }
                                 }
                             }

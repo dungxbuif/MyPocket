@@ -51,6 +51,9 @@ shared_fields: [status]
 - Align Credit and Notifications populated states with shared compact surfaces,
   including masked credit metrics, statement rows, unread/read grouping and
   mark-read actions.
+- Group More navigation and Feedback items into shared reference surfaces;
+  preserve route/auth/API behavior and the explicit feedback resolve/unresolve
+  workflow.
 - Stabilize JSON request bytes with sorted keys so identical budget-series
   retries remain idempotency-safe and reproducible. Focused native tests and
   Release simulator build pass; physical-device owner UAT remains pending.

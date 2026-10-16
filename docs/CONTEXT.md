@@ -58,12 +58,13 @@ recording actual and unvisited states in the
 Extended MyPocket functions are preserved. Survey completion and 100% UI
 reproduction are separate acceptance gates, neither is claimed yet.
 
-Reference waves 1–4 are now implemented locally for populated overview,
+Reference waves 1–5 are now implemented locally for populated overview,
 wallets, savings/budget reports, transaction ledger, credit and notifications.
-Shared surfaces
+More and Feedback are included in the same audit. Shared surfaces
 own the reference radius, compact metric grid, adaptive daily rows, masking
 and accessibility reading order; screen code only supplies data. Focused
-signed simulator tests pass 14/14 for waves 1–3 plus 2/2 for wave 4, the
+signed simulator tests pass 14/14 for waves 1–3, 2/2 for wave 4 and 4/4 for
+wave 5, the
 native unit target passes 331/331 before wave 4, and
 the Release simulator build passes with warnings treated as errors. A
 deterministic sorted-key encoder was added so identical budget-series retries

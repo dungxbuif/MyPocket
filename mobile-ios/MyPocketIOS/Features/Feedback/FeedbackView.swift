@@ -22,6 +22,23 @@ enum FeedbackPresentation {
     }
 }
 
+/// Presentation-only contract for the owner-facing feedback inbox. Resolution
+/// remains an explicit owner confirmation and is independent from backend
+/// development status/changelog state.
+enum FeedbackReferencePresentation {
+    static let surfaceStyle: MPSurfaceCardStyle = .reference
+    static let dividerSpacing: CGFloat = 0
+    static let resolutionHint = "Tick khi bạn xác nhận đã hết lỗi. Bỏ tick nếu vấn đề xuất hiện lại."
+
+    static func tabID(forResolved resolved: Bool) -> String {
+        resolved ? "resolved" : "unresolved"
+    }
+
+    static func tabTitle(forResolved resolved: Bool, count: Int) -> String {
+        resolved ? "Đã giải quyết (\(count))" : "Chưa giải quyết (\(count))"
+    }
+}
+
 @MainActor
 final class FeedbackViewModel: ObservableObject {
     @Published private(set) var items: [FeedbackModel] = []
@@ -134,24 +151,55 @@ struct FeedbackOverlay: View {
     }
 
     var body: some View {
-        MPSurfaceCard {
-        VStack(alignment: .leading, spacing: 12) {
-            MPScreenHeader(title: "Phản hồi", leading: { EmptyView() }, trailing: { MPIconButton(systemName: "xmark", label: "Đóng", action: onClose) })
-            ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+        MPEditorScaffold(
+            title: "Phản hồi",
+            isBusy: model.isSending,
+            onCancel: onClose
+        ) {
             MPWalletSelector(title: "Loại", options: ["bug", "feature", "improvement"], selection: $model.type)
             MPTextField(title: "Tiêu đề", text: $model.title, placeholder: "Mô tả ngắn")
             MPTextEditor(title: "Chi tiết", text: $model.description, placeholder: "Điều gì đã xảy ra?")
             MPImageAttachmentPicker(data: $attachment)
             if let errorMessage = model.errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
-            }
-            }
+        } footer: {
             MPButton("Gửi phản hồi", isLoading: model.isSending) {
                 Task { if await model.submit(screenshot: attachment) { onClose() } }
             }
         }
-        }
         .accessibilityIdentifier("feedback-overlay")
+    }
+}
+
+private struct FeedbackItemRow: View {
+    let item: FeedbackModel
+    let changelog: [ChangelogModel]
+    let isUpdating: Bool
+    let onToggle: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            MPCheckboxRow(
+                title: item.title,
+                isSelected: item.isResolved,
+                accessibilityIdentifier: "feedback-resolution-\(item.id)",
+                action: onToggle
+            )
+            .disabled(isUpdating)
+            MPText(item.description, style: .secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 8) {
+                MPText(MPSelectionLabels.display(for: item.type), style: .secondary)
+                MPFeedbackStatus(
+                    statusLabel: FeedbackPresentation.statusLabel(for: item.status),
+                    isFixed: item.status == "fixed",
+                    changelogVersion: FeedbackPresentation.changelogVersion(for: item, in: changelog)
+                )
+                Spacer(minLength: 0)
+            }
+            if isUpdating { MPText("Đang lưu…", style: .secondary) }
+            if let fixedAt = item.fixedAt { MPText("Đã xử lý: \(MPFormat.shortDate(fixedAt))", style: .secondary) }
+            if let resolvedAt = item.resolvedAt { MPText("Bạn đã xác nhận: \(MPFormat.shortDate(resolvedAt))", style: .secondary) }
+        }
     }
 }
 
@@ -179,34 +227,28 @@ struct FeedbackView: View {
                     (id: "unresolved", title: "Chưa giải quyết (\(model.items.filter { !$0.isResolved }.count))"),
                     (id: "resolved", title: "Đã giải quyết (\(model.items.filter { $0.isResolved }.count))")
                 ], selection: $selection, accessibilityIdentifier: "feedback-tabs")
-                MPText("Tick khi bạn xác nhận đã hết lỗi. Bỏ tick nếu vấn đề xuất hiện lại.", style: .secondary)
+                MPText(FeedbackReferencePresentation.resolutionHint, style: .secondary)
                 if let errorMessage = model.errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
                 if model.isLoading && model.items.isEmpty { MPLoadingView(label: "Đang tải phản hồi…") }
                 else if filteredItems.isEmpty {
                     MPEmptyView(title: "Không có phản hồi", detail: selection == "resolved" ? "Các phản hồi bạn đã tick sẽ xuất hiện ở đây." : "Không còn phản hồi chưa giải quyết trong danh sách.")
                 }
-                    ForEach(filteredItems) { item in
-                        MPSurfaceCard {
-                            VStack(alignment: .leading, spacing: 4) {
-                                MPCheckboxRow(title: item.title, isSelected: item.isResolved, accessibilityIdentifier: "feedback-resolution-\(item.id)") {
-                                    Task { await model.setResolved(item, resolved: !item.isResolved) }
+                    if !filteredItems.isEmpty {
+                        MPSurfaceCard(style: FeedbackReferencePresentation.surfaceStyle) {
+                            VStack(alignment: .leading, spacing: FeedbackReferencePresentation.dividerSpacing) {
+                                ForEach(Array(filteredItems.enumerated()), id: \.element.id) { index, item in
+                                    if index > 0 { MPDivider() }
+                                    FeedbackItemRow(
+                                        item: item,
+                                        changelog: model.changelog,
+                                        isUpdating: model.isLoading || model.updatingIDs.contains(item.id)
+                                    ) {
+                                        Task { await model.setResolved(item, resolved: !item.isResolved) }
+                                    }
+                                    .accessibilityIdentifier("feedback-item-\(item.id)")
                                 }
-                                .disabled(model.isLoading || model.updatingIDs.contains(item.id))
-                                MPText(item.description, style: .secondary)
-                                HStack(spacing: 8) {
-                                    MPText(MPSelectionLabels.display(for: item.type), style: .secondary)
-                                    MPFeedbackStatus(
-                                        statusLabel: FeedbackPresentation.statusLabel(for: item.status),
-                                        isFixed: item.status == "fixed",
-                                        changelogVersion: FeedbackPresentation.changelogVersion(for: item, in: model.changelog)
-                                    )
-                                }
-                                if model.updatingIDs.contains(item.id) { MPText("Đang lưu…", style: .secondary) }
-                                if let fixedAt = item.fixedAt { MPText("Đã xử lý: \(MPFormat.shortDate(fixedAt))", style: .secondary) }
-                                if let resolvedAt = item.resolvedAt { MPText("Bạn đã xác nhận: \(MPFormat.shortDate(resolvedAt))", style: .secondary) }
                             }
                         }
-                        .accessibilityIdentifier("feedback-item-\(item.id)")
                     }
                 MPButton(showChangelog ? "Ẩn changelog" : "Xem changelog", style: .plain) { showChangelog.toggle() }
                 if showChangelog {
