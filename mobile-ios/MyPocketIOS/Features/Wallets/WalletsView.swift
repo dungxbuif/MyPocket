@@ -155,7 +155,7 @@ struct WalletsView: View {
 
     private var walletList: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
                 MPSelectionScreenHeader(
                     title: WalletsReferenceCopy.title(isEditing: isEditing),
                     closeTitle: "Đóng",
@@ -393,7 +393,9 @@ struct WalletDetailView: View {
                 }
                 pendingQueue
                 if wallet.type != "goal" {
-                    MPMetricCard(title: "Số dư hiện tại", value: MPFormat.money(wallet.currentBalance, masked: masked))
+                    MPSurfaceCard(style: .reference) {
+                        MPMetric(title: "Số dư hiện tại", value: MPFormat.money(wallet.currentBalance, masked: masked))
+                    }
                         .accessibilityIdentifier("wallet-detail-balance")
                 }
                 if wallet.type == "goal", let target = wallet.targetAmount {
@@ -409,12 +411,14 @@ struct WalletDetailView: View {
                 }
                 if wallet.type == "credit" {
                     if let statement {
-                        LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
-                            MPMetricCard(title: "Dư nợ", value: MPFormat.money(abs(statement.balance), masked: masked))
-                            MPMetricCard(title: "Khả dụng", value: MPFormat.money(statement.availableCredit, masked: masked))
-                            MPMetricCard(title: "Hạn mức", value: MPFormat.money(statement.creditLimit, masked: masked))
-                            MPMetricCard(title: "Đến hạn", value: MPFormat.money(statement.amountDue, masked: masked))
-                            MPMetricCard(title: "Trạng thái", value: MPSelectionLabels.display(for: statement.paymentStatus))
+                        MPSurfaceCard(style: .reference) {
+                            MPMetricGrid(items: [
+                                MPMetricItem(title: "Dư nợ", value: MPFormat.money(abs(statement.balance), masked: masked)),
+                                MPMetricItem(title: "Khả dụng", value: MPFormat.money(statement.availableCredit, masked: masked)),
+                                MPMetricItem(title: "Hạn mức", value: MPFormat.money(statement.creditLimit, masked: masked)),
+                                MPMetricItem(title: "Đến hạn", value: MPFormat.money(statement.amountDue, masked: masked)),
+                                MPMetricItem(title: "Trạng thái", value: MPSelectionLabels.display(for: statement.paymentStatus))
+                            ], masked: false)
                         }
                         if statement.paymentStatus == "not_configured" {
                             MPText("Chưa cấu hình dư nợ sao kê và ngày đến hạn.", style: .secondary)
@@ -445,7 +449,7 @@ struct WalletDetailView: View {
                     MPText("TẤT CẢ CÁC GIAO DỊCH", style: .title)
                         .accessibilityIdentifier("wallet-detail-all-transactions")
                     if groupedTransactions.isEmpty {
-                        MPSurfaceCard {
+                        MPSurfaceCard(style: .reference) {
                             MPEmptyView(title: "Chưa có giao dịch", detail: "Các giao dịch của ví sẽ xuất hiện ở đây.")
                         }
                     } else {
@@ -629,7 +633,7 @@ struct WalletDetailView: View {
         let progress = MPFormat.savingsProgress(balance: wallet.currentBalance, target: wallet.targetAmount ?? 0)
         return Group {
             if progress.remaining > 0 {
-                MPSurfaceCard {
+                        MPSurfaceCard(style: .reference) {
                     HStack(alignment: .top, spacing: 12) {
                         MPIcon(systemName: "lightbulb", color: MPColor.ink, size: 28)
                         MPText("Bạn nên tiết kiệm thêm \(MPFormat.money(progress.remaining, masked: masked)) nữa trong tháng này.", style: .body)
@@ -654,7 +658,7 @@ struct WalletDetailView: View {
     @ViewBuilder
     private var goalLedgerGroups: some View {
         if filteredGoalTransactions.isEmpty {
-            MPSurfaceCard {
+            MPSurfaceCard(style: .reference) {
                 MPEmptyView(title: "Chưa có giao dịch", detail: "Các giao dịch của ví sẽ xuất hiện ở đây.")
             }
         } else {
@@ -677,7 +681,7 @@ struct WalletDetailView: View {
 
     @ViewBuilder
     private func transactionCard(_ rows: [TransactionModel]) -> some View {
-        MPSurfaceCard {
+        MPSurfaceCard(style: .reference) {
             if rows.isEmpty {
                 MPEmptyView(title: "Chưa có giao dịch", detail: "Các giao dịch của ví sẽ xuất hiện ở đây.")
             } else {

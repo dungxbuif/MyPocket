@@ -5062,6 +5062,20 @@ The Release simulator build passes with warnings treated as errors at
 project guards plus `git diff --check` pass. No API, database, provider,
 production or device state changed.
 
+## Reference wave 8 integration gate — 2026-10-16
+
+Account settings and Wallet Detail now use grouped reference surfaces. API
+key lifecycle, timezone, Face ID, logout, wallet ledger, credit statement,
+queue/editor routes, masking and accessibility identifiers are unchanged.
+`AccountWalletReferenceTests` passes 2/2 with no failures, skips or runtime
+warnings at `/tmp/mypocket-account-wallet-focused-20261016/Logs/Test/`.
+The complete native unit target passes 344/344 with no failures, skips or
+runtime warnings at `/tmp/mypocket-account-wallet-unit-20261016/Logs/Test/`.
+Base-component and project guards plus `git diff --check` pass. The Release
+simulator build passes with warnings treated as errors at
+`/tmp/mypocket-account-wallet-release-20261016`.
+No API, database, provider, production or physical-device state changed.
+
 ## Native AI-entry uncertain request recovery — 2026-10-08
 
 | Check | Command / evidence | Result |

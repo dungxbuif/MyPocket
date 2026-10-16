@@ -52,6 +52,11 @@ shared_fields: [status]
   2/2, the native unit target passes 342/342, and the Release simulator build
   passes with warnings treated as errors; no backend, database or production
   state changed.
+- Compact Account settings and Wallet Detail with shared reference surfaces
+  and adaptive metric grids while preserving API-key, Face ID, timezone,
+  logout, ledger, credit, queue, editor and masking behavior.
+  `AccountWalletReferenceTests` passes 2/2 and the native unit target passes
+  344/344; no backend or production state changed.
 
 - Continue native Money Lover reference parity with populated transaction
   ledger, savings report and budget report compositions. Shared reference

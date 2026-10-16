@@ -1700,9 +1700,9 @@ struct AccountView: View {
                 .padding(.horizontal, MPMetrics.pagePadding)
 
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
                 if case .authenticated(let session) = auth.phase {
-                    MPSurfaceCard {
+                    MPSurfaceCard(style: .reference) {
                         VStack(alignment: .leading, spacing: 8) {
                             MPText(session.user.name ?? "MyPocket")
                             if let email = session.user.email { MPText(email, style: .secondary) }
@@ -1711,7 +1711,7 @@ struct AccountView: View {
                     }
                 }
                 if let profile {
-                    MPSurfaceCard {
+                    MPSurfaceCard(style: .reference) {
                         VStack(alignment: .leading, spacing: 10) {
                             MPText("Múi giờ tài khoản", style: .title)
                             MPTextField(title: "IANA timezone", text: $timezone, placeholder: profile.timezone)
@@ -1719,7 +1719,7 @@ struct AccountView: View {
                         }
                     }
                 }
-                MPSurfaceCard {
+                MPSurfaceCard(style: .reference) {
                     VStack(alignment: .leading, spacing: 10) {
                         HStack { MPText("API keys", style: .title); Spacer(); MPIconButton(systemName: "plus", label: "Tạo API key") { showKeyEditor = true }.accessibilityIdentifier("account-api-key-add") }
                         MPText("API key có toàn quyền đọc và thay đổi dữ liệu tài khoản của bạn. Chỉ chia sẻ với dịch vụ bạn tin tưởng.", style: .secondary)
@@ -1738,8 +1738,9 @@ struct AccountView: View {
                             HStack { MPButton("Hủy", style: .secondary) { showKeyEditor = false }; MPButton("Tạo") { Task { await createKey() } }.accessibilityIdentifier("account-api-key-create") }
                         }
                         if let createdSecret {
-                            MPAssistantCard(title: "Secret chỉ hiển thị một lần") {
+                            MPSurfaceCard(style: .reference) {
                                 VStack(alignment: .leading, spacing: 10) {
+                                    MPText("Secret chỉ hiển thị một lần", style: .emphasis)
                                     MPText(createdSecret, style: .secondary)
                                         .accessibilityIdentifier("account-api-key-secret-value")
                                     MPButton("Sao chép API key", style: .secondary, fullWidth: false) {
@@ -1767,7 +1768,7 @@ struct AccountView: View {
                         }
                     }
                 }
-                MPSurfaceCard {
+                MPSurfaceCard(style: .reference) {
                     VStack(alignment: .leading, spacing: 10) {
                         MPText("Bảo mật", style: .title)
                         MPText("Đăng nhập lại bằng Face ID, kể cả sau khi đăng xuất. Chỉ dùng trên iPhone này.", style: .secondary)
