@@ -38,6 +38,11 @@ shared_fields: [status]
 
 ## Unreleased — native Stitch parity continuation
 
+- Native Reports now scopes `monthSummary` and Money Insider reads to the
+  current owner through the existing `expectedOwnerID` guard. A month-summary
+  failure now fails closed for the whole report instead of rendering insider
+  totals with an empty breakdown/activity; no backend or API schema change.
+
 - Production Finance Assistant prompt now states explicitly that the model may
   prepare a `propose_create_jar` proposal and must show the confirmation card;
   the direct-write boundary remains unchanged. API image

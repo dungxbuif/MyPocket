@@ -276,6 +276,12 @@ enum ReportsOfflinePolicy {
     }
 }
 
+enum ReportsPresentationPolicy {
+    static func isComplete(summary: InsiderSummaryModel?, monthDetail: MonthSummaryModel?) -> Bool {
+        summary != nil && monthDetail != nil
+    }
+}
+
 enum ReportsMonthPolicy {
     static func isValid(_ value: String) -> Bool {
         let parts = value.split(separator: "-", omittingEmptySubsequences: false)
@@ -335,7 +341,7 @@ struct ReportsView: View {
                             .accessibilityIdentifier("reports-load-button")
                     }
                 }
-                if let summary {
+                if let summary, ReportsPresentationPolicy.isComplete(summary: summary, monthDetail: monthDetail) {
                     if let cachedAt {
                         MPStatusMessage(text: "Bản lưu \(cachedAt.formatted(date: .abbreviated, time: .shortened)) · Chưa cập nhật từ máy chủ.", tone: .info)
                     }
@@ -433,15 +439,21 @@ struct ReportsView: View {
             summary = nil
             monthDetail = nil
             transactions = []
-            async let insiderResult = api.insider(month: month)
-            async let monthResult = api.monthSummary(month: month)
+            async let insiderResult = api.insider(month: month, ownerID: ownerID)
+            async let monthResult = api.monthSummary(month: month, ownerID: ownerID)
             async let transactionResult = api.transactions()
-            summary = try await insiderResult
-            monthDetail = try? await monthResult
+            let loadedSummary = try await insiderResult
+            let loadedMonthDetail = try await monthResult
             // Trend data is part of the same verified read scope. If the
             // ledger read fails, do not persist a report with an empty/fake
             // trend; recover the exact cached month instead.
-            transactions = try await transactionResult
+            let loadedTransactions = try await transactionResult
+            guard ReportsPresentationPolicy.isComplete(summary: loadedSummary, monthDetail: loadedMonthDetail) else {
+                throw APIError.decoding("Incomplete report payload")
+            }
+            summary = loadedSummary
+            monthDetail = loadedMonthDetail
+            transactions = loadedTransactions
             await persistSnapshot()
         } catch {
             await recoverFromSnapshot(error)

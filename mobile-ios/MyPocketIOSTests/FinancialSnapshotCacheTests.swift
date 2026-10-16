@@ -18,6 +18,83 @@ private struct SnapshotOfflineTransport: HTTPTransport {
 }
 
 final class FinancialSnapshotCacheTests: XCTestCase {
+    func testReportReadsCarryExpectedOwnerID() async throws {
+        let transport = ReportsCaptureTransport()
+        let session = AccessSession(
+            token: "access",
+            expiresAt: "2099-01-01T00:00:00Z",
+            refreshToken: "refresh",
+            refreshExpiresAt: "2099-02-01T00:00:00Z",
+            user: AuthUser(id: "owner-report", name: nil, email: nil, timezone: nil)
+        )
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: ReportsSessionStore(session: session)
+        )
+        let api = FinanceAPI(client: client)
+
+        _ = try await api.monthSummary(month: "2026-10", ownerID: "owner-report")
+        _ = try await api.insider(month: "2026-10", ownerID: "owner-report")
+
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.map { $0.value(forHTTPHeaderField: "Authorization") }, ["Bearer access", "Bearer access"])
+        XCTAssertEqual(requests.map { $0.url?.path }, ["/api/v1/months/2026-10", "/api/v1/reports/insider"])
+    }
+
+    func testReportReadsRejectForeignOwnerBeforeTransport() async throws {
+        let transport = ReportsCaptureTransport()
+        let session = AccessSession(
+            token: "access",
+            expiresAt: "2099-01-01T00:00:00Z",
+            refreshToken: "refresh",
+            refreshExpiresAt: "2099-02-01T00:00:00Z",
+            user: AuthUser(id: "owner-report", name: nil, email: nil, timezone: nil)
+        )
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: ReportsSessionStore(session: session)
+        )
+        let api = FinanceAPI(client: client)
+
+        do {
+            _ = try await api.monthSummary(month: "2026-10", ownerID: "other-owner")
+            XCTFail("A report read must not use another owner's session")
+        } catch {
+            XCTAssertEqual(error as? APIError, .accountMismatch)
+        }
+        do {
+            _ = try await api.insider(month: "2026-10", ownerID: "other-owner")
+            XCTFail("A report read must not use another owner's session")
+        } catch {
+            XCTAssertEqual(error as? APIError, .accountMismatch)
+        }
+        let requests = await transport.requests
+        XCTAssertTrue(requests.isEmpty)
+    }
+
+    func testReportsPresentationRequiresBothServerReportPayloads() {
+        let summary = InsiderSummaryModel(
+            month: "2026-10", timezone: "Asia/Ho_Chi_Minh", startAt: "2026-09-30T17:00:00Z",
+            nextStartAt: "2026-10-31T17:00:00Z", isCurrent: true, income: 100, expense: 10,
+            net: 90, previousExpense: 20, expenseDelta: -10, expenseChangeBPS: -5000,
+            averageDailyExpense: 1, daysConsidered: 15, spendingIncomeRatioBPS: 1000,
+            topCategories: [], topExpenses: [], estimated: false
+        )
+        let detail = MonthSummaryModel(
+            month: "2026-10", timezone: "Asia/Ho_Chi_Minh", startAt: "2026-09-30T17:00:00Z",
+            nextStartAt: "2026-10-31T17:00:00Z", isCurrent: true, isComplete: false,
+            income: 100, expense: 10, net: 90, transactionCount: 1, categories: [], note: "",
+            jarSummary: nil, calculatedAt: "2026-10-15T00:00:00Z"
+        )
+
+        XCTAssertFalse(ReportsPresentationPolicy.isComplete(summary: summary, monthDetail: nil))
+        XCTAssertFalse(ReportsPresentationPolicy.isComplete(summary: nil, monthDetail: detail))
+        XCTAssertTrue(ReportsPresentationPolicy.isComplete(summary: summary, monthDetail: detail))
+    }
+
     func testHTTPStatusControlsRecoveryEvenWhenProblemBodyOmitsOrContradictsIt() async throws {
         for body in ["{}", #"{"status":400,"detail":"fixture"}"#] {
             let client = APIClient(baseURL: server, transport: SnapshotOfflineTransport(status: 503, body: body), sessionStore: InMemorySessionStore())
@@ -173,5 +250,30 @@ final class FinancialSnapshotCacheTests: XCTestCase {
         for error in [APIError.unauthorized, .missingSession, .accountMismatch, .decoding("bad"), .http(status: 400), .http(status: 403), .http(status: 404), .http(status: 409), .http(status: 422)] {
             XCTAssertFalse(FinancialSnapshotCache.allowsFallback(error))
         }
+    }
+}
+
+private final class ReportsSessionStore: SessionStore, @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: AccessSession?
+
+    init(session: AccessSession?) { stored = session }
+    func load() -> AccessSession? { lock.withLock { stored } }
+    func save(_ session: AccessSession) throws { lock.withLock { stored = session } }
+    func clear() { lock.withLock { stored = nil } }
+}
+
+private actor ReportsCaptureTransport: HTTPTransport {
+    private(set) var requests: [URLRequest] = []
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        requests.append(request)
+        let body: String
+        if request.url?.path.contains("/months/") == true {
+            body = #"{"data":{"month":"2026-10","timezone":"Asia/Ho_Chi_Minh","start_at":"2026-09-30T17:00:00Z","next_start_at":"2026-10-31T17:00:00Z","is_current":true,"is_complete":false,"income":100,"expense":10,"net":90,"transaction_count":1,"categories":[],"note":"","jar_summary":null,"calculated_at":"2026-10-15T00:00:00Z"},"meta":null}"#
+        } else {
+            body = #"{"data":{"month":"2026-10","timezone":"Asia/Ho_Chi_Minh","start_at":"2026-09-30T17:00:00Z","next_start_at":"2026-10-31T17:00:00Z","is_current":true,"income":100,"expense":10,"net":90,"previous_expense":20,"expense_delta":-10,"expense_change_bps":-5000,"average_daily_expense":1,"days_considered":15,"spending_income_ratio_bps":1000,"top_categories":[],"top_expenses":[],"estimated":false},"meta":null}"#
+        }
+        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
     }
 }

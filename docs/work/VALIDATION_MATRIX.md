@@ -475,6 +475,19 @@ guards and `git diff --check` pass. A separate full native unit attempt ran 283
 tests with the four existing simulator Keychain failures listed above; no cache
 assertion failed.
 
+## 2026-10-16 Reports owner scope and summary fail-safe
+
+`FinanceAPI.monthSummary` and `FinanceAPI.insider` now accept the optional
+owner ID and pass it to the existing `expectedOwnerID` request guard. Reports
+passes its owner context to both reads and awaits both payloads as one atomic
+report load; a month-summary failure therefore clears the whole report and
+uses the existing retry/error state instead of rendering insider-only or empty
+breakdown/activity sections. The focused encrypted-cache/report suite passes
+12/12 on the signed iPhone 16 simulator at
+`/tmp/mypocket-reports-hardening-signed2`. Build-for-testing also passes with
+signing disabled at `/tmp/mypocket-reports-hardening-build`. No backend/API
+schema, offline/outbox, or cache-format change was made.
+
 ## 2026-10-15 Feedback resolution tab behavior
 
 The owner-resolution flow remains native-only and uses the existing feedback

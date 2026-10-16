@@ -193,8 +193,8 @@ final class FinanceAPI: @unchecked Sendable {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/budgets/\(id)", method: .delete))
     }
 
-    func monthSummary(month: String) async throws -> MonthSummaryModel {
-        try await client.send(APIRequest(path: "/months/\(month)"))
+    func monthSummary(month: String, ownerID: String? = nil) async throws -> MonthSummaryModel {
+        try await client.send(APIRequest(path: "/months/\(month)", expectedOwnerID: ownerID))
     }
 
     func saveMonthNote(month: String, note: String) async throws {
@@ -205,13 +205,13 @@ final class FinanceAPI: @unchecked Sendable {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/months/\(month)/note", method: .delete))
     }
 
-    func insider(month: String, walletID: String? = nil, categoryID: String? = nil) async throws -> InsiderSummaryModel {
+    func insider(month: String, walletID: String? = nil, categoryID: String? = nil, ownerID: String? = nil) async throws -> InsiderSummaryModel {
         var query = URLComponents()
         var items = [URLQueryItem(name: "month", value: month)]
         if let walletID { items.append(URLQueryItem(name: "wallet_id", value: walletID)) }
         if let categoryID { items.append(URLQueryItem(name: "category_id", value: categoryID)) }
         query.queryItems = items
-        return try await client.send(APIRequest(path: "/reports/insider?\(query.percentEncodedQuery ?? "")"))
+        return try await client.send(APIRequest(path: "/reports/insider?\(query.percentEncodedQuery ?? "")", expectedOwnerID: ownerID))
     }
 
     func jarMonth(month: String) async throws -> JarMonthSummaryModel {
