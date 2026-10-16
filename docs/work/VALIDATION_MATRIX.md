@@ -13,8 +13,26 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: 2026-10-15
+updated: 2026-10-16
 ---
+
+## 2026-10-16 savings and budget scope audit
+
+The existing contracts are now covered by focused backend tests for account-
+local inclusive budget date boundaries, one explicit `start_date`/`end_date`
+interval, authenticated owner propagation through notification list/read, and
+goal-only notification preference persistence. Existing tests continue to
+cover goal progress/category rules, single-wallet savings entries, and paired
+managed-wallet transfer exclusion.
+
+The following remain **partial**, with no new behavior inferred: recurring
+budget generation, budget/goal forecast fields, producer-driven budget/goal
+notifications or push delivery, and a dedicated savings report/drill-down
+endpoint. The inbox routes are owner-scoped read/mark-read only.
+
+Evidence command: `rtk go test ./internal/entity ./internal/controller/http ./internal/infrastructure/repository` in `backend` — 142 passed, 33 skipped.
+The full Go suite and `git diff --check` remain the final verification gate for
+this slice.
 
 ## 2026-10-16 offline/sync contract verification
 

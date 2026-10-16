@@ -7,6 +7,32 @@ API/worker image `release-20261016-7846945`; owner-authenticated proposal and
 provider UAT are still required before closing the release gate. Streaming,
 durable audit delivery and cross-process cancellation remain separate gates.
 
+## Deterministic AI/OCR evaluation fixtures
+
+The checked-in fixture pack at [`evals/ai/fixtures.json`](../../evals/ai/fixtures.json)
+is the local contract for overlapping OCR rows, missing dates, wallet inference,
+owner-safe advisor arguments and proposal review state. It contains synthetic
+IDs and amounts only; it does not contain provider credentials, prompts from
+real users, OCR source text, or financial rows. The Go test
+`TestAIEvalFixtures` loads these cases and exercises the real draft normalizer,
+deduplicator, wallet fallback, argument decoder and advisor registry.
+
+The fixture clock is fixed to `2026-09-22T10:00:00+07:00`, so missing-date
+assertions never depend on the host clock. Exact duplicate OCR rows are merged
+with their review question retained, while distinct rows (including same-day
+rows with different amounts or notes) remain separate. A missing date is filled
+only as a disclosed review default. A model-supplied unknown or foreign wallet
+falls back to the supplied owner wallet and adds a review question; it is never
+silently accepted. Advisor tool arguments are decoded with unknown fields
+rejected and the authenticated principal supplies owner scope; `owner_id` is
+never a model-controlled argument.
+
+All generated AI-entry proposals remain `pending` until an explicit owner
+approval request. The fixture suite asserts that no auto-approval or ledger
+write occurs. `AI_EVAL_LIVE=1` remains the only opt-in path for provider/OCR
+execution; the deterministic fixture test never reads provider environment
+variables or contacts a live service.
+
 Native presentation correction2026-10-15 (local, not installed update): exact
 signed finance-safe money; invalid values show unavailable, not fabricated zero.
 Count/JSON fallback conversion no longer uses trapping casts; unknown/malformed

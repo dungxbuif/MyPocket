@@ -3,7 +3,7 @@ artifact_type: reporting_spec
 id: REPORTS
 status: in_review
 owner: shared
-updated: 2026-09-13
+updated: 2026-10-16
 human_fields: [report_intent, acceptance]
 ai_fields: [report_inventory, formulas, scenarios]
 shared_fields: [status, trace]
@@ -23,6 +23,16 @@ Reports là trung tâm xem số liệu; Money Insider là phần phân tích t�
 
 Report luôn thể hiện kỳ, bộ lọc, timezone và thời điểm dữ liệu. Drilldown mở đúng tập giao dịch tạo nên chỉ số. Khi lấy dữ liệu offline/cache phải có trạng thái chưa cập nhật. Dữ liệu lịch sử được query lại khi giao dịch thay đổi.
 
+## Trạng thái phạm vi hiện tại — 2026-10-16
+
+Đây là tài liệu mục tiêu; không phải mọi dòng trong inventory đều là endpoint
+đã triển khai. Hiện có progress budget cho khoảng ngày tường minh và goal-wallet
+detail/history từ ledger. Kỳ budget lặp, dự báo cuối kỳ, thông báo sinh từ
+budget/goal và **savings report/drill-down riêng** chưa có API/entity contract,
+nên được đánh dấu **partial** cho đến khi có thiết kế và bằng chứng tương ứng.
+Không dùng các trường `spent`, `days_remaining` hoặc inbox hiện tại để suy ra
+recurrence, forecast hay một report tiết kiệm mới.
+
 Ở màn hình native, trường tháng dùng khóa `YYYY-MM` và chỉ chấp nhận tháng
 `01`–`12`. Giá trị sai được báo ngay trước khi gọi API; dữ liệu của kỳ trước
 được xóa khỏi màn hình để không hiển thị số liệu cũ dưới phạm vi mới.
@@ -36,10 +46,10 @@ Report luôn thể hiện kỳ, bộ lọc, timezone và thời điểm dữ li�
 | Thu và chi theo danh mục | Số tiền, %, cha/con, dạng nhóm/phẳng, biểu đồ tròn/cột | Danh mục con và giao dịch |
 | Chi tiết danh mục | Xu hướng, tổng, trung bình, so với kỳ trước và lịch sử ba tháng khi đủ dữ liệu | Giao dịch và nhóm con |
 | Xu hướng / so sánh | Ngày, tuần, tháng, quý, năm, toàn bộ hoặc khoảng tùy chọn; kỳ hiện tại và lịch sử | Kỳ thành phần |
-| Budget | Phạm vi ví/danh mục, mức, đã chi/còn lại, cảnh báo, khuyến nghị/ngày, dự báo | Budget và giao dịch khớp phạm vi |
+| Budget (partial) | Khoảng ngày tường minh, phạm vi ví/danh mục, mức, đã chi/còn lại và cảnh báo UI hiện có; recurrence, forecast, notification producer và drilldown riêng chưa có contract | Budget và giao dịch khớp phạm vi |
 | Hũ tháng | Các hũ có dữ liệu, chi thực tế, mức phân bổ nếu có, chênh lệch và cảnh báo | Chi thường thuộc hũ; chưa phân hũ |
 | Hũ cộng dồn | Tổng chi từng hũ, diễn biến tháng, phân bổ/chênh lệch trong tháng có cấu hình | Hũ → tháng → giao dịch |
-| Tiết kiệm | Mục tiêu, số hiện có, còn cần, nạp/rút và tiến độ | Ví tiết kiệm và hoạt động liên quan |
+| Tiết kiệm (partial) | Goal-wallet detail/history, mục tiêu, số hiện có, còn cần, nạp/rút và tiến độ; chưa có savings-report/drilldown endpoint hoặc forecast | Ví tiết kiệm và hoạt động liên quan |
 | Tín dụng | Dư nợ, hạn mức còn, sao kê, cần trả/đã trả/còn lại, hạn, quá hạn, phí/lãi | Sao kê và mua/hoàn/trả liên kết |
 | Vay / cho vay | Gốc giải ngân, đã trả/thu hồi, còn phải thu/trả, đối tác, ngày đến hạn | Khoản nợ và từng lần thanh toán |
 | Sự kiện / du lịch | Thời gian, giao dịch liên kết, thu/chi phù hợp, cơ cấu và xu hướng | Chuyến đi và giao dịch |

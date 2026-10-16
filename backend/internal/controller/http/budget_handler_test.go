@@ -68,3 +68,22 @@ func TestBudgetInputValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestCreateBudgetPersistsOneExplicitCalendarInterval(t *testing.T) {
+	repo := &budgetRepoStub{}
+	h := &BudgetHandler{Budgets: repo, Wallets: &transactionWalletRepositoryStub{}, Categories: &transactionCategoryRepositoryStub{}, Transactions: &transactionRepositoryStub{}}
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	router.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1") })
+	router.POST("/budgets", h.CreateBudget)
+	req := httptest.NewRequest("POST", "/budgets", bytes.NewBufferString(`{"name":"Tháng 9","limit_amount":10000,"start_date":"2026-09-01","end_date":"2026-09-30"}`))
+	req.Header.Set("Content-Type", "application/json")
+	res := httptest.NewRecorder()
+	router.ServeHTTP(res, req)
+	if res.Code != 201 || repo.saved == nil {
+		t.Fatalf("status=%d body=%s saved=%#v", res.Code, res.Body.String(), repo.saved)
+	}
+	if repo.saved.StartDate.Format("2006-01-02") != "2026-09-01" || repo.saved.EndDate.Format("2006-01-02") != "2026-09-30" {
+		t.Fatalf("explicit calendar interval changed: start=%s end=%s", repo.saved.StartDate, repo.saved.EndDate)
+	}
+}

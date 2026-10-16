@@ -19,6 +19,12 @@ Owner requested implementation from supplied savings screens. [Active design/pro
 
 Đặt mục tiêu/hạn cho ví tiết kiệm, nạp/rút và xem tiến độ.
 
+**Gap-closure status 2026-10-16:** Goal progress and the existing paired
+transfer/single-wallet entry contracts are covered by current API/native tests.
+Scheduled savings advice, forecast, notification fan-out and a dedicated
+savings report remain **partial** because no current API/entity contract
+defines them; this ticket does not infer those behaviors from the goal fields.
+
 ## Tiêu chí nghiệm thu
 
 - [ ] Tiến độ từ số thực trong ví; sửa giao dịch cập nhật tiến độ.

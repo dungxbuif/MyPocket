@@ -26,6 +26,10 @@ date: 2026-10-16
 - `go test ./...` passed.
 - `go test -race ./...` passed.
 - `go vet ./...` passed.
+- Deterministic local AI/OCR fixture contract covers overlapping duplicate
+  rows, fixed-clock missing-date review, owner-wallet inference, owner-safe
+  advisor arguments and pending proposal/no-auto-approval behavior. The fixture
+  test uses synthetic data only and does not exercise a live provider.
 - Production `GET /api/v1/health` returned `200`.
 - Production API and worker converged at `1/1`.
 - Production Swagger returned `78` paths and includes the async route and

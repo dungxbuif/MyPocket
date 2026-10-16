@@ -205,6 +205,30 @@ func TestCreateGoalWalletRequiresPositiveTarget(t *testing.T) {
 	}
 }
 
+func TestCreateGoalWalletPersistsNotificationPreference(t *testing.T) {
+	stub := &walletRepositoryStub{}
+	router := walletTestRouter(NewWalletHandler(stub))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Quỹ dự phòng","type":"goal","target_amount":1000000,"goal_notifications_enabled":true}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || stub.created == nil || !stub.created.GoalNotificationsEnabled {
+		t.Fatalf("goal notification preference not persisted: status=%d body=%s wallet=%#v", response.Code, response.Body.String(), stub.created)
+	}
+}
+
+func TestCreateBasicWalletIgnoresGoalNotificationPreference(t *testing.T) {
+	stub := &walletRepositoryStub{}
+	router := walletTestRouter(NewWalletHandler(stub))
+	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Tiền mặt","type":"basic","goal_notifications_enabled":true}`))
+	request.Header.Set("Content-Type", "application/json")
+	response := httptest.NewRecorder()
+	router.ServeHTTP(response, request)
+	if response.Code != http.StatusCreated || stub.created == nil || stub.created.GoalNotificationsEnabled {
+		t.Fatalf("non-goal wallet must not enable goal notifications: status=%d body=%s wallet=%#v", response.Code, response.Body.String(), stub.created)
+	}
+}
+
 func TestCreateCreditWalletRequiresPositiveLimit(t *testing.T) {
 	router := walletTestRouter(NewWalletHandler(&walletRepositoryStub{}))
 	request := httptest.NewRequest(http.MethodPost, "/wallets", bytes.NewBufferString(`{"name":"Thẻ tín dụng","type":"credit","credit_limit":0}`))

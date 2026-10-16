@@ -3,7 +3,7 @@ artifact_type: business_rules
 id: BUSINESS-RULES
 status: in_review
 owner: shared
-updated: 2026-09-13
+updated: 2026-10-16
 human_fields: [business_intent, acceptance, open_questions]
 ai_fields: [rule_rows, examples, trace_links]
 shared_fields: [status, trace]
@@ -61,6 +61,12 @@ trace:
 
 Budget theo mô hình Money Lover được chuẩn hoá trực tiếp trong tài liệu nghiệp vụ hiện hành; các dòng M20–M24 dưới đây là contract của MyPocket, không phải bằng chứng triển khai từ ứng dụng khác.
 
+**Trạng thái triển khai 2026-10-16:** API hiện chỉ có budget với một khoảng
+`start_date`/`end_date` tường minh, bao gồm cả hai ngày theo lịch account. Kỳ
+lặp, tự sinh budget mới, dự báo cuối kỳ, thông báo do budget phát sinh và
+drill-down riêng chưa có entity/API contract; các phần đó là **partial** và
+không được suy ra từ các trường hiện tại.
+
 - BUD-01: Budget gồm số tiền, phạm vi ví/danh mục và kỳ. Giao dịch khớp phạm vi tự vào tiến độ; không có yêu cầu gắn trực tiếp một budget vào giao dịch.
 - BUD-02: Kỳ gồm tuần, tháng, quý, năm, ngày tùy chỉnh. Kỳ cố định có lựa chọn lặp; kỳ tùy chỉnh không lặp.
 - BUD-03: Không tạo budget trùng phạm vi cùng ví/danh mục và thời gian chồng lấn. Khi danh mục cha/con hoặc toàn bộ danh mục cùng hiện diện, tổng overview phải khử đếm trùng.
@@ -113,6 +119,13 @@ Nếu tháng 3 có chi 300.000 nhưng không đặt phân bổ, tổng chi ba th
 - TRV-05: Báo cáo tháng tự đính kèm chuyến liên quan và giao dịch có thật; AI có thể dùng ngữ cảnh này để giải thích diễn biến chi tiêu, không suy đoán hoạt động không có dữ liệu.
 
 ## SAV, CRD, DEBT — Tiết kiệm, tín dụng và nợ
+
+**Trạng thái triển khai tiết kiệm 2026-10-16:** Goal wallet, target/date,
+ledger-derived progress, single-wallet deposit/withdrawal/interest entries và
+paired managed-wallet transfer đã có contract hiện hành. Savings report riêng,
+forecast/tốc độ tiết kiệm và notification producer/fan-out chưa có API/entity
+contract; các phần đó là **partial**. In-app notification list/read chỉ là
+inbox đọc được, không phải lịch gửi tự động.
 
 - SAV-01: Ví tiết kiệm sở hữu mục tiêu, hạn tùy chọn và số hiện có. Tiến độ tính từ số dư thực tế; nạp/rút/sửa/xóa cập nhật tiến độ.
 - SAV-02: Đạt mục tiêu khi số hiện có đạt mức mục tiêu. Khi rút làm thấp hơn mục tiêu, trạng thái phản ánh lại tiến độ hiện tại. Chuyển tiền vào tiết kiệm không nhân đôi chi/thu.
