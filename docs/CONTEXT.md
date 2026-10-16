@@ -22,7 +22,7 @@ shared_fields:
 updated: 2026-10-16
 ---
 
-## Current checkpoint — 2026-10-16 20:20 +0700
+## Current checkpoint — 2026-10-16 20:35 +0700
 
 The async advisor and AI-entry multi-image context fixes are now deployed to
 production. API and worker run
@@ -30,7 +30,13 @@ production. API and worker run
 `sha256:71fdd4b4155972f3e6380ae02de846264e503347ab63b9693f65d2f0c713db43`;
 both services are `1/1`, health returns `200`, and production Swagger reports
 78 paths including `POST /api/v1/ai/advisor/messages/async`. The authenticated
-sync capability route is present. No migration or financial data mutation ran.
+sync capability route is present. Before enabling the idle expiry worker, a
+validated `pg_dump -Fc` was written to
+`/tmp/mypocket-pre-migration-20261016.dump` on `vm100` (SHA-256
+`60bd27c795f510854d9ca8c6e16a6285ab1a9ab2f46b3edde1b5a71e160d3a3d`), then
+migrations 033 and 034 were applied from the API image. Migration version is
+34 and clean; no financial rows were reset or deleted. The worker is running
+and no new `last_user_message_at` schema error appeared after the migration.
 
 The multi-image fix preserves request order and wraps each OCR result in a
 document boundary before model extraction. It does not claim provider OCR

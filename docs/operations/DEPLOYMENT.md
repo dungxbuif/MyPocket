@@ -102,6 +102,22 @@ the server-side OCR contract, and the model receives ordered, explicitly
 delimited OCR documents. A configured OCR provider and owner-authenticated
 AI-entry UAT are still required to certify recognition quality.
 
+#### Advisor idle-reset migration catch-up — 2026-10-16
+
+The first async advisor rollout exposed a worker-only schema error because the
+image was updated before migrations 033/034 ran:
+`column "last_user_message_at" does not exist`. Before changing the live
+schema, a custom-format PostgreSQL backup was created and verified at
+`/tmp/mypocket-pre-migration-20261016.dump` on `vm100`; its SHA-256 is
+`60bd27c795f510854d9ca8c6e16a6285ab1a9ab2f46b3edde1b5a71e160d3a3d`.
+
+The API image's `/app/migrate up` then completed successfully. The production
+migration version is `34` with `dirty: false`; API and worker remain `1/1` and
+the worker no longer emits the missing-column error on its next pass. The
+migrations are additive: they add the idle timestamp/index and the reset
+idempotency ledger; they do not delete financial data. For future advisor
+rollouts, run the forward migration before relying on the worker expiry pass.
+
 ### AI jar proposal hotfix — 2026-10-15
 
 The owner-requested feedback fix updated only `mypocket-api` to immutable image
