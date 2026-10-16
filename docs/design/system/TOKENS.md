@@ -54,9 +54,9 @@ minimum and grow for content; profile is one tappable identity row, no duplicate
 manage-account row. Typography remains unchanged; do not achieve density by
 clipping accessibility text. Disabled Account-tab center add action is hidden.
 The shell reserves only the 56pt navbar; its 52pt feedback bubble is an overlay,
-not a full-width lane or spacer. The native target bundles the OFL-licensed
-Manrope variable font and registers it through `UIAppFonts`; feature screens do
-not choose fonts directly.
+not a full-width lane or spacer. The web target keeps the OFL-licensed Manrope
+font, while native iOS uses the system SF Pro metrics through `MPFont`; feature
+screens do not choose fonts directly.
 
 Text dùng Text/Heading với size/weight/tone. Số tiền dùng numeric; scale text 10/11/12/14/16/18/20/24/30/36px. Kích thước 10–11px chỉ cho metadata phụ; không dùng cho input/hành động.
 Layout spacing theo Tailwind scale; kích thước đặc thù tree/chart phải được base sở hữu và đặc tả. Không khai báo thêm màu literal trong TS/TSX/CSS ngoài theme. Không thêm font/theme song song.

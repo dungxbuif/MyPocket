@@ -117,7 +117,7 @@ extension MPButton where Label == Text {
         self.init(style: style, isLoading: isLoading, isDisabled: isDisabled, fullWidth: fullWidth, action: action) {
             // The enclosing base applies MPFont.label. Do not reintroduce a
             // system-font override here; all button labels follow the bundled
-            // Manrope/token contract.
+            // System typography/token contract.
             Text(title)
         }
     }

@@ -29,21 +29,21 @@ enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
 
     var icon: String {
         switch self {
-        case .wallets: return "wallet.pass.fill"
+        case .wallets: return MPReferenceIcon.wallet
         case .budgets: return "chart.pie.fill"
         case .reports: return "chart.bar.xaxis"
         case .categories: return "folder.fill"
         case .jars: return "shippingbox.fill"
         case .months: return "calendar"
-        case .recurring: return "repeat"
+        case .recurring: return MPReferenceIcon.recurring
         case .travel: return "airplane"
         case .portfolio: return "chart.line.uptrend.xyaxis"
         case .credit: return "creditcard.fill"
         case .notifications: return "bell.fill"
         case .assistant: return "sparkles"
         case .aiEntry: return "doc.text.image"
-        case .feedback: return "bubble.left.and.bubble.right.fill"
-        case .account: return "person.crop.circle"
+        case .feedback: return MPReferenceIcon.feedback
+        case .account: return MPReferenceIcon.account
         }
     }
 }

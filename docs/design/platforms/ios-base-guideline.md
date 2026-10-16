@@ -21,7 +21,8 @@ Do not rename every existing component or duplicate it as a new v2 hierarchy.
 
 ## Geometry and visual authority
 
-- Keep current semantic green/neutral palette, Manrope and tokenized text styles.
+- Keep current semantic green/neutral palette, system SF Pro metrics and
+  tokenized text styles.
   No new color/font choice from search output; existing owner choices prevail.
 - Page horizontal gutter16; card horizontal inset12, vertical8. This preserves
   compact vertical rhythm while increasing horizontal breathing room requested

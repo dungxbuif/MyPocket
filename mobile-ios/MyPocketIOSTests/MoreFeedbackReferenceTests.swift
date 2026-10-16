@@ -33,4 +33,13 @@ final class MoreFeedbackReferenceTests: XCTestCase {
             "Tick khi bạn xác nhận đã hết lỗi. Bỏ tick nếu vấn đề xuất hiện lại."
         )
     }
+
+    func testReferenceIconRegistryKeepsAccountGlyphsOnNativeSymbols() {
+        XCTAssertEqual(MPReferenceIcon.account, "person.crop.circle")
+        XCTAssertEqual(MPReferenceIcon.wallet, "wallet.pass.fill")
+        XCTAssertEqual(MPReferenceIcon.group, "shippingbox.fill")
+        XCTAssertEqual(MPReferenceIcon.bankLink, "link.circle.fill")
+        XCTAssertEqual(MPReferenceIcon.recurring, "repeat")
+        XCTAssertEqual(MPReferenceIcon.feedback, "bubble.left.and.bubble.right.fill")
+    }
 }

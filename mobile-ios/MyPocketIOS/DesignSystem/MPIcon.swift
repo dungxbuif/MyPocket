@@ -1,5 +1,16 @@
 import SwiftUI
 
+/// Native SF Symbol contract for reference surfaces. Feature screens consume
+/// these names instead of embedding icon strings in their own layout code.
+enum MPReferenceIcon {
+    static let account = "person.crop.circle"
+    static let wallet = "wallet.pass.fill"
+    static let group = "shippingbox.fill"
+    static let bankLink = "link.circle.fill"
+    static let recurring = "repeat"
+    static let feedback = "bubble.left.and.bubble.right.fill"
+}
+
 struct MPIcon: View {
     let systemName: String
     let label: String?

@@ -14,9 +14,10 @@ SwiftUI. It does not redefine API or finance behavior.
   owned by the base components and verified in previews/UI tests.
 - Web and iOS use the same semantic token roles and business rules, but do not
   share DOM, React Native or CSS implementation files.
-- Native base components use `MPFont` for all text roles; system-font
+- Native base components use `MPFont` for all text roles; screen-local font
   modifiers are rejected by `scripts/check-base-components.sh`. UIKit-backed
-  fields use the registered Manrope UIFont with a safe preview/test fallback.
+  fields use the system SF Pro UIFont so device metrics and Dynamic Type match
+  native controls.
 
 ## Screen mapping
 

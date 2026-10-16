@@ -54,7 +54,7 @@ The exact primitive values come from `DESIGN.md` and are mirrored in
 | Filled action shape | full pill (`rounded-full`) |
 | Card padding | `20px` |
 | Grid gutter | `12px` |
-| Font | Manrope (web-loaded; native bundles `Manrope-Variable.ttf` under the OFL license) |
+| Font | Native iOS system typography (SF Pro metrics; web remains Manrope) |
 
 `rounded-reference-card` / `MPSurfaceCard.Style.reference` owns the 24px
 reference-card shape and the soft `0 4px 20px` shadow. Existing 12px control

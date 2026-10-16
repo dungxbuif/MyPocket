@@ -69,8 +69,10 @@ enum MPFont {
     static let uiBody: UIFont = UIFont.systemFont(ofSize: 16)
 
     private static func custom(size: CGFloat, relativeTo style: Font.TextStyle, weight: Font.Weight = .regular) -> Font {
-        // SwiftUI exposes the system face with explicit sizes on the iOS
-        // deployment target; the shared token sizes preserve our hierarchy.
-        Font.system(size: size, weight: weight, design: .default)
+        // Use the native text style so Dynamic Type scales the same way as
+        // iOS controls. The `size` argument remains part of the token call
+        // sites as the reference hierarchy's design-time documentation.
+        _ = size
+        return Font.system(style, design: .default).weight(weight)
     }
 }
