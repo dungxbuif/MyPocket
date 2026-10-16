@@ -40,11 +40,11 @@
 - Consumes: existing `MPFont`, `MPColor`, `MPMetrics`, `MPText`, and icon call sites.
 - Produces: one system-font hierarchy, semantic color roles, measured card/row metrics, and a complete reference icon mapping consumed by every later task.
 
-- [ ] Step 1: Add failing assertions for the approved system font family, title/body/label sizes, page inset, card radius, row minimum hit target, and required reference icon names.
-- [ ] Step 2: Run `xcodebuild test` for the focused reference tests and verify the new assertions fail against the old values.
-- [ ] Step 3: Implement the token/icon changes only in the shared design-system files; remove remaining screen-level font-name use.
-- [ ] Step 4: Run the focused tests and verify all typography/metric/icon assertions pass.
-- [ ] Step 5: Reconcile the Stitch/reference docs with the actual native typography decision and commit `feat(native): lock parity design tokens`.
+- [x] Step 1: Add failing assertions for the approved system font family, title/body/label sizes, page inset, card radius, row minimum hit target, and required reference icon names.
+- [x] Step 2: Run `xcodebuild test` for the focused reference tests and verify the new assertions fail against the old values.
+- [x] Step 3: Implement the token/icon changes only in the shared design-system files; remove remaining screen-level font-name use.
+- [x] Step 4: Run the focused tests and verify all typography/metric/icon assertions pass.
+- [x] Step 5: Reconcile the Stitch/reference docs with the actual native typography decision and commit `feat(native): lock parity design tokens`.
 
 ### Task 2: Rebuild the native shell and bottom navigation
 
