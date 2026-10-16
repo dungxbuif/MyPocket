@@ -812,40 +812,66 @@ struct MPProfileCard: View {
 
     var body: some View {
         MPSurfaceCard(style: .reference) {
-            VStack(alignment: .leading, spacing: 10) {
-                HStack(spacing: 8) {
-                    Text(initial)
-                        .font(MPFont.headline)
-                        .foregroundStyle(.white)
-                        .frame(width: 40, height: 40)
-                        .background(MPColor.brand, in: Circle())
-                        .accessibilityHidden(true)
-                    VStack(alignment: .leading, spacing: 2) {
-                        MPText(name, style: .emphasis).lineLimit(1)
-                        MPText(email.isEmpty ? "Chưa có email" : email, style: .secondary).lineLimit(1)
+            if badgeTitle == nil { compactBody }
+            else { referenceBody }
+        }
+    }
+
+    private var identityRow: some View {
+        HStack(spacing: 8) {
+            Text(initial)
+                .font(MPFont.headline)
+                .foregroundStyle(.white)
+                .frame(width: badgeTitle == nil ? 36 : 40, height: badgeTitle == nil ? 36 : 40)
+                .background(MPColor.brand, in: Circle())
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                MPText(name, style: .emphasis).lineLimit(1)
+                if badgeTitle == nil {
+                    HStack(spacing: 4) {
+                        MPText(accountSubtitle, style: .secondary).font(MPFont.labelSmall).lineLimit(1)
+                        Text("·").font(MPFont.labelSmall).foregroundStyle(MPColor.secondary).accessibilityHidden(true)
+                        MPText(email.isEmpty ? "Chưa có email" : email, style: .secondary).font(MPFont.labelSmall).lineLimit(1)
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                } else {
+                    MPText(email.isEmpty ? "Chưa có email" : email, style: .secondary).lineLimit(1)
                 }
-                if let badgeTitle {
-                    Text(badgeTitle)
-                        .font(MPFont.labelSmall)
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(MPColor.warning, in: Capsule())
-                        .accessibilityIdentifier("more-profile-badge")
-                }
-                MPDivider()
-                MPButton(style: .plain, accessibilityIdentifier: accessibilityIdentifier, action: onManage) {
-                    HStack {
-                        MPText("Quản lý tài khoản", style: .emphasis)
-                        Spacer()
-                        MPIcon(systemName: "chevron.right", color: MPColor.secondary)
-                            .accessibilityHidden(true)
-                    }
-                }
-                .accessibilityLabel("Quản lý tài khoản: \(name), \(accountSubtitle), \(email)")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+
+    private var compactBody: some View {
+        MPButton(style: .plain, accessibilityIdentifier: accessibilityIdentifier, action: onManage) {
+            HStack {
+                identityRow
+                MPIcon(systemName: "chevron.right", color: MPColor.secondary).accessibilityHidden(true)
+            }
+        }
+        .accessibilityLabel("Quản lý tài khoản: \(name), \(accountSubtitle), \(email)")
+    }
+
+    private var referenceBody: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            identityRow
+            if let badgeTitle {
+                Text(badgeTitle)
+                    .font(MPFont.labelSmall)
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(MPColor.warning, in: Capsule())
+                    .accessibilityIdentifier("more-profile-badge")
+            }
+            MPDivider()
+            MPButton(style: .plain, accessibilityIdentifier: accessibilityIdentifier, action: onManage) {
+                HStack {
+                    MPText("Quản lý tài khoản", style: .emphasis)
+                    Spacer()
+                    MPIcon(systemName: "chevron.right", color: MPColor.secondary).accessibilityHidden(true)
+                }
+            }
+            .accessibilityLabel("Quản lý tài khoản: \(name), \(accountSubtitle), \(email)")
         }
     }
 }
