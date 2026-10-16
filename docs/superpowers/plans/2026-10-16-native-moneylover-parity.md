@@ -99,11 +99,11 @@
 - Consumes: shell/navigation and token contracts from Tasks 1–3; existing finance API view models.
 - Produces: reference balance header, wallet cards, scoped ledger, period controls, transaction rows, transfer overflow, and global add flow with unchanged API calls.
 
-- [ ] Step 1: Add/extend failing assertions for card geometry, row density, selected wallet scope, period tabs, add action, transfer action, and masked values.
-- [ ] Step 2: Run focused tests and verify failures.
-- [ ] Step 3: Refactor feature views to shared surfaces/rows and apply measured reference spacing.
-- [ ] Step 4: Run unit/UI smoke for ordinary, goal, credit, transfer, masked, empty, and error states.
-- [ ] Step 5: Capture device screenshots and commit `feat(native): align ledger and wallet reference screens`.
+- [x] Step 1: Add/extend failing assertions for card geometry, row density, selected wallet scope, period tabs, add action, transfer action, and masked values.
+- [x] Step 2: Run focused tests and verify failures.
+- [x] Step 3: Refactor feature views to shared surfaces/rows and apply measured reference spacing.
+- [x] Step 4: Run unit/UI smoke for ordinary, goal, credit, transfer, masked, empty, and error states.
+- [x] Step 5: Capture device screenshots and commit `feat(native): align ledger and wallet reference screens`.
 
 ### Task 5: Align planning/reporting and specialized surfaces
 
