@@ -36,10 +36,12 @@ SwiftUI. It does not redefine API or finance behavior.
 
 The persistent shell tabs stay interactive while Account/More is selected so a
 user can leave any secondary destination through Overview, Transactions or
-Assistant. The center add affordance is disabled on Account to keep its raised
-hit region off the long menu; a narrow blocker protects the already-selected
-Account tab. Raised Add is also hidden on Assistant to avoid covering its input;
-Overview/Transactions retain Add. Composer reports measured floating-action
+Assistant. Center Add remains available on Account root and restores Account
+after the transaction editor closes; Account child destinations hide it.
+A narrow blocker protects the already-selected Account tab. Raised Add is also
+hidden on Assistant to avoid covering its input; Overview/Transactions retain
+Add. Secondary routes restore scoped native edge Back, blocked during editing,
+pending transitions and modal presentation. Composer reports measured floating-action
 clearance so Feedback floats above Send with no reserved content lane.
 `MainTabView` explicitly sizes each route to the available height
 minus its 56pt sibling navbar. The 52pt `MPFeedbackBubble` overlays the trailing
@@ -242,5 +244,7 @@ are shown from persisted API state.
 Every feature exposes loading, ready, empty and error states. Write forms also
 expose dirty, submitting, success and conflict states. Async state bases must
 provide a visible label and accessibility value; masked money must not leak the
-unmasked amount through VoiceOver. UI tests use stable accessibility IDs rather
-than screen text alone.
+unmasked amount through VoiceOver. A populated report/list keeps its last
+successful snapshot during refresh and uses the shared compact inline progress
+indicator; the blocking loader is reserved for an empty first load. UI tests use
+stable accessibility IDs rather than screen text alone.

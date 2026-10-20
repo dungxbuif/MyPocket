@@ -13,8 +13,268 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: 2026-10-16
+updated: 2026-10-20
 ---
+
+### Advisor review fixes / release 1.2.1 candidate — 2026-10-20
+
+Release reconciliation: this candidate became release `1.2.1` after the
+production migration/image rollout and signed iPhone install recorded in the
+release note. The evidence below remains scoped; it does not convert the
+fixture schema into a live 31-prompt quality score or claim full physical
+device/Mobile MCP acceptance.
+
+[Review ticket](tickets/AI-ADVISOR-REVIEW-FIX-20261020.md) supersedes earlier
+completion claims for snapshot/context/grounding integration.
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Actual-loop regressions | `go test ./internal/usecase -run TestAdvisorReview -count=1` | PASS: 20 test/subtest events; unread/stale/system/archived resources, context, repair, evidence and terminal budgets. |
+| Full backend normal + race | `TEST_DATABASE_URL=<owned-loopback>/mypocket_advisor_release_20261020 go test -json ./... -count=1`; same with `-race`; `/tmp/mypocket-1.2.1-backend{,-race}.json` | Each PASS: 753 events, zero failures, 33 Redis/live/storage opt-in skips. |
+| PostgreSQL boundaries | TestAdvisorReaperRechecksCandidateLeaseUnderLock, TestAdvisorContextStatePersistsWithOwnerGenerationIsolation, TestAdvisorRuntimeMigrationAllowsLegacyWriterDuringRollingUpdate | PASS on fresh migration 41: lease recheck, isolation, persisted sequence and old-writer default. |
+| Live provider smoke | AI_ADVISOR_QUALITY_LIVE=1 TestLiveAdvisorQualityMatrix; AI_ADVISOR_REVIEW_LIVE=1 TestLiveAdvisorReviewGroundedProtocol | PASS: 6 existing + 3 grounded cases with DeepSeek-V4.1-Flash; not a 31-prompt accuracy score. |
+| Native units | `/tmp/mypocket-1.2.1-native-units.xcresult` | PASS: 380/380, zero failure/skip/runtime warnings. |
+| Signed iPhone Release | `/tmp/mypocket-release-1.2.1-device/Build/Products/Release-iphoneos/MyPocketIOS.app`; codesign + release preflight | PASS: 1.2.1 (4), production API, portrait; existing full-screen/orientation build warning. Install recorded after execution. |
+| Static/package/rollout | go vet, base/project guards, release artifact tests, rollout preflight test, git diff --check | PASS. |
+
+Runtime/grounding flags remain false for patch rollout. Broader model-quality
+acceptance and physical biometric/offline/touch acceptance remain separate.
+
+### Advisor reliability implementation candidate — 2026-10-20
+
+The approved [spec](../superpowers/specs/2026-10-20-advisor-reliability-design.md)
+and [plan](../superpowers/plans/2026-10-20-advisor-reliability.md) now have a
+local implementation candidate. Migration 000041 lease/atomic completion is
+feature-flagged, as is typed `finish_answer` grounding; neither flag is enabled
+by default and no production rollout is claimed.
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Backend deterministic regression | `cd backend && go test ./... -count=1` | PASS: all packages green on source commit `fbe700b`. |
+| Backend race slice | `cd backend && go test -race ./internal/usecase ./internal/infrastructure/repository ./cmd/worker -count=1` | PASS: usecase, repository and worker race suites green. |
+| Static/contract guards | `go vet ./...`; `git diff --check`; `mobile-ios/scripts/check-base-components.sh`; `mobile-ios/scripts/verify-project.sh` | PASS. |
+| Native advisor observer | `xcodebuild test ... -only-testing:MyPocketIOSTests` | PASS: exit 0; Xcode emits only the existing `invalidDigitCount(94232)` simulator warning. |
+| Reliability fixture schema | `evals/finance-assistant/reliability-cases.json`; `go test ./internal/infrastructure/ai -run TestAdvisorReliabilityFixtureSchema -count=1` | Dataset/registry check only; not execution of 31 prompts or model-quality acceptance. |
+| Migration/production/provider/device acceptance | Disposable PostgreSQL upgrade, live model matrix, physical device UAT | OPEN: must run separately before enabling flags or releasing. |
+
+### Advisor reliability design/plan — 2026-10-20
+
+`AI-ADVISOR-RELIABILITY-20261020`: the original planning entry is superseded by
+the implementation candidate above. The
+[spec](../superpowers/specs/2026-10-20-advisor-reliability-design.md) maps AC1–10
+to the [plan](../superpowers/plans/2026-10-20-advisor-reliability.md)'s seven
+tasks. The historical planning note is retained for traceability; use the
+candidate gate above for current implementation evidence.
+
+### MyPocket 1.2.0 main integration — 2026-10-20
+
+Release note: [REL-1.2.0-20261020](../releases/REL-1.2.0-20261020.md).
+Feedback audit: [FEEDBACK-UNRESOLVED-UAT-20261020](audits/FEEDBACK-UNRESOLVED-UAT-20261020.md).
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Non-destructive integration | merge commit `c9ea660089ca24ec5ffff6ee68719f3628568bd1` | PASS: `codex/feedback-backlog-20261019` merged into `main` with both histories preserved and no conflicts/history rewrite. |
+| Superseded worktree reconciliation | archival merge `ef8a08db26496635c0e21011180f65e2ee2c218a` | PASS: 11 legacy `codex/web-gap-implementation` commits remain reachable while the current main tree wins. The obsolete Expo/web move and old Google-auth backend were not reintroduced. |
+| Backend merged tree | `go test ./...`; `go test -race ./...`; `go vet ./...`; `go mod verify` | PASS: all packages green; modules verified. Live provider/storage probes remain opt-in. |
+| Native merged units | `xcodebuild ... -only-testing:MyPocketIOSTests test`; xcresult `Test-MyPocketIOS-2026.10.20_21-47-10-+0700.xcresult` | PASS: 374/374, zero failures. |
+| Focused feedback UI | 16 selected `LaunchTests`; xcresult `Test-MyPocketIOS-2026.10.20_21-48-09-+0700.xcresult` | PASS: 11 executed, five fixture/environment guarded skips, zero failures. Includes feedback bubble, Account Add/Back, category route, transaction editor/menu and AI-entry attachment/proposal layout. |
+| Native Release artifact | `/tmp/mypocket-main-release-1.2.0-20261020/Build/Products/Release-iphonesimulator/MyPocketIOS.app`; base/project guards; release preflight | PASS: warnings-as-errors build; `com.mypocket.ios`, `1.2.0 (3)`, production HTTPS API and portrait-only. Simulator artifact only; no physical install/distribution claim. |
+| Production feedback queue | authenticated read-only 50-row snapshot; 32 owner-resolved, 18 unresolved | PARTIAL: 11 historical rows covered locally, six need external/populated UAT, one contract remains, and two new reports are partial. No status was mutated. |
+
+### MCP final review correction wave — 2026-10-20
+
+[Correction note](bugs/MCP-FINAL-REVIEW-20261020.md) records permanent
+RED/GREEN proof for screenshot multipart/resource results,
+stalled canonical advisor/feedback auditing, and category replay. PostgreSQL 17
+and Redis 7 are disposable loopback fixtures at schema 40 (`dirty=false`).
+An archive of the exact staged source excludes unrelated worktree edits.
+Full normal and race runs each pass 741 test/subtest results across 13 packages,
+zero failures and 9 explicit live provider/storage skips. Focused MCP/category/
+audit race passes 210 results with zero failures/skips; route/docs gate passes 9.
+Swagger regeneration is byte-identical (91 paths, 101 tools, 19 exclusions),
+vet/modules/format/diff pass and 229 design links validate. Commands and source
+isolation are recorded in the correction note. This supersedes dependency on
+uncommitted category changes in the historical aggregate gate below.
+
+### MCP/API parity aggregate local gate — 2026-10-20
+
+Scope: [approved design](tickets/MCP-API-PARITY-20261020-DETAIL_DESIGN.md),
+[plan](../superpowers/plans/2026-10-20-mcp-api-parity.md),
+[ADR-025](../decisions/ADR-025-mcp-api-parity.md) and
+[human/agent contract](../ai/mcp-api-parity.md). Commands run from `backend/`
+unless noted. Counts include test/subtest events, excluding package events.
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Canonical production route/catalog/docs authority | `rtk go generate ./cmd/api`; `rtk go test ./internal/controller/http -run 'TestMCP.*Docs|TestMCPAuthenticatedRouteParity|TestMCPRouteExclusions|TestApplicationRouter|TestCandidateRouteContract' -count=1`; `/tmp/mypocket-mcp-task9-docs.json` | PASS: 9 tests; 101 tools, 19 explicit exclusions, closed runtime SDK schemas and 91 OpenAPI paths. Generation has no checked-in drift. `NewApplicationRouter` is shared with production main; authenticated MCP GET/POST/DELETE and public-doc registrations are classified. |
+| Disposable persistence foundation | `rtk proxy env DATABASE_URL=<owned-loopback-fixture> go run ./cmd/migrate up` and `version`; PostgreSQL `17-alpine`, Redis `7-alpine` | PASS: schema `40`, `dirty=false`, loopback ports `51308`/`51307`. Synthetic UUID owners only. No production/staging services or provider endpoints accessed. |
+| Aggregate backend + race regression | `rtk proxy env TEST_DATABASE_URL=<owned-loopback-fixture> TEST_REDIS_URL=<owned-loopback-fixture> go test -json ./... -count=1`; same command with `-race`; `/tmp/mypocket-mcp-task9-final-backend.json`, `/tmp/mypocket-mcp-task9-backend-race.json` | PASS: each run has 727 passing test/subtest results across 13 tested packages, zero failures and 11 opt-in live provider/storage skips. Skips are unrelated to MCP database/auth/write/audit proof. |
+| MCP auth/write/async/audit race proof | `rtk proxy env TEST_DATABASE_URL=<owned-loopback-fixture> TEST_REDIS_URL=<owned-loopback-fixture> go test -race -json ./internal/controller/http ./internal/usecase ./internal/infrastructure/ai ./internal/infrastructure/cache ./internal/infrastructure/repository -run '^TestMCP|^TestApplicationRouter|^TestAudit|^TestRedis.*Audit|^TestRedisRecord|^TestPostgres.*Audit' -count=1`; `/tmp/mypocket-mcp-task9-final-race.json` | PASS: 178 test/subtest results across five packages, zero failures/skips. Real PostgreSQL/Redis cover owner isolation, exact revoked-key 401, zero-dispatch injection rejection, direct writes, receipts/CAS, transfer pair state/replay, async revocation boundaries and audit outbox byte-count replay. This does not claim a forced failure after the first transfer insert. |
+| Official SDK local smoke | `rtk proxy env TEST_DATABASE_URL=<owned-loopback-fixture> TEST_REDIS_URL=<owned-loopback-fixture> go test -json ./internal/controller/http -run '^TestMCP(InitializeToolsAndCanonicalDispatch|MachineCatalogDocsPublishEveryRouteAndSchema|AuthJWTAPIKeySameOwnerParity|DirectOrdinaryWriteFamiliesJWTAndAPIKey|AuthRejectsMalformedExpiredRevokedKeysAndSessions|AuthLogoutRevokesCurrentAPIKey)$' -count=1`; `/tmp/mypocket-mcp-task9-sdk-smoke.json` | PASS: 27 results, zero failures/skips. SDK initializes/lists schemas against the local transport; real disposable owner fixtures exercise JWT/API-key reads, direct writes and exact post-initialization revoked-key rejection. This is the official Go SDK client, not third-party client compatibility acceptance. |
+| Disposable fixture teardown | Before teardown: PostgreSQL `"user"` row count `0`, Redis `test:mcp-parity:*` count `0`; `rtk docker rm --force --volumes mcp-task9-pg-20261020 mcp-task9-redis-20261020`; exact filtered container/volume inventory | PASS: both owned containers and their two anonymous volumes are absent. The owned Redis had 27 other synthetic aggregate-test keys; deleting its whole disposable volume removed those too. No unrelated container/volume was removed. |
+| Static/docs checks | `rtk go vet ./...`; `rtk proxy go mod verify`; root `rtk git diff --check`; `rtk proxy sh -c 'gofmt -l $(git ls-files "*.go")'`; `rtk proxy node app/scripts/check-design-docs.mjs` | PASS: vet/modules/format/diff clean; 229 local design links valid. One approved mechanical `audit.go` alignment correction has no non-whitespace diff. |
+| Staging/provider/device/release acceptance | Owner-authenticated staging SDK client, JWT/API-key read/write, revoked-key denial, replay/CAS, multipart and advisor async/cancel; [rollout readiness](../operations/ROLLOUT_READINESS.md) | OPEN: local suites establish candidate behavior only. No deployment, production data reset, production schema migration, live provider quality, physical device or external MCP client acceptance is claimed. |
+
+The 11 aggregate skips are the explicit live advisor application/quality,
+extraction, tool-calling, JSON-schema, Qwen image, OCR-PDF, product-help,
+review-overlap, stored-OCR and S3-PDF probes. They require separate provider or
+storage opt-in. The local MCP async provider is synthetic, while key/session,
+finance and advisor persistence are real disposable PostgreSQL/Redis.
+Remaining nonblocking test-depth limits: transfer state is asserted directly
+in PostgreSQL, while adjustment/bulk-delete and category CAS lack complete
+per-family MCP/REST parsed readback; missing-key transfer delete is not
+explicitly exercised. Representative create-family readback, actual replay,
+CAS and persistence tests pass; no exhaustive transport readback is claimed.
+
+### Advisor quality harness — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Synthetic real-orchestrator quality contracts | `go test ./internal/infrastructure/ai -run 'TestAdvisorQuality|TestAdvisorFixturePack' -count=1`; [detail design](tickets/AI-ADVISOR-QUALITY-HARNESS-20261020-DETAIL_DESIGN.md) | PASS: 8 deterministic tests cover account-local September/month ranges (Asia/Ho_Chi_Minh and America/Los_Angeles), multi-turn follow-up, missing data, unsupported banking rejection, prompt-injection/owner override rejection, and review-only transaction proposals. Synthetic owner/amount/range/card assertions use no production data or writes. |
+| Advisor harness package/race regression | `go test ./internal/infrastructure/ai -count=1`; `go test -race ./internal/infrastructure/ai -count=1`; `go test ./... -count=1` | PASS. The opt-in live matrix is skipped unless `AI_ADVISOR_QUALITY_LIVE=1`; no live provider call was made in this gate. |
+
+### Advisor knowledge/context contract — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Account-local date and bounded visible context | `go test ./internal/usecase -run 'Advisor|AIEval' -count=1`; `BuildAdvisorSystemMessageAt` timezone-boundary tests; existing 12-message context test | PASS: Asia/Ho_Chi_Minh and America/Los_Angeles date boundaries are deterministic; invalid/missing timezone fails closed; hidden memory/card payloads remain excluded. |
+| Native product-help coverage | Same focused suite; `TestAdvisorProductHelpCoversNativeSecondaryDestinations` | PASS: reports, categories, months, recurring, Travel Mode, portfolio, credit, notifications, AI entry, feedback and account resolve to stable v1.3 source IDs. |
+
+### Native backlog audit — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Native unit/contract regression after the latest feedback build | `xcodebuild test -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS -destination 'platform=iOS Simulator,id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' -only-testing:MyPocketIOSTests -parallel-testing-enabled NO`; `~/Library/Developer/Xcode/DerivedData/MyPocketIOS-afjozxgezcwvbbftsuujrdtazexk/Logs/Test/Test-MyPocketIOS-2026.10.20_01-03-37-+0700.xcresult` | PASS: 368/368 tests, zero failures, zero skipped and zero runtime warnings (fresh rerun at 01:03 +0700). The audit found no reproducible offline-only native defect safe to change without an owner/device or provider contract. |
+| Feedback, loading/cache, attachment and Face ID contract review | `mobile-ios/MyPocketIOS/Features/Feedback/FeedbackView.swift`, `DesignSystem/MPAsyncStates.swift`, `DesignSystem/MPAttachmentViews.swift`, `Features/Auth/AuthViewModel.swift`; corresponding XCTest suites | COVERED LOCALLY: feedback resolution/refresh race, cached-content refresh policy, 20-file/5 MiB attachment boundary, and logout/refresh/credential revocation contracts are implemented and regression-tested. Physical biometric, provider/storage and populated-device acceptance remain separate gates. |
+
+### Physical Release/auth recheck — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Installed Release artifact metadata and signature | `/tmp/mypocket-release-device-latest-1792431904/Build/Products/Release-iphoneos/MyPocketIOS.app`; `codesign --verify --deep --strict`; `mobile-ios/scripts/release-artifact-preflight.sh` | PASS: latest feedback-race source build is `com.mypocket.ios`, version `1.1.0`, build `2`, production HTTPS API URL and portrait-only orientation. |
+| Paired physical-device install state | `xcrun devicectl device info apps --device 00008120-001C28C02131A01E` | PASS: iPhone 15 Plus reports `MyPocket / com.mypocket.ios / 1.1.0 / 2`. |
+| Face ID/logout/session contract | `/tmp/mypocket-device-gap-auth-20261020.xcresult` (`DeviceSignInTests` + `AppRouteCoordinatorTests`) | PASS: 8/8 simulator contract tests, including logout-retained enrollment, revoked credential clearing, refresh/session expiry and protected-route discard. Physical biometric interaction remains owner/device UAT. |
+
+### Production API route/method/auth parity — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Read-only production OpenAPI parity | `AUDIT_BASE_URL=https://money.dungxbuif.com REQUIRE_ROUTE_PARITY=1 scripts/mypocket-production-readonly-audit.sh` | PARTIAL/STOP: health `200`, live/local version `1.1.0`, 88 live vs 90 local paths. Strict mode fails on candidate-only portfolio correction routes `/api/v1/portfolio/assets/{id}/trade-corrections` and `/api/v1/portfolio/assets/{id}/trade-corrections/preview`; no shared-operation `SECURITY_DRIFT`. No authenticated request or mutation was made. |
+
+### Native transaction/report visual recheck — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Transaction/report UI navigation and base geometry | `/tmp/mypocket-visual-device-20261020-1792429747.xcresult` on `MyPocket-iPhone-16` (iOS 18.5); `xcrun xcresulttool get test-results summary` | PASS: 5 selected UI tests, 0 failures, 0 runtime warnings; transaction editor/date picker, ledger scoped header, overflow actions, reports month filter/reload, and secondary shell inset all exercised. |
+| Populated transaction/report readback | `/tmp/mypocket-local-ui-1792431228-29192.xcresult` | PASS: 5/5 API-backed simulator tests against the disposable PostgreSQL/Redis fixture. Week ledger, report insight/trend, savings goal-transfer vs surplus, and overview→ledger→wallet transaction consistency all passed with exact persisted values. Fixture was loopback-only and teardown remains required; no production rows were used. |
+| Physical-device install/launch | `xcodebuild` Release destination `00008120-001C28C02131A01E`; `xcrun devicectl device install app`; `xcrun devicectl device process launch`; `/tmp/mypocket-iphone-latest-20261020.png` | PASS: latest Release-signed `com.mypocket.ios` built from production API config, installed, launched after unlock, and captured on paired iPhone 15 Plus. Artifact: `/tmp/mypocket-release-device-latest-1792431904/Build/Products/Release-iphoneos/MyPocketIOS.app`. |
+| Physical-device touch/visual acceptance | `mobilecli agent status` + `mobilecli snapshot` on iPhone 15 Plus; `/tmp/mypocket-iphone-latest-20261020.png` | PARTIAL: physical launch and screenshot are proven after unlock; Mobile MCP/WDA touch automation is still unavailable, so touch, Face ID and the full screen matrix remain open for manual UAT. |
+| Latest source build on physical iPhone | `/tmp/mypocket-release-device-final-20261020/Build/Products/Release-iphoneos/MyPocketIOS.app`; `xcrun devicectl device install/process launch/capture screenshot` | PASS: current source with portfolio correction adapter built, installed and launched on `00008120-001C28C02131A01E`; screenshot `/tmp/mypocket-iphone-final-20261020.png` (1290x2796). |
+| Latest backlog build on physical iPhone | `/tmp/mypocket-release-device-backlog-20261020/Build/Products/Release-iphoneos/MyPocketIOS.app`; `xcrun devicectl device install/process launch/capture screenshot` | PASS: current source with portfolio correction UI and AI hardening built, installed and launched on `00008120-001C28C02131A01E`; screenshot `/tmp/mypocket-iphone-backlog-20261020.png` (1290x2796). |
+
+### Feedback submit/refresh race — 2026-10-20
+
+| Stale refresh cannot erase a newly submitted feedback item | `APIClientTests.testFeedbackRefreshCannotEraseNewlySubmittedItem` with a held stale GET and POST fixture; focused simulator XCTest | PASS after `FeedbackViewModel.submit` now invalidates the list generation before/after submission. No API, schema, production feedback status or deployment changed. |
+
+### Optimistic-lock migration contract recheck — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Version migration preserves CAS invariant | `go test ./migrations -run 'TestRowVersionMigrationPreservesCASInvariant|TestMigrationHistory' -count=1`; `docs/work/tickets/AI-VERSION-LOCK-20261020.md` | PASS: `000040` keeps both row-version columns non-null/defaulted and rejects values below `1`; no production database was contacted. |
+
+### Portfolio correction preview version guard — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Preview rejects missing/stale asset versions and accepts the current version | `go test ./internal/infrastructure/repository -run TestPortfolioCorrectionVersionGuard -count=1`; full `go test ./... -count=1` from `backend/` | PASS: stale previews return the same conflict used by commit; no production database was contacted. |
+
+### Native portfolio correction adapter — 2026-10-20
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Preview/commit request contract | `APIClientTests.testPortfolioTradeCorrectionUsesPreviewContractAndIdempotency`; `/tmp/mypocket-portfolio-correction-native-20261020/Logs/Test/Test-MyPocketIOS-2026.10.20_00-51-50-+0700.xcresult` | PASS: native sends owner-authenticated preview without an idempotency reservation, then sends commit with the caller-owned `Idempotency-Key`; snake_case body and version/replacement fields are asserted. |
+| Native correction editor/readback | `PortfolioView` correction menu/editor in `SecondaryFeatureViews.swift`; `DesignSystemTests.testPortfolioCorrectionActionsExposeStableCopyAndAccessibilityIDs`; `/tmp/mypocket-portfolio-correction-green2.log` | PASS locally: each trade row exposes shared overflow actions, replacement/void drafts require a reason, preview renders before/after position deltas, and commit is explicit/idempotent. Physical correction UAT and production migration `000038` remain open. |
+
+## 2026-10-19 feedback batch — local integrated verification
+
+Scope: [parallel plan](../superpowers/plans/2026-10-19-feedback-parallel.md) and
+[batch design](tickets/FEEDBACK-20261019-DETAIL_DESIGN.md).
+
+### Remaining-contracts continuation — 2026-10-19
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Portfolio replace/void revisions | Commit `66e6672b`; entity, HTTP, repository and migration tests; `go test -race ./... -count=1` | PASS locally. Production rollout/native correction editor remain open. |
+| AI confirmed write proposals and resource-version locking | Local focused HTTP/usecase tests plus repository/version migration tests; full backend gates pending | PASS locally for required `expected_version`, owner-bound proposal confirmation, atomic transaction/category CAS, stale `409` no-write behavior and version increments; production rollout/device acceptance remains open. |
+| APNs transport/queue contract | Commit `6ee1497f`; 57 focused push tests; migration `000039` | PASS for mock transport, retry/revoke/dedupe and durable queue. Real delivery remains disabled pending paid Apple signing/provider credentials. |
+| Advisor live conversation | `scripts/mypocket-advisor-uat.sh`; completed run/history plus read-only production regression | PASS: one real conversation persisted two messages; all covered authenticated GET surfaces returned HTTP 200. |
+| Offline simulator contracts | `/tmp/mypocket-offline-contract-20261019/Logs/Test/Test-MyPocketIOS-2026.10.19_23-41-17-+0700.xcresult` | PASS: 56/56 focused sync/outbox/cache tests. Physical network fault injection/full touch remain open. |
+| Offline auth/owner/ambiguous-ack boundary | `docs/work/tickets/OFFLINE-CONTRACT-AUDIT-20261020.md`; `/tmp/mypocket-offline-audit-20261020/Logs/Test/Test-MyPocketIOS-2026.10.20_00-25-11-+0700.xcresult` | PASS locally: 9/9 `SyncEngineTests`, including owner switch after transport; existing APIClient tests cover one-refresh 401 with stable body/key. Production capability and physical-device acceptance remain open. |
+| Native unit regression after continuation | `/tmp/mypocket-native-full-20261019` | PASS: `MyPocketIOSTests` 364/364, 0 failed, 0 skipped; project and base-component guards pass. |
+
+### Portfolio correction revision contract — 2026-10-19
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Entity RED/GREEN | `go test ./internal/entity -run Portfolio -count=1` | PASS: replacement and void revisions replay the complete weighted-average history; duplicate revision and resulting oversell are rejected. |
+| Repository/HTTP compile and focused tests | `go test ./internal/controller/http -run Portfolio -count=1` and `go test ./internal/infrastructure/repository -run Portfolio -count=1` | PASS against existing migrated test environment (DB-backed cases skip when `TEST_DATABASE_URL` is absent). |
+| Migration contract | `go test ./migrations -count=1` | PASS: additive `000038` is discovered and migration checks remain green. |
+| Production/device acceptance | Preview/commit route, native editor and physical UAT | OPEN: requires matched rollout, populated fixture and device evidence; no production financial rows changed by this implementation. |
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Final backend integrated race gate | From `backend/`: `TEST_DATABASE_URL=<disposable55436> TEST_REDIS_URL=<dedicated58659> go test -race -json ./... -count=1`; `/tmp/mypocket-feedback-backend-final10-20261019.jsonl` | PASS: 499 test/subtest results across 11 tested packages; zero failed package/test, 14 explicitly opt-in live AI/OCR/S3 probes skipped. Includes bounded multi-image OCR concurrency/upload deadlines, OCR persistence, advisor SSE replay, portfolio metadata/race, API-key owner normalization/rejection, portfolio metadata/race, notification dedupe, Redis audit retry, tool-call ID, sync capability, push-token, audit-outbox, provider validation and distributed cancellation regressions. |
+| Backend continuation race gate | `/tmp/mypocket-feedback-backend-final12-20261019.jsonl`; disposable PostgreSQL/Redis; provider/OCR diagnostics included | PASS: all Go packages completed with `go test -race ./... -count=1`; no package or race failure. |
+| Final native Release artifact | `/tmp/mypocket-final-release-20261019c/Build/Products/Release-iphonesimulator/MyPocketIOS.app` | PASS: warnings-as-errors build, artifact metadata preflight, base-component guard and project verification. |
+| Backend static analysis | `go vet ./...` | PASS after final follow-up |
+| Portfolio actual persistence/race | [Finance RED/GREEN](tickets/FEEDBACK-20261019-FINANCE-DETAIL_DESIGN.md) | PASS: omitted/null-body preserves price with 400; explicit null/zero remain valid; concurrent trade survives asset-delete conflict |
+| Native final unit/selected UI | `/tmp/mypocket-feedback-native-final8-20261019.xcresult` | PASS: 361 native unit tests, zero failures/skips/runtime warnings. The selected UI suite remains 6/6 from the signed final artifact; includes Account Add/cancel, secondary swipe, dirty-editor protection, delegate-overlap lifecycle, deep-link auth/session, offline cache and push-token request regressions. This is not a run of every native UI scenario. |
+| Native visual/base-component audit | `/tmp/mypocket-native-visual-audit-20261019.xcresult` | PASS: 8/8 focused geometry/route/base-component contracts; cards, compact rows, feedback bubble clearance and typed More destinations remain tokenized and portrait-safe. |
+| API-key owner fail-closed contract | [API key owner contract](tickets/API-KEY-OWNER-CONTRACT-20261019.md) | PASS in backend race gate: owner IDs normalize before persistence and malformed ownerless keys are rejected before handlers execute. |
+| Native Release simulator | `/tmp/mypocket-feedback-release-final8-20261019/Build/Products/Release-iphonesimulator/MyPocketIOS.app` | PASS with warnings treated as errors; portrait-only Info.plist and base/project guards also pass. No physical source build/install claim. |
+| Native Release artifact metadata | `mobile-ios/scripts/release-artifact-preflight.test.sh`; `APP_PATH=/tmp/mypocket-release-artifact-preflight-20261019/Build/Products/Release-iphonesimulator/MyPocketIOS.app mobile-ios/scripts/release-artifact-preflight.sh` | PASS: fixture negative cases reject wrong build/API/orientation; fresh packaged artifact is `com.mypocket.ios`, `1.1.0 (2)`, production HTTPS URL and portrait-only. Read-only; does not prove signing/install. |
+| Native physical-UAT build-selection guard | `xcodebuild ... -configuration Release -destination 'id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D'` plus `/tmp/mypocket-native-audit-build.log` and release artifact preflight | PASS: current-source Release simulator artifact builds with warnings treated as errors and embeds `https://money.dungxbuif.com/api/v1`; Debug intentionally embeds `127.0.0.1:8080` and must not be used for a production-device run. The device candidate must be installed from Release or an explicit production override. |
+| Public generated contract | `go run github.com/swaggo/swag/cmd/swag init -g cmd/api/main.go`; focused price test rerun | PASS: required `latest_price`, nullable extension and 400 documented; explicit null HTTP test still passes |
+| Design doc links | `node app/scripts/check-design-docs.mjs` using bundled Node | PASS: 229 links |
+| Redis audit retry/retention | `TEST_REDIS_URL=redis://127.0.0.1:52990/0 go test -race ./internal/infrastructure/cache -count=1` against disposable Redis container `mypocket-audit-redis-20261019` | PASS: dedicated feedback/advisor streams, redacted fields and repeated-event dedupe; stream remains approximately bounded at 10,000. Durable outage recovery/alerting are not claimed. |
+| Migration/rollout preflight | `go test ./migrations -count=1`; `scripts/mypocket-rollout-preflight.sh`; `AUDIT_BASE_URL=https://money.dungxbuif.com REQUIRE_ROUTE_PARITY=1 scripts/mypocket-production-readonly-audit.sh` | LOCAL PASS / PRODUCTION STOP: ordered 035→036→037→038→039→040 history, current up/down files and additive safety constraints; production health is 200 with 88 live vs 90 local candidate paths, so strict parity fails on the two portfolio correction routes. The preflight is read-only and warns without `BACKUP_FILE`; it does not prove the target database version. The latest recorded production schema remains version 37 (`dirty=false`), so 038–040 backup, manager-path version readback, migration, matching API/worker rollout and worker gates remain pending. See [rollout readiness](../operations/ROLLOUT_READINESS.md). |
+
+The read-only production snapshot contains 48 open feedback records; developer
+status and owner resolution were not changed. Physical-device, real-provider,
+comprehensive visual acceptance and production rollout remain separate gates.
+See [remaining deliverables](tickets/FEEDBACK-20261019-REMAINING.md).
+
+### E2E acceptance audit — 2026-10-19 22:42 +0700
+
+| Flow | Local proof | Result / residual |
+| --- | --- | --- |
+| Wallet create/update/delete and owner isolation | Backend wallet HTTP/repository tests plus native API-backed wallet management/detail tests in `MyPocketIOSUITests/LaunchTests.swift` | PASS in local contracts. Physical owner/device UAT remains open. |
+| Transaction create/edit/delete, categories, jars and credit | Backend transaction/category/jar/credit tests plus native transaction, category, jar and credit UI-backed scenarios | PASS in local contracts. Provider-generated transaction proposals still require live-provider acceptance. |
+| Paired wallet transfer and replay | Backend transaction/offline transfer HTTP and PostgreSQL tests; native outbox/transfer scenarios | PASS: paired rows and idempotent replay are asserted. Production capability/version readback remains open. |
+| Budget, recurring budget, savings and reports | Backend budget-series/report/savings integration tests; native budget/recurrence/savings/report scenarios; [rollout audit](tickets/SAVINGS-BUDGET-ROLLOUT-AUDIT-20261020.md) | PASS against disposable PostgreSQL; production route surface is 88 live vs 90 local candidate paths (strict parity is stopped by the two portfolio correction routes), while the latest recorded production schema is version 37 (`dirty=false`) and therefore does not yet prove migrations 038–040. Populated physical owner/device acceptance remains open. |
+| Auth, refresh/logout and deep links | Backend auth/device/API-key tests; native `AppRouteCoordinatorTests` and password-auth tests | PASS for local owner/session contracts. Signed-device Face ID and physical deep-link acceptance remain open. |
+| Offline cache, outbox and loading states | Native `FinancialSnapshotCacheTests`, `FinancialMutationQueueTests` and `SyncEngineTests` | PASS: owner/server isolation, retry/conflict/auth blocking and no white-flash refresh policy. Real production capability payload remains unverified. |
+
+The fresh backend audit command was run from `backend/`:
+`TEST_DATABASE_URL=postgres://mypocket_test:local-fixture-only@127.0.0.1:55436/mypocket_savings_budget?sslmode=disable TEST_REDIS_URL=redis://127.0.0.1:6379/14 go test -race -json ./... -count=1`.
+Evidence: `/tmp/mypocket-e2e-backend-audit-20261019.jsonl`; 484 passing
+test/subtest results, zero failures, and nine opt-in live provider/storage
+tests skipped (the other five package-level skips have no test files). `go vet
+./...` also passed. The fresh native unit command targeted the current iOS
+simulator and produced `/tmp/mypocket-e2e-native-audit-20261019.xcresult`:
+`xcodebuild -project mobile-ios/MyPocketIOS.xcodeproj -scheme MyPocketIOS -destination 'platform=iOS Simulator,id=EC80B092-CEF1-4A8E-A5A3-7420298EFD4D' -only-testing:MyPocketIOSTests test -enableCodeCoverage NO -parallel-testing-enabled NO CODE_SIGN_IDENTITY=- CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM=AU442S3MN`.
+It passed 359/359 with zero failures. Native UI tests that require a running
+local API or signed physical device were not claimed by this audit.
+
+### Release/device recheck — 2026-10-19 22:38 +0700
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Production read-only smoke | `curl` health and `/api/v1/docs/doc.json` | PASS: health 200; production remains `1.1.0` with 78 paths. Local generated contract has 88 paths; no rollout performed. |
+| Rollout safety preflight | `scripts/mypocket-rollout-preflight.test.sh`; `/tmp/mypocket-rollout-preflight-20261019.txt` | PASS with expected warning: repository migration files are ordered through 040; no backup was supplied and no target DB version was read, so production rollout of 038–040 remains blocked. |
+| Native project/base guards | `/tmp/mypocket-ios-verify-20261019.txt`, `/tmp/mypocket-ios-base-guard-20261019.txt` | PASS; portrait-only Info.plist remains enforced. |
+| Native Release simulator | `/tmp/mypocket-release-readiness-sim-20261019/Build/Products/Release-iphonesimulator/MyPocketIOS.app` | PASS with warnings treated as errors; unsigned simulator artifact only. |
+| Physical signing/install | `/tmp/mypocket-release-readiness-20261019.log`; `devicectl` inventory | BLOCKED: Xcode has no account/profile for team `GYRA8D4M54` and bundle `com.mypocket.ios`; device still runs `1.1.0 (2)`. |
 
 ## 2026-10-16 native parity merge gate
 
@@ -5176,3 +5436,28 @@ close the remaining port audit or owner UAT.
 This checkpoint is a build/install gate, not a claim of 100% reference parity.
 The physical launch/screenshot gate remains open until the owner unlocks the
 iPhone; the reference survey keeps all unvisited Money Lover branches explicit.
+## Production API UAT regression — 2026-10-19
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Dedicated UAT login and authenticated core reads | PASS | `scripts/mypocket-production-uat-regression.sh`; `/tmp/mypocket-production-uat-regression-20261019.log` |
+| Reports, months, jars, recurring, travel, portfolio and notifications | PASS | Harness HTTP 200 checks against the isolated UAT owner |
+| Feedback/changelog, API-key listing, sync and AI capabilities | PASS | Harness HTTP 200 checks; no secrets printed or persisted |
+| Parameterized credit/jar/budget report reads | CONDITIONAL | Only executed when the UAT owner already has matching fixtures; no fixture was fabricated |
+| Advisor conversation history | NOT RUN | Requires explicit `UAT_CONVERSATION_ID`; baseline run did not create an AI conversation |
+| Production mutation during this regression | PASS | Harness is GET-only after the pre-existing UAT fixtures |
+
+This is API read-surface evidence only. It does not close signed-device,
+Face ID, APNs, offline-network, provider-quality or owner visual UAT gates.
+
+## Continuation verification — 2026-10-19
+
+| Gate | Result | Evidence |
+|---|---|---|
+| Full backend race suite with disposable PostgreSQL/Redis | PASS | `/tmp/mypocket-full-race-continuation-20261019.log`; all backend packages passed |
+| Physical Release build | PASS | `/tmp/mypocket-physical-release-20261019/`; warnings-as-errors enabled |
+| Production API embedded in physical artifact | PASS | `Info.plist`: `https://money.dungxbuif.com/api/v1`, version `1.1.0`, build `2` |
+| Physical install and launch | PASS | iPhone 15 Plus `00008120-001C28C02131A01E`; screenshot `/tmp/mypocket-prod-release-20261019.png` |
+
+The physical binary is a Personal Team development-signed install; Associated
+Domains/universal links and APNs still require a paid distribution profile.

@@ -46,6 +46,7 @@ enum MPMetrics {
     static let cardVerticalPadding: CGFloat = 8
     static let sectionSpacing: CGFloat = 8
     static let rowSpacing: CGFloat = 4
+    static let transactionRowVerticalPadding: CGFloat = 6
     static let bottomNavigationHeight: CGFloat = 56
     static let balanceTextSize: CGFloat = 34
 }

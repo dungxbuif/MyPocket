@@ -24,10 +24,10 @@ import (
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/controller/http,../../internal/usecase,../../internal/entity -o ../../docs --parseInternal
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/controller/http,../../internal/usecase,../../internal/entity,../../internal/repository -o ../../docs --parseInternal
 
 // @title MyPocket API
-// @version 1.1.0
+// @version 1.2.1
 // @description Current implemented API surface for local development.
 // @host localhost:8080
 // @BasePath /
@@ -59,6 +59,9 @@ func main() {
 	defer func() {
 		_ = cacheRepo.Close()
 	}()
+	// Persist redacted audit hand-offs before the Redis fast path so a brief
+	// cache outage cannot lose auth/feedback audit evidence.
+	cacheRepo.SetAuditOutbox(repo.NewAuditOutboxPostgresRepository(database))
 
 	passwordSvc := auth.NewPasswordService()
 
@@ -119,30 +122,33 @@ func main() {
 	apiKeyService := usecase.NewUserAPIKeyService(repo.NewUserAPIKeyPostgresRepository(database))
 	middleware.APIKeys = apiKeyService
 	middleware.Audit = cacheRepo
-	router := httpapi.NewRouter(authHandler, profileHandler, homeHandler, categoryHandler, walletHandler, transactionHandler, middleware, cfg.CORSAllowedOrigins)
-	router.RegisterNotificationRoutes(&httpapi.NotificationHandler{Notifications: repo.NewNotificationPostgresRepository(database)})
-	router.RegisterAPIKeyRoutes(&httpapi.APIKeyHandler{Service: apiKeyService})
+	handlers := httpapi.ApplicationHandlers{
+		Auth: authHandler, Profile: profileHandler, Home: homeHandler,
+		Category: categoryHandler, Wallet: walletHandler,
+		Transaction: transactionHandler, Middleware: middleware,
+	}
+	handlers.Notification = &httpapi.NotificationHandler{
+		Notifications: repo.NewNotificationPostgresRepository(database),
+		PushTokens:    usecase.NewPushTokenInteractor(repo.NewPushTokenPostgresRepository(database)),
+	}
+	handlers.APIKey = &httpapi.APIKeyHandler{Service: apiKeyService}
 	budgetRepository := repo.NewBudgetPostgresRepository(database)
 	budgetSeriesRepository := repo.NewBudgetSeriesPostgresRepository(database)
-	router.RegisterBudgetRoutes(&httpapi.BudgetHandler{Budgets: budgetRepository, Series: budgetSeriesRepository, Wallets: walletRepository, Categories: categoryRepository, Transactions: transactionRepository, Users: userRepo})
-	router.RegisterBudgetSeriesRoutes(&httpapi.BudgetSeriesHandler{Series: budgetSeriesRepository, Users: userRepo})
-	router.RegisterBudgetReportRoutes(&httpapi.BudgetReportHandler{Budgets: budgetRepository, Transactions: transactionRepository, Categories: categoryRepository, Users: userRepo})
-	savingsReportHandler := &httpapi.SavingsReportHandler{Wallets: walletRepository, Transactions: transactionRepository, Users: userRepo}
-	savingsReportRoutes := router.Engine.Group("/api/v1/reports")
-	savingsReportRoutes.Use(middleware.RequireAuth)
-	savingsReportRoutes.GET("/savings", savingsReportHandler.GetSavingsReport)
-	savingsReportRoutes.GET("/savings/transactions", savingsReportHandler.ListSavingsTransactions)
-	router.RegisterJarRoutes(&httpapi.JarHandler{Jars: jarRepository, Users: userRepo})
-	router.RegisterMonthRoutes(&httpapi.MonthHandler{Users: userRepo, Transactions: transactionRepository, Categories: categoryRepository, Jars: jarRepository, Notes: monthNotes})
+	handlers.Budget = &httpapi.BudgetHandler{Budgets: budgetRepository, Series: budgetSeriesRepository, Wallets: walletRepository, Categories: categoryRepository, Transactions: transactionRepository, Users: userRepo}
+	handlers.BudgetSeries = &httpapi.BudgetSeriesHandler{Series: budgetSeriesRepository, Users: userRepo}
+	handlers.BudgetReport = &httpapi.BudgetReportHandler{Budgets: budgetRepository, Transactions: transactionRepository, Categories: categoryRepository, Users: userRepo}
+	handlers.Savings = &httpapi.SavingsReportHandler{Wallets: walletRepository, Transactions: transactionRepository, Users: userRepo}
+	handlers.Jar = &httpapi.JarHandler{Jars: jarRepository, Users: userRepo}
+	handlers.Month = &httpapi.MonthHandler{Users: userRepo, Transactions: transactionRepository, Categories: categoryRepository, Jars: jarRepository, Notes: monthNotes}
 	recurringRepository := repo.NewRecurringPostgresRepository(database)
-	router.RegisterRecurringRoutes(&httpapi.RecurringHandler{Schedules: recurringRepository, Wallets: walletRepository, Categories: categoryRepository, Users: userRepo})
+	handlers.Recurring = &httpapi.RecurringHandler{Schedules: recurringRepository, Wallets: walletRepository, Categories: categoryRepository, Users: userRepo}
 	creditRepository, _ := transactionRepository.(transactionrepo.CreditRepository)
-	router.RegisterCreditRoutes(&httpapi.CreditHandler{Credits: creditRepository, Wallets: walletRepository, Categories: categoryRepository})
-	router.RegisterTravelRoutes(&httpapi.TravelHandler{Events: travelRepository})
+	handlers.Credit = &httpapi.CreditHandler{Credits: creditRepository, Wallets: walletRepository, Categories: categoryRepository}
+	handlers.Travel = &httpapi.TravelHandler{Events: travelRepository}
 	portfolioRepository := repo.NewPortfolioPostgresRepository(database)
-	router.RegisterPortfolioRoutes(&httpapi.PortfolioHandler{Portfolio: portfolioRepository})
+	handlers.Portfolio = &httpapi.PortfolioHandler{Portfolio: portfolioRepository}
 	insiderRepository := repo.NewInsiderPostgresRepository(database)
-	router.RegisterInsiderRoutes(&httpapi.InsiderHandler{Reader: insiderRepository, Users: userRepo})
+	handlers.Insider = &httpapi.InsiderHandler{Reader: insiderRepository, Users: userRepo}
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
 	attachmentStorage, err := newAttachmentStorage(cfg)
 	if err != nil {
@@ -152,12 +158,13 @@ func main() {
 	// storage is intentionally optional; a typed-nil interface would compare
 	// non-nil and panic when feedback/AI attachment code calls Key or Put.
 	aiAttachmentStorage, feedbackStorage := optionalAttachmentStores(attachmentStorage)
-	router.RegisterAIEntryRoutes(&httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: aiAttachmentStorage, Users: userRepo}})
+	handlers.AIEntry = &httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: aiAttachmentStorage, Users: userRepo}}
 	financeReader := repo.NewFinanceQueryPostgresRepository(database)
 	financeQueryService := usecase.NewFinanceQueryService(financeReader)
 	advisorProvider := ai.NewAdvisorClient(ai.AdvisorClientConfig{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, StoreUsage: cfg.AIStoreUsage})
 	advisorStore := repo.NewAdvisorPostgresRepository(database)
 	advisorOrchestrator := usecase.NewAdvisorOrchestrator(advisorProvider, usecase.NewAdvisorToolRegistry(financeQueryService))
+	advisorOrchestrator.GroundingEnabled = cfg.AIAdvisorGroundingEnabled
 	advisorOrchestrator.Validator = usecase.AdvisorPrincipalValidatorFunc(func(ctx context.Context, principal usecase.Principal) error {
 		switch principal.CredentialKind {
 		case "user_api_key":
@@ -175,8 +182,8 @@ func main() {
 			return usecase.ErrAdvisorPrincipalInvalid
 		}
 	})
-	advisorService := usecase.NewAdvisorService(advisorStore, advisorOrchestrator)
-	router.RegisterAdvisorRoutes(&httpapi.AdvisorHandler{
+	advisorService := usecase.NewAdvisorServiceWithRuntime(advisorStore, advisorOrchestrator, cfg.AIAdvisorRunLeasesEnabled)
+	handlers.Advisor = &httpapi.AdvisorHandler{
 		Service:      advisorService,
 		Users:        userRepo,
 		Finance:      financeQueryService,
@@ -185,7 +192,7 @@ func main() {
 		Budgets:      budgetRepository,
 		Categories:   categoryRepository,
 		Transactions: transactionRepository,
-	})
+	}
 	feedbackRepository := repo.NewFeedbackPostgresRepository(database)
 	changelogRepository := repo.NewChangelogPostgresRepository(database)
 	feedbackService := usecase.NewFeedbackServiceWithStorage(feedbackRepository, cacheRepo, feedbackStorage, time.Now)
@@ -193,9 +200,13 @@ func main() {
 	if cfg.AppEnv != "development" && strings.TrimSpace(cfg.FeedbackAgentToken) == "" {
 		log.Fatal("FEEDBACK_AGENT_TOKEN must be configured outside development")
 	}
-	router.RegisterFeedbackRoutes(&httpapi.FeedbackHandler{Service: feedbackService}, &httpapi.ChangelogHandler{Service: changelogService}, httpapi.NewFeedbackAgentMiddleware(cfg.FeedbackAgentToken))
-	router.Engine.GET("/api/v1/docs/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	httpapi.RegisterPublicDocsRedirect(router.Engine)
+	handlers.Feedback = &httpapi.FeedbackHandler{Service: feedbackService}
+	handlers.Changelog = &httpapi.ChangelogHandler{Service: changelogService}
+	handlers.FeedbackAgent = httpapi.NewFeedbackAgentMiddleware(cfg.FeedbackAgentToken)
+	router := httpapi.NewApplicationRouter(handlers, httpapi.ApplicationRouterOptions{
+		AllowedOrigins: cfg.CORSAllowedOrigins,
+		DocsHandler:    ginSwagger.WrapHandler(swaggerFiles.Handler),
+	})
 
 	if err := router.Engine.Run(cfg.HTTPAddr); err != nil {
 		log.Fatalf("server failed: %v", err)

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Audit MyPocket Business Logic"
+  short_description: "Prove finance and API invariants end to end"
+  brand_color: "#111111"
+  default_prompt: "Use $auditing-mypocket-business-logic to audit a MyPocket business flow, fix confirmed defects with RED-GREEN proof, and reconcile the public docs."
+policy:
+  allow_implicit_invocation: true

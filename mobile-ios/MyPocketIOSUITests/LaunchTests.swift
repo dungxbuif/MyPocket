@@ -908,6 +908,7 @@ private struct SavingsReportFixture: Decodable, Sendable {
     struct Goals: Decodable, Sendable {
         let opening_balance: Int64
         let closing_balance: Int64
+        let initial_balance_added: Int64
         let deposits: Int64
         let internal_transfers: Int64
     }
@@ -1221,7 +1222,7 @@ final class LaunchTests: XCTestCase {
         try await OfflineFaultFixture.configure(mode: mode, walletID: fixture.wallet.id, reset: true)
         let note = "Offline draft \(suffix)"
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
         app.launch()
         openWallets(app)
         XCTAssertTrue(app.staticTexts[fixture.wallet.name].waitForExistence(timeout: 10))
@@ -1743,9 +1744,9 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(app.staticTexts["screen-title-Nhập giao dịch bằng AI"].waitForExistence(timeout: 5))
         app.buttons["screen-back"].tap()
         XCTAssertTrue(app.staticTexts["Mở rộng"].waitForExistence(timeout: 5))
-        XCTAssertFalse(
+        XCTAssertTrue(
             add.exists,
-            "The global raised add affordance must not be instantiated on Account, so it cannot cover menu rows."
+            "Account root keeps the shared transaction Add action; only Account child routes hide it."
         )
         app.buttons["bottom-tab-transactions"].tap()
         let transactionAdd = app.buttons["add-transaction-button"]
@@ -2449,74 +2450,20 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue((input.value as? String)?.contains("Dong cuoi can giu") == true, "Accessibility menu switching must retain the full draft")
     }
 
-    func testAssistantLandscapeKeepsComposerAndConversationUsableWithKeyboard() {
-        verifyAssistantLandscapeWithKeyboard(authArgument: "-UITestAuthenticated", requiresOverview: false)
-    }
-
-    func testAPIBackedAssistantLandscapeKeepsOverviewComposerAndConversationUsableWithKeyboard() throws {
-#if !LOCAL_API_UI
-        throw XCTSkip("Requires the disposable local API fixture")
-#else
-        verifyAssistantLandscapeWithKeyboard(authArgument: "-UITestAuthenticatedAPI", requiresOverview: true)
-#endif
-    }
-
-    private func verifyAssistantLandscapeWithKeyboard(authArgument: String, requiresOverview: Bool) {
+    func testAppRemainsPortraitWhenDeviceRotates() {
         let device = XCUIDevice.shared
         defer { device.orientation = .portrait }
         device.orientation = .portrait
         let app = XCUIApplication()
-        app.launchArguments = [authArgument]
+        app.launchArguments = ["-UITestAuthenticated"]
         app.launch()
-        app.buttons["bottom-tab-assistant"].tap()
-        let input = app.textFields["assistant-composer-input"]
-        XCTAssertTrue(input.waitForExistence(timeout: 10))
-        if requiresOverview { XCTAssertTrue(app.buttons["assistant-pinned-overview"].waitForExistence(timeout: 10)) }
+        XCTAssertTrue(app.buttons["bottom-tab-overview"].waitForExistence(timeout: 10))
         device.orientation = .landscapeLeft
-        let rotated = XCTNSPredicateExpectation(predicate: NSPredicate { _, _ in app.frame.width > app.frame.height }, object: nil)
-        XCTAssertEqual(XCTWaiter.wait(for: [rotated], timeout: 5), .completed, "Do not claim landscape coverage if app remains portrait")
-        guard app.frame.width > app.frame.height else { attachScreenshot(app, named: "assistant-landscape-not-supported"); return }
-        input.tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        input.typeText("Dong dau\nDong hai\nDong cuoi can giu")
-        XCTAssertTrue((input.value as? String)?.contains("Dong cuoi can giu") == true)
-        let composer = app.descendants(matching: .any)["assistant-composer"].firstMatch
-        let send = app.buttons["assistant-composer-action"]
-        let overview = app.buttons["assistant-pinned-overview"]
-        let overviewFrame = overview.exists ? overview.frame : CGRect.zero
-        let geometry = XCTAttachment(string: [
-            "app=\(app.frame)",
-            "header=\(app.staticTexts["Finance Assistant"].firstMatch.frame)",
-            "composer=\(composer.frame)",
-            "input=\(input.frame)",
-            "send=\(send.frame)",
-            "conversation=\(app.scrollViews["assistant-conversation"].frame)",
-            "keyboard=\(app.keyboards.firstMatch.frame)",
-            "overview=\(overviewFrame)"
-        ].joined(separator: "\n"))
-        geometry.name = requiresOverview ? "assistant-landscape-api-geometry" : "assistant-landscape-geometry"
-        geometry.lifetime = .keepAlways
-        add(geometry)
-        XCTAssertTrue(app.frame.contains(composer.frame))
-        XCTAssertGreaterThanOrEqual(send.frame.width, 44)
-        XCTAssertGreaterThanOrEqual(send.frame.height, 44)
-        XCTAssertLessThanOrEqual(composer.frame.maxY, app.keyboards.firstMatch.frame.minY + 1)
-        XCTAssertGreaterThanOrEqual(app.scrollViews["assistant-conversation"].frame.height, 44, "Landscape draft must leave a usable conversation viewport")
-        XCTAssertFalse(app.buttons["bottom-tab-assistant"].exists)
-        attachScreenshot(app, named: requiresOverview ? "assistant-landscape-api-focused-keyboard" : "assistant-landscape-focused-keyboard")
-        if requiresOverview {
-            XCTAssertFalse(overview.exists)
-            let headerOverview = app.buttons["assistant-header-overview"]
-            XCTAssertTrue(headerOverview.isHittable)
-            headerOverview.tap()
-            XCTAssertTrue(app.descendants(matching: .any)["assistant-overview-details"].firstMatch.waitForExistence(timeout: 5))
-            app.buttons["Đóng"].firstMatch.tap()
-        }
-        attachScreenshot(app, named: requiresOverview ? "assistant-landscape-api-multiline-keyboard" : "assistant-landscape-multiline-keyboard")
-        let dismiss = app.buttons["assistant-dismiss-keyboard"]
-        if dismiss.exists { dismiss.tap() }
-        XCTAssertTrue(app.buttons["bottom-tab-assistant"].waitForExistence(timeout: 5))
-        XCTAssertTrue((input.value as? String)?.contains("Dong cuoi can giu") == true)
+        let portrait = NSPredicate { _, _ in app.frame.height >= app.frame.width }
+        let remainsPortrait = XCTNSPredicateExpectation(predicate: portrait, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [remainsPortrait], timeout: 5), .completed)
+        XCTAssertGreaterThanOrEqual(app.frame.height, app.frame.width, "MyPocket supports portrait only")
+        attachScreenshot(app, named: "portrait-lock-after-landscape-request")
     }
 
     func testAssistantShowsSuggestedQuestionsBeforeFirstMessage() throws {
@@ -2872,6 +2819,58 @@ final class LaunchTests: XCTestCase {
         cancel.tap()
         XCTAssertTrue(addCategory.waitForExistence(timeout: 5), "Category cancel must actually work above the navbar")
         attachScreenshot(app, named: "category-editor-feedback-clearance")
+    }
+
+    func testAccountRootAddOpensTransactionAndCancelReturnsToAccount() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        openMore(app)
+        let add = app.buttons["add-transaction-button"]
+        XCTAssertTrue(add.waitForExistence(timeout: 3), "Account root keeps the global transaction Add action.")
+        guard add.exists else { return }
+        add.tap()
+        let close = app.buttons["screen-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        guard close.exists else { return }
+        close.tap()
+        XCTAssertTrue(app.staticTexts["screen-title-Thêm"].waitForExistence(timeout: 5), "Cancel returns to the originating Account tab.")
+        app.buttons["more-profile-account"].tap()
+        XCTAssertFalse(app.buttons["add-transaction-button"].exists, "Secondary routes keep their own create actions.")
+    }
+
+    func testSecondaryRouteSupportsLeadingEdgeSwipeBack() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        openMore(app)
+        app.buttons["more-profile-account"].tap()
+        XCTAssertTrue(app.staticTexts["screen-title-Tài khoản"].waitForExistence(timeout: 5))
+        let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.005, dy: 0.5))
+        let end = app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.5))
+        start.press(forDuration: 0.1, thenDragTo: end)
+        XCTAssertTrue(app.staticTexts["screen-title-Thêm"].waitForExistence(timeout: 5), "A leading-edge swipe pops the secondary route.")
+    }
+
+    func testSecondaryEdgeSwipeDoesNotDiscardCategoryEditorDraft() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        openMore(app)
+        let categories = app.buttons["more-destination-categories"]
+        reveal(categories, in: app)
+        categories.tap()
+        let add = app.buttons["category-add-group"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        let name = app.textFields["Tên nhóm"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap()
+        name.typeText("Draft preserved")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.005, dy: 0.35))
+            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.85, dy: 0.35)))
+        XCTAssertTrue(app.staticTexts["category-editor-title"].exists)
+        XCTAssertEqual(name.value as? String, "Draft preserved", "Back swipe cannot silently discard an editor draft.")
     }
 
     func testSelectedAccountTabDoesNotActivateLastMoreRow() throws {
@@ -3503,8 +3502,12 @@ final class LaunchTests: XCTestCase {
                                                        amount: 5_000_000, note: transferNote)
         let month = LocalAPIFixture.currentMonth()
         let report = try await LocalAPIFixture.savingsBudgetRead("/reports/savings?month=\(month)", as: SavingsReportFixture.self)
-        XCTAssertEqual(report.goals.opening_balance, 100_000)
+        // A goal wallet created during the selected month starts at zero for
+        // the period opening; its configured seed is reported separately as
+        // initial_balance_added. This matches the savings report contract.
+        XCTAssertEqual(report.goals.opening_balance, 0)
         XCTAssertEqual(report.goals.closing_balance, 5_100_000)
+        XCTAssertEqual(report.goals.initial_balance_added, 100_000)
         XCTAssertEqual(report.goals.deposits, 0, "Paired transfer is separate from ordinary deposits")
         XCTAssertEqual(report.goals.internal_transfers, 5_000_000)
         XCTAssertEqual(report.surplus.income, 20_000_000)
@@ -3668,13 +3671,18 @@ final class LaunchTests: XCTestCase {
         formatter.numberStyle = .currency; formatter.currencyCode = "VND"; formatter.currencySymbol = "₫"
         formatter.maximumFractionDigits = 0; formatter.locale = Locale(identifier: "vi_VN")
         let formatted = formatter.string(from: NSNumber(value: amount))!
-        let metric = app.staticTexts["\(title): \(formatted)"].firstMatch
+        // MPMetricGrid exposes each metric as an accessibility container with
+        // label=title and value=formatted amount (the value is not a child
+        // StaticText joined into one identifier). Query that stable contract
+        // instead of depending on the visual text composition.
+        let metric = app.descendants(matching: .any)
+            .matching(NSPredicate(format: "label == %@", title)).firstMatch
         guard metric.waitForExistence(timeout: 10) else {
-            XCTFail("Expected server amount \(title): \(formatted)")
+            XCTFail("Expected server metric label \(title) with amount \(formatted)")
             return
         }
         reveal(metric, in: app)
-        XCTAssertTrue(metric.exists)
+        XCTAssertEqual(metric.value as? String, formatted, "Expected server amount \(title): \(formatted)")
     }
 
     private func assertSavingsBudgetNote(_ note: String, in app: XCUIApplication) {

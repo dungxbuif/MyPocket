@@ -143,6 +143,12 @@ The page header uses the shared `ScreenHeader` molecule so title/action spacing 
 
 No screen-local color, shape, input, button or card styling is allowed. Debt, receipt/OCR and advanced filter controls stay out of this screen until their own approved slices exist.
 
+Native transaction rows use `MPTransactionRow` with 44pt minimum content plus
+6pt top/bottom padding. This spacing is shared with Overview, wallet/credit
+history and Assistant results; Dynamic Type can expand without a fixed cap.
+Account root global Add opens the same transaction editor and restores Account
+after save/cancel. Secondary Account destinations keep their own create actions.
+
 The native transaction editor exposes report inclusion as the shared
 checkbox-row base. It is selected by default for a new entry and editing uses
 the transaction's persisted report-inclusion value.

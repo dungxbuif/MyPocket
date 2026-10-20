@@ -67,6 +67,33 @@ func TestUserAPIKeyCreateReturnsSecretButStoresOnlyDigest(t *testing.T) {
 	}
 }
 
+func TestUserAPIKeyCreateNormalizesOwnerBeforePersistence(t *testing.T) {
+	repo := &apiKeyRepoStub{}
+	service := NewUserAPIKeyService(repo)
+	created, err := service.Create(context.Background(), APIKeyCreateInput{OwnerID: "  owner-1  ", Name: "Normalized"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.Key.OwnerID != "owner-1" || repo.created == nil || repo.created.OwnerID != "owner-1" {
+		t.Fatalf("owner must be normalized before persistence: created=%+v persisted=%+v", created.Key, repo.created)
+	}
+}
+
+func TestUserAPIKeyAuthenticateRejectsOwnerlessPersistedCredential(t *testing.T) {
+	repo := &apiKeyRepoStub{}
+	service := NewUserAPIKeyService(repo)
+	created, err := service.Create(context.Background(), APIKeyCreateInput{OwnerID: "owner-1", Name: "Malformed"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Simulate a malformed legacy row. Authentication must fail closed before a
+	// handler can receive an empty owner and accidentally widen a query.
+	repo.key.OwnerID = "   "
+	if _, err := service.Authenticate(context.Background(), created.Secret, nil); !errors.Is(err, ErrAPIKeyInvalid) {
+		t.Fatalf("ownerless persisted key must be rejected, got %v", err)
+	}
+}
+
 func TestUserAPIKeyAuthenticateIgnoresLegacyScopesButKeepsOwnerAndRevocation(t *testing.T) {
 	repo := &apiKeyRepoStub{}
 	service := NewUserAPIKeyService(repo)

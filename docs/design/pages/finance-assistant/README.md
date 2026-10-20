@@ -85,10 +85,19 @@ Historical web contract below is archived, not native authority.
 
 The first implementation is a read-only conversation tab. It keeps the conversation in PostgreSQL and stores the conversation ID in the browser only as a pointer for history reload; ledger data remains the backend source of truth.
 
+Native run recovery is GET-only: `AdvisorRunObserver` follows a queued or
+running `run_id` until a terminal server status, with 1/2/3-second foreground
+polling and 3/5/10-second network backoff. It never resubmits the user message.
+Run responses may include additive `server_time`, `deadline_at` and
+`retry_after_ms`; history `meta` may include `active_run`. Legacy envelopes
+remain valid. Capabilities advertise `run_timeout_seconds` and
+`grounding_version` when present.
+
 ## Contract
 
 - The composer uses `AssistantComposer mode="advisor"`, hides receipt uploads and keeps the shared `BaseTextArea`/`BaseButton` controls.
 - User messages are submitted to `POST /api/v1/ai/advisor/messages` with a client request ID; the backend persists a run and assistant message before returning.
+- Async submissions use `POST /api/v1/ai/advisor/messages/async`; the native client observes the returned run with `GET /api/v1/ai/advisor/runs/{id}` and can resume an `active_run` discovered from history after foreground/relaunch.
 - History loads from `GET /api/v1/ai/advisor/conversation/messages?conversation_id=...`.
 - Finance tools in V1 are read-only. A structured wallet-creation proposal is a separate, explicitly user-confirmed UI action through the existing wallet API; its confirmation is disabled while saving and disappears after success, while errors remain retryable. No transaction mutation, bank connection, payment, or arbitrary model URL is exposed.
 - When the AI provider is missing, the screen shows a configuration state instead of fake finance numbers.

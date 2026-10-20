@@ -685,8 +685,9 @@ final class FinanceModelTests: XCTestCase {
     }
 
     func testPortfolioSummaryDecodesTradesAndNullableValuation() throws {
-        let data = Data(#"{"assets":[{"id":"asset-1","symbol":"VNM","name":"Vinamilk","latest_price":72000,"latest_price_at":"2026-10-05T10:00:00Z"}],"positions":[{"asset_id":"asset-1","symbol":"VNM","name":"Vinamilk","quantity":"1.25","cost_basis":90000,"average_cost":72000,"realized_pnl":1000,"market_value":95000,"unrealized_pnl":5000,"latest_price":76000}],"trades":[{"id":"trade-1","asset_id":"asset-1","side":"buy","quantity":"1.25","unit_price":72000,"fee":1000,"occurred_at":"2026-10-05T10:00:00Z"}],"total_cost_basis":91000,"total_market_value":95000,"total_unrealized_pnl":5000}"#.utf8)
+        let data = Data(#"{"assets":[{"id":"asset-1","symbol":"VNM","name":"Vinamilk","version":3,"latest_price":72000,"latest_price_at":"2026-10-05T10:00:00Z"}],"positions":[{"asset_id":"asset-1","symbol":"VNM","name":"Vinamilk","quantity":"1.25","cost_basis":90000,"average_cost":72000,"realized_pnl":1000,"market_value":95000,"unrealized_pnl":5000,"latest_price":76000}],"trades":[{"id":"trade-1","asset_id":"asset-1","side":"buy","quantity":"1.25","unit_price":72000,"fee":1000,"occurred_at":"2026-10-05T10:00:00Z"}],"total_cost_basis":91000,"total_market_value":95000,"total_unrealized_pnl":5000}"#.utf8)
         let summary = try JSONDecoder.mypocket.decode(PortfolioSummaryModel.self, from: data)
+        XCTAssertEqual(summary.assets.first?.version, 3)
         XCTAssertEqual(summary.trades.first?.quantity, "1.25")
         XCTAssertEqual(summary.positions.first?.realizedPnL, 1000)
         XCTAssertEqual(summary.totalUnrealizedPnL, 5000)
@@ -773,6 +774,56 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertFalse(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: false, isProcessing: true))
         XCTAssertFalse(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: true, isProcessing: true))
         XCTAssertTrue(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: false, isProcessing: false))
+    }
+
+    func testAIEntryRecoveryBlocksLocalDoubleSubmitWhileMultipartRequestIsInFlight() {
+        XCTAssertFalse(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: false, isProcessing: false, isLocallyProcessing: true))
+        XCTAssertTrue(AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: false, isProcessing: false, isLocallyProcessing: false))
+    }
+
+    func testAdvisorHistoryApplyRejectsLateResponseFromAnotherConversationOrGeneration() {
+        XCTAssertTrue(AssistantHistoryLoadPolicy.canApply(
+            responseConversationID: "conversation-1", responseGeneration: 3,
+            expectedConversationID: "conversation-1", expectedGeneration: 3
+        ))
+        XCTAssertFalse(AssistantHistoryLoadPolicy.canApply(
+            responseConversationID: "conversation-old", responseGeneration: 3,
+            expectedConversationID: "conversation-1", expectedGeneration: 3
+        ))
+        XCTAssertFalse(AssistantHistoryLoadPolicy.canApply(
+            responseConversationID: "conversation-1", responseGeneration: 2,
+            expectedConversationID: "conversation-1", expectedGeneration: 3
+        ))
+    }
+
+func testAdvisorHistoryRequestPolicyRejectsLateErrorAfterConversationReset() {
+    let requestToken = UUID()
+    XCTAssertTrue(AssistantHistoryLoadPolicy.isCurrent(
+        requestToken: requestToken,
+        currentToken: requestToken,
+        responseConversationID: "conversation-1",
+        expectedConversationID: "conversation-1"
+    ))
+    XCTAssertFalse(AssistantHistoryLoadPolicy.isCurrent(
+        requestToken: requestToken,
+        currentToken: UUID(),
+        responseConversationID: "conversation-1",
+        expectedConversationID: "conversation-1"
+    ))
+    XCTAssertFalse(AssistantHistoryLoadPolicy.isCurrent(
+        requestToken: requestToken,
+        currentToken: requestToken,
+        responseConversationID: "conversation-old",
+        expectedConversationID: "conversation-1"
+    ))
+}
+
+    func testAdvisorRecoveryReusesStableClientRequestIDForPossiblyAcceptedFailures() {
+        XCTAssertTrue(AssistantAdvisorRecoveryPolicy.shouldReplay(after: .transport("timeout")))
+        XCTAssertTrue(AssistantAdvisorRecoveryPolicy.shouldReplay(after: .decoding("invalid")))
+        XCTAssertTrue(AssistantAdvisorRecoveryPolicy.shouldReplay(after: .http(status: 503)))
+        XCTAssertFalse(AssistantAdvisorRecoveryPolicy.shouldReplay(after: .http(status: 400)))
+        XCTAssertFalse(AssistantAdvisorRecoveryPolicy.shouldReplay(after: .unauthorized))
     }
 
     func testWalletInputEncodesGoalAndCreditMetadata() throws {

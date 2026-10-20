@@ -26,13 +26,17 @@
 		</dict>
 	</array>
 	<key>CFBundleShortVersionString</key>
-	<string>1.1.0</string>
+	<string>1.2.1</string>
 	<key>CFBundleVersion</key>
-	<string>2</string>
+	<string>4</string>
 	<key>MP_API_BASE_URL</key>
 	<string>$(MP_API_BASE_URL)</string>
 	<key>NSFaceIDUsageDescription</key>
 	<string>Dùng Face ID để mở khóa phiên MyPocket đang còn hiệu lực.</string>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+	</array>
 	<key>UIAppFonts</key>
 	<array>
 		<string>Manrope-Variable.ttf</string>

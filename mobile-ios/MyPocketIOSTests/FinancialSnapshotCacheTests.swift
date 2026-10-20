@@ -181,6 +181,69 @@ final class FinancialSnapshotCacheTests: XCTestCase {
         XCTAssertNil(model.errorMessage)
     }
 
+    @MainActor
+    func testWalletsRestoreOwnerScopedSnapshotWhenRefreshIsOffline() async throws {
+        let cache = try FinancialSnapshotCache(directory: root(), serverURL: server, keys: SnapshotFixtureKeys())
+        let wallet = WalletModel(id: "wallet-cache", name: "Ví offline", type: "basic", currency: "VND", openingBalance: 0, currentBalance: 420_000, availableCredit: nil, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil)
+        try await cache.save(FinancialSnapshot(ownerID: "owner-wallet", fetchedAt: Date(timeIntervalSince1970: 1790000200), transactions: [], wallets: [wallet], categories: [], timezone: "Asia/Ho_Chi_Minh"))
+
+        let sessions = InMemorySessionStore()
+        try sessions.save(AccessSession(token: "fixture-token", expiresAt: "2099-01-01T00:00:00Z", refreshToken: "fixture-refresh", refreshExpiresAt: "2099-02-01T00:00:00Z", user: AuthUser(id: "owner-wallet", name: nil, email: nil, timezone: nil)))
+        let api = FinanceAPI(client: APIClient(baseURL: server, transport: SnapshotOfflineTransport(status: nil), sessionStore: sessions))
+        let model = WalletsViewModel(api: api, ownerID: "owner-wallet", snapshotCache: cache)
+
+        await model.load()
+
+        XCTAssertEqual(model.wallets.map(\.id), ["wallet-cache"])
+        XCTAssertEqual(model.accountTimezone, "Asia/Ho_Chi_Minh")
+        XCTAssertEqual(model.cachedAt, Date(timeIntervalSince1970: 1790000200))
+        XCTAssertNil(model.errorMessage)
+    }
+
+    @MainActor
+    func testDeletingWalletUpdatesOfflineSnapshotImmediately() async throws {
+        let cache = try FinancialSnapshotCache(directory: root(), serverURL: server, keys: SnapshotFixtureKeys())
+        let wallet = WalletModel(id: "wallet-delete", name: "Ví cần xóa", type: "basic", currency: "VND", openingBalance: 0, currentBalance: 0, availableCredit: nil, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil)
+        try await cache.save(FinancialSnapshot(ownerID: "owner-delete", fetchedAt: Date(timeIntervalSince1970: 1790000200), transactions: [], wallets: [wallet], categories: [], timezone: "Asia/Ho_Chi_Minh"))
+
+        let sessions = InMemorySessionStore()
+        try sessions.save(AccessSession(token: "fixture-token", expiresAt: "2099-01-01T00:00:00Z", refreshToken: "fixture-refresh", refreshExpiresAt: "2099-02-01T00:00:00Z", user: AuthUser(id: "owner-delete", name: nil, email: nil, timezone: nil)))
+        let api = FinanceAPI(client: APIClient(baseURL: server, transport: WalletDeleteTransport(), sessionStore: sessions))
+        let model = WalletsViewModel(api: api, ownerID: "owner-delete", snapshotCache: cache)
+
+        let deleted = await model.delete(wallet)
+        XCTAssertTrue(deleted)
+
+        let retained = try await cache.load(ownerID: "owner-delete")
+        XCTAssertEqual(retained?.wallets, [])
+        XCTAssertEqual(retained?.timezone, "Asia/Ho_Chi_Minh")
+    }
+
+    func testLoadingPolicyKeepsExistingContentVisibleDuringRefresh() {
+        XCTAssertFalse(MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: true, hasContent: true))
+        XCTAssertTrue(MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: true, hasContent: false))
+        XCTAssertTrue(MPLoadingPresentationPolicy.showsInlineProgress(isLoading: true, hasContent: true))
+        XCTAssertFalse(MPLoadingPresentationPolicy.showsInlineProgress(isLoading: true, hasContent: false))
+        XCTAssertFalse(MPLoadingPresentationPolicy.showsInlineProgress(isLoading: false, hasContent: true))
+    }
+
+    @MainActor
+    func testOverviewHydratesSnapshotBeforeSlowRefreshCompletes() async throws {
+        let cache = try FinancialSnapshotCache(directory: root(), serverURL: server, keys: SnapshotFixtureKeys())
+        let wallet = WalletModel(id: "wallet-overview-cache", name: "Ví tổng quan", type: "basic", currency: "VND", openingBalance: 0, currentBalance: 700_000, availableCredit: nil, isInTotal: true, description: nil, targetAmount: nil, targetDate: nil, creditLimit: nil, lastStatementBalance: nil, statementDay: nil, paymentDueDay: nil)
+        try await cache.save(FinancialSnapshot(ownerID: "owner-overview", fetchedAt: Date(timeIntervalSince1970: 1790000300), transactions: [], wallets: [wallet], categories: [], timezone: "Asia/Ho_Chi_Minh"))
+        let sessions = InMemorySessionStore()
+        try sessions.save(AccessSession(token: "fixture-token", expiresAt: "2099-01-01T00:00:00Z", refreshToken: "fixture-refresh", refreshExpiresAt: "2099-02-01T00:00:00Z", user: AuthUser(id: "owner-overview", name: nil, email: nil, timezone: nil)))
+        let api = FinanceAPI(client: APIClient(baseURL: server, transport: DelayedOfflineTransport(), sessionStore: sessions))
+        let model = OverviewViewModel(api: api, ownerID: "owner-overview", snapshotCache: cache)
+
+        let task = Task { await model.load() }
+        try await Task.sleep(for: .milliseconds(30))
+        XCTAssertEqual(model.wallets.map(\.id), ["wallet-overview-cache"])
+        XCTAssertEqual(model.cachedAt, Date(timeIntervalSince1970: 1790000300))
+        await task.value
+    }
+
     func testReportsOfflinePolicyRequiresExactReportMonth() async throws {
         var value = snapshot()
         value.monthSummary = MonthSummaryModel(month: "2026-10", timezone: "Asia/Ho_Chi_Minh", startAt: "2026-09-30T17:00:00Z", nextStartAt: "2026-10-31T17:00:00Z", isCurrent: true, isComplete: false, income: 100, expense: 10, net: 90, transactionCount: 1, categories: [], note: "", jarSummary: nil, calculatedAt: "2026-10-15T00:00:00Z")
@@ -261,6 +324,22 @@ private final class ReportsSessionStore: SessionStore, @unchecked Sendable {
     func load() -> AccessSession? { lock.withLock { stored } }
     func save(_ session: AccessSession) throws { lock.withLock { stored = session } }
     func clear() { lock.withLock { stored = nil } }
+}
+
+private struct DelayedOfflineTransport: HTTPTransport {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        try await Task.sleep(for: .milliseconds(150))
+        throw URLError(.notConnectedToInternet)
+    }
+}
+
+private struct WalletDeleteTransport: HTTPTransport {
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        guard request.httpMethod == "DELETE", request.url?.path == "/api/v1/wallets/wallet-delete" else {
+            throw URLError(.badServerResponse)
+        }
+        return (Data(), HTTPURLResponse(url: request.url!, statusCode: 204, httpVersion: nil, headerFields: nil)!)
+    }
 }
 
 private actor ReportsCaptureTransport: HTTPTransport {

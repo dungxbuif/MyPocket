@@ -285,6 +285,8 @@ definitions:
         type: string
       updated_at:
         type: string
+      version:
+        type: integer
       wallet_ids:
         items:
           type: string
@@ -627,6 +629,8 @@ definitions:
         type: string
       updated_at:
         type: string
+      version:
+        type: integer
     type: object
   entity.PortfolioPosition:
     properties:
@@ -696,6 +700,25 @@ definitions:
         type: string
       unit_price:
         type: integer
+    type: object
+  entity.PushToken:
+    properties:
+      created_at:
+        type: string
+      device_id:
+        type: string
+      device_name:
+        type: string
+      environment:
+        type: string
+      id:
+        type: string
+      platform:
+        type: string
+      revoked_at:
+        type: string
+      updated_at:
+        type: string
     type: object
   entity.RecurringSchedule:
     properties:
@@ -875,6 +898,8 @@ definitions:
         type: string
       updated_at:
         type: string
+      version:
+        type: integer
       wallet_id:
         type: string
     type: object
@@ -1186,6 +1211,8 @@ definitions:
     type: object
   httpapi.categoryInput:
     properties:
+      expected_version:
+        type: integer
       icon_key:
         type: string
       kind:
@@ -1319,10 +1346,48 @@ definitions:
       symbol:
         type: string
     type: object
+  httpapi.portfolioAssetUpdateInput:
+    properties:
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
   httpapi.portfolioPriceInput:
     properties:
       latest_price:
         type: integer
+        x-nullable: true
+    required:
+    - latest_price
+    type: object
+  httpapi.portfolioTradeCorrectionFields:
+    properties:
+      fee:
+        type: integer
+      note:
+        type: string
+      occurred_at:
+        type: string
+      quantity:
+        type: string
+      side:
+        type: string
+      unit_price:
+        type: integer
+    type: object
+  httpapi.portfolioTradeCorrectionInput:
+    properties:
+      expected_asset_version:
+        type: integer
+      operation:
+        type: string
+      reason:
+        type: string
+      replacement:
+        $ref: '#/definitions/httpapi.portfolioTradeCorrectionFields'
+      source_trade_id:
+        type: string
     type: object
   httpapi.portfolioTradeInput:
     properties:
@@ -1386,6 +1451,8 @@ definitions:
         type: boolean
       category_id:
         type: string
+      expected_version:
+        type: integer
       included_in_reports:
         type: boolean
       jar_id:
@@ -1407,6 +1474,8 @@ definitions:
         type: integer
       category_id:
         type: string
+      expected_version:
+        type: integer
       included_in_reports:
         type: boolean
       jar_id:
@@ -1489,6 +1558,21 @@ definitions:
       type:
         type: string
     type: object
+  repository.PortfolioTradeCorrectionResult:
+    properties:
+      affected_trade_ids:
+        items:
+          type: string
+        type: array
+      after:
+        $ref: '#/definitions/entity.PortfolioPosition'
+      asset_version:
+        type: integer
+      before:
+        $ref: '#/definitions/entity.PortfolioPosition'
+      revision_id:
+        type: string
+    type: object
   usecase.DeviceCredentialOutput:
     properties:
       expires_at:
@@ -1534,6 +1618,19 @@ definitions:
       user:
         $ref: '#/definitions/usecase.UserProfile'
     type: object
+  usecase.PushTokenInput:
+    properties:
+      device_id:
+        type: string
+      device_name:
+        type: string
+      environment:
+        type: string
+      platform:
+        type: string
+      token:
+        type: string
+    type: object
   usecase.UserProfile:
     properties:
       created_at:
@@ -1554,7 +1651,7 @@ info:
   contact: {}
   description: Current implemented API surface for local development.
   title: MyPocket API
-  version: 1.1.0
+  version: 1.2.1
 paths:
   /api/v1/agent/feedback:
     get:
@@ -1666,6 +1763,11 @@ paths:
         may include server-authoritative conversation_id, generation, last_user_message_at,
         expires_at and server_time.
       parameters:
+      - description: Conversation identifier
+        in: query
+        name: conversation_id
+        required: true
+        type: string
       - description: Read messages before sequence
         in: query
         name: before_seq
@@ -1812,6 +1914,34 @@ paths:
       security:
       - BearerAuth: []
       summary: Cancel a queued or running Finance Assistant run
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/runs/{id}/events:
+    get:
+      parameters:
+      - description: Run ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Only return events after this sequence
+        in: query
+        name: after_seq
+        type: integer
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE event stream
+          schema:
+            type: string
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Replay persisted Finance Assistant run events as SSE
       tags:
       - AI Advisor
   /api/v1/ai/entry/capabilities:
@@ -2711,9 +2841,18 @@ paths:
         required: true
         schema:
           $ref: '#/definitions/httpapi.categoryInput'
+      - description: Stable printable ASCII key (1-128 bytes) reused to replay a category
+          create
+        in: header
+        name: Idempotency-Key
+        type: string
       produces:
       - application/json
       responses:
+        "200":
+          description: Idempotent replay
+          schema:
+            $ref: '#/definitions/entity.Category'
         "201":
           description: Created
           schema:
@@ -3042,13 +3181,15 @@ paths:
     post:
       consumes:
       - application/json
-      description: Accepts a normal JWT/session or a full-owner user API key; legacy
-        scopes are ignored.
+      - multipart/form-data
+      description: |-
+        Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.
+        Send JSON text fields, or multipart/form-data with type, title, description and optional screenshot file. Screenshots must be detected PNG, nonempty and at most 1048576 bytes; the entire multipart body is limited to 2097152 bytes. The x-multipart-form extension describes the alternate file variant without mixing Swagger body and formData parameters.
       parameters:
-      - description: Feedback
+      - description: JSON feedback fields; multipart alternative uses the same named
+          fields and optional PNG screenshot
         in: body
         name: feedback
-        required: true
         schema:
           $ref: '#/definitions/httpapi.feedbackInput'
       produces:
@@ -3063,6 +3204,19 @@ paths:
       summary: Create owner-scoped feedback
       tags:
       - Feedback
+      x-multipart-form:
+        fields:
+          description:
+            type: string
+          screenshot:
+            max_bytes: 1048576
+            mime_type: image/png
+            type: file
+          title:
+            type: string
+          type:
+            type: string
+        max_body_bytes: 2097152
   /api/v1/feedback/{id}:
     get:
       description: Accepts a normal JWT/session or a full-owner user API key; legacy
@@ -3382,6 +3536,178 @@ paths:
       summary: Login with email and password
       tags:
       - Authentication
+  /api/v1/mcp:
+    delete:
+      consumes:
+      - application/json
+      description: Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses.
+        JWT and mpk_ API keys have identical same-owner user authority without scopes.
+        POST carries initialize, tools/list and tools/call; tools/list publishes authoritative
+        tool names and inputSchema values. Ordinary tools may write directly; Assistant
+        prepared actions retain their canonical confirmation contract. GET and DELETE
+        normally return 405 in stateless mode. Credential bootstrap/exchange and service-token
+        routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors
+        and audit privacy.
+      parameters:
+      - description: SDK-owned MCP JSON-RPC request (POST only); discover business
+          schemas through tools/list
+        in: body
+        name: request
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SDK JSON-RPC response; inspect result.isError and structuredContent.status/body
+            for domain outcomes
+          schema:
+            additionalProperties: true
+            type: object
+        "202":
+          description: Accepted SDK notification
+          schema:
+            type: string
+        "400":
+          description: SDK invalid protocol request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Missing, invalid, expired or revoked owner credential
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Origin is not allowed
+          schema:
+            type: string
+        "405":
+          description: Stateless transport accepts POST
+          schema:
+            type: string
+        "413":
+          description: Outer request exceeds configured input bound
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: MCP authenticated user-operation transport
+      tags:
+      - MCP
+    get:
+      consumes:
+      - application/json
+      description: Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses.
+        JWT and mpk_ API keys have identical same-owner user authority without scopes.
+        POST carries initialize, tools/list and tools/call; tools/list publishes authoritative
+        tool names and inputSchema values. Ordinary tools may write directly; Assistant
+        prepared actions retain their canonical confirmation contract. GET and DELETE
+        normally return 405 in stateless mode. Credential bootstrap/exchange and service-token
+        routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors
+        and audit privacy.
+      parameters:
+      - description: SDK-owned MCP JSON-RPC request (POST only); discover business
+          schemas through tools/list
+        in: body
+        name: request
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SDK JSON-RPC response; inspect result.isError and structuredContent.status/body
+            for domain outcomes
+          schema:
+            additionalProperties: true
+            type: object
+        "202":
+          description: Accepted SDK notification
+          schema:
+            type: string
+        "400":
+          description: SDK invalid protocol request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Missing, invalid, expired or revoked owner credential
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Origin is not allowed
+          schema:
+            type: string
+        "405":
+          description: Stateless transport accepts POST
+          schema:
+            type: string
+        "413":
+          description: Outer request exceeds configured input bound
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: MCP authenticated user-operation transport
+      tags:
+      - MCP
+    post:
+      consumes:
+      - application/json
+      description: Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses.
+        JWT and mpk_ API keys have identical same-owner user authority without scopes.
+        POST carries initialize, tools/list and tools/call; tools/list publishes authoritative
+        tool names and inputSchema values. Ordinary tools may write directly; Assistant
+        prepared actions retain their canonical confirmation contract. GET and DELETE
+        normally return 405 in stateless mode. Credential bootstrap/exchange and service-token
+        routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors
+        and audit privacy.
+      parameters:
+      - description: SDK-owned MCP JSON-RPC request (POST only); discover business
+          schemas through tools/list
+        in: body
+        name: request
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SDK JSON-RPC response; inspect result.isError and structuredContent.status/body
+            for domain outcomes
+          schema:
+            additionalProperties: true
+            type: object
+        "202":
+          description: Accepted SDK notification
+          schema:
+            type: string
+        "400":
+          description: SDK invalid protocol request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Missing, invalid, expired or revoked owner credential
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Origin is not allowed
+          schema:
+            type: string
+        "405":
+          description: Stateless transport accepts POST
+          schema:
+            type: string
+        "413":
+          description: Outer request exceeds configured input bound
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: MCP authenticated user-operation transport
+      tags:
+      - MCP
   /api/v1/months/{month}:
     get:
       parameters:
@@ -3481,6 +3807,59 @@ paths:
       summary: Mark one in-app notification as read
       tags:
       - Notifications
+  /api/v1/notifications/devices:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider token registration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/usecase.PushTokenInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PushToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Register an iOS push token for the authenticated owner
+      tags:
+      - Notifications
+  /api/v1/notifications/devices/{id}:
+    delete:
+      parameters:
+      - description: Push token registration ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Revoke an iOS push token owned by the authenticated user
+      tags:
+      - Notifications
   /api/v1/portfolio/assets:
     get:
       produces:
@@ -3553,10 +3932,54 @@ paths:
       summary: Delete an unused portfolio asset
       tags:
       - Portfolio
+    patch:
+      consumes:
+      - application/json
+      description: Updates symbol and/or name only. Portfolio trades remain immutable
+        and are not rewritten.
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Metadata fields to update
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioAssetUpdateInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PortfolioAsset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update portfolio asset metadata
+      tags:
+      - Portfolio
   /api/v1/portfolio/assets/{id}/price:
     patch:
       consumes:
       - application/json
+      description: 'latest_price must be present: null clears the price, zero records
+        a known zero. Omitting the field or sending a null body returns 400 without
+        modifying valuation.'
       parameters:
       - description: Asset ID
         in: path
@@ -3576,9 +3999,74 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/entity.PortfolioAsset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
       security:
       - BearerAuth: []
       summary: Update or clear the latest manual portfolio price
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/trade-corrections:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stable correction key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Correction
+        in: body
+        name: correction
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioTradeCorrectionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.PortfolioTradeCorrectionResult'
+      security:
+      - BearerAuth: []
+      summary: Commit a portfolio trade correction
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/trade-corrections/preview:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Correction
+        in: body
+        name: correction
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioTradeCorrectionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.PortfolioTradeCorrectionResult'
+      security:
+      - BearerAuth: []
+      summary: Preview an immutable portfolio trade correction
       tags:
       - Portfolio
   /api/v1/portfolio/assets/{id}/trades:

@@ -54,6 +54,14 @@ type AdvisorHistoryMeta struct {
 	LastUserMessageAt *time.Time `json:"last_user_message_at,omitempty"`
 	ExpiresAt         *time.Time `json:"expires_at,omitempty"`
 	ServerTime        time.Time  `json:"server_time"`
+	ActiveRun         *AdvisorActiveRun `json:"active_run,omitempty"`
+}
+
+type AdvisorActiveRun struct {
+	ID         string     `json:"id"`
+	Status     string     `json:"status"`
+	CreatedAt  time.Time  `json:"created_at"`
+	DeadlineAt *time.Time `json:"deadline_at,omitempty"`
 }
 
 func (c AdvisorConversation) HistoryMeta(serverTime time.Time) AdvisorHistoryMeta {
@@ -162,6 +170,7 @@ type AdvisorRun struct {
 	CredentialKind      string         `json:"credential_kind" gorm:"not null"`
 	CredentialID        string         `json:"-" gorm:"not null"`
 	CredentialExpiresAt *time.Time     `json:"-"`
+	DeadlineAt          *time.Time     `json:"-"`
 	Status              string         `json:"status" gorm:"not null"`
 	LeaseToken          string         `json:"-"`
 	LeaseUntil          *time.Time     `json:"-"`
@@ -177,7 +186,7 @@ func (AdvisorRun) TableName() string { return "advisor_runs" }
 func CanTransitionAdvisorRun(from, to string) bool {
 	switch from {
 	case AdvisorStatusQueued:
-		return to == AdvisorStatusRunning || to == AdvisorStatusCancelled || to == AdvisorStatusPurged
+		return to == AdvisorStatusRunning || to == AdvisorStatusCancelled || to == AdvisorStatusFailed || to == AdvisorStatusInterrupted || to == AdvisorStatusPurged
 	case AdvisorStatusRunning:
 		return to == AdvisorStatusCompleted || to == AdvisorStatusFailed || to == AdvisorStatusCancelled || to == AdvisorStatusInterrupted || to == AdvisorStatusPurged
 	default:

@@ -25,6 +25,13 @@ khoản và server. Khi lỗi mạng/timeout/408/429/5xx, app có thể hiện b
 kèm thời điểm tải và nút **Tải lại**. Đây là số liệu đã xác nhận trước đó, chưa
 phản ánh thay đổi mới; không cộng các khoản đang chờ gửi vào tổng tiền.
 
+Màn Ví dùng cùng snapshot owner-scoped và read-through cache: khi mở lại màn,
+app dựng danh sách từ bản lưu trước trong lúc refresh máy chủ chạy nền. Vì vậy
+refresh không thay toàn bộ nội dung bằng màn hình loading; spinner toàn màn chỉ
+dùng khi chưa có dữ liệu nào để hiển thị. Khi đang refresh, dữ liệu cũ vẫn được
+giữ nguyên và chỉ có trạng thái nhẹ báo chưa cập nhật. Cache được mã hóa, gắn
+với cả owner và server; đổi tài khoản không thể đọc lại bản của tài khoản cũ.
+
 Lỗi đăng nhập, phân quyền hoặc response không hợp lệ không dùng cache để che lỗi.
 Cache mất key/hỏng sẽ không tự bị xóa hay ghi đè. Cần phiên đã lưu còn dùng được;
 chưa bổ sung đăng nhập offline khi phải refresh token. Overview và Reports hiện
@@ -160,7 +167,9 @@ Trước khi gửi hàng đợi, gọi `GET /api/v1/sync/capabilities` bằng JW
 Chỉ cho phép thao tác đã biết và được quảng bá khi enabled=true,version1,
 metadata/key policy đúng. 404, thiếu/sai field, version lạ hoặc disabled phải giữ
 bản nháp/hàng đợi, không thử POST để đoán hỗ trợ. Kiểm tra mới trước mỗi đợt gửi;
-không dùng capability cache cũ để gửi sau khi server rollback. Endpoint này chỉ
+câu trả lời luôn có `Cache-Control: no-store`; client/proxy không được lưu capability
+để tái sử dụng sau rollback. Không dùng capability cache cũ để gửi sau khi server rollback.
+Endpoint này chỉ
 công bố implementation đã cấu hình, không bảo đảm DB/network đang khỏe.
 Backend, engine, create/queue, recovery và foreground scheduler đã nối local;
 full E2E/thiết bị thật và rollout vẫn còn gate riêng.
@@ -271,7 +280,7 @@ cho giao dịch gửi muộn.
 | Contract | Value |
 | --- | --- |
 | Operations | transaction.create, transfer.create |
-| Capability | GET /api/v1/sync/capabilities, JWT/session or owner key, contract_version1; old404/disabled/unknown blocks sends |
+| Capability | GET /api/v1/sync/capabilities, JWT/session or owner key, contract_version1, `Cache-Control: no-store`; old404/disabled/unknown blocks sends |
 | Key | one ASCII value,1–128bytes, stable per intent; offline client uses UUID |
 | Scope | authenticated owner + operation + key, never body owner_id |
 | Hash | decoded typed JSON before generated IDs/time/travel defaults; JSON order/whitespace ignored |

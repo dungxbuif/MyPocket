@@ -62,7 +62,8 @@ func (r *AdvisorPostgresRepository) StartRun(ctx context.Context, input contract
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		run = entity.AdvisorRun{ID: uuid.NewString(), OwnerID: input.OwnerID, ConversationID: conversation.ID, Generation: conversation.Generation, ClientRequestID: input.RequestID, PayloadHash: input.PayloadHash, CredentialKind: input.CredentialKind, CredentialID: input.CredentialID, CredentialExpiresAt: input.ExpiresAt, Status: entity.AdvisorStatusQueued, ModelUsage: map[string]any{}, CreatedAt: now}
+		deadline := now.Add(240 * time.Second)
+		run = entity.AdvisorRun{ID: uuid.NewString(), OwnerID: input.OwnerID, ConversationID: conversation.ID, Generation: conversation.Generation, ClientRequestID: input.RequestID, PayloadHash: input.PayloadHash, CredentialKind: input.CredentialKind, CredentialID: input.CredentialID, CredentialExpiresAt: input.ExpiresAt, DeadlineAt: &deadline, Status: entity.AdvisorStatusQueued, ModelUsage: map[string]any{}, CreatedAt: now}
 		if err := tx.Create(&run).Error; err != nil {
 			return err
 		}
@@ -224,6 +225,23 @@ func (r *AdvisorPostgresRepository) GetRun(ctx context.Context, ownerID, id stri
 	return &run, nil
 }
 
+// GetRunStatus is intentionally a short, non-locking owner-scoped probe. It
+// lets another API process observe cancellation without taking the
+// conversation/run locks used by lifecycle writes.
+func (r *AdvisorPostgresRepository) GetRunStatus(ctx context.Context, ownerID, id string) (string, error) {
+	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(id) == "" {
+		return "", contract.ErrNotFound
+	}
+	var run entity.AdvisorRun
+	if err := r.db.WithContext(ctx).Select("status").Where("id = ? AND owner_id = ?", id, ownerID).First(&run).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", contract.ErrNotFound
+		}
+		return "", err
+	}
+	return run.Status, nil
+}
+
 func (r *AdvisorPostgresRepository) GetRunByRequest(ctx context.Context, ownerID, requestID string) (*entity.AdvisorRun, error) {
 	var run entity.AdvisorRun
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
@@ -287,6 +305,7 @@ func (r *AdvisorPostgresRepository) AdvisorHistoryMeta(ctx context.Context, owne
 		return entity.AdvisorHistoryMeta{}, contract.ErrNotFound
 	}
 	var conversation entity.AdvisorConversation
+	var activeRun *entity.AdvisorRun
 	var serverTime = time.Now().UTC()
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ?", conversationID, ownerID).First(&conversation).Error; err != nil {
@@ -295,12 +314,30 @@ func (r *AdvisorPostgresRepository) AdvisorHistoryMeta(ctx context.Context, owne
 			}
 			return err
 		}
-		return r.expireIdleConversation(tx, &conversation, serverTime)
+		if err := r.expireIdleConversation(tx, &conversation, serverTime); err != nil {
+			return err
+		}
+		var candidate entity.AdvisorRun
+		if err := tx.Where("owner_id = ? AND conversation_id = ? AND status IN ?", ownerID, conversationID, []string{entity.AdvisorStatusQueued, entity.AdvisorStatusRunning}).Order("created_at DESC").First(&candidate).Error; err == nil {
+			activeRun = &candidate
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		return nil
 	})
 	if err != nil {
 		return entity.AdvisorHistoryMeta{}, err
 	}
-	return conversation.HistoryMeta(serverTime), nil
+	meta := conversation.HistoryMeta(serverTime)
+	if activeRun != nil {
+		deadline := activeRun.DeadlineAt
+		if deadline == nil {
+			value := activeRun.CreatedAt.Add(240 * time.Second)
+			deadline = &value
+		}
+		meta.ActiveRun = &entity.AdvisorActiveRun{ID: activeRun.ID, Status: activeRun.Status, CreatedAt: activeRun.CreatedAt, DeadlineAt: deadline}
+	}
+	return meta, nil
 }
 
 func (r *AdvisorPostgresRepository) AppendEvent(ctx context.Context, ownerID, runID, eventType string, payload any) (*entity.AdvisorEvent, error) {
@@ -340,6 +377,30 @@ func (r *AdvisorPostgresRepository) AppendEvent(ctx context.Context, ownerID, ru
 		return nil, err
 	}
 	return &event, nil
+}
+
+// ListEvents returns a bounded, owner-scoped replay window. The run lookup is
+// deliberately separate from the event query so a foreign run is
+// indistinguishable from a missing run to callers.
+func (r *AdvisorPostgresRepository) ListEvents(ctx context.Context, ownerID, runID string, afterSeq, limit int) ([]entity.AdvisorEvent, error) {
+	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(runID) == "" || afterSeq < 0 {
+		return nil, contract.ErrNotFound
+	}
+	var run entity.AdvisorRun
+	if err := r.db.WithContext(ctx).Where("id = ? AND owner_id = ?", runID, ownerID).First(&run).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, contract.ErrNotFound
+		}
+		return nil, err
+	}
+	if limit <= 0 || limit > 100 {
+		limit = 100
+	}
+	var events []entity.AdvisorEvent
+	if err := r.db.WithContext(ctx).Where("run_id = ? AND seq > ?", runID, afterSeq).Order("seq ASC").Limit(limit).Find(&events).Error; err != nil {
+		return nil, err
+	}
+	return events, nil
 }
 
 func (r *AdvisorPostgresRepository) CreateAssistantMessage(ctx context.Context, ownerID, runID string, generation int64, parts []entity.AdvisorPart) (*entity.AdvisorMessage, error) {

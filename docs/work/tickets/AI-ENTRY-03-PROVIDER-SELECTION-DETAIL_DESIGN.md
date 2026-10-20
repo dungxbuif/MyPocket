@@ -1,7 +1,7 @@
 ---
 artifact_type: detail_design
 id: AI-ENTRY-03
-status: draft
+status: draft_with_local_guard
 owner: shared
 approval: pending_owner_decisions
 parent: AI-ENTRY-03-PROVIDER-SELECTION.md
@@ -52,6 +52,18 @@ The current AI entry remains a server-configured OpenAI-compatible endpoint. It 
 - UI tests proving selected model, price timestamp, estimated cost and data-sharing notice are visible before submission.
 - Live synthetic extraction evaluation and latency/price estimate comparison per supported model; no ledger writes.
 - Secret scans and tests proving provider credentials never reach frontend payloads/logs.
+
+## Local guard implemented before product approval
+
+The current one-provider deployment now has a small fail-closed contract guard,
+without implementing a chooser: both extraction and advisor configuration reject
+missing endpoint/key/model values and endpoints containing credentials, query
+parameters or fragments. The adapters send the key only as an HTTP
+`Authorization` header, do not place it in JSON/URLs, and do not silently retry
+through another provider. Unit tests cover the shared validation boundary and
+request credential isolation. This does not satisfy the future selection,
+pricing, consent, BYOK or regional-processing requirements above; those remain
+owner decisions and require new API/UI contracts after approval.
 
 ## Trace and next step
 

@@ -48,13 +48,60 @@ func (r *PortfolioPostgresRepository) CreateAsset(ownerID string, input portfoli
 	return row, nil
 }
 
+func (r *PortfolioPostgresRepository) UpdateAsset(ownerID, assetID string, update portfoliorepo.PortfolioAssetUpdate) (*entity.PortfolioAsset, error) {
+	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(assetID) == "" || (update.Symbol == nil && update.Name == nil) {
+		return nil, portfoliorepo.ErrPortfolioAssetInvalid
+	}
+	if update.Symbol != nil {
+		value := strings.TrimSpace(*update.Symbol)
+		if value == "" || len(value) > 32 {
+			return nil, portfoliorepo.ErrPortfolioAssetInvalid
+		}
+	}
+	if update.Name != nil {
+		value := strings.TrimSpace(*update.Name)
+		if value == "" || len(value) > 160 {
+			return nil, portfoliorepo.ErrPortfolioAssetInvalid
+		}
+	}
+	var row entity.PortfolioAsset
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND id = ?", ownerID, assetID).First(&row).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return portfoliorepo.ErrPortfolioAssetNotFound
+			}
+			return err
+		}
+		changes := make(map[string]any, 2)
+		if update.Symbol != nil {
+			row.Symbol = strings.TrimSpace(*update.Symbol)
+			changes["symbol"] = row.Symbol
+		}
+		if update.Name != nil {
+			row.Name = strings.TrimSpace(*update.Name)
+			changes["name"] = row.Name
+		}
+		if err := tx.Model(&row).Updates(changes).Error; err != nil {
+			if portfolioUniqueViolation(err) {
+				return portfoliorepo.ErrPortfolioAssetConflict
+			}
+			return err
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
+}
+
 func (r *PortfolioPostgresRepository) DeleteAsset(ownerID, assetID string) error {
 	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(assetID) == "" {
 		return portfoliorepo.ErrPortfolioAssetInvalid
 	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		var asset entity.PortfolioAsset
-		if err := tx.Where("owner_id = ? AND id = ?", ownerID, assetID).First(&asset).Error; err != nil {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND id = ?", ownerID, assetID).First(&asset).Error; err != nil {
 			if errors.Is(err, gorm.ErrRecordNotFound) {
 				return portfoliorepo.ErrPortfolioAssetNotFound
 			}

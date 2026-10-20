@@ -32,16 +32,20 @@ Do not rename every existing component or duplicate it as a new v2 hierarchy.
   negative padding and arbitrary horizontal overrides.
 - Minimum interactive target44pt. Normal finance row44 minimum, content-driven
   expansion for long copy/Dynamic Type. No fixed maximum height/font shrinking.
+  Transaction rows add a shared6pt top/bottom inset for separation; wallet rows
+  keep their existing compact geometry.
 - No card-in-card. A section owns one surface; internal metrics/rows/dividers
   are flat content. Cards are not a universal wrapper for every label/action.
 - One content scroll area per screen. Navbar bounds content; floating feedback
   does not reserve a lane. Keyboard-safe composer/editor actions remain reachable.
   Feedback hides during keyboard input and returns on dismissal; pinned footer
   height determines its at-rest clearance, without reducing the scroll viewport.
-  Current avoidance implementation also reports shared button/preview frames and
-  tries alternative edge positions. This remains unaccepted: proposal render
-  covers description input despite196/196 selected tests. Review protected input/
-  content regions and saturated viewport behavior before another placement fix.
+  The lower-right anchor is stable; obstacle reports do not move it between
+  rows/sides. Populated-screen/device reachability remains a separate visual gate.
+- The iOS app is portrait-only. The app target declares only
+  `UIInterfaceOrientationPortrait`; feature screens must not add orientation
+  overrides or landscape-specific layout branches. UI tests must verify that a
+  landscape device request leaves the app viewport portrait.
 
 ## Interaction rules
 
@@ -55,6 +59,10 @@ Do not rename every existing component or duplicate it as a new v2 hierarchy.
   draft for reopening the same item. A different item/create starts a distinct
   draft; success resets it. Jar month changes invalidate the draft. No durable
   draft/restart promise is implied; offline persistence is a separate contract.
+- More secondary routes support native leading-edge Back through a scoped
+  shared bridge. Editors and unsaved Account/month fields block that gesture;
+  use their explicit Cancel/Back actions. Account root retains global Add and
+  returns there after the transaction editor closes; child routes hide Add.
 - Money is integer minor-unit/VND input formatted through one money base/parser.
   Quantity is decimal, frequency interval integer, allocation percent bounded
   percentage: separate input semantics, same field styling. Never strip decimals

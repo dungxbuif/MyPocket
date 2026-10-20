@@ -3,7 +3,7 @@ artifact_type: api_reference
 id: FEEDBACK_API
 status: implemented_with_production_route_owner_uat_open
 owner: shared
-updated: 2026-10-15
+updated: 2026-10-20
 trace:
   design: ../superpowers/specs/2026-09-22-feedback-fix-changelog-design.md
   plan: ../superpowers/plans/2026-09-22-feedback-fix-changelog.md
@@ -134,6 +134,21 @@ false`.
 ## Screenshot capture
 
 `POST /feedback` also accepts `multipart/form-data` with `type`, `title`, `description`, and one `screenshot` PNG (maximum 1 MiB). The server stores it privately and exposes only `screenshot_available` in feedback JSON. `GET /feedback/{id}/screenshot` is owner-scoped and returns a short-lived `302` signed URL; `GET /agent/feedback/{id}/screenshot` uses the dedicated feedback-agent token. Storage object keys are never returned.
+
+The full multipart body is limited to 2 MiB; a screenshot must be nonempty,
+detected as PNG, and may be exactly 1 MiB. Swagger lists JSON and multipart
+content types; its `x-multipart-form` extension describes the alternate file
+fields without combining incompatible body/formData parameter declarations.
+
+Through [MCP](../ai/mcp-api-parity.md), `feedback.create` accepts the same text
+fields and optional `screenshot: {filename, mime_type: "image/png", base64}`.
+`feedback.screenshot` returns the signed URL only in a successful ResourceLink
+plus a relative authenticated REST fallback, discarding signed redirect HTML.
+Foreign/missing IDs retain `404` in both transports. The application factory
+queues MCP feedback-created/resolution domain audits with bounded best-effort
+delivery, alongside the separate MCP operation event; direct REST domain audit
+remains synchronous. Saturated queues drop new events and are not durable
+until the existing sink/outbox persists them.
 
 When private storage is unavailable, the server returns a controlled problem
 (`FEEDBACK_SCREENSHOT_INVALID` in local development or

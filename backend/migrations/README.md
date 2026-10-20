@@ -1,5 +1,25 @@
 # Stage v1 migrations
 
+Release 1.2.1: migration 000041 defaults deadline_at to database now + 240
+seconds so old API instances can keep inserting during rolling update. This
+default was added before 41's first production deployment. Fresh migrations
+and an old-writer regression pass on disposable PostgreSQL. Financial tables
+and values are untouched; never rerun a previously applied migration.
+
+## Current candidate rollout
+
+The current candidate is additive after the deployed version-34 baseline and
+must be applied in order: `000035` → `000036` → `000037` → `000038` → `000039` →
+`000040` → `000041`. Verify a validated
+custom-format backup and `dirty=false` before applying the forward path. The
+API image must be deployed with the matching worker only after version 041 is
+clean. See [`docs/operations/ROLLOUT_READINESS.md`](../../docs/operations/ROLLOUT_READINESS.md)
+and run the read-only repository preflight:
+
+```sh
+./scripts/mypocket-rollout-preflight.sh
+```
+
 ## 000035 — recurring budgets (local candidate)
 
 Adds owner-scoped series/revision tables, optional series/carry snapshot fields
@@ -38,6 +58,12 @@ Stage v1 starts with one baseline migration pair and uses additive forward migra
 - `000031_device_credentials.up.sql` adds the independent owner-scoped device sign-in table and index. It does not reset/change financial rows or existing passwords; deploy backend before enabling native remembered Face ID sign-in. Back up and verify the live migration version before applying 30/31. Never force or rerun a baseline on production.
 - `000033_advisor_idle_reset.up.sql` adds nullable server-authoritative last-user activity metadata and a partial expiry-scan index. It backfills from user messages only and never deletes advisor or financial data; the application/worker must be deployed and verified separately before enabling cleanup.
 - `000034_advisor_reset_requests.up.sql` adds an owner-scoped, content-free idempotency ledger for explicit Finance Assistant “Chat mới” resets. It does not touch wallets, transactions, reports or confirmed actions.
+- `000036_push_tokens.up.sql` adds owner-scoped iOS push-token registration metadata. It does not call APNs, send notifications, alter financial rows or expose the token in API responses. Apply only after backup/version verification; provider entitlements and delivery remain a separate gate.
+- `000037_audit_outbox.up.sql` adds a private redacted audit delivery buffer with idempotent stream/event keys and leased worker retries. It contains no prompts, OCR text, credentials or financial rows; apply only after backup/version checks and worker rollout readiness.
+- `000038_portfolio_trade_corrections.up.sql` adds optimistic portfolio asset versions and immutable owner-scoped replace/void revisions. Existing trades and wallet balances remain unchanged; apply only after backup/version verification.
+- `000039_push_deliveries.up.sql` adds the durable owner-scoped APNs delivery hand-off. It is deduped per notification/token/environment, stores only an app-owned route payload, and does not call APNs by itself; apply only after backup/version checks and matching worker rollout.
+- `000040_row_versions.up.sql` adds positive, non-null optimistic-lock versions to ordinary transactions and personal categories. Existing rows start at version `1`; the migration does not rewrite financial values or category relationships. Apply only after backup/version checks and deploy the matching API before enabling clients that send `expected_version`.
+- `000041_advisor_runtime.up.sql` adds the server-authoritative `advisor_runs.deadline_at` backfill/check and reaper index, then verifies duplicate assistant completions before installing an idempotent partial uniqueness guard. Existing advisor/financial rows are preserved; apply only after backup/version checks. Its down file is disposable-fixture-only.
 
 The previous incremental migration files were squashed for the stage reset. Existing databases whose migration table is at version 19 must be recreated or explicitly reset to version 1 in a disposable environment before running this baseline. Do not force or drop a production database.
 

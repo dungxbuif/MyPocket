@@ -10,13 +10,53 @@ schema, migration, credential, or financial data operation is part of this
 topology change. Restore the web route/service only with explicit owner
 approval, using the recorded rollback backup below.
 
-## SQL diagnostics privacy — local implementation, rollout pending
+## Release 1.2.1 rollout — 2026-10-20
+
+The API and worker now run the immutable image
+`registry.dungxbuif.com/mypocket-api:release-1.2.1-837bd505` at digest
+`sha256:34226ef0700f1ea4ff05d2c3de4d0fc0488d28ef71f7b4c735b09172c3d1fd54`.
+Both services converged to `1/1`; `mypocket-web` remains intentionally `0/0`.
+The database advanced cleanly from migration 40 to 41. A verified backup was
+created at `/tmp/mypocket-pre-1.2.1.dump`; pre/post wallet, transaction, budget
+and category checksums were identical. Health returned HTTP 200 and the strict
+readonly OpenAPI audit reported 91 live paths matching 91 local paths.
+
+The native artifact `1.2.1 (4)` was codesigned with the owner's Personal Team,
+installed on the paired iPhone, and launched. This records installation, not
+complete physical interaction, Face ID, offline, APNs, or Mobile MCP/WDA
+acceptance.
+
+## Current production rollout — 2026-10-19
+
+The approved release window deployed the immutable image
+`registry.dungxbuif.com/mypocket-api:release-20261019-uat2` at digest
+`sha256:17e3842326abb397d5184e6a5d407b51efb37ec05230171ab83128c7626cd6b7`
+to both `mypocket-api` and `mypocket-worker`; each converged to `1/1`.
+Migrations 035–037 advanced the database from version 34 to version 37 with
+`dirty=false`. The validated pre-migration custom-format backup is retained at
+`/tmp/mypocket-pre-release-20261019.dump` (SHA-256
+`888bbacf594270512fde46889652d91e100335e2c21f7a99db2f903c4c7a2fc7`). No
+financial rows were reset or deleted. At that release point the production
+read-only route audit reported 88 live paths matching the then-deployed
+88-path candidate; health and Swagger returned HTTP 200. The current checkout
+has since added two portfolio trade-correction operations, so a fresh strict
+probe is expected to report 88 live versus 90 local until the matching image
+and migrations are rolled out. `mypocket-web` remains intentionally `0/0` in
+API-only mode.
+
+The isolated UAT owner passed the authenticated GET-only regression harness;
+see [physical/API UAT evidence](IOS-PHYSICAL-UAT-20261019.md). Physical
+iPhone signing/install, Face ID, APNs and offline-network acceptance remain
+external gates and are not implied by this backend rollout.
+
+## SQL diagnostics privacy — deployed 2026-10-19
 
 The shared Go PostgreSQL adapter now keeps only statement class (SELECT/INSERT/
 UPDATE/etc), elapsed time, rows and safe SQLSTATE, never full SQL text/parameters
 or raw database error strings. Generic GORM message arguments are omitted.
-This applies to API/worker/cleanup when built with the new source; deployed images
-have not changed. Real PostgreSQL privacy tests and full Go race/vet pass locally.
+This applies to API/worker/cleanup in the deployed release image. Real
+PostgreSQL privacy tests and full Go race/vet pass locally; sampled production
+worker logs contain only redacted statement classes and row counts.
 Use request IDs, operation spans, source and SQLSTATE to debug. Do not enable raw
 SQL/body/DSN logging to recover query values. Returned errors remain unchanged;
 do not blindly print them elsewhere. Older logs may contain sensitive values;
@@ -24,6 +64,9 @@ retention/access review is separate, no logs were deleted in this work.
 [Decision/evidence](../decisions/ADR-019-financial-sql-log-redaction.md).
 
 ## Current native-only auth rollout — 2026-10-14
+
+> Historical record. This pre-rollout signing state was superseded by the
+> 2026-10-19 Personal Team install and the current status documented above.
 
 Owner approved additive backend deployment preserving existing data. Auth-only
 commit `12572c87` is deployed as `mypocket-api:auth-12572c87` with digest
@@ -87,7 +130,7 @@ and worker `release-73c4c37` at digest
 The vm100 SSH account is a Swarm worker, so manager-level service inspection
 and updates require the manager path; no such mutation was attempted.
 
-### v1.1.0 release rollout — 2026-10-15
+### Historical v1.1.0 release rollout — 2026-10-15 (superseded)
 
 The current release tag `v1.1.0` is deployed. API and worker both
 run the immutable image
@@ -99,7 +142,7 @@ not redeployed for this native-focused release. Physical iPhone signing is
 still blocked by the missing Xcode account/profile; the unsigned Release
 iphoneos artifact is recorded in the release note.
 
-### Async advisor and AI-entry context rollout — 2026-10-16
+### Historical async advisor and AI-entry context rollout — 2026-10-16 (superseded)
 
 The API and worker were updated to immutable image
 `registry.dungxbuif.com/mypocket-api:release-20261016-7846945` at digest
@@ -157,6 +200,25 @@ rollout above, with no migration or web update in that rollout.
 
 ## Release process
 
+### Production rollout — 2026-10-20
+
+The API-only production rollout completed from `main` commit `a2de756a3`.
+The immutable image `registry.dungxbuif.com/mypocket-api:release-20261020-a2de756`
+was applied to both `mypocket-api` and `mypocket-worker`; Swarm resolved it to
+`sha256:5b54465e743f230f416172e87646548110d8b5e0470858c94167b5aaca1f3b45`.
+`mypocket-web` remains intentionally `0/0`.
+
+The owner explicitly approved skipping the usual backup. Migration advanced
+from version `37 dirty=false` to `40 dirty=false`; no financial data was reset
+or deleted. Public health returned `200`, and the strict read-only route audit
+passed with `LIVE_PATHS=91` and `LOCAL_PATHS=91`.
+
+A dedicated production UAT owner was created with credentials held out-of-band.
+The authenticated GET-only regression passed across the populated core read
+surfaces. MobileNext sees the physical iPhone online with MyPocket installed;
+it remains on the app lock screen, so owner unlock is required before claiming
+physical UAT/Face ID acceptance.
+
 1. Run the local release gate: backend tests, frontend release gate, design
    checks, typecheck and production build.
 2. Commit and push the release branch.
@@ -164,13 +226,42 @@ rollout above, with no migration or web update in that rollout.
    `mypocket-worker:<release-tag>` to the private registry on the amd64 build
    node. Run frontend design/typecheck/build gates locally when changing web
    source, but do not deploy the web service in API-only mode.
-4. For a normal release, run the forward migration command from the API image
-   on `homelab-net`, `data-net` and `mypocket-net` before updating the API.
+4. For a normal release, run the read-only [rollout preflight](ROLLOUT_READINESS.md),
+   create and validate the protected backup, then run the forward migration
+   command from the API image on `homelab-net`, `data-net` and `mypocket-net`
+   before updating the API. The current candidate advances version 34 through
+   migrations `035` → `036` → `037`; verify `dirty=false` and version `037`
+   before enabling the matching worker.
 5. Update the API and worker Swarm services with the immutable image tag and
    registry auth; the API uses `/app/api` and the worker uses
    `--entrypoint /app/worker`. Wait until API and worker each report `1/1`.
 6. Verify `GET /api/v1/health` and `/api/v1/docs/index.html` return HTTP 200;
    verify `/` does not serve the web bundle.
+
+Before opening the change window, run the GET-only route/version audit against
+the intended origin:
+
+```sh
+AUDIT_BASE_URL=https://money.dungxbuif.com \
+  ./scripts/mypocket-production-readonly-audit.sh
+```
+
+It reports live-versus-candidate OpenAPI path drift without authenticated
+requests. During a staged rollout, candidate-only routes are expected. After
+the API and worker converge, rerun with `REQUIRE_ROUTE_PARITY=1`; a non-zero
+result is a release stop condition and must be reconciled before declaring the
+candidate live.
+
+The repository-only preflight is deterministic and never mutates production:
+
+```sh
+./scripts/mypocket-rollout-preflight.sh
+```
+
+It is not a substitute for the production backup, migration-version check,
+service convergence or worker-log observation. Use the full
+[`ROLLOUT_READINESS.md`](ROLLOUT_READINESS.md) checklist and retain the
+read-only command evidence with the release record.
 
 ## API-only routing change — 2026-10-13
 

@@ -10,6 +10,12 @@ shared_fields: [status, links]
 
 # MyPocket Docs Guide
 
+Proposed Finance Assistant reliability upgrade:
+[Vietnamese specification](superpowers/specs/2026-10-20-advisor-reliability-design.md)
+and [technical implementation plan](superpowers/plans/2026-10-20-advisor-reliability.md).
+Both are plain Markdown for humans and AI agents, explicitly `in_review`;
+they describe planned behavior, not APIs or recovery guarantees already shipped.
+
 Native iOS: [hướng dẫn trợ lý tài chính](guides/finance-assistant-ios.md), gồm
 giao diện chat, bản nháp, lịch sử và tham chiếu endpoint đọc được cho AI agents.
 Thêm [đầu tư](guides/portfolio-ios.md) và [nhập số đúng loại](guides/numeric-input-ios.md);
@@ -20,13 +26,15 @@ Hướng dẫn sử dụng sổ giao dịch: [lọc theo ví, tuần và khoản
 [API giao dịch có khóa chống trùng](guides/offline-sync-api.md): contract cho người
 đọc và AI agents; mới kiểm chứng local, chưa deploy hay có offline iOS hoàn chỉnh.
 
-Finance Assistant design and execution record: [design](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md), [V1 implementation plan](superpowers/plans/2026-09-22-finance-assistant-v1.md), and the implemented [tool catalog](architecture/AI_ADVISOR_TOOLS.md). These are plain Markdown for humans and agents. The local advisor is a JWT/API-key synchronous JSON pilot with best-effort Redis access audit; it is not yet a public streaming/durable-audit release.
+Finance Assistant design and execution record: [design](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md), [V1 implementation plan](superpowers/plans/2026-09-22-finance-assistant-v1.md), and the implemented [tool catalog](architecture/AI_ADVISOR_TOOLS.md). These are plain Markdown for humans and agents. The advisor accepts JWT/session or full-owner API keys, supports synchronous and asynchronous JSON plus bounded SSE event replay, and returns read results or explicitly confirmed proposal cards. Direct model writes remain disabled; provider, durable-audit, production-rollout and device UAT gates are documented separately.
 
 Implementation companion: [Finance Assistant technical guide](superpowers/plans/2026-09-22-finance-assistant-technical-guide.md) — Go interfaces, SQL tables, API/SSE contracts, React state machine, exact test fixtures and rollout instructions. It separates implemented local behavior from remaining release gates.
 
 Implemented API reference: [Feedback → Fix → Changelog](architecture/FEEDBACK_API.md), including the user JWT, local agent token, lifecycle, atomic publication, and AI-agent quick reference.
 
-Finance Assistant implementation: [page contract](design/pages/finance-assistant/README.md) and [AI advisor design/plan](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md). The local V1 slice is read-only; provider-backed chat requires configured AI credentials and public launch still requires durable Redis audit delivery/alerting, browser proof and deployment evidence.
+Finance Assistant implementation: [page contract](design/pages/finance-assistant/README.md) and [AI advisor design/plan](work/tickets/AI-ADVISOR-01-DETAIL_DESIGN.md). Provider-backed chat requires configured AI credentials. Proposal actions are prepared by the model but only committed through an owner/generation-bound confirmation endpoint; durable Redis audit delivery/alerting, production rollout of the latest migrations, browser proof and device acceptance remain release gates.
+
+Machine-readable API contracts are checked in at [`backend/docs/swagger.json`](../backend/docs/swagger.json) and [`backend/docs/swagger.yaml`](../backend/docs/swagger.yaml). Markdown architecture and guide pages intentionally explain owner scope, idempotency, error codes and rollout status that OpenAPI alone cannot express.
 
 This is the documentation entry point for MyPocket. Start with [requirements/SPEC.md](requirements/SPEC.md), [requirements/BUSINESS_RULES.md](requirements/BUSINESS_RULES.md), and [requirements/REPORTS.md](requirements/REPORTS.md) for the product under review.
 

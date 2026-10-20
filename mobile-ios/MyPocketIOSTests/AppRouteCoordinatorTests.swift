@@ -22,6 +22,16 @@ final class AppRouteCoordinatorTests: XCTestCase {
         XCTAssertEqual(coordinator.consumeIfAuthenticated(.authenticated(testSession)), .assistant)
     }
 
+    func testLogoutDiscardsRouteWaitingBehindProtectedSession() {
+        let coordinator = AppRouteCoordinator()
+        coordinator.receive(.reports)
+
+        coordinator.discardPendingRoute()
+
+        XCTAssertNil(coordinator.pendingRoute)
+        XCTAssertNil(coordinator.consumeIfAuthenticated(.authenticated(testSession)))
+    }
+
     private var testSession: AccessSession {
         AccessSession(
             token: "access",

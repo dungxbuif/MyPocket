@@ -111,7 +111,7 @@ struct MPTextField: View {
                             accessibilityIdentifier: accessibilityIdentifier,
                             keyboardType: keyboardType
                         )
-                        .frame(height: MPMetrics.controlHeight)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: MPMetrics.controlHeight, maxHeight: MPMetrics.controlHeight, alignment: .leading)
                     } else {
                         MPUikitTextField(
                             text: $text,
@@ -121,7 +121,7 @@ struct MPTextField: View {
                             accessibilityIdentifier: nil,
                             keyboardType: keyboardType
                         )
-                        .frame(height: MPMetrics.controlHeight)
+                        .frame(minWidth: 0, maxWidth: .infinity, minHeight: MPMetrics.controlHeight, maxHeight: MPMetrics.controlHeight, alignment: .leading)
                     }
                 }
                 if !text.isEmpty {
@@ -140,6 +140,7 @@ struct MPTextField: View {
                     .accessibilityIdentifier(clearButtonAccessibilityIdentifier)
                 }
             }
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             .modifier(MPFormControlModifier(isFocused: isFocused))
             .accessibilityLabel(title)
             if let error {
@@ -307,6 +308,7 @@ struct MPSecureField: View {
                 }
             }
             .focused($isFocused)
+            .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
             .modifier(MPFormControlModifier(isFocused: isFocused))
             .accessibilityLabel(title)
         }

@@ -38,6 +38,10 @@ func TestAdvisorPostgresStartRunIsIdempotentAndBusyScoped(t *testing.T) {
 	})
 
 	store := NewAdvisorPostgresRepository(db)
+	statusStore, ok := store.(repository.AdvisorRunStatusRepository)
+	if !ok {
+		t.Fatal("postgres advisor repository must expose owner-scoped status probe")
+	}
 	parts := []entity.AdvisorPart{{Type: "text", Text: "Tôi đã chi bao nhiêu?"}}
 	first, message, replay, err := store.StartRun(context.Background(), repository.AdvisorRunInput{OwnerID: owner, CredentialKind: "session", CredentialID: "session-1", RequestID: "req-1", PayloadHash: "hash-1", Parts: parts})
 	if err != nil || replay || first.Status != entity.AdvisorStatusQueued || message.Seq != 1 {
@@ -56,8 +60,59 @@ func TestAdvisorPostgresStartRunIsIdempotentAndBusyScoped(t *testing.T) {
 	if err := store.MarkRunStatus(context.Background(), owner, first.ID, entity.AdvisorStatusCancelled, time.Now().UTC()); err != nil {
 		t.Fatal(err)
 	}
+	if status, err := statusStore.GetRunStatus(context.Background(), owner, first.ID); err != nil || status != entity.AdvisorStatusCancelled {
+		t.Fatalf("owner-scoped status probe mismatch: status=%q err=%v", status, err)
+	}
+	if _, err := statusStore.GetRunStatus(context.Background(), uuid.NewString(), first.ID); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("foreign owner must not observe run status: %v", err)
+	}
 	if _, err := store.CreateAssistantMessage(context.Background(), owner, first.ID, first.Generation, []entity.AdvisorPart{{Type: "text", Text: "late answer"}}); !errors.Is(err, repository.ErrAdvisorLeaseLost) {
 		t.Fatalf("cancelled run must not accept a late assistant message, got %v", err)
+	}
+}
+
+func TestAdvisorPostgresListEventsReplaysOwnerScopedCursor(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("requires migrated local TEST_DATABASE_URL")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := uuid.NewString()
+	foreign := uuid.NewString()
+	for _, id := range []string{owner, foreign} {
+		if err := db.Create(&entity.User{ID: id, Email: id + "@advisor-events.test", GoogleSubject: id}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		for _, id := range []string{owner, foreign} {
+			db.Where("id = ?", id).Delete(&entity.User{})
+		}
+	})
+	store := NewAdvisorPostgresRepository(db)
+	eventStore := store.(*AdvisorPostgresRepository)
+	run, _, _, err := store.StartRun(context.Background(), repository.AdvisorRunInput{OwnerID: owner, CredentialKind: "session", CredentialID: "synthetic", RequestID: "events", PayloadHash: "events", Parts: []entity.AdvisorPart{{Type: "text", Text: "events"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkRunStatus(context.Background(), owner, run.ID, entity.AdvisorStatusRunning, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AppendEvent(context.Background(), owner, run.ID, "run.started", map[string]any{"ok": true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.AppendEvent(context.Background(), owner, run.ID, "run.progress", map[string]any{"step": 1}); err != nil {
+		t.Fatal(err)
+	}
+	events, err := eventStore.ListEvents(context.Background(), owner, run.ID, 1, 100)
+	if err != nil || len(events) != 1 || events[0].Seq != 2 || events[0].Type != "run.progress" {
+		t.Fatalf("cursor replay mismatch: events=%+v err=%v", events, err)
+	}
+	if _, err := eventStore.ListEvents(context.Background(), foreign, run.ID, 0, 100); !errors.Is(err, repository.ErrNotFound) {
+		t.Fatalf("foreign owner must not read events: %v", err)
 	}
 }
 

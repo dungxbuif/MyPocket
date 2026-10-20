@@ -16,7 +16,7 @@ The user's correction on 2026-09-21 is authoritative: each operation is an API a
 
 ## API contract
 
-- `POST /api/v1/ai/entry/process`: authenticated, one-shot extraction request. Accept multipart `request_id`, `text`, `timezone`, and up to three files (`image/jpeg`, `image/png`, or `application/pdf`, each at most 5 MiB). Return an opaque processing/batch ID and editable proposal list only after extraction finishes. Repeating the same idempotency key and payload returns the stored outcome; reusing the key with a different payload conflicts. No automatic provider retry.
+- `POST /api/v1/ai/entry/process`: authenticated, one-shot extraction request. Accept multipart `request_id`, `text`, `timezone`, and up to twenty files (`image/jpeg`, `image/png`, or `application/pdf`, each at most 5 MiB). Return an opaque processing/batch ID and editable proposal list only after extraction finishes. Repeating the same idempotency key and payload returns the stored outcome; reusing the key with a different payload conflicts. No automatic provider retry.
 - `GET /api/v1/ai/entry/requests/{request_id}`: owner-scoped fetch of processing status and proposals using the client-generated idempotency UUID, including when the original POST response was lost. It never starts extraction.
 - Existing proposal operations remain independent: `PATCH /proposals/{id}`, `POST /proposals/{id}/approve`, and `POST /proposals/{id}/reject`. They are scoped to owner and proposal version.
 - Remove frontend calls to `/sessions`, `/sessions/latest`, and `/sessions/{id}/messages`. Stop generating conversational history for extraction. Internal persistence may retain an opaque process record for idempotency and proposal lifecycle, but it must not expose or behave as a conversation/session.
@@ -36,7 +36,7 @@ Keep the approved one-shot composer and result-card layout. Submit once; on ambi
 ## Acceptance and regression tests
 
 1. Frontend sends one request to `/ai/entry/process`, with text/files and an idempotency key; no session route is called. A read-only `GET /requests/{request_id}` recovers the result after an ambiguous timeout without repeating provider work.
-2. A valid PDF fixture passes server validation and private OCR upload; a PDF MIME spoof, unsupported file, >5 MiB file, or more than three files is rejected before any provider request.
+2. A valid PDF fixture passes server validation and private OCR upload; a PDF MIME spoof, unsupported file, >5 MiB file, or more than twenty files is rejected before any provider request.
 3. For PDF and image inputs, captured LLM HTTP requests contain extracted OCR text but no file bytes, base64, file URL, or image content. OCR failure does not call the model; extraction failure returns no proposals/ledger writes and is not retried automatically.
 4. Replaying an identical request key returns the same process result without a second OCR/model submission; changed content with the same key conflicts.
 5. Process reads, proposal edits, rejects, and approvals are owner-scoped. Approval replay creates one ledger row and attachment links only for the approved proposal.

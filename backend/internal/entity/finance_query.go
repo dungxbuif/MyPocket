@@ -52,21 +52,33 @@ type FinanceFilter struct {
 	Limit           int       `json:"limit,omitempty"`
 }
 
+// CategoryCatalogFilter is the owner-scoped, deterministic filter used by
+// advisor resource reads. It intentionally lives beside NormalizedQuery so
+// repositories can validate the same contract independently of the model.
+type CategoryCatalogFilter struct {
+	Kind            string   `json:"kind,omitempty"`
+	WalletIDs       []string `json:"wallet_ids,omitempty"`
+	IncludeArchived bool     `json:"include_archived"`
+	Limit           int      `json:"limit,omitempty"`
+	Cursor          string   `json:"cursor,omitempty"`
+}
+
 type NormalizedFinanceFilter struct {
 	FinanceFilter
 	Dates NormalizedDateRange `json:"dates"`
 }
 
 type NormalizedQuery struct {
-	Key          string                  `json:"key"`
-	Kind         string                  `json:"kind"`
-	Filter       NormalizedFinanceFilter `json:"filter"`
-	CompareRange *DateRange              `json:"compare_range,omitempty"`
-	ObjectIDs    []string                `json:"object_ids,omitempty"`
-	Month        string                  `json:"month,omitempty"`
-	ActiveOn     string                  `json:"active_on,omitempty"`
-	Limit        int                     `json:"limit,omitempty"`
-	Cursor       string                  `json:"cursor,omitempty"`
+	Key            string                  `json:"key"`
+	Kind           string                  `json:"kind"`
+	Filter         NormalizedFinanceFilter `json:"filter"`
+	CompareRange   *DateRange              `json:"compare_range,omitempty"`
+	ObjectIDs      []string                `json:"object_ids,omitempty"`
+	Month          string                  `json:"month,omitempty"`
+	ActiveOn       string                  `json:"active_on,omitempty"`
+	Limit          int                     `json:"limit,omitempty"`
+	Cursor         string                  `json:"cursor,omitempty"`
+	CategoryFilter *CategoryCatalogFilter  `json:"category_filter,omitempty"`
 }
 
 type SourceScope struct {

@@ -20,7 +20,11 @@ struct BudgetReportView: View {
                     VStack(alignment: .leading, spacing: 8) {
                         MPScreenHeader(title: "Báo cáo ngân sách", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
                         MPText(budget.name, style: .emphasis)
-                        if loading { MPLoadingView(label: "Đang tải báo cáo...") }
+                        if MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: loading, hasContent: report != nil) {
+                            MPLoadingView(label: "Đang tải báo cáo...")
+                        } else if MPLoadingPresentationPolicy.showsInlineProgress(isLoading: loading, hasContent: report != nil) {
+                            MPInlineRefreshProgress(label: "Đang cập nhật báo cáo...")
+                        }
                         if let error { MPErrorView(title: "Không tải được báo cáo", detail: error) { Task { await load() } } }
                         if let report {
                             MPText("\(report.startDate) → \(report.endDate) · \(report.timezone)", style: .secondary)
@@ -72,7 +76,9 @@ struct BudgetReportView: View {
 
     private func load() async {
         guard !loading else { return }
-        loading = true; error = nil; report = nil
+        // Preserve the last successful snapshot while retrying so a quick
+        // refresh never flashes an empty report screen.
+        loading = true; error = nil
         defer { loading = false }
         do {
             let loaded = try await api.budgetReport(id: budget.id, ownerID: ownerID)

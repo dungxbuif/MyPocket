@@ -6,11 +6,13 @@ import (
 	"net/url"
 	"time"
 
+	"github.com/mypocket/backend/internal/repository"
 	"github.com/redis/go-redis/v9"
 )
 
 type Redis struct {
 	client *redis.Client
+	outbox repository.AuditOutboxRepository
 }
 
 func NewRedis(redisURL string) (*Redis, error) {
@@ -22,6 +24,13 @@ func NewRedis(redisURL string) (*Redis, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Audit writes are intentionally bounded and retryable. Keep the retry
+	// budget short so an unavailable cache cannot hold an HTTP request open
+	// indefinitely; Record also uses an event fingerprint to make a retry
+	// idempotent at the stream boundary.
+	opt.MaxRetries = 3
+	opt.MinRetryBackoff = 20 * time.Millisecond
+	opt.MaxRetryBackoff = 200 * time.Millisecond
 	client := redis.NewClient(opt)
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -71,6 +80,14 @@ func (r *Redis) GetAndDelete(key string) (string, bool, error) {
 
 func (r *Redis) Close() error {
 	return r.client.Close()
+}
+
+// SetAuditOutbox enables durable hand-off while retaining Redis as the fast
+// path. It is called during API/worker wiring before serving requests.
+func (r *Redis) SetAuditOutbox(outbox repository.AuditOutboxRepository) {
+	if r != nil {
+		r.outbox = outbox
+	}
 }
 
 func (r *Redis) String() string {

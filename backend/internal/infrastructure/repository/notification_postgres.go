@@ -5,14 +5,31 @@ import (
 	"time"
 
 	"github.com/mypocket/backend/internal/entity"
-	contract "github.com/mypocket/backend/internal/repository"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 )
 
 type NotificationPostgresRepository struct{ db *gorm.DB }
 
-func NewNotificationPostgresRepository(db *gorm.DB) contract.NotificationRepository {
+func NewNotificationPostgresRepository(db *gorm.DB) *NotificationPostgresRepository {
 	return &NotificationPostgresRepository{db: db}
+}
+
+// CreateIfAbsent inserts one inbox item without replacing an existing item
+// with the same owner-scoped dedupe key. Worker retries can therefore safely
+// replay the same event.
+func (r *NotificationPostgresRepository) CreateIfAbsent(ctx context.Context, item *entity.Notification) (bool, error) {
+	if item == nil || item.OwnerID == "" || item.DedupeKey == "" || item.Kind == "" || item.Title == "" || item.Body == "" {
+		return false, gorm.ErrInvalidData
+	}
+	result := r.db.WithContext(ctx).Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "owner_id"}, {Name: "dedupe_key"}},
+		DoNothing: true,
+	}).Create(item)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
 }
 
 func (r *NotificationPostgresRepository) List(ctx context.Context, ownerID string) ([]entity.Notification, error) {

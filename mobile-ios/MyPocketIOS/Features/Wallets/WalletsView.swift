@@ -52,28 +52,96 @@ final class WalletsViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var accountTimezone = TimeZone.current.identifier
+    @Published private(set) var cachedAt: Date?
     private let api: FinanceAPI
+    private let ownerID: String?
+    private let snapshotCache: FinancialSnapshotCache?
 
-    init(api: FinanceAPI) { self.api = api }
+    init(api: FinanceAPI, ownerID: String? = nil, snapshotCache: FinancialSnapshotCache? = nil) {
+        self.api = api
+        self.ownerID = ownerID
+        self.snapshotCache = snapshotCache ?? (try? FinancialSnapshotCache.makeDefault())
+    }
 
     func load() async {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
+        // Hydrate immediately from the encrypted owner-scoped snapshot so
+        // returning to this screen does not flash a blank loading state.
+        await restoreCachedSnapshot()
         defer { isLoading = false }
         do {
-            async let walletResult = api.wallets()
-            async let profile = api.profile()
+            async let walletResult = api.wallets(ownerID: ownerID)
+            async let profile = api.profile(ownerID: ownerID)
             wallets = try await walletResult
             if let profile = try? await profile { accountTimezone = profile.timezone }
+            cachedAt = nil
+            await persistSnapshot()
         }
-        catch { errorMessage = "Không thể tải ví." }
+        catch { await recoverLoad(error) }
+    }
+
+    private func restoreCachedSnapshot() async {
+        guard wallets.isEmpty, let ownerID, let snapshotCache else { return }
+        do {
+            guard let snapshot = try await snapshotCache.load(ownerID: ownerID) else { return }
+            wallets = snapshot.wallets
+            accountTimezone = snapshot.timezone
+            cachedAt = snapshot.fetchedAt
+        } catch {
+            // The server remains authoritative; a corrupt cache is ignored
+            // and cannot replace or leak data across owners.
+        }
+    }
+
+    private func recoverLoad(_ error: Error) async {
+        guard FinancialSnapshotCache.allowsFallback(error), let ownerID, let snapshotCache else {
+            // Authentication and malformed/authorisation failures must not
+            // expose a previous user's data. A transient failure can retain
+            // the already-rendered rows until a retry succeeds.
+            if wallets.isEmpty { errorMessage = "Không thể tải ví." }
+            else { errorMessage = "Đang hiển thị dữ liệu đã tải. Chưa cập nhật từ máy chủ." }
+            return
+        }
+        do {
+            guard let snapshot = try await snapshotCache.load(ownerID: ownerID) else {
+                throw OutboxStoreError.storageUnavailable
+            }
+            wallets = snapshot.wallets
+            accountTimezone = snapshot.timezone
+            cachedAt = snapshot.fetchedAt
+            errorMessage = nil
+        } catch {
+            if wallets.isEmpty { errorMessage = "Không thể tải ví." }
+            else { errorMessage = "Đang hiển thị dữ liệu đã tải. Chưa cập nhật từ máy chủ." }
+        }
+    }
+
+    private func persistSnapshot() async {
+        guard let ownerID, let snapshotCache else { return }
+        do {
+            let previous = try await snapshotCache.load(ownerID: ownerID)
+            try await snapshotCache.save(FinancialSnapshot(
+                ownerID: ownerID,
+                fetchedAt: Date(),
+                transactions: previous?.transactions ?? [],
+                wallets: wallets,
+                categories: previous?.categories ?? [],
+                timezone: accountTimezone,
+                monthSummary: previous?.monthSummary,
+                insider: previous?.insider
+            ))
+        } catch {
+            // Cache is an availability aid; never fail a successful server read.
+        }
     }
 
     func delete(_ wallet: WalletModel) async -> Bool {
         do {
             try await api.deleteWallet(id: wallet.id)
             wallets.removeAll { $0.id == wallet.id }
+            await persistSnapshot()
             return true
         } catch {
             errorMessage = "Không thể xóa ví. Ví có thể còn giao dịch liên kết."
@@ -95,12 +163,14 @@ struct WalletsView: View {
 
     init(
         api: FinanceAPI,
+        ownerID: String? = nil,
+        snapshotCache: FinancialSnapshotCache? = nil,
         initialWalletID: String? = nil,
         onSelectWallet: @escaping (String?) -> Void = { _ in },
         onBack: (() -> Void)? = nil,
         onAIEntry: (() -> Void)? = nil
     ) {
-        _model = StateObject(wrappedValue: WalletsViewModel(api: api))
+        _model = StateObject(wrappedValue: WalletsViewModel(api: api, ownerID: ownerID, snapshotCache: snapshotCache))
         self.initialWalletID = initialWalletID
         self.onSelectWallet = onSelectWallet
         self.onBack = onBack
@@ -174,7 +244,10 @@ struct WalletsView: View {
                 if !model.wallets.isEmpty, let errorMessage = model.errorMessage {
                     MPStatusMessage(text: errorMessage, tone: .danger)
                 }
-                if model.isLoading && model.wallets.isEmpty {
+                if let cachedAt = model.cachedAt {
+                    MPStatusMessage(text: "Bản lưu \(cachedAt.formatted(date: .abbreviated, time: .shortened)) · Chưa cập nhật từ máy chủ.", tone: .info)
+                }
+                if MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: model.isLoading, hasContent: !model.wallets.isEmpty) {
                     MPLoadingView(label: "Đang tải ví...")
                 } else if let errorMessage = model.errorMessage, model.wallets.isEmpty {
                     MPErrorView(title: "Không tải được ví", detail: errorMessage) { Task { await model.load() } }
@@ -473,7 +546,11 @@ struct WalletDetailView: View {
                         MPStatusMessage(text: "Chưa tải được danh mục giao dịch.", tone: .danger)
                     }
                 }
-                if loading { MPLoadingView(label: "Đang tải chi tiết...") }
+                if MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: loading, hasContent: detailsReady) {
+                    MPLoadingView(label: "Đang tải chi tiết...")
+                } else if MPLoadingPresentationPolicy.showsInlineProgress(isLoading: loading, hasContent: detailsReady) {
+                    MPInlineRefreshProgress(label: "Đang cập nhật chi tiết...")
+                }
                 if let error { MPErrorView(title: "Không tải được chi tiết ví", detail: error) { Task { await load() } } }
             }
             .padding(MPMetrics.pagePadding)
@@ -902,6 +979,7 @@ struct WalletEditorView: View {
             .safeAreaPadding(.bottom, 4)
         }
         .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
+        .mpInteractiveBackBlocked()
         .safeAreaInset(edge: .bottom) {
             MPBottomNavigationInset()
         }

@@ -47,7 +47,7 @@ Direct dependencies inspected: existing owner-scoped process/proposal persistenc
 
 ## API/data contract
 
-- `POST /api/v1/ai/entry/process`: one authenticated multipart request containing `request_id`, `text`, `timezone`, and up to three `files`; it performs validation, private storage, OCR, text-only LLM extraction, and returns the reviewable result. No separate create-session/submit calls.
+- `POST /api/v1/ai/entry/process`: one authenticated multipart request containing `request_id`, `text`, `timezone`, and up to twenty `files`; it performs validation, private storage, OCR, text-only LLM extraction, and returns the reviewable result. No separate create-session/submit calls.
 - `GET /api/v1/ai/entry/requests/:request_id`: owner-scoped read-only processing state and proposals for recovery; never starts provider work.
 - Existing proposal edit/approve/reject endpoints remain owner-scoped. Approval returns attachment metadata IDs and transaction ID.
 - `GET /api/v1/transactions/:id/attachments/:attachmentId/download`: owner-scoped short-lived download redirect/URL.

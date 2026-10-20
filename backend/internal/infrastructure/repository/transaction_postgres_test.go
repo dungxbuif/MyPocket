@@ -207,7 +207,7 @@ func TestUpdateTransferMutatesBothRowsAndRejectsWrongOwnerOrMalformedPair(t *tes
 	if err != nil {
 		t.Fatalf("update transfer: %v", err)
 	}
-	if len(rows) != 2 || rows[0].Amount != 9100 || rows[1].Amount != 9100 || rows[0].Note == nil || *rows[0].Note != note {
+	if len(rows) != 2 || rows[0].Amount != 9100 || rows[1].Amount != 9100 || rows[0].Version != 2 || rows[1].Version != 2 || rows[0].Note == nil || *rows[0].Note != note {
 		t.Fatalf("expected both rows updated, got %+v", rows)
 	}
 	if err := repo.DeleteTransfer("another-owner", transferID); !errors.Is(err, transactionrepo.ErrTransferNotFound) {

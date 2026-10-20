@@ -66,6 +66,15 @@ func TestConfigured(t *testing.T) {
 	}
 }
 
+func TestImageExtractionFailsClosedWhenOCRIsUnconfigured(t *testing.T) {
+	// An AI key alone must never cause an image request to reach the model.
+	c := NewClient(Config{BaseURL: "https://example.invalid/v1", APIKey: "model-key", Model: "model"})
+	_, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}})
+	if !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("image extraction without OCR credentials must fail closed: %v", err)
+	}
+}
+
 func TestExtractionBudgetIncludesColdModelStart(t *testing.T) {
 	if modelTimeout < 120*time.Second {
 		t.Fatalf("model timeout %s is too short for a multi-image batch", modelTimeout)
@@ -143,6 +152,50 @@ func TestExtractionSeparatesUserInstructionAndStoresUsageWhenEnabled(t *testing.
 	}
 	if out.ModelUsage == nil || modelUsageInt(out.ModelUsage, "total_tokens") != 124 || out.ModelUsage["request_id"] != "provider-request-1" {
 		t.Fatalf("usage metadata not retained: %#v", out.ModelUsage)
+	}
+}
+
+func TestExtractionCarriesUserInstructionAlongsideOCRSource(t *testing.T) {
+	img := pngImage(t)
+	var modelInput string
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			_, _ = io.WriteString(w, `{"status":"completed","documentId":"doc_prompt_image","result":{"text":"Highlands 45.000 ngày 2026-09-20"}}`)
+		case "/v1/chat/completions":
+			var request struct {
+				Messages []chatMessage `json:"messages"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			if len(request.Messages) != 2 {
+				t.Fatalf("expected system and user messages, got %d", len(request.Messages))
+			}
+			modelInput = request.Messages[1].Content
+			modelResponse(w, `{"reply":"Đã lọc theo chỉ thị","drafts":[]}`)
+		default:
+			t.Fatalf("unexpected provider path: %s", r.URL.Path)
+		}
+	})
+	_, err := c.Extract(context.Background(), Input{
+		Text:        "các giao dịch trong ảnh",
+		Instruction: "chỉ lấy giao dịch tháng 9",
+		Timezone:    "Asia/Ho_Chi_Minh",
+		Now:         time.Date(2026, 9, 30, 12, 0, 0, 0, time.FixedZone("ICT", 7*3600)),
+		Images:      []Image{img},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(modelInput, `"user_instruction":"chỉ lấy giao dịch tháng 9"`) {
+		t.Fatalf("user instruction was lost when an image was attached: %s", modelInput)
+	}
+	if !strings.Contains(modelInput, "Highlands 45.000") || !strings.Contains(modelInput, "OCR document 1") {
+		t.Fatalf("OCR source was not carried alongside the instruction: %s", modelInput)
+	}
+	if strings.Contains(modelInput, img.Base64) || strings.Contains(modelInput, "image_url") {
+		t.Fatal("model request leaked original image bytes")
 	}
 }
 
@@ -433,6 +486,52 @@ func TestExtractionMarksEachOCRDocumentBoundary(t *testing.T) {
 	}
 	if strings.Index(modelSource, "OCR-A") > strings.Index(modelSource, "OCR-B") {
 		t.Fatalf("OCR blocks were reordered: %s", modelSource)
+	}
+}
+
+func TestExtractionOCRUsesBoundedConcurrencyForLargeBatches(t *testing.T) {
+	var inFlight, maxInFlight, submissions atomic.Int32
+	updateMax := func(value int32) {
+		for {
+			current := maxInFlight.Load()
+			if value <= current || maxInFlight.CompareAndSwap(current, value) {
+				return
+			}
+		}
+	}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			submissions.Add(1)
+			current := inFlight.Add(1)
+			updateMax(current)
+			time.Sleep(35 * time.Millisecond)
+			inFlight.Add(-1)
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"documentId":"doc","status":"completed","result":{"text":"receipt"}}`)
+		case "/v1/chat/completions":
+			modelResponse(w, `{"reply":"review","drafts":[]}`)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	images := make([]Image, 8)
+	for i := range images {
+		images[i] = pngImage(t)
+		images[i].Name = fmt.Sprintf("receipt-%d.png", i)
+	}
+	started := time.Now()
+	if _, err := c.Extract(context.Background(), Input{Images: images}); err != nil {
+		t.Fatal(err)
+	}
+	if submissions.Load() != int32(len(images)) {
+		t.Fatalf("OCR submissions=%d want=%d", submissions.Load(), len(images))
+	}
+	if maxInFlight.Load() < 2 || maxInFlight.Load() > ocrConcurrency {
+		t.Fatalf("OCR concurrency=%d want between 2 and %d", maxInFlight.Load(), ocrConcurrency)
+	}
+	if elapsed := time.Since(started); elapsed >= 8*35*time.Millisecond {
+		t.Fatalf("OCR batch still appears serial: elapsed=%s", elapsed)
 	}
 }
 

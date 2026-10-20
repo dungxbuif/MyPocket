@@ -10,9 +10,12 @@ import (
 
 	"github.com/mypocket/backend/internal/config"
 	"github.com/mypocket/backend/internal/entity"
+	"github.com/mypocket/backend/internal/infrastructure/cache"
 	"github.com/mypocket/backend/internal/infrastructure/db"
 	repo "github.com/mypocket/backend/internal/infrastructure/repository"
+	"github.com/mypocket/backend/internal/infrastructure/storage"
 	"github.com/mypocket/backend/internal/repository"
+	"github.com/mypocket/backend/internal/usecase"
 	"gorm.io/gorm"
 )
 
@@ -32,7 +35,40 @@ func main() {
 	once := workerOnce()
 	runner := repo.NewRecurringPostgresRepository(database)
 	budgetSeries := repo.NewBudgetSeriesPostgresRepository(database)
-	advisorExpiry, _ := repo.NewAdvisorPostgresRepository(database).(repository.AdvisorExpiryRepository)
+	auditOutbox := repo.NewAuditOutboxPostgresRepository(database)
+	auditRedis, redisErr := cache.NewRedis(cfg.RedisURL)
+	if redisErr != nil {
+		log.Printf("worker audit redis unavailable; durable outbox will retry: %v", redisErr)
+	}
+	defer func() {
+		if auditRedis != nil {
+			_ = auditRedis.Close()
+		}
+	}()
+	advisorRepository := repo.NewAdvisorPostgresRepository(database)
+	advisorExpiry, _ := advisorRepository.(repository.AdvisorExpiryRepository)
+	advisorRuntime, _ := advisorRepository.(repository.AdvisorRuntimeRepository)
+	reaperCtx, stopReaper := context.WithCancel(context.Background())
+	defer stopReaper()
+	stopAdvisorReaper := func() {}
+	if cfg.AIAdvisorRunLeasesEnabled {
+		stopAdvisorReaper = startAdvisorReaper(reaperCtx, advisorRuntime)
+	} else {
+		log.Printf("advisor runtime reaper disabled; set AI_ADVISOR_RUN_LEASES_ENABLED=true after migration")
+	}
+	defer stopAdvisorReaper()
+	attachmentCleanup := attachmentCleanupRunner(nil)
+	if privateStorage, storageErr := storage.NewS3(storage.S3Config{
+		Endpoint: cfg.S3Endpoint, Region: cfg.S3Region, Bucket: cfg.S3Bucket,
+		Prefix: cfg.S3Prefix, Environment: cfg.AppEnv, AccessKeyID: cfg.S3AccessKeyID,
+		SecretAccessKey: cfg.S3SecretAccessKey, ForcePathStyle: cfg.S3ForcePathStyle,
+	}); storageErr != nil {
+		log.Printf("attachment cleanup unavailable; configure private storage to enable scheduled cleanup: %v", storageErr)
+	} else {
+		attachmentCleanup = &usecase.AIEntryAttachmentCleanup{
+			Entries: repo.NewAIEntryPostgresRepository(database), Storage: privateStorage,
+		}
+	}
 	for {
 		if err := runRecurringPass(database, runner, time.Now().UTC()); err != nil {
 			log.Printf("recurring worker pass failed: %v", err)
@@ -40,9 +76,32 @@ func main() {
 		if err := runBudgetSeriesPass(database, budgetSeries, time.Now().UTC()); err != nil {
 			log.Printf("budget series worker pass failed: %v", err)
 		}
+		if err := runBudgetNotificationPass(database, time.Now().UTC()); err != nil {
+			log.Printf("budget notification worker pass failed: %v", err)
+		}
 		if advisorExpiry != nil {
 			if _, err := runAdvisorExpiryPass(context.Background(), advisorExpiry, time.Now().UTC()); err != nil {
 				log.Printf("advisor expiry worker pass failed: %v", err)
+			}
+		}
+		if attachmentCleanup != nil {
+			deleted, cleanupErr := runAttachmentCleanupPass(context.Background(), attachmentCleanup)
+			if cleanupErr != nil {
+				log.Printf("attachment cleanup pass failed after %d deletion(s): %v", deleted, cleanupErr)
+			} else if deleted > 0 {
+				log.Printf("attachment cleanup pass deleted %d expired unlinked object(s)", deleted)
+			}
+		}
+		if auditRedis == nil {
+			if candidate, reconnectErr := cache.NewRedis(cfg.RedisURL); reconnectErr == nil {
+				auditRedis = candidate
+			} else {
+				log.Printf("audit outbox redis reconnect failed: %v", reconnectErr)
+			}
+		}
+		if auditRedis != nil {
+			if _, err := runAuditOutboxPass(context.Background(), auditOutbox, auditRedis, time.Now().UTC()); err != nil {
+				log.Printf("audit outbox worker pass failed: %v", err)
 			}
 		}
 		if once {
@@ -50,6 +109,17 @@ func main() {
 		}
 		time.Sleep(interval)
 	}
+}
+
+type attachmentCleanupRunner interface {
+	Run(context.Context, int) (int, error)
+}
+
+func runAttachmentCleanupPass(ctx context.Context, runner attachmentCleanupRunner) (int, error) {
+	if runner == nil {
+		return 0, nil
+	}
+	return runner.Run(ctx, 100)
 }
 
 func runBudgetSeriesPass(database *gorm.DB, runner repository.BudgetSeriesRepository, now time.Time) error {

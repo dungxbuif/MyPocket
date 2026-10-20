@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -94,9 +95,30 @@ func TestLiveToolCallingCompatibility(t *testing.T) {
 	started := time.Now()
 	body, _, err := client.request(ctx, "POST", cfg.AIBaseURL+"/chat/completions", cfg.AIAPIKey, request, "AI tool probe")
 	if err != nil {
-		t.Logf("tool_call_probe transport_or_capability_error=%q latency=%s", err.Error(), time.Since(started).Round(time.Millisecond))
-		return
+		// An explicitly enabled probe is a gate. In particular, a provider 403
+		// must fail instead of looking like a successful test with diagnostics.
+		t.Fatalf("tool_call_probe provider unavailable: %v (latency=%s)", err, time.Since(started).Round(time.Millisecond))
 	}
+	probe, err := validateLiveToolCallResponse(body)
+	if err != nil {
+		t.Fatalf("tool_call_probe invalid capability: %v (response_bytes=%d latency=%s)", err, len(body), time.Since(started).Round(time.Millisecond))
+	}
+	t.Logf("tool_call_probe finish_reason=%s tool_call_count=%d tool_name=%s schema_valid=true response_bytes=%d candidate_bytes=%d prompt_tokens=%d completion_tokens=%d latency=%s", probe.FinishReason, probe.ToolCallCount, probe.ToolName, len(body), len(probe.Candidate), probe.PromptTokens, probe.CompletionTokens, time.Since(started).Round(time.Millisecond))
+}
+
+type liveToolCallProbeResult struct {
+	FinishReason     string
+	ToolCallCount    int
+	ToolName         string
+	Candidate        string
+	PromptTokens     int
+	CompletionTokens int
+}
+
+// validateLiveToolCallResponse keeps the opt-in probe strict and testable. It
+// intentionally accepts only the one synthetic function and the same proposal
+// schema used by the extraction parser; it never logs model content.
+func validateLiveToolCallResponse(body []byte) (liveToolCallProbeResult, error) {
 	var envelope struct {
 		Choices []struct {
 			FinishReason string `json:"finish_reason"`
@@ -116,29 +138,69 @@ func TestLiveToolCallingCompatibility(t *testing.T) {
 			CompletionTokens int `json:"completion_tokens"`
 		} `json:"usage"`
 	}
-	if err := json.Unmarshal(body, &envelope); err != nil || len(envelope.Choices) != 1 {
-		t.Logf("tool_call_probe envelope=invalid response_bytes=%d latency=%s", len(body), time.Since(started).Round(time.Millisecond))
-		return
+	if err := json.Unmarshal(body, &envelope); err != nil {
+		return liveToolCallProbeResult{}, fmt.Errorf("response envelope is not JSON: %w", err)
+	}
+	if len(envelope.Choices) != 1 {
+		return liveToolCallProbeResult{}, fmt.Errorf("expected exactly one choice, got %d", len(envelope.Choices))
 	}
 	choice := envelope.Choices[0]
-	var candidate string
-	toolName := ""
-	for _, call := range choice.Message.ToolCalls {
-		toolName = call.Function.Name
-		if call.Function.Name == "propose_transactions" {
-			candidate = call.Function.Arguments
-		}
+	if len(choice.Message.ToolCalls) != 1 {
+		return liveToolCallProbeResult{}, fmt.Errorf("expected exactly one tool call, got %d", len(choice.Message.ToolCalls))
+	}
+	call := choice.Message.ToolCalls[0]
+	if call.Type != "" && call.Type != "function" {
+		return liveToolCallProbeResult{}, fmt.Errorf("unexpected tool call type %q", call.Type)
+	}
+	if call.Function.Name != "propose_transactions" {
+		return liveToolCallProbeResult{}, fmt.Errorf("unexpected tool name %q", call.Function.Name)
+	}
+	candidate := strings.TrimSpace(call.Function.Arguments)
+	if candidate == "" {
+		candidate = strings.TrimSpace(choice.Message.Content)
 	}
 	if candidate == "" {
-		candidate = choice.Message.Content
+		return liveToolCallProbeResult{}, errors.New("tool call returned empty proposal")
 	}
-	_, schemaErr := parseOutput([]byte(candidate))
-	if mismatch := new(SchemaMismatchError); errors.As(schemaErr, &mismatch) {
-		issues, _ := json.Marshal(mismatch.Issues)
-		t.Logf("tool_call_probe finish_reason=%s tool_call_count=%d tool_name=%s schema_valid=false issues=%s response_bytes=%d candidate_bytes=%d prompt_tokens=%d completion_tokens=%d latency=%s", choice.FinishReason, len(choice.Message.ToolCalls), toolName, issues, len(body), len(candidate), envelope.Usage.PromptTokens, envelope.Usage.CompletionTokens, time.Since(started).Round(time.Millisecond))
-		return
+	if _, err := parseOutput([]byte(candidate)); err != nil {
+		if mismatch := new(SchemaMismatchError); errors.As(err, &mismatch) {
+			issues, _ := json.Marshal(mismatch.Issues)
+			return liveToolCallProbeResult{}, fmt.Errorf("proposal schema mismatch: %s", issues)
+		}
+		return liveToolCallProbeResult{}, fmt.Errorf("proposal output invalid: %w", err)
 	}
-	t.Logf("tool_call_probe finish_reason=%s tool_call_count=%d tool_name=%s schema_valid=%t response_bytes=%d candidate_bytes=%d prompt_tokens=%d completion_tokens=%d latency=%s", choice.FinishReason, len(choice.Message.ToolCalls), toolName, schemaErr == nil, len(body), len(candidate), envelope.Usage.PromptTokens, envelope.Usage.CompletionTokens, time.Since(started).Round(time.Millisecond))
+	return liveToolCallProbeResult{
+		FinishReason:     choice.FinishReason,
+		ToolCallCount:    len(choice.Message.ToolCalls),
+		ToolName:         call.Function.Name,
+		Candidate:        candidate,
+		PromptTokens:     envelope.Usage.PromptTokens,
+		CompletionTokens: envelope.Usage.CompletionTokens,
+	}, nil
+}
+
+func TestValidateLiveToolCallResponse(t *testing.T) {
+	valid := `{"choices":[{"finish_reason":"tool_calls","message":{"content":null,"tool_calls":[{"type":"function","function":{"name":"propose_transactions","arguments":"{\"reply\":\"Review\",\"drafts\":[]}"}}]}}],"usage":{"prompt_tokens":12,"completion_tokens":4}}`
+	if got, err := validateLiveToolCallResponse([]byte(valid)); err != nil || got.ToolName != "propose_transactions" || got.PromptTokens != 12 {
+		t.Fatalf("valid probe response rejected: got=%+v err=%v", got, err)
+	}
+	cases := []struct {
+		name string
+		body string
+	}{
+		{name: "invalid json", body: "not-json"},
+		{name: "no choices", body: `{"choices":[]}`},
+		{name: "wrong tool", body: `{"choices":[{"message":{"tool_calls":[{"type":"function","function":{"name":"get_finance_summary","arguments":"{}"}}]}}]}`},
+		{name: "empty candidate", body: `{"choices":[{"message":{"tool_calls":[{"type":"function","function":{"name":"propose_transactions","arguments":""}}]}}]}`},
+		{name: "bad schema", body: `{"choices":[{"message":{"tool_calls":[{"type":"function","function":{"name":"propose_transactions","arguments":"{\"unexpected\":true}"}}]}}]}`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := validateLiveToolCallResponse([]byte(tc.body)); err == nil {
+				t.Fatal("invalid probe response unexpectedly accepted")
+			}
+		})
+	}
 }
 
 // TestLiveJSONSchemaCompatibility checks the OpenAI-compatible structured

@@ -1,11 +1,24 @@
 # Authentication and refresh-token contract
 
-Full-owner API-key extension2026-10-14 is implemented/tested locally, not deployed.
+Full-owner API-key authorization is deployed in the current REST release.
 All JWT-protected user operations accept validated Bearer mpk_ keys, including
 financial writes/key management. No scopes; old arrays ignored. Keys still
 expire/revoke and cannot impersonate another owner. JWT retains Redis validation;
 keys do not refresh into sessions. Service/internal tokens remain separate.
 [Human/agent guide](../guides/api-keys.md), [ADR021](../decisions/ADR-021-full-owner-api-keys.md).
+
+The local MCP candidate at `/api/v1/mcp` uses the same `RequireAuth` boundary
+and revalidates the original bearer on every canonical inner REST dispatch.
+JWT = validated `mpk_` key = MCP for same-owner authenticated user operations;
+there are no MCP scopes or extra MCP approval rules. Ordinary writes execute
+directly, while Assistant prepared-action confirmation and device-enrollment
+password checks remain requirements of their canonical operations. Expiry,
+revocation, malformed-owner rejection and JWT session/family validation apply.
+MCP cannot bootstrap login/refresh/device/Google credentials or access
+service-token `/agent/*` and `/internal/*` routes. API-key logout through MCP
+revokes that key only; a JWT logout still supplies its refresh token.
+See the [human/agent MCP contract](../ai/mcp-api-parity.md) and
+[ADR-025](../decisions/ADR-025-mcp-api-parity.md). MCP rollout is not yet claimed.
 
 MyPocket keeps the short-lived JWT access token for API calls and adds a
 rotating opaque refresh token for long-lived sessions. Refresh tokens are never
@@ -46,7 +59,8 @@ them, so a refresh overlapping logout cannot resurrect a revoked family.
 Device credentials are independent of access/refresh sessions. Enrollment
 requires a normal authenticated session and confirmation of the account
 password. Local full-owner key extension accepts API keys through common auth;
-password confirmation remains mandatory. Production rollout is pending.
+password confirmation remains mandatory. These REST routes are deployed;
+physical Face ID/device acceptance remains a separate gate.
 
 | Endpoint | Authentication | Input / result |
 | --- | --- | --- |

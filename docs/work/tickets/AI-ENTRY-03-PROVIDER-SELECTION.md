@@ -1,7 +1,7 @@
 ---
 artifact_type: ticket
 id: AI-ENTRY-03
-status: draft
+status: draft_with_local_guard
 owner: human
 kind: product
 parent: TICKET-09
@@ -48,6 +48,8 @@ Người dùng hiểu dữ liệu nào được gửi tới dịch vụ nào, ch
 
 ## Trạng thái
 
-Ticket và [detail design](AI-ENTRY-03-PROVIDER-SELECTION-DETAIL_DESIGN.md) ở trạng thái `draft`, chờ owner review các quyết định trên. Không triển khai trong AI-ENTRY-01/02.
+Ticket và [detail design](AI-ENTRY-03-PROVIDER-SELECTION-DETAIL_DESIGN.md) vẫn chờ owner review các quyết định sản phẩm trên. Một local contract guard đã được triển khai độc lập: endpoint phải là HTTP(S) tuyệt đối không có userinfo/query/fragment, model và key phải có; extraction/advisor chỉ gửi credential qua `Authorization` và không có provider fallback. Guard này không tạo chooser, không onboarding provider, không lưu BYOK và không phát sinh chi phí.
+
+Các phần còn lại (capability/price catalog, cost consent, preference scope, vùng dữ liệu và ngân sách) chưa được coi là đã triển khai. Khi owner chốt phạm vi, bổ sung contract/API/UI tests trước khi kết nối provider mới.
 
 Liên kết: [TICKET-09](TICKET-09-tro-ly-ai.md) · [AI-ENTRY-01](TICKET-09-01-ENTRY-DETAIL_DESIGN.md) · [Backlog](../BACKLOG.md) · [Validation](../VALIDATION_MATRIX.md) · [ADR registry](../../decisions/README.md) · [Changelog](../../releases/CHANGELOG.md).

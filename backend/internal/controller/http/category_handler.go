@@ -3,8 +3,11 @@ package httpapi
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/mypocket/backend/internal/entity"
+	categoryrepo "github.com/mypocket/backend/internal/repository"
 	"github.com/mypocket/backend/internal/usecase"
 	"gorm.io/gorm"
 )
@@ -14,15 +17,17 @@ const (
 	categoryLoadErrorMessage      = "không đọc được danh sách nhóm"
 	categoryNotFoundMessage       = "không tìm thấy nhóm hoặc nhóm hệ thống không thể sửa"
 	categoryDeleteNotFoundMessage = "không tìm thấy nhóm hoặc nhóm hệ thống không thể xóa"
+	categoryVersionMessage        = "nhóm đã thay đổi, hãy tải lại trước khi lưu"
 )
 
 type CategoryHandler struct{ Categories *usecase.CategoryInteractor }
 type categoryInput struct {
-	Name      string   `json:"name"`
-	Kind      string   `json:"kind"`
-	ParentID  *string  `json:"parent_id"`
-	WalletIDs []string `json:"wallet_ids"`
-	IconKey   string   `json:"icon_key"`
+	Name            string   `json:"name"`
+	Kind            string   `json:"kind"`
+	ParentID        *string  `json:"parent_id"`
+	WalletIDs       []string `json:"wallet_ids"`
+	IconKey         string   `json:"icon_key"`
+	ExpectedVersion *int64   `json:"expected_version,omitempty"`
 }
 type categoryWalletInput struct {
 	WalletIDs []string `json:"wallet_ids"`
@@ -64,7 +69,9 @@ func (h *CategoryHandler) ListCategories(c *gin.Context) {
 // @Produce json
 // @Security BearerAuth
 // @Param category body categoryInput true "Category input"
+// @Param Idempotency-Key header string false "Stable printable ASCII key (1-128 bytes) reused to replay a category create"
 // @Success 201 {object} entity.Category
+// @Success 200 {object} entity.Category "Idempotent replay"
 // @Failure 400 {object} Problem
 // @Router /api/v1/categories [post]
 func (h *CategoryHandler) CreateCategory(c *gin.Context) {
@@ -75,6 +82,41 @@ func (h *CategoryHandler) CreateCategory(c *gin.Context) {
 	}
 	input, ok := bindCategoryInput(c)
 	if !ok {
+		return
+	}
+	keyHeaders := c.Request.Header.Values("Idempotency-Key")
+	if len(keyHeaders) > 1 {
+		Fail(c, http.StatusBadRequest, Problem{Code: "INVALID_IDEMPOTENCY_KEY", Title: problemTitleBadRequest, Detail: "Idempotency-Key phải là một giá trị ASCII, dài từ 1 đến 128 byte."})
+		return
+	}
+	if len(keyHeaders) == 1 {
+		key := strings.TrimSpace(keyHeaders[0])
+		valid := key != "" && len(key) <= 128
+		for _, character := range key {
+			if character < 32 || character > 126 {
+				valid = false
+			}
+		}
+		if !valid {
+			Fail(c, http.StatusBadRequest, Problem{Code: "INVALID_IDEMPOTENCY_KEY", Title: problemTitleBadRequest, Detail: "Idempotency-Key phải là một giá trị ASCII, dài từ 1 đến 128 byte."})
+			return
+		}
+		item, replayed, err := h.Categories.CreateIdempotent(owner, input, key, hashMutationInput(input))
+		if err != nil {
+			if errors.Is(err, usecase.ErrCategoryMutationUnavailable) {
+				Fail(c, http.StatusServiceUnavailable, Problem{Code: "mutation_unavailable", Title: problemTitleInternalServer, Detail: "Chưa thể xử lý yêu cầu có khóa chống trùng."})
+				return
+			}
+			if !createReceiptFailure(c, err) {
+				categoryError(c, err, categoryNotFoundMessage)
+			}
+			return
+		}
+		if replayed {
+			OK(c, item)
+			return
+		}
+		Created(c, item)
 		return
 	}
 	item, err := h.Categories.Create(owner, input)
@@ -107,8 +149,19 @@ func (h *CategoryHandler) UpdateCategory(c *gin.Context) {
 	if !ok {
 		return
 	}
-	item, err := h.Categories.Update(owner, c.Param("id"), input)
+	var item *entity.Category
+	var err error
+	categoryInputValue := usecase.CategoryInput{Name: input.Name, Kind: input.Kind, ParentID: input.ParentID, WalletIDs: input.WalletIDs, IconKey: input.IconKey}
+	if input.ExpectedVersion != nil {
+		item, err = h.Categories.UpdateVersioned(owner, c.Param("id"), categoryInputValue, *input.ExpectedVersion)
+	} else {
+		item, err = h.Categories.Update(owner, c.Param("id"), categoryInputValue)
+	}
 	if err != nil {
+		if errors.Is(err, categoryrepo.ErrCategoryVersionConflict) {
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: categoryVersionMessage})
+			return
+		}
 		categoryError(c, err, categoryNotFoundMessage)
 		return
 	}
@@ -215,7 +268,7 @@ func bindCategoryInput(c *gin.Context) (usecase.CategoryInput, bool) {
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
 		return usecase.CategoryInput{}, false
 	}
-	return usecase.CategoryInput{Name: input.Name, Kind: input.Kind, ParentID: input.ParentID, WalletIDs: input.WalletIDs, IconKey: input.IconKey}, true
+	return usecase.CategoryInput{Name: input.Name, Kind: input.Kind, ParentID: input.ParentID, WalletIDs: input.WalletIDs, IconKey: input.IconKey, ExpectedVersion: input.ExpectedVersion}, true
 }
 func categoryError(c *gin.Context, err error, notFoundDetail string) {
 	if errors.Is(err, gorm.ErrRecordNotFound) {

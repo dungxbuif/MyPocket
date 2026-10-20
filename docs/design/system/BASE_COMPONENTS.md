@@ -33,6 +33,12 @@ Feature validators retain positivity/scale rules; money stays `MPAmountField`.
 one scroll area, keyboard-safe pinned actions and pending edit/dismiss prevention.
 Features own drafts, requests and errors; full-screen wrapper owns presentation.
 Short manual-price/choice forms use shared form sheet instead.
+The scaffold publishes `MPInteractiveBackBlockedKey` while mounted. Native
+secondary route hosts consume it through `MPInteractiveBack`; custom category/
+wallet editors and dirty Account/month fields publish the same preference.
+The bridge only changes its own navigation stack's interactive-pop delegate,
+restores the previous native delegate on disappearance, and refuses roots,
+active transitions or presented modals. No financial write is triggered by pop.
 The typed `init(isBusy:header:fields:footer:)` allows AI-entry's existing custom
 header/Save-all without AnyView or a separate editor hierarchy. Header min52pt
 preserves44pt controls with breathing room and grows with content. The shell
@@ -57,18 +63,20 @@ owns1–4-line input and44pt send/stop. Service unavailable permits drafting but
 never submitting. `MPChatMessage` gives user prose a trailing bubble and leaves
 assistant parts flat. `MPChatOverview` pins exact tool-derived income/expense;
 details use shared form sheet. `MPFloatingActionClearanceKey` reports actual
-composer height to move Feedback, not reserve a scroll lane. Raised Add hidden
-on Assistant/Account; Overview/Transactions retain it. See native screen spec.
+composer height to move Feedback, not reserve a scroll lane. Raised Add is hidden
+on Assistant and Account child destinations; Overview/Transactions/Account root
+retain it. See native screen spec.
 
 Current surface inset override: horizontal12pt, vertical8pt. Other geometry
 below is historical where it conflicts; rollout verification remains in progress.
 
 Native density override — 2026-10-14: card padding8pt, control/menu/category
-minimum44pt, transaction/wallet glyph32pt with no outer row padding, page
+minimum44pt, transaction/wallet glyph32pt, page
 section gap8pt/row gap4pt. Profile is one tappable identity row (avatar36), not
 identity plus a second management row. These supersede the older geometry in
 the inventory below; button corners8/card corners12 and typography unchanged.
-Account-tab disabled center add action is fully hidden. Dynamic Type remains
+Transaction rows now use 6pt outer vertical padding; wallet rows remain unpadded.
+Account root retains center Add; child destinations hide it. Dynamic Type remains
 content-driven; no maximum row height. Urgent test execution skipped by owner;
 compile/signature/install checks still required. No backend/API changes.
 
@@ -105,7 +113,7 @@ compile/signature/install checks still required. No backend/API changes.
 | MPCategoryPicker / MPCategoryTree (SwiftUI) | category candidates, kind, optional eligible-ID set, selected ID, optional clear action | One tree owns management and selection row geometry, localized hierarchy-preserving search, selectable-row check, disabled parent context, one shared surface per root and stable IDs; root/child glyphs 40/32pt, connectors terminate before the icon; host owns sheet lifecycle and payload |
 | MPFeedbackBubble / MPBottomNavigationInset (SwiftUI) | bubble action; inset has no consumer props | Bubble is a 52pt stable lower-right overlay with an 8pt bottom margin inside the full scroll viewport; no dedicated lane, spacer or obstacle-driven jumping. MainTabView explicitly sizes route content above its 56pt sibling navbar, so nested NavigationStack scroll regions cannot extend behind it. Footer/composer clearance keeps the dock above protected chrome; the bubble hides before capture and during feedback presentation without resizing content. MPBottomNavigationInset is only for independent editors/modals, not shell routes. |
 | MPSurfaceCard / MPMetric / MPMetricCard (SwiftUI) | shared surface style alias; semantic metric title/value/detail/masked | All card styles share 12pt padding, 12pt radius and flat surface; children are accessibility-contained. Metrics share one presentation; screens do not build competing cards/metric fonts. |
-| MPTransactionRow / MPTransactionPresentation (SwiftUI) | persisted transaction/category or validated structured fields, timezone, masked | Canonical semantic mapping for category/icon, note-or-local-date, signed/masked amount and neutral transfer/adjustment; used by Overview, ledger, wallet/credit history and Assistant. Default glyph 36pt, 4pt vertical padding, min44pt content height; amounts stack for accessibility text sizes. |
+| MPTransactionRow / MPTransactionPresentation (SwiftUI) | persisted transaction/category or validated structured fields, timezone, masked | Canonical semantic mapping for category/icon, note-or-local-date, signed/masked amount and neutral transfer/adjustment; used by Overview, ledger, wallet/credit history and Assistant. Default glyph 32pt, 6pt vertical padding, min44pt content height; amounts stack for accessibility text sizes. |
 | MPImageAttachmentPicker / MPAttachmentThumb (SwiftUI) | optional bound image bytes | Shared choose/remove/replace image, loading/error states and thumbnail; source limit25MiB, bounded decoding, conversion to PNG ≤1MiB for existing feedback multipart contract. Both feedback entry points reuse this base. |
 | BaseFileUpload | field/button | Chọn nhiều JPEG/PNG/PDF; giới hạn và xử lý tệp do consumer cung cấp; button variant kích hoạt input ẩn có nhãn truy cập được |
 | BaseCheckbox | checked/disabled/label/onChange | controlled boolean, native keyboard, hàng min 44px |

@@ -139,7 +139,7 @@ final class APIClientTests: XCTestCase {
         let legacyPayload = String(decoding: try advisorHistoryPayload(sequences: [1]), as: UTF8.self)
         let payload = Data(legacyPayload.replacingOccurrences(
             of: #""meta":null"#,
-            with: #""meta":{"conversation_id":"00000000-0000-0000-0000-000000000001","generation":4,"last_user_message_at":"2026-10-15T10:00:00Z","expires_at":"2026-10-15T10:30:00Z","server_time":"2026-10-15T10:05:00Z"}"#
+            with: #""meta":{"conversation_id":"00000000-0000-0000-0000-000000000001","generation":4,"last_user_message_at":"2026-10-15T10:00:00Z","expires_at":"2026-10-15T10:30:00Z","server_time":"2026-10-15T10:05:00Z","active_run":{"id":"run-active","status":"running","created_at":"2026-10-15T10:01:00Z","deadline_at":"2026-10-15T10:05:00Z"}}"#
         ).utf8)
         let transport = AdvisorContractTransport(payloads: [payload])
         let client = APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: transport, sessionStore: TestSessionStore(session: testSession))
@@ -151,6 +151,8 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(page.meta?.generation, 4)
         XCTAssertEqual(page.meta?.expiresAt, "2026-10-15T10:30:00Z")
         XCTAssertEqual(page.meta?.serverTime, "2026-10-15T10:05:00Z")
+        XCTAssertEqual(page.meta?.activeRun?.id, "run-active")
+        XCTAssertEqual(page.meta?.activeRun?.status, "running")
     }
 
     func testAdvisorCancellationUsesExplicitRunEndpointWithoutResubmission() async throws {
@@ -181,6 +183,36 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Idempotency-Key"), "reset-key-1")
         XCTAssertNil(request.httpBody)
+    }
+
+    func testAdvisorAsyncSubmitUsesClientRequestIDAsStableRetryKey() async throws {
+        let payload = Data(#"{"data":{"run_id":"run-1","conversation_id":"conversation-1","status":"queued"},"meta":null}"#.utf8)
+        let transport = AdvisorContractTransport(payloads: [payload, payload])
+        let client = APIClient(baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport, sessionStore: TestSessionStore(session: testSession))
+        let input = AdvisorMessageInputModel(clientRequestID: "advisor-retry-1", text: "Tháng này tôi chi thế nào?")
+        _ = try await FinanceAPI(client: client).beginAdvisorMessage(input)
+        _ = try await FinanceAPI(client: client).beginAdvisorMessage(input)
+        let requests = await transport.requests
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Idempotency-Key"), "advisor-retry-1")
+        XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), "advisor-retry-1")
+        XCTAssertEqual(requests[0].httpBody, requests[1].httpBody)
+    }
+
+    func testAdvisorRunDecodesAdditiveLifecycleMetadataAndLegacyPayload() async throws {
+        let payload = Data(#"{"data":{"id":"run-1","owner_id":"owner-1","conversation_id":"conversation-1","status":"running","server_time":"2026-10-15T10:01:00Z","deadline_at":"2026-10-15T10:05:00Z","retry_after_ms":3000,"created_at":"2026-10-15T10:01:00Z"},"meta":null}"#.utf8)
+        let transport = AdvisorContractTransport(payloads: [payload, Data(#"{"data":{"id":"run-2","conversation_id":"conversation-1","status":"completed"},"meta":null}"#.utf8)])
+        let api = FinanceAPI(client: APIClient(baseURL: URL(string: "https://example.test/api/v1")!, transport: transport, sessionStore: TestSessionStore(session: testSession)))
+
+        let current = try await api.advisorRun(id: "run-1")
+        let legacy = try await api.advisorRun(id: "run-2")
+
+        XCTAssertEqual(current.ownerID, "owner-1")
+        XCTAssertEqual(current.deadlineAt, "2026-10-15T10:05:00Z")
+        XCTAssertEqual(current.retryAfterMs, 3000)
+        XCTAssertNil(legacy.deadlineAt)
+        XCTAssertNil(legacy.retryAfterMs)
     }
 
     private func advisorHistoryPayload(sequences: [Int]) throws -> Data {
@@ -533,6 +565,33 @@ final class APIClientTests: XCTestCase {
         XCTAssertTrue(try XCTUnwrap(model.items.first).isResolved)
         XCTAssertNil(model.errorMessage)
     }
+
+    @MainActor
+    func testFeedbackRefreshCannotEraseNewlySubmittedItem() async throws {
+        let transport = DelayedFeedbackCreateTransport()
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: TestSessionStore(session: testSession)
+        )
+        let model = FeedbackViewModel(api: FinanceAPI(client: client))
+        await model.load()
+
+        await transport.holdNextList()
+        let refresh = Task { await model.load() }
+        await transport.waitUntilListHeld()
+
+        model.title = "Mất phản hồi sau refresh"
+        model.description = "Bản ghi mới phải còn trong danh sách."
+        let submitted = await model.submit()
+        XCTAssertTrue(submitted)
+        XCTAssertTrue(model.items.contains(where: { $0.id == "new-feedback" }))
+
+        await transport.releaseList()
+        await refresh.value
+        XCTAssertTrue(model.items.contains(where: { $0.id == "new-feedback" }), "stale GET must not erase a newly submitted feedback")
+        XCTAssertNil(model.errorMessage)
+    }
 #if DEBUG
     func testInMemorySessionStoreRoundTripAndClear() throws {
         let store = InMemorySessionStore()
@@ -620,6 +679,55 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
         XCTAssertNil(request.httpBody)
         XCTAssertNil(request.value(forHTTPHeaderField: "Idempotency-Key"))
+    }
+
+    func testPushTokenRegistrationUsesOwnerSessionAndNeverReadsTokenBack() async throws {
+        let transport = AccountActionTransport()
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: TestSessionStore(session: testSession)
+        )
+
+        let registration = try await FinanceAPI(client: client).registerPushToken(
+            deviceID: "install-1",
+            deviceName: "iPhone",
+            token: String(repeating: "a", count: 64),
+            environment: "production",
+            idempotencyKey: "push-retry-1"
+        )
+
+        XCTAssertEqual(registration.id, "push-1")
+        XCTAssertEqual(registration.platform, "ios")
+        XCTAssertEqual(registration.environment, "production")
+        let request = try XCTUnwrap(transport.requests.first)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/api/v1/notifications/devices")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Idempotency-Key"), "push-retry-1")
+        let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(request.httpBody)) as? [String: String])
+        XCTAssertEqual(json["device_id"], "install-1")
+        XCTAssertEqual(json["device_name"], "iPhone")
+        XCTAssertEqual(json["platform"], "ios")
+        XCTAssertEqual(json["environment"], "production")
+        XCTAssertEqual(json["token"]?.count, 64)
+    }
+
+    func testPushTokenRevokeUsesOwnerSessionAndNoBody() async throws {
+        let transport = AccountActionTransport()
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: TestSessionStore(session: testSession)
+        )
+
+        try await FinanceAPI(client: client).revokePushToken(id: "push-1")
+
+        let request = try XCTUnwrap(transport.requests.first)
+        XCTAssertEqual(request.httpMethod, "DELETE")
+        XCTAssertEqual(request.url?.path, "/api/v1/notifications/devices/push-1")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        XCTAssertNil(request.httpBody)
     }
 
     func testAPIKeyCreateUsesOwnerSessionSnakeCaseBodyAndIdempotency() async throws {
@@ -781,6 +889,42 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(json["fee"] as? Int, 1_000)
         XCTAssertEqual(json["occurred_at"] as? String, "2026-10-07T05:00:00Z")
         XCTAssertEqual(json["note"] as? String, "DCA")
+    }
+
+    func testPortfolioTradeCorrectionUsesPreviewContractAndIdempotency() async throws {
+        let transport = PortfolioCorrectionTransport()
+        let client = APIClient(
+            baseURL: URL(string: "https://example.test/api/v1")!,
+            transport: transport,
+            sessionStore: TestSessionStore(session: testSession)
+        )
+        let api = FinanceAPI(client: client)
+        let replacement = PortfolioTradeInputModel(
+            side: "buy", quantity: "1.5", unitPrice: 120_000, fee: 500,
+            occurredAt: "2026-10-07T05:00:00Z", note: "corrected"
+        )
+        let input = PortfolioTradeCorrectionInputModel(
+            sourceTradeID: "trade-1", expectedAssetVersion: 3,
+            operation: "replace", reason: "Sửa giá nhập", replacement: replacement
+        )
+
+        let preview = try await api.previewPortfolioTradeCorrection(assetID: "asset-1", input: input)
+        XCTAssertEqual(preview.assetVersion, 3)
+        XCTAssertEqual(transport.requests.count, 1)
+        XCTAssertEqual(transport.requests[0].httpMethod, "POST")
+        XCTAssertEqual(transport.requests[0].url?.path, "/api/v1/portfolio/assets/asset-1/trade-corrections/preview")
+        XCTAssertEqual(transport.requests[0].value(forHTTPHeaderField: "Authorization"), "Bearer access")
+        let previewJSON = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(transport.requests[0].httpBody)) as? [String: Any])
+        XCTAssertEqual(previewJSON["source_trade_id"] as? String, "trade-1")
+        XCTAssertEqual(previewJSON["expected_asset_version"] as? Int, 3)
+        XCTAssertEqual((previewJSON["replacement"] as? [String: Any])?["unit_price"] as? Int, 120_000)
+        XCTAssertNil(transport.requests[0].value(forHTTPHeaderField: "Idempotency-Key"), "preview must not reserve a mutation")
+
+        let committed = try await api.correctPortfolioTrade(assetID: "asset-1", input: input, idempotencyKey: "correction-1")
+        XCTAssertEqual(committed.revisionID, "revision-1")
+        XCTAssertEqual(transport.requests.count, 2)
+        XCTAssertEqual(transport.requests[1].url?.path, "/api/v1/portfolio/assets/asset-1/trade-corrections")
+        XCTAssertEqual(transport.requests[1].value(forHTTPHeaderField: "Idempotency-Key"), "correction-1")
     }
 
     private var testSession: AccessSession {
@@ -955,6 +1099,46 @@ private actor DelayedFeedbackTransport: HTTPTransport {
     }
 }
 
+private actor DelayedFeedbackCreateTransport: HTTPTransport {
+    private var holdNext = false
+    private var held = false
+    private var waiter: CheckedContinuation<Void, Never>?
+    private var release: CheckedContinuation<Void, Never>?
+
+    func holdNextList() { holdNext = true }
+    func waitUntilListHeld() async {
+        if held { return }
+        await withCheckedContinuation { waiter = $0 }
+    }
+    func releaseList() {
+        release?.resume()
+        release = nil
+        held = false
+    }
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        let path = request.url?.path ?? ""
+        let data: Data
+        if path.hasSuffix("/changelog") {
+            data = Data(#"{"data":[],"meta":null}"#.utf8)
+        } else if request.httpMethod == "POST" && path.hasSuffix("/feedback") {
+            data = Data(#"{"data":{"id":"new-feedback","type":"bug","title":"Mất phản hồi sau refresh","description":"Bản ghi mới phải còn trong danh sách.","status":"open","resolved":false,"created_at":"2026-10-20T00:00:00Z","updated_at":"2026-10-20T00:00:00Z","screenshot_available":false},"meta":null}"#.utf8)
+        } else {
+            // The held list is deliberately stale: it predates the submitted
+            // row and must not replace the view model's local POST result.
+            data = Data(#"{"data":[{"id":"old-feedback","type":"bug","title":"Cũ","description":"Cũ","status":"open","resolved":false,"created_at":"2026-10-19T00:00:00Z","updated_at":"2026-10-19T00:00:00Z","screenshot_available":false}],"meta":null}"#.utf8)
+            if holdNext {
+                holdNext = false
+                held = true
+                waiter?.resume()
+                waiter = nil
+                await withCheckedContinuation { release = $0 }
+            }
+        }
+        return (data, HTTPURLResponse(url: request.url!, statusCode: request.httpMethod == "POST" ? 201 : 200, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
 private final class CapabilityCaptureTransport: HTTPTransport, @unchecked Sendable {
     private(set) var request: URLRequest?
     private(set) var callCount = 0
@@ -998,6 +1182,10 @@ private final class AccountActionTransport: HTTPTransport, @unchecked Sendable {
         if request.httpMethod == "POST", path.hasSuffix("/api-keys") {
             let body = #"{"data":{"id":"key-1","name":"iPhone","scopes":["finance:read"],"expires_at":"2027-01-01","secret":"mpk_secret"},"meta":null}"#
             return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
+        }
+        if request.httpMethod == "POST", path.hasSuffix("/notifications/devices") {
+            let body = #"{"data":{"id":"push-1","device_id":"install-1","device_name":"iPhone","platform":"ios","environment":"production","created_at":"2026-10-19T00:00:00Z","updated_at":"2026-10-19T00:00:00Z"},"meta":null}"#
+            return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
         if path.contains("/notifications/") || request.httpMethod == "DELETE" {
             return (Data(), HTTPURLResponse(url: request.url!, statusCode: 204, httpVersion: nil, headerFields: nil)!)
@@ -1051,6 +1239,21 @@ private final class PortfolioTradeTransport: HTTPTransport, @unchecked Sendable 
         self.request = request
         let response = #"{"data":{"id":"trade-1","owner_id":"owner-1","asset_id":"asset-1","side":"buy","quantity":"1.25000000","unit_price":72000,"fee":1000,"occurred_at":"2026-10-07T05:00:00Z","note":"DCA"},"meta":null}"#
         return (Data(response.utf8), HTTPURLResponse(url: request.url!, statusCode: 201, httpVersion: nil, headerFields: nil)!)
+    }
+}
+
+private final class PortfolioCorrectionTransport: HTTPTransport, @unchecked Sendable {
+    private(set) var requests: [URLRequest] = []
+
+    func data(for request: URLRequest) async throws -> (Data, URLResponse) {
+        requests.append(request)
+        let body: String
+        if request.url?.path.hasSuffix("/preview") == true {
+            body = #"{"data":{"revision_id":"","asset_version":3,"before":{"asset_id":"asset-1","quantity":"1","cost_basis":100000,"average_cost":100000,"realized_pnl":0},"after":{"asset_id":"asset-1","quantity":"1.5","cost_basis":180000,"average_cost":120000,"realized_pnl":0},"affected_trade_ids":[]},"meta":null}"#
+        } else {
+            body = #"{"data":{"revision_id":"revision-1","asset_version":4,"before":{"asset_id":"asset-1","quantity":"1","cost_basis":100000,"average_cost":100000,"realized_pnl":0},"after":{"asset_id":"asset-1","quantity":"1.5","cost_basis":180000,"average_cost":120000,"realized_pnl":0},"affected_trade_ids":["trade-1"]},"meta":null}"#
+        }
+        return (Data(body.utf8), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
     }
 }
 

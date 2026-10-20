@@ -49,11 +49,14 @@ subheadline 16, body 15 (medium), metadata 13 (medium), labels 14/12 and currenc
 hierarchy token. UIKit form input text stays 16pt. SwiftUI text follows Dynamic Type;
 transaction amounts move below copy at accessibility sizes. Shared cards use
 12pt horizontal/8pt vertical padding, 12pt corners and no shadow; default transaction/wallet rows use a
-32pt glyph with no outer vertical padding and 44pt minimum content height.
+32pt glyph and 44pt minimum content height. Transaction rows add the shared
+`transactionRowVerticalPadding` of 6pt above/below for readable separation;
+wallet row geometry is unchanged.
 Page section gaps are 8pt and dense row gaps 4pt. Menu/category rows keep a 44pt
 minimum and grow for content; profile is one tappable identity row, no duplicate
 manage-account row. Typography remains unchanged; do not achieve density by
-clipping accessibility text. Disabled Account-tab center add action is hidden.
+clipping accessibility text. Account root retains center Add; Account child
+destinations and Assistant hide it.
 The shell reserves only the 56pt navbar; its 52pt feedback bubble is an overlay,
 not a full-width lane or spacer. The web target keeps the OFL-licensed Manrope
 The selected primary tab uses the shared `surfacePill` style (`MPColor.row`,

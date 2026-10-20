@@ -55,7 +55,7 @@ final class OverviewViewModel: ObservableObject {
         guard !isLoading else { return }
         isLoading = true
         errorMessage = nil
-        cachedAt = nil
+        await restoreCachedSnapshot()
         defer { isLoading = false }
         do {
             async let walletResult = api.wallets()
@@ -73,6 +73,22 @@ final class OverviewViewModel: ObservableObject {
         await loadMonthSummary()
         await loadInsider()
         await persistSnapshot()
+    }
+
+    private func restoreCachedSnapshot() async {
+        guard wallets.isEmpty, let ownerID, let snapshotCache else { return }
+        do {
+            guard let snapshot = try await snapshotCache.load(ownerID: ownerID) else { return }
+            wallets = snapshot.wallets
+            transactions = snapshot.transactions.sorted { $0.occurredAt > $1.occurredAt }
+            categories = snapshot.categories
+            accountTimezone = snapshot.timezone
+            monthSummary = snapshot.monthSummary
+            insider = snapshot.insider
+            cachedAt = snapshot.fetchedAt
+        } catch {
+            // A bad cache must never block the authoritative server read.
+        }
     }
 
     private func recoverLoad(_ error: Error) async {

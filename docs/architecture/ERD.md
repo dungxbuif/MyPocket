@@ -127,6 +127,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `transaction_attachments` | Private S3 receipt metadata and OCR text/state | User/process | Migration `000011`–`000012`; object key is backend-only; 24-hour unlinked cleanup lifecycle. |
 | `transaction_attachment_links` | Approved transaction-to-receipt relation | User via both FKs | Unique transaction/attachment pair; only created inside proposal approval. |
 | `notifications` | Owner-scoped in-app notification inbox | User | Migration `000029`; unique `(owner_id, dedupe_key)` and newest-first index. |
+| `push_tokens` | Owner-scoped iOS provider addresses for future push delivery | User | Migration `000036`; token excluded from JSON/logs, unique by `(platform, environment, token)` and owner/device upsert key. Registration only; no APNs delivery. |
 
 ## Relationships
 
@@ -143,6 +144,7 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `transactions` | `transactions` | Paired 1-to-1 by nullable `transfer_id` | Source expense and destination income share a transfer id; both rows are created atomically and excluded from reports/jars. |
 | `transactions` | `transaction_attachments` | Many-to-many | Qua `transaction_attachment_links`; transaction owner and attachment owner are both checked before signed download. |
 | `user` | `notifications` | 1-to-many | `notifications.owner_id` references `user.id` with cascade delete; all reads/marks scope by owner. |
+| `user` | `push_tokens` | 1-to-many | `push_tokens.owner_id` references `user.id` with cascade delete; registration/revocation always uses the authenticated owner. |
 
 ## Constraints
 

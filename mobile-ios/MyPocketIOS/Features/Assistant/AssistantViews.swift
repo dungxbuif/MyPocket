@@ -3,10 +3,55 @@ import UIKit
 import UniformTypeIdentifiers
 
 enum AssistantComposerPolicy {
-    static func canSend(enabled: Bool, text: String, activeRunID: String?) -> Bool {
+    static func canSend(enabled: Bool, text: String, activeRunID: String?, isLocallySending: Bool = false) -> Bool {
         enabled
             && activeRunID == nil
+            && !isLocallySending
             && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+}
+
+enum AssistantHistoryLoadPolicy {
+    static func isCurrent(
+        requestToken: UUID,
+        currentToken: UUID,
+        responseConversationID: String,
+        expectedConversationID: String
+    ) -> Bool {
+        requestToken == currentToken && responseConversationID == expectedConversationID
+    }
+
+    /// Accept metadata only for the conversation/generation that initiated the
+    /// request. The view's request token covers legacy empty responses.
+    static func canApply(
+        responseConversationID: String,
+        responseGeneration: Int64?,
+        expectedConversationID: String,
+        expectedGeneration: Int64?
+    ) -> Bool {
+        guard !responseConversationID.isEmpty,
+              responseConversationID == expectedConversationID else { return false }
+        guard let responseGeneration, let expectedGeneration else { return true }
+        return responseGeneration == expectedGeneration
+    }
+}
+
+enum AssistantAdvisorRecoveryPolicy {
+    /// A transport/5xx failure may happen after the server accepted a request;
+    /// replaying the same client request ID is therefore safe. Validation and
+    /// authentication failures are known rejections and must not be replayed.
+    static func shouldReplay(after error: APIError) -> Bool {
+        switch error {
+        case .transport, .decoding:
+            return true
+        case .http(let status):
+            return status >= 500
+        case .problem(let problem):
+            guard let status = problem.status else { return true }
+            return status >= 500
+        case .invalidURL, .unauthorized, .missingSession, .accountMismatch:
+            return false
+        }
     }
 }
 
@@ -238,6 +283,7 @@ struct AssistantView: View {
     let onBack: () -> Void
     let ownerID: String
     let masked: Bool
+    @Environment(\.scenePhase) private var scenePhase
     @State private var capabilities: AdvisorCapabilitiesModel?
     @State private var overview: AdvisorOverviewModel?
     @State private var messages: [AdvisorMessageModel] = []
@@ -257,6 +303,11 @@ struct AssistantView: View {
     @State private var dismissKeyboardRequest = 0
     @State private var resetConfirmation = false
     @State private var resetting = false
+    @State private var historyRequestToken = UUID()
+    @State private var advisorPollToken = UUID()
+    @State private var advisorSubmitRequestID: String?
+    @State private var advisorSubmitUncertain = false
+    @StateObject private var runObserver: AdvisorRunObserver
 
     private let suggestions = [
         "Tháng này tôi tiêu thế nào?",
@@ -270,6 +321,9 @@ struct AssistantView: View {
         self.ownerID = ownerID
         self.masked = masked
         self.draft = draft
+        _runObserver = StateObject(wrappedValue: AdvisorRunObserver(fetchRun: { runID in
+            try await api.advisorRun(id: runID)
+        }))
         let key = Self.conversationKey(ownerID: ownerID)
         _conversationID = State(initialValue: UserDefaults.standard.string(forKey: key) ?? "")
     }
@@ -294,6 +348,11 @@ struct AssistantView: View {
         conversationID = ""
         hasOlder = false
         activeRunID = nil
+        historyRequestToken = UUID()
+        advisorPollToken = UUID()
+        runObserver.reset()
+        advisorSubmitRequestID = nil
+        advisorSubmitUncertain = false
         UserDefaults.standard.removeObject(forKey: Self.conversationKey(ownerID: ownerID))
     }
 
@@ -372,9 +431,19 @@ struct AssistantView: View {
                         .id(message.id)
                     }
                     if sending || activeRunID != nil {
-                        MPLoadingView(label: "Trợ lý đang phân tích...")
+                        let label = runObserver.connectionState == .reconnecting
+                            ? "Kết nối gián đoạn. Yêu cầu vẫn được theo dõi..."
+                            : "Trợ lý đang phân tích..."
+                        MPLoadingView(label: label)
                     }
                     if let error { MPStatusMessage(text: error, tone: .danger) }
+                    if advisorSubmitUncertain {
+                        MPStatusMessage(text: "Yêu cầu có thể đã được tiếp nhận. Giữ nguyên nội dung và dùng nút thử lại để tiếp tục; không tạo yêu cầu mới.", tone: .info)
+                        MPButton("Thử lại yêu cầu", style: .secondary, isLoading: sending) {
+                            Task { await retryUncertainAdvisorSubmit() }
+                        }
+                        .accessibilityIdentifier("assistant-retry-submit")
+                    }
                     Color.clear.frame(height: 1).id("assistant-latest")
                 }
                 .padding(MPMetrics.pagePadding)
@@ -388,13 +457,14 @@ struct AssistantView: View {
             MPChatComposer(
                 text: inputBinding,
                 isBusy: sending || activeRunID != nil,
-                isEnabled: capabilities?.enabled == true,
+                isEnabled: capabilities?.enabled == true && !advisorSubmitUncertain,
                 onSend: { Task { await send() } },
                 onCancel: activeRunID.map { runID in { Task { await cancel(runID: runID) }; return () } },
                 dismissKeyboardRequest: dismissKeyboardRequest
             )
             .padding(.horizontal, MPMetrics.pagePadding)
             .padding(.vertical, 8)
+            .disabled(advisorSubmitUncertain)
             .background {
                 GeometryReader { geometry in
                     Color.clear.preference(key: MPFloatingActionClearanceKey.self, value: geometry.size.height)
@@ -404,6 +474,23 @@ struct AssistantView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .mpObserveKeyboardVisibility($keyboardVisible)
         .task { await loadInitialState() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .inactive || phase == .background {
+                runObserver.suspend()
+            } else if phase == .active {
+                if let runID = activeRunID {
+                    let token = advisorPollToken
+                    Task {
+                        await runObserver.observe(ownerID: ownerID, runID: runID)
+                        guard advisorPollToken == token, activeRunID == runID else { return }
+                        await reloadHistory()
+                        if advisorPollToken == token { activeRunID = nil }
+                    }
+                } else {
+                    Task { await reloadHistory() }
+                }
+            }
+        }
         .mpFormBottomSheet(isPresented: $overviewPresented, title: "Tổng quan tài chính", accessibilityIdentifier: "assistant-overview-details", onClose: { overviewPresented = false }) {
             if let overview {
                 AssistantStructuredCard(
@@ -493,13 +580,42 @@ struct AssistantView: View {
 
     private func reloadHistory() async {
         guard !conversationID.isEmpty else { return }
+        let requestedConversationID = conversationID
+        let requestToken = UUID()
+        historyRequestToken = requestToken
         do {
-            let page = try await api.advisorHistory(conversationID: conversationID)
+            let page = try await api.advisorHistory(conversationID: requestedConversationID)
+            guard AssistantHistoryLoadPolicy.isCurrent(
+                requestToken: requestToken,
+                currentToken: historyRequestToken,
+                responseConversationID: conversationID,
+                expectedConversationID: requestedConversationID
+            ) else { return }
+            if let meta = page.meta,
+               !AssistantHistoryLoadPolicy.canApply(
+                    responseConversationID: meta.conversationID,
+                    responseGeneration: meta.generation,
+                    expectedConversationID: requestedConversationID,
+                    expectedGeneration: historyMeta?.generation
+               ) {
+                return
+            }
             messages = page.messages
             historyMeta = page.meta
             hasOlder = messages.count == 50
             error = nil
+            if let activeRun = page.meta?.activeRun,
+               !["completed", "failed", "cancelled", "interrupted", "purged"].contains(activeRun.status),
+               activeRunID != activeRun.id {
+                resumeActiveRun(activeRun.id)
+            }
         } catch let error as APIError {
+            guard AssistantHistoryLoadPolicy.isCurrent(
+                requestToken: requestToken,
+                currentToken: historyRequestToken,
+                responseConversationID: conversationID,
+                expectedConversationID: requestedConversationID
+            ) else { return }
             if AssistantHistoryExpiryPolicy.isExpired(error) {
                 clearExpiredConversation()
                 self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
@@ -507,15 +623,41 @@ struct AssistantView: View {
                 self.error = error.userMessage
             }
         }
-        catch { self.error = "Không thể tải lại lịch sử trợ lý." }
+        catch {
+            guard AssistantHistoryLoadPolicy.isCurrent(
+                requestToken: requestToken,
+                currentToken: historyRequestToken,
+                responseConversationID: conversationID,
+                expectedConversationID: requestedConversationID
+            ) else { return }
+            self.error = "Không thể tải lại lịch sử trợ lý."
+        }
     }
 
     private func loadOlderMessages() async {
         guard !conversationID.isEmpty, let first = messages.first, !loadingOlder, hasOlder else { return }
+        let requestedConversationID = conversationID
+        let requestToken = UUID()
+        historyRequestToken = requestToken
         loadingOlder = true
         defer { loadingOlder = false }
         do {
-            let page = try await api.advisorHistory(conversationID: conversationID, beforeSequence: first.seq)
+            let page = try await api.advisorHistory(conversationID: requestedConversationID, beforeSequence: first.seq)
+            guard AssistantHistoryLoadPolicy.isCurrent(
+                requestToken: requestToken,
+                currentToken: historyRequestToken,
+                responseConversationID: conversationID,
+                expectedConversationID: requestedConversationID
+            ) else { return }
+            if let meta = page.meta,
+               !AssistantHistoryLoadPolicy.canApply(
+                    responseConversationID: meta.conversationID,
+                    responseGeneration: meta.generation,
+                    expectedConversationID: requestedConversationID,
+                    expectedGeneration: historyMeta?.generation
+               ) {
+                return
+            }
             messages = mergeMessages(messages, page.messages)
             if let incomingMeta = page.meta {
                 if let currentGeneration = historyMeta?.generation {
@@ -527,6 +669,12 @@ struct AssistantView: View {
             hasOlder = page.messages.count == 50
             error = nil
         } catch let error as APIError {
+            guard AssistantHistoryLoadPolicy.isCurrent(
+                requestToken: requestToken,
+                currentToken: historyRequestToken,
+                responseConversationID: conversationID,
+                expectedConversationID: requestedConversationID
+            ) else { return }
             if AssistantHistoryExpiryPolicy.isExpired(error) {
                 clearExpiredConversation()
                 self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
@@ -534,7 +682,15 @@ struct AssistantView: View {
                 self.error = error.userMessage
             }
         }
-        catch { self.error = "Không thể tải tin cũ của trợ lý." }
+        catch {
+            guard AssistantHistoryLoadPolicy.isCurrent(
+                requestToken: requestToken,
+                currentToken: historyRequestToken,
+                responseConversationID: conversationID,
+                expectedConversationID: requestedConversationID
+            ) else { return }
+            self.error = "Không thể tải tin cũ của trợ lý."
+        }
     }
 
     private func mergeMessages(_ current: [AdvisorMessageModel], _ incoming: [AdvisorMessageModel]) -> [AdvisorMessageModel] {
@@ -545,53 +701,95 @@ struct AssistantView: View {
 
     private func send() async {
         let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard AssistantComposerPolicy.canSend(enabled: capabilities?.enabled == true, text: text, activeRunID: activeRunID) else { return }
+        guard !advisorSubmitUncertain,
+              AssistantComposerPolicy.canSend(
+                  enabled: capabilities?.enabled == true,
+                  text: text,
+                  activeRunID: activeRunID,
+                  isLocallySending: sending
+              ) else { return }
         sending = true; error = nil; defer { sending = false }
+        let clientRequestID = advisorSubmitRequestID ?? UUID().uuidString
+        advisorSubmitRequestID = clientRequestID
         do {
-            let result = try await api.beginAdvisorMessage(AdvisorMessageInputModel(clientRequestID: UUID().uuidString, text: text))
+            let result = try await api.beginAdvisorMessage(AdvisorMessageInputModel(clientRequestID: clientRequestID, text: text))
+            advisorSubmitRequestID = nil
+            advisorSubmitUncertain = false
             conversationID = result.conversationID
             UserDefaults.standard.set(result.conversationID, forKey: Self.conversationKey(ownerID: ownerID))
             activeRunID = result.runID
+            let pollToken = UUID()
+            advisorPollToken = pollToken
             input = ""
             if result.status == "queued" || result.status == "running" {
-                var completed = false
-                for _ in 0..<60 {
-                    try await Task.sleep(for: .milliseconds(500))
-                    let run = try await api.advisorRun(id: result.runID)
-                    if ["completed", "failed", "cancelled", "interrupted", "purged"].contains(run.status) {
-                        completed = true
-                        if run.status == "purged" {
-                            input = text
-                            clearExpiredConversation()
-                            self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
-                        } else if run.status != "completed" {
-                            self.error = "Yêu cầu trợ lý kết thúc với trạng thái \(MPSelectionLabels.display(for: run.status))."
-                        }
-                        break
+                await runObserver.observe(ownerID: ownerID, runID: result.runID)
+                guard advisorPollToken == pollToken, activeRunID == result.runID else { return }
+                if let run = runObserver.terminalResult {
+                    if run.status == "purged" {
+                        input = text
+                        clearExpiredConversation()
+                        self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
+                    } else if run.status != "completed" {
+                        self.error = "Yêu cầu trợ lý kết thúc với trạng thái \(MPSelectionLabels.display(for: run.status))."
                     }
-                }
-                guard completed else {
-                    self.error = "Yêu cầu vẫn đang xử lý. Bạn có thể bấm Hủy trước khi gửi yêu cầu khác."
-                    return
                 }
             }
             await reloadHistory()
+            guard advisorPollToken == pollToken, activeRunID == result.runID else { return }
             activeRunID = nil
-        } catch let error as APIError {
-            if AssistantHistoryExpiryPolicy.isExpired(error) {
+        } catch let apiError as APIError {
+            if AssistantHistoryExpiryPolicy.isExpired(apiError) {
                 input = text
                 clearExpiredConversation()
                 self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
+            } else if advisorSubmitRequestID != nil && AssistantAdvisorRecoveryPolicy.shouldReplay(after: apiError) {
+                advisorSubmitUncertain = true
+                self.error = "Không thể xác nhận phản hồi của máy chủ. Giữ nguyên nội dung và tải lại yêu cầu trước khi gửi lại."
             } else {
-                self.error = error.userMessage
+                if advisorSubmitRequestID != nil { advisorSubmitRequestID = nil }
+                self.error = apiError.userMessage
             }
         }
-        catch { self.error = "Không thể xử lý yêu cầu trợ lý tài chính." }
+        catch {
+            if advisorSubmitRequestID != nil {
+                advisorSubmitUncertain = true
+                self.error = "Không thể xác nhận máy chủ đã tiếp nhận yêu cầu. Giữ nguyên nội dung và thử lại yêu cầu này."
+            } else {
+                self.error = "Không thể xử lý yêu cầu trợ lý tài chính."
+            }
+        }
+    }
+
+    private func retryUncertainAdvisorSubmit() async {
+        guard advisorSubmitUncertain, advisorSubmitRequestID != nil else { return }
+        advisorSubmitUncertain = false
+        await send()
     }
 
     private func cancel(runID: String) async {
-        do { try await api.cancelAdvisorRun(id: runID); sending = false; activeRunID = nil; error = "Đã hủy yêu cầu." }
+        do {
+            try await api.cancelAdvisorRun(id: runID)
+            guard activeRunID == runID else { return }
+            advisorPollToken = UUID()
+            runObserver.reset()
+            sending = false
+            activeRunID = nil
+            error = "Đã hủy yêu cầu."
+        }
         catch { self.error = "Không thể hủy yêu cầu đang chạy." }
+    }
+
+    private func resumeActiveRun(_ runID: String) {
+        guard activeRunID != runID else { return }
+        activeRunID = runID
+        let token = advisorPollToken
+        Task {
+            await runObserver.observe(ownerID: ownerID, runID: runID)
+            guard advisorPollToken == token, activeRunID == runID else { return }
+            await reloadHistory()
+            guard advisorPollToken == token else { return }
+            activeRunID = nil
+        }
     }
 
     private func createWalletFromAssistant(_ input: WalletModelInput, idempotencyKey: String) async throws {
@@ -1152,6 +1350,20 @@ enum AIEntryProposalReview {
     static func pending(_ proposals: [EntryProposalModel]) -> [EntryProposalModel] {
         proposals.filter { $0.status == "pending" }
     }
+
+    @MainActor static func transactionRow(for proposal: EntryProposalModel, category: CategoryModel? = nil, timeZone: TimeZone, masked: Bool) -> MPTransactionRow {
+        MPTransactionRow(
+            type: proposal.draft.type,
+            rawAmount: proposal.draft.amount,
+            categoryName: category?.name,
+            systemKey: category?.systemKey,
+            iconKey: category?.iconKey,
+            note: proposal.draft.note,
+            occurredAt: proposal.draft.occurredAt,
+            timeZone: timeZone,
+            masked: masked
+        )
+    }
 }
 
 enum AIEntryRequestRecoveryPolicy {
@@ -1177,8 +1389,18 @@ enum AIEntryRequestRecoveryPolicy {
         }
     }
 
-    static func canSubmit(isUncertain: Bool, isProcessing: Bool) -> Bool {
-        !isUncertain && !isProcessing
+    static func canSubmit(isUncertain: Bool, isProcessing: Bool, isLocallyProcessing: Bool = false) -> Bool {
+        !isUncertain && !isProcessing && !isLocallyProcessing
+    }
+}
+
+enum AIEntryDecisionPolicy {
+    static func canDecide(proposalID: String, deciding: Set<String>, savingAll: Bool) -> Bool {
+        !savingAll && !deciding.contains(proposalID)
+    }
+
+    static func canSaveAll(savingAll: Bool, processing: Bool, deciding: Set<String>) -> Bool {
+        !savingAll && !processing && deciding.isEmpty
     }
 }
 
@@ -1200,12 +1422,13 @@ struct AIEntryView: View {
     @State private var requestID: String?
     @State private var uncertain = false
     @State private var savingAll = false
+    @State private var decidingProposalIDs: Set<String> = []
 
     var body: some View {
         MPEditorScaffold(isBusy: processing || savingAll, header: {
             MPScreenHeader(title: "Nhập giao dịch bằng AI", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
                     if !pendingProposals.isEmpty {
-                        MPButton("Lưu tất cả", style: .secondary, isLoading: savingAll, isDisabled: processing || savingAll) {
+                        MPButton("Lưu tất cả", style: .secondary, isLoading: savingAll, isDisabled: !AIEntryDecisionPolicy.canSaveAll(savingAll: savingAll, processing: processing, deciding: decidingProposalIDs)) {
                             Task { await saveAll() }
                         }
                         .accessibilityIdentifier("ai-entry-save-all")
@@ -1238,14 +1461,21 @@ struct AIEntryView: View {
                     ForEach(process.proposals) { proposal in
                         MPSurfaceCard {
                             VStack(alignment: .leading, spacing: 8) {
-                                MPText(AIEntryProposalReview.typeLabel(proposal.draft.type))
-                                MPText("\(MPFormat.money(proposal.draft.amount, masked: masked)) · \(MPFormat.shortDate(proposal.draft.occurredAt, timeZone: TimeZone(identifier: accountTimezone) ?? .current))", style: .secondary)
-                                if !proposal.draft.note.isEmpty { MPText(proposal.draft.note, style: .secondary) }
+                                AIEntryProposalReview.transactionRow(
+                                    for: proposal,
+                                    category: categories.first { $0.id == proposal.draft.categoryID },
+                                    timeZone: TimeZone(identifier: accountTimezone) ?? .current,
+                                    masked: masked
+                                )
+                                .accessibilityIdentifier("ai-entry-proposal-row-\(proposal.id)")
+                                if AIEntryProposalReview.normalizedType(proposal.draft.type) == nil {
+                                    MPStatusMessage(text: AIEntryProposalReview.typeLabel(proposal.draft.type), tone: .info)
+                                }
                                 if proposal.status == "pending" {
                                     HStack {
-                                        MPButton("Sửa", style: .secondary, isDisabled: savingAll) { editProposal = proposal }
-                                        MPButton("Bỏ qua", style: .secondary, isDisabled: savingAll) { Task { await decide(proposal, as: "reject") } }
-                                        MPButton("Lưu giao dịch", isDisabled: savingAll) { Task { await decide(proposal, as: "approve") } }
+                                        MPButton("Sửa", style: .secondary, isDisabled: !AIEntryDecisionPolicy.canDecide(proposalID: proposal.id, deciding: decidingProposalIDs, savingAll: savingAll)) { editProposal = proposal }
+                                        MPButton("Bỏ qua", style: .secondary, isLoading: decidingProposalIDs.contains(proposal.id), isDisabled: !AIEntryDecisionPolicy.canDecide(proposalID: proposal.id, deciding: decidingProposalIDs, savingAll: savingAll)) { Task { await decide(proposal, as: "reject") } }
+                                        MPButton("Lưu giao dịch", isLoading: decidingProposalIDs.contains(proposal.id), isDisabled: !AIEntryDecisionPolicy.canDecide(proposalID: proposal.id, deciding: decidingProposalIDs, savingAll: savingAll)) { Task { await decide(proposal, as: "approve") } }
                                     }
                                 } else { MPStatusMessage(text: proposal.status == "approved" ? "Đã lưu" : "Đã bỏ qua", tone: proposal.status == "approved" ? .success : .info) }
                             }
@@ -1260,7 +1490,7 @@ struct AIEntryView: View {
                     MPButton("Soạn nội dung mới", style: .secondary) { requestID = nil; process = nil; text = ""; files = [] }
                 }
         } footer: {
-            MPButton("Phân tích đề xuất", isLoading: processing, isDisabled: !AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: uncertain, isProcessing: process?.processing == true) || savingAll) { Task { await processEntry() } }
+            MPButton("Phân tích đề xuất", isLoading: processing, isDisabled: !AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: uncertain, isProcessing: process?.processing == true, isLocallyProcessing: processing) || savingAll) { Task { await processEntry() } }
                 .accessibilityIdentifier("ai-entry-process")
         }
         .background(MPColor.canvas.ignoresSafeArea())
@@ -1296,7 +1526,7 @@ struct AIEntryView: View {
     private func loadCapabilities() async { do { capabilities = try await api.entryCapabilities() } catch { self.error = "Không thể tải trạng thái AI entry." } }
     private func loadReferenceData() async { do { async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); wallets = try await walletList; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone } } catch { self.error = "Không thể tải danh sách ví và danh mục." } }
     private func processEntry() async {
-        guard AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: uncertain, isProcessing: process?.processing == true) else { return }
+        guard AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: uncertain, isProcessing: process?.processing == true, isLocallyProcessing: processing) else { return }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty else { error = "Nhập mô tả hoặc đính kèm chứng từ trước khi phân tích."; return }
         guard capabilities?.aiConfigured != false else { error = "AI chưa được cấu hình trên máy chủ."; return }
         guard files.isEmpty || capabilities?.filesConfigured == true else { error = "OCR hoặc nơi lưu chứng từ chưa được cấu hình."; return }
@@ -1386,8 +1616,13 @@ struct AIEntryView: View {
         return try await api.entryRequest(id: id)
     }
     private func decide(_ proposal: EntryProposalModel, as decision: String) async {
-        do { let updated = try await api.decideEntryProposal(id: proposal.id, version: proposal.version, decision: decision); process?.proposals = process?.proposals.map { $0.id == updated.id ? updated : $0 } ?? [] }
-        catch { self.error = "Không thể cập nhật đề xuất. Tải lại để kiểm tra trạng thái." }
+        guard AIEntryDecisionPolicy.canDecide(proposalID: proposal.id, deciding: decidingProposalIDs, savingAll: savingAll) else { return }
+        decidingProposalIDs.insert(proposal.id)
+        defer { decidingProposalIDs.remove(proposal.id) }
+        do {
+            let updated = try await api.decideEntryProposal(id: proposal.id, version: proposal.version, decision: decision)
+            process?.proposals = process?.proposals.map { $0.id == updated.id ? updated : $0 } ?? []
+        } catch { self.error = "Không thể cập nhật đề xuất. Tải lại để kiểm tra trạng thái." }
     }
 
     private var pendingProposals: [EntryProposalModel] {
@@ -1399,7 +1634,7 @@ struct AIEntryView: View {
     }
 
     private func saveAll() async {
-        guard !savingAll, !processing else { return }
+        guard AIEntryDecisionPolicy.canSaveAll(savingAll: savingAll, processing: processing, deciding: decidingProposalIDs) else { return }
         let pending = pendingProposals
         guard !pending.isEmpty else { return }
         savingAll = true
@@ -1793,6 +2028,7 @@ struct AccountView: View {
             .background(MPColor.canvas.ignoresSafeArea())
         }
         .task { await loadAccount() }
+        .mpInteractiveBackBlocked(showKeyEditor || faceIDEnrollmentPresented || auth.isBusy || (profile != nil && timezone != profile?.timezone))
         .mpFormBottomSheet(isPresented: $faceIDEnrollmentPresented, title: "Bật đăng nhập Face ID", accessibilityIdentifier: "face-id-enrollment", isDismissDisabled: auth.isBusy, onClose: { faceIDPassword = ""; faceIDEnrollmentPresented = false }) {
             MPText("Xác nhận mật khẩu để ghi nhớ tài khoản trên iPhone này.", style: .secondary)
             MPSecureField(title: "Mật khẩu", text: $faceIDPassword, placeholder: "Nhập mật khẩu", accessibilityIdentifier: "face-id-enrollment-password")

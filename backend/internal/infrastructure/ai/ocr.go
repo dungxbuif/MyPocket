@@ -115,7 +115,11 @@ func (c *Client) ocr(ctx context.Context, img Image) (string, error) {
 		}
 		switch document.Status {
 		case "completed":
-			return completedOCRText(document)
+			text, err := completedOCRText(document)
+			if err != nil {
+				return "", wrapProviderError("ocr_poll", "ocr_result_invalid", err)
+			}
+			return text, nil
 		case "failed":
 			return "", wrapProviderError("ocr_poll", "ocr_failed", errors.New("OCR recognition failed"))
 		case "cancelled", "canceled":

@@ -5,9 +5,9 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"log/slog"
+	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -16,6 +16,11 @@ import (
 )
 
 const advisorResponseLimit = 256 * 1024
+
+const (
+	advisorUsageStringLimit = 256
+	advisorUsageValueLimit  = int64(1_000_000_000)
+)
 
 var ErrAdvisorNotConfigured = errors.New("advisor provider is not configured")
 
@@ -37,7 +42,7 @@ func NewAdvisorClient(config AdvisorClientConfig) *AdvisorClient {
 }
 
 func (c *AdvisorClient) Available() bool {
-	return c != nil && validURL(c.config.BaseURL) && strings.TrimSpace(c.config.APIKey) != "" && strings.TrimSpace(c.config.Model) != ""
+	return c != nil && c.config.Validate() == nil
 }
 
 func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) (usecase.AdvisorResponse, error) {
@@ -86,11 +91,11 @@ func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) 
 	}
 	body, err := json.Marshal(payload)
 	if err != nil {
-		return usecase.AdvisorResponse{}, ErrAdvisorNotConfigured
+		return usecase.AdvisorResponse{}, usecase.ErrAdvisorProviderUnavailable
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.config.BaseURL+"/chat/completions", bytes.NewReader(body))
 	if err != nil {
-		return usecase.AdvisorResponse{}, ErrAdvisorNotConfigured
+		return usecase.AdvisorResponse{}, usecase.ErrAdvisorProviderUnavailable
 	}
 	req.Header.Set("Authorization", "Bearer "+c.config.APIKey)
 	req.Header.Set("Content-Type", "application/json")
@@ -101,21 +106,24 @@ func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) 
 		if ctx.Err() != nil {
 			return usecase.AdvisorResponse{}, ctx.Err()
 		}
-		return usecase.AdvisorResponse{}, ErrAdvisorNotConfigured
+		return usecase.AdvisorResponse{}, usecase.ErrAdvisorProviderUnavailable
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return usecase.AdvisorResponse{}, fmt.Errorf("advisor provider returned HTTP %d", resp.StatusCode)
+		// Keep provider outages in the stable 503 contract. Never return the
+		// upstream body: it may contain credentials, prompts, or account data.
+		return usecase.AdvisorResponse{}, usecase.ErrAdvisorProviderUnavailable
 	}
 	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, advisorResponseLimit+1))
 	if err != nil || len(responseBody) > advisorResponseLimit {
-		return usecase.AdvisorResponse{}, ErrAdvisorNotConfigured
+		return usecase.AdvisorResponse{}, usecase.ErrAdvisorProviderUnavailable
 	}
 	var envelope struct {
 		ID      string          `json:"id"`
 		Usage   json.RawMessage `json:"usage"`
 		Choices []struct {
-			Message struct {
+			FinishReason string `json:"finish_reason"`
+			Message      struct {
 				Content   *string `json:"content"`
 				ToolCalls []struct {
 					ID       string `json:"id"`
@@ -128,7 +136,7 @@ func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) 
 		} `json:"choices"`
 	}
 	if err := json.Unmarshal(responseBody, &envelope); err != nil || len(envelope.Choices) != 1 {
-		return usecase.AdvisorResponse{}, ErrAdvisorNotConfigured
+		return usecase.AdvisorResponse{}, usecase.ErrAdvisorProviderUnavailable
 	}
 	choice := envelope.Choices[0].Message
 	response := usecase.AdvisorResponse{}
@@ -138,14 +146,15 @@ func (c *AdvisorClient) Chat(ctx context.Context, input usecase.AdvisorRequest) 
 	for _, call := range choice.ToolCalls {
 		response.ToolCalls = append(response.ToolCalls, usecase.AdvisorToolCall{ID: call.ID, Name: call.Function.Name, Arguments: json.RawMessage(call.Function.Arguments)})
 	}
-	usage := map[string]any{"provider": "openai_compatible", "model": c.config.Model, "request_id": envelope.ID, "latency_ms": time.Since(started).Milliseconds()}
-	if len(envelope.Usage) > 0 && string(envelope.Usage) != "null" {
-		var providerUsage map[string]any
-		if json.Unmarshal(envelope.Usage, &providerUsage) == nil {
-			for key, value := range providerUsage {
-				usage[key] = value
-			}
-		}
+	usage := map[string]any{
+		"provider":      "openai_compatible",
+		"model":         boundAdvisorUsageString(c.config.Model),
+		"request_id":    boundAdvisorUsageString(envelope.ID),
+		"latency_ms":    time.Since(started).Milliseconds(),
+		"finish_reason": boundAdvisorUsageString(envelope.Choices[0].FinishReason),
+	}
+	for key, value := range normalizeAdvisorProviderUsage(envelope.Usage) {
+		usage[key] = value
 	}
 	slog.Info("AI advisor model response completed", "model", c.config.Model, "latency_ms", time.Since(started).Milliseconds(), "prompt_tokens", advisorUsageInt(usage, "prompt_tokens"), "completion_tokens", advisorUsageInt(usage, "completion_tokens"), "total_tokens", advisorUsageInt(usage, "total_tokens"), "tool_call_count", len(response.ToolCalls), "response_bytes", len(responseBody))
 	if c.config.StoreUsage {
@@ -165,6 +174,64 @@ func advisorUsageInt(usage map[string]any, key string) int64 {
 	default:
 		return 0
 	}
+}
+
+func normalizeAdvisorProviderUsage(raw json.RawMessage) map[string]any {
+	usage := map[string]any{
+		"prompt_tokens":     int64(0),
+		"completion_tokens": int64(0),
+		"total_tokens":      int64(0),
+	}
+	if len(raw) == 0 || string(raw) == "null" {
+		return usage
+	}
+	var providerUsage map[string]any
+	if json.Unmarshal(raw, &providerUsage) != nil {
+		return usage
+	}
+	for _, key := range []string{"prompt_tokens", "completion_tokens", "total_tokens"} {
+		if value, ok := advisorUsageNumber(providerUsage[key]); ok {
+			usage[key] = value
+		}
+	}
+	return usage
+}
+
+func advisorUsageNumber(value any) (int64, bool) {
+	var number float64
+	switch typed := value.(type) {
+	case float64:
+		number = typed
+	case float32:
+		number = float64(typed)
+	case int:
+		return advisorUsageNumber(int64(typed))
+	case int64:
+		if typed < 0 || typed > advisorUsageValueLimit {
+			return 0, false
+		}
+		return typed, true
+	case json.Number:
+		parsed, err := typed.Int64()
+		if err != nil {
+			return 0, false
+		}
+		return advisorUsageNumber(parsed)
+	default:
+		return 0, false
+	}
+	if math.IsNaN(number) || math.IsInf(number, 0) || number < 0 || number > float64(advisorUsageValueLimit) || math.Trunc(number) != number {
+		return 0, false
+	}
+	return int64(number), true
+}
+
+func boundAdvisorUsageString(value string) string {
+	value = strings.TrimSpace(value)
+	if len([]rune(value)) > advisorUsageStringLimit {
+		return string([]rune(value)[:advisorUsageStringLimit])
+	}
+	return value
 }
 
 func advisorErrorKind(err error) string {

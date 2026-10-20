@@ -101,7 +101,15 @@ final class FeedbackViewModel: ObservableObject {
             return false
         }
         isSending = true
-        defer { isSending = false }
+        // A refresh may already be waiting on an older list snapshot when the
+        // owner submits a new report. Invalidate that snapshot before the POST
+        // and again when it settles so the stale GET cannot erase the newly
+        // inserted item (or a failed submission's current list).
+        mutationRevision &+= 1
+        defer {
+            mutationRevision &+= 1
+            isSending = false
+        }
         do {
             let item = try await api.createFeedback(input, screenshot: screenshot)
             items.insert(item, at: 0)

@@ -50,7 +50,7 @@
 **Files:** AI entry handler/usecase, OCR adapter, HTTP tests.
 
 - [x] Write a failing HTTP regression asserting `POST /api/v1/ai/entry/process` stores one request and returns proposals without creating a chat/message row; assert `GET /requests/{request_id}` is read-only and owner-scoped.
-- [x] Write a failing OCR adapter test for private PDF/image source submission and text-only LLM; retain JPEG/PNG coverage. Reject MIME spoof, >5 MiB and >3 files before any provider request.
+- [x] Write a failing OCR adapter test for private PDF/image source submission and text-only LLM; retain JPEG/PNG coverage. Reject MIME spoof, >5 MiB and >20 files before any provider request.
 - [x] Write a failing provider-boundary assertion capturing the LLM request: only recognized OCR text and bounded wallet/category catalog may be present; no bytes, base64, URL, or image field.
 - [x] Implement direct process and request-read routes, request-key idempotency, internal process persistence without conversation history, PDF-capable OCR upload, and ordering that prevents the LLM call when OCR fails.
 - [x] Run focused OCR/use-case/HTTP tests and frontend request-contract tests. Do not use the user PDF for an automatic/live retry; any live manual test requires explicit user action after code is deployed.

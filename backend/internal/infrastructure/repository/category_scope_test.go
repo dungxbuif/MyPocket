@@ -148,8 +148,8 @@ func TestCategoryArchiveIsOwnerScopedIdempotentAndPreservesHistory(t *testing.T)
 
 	repository := NewCategoryPostgresRepository(db)
 	archived, err := repository.SetActive(ownerID, category.ID, false)
-	if err != nil || archived.IsActive {
-		t.Fatalf("archive result = %+v, err = %v; want inactive category", archived, err)
+	if err != nil || archived.IsActive || archived.Version != 2 {
+		t.Fatalf("archive result = %+v, err = %v; want inactive category at version 2", archived, err)
 	}
 	if _, err := repository.SetActive(ownerID, category.ID, false); err != nil {
 		t.Fatalf("repeating archive must be idempotent: %v", err)
@@ -168,7 +168,7 @@ func TestCategoryArchiveIsOwnerScopedIdempotentAndPreservesHistory(t *testing.T)
 		t.Fatalf("archiving category changed historical transaction count to %d", historyCount)
 	}
 	restored, err := repository.SetActive(ownerID, category.ID, true)
-	if err != nil || !restored.IsActive {
-		t.Fatalf("restore result = %+v, err = %v; want active category", restored, err)
+	if err != nil || !restored.IsActive || restored.Version != 3 {
+		t.Fatalf("restore result = %+v, err = %v; want active category at version 3", restored, err)
 	}
 }

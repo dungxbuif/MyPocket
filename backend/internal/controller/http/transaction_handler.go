@@ -29,6 +29,7 @@ const (
 	transactionNotFoundMessage            = "không tìm thấy giao dịch"
 	transactionLoadMessage                = "không đọc được giao dịch"
 	transactionSaveMessage                = "không lưu được giao dịch"
+	transactionVersionMessage             = "giao dịch đã thay đổi, hãy tải lại trước khi lưu"
 	transactionAdjustmentDirectionMessage = "hướng điều chỉnh số dư không hợp lệ"
 	transactionBulkDeleteLimit            = 100
 )
@@ -53,6 +54,7 @@ type transactionInput struct {
 	Note              *string `json:"note"`
 	IncludedInReports *bool   `json:"included_in_reports"`
 	TravelEventID     *string `json:"travel_event_id"`
+	ExpectedVersion   *int64  `json:"expected_version,omitempty"`
 }
 
 type transactionCreateInput struct {
@@ -93,6 +95,10 @@ type adjustmentInput struct {
 
 type bulkDeleteInput struct {
 	TransactionIDs []string `json:"transaction_ids"`
+}
+
+type transactionDeleteInput struct {
+	ExpectedVersion *int64 `json:"expected_version,omitempty"`
 }
 
 type travelTransactionInput struct {
@@ -619,10 +625,23 @@ func (h *TransactionHandler) UpdateTransaction(c *gin.Context) {
 	if input.IncludedInReports != nil {
 		updates["included_in_reports"] = *input.IncludedInReports
 	}
-	transaction, err := h.Transactions.Update(owner, c.Param("id"), updates)
+	expectedVersion := maxTransactionVersion(existing.Version)
+	if input.ExpectedVersion != nil {
+		expectedVersion = *input.ExpectedVersion
+	}
+	var transaction *entity.Transaction
+	if versioned, ok := h.Transactions.(transactionrepo.VersionedTransactionRepository); ok {
+		transaction, err = versioned.UpdateWithVersion(owner, c.Param("id"), expectedVersion, updates)
+	} else {
+		transaction, err = h.Transactions.Update(owner, c.Param("id"), updates)
+	}
 	if err != nil {
 		if errors.Is(err, transactionrepo.ErrCategoryInactive) {
 			categoryInactive(c)
+			return
+		}
+		if errors.Is(err, transactionrepo.ErrTransactionVersionConflict) {
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: transactionVersionMessage})
 			return
 		}
 		Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
@@ -660,11 +679,39 @@ func (h *TransactionHandler) DeleteTransaction(c *gin.Context) {
 			return
 		}
 	}
-	if err := h.Transactions.Delete(owner, c.Param("id")); err != nil {
+	var input transactionDeleteInput
+	if c.Request.Body != nil && c.Request.ContentLength != 0 {
+		_ = json.NewDecoder(c.Request.Body).Decode(&input)
+	}
+	expectedVersion := int64(0)
+	if existing, err := h.Transactions.Find(owner, c.Param("id")); err == nil && existing != nil {
+		expectedVersion = maxTransactionVersion(existing.Version)
+	}
+	if input.ExpectedVersion != nil {
+		expectedVersion = *input.ExpectedVersion
+	}
+	var deleteErr error
+	if versioned, ok := h.Transactions.(transactionrepo.VersionedTransactionRepository); ok && expectedVersion > 0 {
+		deleteErr = versioned.DeleteWithVersion(owner, c.Param("id"), expectedVersion)
+	} else {
+		deleteErr = h.Transactions.Delete(owner, c.Param("id"))
+	}
+	if deleteErr != nil {
+		if errors.Is(deleteErr, transactionrepo.ErrTransactionVersionConflict) {
+			Fail(c, http.StatusConflict, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: transactionVersionMessage})
+			return
+		}
 		Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
 		return
 	}
 	NoContent(c)
+}
+
+func maxTransactionVersion(version int64) int64 {
+	if version < 1 {
+		return 1
+	}
+	return version
 }
 
 // UpdateTransactionTravel godoc

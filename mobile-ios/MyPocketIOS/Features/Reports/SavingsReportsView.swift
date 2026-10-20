@@ -29,7 +29,11 @@ struct SavingsReportsView: View {
                             }
                             .disabled(loading)
                         }
-                        if loading { MPLoadingView(label: "Đang tải báo cáo tiết kiệm...") }
+                        if MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: loading, hasContent: report != nil) {
+                            MPLoadingView(label: "Đang tải báo cáo tiết kiệm...")
+                        } else if MPLoadingPresentationPolicy.showsInlineProgress(isLoading: loading, hasContent: report != nil) {
+                            MPInlineRefreshProgress(label: "Đang cập nhật báo cáo tiết kiệm...")
+                        }
                         if let error { MPErrorView(title: "Không tải được báo cáo tiết kiệm", detail: error) { Task { await load() } } }
                         if let report {
                             MPText("\(report.month) · \(report.timezone) · Cập nhật \(report.asOf)", style: .secondary)
@@ -130,7 +134,10 @@ struct SavingsReportsView: View {
         guard !loading else { return }
         let requestedMonth = month.trimmingCharacters(in: .whitespacesAndNewlines)
         let requestedWallet = walletID
-        report = nil; error = nil
+        // Keep the last successful report visible during a retry/refresh. The
+        // month and wallet controls clear it before a scope change, so stale
+        // content is never shown for a newly selected report.
+        error = nil
         guard ReportsMonthPolicy.isValid(requestedMonth) else { error = "Nhập tháng hợp lệ theo YYYY-MM."; return }
         loading = true; defer { loading = false }
         do {
@@ -190,7 +197,11 @@ struct ReportTransactionsView: View {
                     MPOptionSelector(title: "Loại giao dịch", options: kindOptions, selectionID: $kind, emptyLabel: "Tất cả")
                         .disabled(loading)
                 }
-                if loading { MPLoadingView(label: "Đang tải giao dịch...") }
+                if MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: loading, hasContent: page != nil) {
+                    MPLoadingView(label: "Đang tải giao dịch...")
+                } else if MPLoadingPresentationPolicy.showsInlineProgress(isLoading: loading, hasContent: page != nil) {
+                    MPInlineRefreshProgress(label: "Đang cập nhật giao dịch...")
+                }
                 if let error { MPErrorView(title: "Không tải được giao dịch", detail: error) { Task { await load(offset: failedOffset) } } }
                 if let page {
                     if page.items.isEmpty { MPEmptyView(title: "Không có giao dịch phù hợp", detail: "Phạm vi giống báo cáo đã chọn.") }

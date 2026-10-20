@@ -7,9 +7,22 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/mypocket/backend/internal/infrastructure/auth"
 	postgresrepo "github.com/mypocket/backend/internal/infrastructure/repository"
 )
+
+func TestSyncCapabilitiesIsNotCacheable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	handler := &TransactionHandler{}
+	engine.GET("/sync/capabilities", handler.SyncCapabilities)
+	response := httptest.NewRecorder()
+	engine.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/sync/capabilities", nil))
+	if got := response.Header().Get("Cache-Control"); got != "no-store" {
+		t.Fatalf("offline capability must not be cached: Cache-Control=%q", got)
+	}
+}
 
 func TestSyncCapabilitiesAdvertisesOnlyConfiguredDurableCreateContract(t *testing.T) {
 	f := newOfflineHTTPFixture(t)
@@ -36,6 +49,9 @@ func TestSyncCapabilitiesAdvertisesOnlyConfiguredDurableCreateContract(t *testin
 			r.Engine.ServeHTTP(response, request)
 			if response.Code != 200 {
 				t.Fatalf("missing capability endpoint:%d", response.Code)
+			}
+			if got := response.Header().Get("Cache-Control"); got != "no-store" {
+				t.Fatalf("offline capability must not be cached: Cache-Control=%q", got)
 			}
 			var envelope struct {
 				Data struct {

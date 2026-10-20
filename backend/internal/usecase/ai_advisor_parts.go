@@ -32,7 +32,7 @@ func BuildAdvisorPartsForRun(answer AdvisorAnswer, conversationID string, genera
 		if err := json.Unmarshal(result.View, &data); err != nil {
 			continue
 		}
-		if (result.ViewKind == "wallet_creation_proposal" || result.ViewKind == "jar_creation_proposal" || result.ViewKind == "jar_update_proposal" || result.ViewKind == "budget_creation_proposal" || result.ViewKind == "budget_update_proposal") && conversationID != "" && generation > 0 && runID != "" {
+		if isAdvisorProposalView(result.ViewKind) && conversationID != "" && generation > 0 && runID != "" {
 			if view, ok := data.(map[string]any); ok {
 				view["conversation_id"] = conversationID
 				view["generation"] = generation
@@ -80,9 +80,20 @@ func advisorPartType(viewKind string) (string, bool) {
 		return "budget_confirmation", true
 	case "budget_update_proposal":
 		return "budget_confirmation", true
+	case "transaction_creation_proposal", "transaction_update_proposal", "transaction_delete_proposal", "transaction_recategorize_proposal":
+		return "transaction_confirmation", true
+	case "wallet_transfer_proposal":
+		return "transfer_confirmation", true
+	case "category_creation_proposal", "category_update_proposal":
+		return "category_confirmation", true
 	case "product_help":
 		return "product_help", true
 	default:
 		return "", false
 	}
+}
+
+func isAdvisorProposalView(viewKind string) bool {
+	partType, ok := advisorPartType(viewKind)
+	return ok && (partType == "wallet_confirmation" || partType == "jar_confirmation" || partType == "budget_confirmation" || partType == "transaction_confirmation" || partType == "transfer_confirmation" || partType == "category_confirmation")
 }

@@ -35,13 +35,19 @@ struct AppRootView: View {
             routeCoordinator.receive(route)
             activeRoute = routeCoordinator.consumeIfAuthenticated(auth.phase)
         }
-        .onChange(of: auth.phase) { _, phase in
+        .onChange(of: auth.phase) { previousPhase, phase in
             switch phase {
             case .authenticated:
                 activeRoute = routeCoordinator.consumeIfAuthenticated(phase)
             case .checking, .locked, .unauthenticated:
                 // A consumed route must not be replayed after logout or a new
                 // login; only a fresh URL may create a new pending route.
+                if case .authenticated = previousPhase {
+                    routeCoordinator.discardPendingRoute()
+                }
+                if case .locked = previousPhase {
+                    routeCoordinator.discardPendingRoute()
+                }
                 activeRoute = nil
             }
         }

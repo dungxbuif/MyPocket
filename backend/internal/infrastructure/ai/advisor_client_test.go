@@ -3,8 +3,10 @@ package ai
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/mypocket/backend/internal/usecase"
@@ -77,5 +79,69 @@ func TestAdvisorClientRejectsMissingConfiguration(t *testing.T) {
 	client := NewAdvisorClient(AdvisorClientConfig{})
 	if _, err := client.Chat(context.Background(), usecase.AdvisorRequest{}); err == nil {
 		t.Fatal("unconfigured advisor provider must fail closed")
+	}
+}
+
+func TestAdvisorClientMapsUpstreamFailureToProviderUnavailable(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusBadGateway)
+		_, _ = w.Write([]byte(`{"detail":"upstream credentials or body must never escape"}`))
+	}))
+	defer server.Close()
+	client := NewAdvisorClient(AdvisorClientConfig{BaseURL: server.URL, APIKey: "secret", Model: "test"})
+	_, err := client.Chat(context.Background(), usecase.AdvisorRequest{Messages: []usecase.AdvisorChatMessage{{Role: "user", Content: "summary"}}})
+	if !errors.Is(err, usecase.ErrAdvisorProviderUnavailable) {
+		t.Fatalf("upstream failure must map to provider unavailable, got %v", err)
+	}
+	if strings.Contains(err.Error(), "credentials") || strings.Contains(err.Error(), server.URL) {
+		t.Fatalf("provider failure leaked sensitive detail: %v", err)
+	}
+}
+
+func TestAdvisorClientNormalizesBoundedUsageMetadata(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"provider-request-1","choices":[{"finish_reason":"tool_calls","message":{"content":"ok"}}],"usage":{"prompt_tokens":12,"completion_tokens":4,"total_tokens":16,"secret":"do-not-store","prompt_tokens_details":{"cached_tokens":7}}}`))
+	}))
+	defer server.Close()
+
+	client := NewAdvisorClient(AdvisorClientConfig{BaseURL: server.URL, APIKey: "secret", Model: "advisor-model", StoreUsage: true})
+	response, err := client.Chat(context.Background(), usecase.AdvisorRequest{Messages: []usecase.AdvisorChatMessage{{Role: "user", Content: "summary"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Usage == nil {
+		t.Fatal("usage must be retained when StoreUsage is enabled")
+	}
+	if response.Usage["provider"] != "openai_compatible" || response.Usage["model"] != "advisor-model" || response.Usage["request_id"] != "provider-request-1" || response.Usage["finish_reason"] != "tool_calls" {
+		t.Fatalf("bounded provider metadata missing: %#v", response.Usage)
+	}
+	for key, want := range map[string]int64{"prompt_tokens": 12, "completion_tokens": 4, "total_tokens": 16} {
+		if got := advisorUsageInt(response.Usage, key); got != want {
+			t.Fatalf("%s=%d, want %d: %#v", key, got, want, response.Usage)
+		}
+	}
+	if _, ok := response.Usage["secret"]; ok {
+		t.Fatal("unknown provider usage field must not be persisted")
+	}
+	if _, ok := response.Usage["prompt_tokens_details"]; ok {
+		t.Fatal("nested provider usage details must not be persisted")
+	}
+}
+
+func TestAdvisorClientStoreUsageOptOut(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{"id":"provider-request-2","choices":[{"finish_reason":"stop","message":{"content":"ok"}}],"usage":{"prompt_tokens":12,"completion_tokens":4,"total_tokens":16}}`))
+	}))
+	defer server.Close()
+
+	client := NewAdvisorClient(AdvisorClientConfig{BaseURL: server.URL, APIKey: "secret", Model: "advisor-model", StoreUsage: false})
+	response, err := client.Chat(context.Background(), usecase.AdvisorRequest{Messages: []usecase.AdvisorChatMessage{{Role: "user", Content: "summary"}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if response.Usage != nil {
+		t.Fatalf("usage must be omitted when StoreUsage is disabled: %#v", response.Usage)
 	}
 }

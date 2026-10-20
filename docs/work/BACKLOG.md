@@ -15,10 +15,142 @@ ai_fields:
 shared_fields:
   - queue_items
   - status
-updated: 2026-10-15
+updated: 2026-10-20
 ---
 
+## Advisor review follow-up specification — 2026-10-20
+
+Priority correction: [review integration fixes](tickets/AI-ADVISOR-REVIEW-FIX-20261020.md)
+close missing snapshot wiring, continuation restoration, grounding/repair,
+transcript bounds and reaper lease revalidation. The 31 prompt cases remain
+a dataset until a real evaluation executes them; schema validation is not
+release acceptance. Keep production rollout separate from this code fix.
+
+Candidate verified: 753 normal/race events each, 6+3 live smoke cases, 380
+native units and signed 1.2.1 (4) artifact. Owner authorized release; migration
+41, API/worker rollout and iPhone install follow. Keep feature flags off.
+
+`AI-ADVISOR-RELIABILITY-20261020`: high-risk, P1/P2, `in_progress`.
+The owner approved the [spec](../superpowers/specs/2026-10-20-advisor-reliability-design.md)
+and [7-task plan](../superpowers/plans/2026-10-20-advisor-reliability.md).
+Local implementation now covers resource/version discovery, migration 000041
+lease recovery and atomic completion, native run observation, compact context
+and optional typed financial grounding. Flags remain off by default until
+migration/provider gates pass. Remaining backlog is integrated synthetic
+31-case coverage, disposable DB/race evidence, live provider quality and device
+acceptance; no production rollout is claimed.
+
+## MCP final review correction wave — 2026-10-20
+
+[MCP-FINAL-REVIEW-20261020](bugs/MCP-FINAL-REVIEW-20261020.md) corrects the
+four Important final-review findings: category-create receipt dependency,
+canonical audit stalls, feedback PNG upload and screenshot redirect mapping.
+Local regression and isolated candidate verification are tracked in that work
+note and the validation matrix. Existing staging/client/provider/device gates
+remain open; this wave does not deploy or alter production data.
+
+## MCP/API parity — 2026-10-20
+
+`MCP-API-PARITY-20261020` has local implementation and automated verification
+through the official Go SDK. The 101 tools preserve canonical same-owner
+JWT/API-key capability, direct writes, CAS/idempotency and existing Assistant
+confirmation; 19 non-tool routes are explicitly classified. Route growth is
+checked through the shared `NewApplicationRouter` production seam and runtime
+SDK schemas. [Design](tickets/MCP-API-PARITY-20261020-DETAIL_DESIGN.md),
+[contract](../ai/mcp-api-parity.md), [validation](VALIDATION_MATRIX.md).
+
+Remaining release gate: owner-authenticated staging JWT/API-key MCP client
+smoke, revoked-key denial, replay/CAS, multipart and async/cancel acceptance.
+No production deployment, schema migration, provider or device acceptance is
+claimed. Keep this release follow-up distinct from Mobile MCP/WDA automation.
+
+## 2026-10-20 optimistic locking closure
+
+Physical-device release recheck (2026-10-20): the Personal Team-signed
+production-API artifact is installed on the paired iPhone 15 Plus as
+`com.mypocket.ios` `1.1.0 (2)`. Signature and portrait-only artifact
+preflight pass; Face ID interaction, physical offline interruption, APNs and
+full touch acceptance remain explicit owner/device gates.
+
+`AI-VERSION-LOCK-20261020` is in review. Migration `000040` and local CAS
+enforcement cover transaction/category versions; AI proposal schemas now require
+the captured version and stale confirmations fail with `409` before mutation.
+Focused tests pass. Production rollout, migrated PostgreSQL evidence and
+physical Mobile MCP/WDA touch acceptance remain separate gates.
+
+Portfolio correction audit also guards the read-only preview with the asset
+version CAS contract; missing/stale previews fail closed locally. Accounting
+semantics and native/production acceptance remain decision and rollout gates.
+
 # Backlog
+
+## AI assistant reliability and knowledge — 2026-10-20
+
+Active parallel lanes: native submit/history/cancel races; category-confirmation
+durable replay; compact app knowledge and account-local date context.
+The provider tool probe now fails on transport/envelope/schema errors
+(`f22bff57`). A new real-orchestrator live evaluation passes three synthetic
+navigation/jar/wallet cases with DeepSeek-V4.1-Flash; broader finance reasoning,
+multi-turn, mutation replay and production/device acceptance remain open.
+See [evaluation evidence](tickets/AI-ADVISOR-REAL-LOOP-EVAL-20261020.md)
+and [revised plan](../superpowers/plans/2026-10-20-ai-assistant-rag-intelligence.md).
+
+## Current execution — 2026-10-19
+
+Continuation reconciliation (23:20 ICT): full backend race, provider/OCR
+contracts, production read-only UAT and the physical Release install all pass.
+The AI write-action audit confirms a bounded owner-scoped proposal surface:
+wallet/jar/budget plus ordinary transaction, wallet-transfer and category
+proposals. Transaction/category update/delete/recategorize proposals carry the
+persisted `expected_version` CAS contract from migration `000040`; all writes
+still require explicit review/confirmation. Payments, external-bank actions,
+category automation rules and portfolio trade corrections remain separately
+contracted or decision-required and are not silently enabled. Physical
+offline/APNs/touch regression remain device gates, not unverified
+implementation claims.
+
+2026-10-20 native follow-up: feedback submission now invalidates any in-flight
+list generation, preventing a stale refresh from erasing a newly submitted
+feedback row. This is a local native race fix; API/schema/production feedback
+state and release publication remain unchanged pending focused/full verification.
+
+Owner requested all feedback/backlog fixes and parallel plan/tests before
+parallel implementation, followed by one integrated verification pass. The
+[active reconciliation design](tickets/FEEDBACK-20261019-DETAIL_DESIGN.md)
+assigns all 48 production feedback records to native, finance, AI or integration
+owners. Work proceeds on `codex/feedback-backlog-20261019`; production feedback
+statuses remain unchanged. Historical rows below are source context, not proof
+of missing implementation. Current savings/budget contracts and the recurring
+worker already exist; inspect them before scheduling duplicate work.
+
+The local repair batch and review follow-ups are verified: native Account
+Add/back/spacing, portfolio price/deletion integrity, OCR recovery/help and
+older AI-action confirmation. Follow-up lanes add replayable advisor SSE,
+portfolio metadata correction and budget-threshold inbox production with
+dedupe. Offline/loading follow-up preserves cached rows during refresh and
+hydrates owner-scoped snapshots; AI tool-call IDs and sync capability caching
+are guarded by regressions. Push-token registration/revocation and audit outbox
+lease/retry are also covered locally. Final gates: backend race 499 passed test/subtest
+results with disposable PostgreSQL/Redis, native 366 unit + 6 selected UI tests,
+portrait-only Release simulator build, vet and base/project guards. Fourteen live
+provider/storage probes are opt-in and were skipped in this gate. See [remaining deliverables](tickets/FEEDBACK-20261019-REMAINING.md)
+for unfinished contracts and deployment/provider/device acceptance; do not
+interpret this checkpoint as all 48 production feedback items resolved.
+
+Release/device recheck (2026-10-19 23:09 +0700): production health remains
+200 on the deployed 78-path image; local candidate route drift is documented.
+Read-only rollout preflight, native project/base guards, diff check and the
+warnings-as-errors Release simulator build pass. A Personal Team build was
+subsequently installed and launched on the paired iPhone; the remaining
+physical gates are owner-entered UAT account login, offline fault injection,
+APNs delivery and full touch-by-touch sweep.
+
+The current-source simulator artifact now has a separate read-only metadata
+gate: `mobile-ios/scripts/release-artifact-preflight.test.sh` covers wrong
+version/API/orientation cases, and the fresh Release `.app` passes the
+preflight for bundle `com.mypocket.ios`, version `1.1.0`, build `2`, production
+HTTPS API URL and portrait-only orientation. This does not close the physical
+signing/install gate or imply a production rollout.
 
 2026-10-13: Owner approved production API-only routing and stopping the web
 service. [OPS-API-ONLY](tickets/OPS-API-ONLY-DETAIL_DESIGN.md) records the
@@ -33,11 +165,14 @@ Security follow-up: rotate production credentials after an unfiltered runtime in
 Owner selected both goal-wallet activity and account-wide surplus and delegated
 remaining budget recurrence/forecast decisions. [Design](../superpowers/specs/2026-10-16-savings-budget-design.md)
 and [plan](../superpowers/plans/2026-10-16-savings-budget-implementation.md)
-are implemented locally: additive migration035, versioned series, positive
-carryover, deterministic forecast and matching transaction pages, native views.
-Real PostgreSQL race suites pass; signed native unit and Release build pass.
-Native API-backed UI evidence is being collected. Production new-route/schema
-rollout, physical candidate install and owner acceptance remain pending.
+are implemented: additive migration035, versioned series, positive carryover,
+deterministic forecast and matching transaction pages, native views. Real
+PostgreSQL race suites pass; signed native unit and Release build pass. The
+production rollout record (migrations035–037, matching API/worker image and
+88/88 route parity) is in [ROLLOUT_READINESS](../operations/ROLLOUT_READINESS.md).
+Physical populated-screen/device acceptance remains pending. See the
+[2026-10-20 audit](tickets/SAVINGS-BUDGET-ROLLOUT-AUDIT-20261020.md); do not
+schedule duplicate feature work from historical “partial” notes.
 
 Owner also requested a physical Money Lover visual survey and subsequent native
 UI reproduction, preserving MyPocket extensions. [Survey](../design/reference-survey/2026-10-16-money-lover-iphone.md)
@@ -758,7 +893,7 @@ per the owner's migration decision; backend/web OAuth remains separate.
 2026-09-23: owner requires AI entry to suggest reviewable drafts, auto-merge clear repeated screenshot rows and prefill inferred/default wallets rather than refusing the batch. [Review-first correction](bugs/AI-ENTRY-REVIEW-FIRST-DETAIL_DESIGN.md): in_review, regression_verified locally. Proposal count is no longer capped in parser/usecase/repository; only provider response/transport envelopes remain. Nine stored OCR attachments yield 30 drafts; held-out overlap/partial-row and 31-draft tests pass. Go tests/race/build pass and local API restarted. Next: owner upload/review UAT with a new request; do not claim all source rows reconciled or production deployed.
 2026-09-23: diagnostics/usage follow-up adds privacy-safe AI stage logs, optional internal model-usage persistence (`AI_STORE_USAGE`, enabled by default), explicit `user_instruction` filtering guidance, and a user-isolation audit. Streaming is deliberately deferred until an async/polling contract is separately designed; current JSON extraction remains bounded at 180s model/210s overall.
 
-2026-09-22 follow-up: detailed [technical instructions](../superpowers/plans/2026-09-22-finance-assistant-technical-guide.md) accompany the V1 plan. The local implementation now has query/history/tools/JWT/API-key JSON/overview/UI and best-effort Redis audit proof; jar-read side effects, deterministic context anchors, submit recovery/drilldown, SSE, durable audit delivery and browser/provider gates remain open.
+2026-09-22 follow-up: detailed [technical instructions](../superpowers/plans/2026-09-22-finance-assistant-technical-guide.md) accompany the V1 plan. The local implementation now has query/history/tools/JWT/API-key JSON/overview/UI, persisted advisor-event replay over authenticated SSE and best-effort Redis audit proof; durable audit delivery and browser/provider gates remain open.
 
 2026-09-22 latest turn: owner requested implementation of a separate comprehensive Finance Assistant tab. [AI-ADVISOR-01](tickets/AI-ADVISOR-01-DETAIL_DESIGN.md) separates current one-shot AI entry from persistent advisory chat, with a local V1 read-only slice and remaining release gates. Feedback → Fix → Changelog is locally wired; its browser/production proof remains separate. Public third-party advisor launch depends on Redis-audited provider/browser/deployment evidence; local user API-key authentication is now implemented, not Feedback's service token.
 

@@ -1,0 +1,8 @@
+node_modules
+dist
+test-results
+playwright-report
+.env*
+docs/node_modules
+docs/build
+docs/.docusaurus

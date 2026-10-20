@@ -12,7 +12,7 @@ import (
 func TestAdvisorToolRegistryContainsOnlyReadTools(t *testing.T) {
 	reader := &financeReaderStub{bundle: entity.FactBundle{Results: []entity.FinanceResult{{QueryKey: "q1"}}}}
 	registry := NewAdvisorToolRegistry(NewFinanceQueryService(reader))
-	for _, name := range []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget"} {
+	for _, name := range []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "list_categories", "get_category", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget"} {
 		if _, ok := registry.Lookup(name); !ok {
 			t.Fatalf("missing read tool %s", name)
 		}
@@ -22,25 +22,39 @@ func TestAdvisorToolRegistryContainsOnlyReadTools(t *testing.T) {
 			t.Fatalf("write/escape tool registered: %s", forbidden)
 		}
 	}
+	for _, name := range []string{"propose_create_transaction", "propose_update_transaction", "propose_delete_transaction", "propose_transfer_wallet", "propose_create_category", "propose_update_category", "propose_recategorize_transaction"} {
+		if _, ok := registry.Lookup(name); !ok {
+			t.Fatalf("missing bounded proposal tool %s", name)
+		}
+	}
 }
 
 func TestAdvisorToolDefinitionsExposeModelParameters(t *testing.T) {
 	registry := NewAdvisorToolRegistry(NewFinanceQueryService(&financeReaderStub{}))
 	expected := map[string][]string{
-		"get_finance_summary":      {"range", "wallet_ids", "category_ids", "include_children"},
-		"search_transactions":      {"range", "wallet_ids", "category_ids", "include_children", "type", "report_scope", "note_contains", "min_amount", "max_amount", "limit", "cursor"},
-		"compare_spending_periods": {"current", "previous", "wallet_ids", "category_ids", "include_children"},
-		"get_wallet_balances":      {"wallet_ids"},
-		"get_budget_progress":      {"budget_ids", "active_on"},
-		"get_goal_progress":        {"wallet_ids"},
-		"get_jar_progress":         {"month", "jar_ids"},
-		"get_transaction":          {"transaction_id"},
-		"propose_create_wallet":    {"name", "type", "opening_balance", "is_in_total", "description", "target_amount", "target_date", "credit_limit", "last_statement_balance", "statement_day", "payment_due_day"},
-		"propose_create_jar":       {"month", "name", "allocation_mode", "allocation_amount", "allocation_percent"},
-		"propose_update_jar":       {"jar_id", "month", "name", "allocation_mode", "allocation_amount", "allocation_percent"},
-		"propose_create_budget":    {"name", "limit_amount", "wallet_id", "category_id", "start_date", "end_date"},
-		"propose_update_budget":    {"budget_id", "name", "limit_amount", "wallet_id", "category_id", "start_date", "end_date"},
-		"get_product_help":         {"query", "max_results"},
+		"get_finance_summary":              {"range", "wallet_ids", "category_ids", "include_children"},
+		"search_transactions":              {"range", "wallet_ids", "category_ids", "include_children", "type", "report_scope", "note_contains", "min_amount", "max_amount", "limit", "cursor"},
+		"compare_spending_periods":         {"current", "previous", "wallet_ids", "category_ids", "include_children"},
+		"get_wallet_balances":              {"wallet_ids"},
+		"get_budget_progress":              {"budget_ids", "active_on"},
+		"get_goal_progress":                {"wallet_ids"},
+		"get_jar_progress":                 {"month", "jar_ids"},
+		"get_transaction":                  {"transaction_id"},
+		"list_categories":                  {"kind", "wallet_ids", "include_archived", "limit", "cursor"},
+		"get_category":                     {"category_id"},
+		"propose_create_wallet":            {"name", "type", "opening_balance", "is_in_total", "description", "target_amount", "target_date", "credit_limit", "last_statement_balance", "statement_day", "payment_due_day"},
+		"propose_create_jar":               {"month", "name", "allocation_mode", "allocation_amount", "allocation_percent"},
+		"propose_update_jar":               {"jar_id", "month", "name", "allocation_mode", "allocation_amount", "allocation_percent"},
+		"propose_create_budget":            {"name", "limit_amount", "wallet_id", "category_id", "start_date", "end_date"},
+		"propose_update_budget":            {"budget_id", "name", "limit_amount", "wallet_id", "category_id", "start_date", "end_date"},
+		"get_product_help":                 {"query", "max_results"},
+		"propose_create_transaction":       {"wallet_id", "category_id", "type", "amount", "occurred_at", "note", "included_in_reports"},
+		"propose_update_transaction":       {"transaction_id", "wallet_id", "category_id", "type", "amount", "occurred_at", "note", "included_in_reports", "expected_version"},
+		"propose_delete_transaction":       {"transaction_id", "expected_version"},
+		"propose_transfer_wallet":          {"source_wallet_id", "destination_wallet_id", "amount", "occurred_at", "note"},
+		"propose_create_category":          {"name", "kind", "parent_id", "wallet_ids", "icon_key"},
+		"propose_update_category":          {"category_id", "name", "kind", "parent_id", "wallet_ids", "icon_key"},
+		"propose_recategorize_transaction": {"transaction_id", "category_id", "expected_version"},
 	}
 	for name, properties := range expected {
 		tool, ok := registry.Lookup(name)
@@ -55,6 +69,59 @@ func TestAdvisorToolDefinitionsExposeModelParameters(t *testing.T) {
 		for _, property := range properties {
 			if _, ok := actual[property]; !ok {
 				t.Errorf("%s schema missing property %s", name, property)
+			}
+		}
+		if name == "propose_update_transaction" || name == "propose_delete_transaction" || name == "propose_recategorize_transaction" || name == "propose_update_category" {
+			required, ok := definition.Parameters["required"].([]string)
+			if !ok {
+				t.Fatalf("%s schema must expose required fields, got %#v", name, definition.Parameters["required"])
+			}
+			found := false
+			for _, field := range required {
+				if field == "expected_version" {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("%s must require expected_version", name)
+			}
+		}
+	}
+}
+
+func TestAdvisorWriteProposalsValidateWithoutMutation(t *testing.T) {
+	registry := NewAdvisorToolRegistry(NewFinanceQueryService(&financeReaderStub{}))
+	cases := []struct {
+		name    string
+		valid   string
+		view    string
+		invalid []string
+	}{
+		{"propose_create_transaction", `{"wallet_id":"11111111-1111-4111-8111-111111111111","category_id":"22222222-2222-4222-8222-222222222222","type":"expense","amount":35000}`, "transaction_creation_proposal", []string{`{"wallet_id":"other","type":"expense","amount":1}`, `{"wallet_id":"11111111-1111-4111-8111-111111111111","type":"adjustment","amount":1}`}},
+		{"propose_update_transaction", `{"transaction_id":"33333333-3333-4333-8333-333333333333","wallet_id":"11111111-1111-4111-8111-111111111111","type":"income","amount":100,"expected_version":1}`, "transaction_update_proposal", []string{`{"transaction_id":"bad","wallet_id":"11111111-1111-4111-8111-111111111111","type":"income","amount":100,"expected_version":1}`, `{"transaction_id":"33333333-3333-4333-8333-333333333333","wallet_id":"11111111-1111-4111-8111-111111111111","type":"income","amount":100}`}},
+		{"propose_delete_transaction", `{"transaction_id":"33333333-3333-4333-8333-333333333333","expected_version":1}`, "transaction_delete_proposal", []string{`{"transaction_id":"bad","expected_version":1}`, `{"transaction_id":"33333333-3333-4333-8333-333333333333"}`}},
+		{"propose_transfer_wallet", `{"source_wallet_id":"11111111-1111-4111-8111-111111111111","destination_wallet_id":"22222222-2222-4222-8222-222222222222","amount":100}`, "wallet_transfer_proposal", []string{`{"source_wallet_id":"11111111-1111-4111-8111-111111111111","destination_wallet_id":"11111111-1111-4111-8111-111111111111","amount":100}`}},
+		{"propose_create_category", `{"name":"Cà phê","kind":"expense","wallet_ids":[]}`, "category_creation_proposal", []string{`{"name":"","kind":"expense"}`, `{"name":"Bad","kind":"unknown"}`}},
+		{"propose_update_category", `{"category_id":"44444444-4444-4444-8444-444444444444","name":"Cà phê","kind":"expense","expected_version":1}`, "category_update_proposal", []string{`{"category_id":"bad","name":"Cà phê","kind":"expense","expected_version":1}`, `{"category_id":"44444444-4444-4444-8444-444444444444","name":"Cà phê","kind":"expense"}`}},
+		{"propose_recategorize_transaction", `{"transaction_id":"33333333-3333-4333-8333-333333333333","category_id":"44444444-4444-4444-8444-444444444444","expected_version":1}`, "transaction_recategorize_proposal", []string{`{"transaction_id":"bad","category_id":"44444444-4444-4444-8444-444444444444","expected_version":1}`, `{"transaction_id":"33333333-3333-4333-8333-333333333333","category_id":"44444444-4444-4444-8444-444444444444"}`}},
+	}
+	for _, tc := range cases {
+		tool, ok := registry.Lookup(tc.name)
+		if !ok {
+			t.Fatalf("missing %s", tc.name)
+		}
+		result, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1"}, json.RawMessage(tc.valid))
+		if err != nil || result.Status != "proposed" || result.ViewKind != tc.view {
+			t.Fatalf("%s valid proposal: result=%+v err=%v", tc.name, result, err)
+		}
+		var envelope map[string]any
+		if json.Unmarshal(result.View, &envelope) != nil || envelope["action_id"] == "" {
+			t.Fatalf("%s proposal has no durable action id", tc.name)
+		}
+		for _, raw := range tc.invalid {
+			if _, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1"}, json.RawMessage(raw)); err == nil {
+				t.Fatalf("%s accepted invalid input %s", tc.name, raw)
 			}
 		}
 	}
@@ -99,6 +166,48 @@ func TestAdvisorGetTransactionRequiresOneID(t *testing.T) {
 	if _, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}, json.RawMessage(`{"transaction_id":""}`)); err == nil {
 		t.Fatal("empty transaction id must be rejected")
 	}
+}
+
+func TestAdvisorCategoryCatalogScopesOwnerAndBoundedFilters(t *testing.T) {
+	reader := &financeReaderStub{bundle: entity.FactBundle{Results: []entity.FinanceResult{{QueryKey: "q1", ViewKind: "category_catalog"}}}}
+	tool, ok := NewAdvisorToolRegistry(NewFinanceQueryService(reader)).Lookup("list_categories")
+	if !ok {
+		t.Fatal("list_categories tool missing")
+	}
+	walletID := "11111111-1111-4111-8111-111111111111"
+	request := map[string]any{"kind": "expense", "wallet_ids": []string{walletID}, "limit": 100, "include_archived": true}
+	if _, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1"}, mustJSON(request)); err != nil {
+		t.Fatal(err)
+	}
+	if reader.owner != "owner-1" || len(reader.queries) != 1 || reader.queries[0].CategoryFilter == nil {
+		t.Fatalf("unexpected category query: owner=%q queries=%+v", reader.owner, reader.queries)
+	}
+	filter := reader.queries[0].CategoryFilter
+	if filter.Kind != CategoryKindExpense || len(filter.WalletIDs) != 1 || filter.Limit != 100 || !filter.IncludeArchived {
+		t.Fatalf("unexpected category filter: %+v", filter)
+	}
+	tooMany := make([]string, 21)
+	for i := range tooMany {
+		tooMany[i] = walletID
+	}
+	if _, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1"}, mustJSON(map[string]any{"wallet_ids": tooMany})); err == nil {
+		t.Fatal("catalog must reject more than 20 wallet filters")
+	}
+}
+
+func TestAdvisorCategoryDetailRequiresUUID(t *testing.T) {
+	tool, _ := NewAdvisorToolRegistry(NewFinanceQueryService(&financeReaderStub{})).Lookup("get_category")
+	if _, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1"}, json.RawMessage("{\"category_id\":\"not-a-uuid\"}")); err == nil {
+		t.Fatal("category detail must reject malformed UUID")
+	}
+}
+
+func mustJSON(value any) json.RawMessage {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return raw
 }
 
 func TestAdvisorWalletProposalValidatesAndDoesNotWrite(t *testing.T) {
@@ -296,7 +405,7 @@ func TestAdvisorProductHelpRejectsBoundsAndUnknownFields(t *testing.T) {
 		`{"query":""}`,
 		`{"query":"x","max_results":0}`,
 		`{"query":"x","max_results":6}`,
-		`{"query":"x","owner_id":"other"}`,
+		"{\"query\":\"x\",\"owner_id\":\"other\"}",
 	} {
 		if _, err := tool.Execute(context.Background(), Principal{OwnerID: "owner-1"}, json.RawMessage(raw)); err == nil {
 			t.Fatalf("invalid product-help input accepted: %s", raw)

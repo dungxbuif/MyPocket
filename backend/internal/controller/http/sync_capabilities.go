@@ -25,6 +25,10 @@ type SyncCapabilitiesResponse struct {
 // @Failure 401 {object} Problem
 // @Router /api/v1/sync/capabilities [get]
 func (h *TransactionHandler) SyncCapabilities(c *gin.Context) {
+	// Capability state is deployment-sensitive: caching a previous enabled
+	// response could authorize an offline drain after the server has rolled the
+	// contract back. Keep this read fresh at every foreground sync attempt.
+	c.Header("Cache-Control", "no-store")
 	response := SyncCapabilitiesResponse{
 		ContractVersion: 1, Operations: []string{}, ReceiptMetadata: "/meta/mutation",
 		IdempotencyKeyRequiredForOffline: true, LegacyUnkeyedOnline: true,

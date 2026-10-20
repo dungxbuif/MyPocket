@@ -1,0 +1,125 @@
+{
+  "artifact": "FEEDBACK-20261019-UAT-HARNESS",
+  "updated": "2026-10-19",
+  "scope": "synthetic-local-acceptance",
+  "production_mutation": false,
+  "cases": [
+    {
+      "id": "62e31193",
+      "area": "ai-response-rendering",
+      "local_evidence": [
+        {"file": "mobile-ios/MyPocketIOSTests/FinanceModelTests.swift", "tests": ["testAssistantMarkdownParserBuildsReadableBlocks"]},
+        {"file": "backend/internal/controller/http/ai_advisor_handler_test.go", "tests": ["TestAdvisorRoutesExposeConversationSurface"]}
+      ],
+      "external_only_gates": ["configured-provider response formatting", "owner-authenticated populated-device UAT"]
+    },
+    {
+      "id": "726943be",
+      "area": "notifications-and-push-token",
+      "local_evidence": [
+        {"file": "mobile-ios/MyPocketIOSTests/APIClientTests.swift", "tests": ["testPushTokenRegistrationUsesOwnerSessionAndNeverReadsTokenBack", "testPushTokenRevokeUsesOwnerSessionAndNoBody"]},
+        {"file": "backend/internal/controller/http/notification_handler_test.go", "tests": ["TestPushTokenHandlersForwardOwnerAndNeverReturnToken"]}
+      ],
+      "external_only_gates": ["signed-device notification permission", "APNs delivery and failure handling"]
+    },
+    {
+      "id": "1db32af3",
+      "area": "month-report-and-notes",
+      "local_evidence": [
+        {"file": "backend/internal/controller/http/savings_budget_integration_test.go", "tests": ["TestSavingsBudgetReportsRealLedgerAndOwnerKey"]},
+        {"file": "mobile-ios/MyPocketIOSTests/APIClientTests.swift", "tests": ["testSavingsAndBudgetReportsPreserveServerScopeAndPagination"]}
+      ],
+      "external_only_gates": ["owner-authenticated timezone boundary UAT", "deployed readback"]
+    },
+    {
+      "id": "31ef1877",
+      "area": "device-login",
+      "local_evidence": [
+        {"file": "mobile-ios/MyPocketIOSTests/DeviceSignInTests.swift", "tests": ["testLogoutRetainsFaceIDEnrollmentAndDeviceLoginCreatesNewSession", "testExpiredSessionStillOffersIndependentDeviceSignIn"]},
+        {"file": "backend/internal/controller/http/auth_device_handler_test.go", "tests": ["TestDeviceAuthHTTPWithPostgresAndOwnerIsolation"]}
+      ],
+      "external_only_gates": ["physical Face ID enrollment/logout", "signed-device Keychain entitlement"]
+    },
+    {
+      "id": "d098ff72",
+      "area": "face-id-controls",
+      "local_evidence": [
+        {"file": "mobile-ios/MyPocketIOSTests/DeviceSignInTests.swift", "tests": ["testCancellingFaceIDPreservesEnrollmentAndDoesNotCallAPI", "testRevokedCredentialIsClearedButNetworkFailureKeepsFaceIDOption"]}
+      ],
+      "external_only_gates": ["physical biometric sensor result", "signed-device Keychain state"]
+    },
+    {
+      "id": "2d0811c0",
+      "area": "feedback-sheet-layout",
+      "local_evidence": [
+        {"file": "mobile-ios/MyPocketIOSTests/DesignSystemTests.swift", "tests": ["testFloatingFeedbackUsesStableLowerRightDockAndNeverReservesObstacleLane"]},
+        {"file": "mobile-ios/MyPocketIOSTests/ReferenceDisplayTests.swift", "tests": ["testFeedbackDockLeavesContentViewportUnchangedAndUsesFooterClearanceOnly"]}
+      ],
+      "external_only_gates": ["owner visual device acceptance at compact and accessibility text sizes"]
+    },
+    {
+      "id": "26fcad87",
+      "area": "portfolio-editor",
+      "local_evidence": [
+        {"file": "backend/internal/controller/http/portfolio_handler_test.go", "tests": ["TestPortfolioAssetMetadataUpdateTrimsAndPreservesUnspecifiedField"]},
+        {"file": "mobile-ios/MyPocketIOSTests/FinanceModelTests.swift", "tests": ["testPortfolioTradeDraftValidatorMirrorsBackendNumericContract"]}
+      ],
+      "external_only_gates": ["populated portfolio workflow on device", "deployed API readback"]
+    },
+    {
+      "id": "06fb8f5b",
+      "area": "portfolio-asset-price-trade",
+      "local_evidence": [
+        {"file": "backend/internal/controller/http/portfolio_handler_test.go", "tests": ["TestPortfolioPriceRequiresExplicitFieldAndPreservesNullClearing"]},
+        {"file": "mobile-ios/MyPocketIOSTests/FinanceModelTests.swift", "tests": ["testPortfolioSummaryDecodesTradesAndNullableValuation"]}
+      ],
+      "external_only_gates": ["owner populated-data acceptance", "deployed API readback"]
+    },
+    {
+      "id": "4ca27075",
+      "area": "monthly-summary",
+      "local_evidence": [
+        {"file": "backend/internal/controller/http/savings_budget_integration_test.go", "tests": ["TestSavingsBudgetReportsRealLedgerAndOwnerKey"]},
+        {"file": "mobile-ios/MyPocketIOSTests/FinancialSnapshotCacheTests.swift", "tests": ["testReportReadsCarryExpectedOwnerID", "testReportsOfflinePolicyRequiresExactReportMonth"]}
+      ],
+      "external_only_gates": ["deployed data and timezone boundary acceptance", "owner visual UAT"]
+    },
+    {
+      "id": "fc8cae65",
+      "area": "variable-value-portfolio",
+      "local_evidence": [
+        {"file": "backend/internal/controller/http/portfolio_handler_test.go", "tests": ["TestPortfolioPriceRequiresExplicitFieldAndPreservesNullClearing"]},
+        {"file": "mobile-ios/MyPocketIOSTests/FinanceModelTests.swift", "tests": ["testPortfolioDetailsFilterAndSortTradesWithLocalizedLabels"]}
+      ],
+      "external_only_gates": ["owner workflow acceptance", "deployed valuation readback"]
+    },
+    {
+      "id": "824dea29",
+      "area": "ai-write-actions",
+      "local_evidence": [
+        {"file": "backend/internal/controller/http/ai_advisor_handler_test.go", "tests": ["TestAdvisorConfirmWalletActionUsesPersistedProposalAndMutationKey", "TestAdvisorConfirmJarActionUsesPersistedProposalAndMutationKey"]},
+        {"file": "mobile-ios/MyPocketIOSTests/APIClientTests.swift", "tests": ["testConfirmAdvisorWalletActionUsesBoundActionEndpoint", "testConfirmAdvisorJarActionUsesBoundActionEndpoint"]}
+      ],
+      "external_only_gates": ["configured-provider action proposal", "owner review/confirmation on device", "deployed matched API/client"]
+    },
+    {
+      "id": "7ddf77f3",
+      "area": "offline-outbox-and-transfer",
+      "local_evidence": [
+        {"file": "backend/internal/controller/http/offline_create_http_test.go", "tests": ["TestOfflineCreateHTTPReplaysBeforeCategoryAndWalletRevalidation", "TestOfflineTransferHTTPConcurrentReplayKeepsExactlyOneExcludedPair"]},
+        {"file": "mobile-ios/MyPocketIOSTests/OutboxStoreTests.swift", "tests": ["testOwnerServerIsolationFIFOAndSameKeyConflict"]},
+        {"file": "mobile-ios/MyPocketIOSTests/APIClientTests.swift", "tests": ["testOfflineSyncCapabilitiesUsesAuthenticatedReadOnlyEndpoint"]}
+      ],
+      "external_only_gates": ["signed-device interruption/recovery", "deployed capability payload", "owner offline acceptance"]
+    },
+    {
+      "id": "019b2e9c",
+      "area": "offline-cache-and-loading",
+      "local_evidence": [
+        {"file": "mobile-ios/MyPocketIOSTests/FinancialSnapshotCacheTests.swift", "tests": ["testWalletsRestoreOwnerScopedSnapshotWhenRefreshIsOffline", "testLoadingPolicyKeepsExistingContentVisibleDuringRefresh", "testEncryptedSnapshotSurvivesRestartWithoutPlaintextOrCrossOwnerServerRead"]},
+        {"file": "mobile-ios/MyPocketIOSTests/APIClientTests.swift", "tests": ["testOwnerBoundRequestRejectsAnotherAccountBeforeTransport"]}
+      ],
+      "external_only_gates": ["physical offline/foreground lifecycle", "owner logout/relogin acceptance"]
+    }
+  ]
+}

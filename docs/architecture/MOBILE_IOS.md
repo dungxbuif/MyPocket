@@ -175,6 +175,11 @@ rows with a generic load error.
 
 Portfolio UI keeps current-price drafts keyed by asset ID, mirrors the nullable
 price contract, and sends the selected trade date through the existing API.
+Trade history rows use the shared overflow-menu base for immutable correction
+actions. Replace/void drafts require a reason, call the read-only preview first,
+render before/after position deltas, and only then commit with a stable
+idempotency key. The original trade remains audit history; this UI never issues
+direct edit/delete requests.
 
 Recurring schedules exclude credit wallets and filter category choices by the
 selected expense/income type. Changing the schedule type clears an incompatible

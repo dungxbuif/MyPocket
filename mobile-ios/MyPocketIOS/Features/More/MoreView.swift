@@ -225,6 +225,7 @@ struct MoreView: View {
 }
 
 struct SecondaryScreen: View {
+    @State private var interactiveBackBlocked = false
     let destination: MoreDestination
     let api: FinanceAPI
     @ObservedObject var auth: AuthViewModel
@@ -241,6 +242,8 @@ struct SecondaryScreen: View {
             case .wallets:
                 WalletsView(
                     api: api,
+                    ownerID: assistantOwnerID,
+                    snapshotCache: auth.financialCache,
                     initialWalletID: initialWalletID,
                     onSelectWallet: { onOpenTransactions($0) },
                     onBack: onBack,
@@ -269,6 +272,8 @@ struct SecondaryScreen: View {
         // Secondary routes own the Stitch/web reference back capsule. Do not
         // render a second native navigation bar back button above it.
         .navigationBarBackButtonHidden(true)
+        .onPreferenceChange(MPInteractiveBackBlockedKey.self) { interactiveBackBlocked = $0 }
+        .background { MPInteractiveBack(isBlocked: interactiveBackBlocked) }
     }
 
     private var assistantOwnerID: String {

@@ -1,0 +1,11 @@
+---
+title: Export và vòng đời tài khoản
+---
+
+# Export, import và thao tác phá hủy
+
+Export/import chạy bằng job user-scoped. Tạo export với `Idempotency-Key`, poll `/exports/{id}`, rồi lấy URL tải ngắn hạn từ `/exports/{id}/download`. Import luôn review-first: tạo job, kiểm tra lỗi/dữ liệu, sau đó confirm bằng version hiện tại.
+
+Reset/delete là ngoại lệ browser-only: API key không được phép thực hiện. Phiên cookie phải recent-authenticated, lấy preview có token ký, nhập đúng xác nhận, rồi gửi `Idempotency-Key`. Theo dõi `/account/jobs/{id}` đến terminal status.
+
+Không tự động confirm import hoặc reset/delete trong agent. Trước destructive action, xuất dữ liệu và kiểm tra file tải được; backup vận hành của production vẫn là quy trình riêng.

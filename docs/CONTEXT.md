@@ -19,8 +19,152 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-10-16
+updated: 2026-10-20
 ---
+
+## Advisor reliability specification — 2026-10-20
+
+Review closure is verified locally on `codex/advisor-review-fixes-20261020`:
+[ticket](work/tickets/AI-ADVISOR-REVIEW-FIX-20261020.md). Earlier completion
+claims did not prove snapshot/context/grounding integration. Production-loop
+regressions and real PostgreSQL reaper/context tests now cover those gaps;
+the 31-case schema check is not a model-quality result. Production flags and
+physical-device acceptance remain separate.
+
+Release 1.2.1 authorized: full normal/race each 753 pass events on disposable
+PostgreSQL; live provider smoke 6+3 cases; native units 380/380; signed iPhone
+Release `1.2.1 (4)` preflight passes. Deployment/install are recorded only after
+execution in the release note.
+
+Owner approved implementation of the [Finance Assistant reliability spec](superpowers/specs/2026-10-20-advisor-reliability-design.md)
+and [plan](superpowers/plans/2026-10-20-advisor-reliability.md). The local
+candidate now contains category resource/version snapshots, migration 000041
+lease fencing and atomic completion, an independent reaper, feature-flagged
+service integration, native reconnect observation, bounded context state and
+optional typed `finish_answer` evidence rendering. Flags default off until the
+schema/provider gates are verified; no production rollout is implied. No vector
+RAG infrastructure or API-key scope policy was added. Remaining release work is
+the 31-case integrated matrix, disposable DB/race evidence, live provider and
+physical-device acceptance.
+
+## MCP final review corrections — 2026-10-20
+
+The final review correction wave restores optional PNG feedback uploads,
+successful screenshot ResourceLinks, bounded MCP advisor/feedback audit delivery
+and durable category-create replay using the existing mutation ledger. Direct
+REST auditing remains synchronous and no schema migration is added.
+[Correction work note](work/bugs/MCP-FINAL-REVIEW-20261020.md) records regression,
+database and candidate-isolation verification. Staging/client/provider/device
+acceptance remains separate from this local candidate.
+
+## MCP/API capability parity — 2026-10-20
+
+The local candidate exposes authenticated `/api/v1/mcp` using official Go SDK
+v1.8.0. `NewApplicationRouter` is now the shared production/test route seam;
+the independent inventory, canonical routes, OpenAPI and actual SDK discovery
+agree on 101 named authenticated tools and 19 explicit non-tool exclusions.
+JWT and persisted API keys retain identical same-owner authority with no new
+scopes or MCP-only confirmation. Ordinary writes use canonical handlers;
+Assistant prepared actions retain their existing confirmation provenance.
+Async handles, finite replay, bounded multipart/resource links and redacted
+bounded audit are documented in the [integration contract](ai/mcp-api-parity.md)
+and [ADR-025](decisions/ADR-025-mcp-api-parity.md).
+
+Aggregate local evidence and staging residuals are recorded in the
+[validation matrix](work/VALIDATION_MATRIX.md) and
+[design](work/tickets/MCP-API-PARITY-20261020-DETAIL_DESIGN.md). No deployment,
+production database access, provider calls or device acceptance is implied.
+Next: owner-authenticated staging JWT/API-key initialize/list/read/write,
+revoked-key, replay/CAS, multipart and async/cancel acceptance before rollout.
+
+## Advisor product knowledge/context — 2026-10-20
+
+The Finance Assistant handbook now matches the maintained native navigation and
+all supported proposal boundaries (catalog `get_product_help` v1.3, embedded
+handbook v1.4). The system message injects the authenticated account's local
+calendar date through a deterministic helper; missing/invalid timezones never
+produce a guessed date. Context remains bounded to the latest 12 visible text
+messages and does not retain hidden card/financial memory. No provider, API,
+database schema or vector/RAG infrastructure changed. Design and evidence:
+[AI-ADVISOR-CONTEXT-KNOWLEDGE-20261020](work/tickets/AI-ADVISOR-CONTEXT-KNOWLEDGE-20261020-DETAIL_DESIGN.md).
+
+## Feedback submit/refresh race — 2026-10-20
+
+AI follow-up: owner approved parallel assistant improvements, preserving the
+30-minute idle reset and maintained iOS surface. App knowledge/context and
+chat/action correctness are the immediate priorities; new vector retrieval
+infrastructure is deferred pending measured need. Local model
+`DeepSeek-V4.1-Flash` passed extraction/tool smoke and three real-orchestrator
+synthetic cases (navigation, jar proposal, wallet proposal). No production
+model rollout or full financial-quality acceptance is implied.
+[Evidence](work/tickets/AI-ADVISOR-REAL-LOOP-EVAL-20261020.md).
+Native races and durable category action replay remain active parallel work.
+
+`FeedbackViewModel.submit` now participates in the same generation invalidation
+contract as resolution changes. A stale feedback GET started before a new POST
+can no longer erase the newly submitted row from the native inbox. The
+regression uses a held stale list response and a POST-shaped fixture; no API,
+database, production feedback status or release state changed. Focused and full
+native verification remain required before owner/device acceptance.
+
+## Optimistic locking continuation — 2026-10-20
+
+Transaction/category row versions are now implemented locally in migration
+`000040`. AI update/delete/recategorize and category-update proposals require a
+positive `expected_version`; persisted cards missing it are rejected before
+dispatch, and stale CAS confirmation returns `409` without a write. Focused Go
+HTTP/usecase/repository/migration tests pass. PostgreSQL-backed assertions run
+only when `TEST_DATABASE_URL` points to a migrated disposable database;
+Mobile MCP/WDA touch proof remains unavailable and is not claimed.
+
+Portfolio correction audit on 2026-10-20 now applies the same asset-version
+guard to read-only previews: missing or stale previews fail closed before a
+projection is returned. The append-only revision model and accounting decision
+boundary are unchanged; local focused and full backend tests pass, while
+production migration/native correction acceptance remain open.
+
+## Active feedback/backlog batch — 2026-10-19
+
+Owner authorized parallel planning and regression-test authoring, then parallel
+implementation and combined verification. Current branch is
+`codex/feedback-backlog-20261019`, based on `f10cff45`. Three workers own native,
+finance and AI separately; the coordinator owns shared docs/integration. The
+[batch design](work/tickets/FEEDBACK-20261019-DETAIL_DESIGN.md) maps all 48 fetched
+production feedback records. Local fixes and independent review follow-ups are
+implemented: Account Add/Back/shared row spacing, portfolio price/delete
+integrity, OCR recovery and persisted evidence, jar help and older-action
+confirmation. Follow-up lanes add authenticated advisor-event SSE replay,
+portfolio metadata correction and budget-threshold inbox production with
+dedupe. Follow-up offline/loading work hydrates owner/server-scoped cache,
+preserves visible data during refresh and prevents auth/payload errors from
+being masked. AI tool-call IDs are validated before finance tools run, and sync
+capabilities are explicitly non-cacheable. Push-token lifecycle and durable
+audit outbox migrations are covered locally; final backend race gate passes 499
+test/subtest results with real disposable PostgreSQL/Redis; native passes 361
+unit tests and a fresh portrait-only Release simulator build. Fourteen live
+provider/storage probes remain opt-in and were skipped in this gate.
+[Remaining work](work/tickets/FEEDBACK-20261019-REMAINING.md) distinguishes real
+feature contracts from rollout/device/provider acceptance. This is not closure
+of all backlog items. Production data and feedback state remain unchanged.
+
+Release/device recheck at 2026-10-19 23:09 +0700 is recorded in
+[rollout readiness](operations/ROLLOUT_READINESS.md): production health is 200,
+the API/worker run `release-20261019-uat2`, and strict route parity is 88/88.
+The connected iPhone has a newly installed Personal Team build `1.1.0 (2)` and
+has launched successfully after Face ID unlock. Owner-entered UAT login,
+offline fault injection, APNs delivery and a full touch sweep remain separate
+physical acceptance gates.
+
+The native build-selection audit also confirms that Release embeds the
+production HTTPS API URL while Debug intentionally targets the local loopback
+API. Physical UAT must therefore run the Release configuration; a default
+Xcode Debug run can show only cached data and is not production-connected.
+
+The fresh Release simulator `.app` also passes the read-only artifact
+preflight: resolved bundle `com.mypocket.ios`, version `1.1.0`, build `2`,
+production HTTPS API URL and portrait-only orientation. This validates package
+metadata; the Personal Team physical install is also recorded in the iOS UAT
+runbook, while distribution signing/APNs remain open.
 
 ## Native parity checkpoint — 2026-10-16
 

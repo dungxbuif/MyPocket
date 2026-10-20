@@ -832,6 +832,7 @@ struct CategoriesView: View {
         }
         .background(MPColor.canvas.ignoresSafeArea())
         .accessibilityIdentifier("category-editor-screen")
+        .mpInteractiveBackBlocked()
     }
 
     private var categoryTreeItems: [MPCategoryTreeItem] {
@@ -1011,7 +1012,11 @@ struct JarsView: View {
             VStack(alignment: .leading, spacing: 16) {
                 MPScreenHeader(title: "Hũ chi tiêu", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
                 MPOptionSelector(title: "Tháng", options: MPFormat.monthOptions(around: month, timeZone: TimeZone(identifier: accountTimezone) ?? .current).map { MPSelectionOption(id: $0, label: MPFormat.monthLabel($0)) }, selectionID: $month)
-                if loading { MPLoadingView(label: "Đang tải hũ tháng này...") }
+                if MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: loading, hasContent: summary != nil) {
+                    MPLoadingView(label: "Đang tải hũ tháng này...")
+                } else if MPLoadingPresentationPolicy.showsInlineProgress(isLoading: loading, hasContent: summary != nil) {
+                    MPInlineRefreshProgress(label: "Đang cập nhật hũ tháng này...")
+                }
                 if let summary {
                     MPSurfaceCard(style: .reference) {
                         MPMetricGrid(items: [
@@ -1278,6 +1283,7 @@ struct MonthsView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
+        .mpInteractiveBackBlocked(noteIsDirty || loading)
         .mpConfirmDialog(isPresented: Binding(get: { pendingMonth != nil }, set: { if !$0 { pendingMonth = nil } }), title: "Bỏ ghi chú đang sửa?", message: "Nội dung chưa lưu sẽ bị bỏ khi chuyển tháng.", confirmTitle: "Chuyển tháng") {
                 guard let next = pendingMonth else { return }
                 pendingMonth = nil
@@ -1816,6 +1822,19 @@ struct PortfolioView: View {
     @State private var tradeEditorPresented = false
     @State private var priceTarget: PortfolioAssetModel?
     @State private var deleteTarget: PortfolioAssetModel?
+    @State private var correctionTarget: PortfolioTradeModel?
+    @State private var correctionOperation = "replace"
+    @State private var correctionReason = ""
+    @State private var correctionSide = "buy"
+    @State private var correctionQuantity = ""
+    @State private var correctionPrice = ""
+    @State private var correctionFee = ""
+    @State private var correctionDate = Date()
+    @State private var correctionNote = ""
+    @State private var correctionPreview: PortfolioTradeCorrectionResultModel?
+    @State private var correctionSaving = false
+    @State private var correctionError: String?
+    @State private var correctionIdempotencyKey: String?
     @State private var saving = false
     @State private var accountTimezone = TimeZone.current.identifier
 
@@ -1898,6 +1917,50 @@ struct PortfolioView: View {
                     .accessibilityIdentifier("portfolio-price-save")
             }
         }
+        .mpFullScreenCover(
+            isPresented: Binding(
+                get: { correctionTarget != nil },
+                set: { if !$0 && !correctionSaving { cancelCorrection() } }
+            )
+        ) {
+            MPEditorScaffold(
+                title: correctionPreview == nil ? PortfolioCorrectionPresentation.operationLabel(correctionOperation) : PortfolioCorrectionPresentation.previewTitle,
+                isBusy: correctionSaving,
+                onCancel: { cancelCorrection() }
+            ) {
+                if let target = correctionTarget {
+                    MPText("Giao dịch gốc: \(Self.tradeSideLabel(target.side)) · \(target.quantity)", style: .emphasis)
+                    MPText(Self.tradeSubtitle(target, timeZone: TimeZone(identifier: accountTimezone) ?? .current, masked: masked), style: .secondary)
+                        .accessibilityIdentifier("portfolio-correction-source")
+                }
+                if let preview = correctionPreview {
+                    correctionPreviewCard(preview)
+                } else {
+                    if correctionOperation == "replace" {
+                        MPWalletSelector(title: "Loại", options: ["buy", "sell"], selection: $correctionSide)
+                        MPNumberField(title: "Khối lượng", text: $correctionQuantity, kind: .decimal, placeholder: "1,5")
+                        MPAmountField(title: "Giá đơn vị", text: $correctionPrice)
+                        MPAmountField(title: "Phí", text: $correctionFee)
+                        MPDateField(title: "Ngày", date: $correctionDate, timeZone: accountTimezone)
+                        MPTextField(title: "Ghi chú", text: $correctionNote, placeholder: "Không bắt buộc", accessibilityIdentifier: "portfolio-correction-note")
+                    }
+                    MPTextEditor(title: PortfolioCorrectionPresentation.reasonLabel, text: $correctionReason, placeholder: "Nêu lý do để đối soát")
+                        .accessibilityIdentifier("portfolio-correction-reason")
+                }
+                if let correctionError { MPStatusMessage(text: correctionError, tone: .danger) }
+            } footer: {
+                if correctionPreview != nil {
+                    HStack(spacing: 8) {
+                        MPButton("Quay lại", style: .secondary, isDisabled: correctionSaving, fullWidth: false) { correctionPreview = nil }
+                        MPButton(PortfolioCorrectionPresentation.confirmAction, isLoading: correctionSaving, fullWidth: true) { Task { await commitCorrection() } }
+                            .accessibilityIdentifier(PortfolioCorrectionPresentation.confirmAccessibilityID)
+                    }
+                } else {
+                    MPButton(PortfolioCorrectionPresentation.previewAction, isLoading: correctionSaving, isDisabled: !correctionDraftIsValid) { Task { await previewCorrection() } }
+                        .accessibilityIdentifier(PortfolioCorrectionPresentation.previewAccessibilityID)
+                }
+            }
+        }
         .mpConfirmDialog(
             isPresented: Binding(get: { deleteTarget != nil }, set: { if !$0 { deleteTarget = nil } }),
             title: "Xóa tài sản?",
@@ -1957,12 +2020,22 @@ struct PortfolioView: View {
                     MPText("Chưa có giao dịch mua bán.", style: .secondary)
                 } else {
                     ForEach(assetTrades) { trade in
-                        MPTransactionRow(
-                            title: "\(Self.tradeSideLabel(trade.side)) · \(trade.quantity)",
-                            subtitle: Self.tradeSubtitle(trade, timeZone: TimeZone(identifier: accountTimezone) ?? .current, masked: masked),
-                            amount: MPFormat.money(trade.unitPrice, masked: masked),
-                            isIncome: trade.side == "sell"
-                        )
+                        HStack(spacing: 4) {
+                            MPTransactionRow(
+                                title: "\(Self.tradeSideLabel(trade.side)) · \(trade.quantity)",
+                                subtitle: Self.tradeSubtitle(trade, timeZone: TimeZone(identifier: accountTimezone) ?? .current, masked: masked),
+                                amount: MPFormat.money(trade.unitPrice, masked: masked),
+                                isIncome: trade.side == "sell"
+                            )
+                            MPOverflowMenu(
+                                label: "Tác vụ giao dịch \(trade.quantity)",
+                                actions: [
+                                    MPOverflowAction(title: PortfolioCorrectionPresentation.replaceAction) { beginCorrection(trade, operation: "replace") },
+                                    MPOverflowAction(title: PortfolioCorrectionPresentation.voidAction) { beginCorrection(trade, operation: "void") }
+                                ]
+                            )
+                            .accessibilityIdentifier(PortfolioCorrectionPresentation.menuAccessibilityID(tradeID: trade.id))
+                        }
                     }
                 }
             }
@@ -1997,6 +2070,126 @@ struct PortfolioView: View {
             return "Giá \(MPFormat.money(trade.unitPrice, masked: masked)) · Phí \(fee) · \(date) · \(note)"
         }
         return "Giá \(MPFormat.money(trade.unitPrice, masked: masked)) · Phí \(fee) · \(date)"
+    }
+
+    @ViewBuilder
+    private func correctionPreviewCard(_ preview: PortfolioTradeCorrectionResultModel) -> some View {
+        MPSurfaceCard(style: .reference) {
+            VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
+                MPText(PortfolioCorrectionPresentation.confirmationMessage, style: .secondary)
+                MPMetricRow(title: "Khối lượng", value: "\(preview.before.quantity) → \(preview.after.quantity)")
+                MPMetricRow(title: "Giá vốn", value: "\(MPFormat.money(preview.before.costBasis, masked: masked)) → \(MPFormat.money(preview.after.costBasis, masked: masked))")
+                MPMetricRow(title: "Đã thực hiện", value: "\(MPFormat.signedMoney(preview.before.realizedPnL, masked: masked)) → \(MPFormat.signedMoney(preview.after.realizedPnL, masked: masked))")
+                MPMetricRow(title: "Phiên bản danh mục", value: "v\(preview.assetVersion)")
+                MPText("Ảnh hưởng \(preview.affectedTradeIDs.count) giao dịch trong lịch sử.", style: .secondary)
+            }
+        }
+        .accessibilityIdentifier("portfolio-correction-preview-card")
+    }
+
+    private var correctionDraftIsValid: Bool {
+        guard correctionTarget != nil,
+              summary?.assets.contains(where: { $0.id == correctionTarget?.assetID && ($0.version ?? 0) > 0 }) == true,
+              !correctionReason.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+        guard correctionOperation == "replace" else { return true }
+        guard let normalizedQuantity = MPNumberInputKind.decimal.normalized(correctionQuantity) else { return false }
+        return PortfolioTradeDraftValidator.isValid(side: correctionSide, quantity: normalizedQuantity, unitPrice: correctionPrice, fee: correctionFee)
+    }
+
+    private func beginCorrection(_ trade: PortfolioTradeModel, operation: String) {
+        correctionTarget = trade
+        correctionOperation = operation == "void" ? "void" : "replace"
+        correctionReason = ""
+        correctionPreview = nil
+        correctionError = nil
+        correctionIdempotencyKey = nil
+        correctionSide = trade.side
+        correctionQuantity = trade.quantity
+        correctionPrice = String(trade.unitPrice)
+        correctionFee = trade.fee == 0 ? "" : String(trade.fee)
+        correctionDate = MPFormat.parseInstant(trade.occurredAt) ?? Date()
+        correctionNote = trade.note ?? ""
+    }
+
+    private func cancelCorrection() {
+        guard !correctionSaving else { return }
+        resetCorrection()
+    }
+
+    private func resetCorrection() {
+        correctionTarget = nil
+        correctionPreview = nil
+        correctionError = nil
+        correctionIdempotencyKey = nil
+    }
+
+    private func correctionInput() -> PortfolioTradeCorrectionInputModel? {
+        guard let target = correctionTarget,
+              let asset = summary?.assets.first(where: { $0.id == target.assetID }),
+              let version = asset.version, version > 0 else {
+            correctionError = "Danh mục chưa có phiên bản để kiểm tra xung đột. Hãy tải lại rồi thử lại."
+            return nil
+        }
+        let replacement: PortfolioTradeInputModel?
+        if correctionOperation == "replace" {
+            guard let quantity = MPNumberInputKind.decimal.normalized(correctionQuantity),
+                  let price = PortfolioTradeDraftValidator.nonNegativeInteger(correctionPrice),
+                  let fee = PortfolioTradeDraftValidator.nonNegativeInteger(correctionFee, allowingEmpty: true),
+                  PortfolioTradeDraftValidator.isValid(side: correctionSide, quantity: quantity, unitPrice: correctionPrice, fee: correctionFee) else {
+                correctionError = "Nhập thông tin thay thế hợp lệ. Khối lượng tối đa 8 chữ số thập phân."
+                return nil
+            }
+            replacement = PortfolioTradeInputModel(
+                side: correctionSide,
+                quantity: quantity,
+                unitPrice: price,
+                fee: fee,
+                occurredAt: Self.accountLocalNoonTimestamp(correctionDate, timezone: accountTimezone),
+                note: correctionNote.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : correctionNote.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+        } else {
+            replacement = nil
+        }
+        let reason = correctionReason.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !reason.isEmpty else {
+            correctionError = "Hãy nhập lý do sửa để lưu dấu vết đối soát."
+            return nil
+        }
+        return PortfolioTradeCorrectionInputModel(
+            sourceTradeID: target.id,
+            expectedAssetVersion: version,
+            operation: correctionOperation,
+            reason: reason,
+            replacement: replacement
+        )
+    }
+
+    private func previewCorrection() async {
+        guard !correctionSaving, let target = correctionTarget, let input = correctionInput() else { return }
+        correctionSaving = true
+        correctionError = nil
+        defer { correctionSaving = false }
+        do {
+            correctionPreview = try await api.previewPortfolioTradeCorrection(assetID: target.assetID, input: input)
+        } catch {
+            correctionError = "Không thể tạo bản xem trước. Dữ liệu danh mục có thể đã thay đổi; hãy tải lại."
+        }
+    }
+
+    private func commitCorrection() async {
+        guard !correctionSaving, let target = correctionTarget, correctionPreview != nil, let input = correctionInput() else { return }
+        correctionSaving = true
+        correctionError = nil
+        let key = correctionIdempotencyKey ?? UUID().uuidString
+        correctionIdempotencyKey = key
+        defer { correctionSaving = false }
+        do {
+            _ = try await api.correctPortfolioTrade(assetID: target.assetID, input: input, idempotencyKey: key)
+            resetCorrection()
+            await load()
+        } catch {
+            correctionError = "Không thể xác nhận sửa giao dịch. Hãy tải lại bản xem trước trước khi thử lại."
+        }
     }
 
     private func load() async {

@@ -52,7 +52,7 @@ func (r *AIEntryPostgresRepository) UpdateAttachmentOCR(ctx context.Context, own
 		for i, attachment := range attachments {
 			text := ""
 			status := "failed"
-			if i < len(texts) {
+			if i < len(texts) && strings.TrimSpace(texts[i]) != "" {
 				text = texts[i]
 				status = "completed"
 			}

@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 	"unicode/utf8"
 )
@@ -25,7 +26,11 @@ var (
 	ErrAIStorage     = errors.New("không lưu được chứng từ; OCR và AI chưa được gọi, không phát sinh lượt xử lý")
 )
 
-const aiProviderTimeout = 210 * time.Second
+const (
+	aiProviderTimeout          = 210 * time.Second
+	aiAttachmentStorageTimeout = 45 * time.Second
+	aiAttachmentStorageWorkers = 4
+)
 
 type AIEntryExtractor interface {
 	Configured() bool
@@ -105,7 +110,12 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 			s.fail(owner, id, token, "")
 			return nil, ErrAIUnavailable
 		}
-		prepared, attachments, err := s.storeForOCR(ctx, owner, id, in.Images)
+		// Object storage is a separate network hop from OCR/model execution.
+		// Bound it explicitly so a stalled S3-compatible endpoint cannot consume
+		// the entire AI request budget before the provider is even called.
+		storageCtx, storageCancel := context.WithTimeout(ctx, aiAttachmentStorageTimeout)
+		prepared, attachments, err := s.storeForOCR(storageCtx, owner, id, in.Images)
+		storageCancel()
 		if err != nil {
 			slog.Warn("AI entry storage failed", "process_id", id, "stage", "storage", "code", "attachment_put_failed", "file_count", len(in.Images))
 			s.failWith(owner, id, token, ErrAIStorage.Error(), "storage_error", "")
@@ -317,7 +327,8 @@ func mergeExactAIDrafts(drafts []entity.AIExtractDraft) []entity.AIExtractDraft 
 // database's attachment ordering. Attachments are persisted in ID order for
 // deterministic repository updates, while the model must see the user's
 // original upload order so date/account context and overlap boundaries remain
-// meaningful.
+// meaningful. Empty slots preserve ID alignment for failed/unprocessed files;
+// the repository must not treat an empty slot as successfully recognized text.
 func alignOCRTexts(images []entity.AIImage, attachments []entity.AIEntryAttachment, texts []string) []string {
 	if len(attachments) == 0 {
 		return append([]string(nil), texts...)
@@ -336,6 +347,9 @@ func alignOCRTexts(images []entity.AIImage, attachments []entity.AIEntryAttachme
 }
 
 func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string, files []entity.AIImage) ([]entity.AIImage, []entity.AIEntryAttachment, error) {
+	if len(files) == 0 {
+		return []entity.AIImage{}, []entity.AIEntryAttachment{}, nil
+	}
 	prepared := make([]entity.AIImage, 0, len(files))
 	attachments := make([]entity.AIEntryAttachment, 0, len(files))
 	keys := make([]string, 0, len(files))
@@ -344,7 +358,8 @@ func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string,
 			_ = s.Storage.Delete(context.WithoutCancel(ctx), key)
 		}
 	}
-	for _, file := range files {
+	dataByIndex := make([][]byte, len(files))
+	for index, file := range files {
 		data, err := base64.StdEncoding.Strict().DecodeString(file.Base64)
 		if err != nil {
 			rollback()
@@ -358,10 +373,7 @@ func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string,
 			return nil, nil, err
 		}
 		keys = append(keys, key)
-		if err = s.Storage.Put(ctx, key, file.MIMEType, data); err != nil {
-			rollback()
-			return nil, nil, err
-		}
+		dataByIndex[index] = data
 		digest := sha256.Sum256(data)
 		attachments = append(attachments, entity.AIEntryAttachment{ID: id, OwnerID: owner, ProcessID: process, ObjectKey: key, Filename: filepath.Base(file.Name), MIMEType: file.MIMEType, SizeBytes: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), OCRStatus: "pending", DeleteAfter: time.Now().Add(24 * time.Hour)})
 		// The original remains in MyPocket's private storage for evidence/download.
@@ -369,6 +381,54 @@ func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string,
 		// app-owned s3:// source, so pass the already validated bytes to the OCR
 		// adapter. The adapter's output boundary still sends only OCR text to the LLM.
 		prepared = append(prepared, entity.AIImage{Name: file.Name, MIMEType: file.MIMEType, Base64: file.Base64, AttachmentID: id})
+	}
+	// Upload independently sized attachments with bounded concurrency. The
+	// request still has one deadline and rollback remains all-or-nothing, but a
+	// twenty-file batch no longer spends its entire budget on serial PUTs.
+	uploadCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	workerCount := aiAttachmentStorageWorkers
+	if workerCount > len(files) {
+		workerCount = len(files)
+	}
+	jobs := make(chan int)
+	var uploadWG sync.WaitGroup
+	var uploadMu sync.Mutex
+	var uploadErr error
+	worker := func() {
+		defer uploadWG.Done()
+		for index := range jobs {
+			if err := s.Storage.Put(uploadCtx, keys[index], files[index].MIMEType, dataByIndex[index]); err != nil {
+				uploadMu.Lock()
+				if uploadErr == nil {
+					uploadErr = err
+					cancel()
+				}
+				uploadMu.Unlock()
+			}
+		}
+	}
+	uploadWG.Add(workerCount)
+	for index := 0; index < workerCount; index++ {
+		go worker()
+	}
+	go func() {
+		defer close(jobs)
+		for index := range files {
+			select {
+			case jobs <- index:
+			case <-uploadCtx.Done():
+				return
+			}
+		}
+	}()
+	uploadWG.Wait()
+	uploadMu.Lock()
+	err := uploadErr
+	uploadMu.Unlock()
+	if err != nil {
+		rollback()
+		return nil, nil, err
 	}
 	// Keep model input in request order. The repository receives attachments in
 	// deterministic ID order, and alignOCRTexts maps OCR results back to that

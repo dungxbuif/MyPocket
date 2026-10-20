@@ -7,6 +7,53 @@ import UniformTypeIdentifiers
 
 @MainActor
 final class DesignSystemTests: XCTestCase {
+    func testApplicationSupportsPortraitOnly() {
+        let delegate = PortraitOnlyApplicationDelegate()
+        XCTAssertEqual(
+            delegate.application(UIApplication.shared, supportedInterfaceOrientationsFor: nil),
+            .portrait
+        )
+    }
+
+    func testOverlappingBackBridgesRestoreOriginalDelegate() throws {
+        let original = NSObjectGestureDelegate()
+        let first = MPInteractiveBack.Controller()
+        let second = MPInteractiveBack.Controller()
+        let navigation = UINavigationController()
+        navigation.setViewControllers([UIViewController(), first, second], animated: false)
+        navigation.loadViewIfNeeded()
+        let gesture = try XCTUnwrap(navigation.interactivePopGestureRecognizer)
+        gesture.delegate = original
+        first.install()
+        second.install()
+        first.restore()
+        XCTAssertTrue(gesture.delegate === second, "An older route cannot detach the current route's gesture owner.")
+        second.restore()
+        XCTAssertTrue(gesture.delegate === original, "Route replacement must restore UIKit's original delegate, not a detached bridge.")
+        first.install()
+        XCTAssertTrue(gesture.delegate === first, "Returning to a prior route reattaches that route only.")
+        first.restore()
+        second.restore()
+        XCTAssertTrue(gesture.delegate === original, "Returning to root and repeated cleanup preserve the original delegate.")
+    }
+
+    private final class NSObjectGestureDelegate: NSObject, UIGestureRecognizerDelegate {}
+
+    func testInteractiveBackRefusesRootEditorAndTransition() {
+        XCTAssertTrue(MPInteractiveBackPolicy.canBegin(depth: 2, isBlocked: false, isTransitioning: false))
+        XCTAssertFalse(MPInteractiveBackPolicy.canBegin(depth: 1, isBlocked: false, isTransitioning: false))
+        XCTAssertFalse(MPInteractiveBackPolicy.canBegin(depth: 2, isBlocked: true, isTransitioning: false))
+        XCTAssertFalse(MPInteractiveBackPolicy.canBegin(depth: 2, isBlocked: false, isTransitioning: true))
+    }
+    func testTransactionRowsHaveBreathingRoomAndExpandForAccessibility() {
+        let row = MPTransactionRow(title: "Ăn uống", subtitle: "", amount: "−50.000 ₫")
+        let compact = UIHostingController(rootView: row.environment(\.dynamicTypeSize, .large))
+            .sizeThatFits(in: CGSize(width: 343, height: 1000)).height
+        XCTAssertGreaterThanOrEqual(compact, 56, "Rows need 6pt separation above and below their 44pt content.")
+        let expanded = UIHostingController(rootView: row.environment(\.dynamicTypeSize, .accessibility3))
+            .sizeThatFits(in: CGSize(width: 343, height: 1000)).height
+        XCTAssertGreaterThan(expanded, compact)
+    }
     func testFloatingFeedbackUsesStableLowerRightDockAndNeverReservesObstacleLane() throws {
         let viewport = CGRect(x: 0, y: 0, width: 375, height: 611)
         let ordinary = try XCTUnwrap(MPFeedbackBubbleLayout.frame(in: viewport, clearance: 60, obstacles: []))
@@ -241,7 +288,7 @@ final class DesignSystemTests: XCTestCase {
         let row = MPTransactionRow(title: "Ăn uống", subtitle: "Cà phê", amount: "−45.000 ₫")
         let host = UIHostingController(rootView: row.environment(\.dynamicTypeSize, .large))
         let compact = host.sizeThatFits(in: CGSize(width: 343, height: 1000))
-        XCTAssertLessThanOrEqual(compact.height, 44.5)
+        XCTAssertLessThanOrEqual(compact.height, 56.5)
         let accessible = UIHostingController(rootView: row.environment(\.dynamicTypeSize, .accessibility3))
         XCTAssertGreaterThan(accessible.sizeThatFits(in: CGSize(width: 343, height: 1000)).height, compact.height)
     }
@@ -462,6 +509,19 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(PortfolioReferenceCopy.addAssetActionAccessibilityID, "portfolio-add-asset")
         XCTAssertEqual(PortfolioReferenceCopy.saveTradeAction, "Lưu giao dịch")
         XCTAssertEqual(PortfolioReferenceCopy.saveTradeActionAccessibilityID, "portfolio-save-trade")
+    }
+
+    func testPortfolioCorrectionActionsExposeStableCopyAndAccessibilityIDs() {
+        XCTAssertEqual(PortfolioCorrectionPresentation.replaceAction, "Sửa giao dịch")
+        XCTAssertEqual(PortfolioCorrectionPresentation.voidAction, "Hủy giao dịch")
+        XCTAssertEqual(PortfolioCorrectionPresentation.previewAction, "Xem thay đổi")
+        XCTAssertEqual(PortfolioCorrectionPresentation.confirmAction, "Xác nhận sửa")
+        XCTAssertEqual(PortfolioCorrectionPresentation.operationLabel("replace"), "Sửa giao dịch")
+        XCTAssertEqual(PortfolioCorrectionPresentation.operationLabel("void"), "Hủy giao dịch")
+        XCTAssertEqual(PortfolioCorrectionPresentation.operationLabel("unknown"), "Sửa giao dịch")
+        XCTAssertEqual(PortfolioCorrectionPresentation.menuAccessibilityID(tradeID: "trade-1"), "portfolio-trade-menu-trade-1")
+        XCTAssertEqual(PortfolioCorrectionPresentation.previewAccessibilityID, "portfolio-correction-preview")
+        XCTAssertEqual(PortfolioCorrectionPresentation.confirmAccessibilityID, "portfolio-correction-confirm")
     }
 
     func testSemanticTokensAreStable() {
@@ -796,6 +856,7 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertFalse(AssistantComposerPolicy.canSend(enabled: false, text: "tháng này", activeRunID: nil))
         XCTAssertFalse(AssistantComposerPolicy.canSend(enabled: true, text: "   ", activeRunID: nil))
         XCTAssertFalse(AssistantComposerPolicy.canSend(enabled: true, text: "tháng này", activeRunID: "run-1"))
+        XCTAssertFalse(AssistantComposerPolicy.canSend(enabled: true, text: "tháng này", activeRunID: nil, isLocallySending: true))
     }
 
 func testAssistantPrivacyMaskRedactsMoneyAndProse() {
@@ -1069,5 +1130,35 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
         ]
 
         XCTAssertEqual(AIEntryProposalReview.pending(proposals).map(\.id), ["pending"])
+    }
+
+    func testAIEntryProposalPresentationUsesCanonicalTransactionRow() {
+        let draft = EntryDraftModel(
+            type: "expense",
+            amount: 45_000,
+            walletID: "wallet",
+            categoryID: "coffee",
+            jarID: nil,
+            occurredAt: "2026-10-07T08:00:00+07:00",
+            note: "Cà phê sáng",
+            includedInReports: true
+        )
+        let proposal = EntryProposalModel(id: "proposal", processID: "process", version: 1, status: "pending", draft: draft, questions: [], transactionID: nil)
+        let category = CategoryModel(id: "coffee", ownerID: "owner", parentID: nil, kind: "expense", name: "Cà phê", systemKey: nil, iconKey: "cup.and.saucer.fill", isSystem: false, walletIDs: [])
+
+        let row = AIEntryProposalReview.transactionRow(for: proposal, category: category, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!, masked: false)
+
+        XCTAssertEqual(row.title, "Cà phê")
+        XCTAssertEqual(row.subtitle, "Cà phê sáng")
+        XCTAssertEqual(row.amount, "−45.000 ₫")
+        XCTAssertEqual(row.amountTone, .expense)
+    }
+
+    func testAIEntryDecisionPolicyLocksOneProposalAndGlobalSave() {
+        XCTAssertTrue(AIEntryDecisionPolicy.canDecide(proposalID: "p1", deciding: [], savingAll: false))
+        XCTAssertFalse(AIEntryDecisionPolicy.canDecide(proposalID: "p1", deciding: ["p1"], savingAll: false))
+        XCTAssertFalse(AIEntryDecisionPolicy.canDecide(proposalID: "p2", deciding: [], savingAll: true))
+        XCTAssertFalse(AIEntryDecisionPolicy.canSaveAll(savingAll: false, processing: false, deciding: ["p1"]))
+        XCTAssertTrue(AIEntryDecisionPolicy.canSaveAll(savingAll: false, processing: false, deciding: []))
     }
 }

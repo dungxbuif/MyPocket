@@ -19,4 +19,7 @@ go test ./internal/usecase -run TestAIEvalFixtures -count=1
 
 Live OCR/provider evaluation remains a separate, explicit opt-in path through
 `AI_EVAL_LIVE=1`; it must use synthetic input and must never be required for
-this test to pass.
+this test to pass. The live harness also needs deployment-managed AI/OCR/S3
+credentials and is not a release prerequisite for local deterministic tests.
+Use the [provider UAT checklist](../../docs/operations/PROVIDER_UAT.md) before
+running it; never point it at a user's receipt or production ledger.

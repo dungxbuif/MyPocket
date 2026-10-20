@@ -75,6 +75,9 @@ func (r *TransactionPostgresRepository) Create(transaction *entity.Transaction) 
 		return transactionrepo.ErrTransactionCategoryRequired
 	}
 	includedInReports := transaction.IncludedInReports
+	if transaction.Version < 1 {
+		transaction.Version = 1
+	}
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		if transaction.CategoryID != nil {
 			if err := validateActiveCategoryAssignment(tx, transaction.OwnerID, *transaction.CategoryID, transaction.Type); err != nil {
@@ -538,7 +541,7 @@ func (r *TransactionPostgresRepository) updateTransferPair(tx *gorm.DB, ownerID,
 	if source.Amount != destination.Amount || source.Type != entity.TransactionTypeExpense || destination.Type != entity.TransactionTypeIncome || source.IncludedInReports || destination.IncludedInReports || source.JarID != nil || destination.JarID != nil {
 		return nil, transactionrepo.ErrTransferPairInvalid
 	}
-	updated := tx.Model(&entity.Transaction{}).Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Updates(map[string]any{"amount": updates.Amount, "occurred_at": updates.OccurredAt, "note": updates.Note})
+	updated := tx.Model(&entity.Transaction{}).Where("owner_id = ? AND transfer_id = ?", ownerID, transferID).Updates(map[string]any{"amount": updates.Amount, "occurred_at": updates.OccurredAt, "note": updates.Note, "version": gorm.Expr("version + 1")})
 	if updated.Error != nil {
 		return nil, updated.Error
 	}
@@ -550,6 +553,7 @@ func (r *TransactionPostgresRepository) updateTransferPair(tx *gorm.DB, ownerID,
 		result[i].Amount = updates.Amount
 		result[i].OccurredAt = updates.OccurredAt
 		result[i].Note = updates.Note
+		result[i].Version = maxVersion(result[i].Version) + 1
 	}
 	return result, nil
 }
@@ -686,11 +690,29 @@ func (r *TransactionPostgresRepository) validateTransferWallets(tx *gorm.DB, own
 }
 
 func (r *TransactionPostgresRepository) Update(ownerID, id string, updates map[string]any) (*entity.Transaction, error) {
+	existing, err := r.Find(ownerID, id)
+	if err != nil {
+		return nil, err
+	}
+	return r.UpdateWithVersion(ownerID, id, maxVersion(existing.Version), updates)
+}
+
+func maxVersion(version int64) int64 {
+	if version < 1 {
+		return 1
+	}
+	return version
+}
+
+func (r *TransactionPostgresRepository) UpdateWithVersion(ownerID, id string, expectedVersion int64, updates map[string]any) (*entity.Transaction, error) {
 	var updated entity.Transaction
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		var existing entity.Transaction
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ?", id, ownerID).First(&existing).Error; err != nil {
+		if err := tx.Where("id = ? AND owner_id = ?", id, ownerID).First(&existing).Error; err != nil {
 			return err
+		}
+		if maxVersion(existing.Version) != expectedVersion {
+			return transactionrepo.ErrTransactionVersionConflict
 		}
 		next := existing
 		if categoryID, ok := updates["category_id"].(*string); ok && categoryID != nil && (existing.CategoryID == nil || *existing.CategoryID != *categoryID) {
@@ -711,12 +733,19 @@ func (r *TransactionPostgresRepository) Update(ownerID, id string, updates map[s
 		if err := validateJarAssignment(tx, ownerID, next.JarID, next.OccurredAt, &existing); err != nil {
 			return err
 		}
-		result := tx.Model(&entity.Transaction{}).Where("id = ? AND owner_id = ?", id, ownerID).Updates(updates)
+		changes := make(map[string]any, len(updates)+1)
+		for key, value := range updates {
+			if key != "version" {
+				changes[key] = value
+			}
+		}
+		changes["version"] = gorm.Expr("version + 1")
+		result := tx.Model(&entity.Transaction{}).Where("id = ? AND owner_id = ? AND version = ?", id, ownerID, expectedVersion).Updates(changes)
 		if result.Error != nil {
 			return result.Error
 		}
 		if result.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
+			return transactionrepo.ErrTransactionVersionConflict
 		}
 		return tx.Where("id = ? AND owner_id = ?", id, ownerID).First(&updated).Error
 	})
@@ -744,12 +773,24 @@ func validateActiveCategoryAssignment(tx *gorm.DB, ownerID, categoryID, kind str
 }
 
 func (r *TransactionPostgresRepository) Delete(ownerID, id string) error {
-	result := r.db.Where("id = ? AND owner_id = ?", id, ownerID).Delete(&entity.Transaction{})
+	existing, err := r.Find(ownerID, id)
+	if err != nil {
+		return err
+	}
+	return r.DeleteWithVersion(ownerID, id, maxVersion(existing.Version))
+}
+
+func (r *TransactionPostgresRepository) DeleteWithVersion(ownerID, id string, expectedVersion int64) error {
+	result := r.db.Where("id = ? AND owner_id = ? AND version = ?", id, ownerID, expectedVersion).Delete(&entity.Transaction{})
 	if result.Error != nil {
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return errors.New("transaction not found")
+		var existing entity.Transaction
+		if err := r.db.Where("id = ? AND owner_id = ?", id, ownerID).First(&existing).Error; err != nil {
+			return err
+		}
+		return transactionrepo.ErrTransactionVersionConflict
 	}
 	return nil
 }

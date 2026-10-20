@@ -13,6 +13,9 @@ ICONSET="$ROOT/MyPocketIOS/Assets.xcassets/AppIcon.appiconset"
 test -f "$ICONSET/Contents.json"
 test -f "$ICONSET/AppIcon.png"
 test -x "$ROOT/scripts/generate-app-icon.sh"
+test -x "$ROOT/scripts/release-artifact-preflight.sh"
+test -x "$ROOT/scripts/release-artifact-preflight.test.sh"
+test -f "$ROOT/scripts/fixtures/release-Info.plist"
 grep -q "MyPocketIOS/Assets.xcassets" "$ROOT/project.yml"
 ICON_SIZE="$(sips -g pixelWidth -g pixelHeight "$ICONSET/AppIcon.png" 2>/dev/null)"
 grep -q "pixelWidth: 1024" <<<"$ICON_SIZE"
@@ -31,6 +34,12 @@ grep -q "com.mypocket.ios" "$ROOT/project.yml"
 grep -q "MP_API_BASE_URL" "$ROOT/Config/Debug.xcconfig"
 grep -q "configFiles:" "$ROOT/project.yml"
 grep -q "Manrope-Variable.ttf" "$ROOT/MyPocketIOS/Resources/Info.plist"
+grep -q "UISupportedInterfaceOrientations" "$ROOT/MyPocketIOS/Resources/Info.plist"
+grep -q "UIInterfaceOrientationPortrait" "$ROOT/MyPocketIOS/Resources/Info.plist"
+if grep -q "UIInterfaceOrientationLandscape" "$ROOT/MyPocketIOS/Resources/Info.plist"; then
+  echo "native iOS app must remain portrait-only" >&2
+  exit 1
+fi
 if grep -q "MP_GOOGLE_\|auth-google\|GooglePKCEClient" "$ROOT/MyPocketIOS/Resources/Info.plist" "$ROOT/Config/Debug.xcconfig" "$ROOT/Config/Release.xcconfig" "$ROOT/MyPocketIOS/Features/Auth/AuthView.swift" "$ROOT/MyPocketIOS/Features/Auth/AuthViewModel.swift"; then
   echo "native password-only auth must not ship Google login configuration or UI" >&2
   exit 1

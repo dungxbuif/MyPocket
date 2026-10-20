@@ -56,6 +56,36 @@ final class FinanceAPI: @unchecked Sendable {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/notifications/\(id)/read", method: .post))
     }
 
+    /// Registers the current APNs token as owner-scoped metadata. This does
+    /// not imply that APNs delivery is configured; the server response only
+    /// contains registration metadata and never echoes the provider token.
+    func registerPushToken(
+        deviceID: String,
+        deviceName: String,
+        token: String,
+        environment: String,
+        idempotencyKey: String? = nil
+    ) async throws -> PushTokenRegistrationModel {
+        struct Input: Encodable {
+            let deviceID: String
+            let deviceName: String
+            let platform: String
+            let environment: String
+            let token: String
+        }
+        let input = Input(deviceID: deviceID, deviceName: deviceName, platform: "ios", environment: environment, token: token)
+        return try await client.send(APIRequest(
+            path: "/notifications/devices",
+            method: .post,
+            body: try body(input),
+            idempotencyKey: idempotencyKey ?? UUID().uuidString
+        ))
+    }
+
+    func revokePushToken(id: String) async throws {
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/notifications/devices/\(id)", method: .delete))
+    }
+
     func createWallet(_ input: WalletModelInput, idempotencyKey: String? = nil) async throws -> WalletModel {
         try await client.send(APIRequest(path: "/wallets", method: .post, body: try body(input), idempotencyKey: idempotencyKey ?? UUID().uuidString))
     }
@@ -353,6 +383,37 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/trades"))
     }
 
+    /// Previews an immutable replace/void revision without reserving or
+    /// mutating a server-side correction. The caller must pass the asset
+    /// version read with the portfolio summary; the server rejects stale
+    /// previews before projecting a result.
+    func previewPortfolioTradeCorrection(
+        assetID: String,
+        input: PortfolioTradeCorrectionInputModel
+    ) async throws -> PortfolioTradeCorrectionResultModel {
+        try await client.send(APIRequest(
+            path: "/portfolio/assets/\(assetID)/trade-corrections/preview",
+            method: .post,
+            body: try body(input)
+        ))
+    }
+
+    /// Commits a previously reviewed immutable replace/void revision. A
+    /// caller-owned idempotency key is required so a response-loss retry
+    /// replays the same receipt rather than appending another revision.
+    func correctPortfolioTrade(
+        assetID: String,
+        input: PortfolioTradeCorrectionInputModel,
+        idempotencyKey: String
+    ) async throws -> PortfolioTradeCorrectionResultModel {
+        try await client.send(APIRequest(
+            path: "/portfolio/assets/\(assetID)/trade-corrections",
+            method: .post,
+            body: try body(input),
+            idempotencyKey: idempotencyKey
+        ))
+    }
+
     func creditStatement(walletID: String, from: String? = nil, to: String? = nil) async throws -> CreditStatementModel {
         var components = URLComponents()
         var items: [URLQueryItem] = []
@@ -459,13 +520,13 @@ final class FinanceAPI: @unchecked Sendable {
     }
 
     func submitAdvisorMessage(_ input: AdvisorMessageInputModel) async throws -> AdvisorSubmitModel {
-        try await client.send(APIRequest(path: "/ai/advisor/messages", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+        try await client.send(APIRequest(path: "/ai/advisor/messages", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
     }
 
     /// Starts the advisor run without waiting for provider completion. The
     /// returned run ID lets the UI cancel even the first request.
     func beginAdvisorMessage(_ input: AdvisorMessageInputModel) async throws -> AdvisorAsyncSubmitModel {
-        try await client.send(APIRequest(path: "/ai/advisor/messages/async", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+        try await client.send(APIRequest(path: "/ai/advisor/messages/async", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
     }
 
     /// Confirms a server-persisted assistant action. Financial fields are
@@ -633,6 +694,22 @@ struct PortfolioTradeInputModel: Codable, Sendable {
     var fee: Int64
     var occurredAt: String
     var note: String?
+}
+
+struct PortfolioTradeCorrectionInputModel: Codable, Sendable {
+    var sourceTradeID: String
+    var expectedAssetVersion: Int64
+    var operation: String
+    var reason: String
+    var replacement: PortfolioTradeInputModel?
+}
+
+struct PortfolioTradeCorrectionResultModel: Codable, Sendable {
+    var revisionID: String
+    var assetVersion: Int64
+    var before: PortfolioPositionModel
+    var after: PortfolioPositionModel
+    var affectedTradeIDs: [String]
 }
 
 struct PortfolioTradeModel: Codable, Identifiable, Sendable {

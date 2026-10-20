@@ -586,6 +586,7 @@ struct MPTransactionRow: View {
             if !dynamicTypeSize.isAccessibilitySize { amountLabel }
         }
         .frame(minHeight: MPMetrics.hitTarget)
+        .padding(.vertical, MPMetrics.transactionRowVerticalPadding)
         .accessibilityElement(children: .combine)
     }
 

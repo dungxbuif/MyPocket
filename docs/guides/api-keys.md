@@ -1,9 +1,10 @@
 # API key cho tích hợp cá nhân
 
-Trạng thái2026-10-14: chính sách mới đã có code/test local, **chưa deploy prod**.
+Trạng thái 2026-10-20: chính sách toàn quyền đã triển khai cho REST.
 Key có toàn quyền đọc và thay đổi dữ liệu của tài khoản tạo key, tương đương
-JWT của tài khoản đó. Không còn chọn scope; key cũ cũng có toàn quyền sau rollout.
+JWT của tài khoản đó. Không còn chọn scope; key cũ còn hiệu lực cũng có toàn quyền.
 Chỉ chia sẻ key với dịch vụ bạn tin tưởng. Thu hồi key không còn dùng.
+MCP hiện là bản ứng viên local, chưa xác nhận triển khai production.
 
 ## Tạo và dùng key
 
@@ -54,6 +55,24 @@ Giao dịch cần chống trùng vẫn phải giữ Idempotency-Key ổn định
 User key không phải FEEDBACK_AGENT_TOKEN: không đọc feedback của tất cả user,
 không truy cập route internal/admin chỉ dành cho service token.
 
+## Kết nối MCP
+
+Cấu hình client Streamable HTTP đến `<server-origin>/api/v1/mcp` với header
+`Authorization: Bearer <JWT-or-mpk-secret>`. Không đưa secret vào URL.
+Client dùng quy trình khởi tạo của SDK rồi `tools/list` để lấy tên và schema
+công cụ hiện tại; chưa có luồng đăng nhập hay tạo phiên qua MCP.
+
+MCP có cùng quyền của tài khoản sở hữu key, không có scope riêng. Công cụ ghi
+thông thường như tạo ví/giao dịch/ngân sách thực thi trực tiếp theo API tương
+ứng. Chỉ luồng bản nháp Assistant vẫn cần xác nhận action đã lưu phía server
+với đúng hội thoại/thế hệ; không gửi lại payload tài chính để thay thế bản nháp.
+Giữ khóa chống trùng trong `params._meta.idempotency_key` cho API hỗ trợ receipt,
+không đặt vào `arguments`; MCP không tự thử lại hay tự tạo khóa.
+
+[Hướng dẫn MCP cho người và AI agent](../ai/mcp-api-parity.md) có ví dụ placeholder,
+giới hạn file/base64, trạng thái async, đọc lại sự kiện, tải tài liệu, CAS và lỗi.
+Không lưu/log link tải đã ký, nội dung tài chính hoặc secret trả về một lần.
+
 ## AI-agent reference
 
 | Property | Contract |
@@ -67,7 +86,9 @@ không truy cập route internal/admin chỉ dành cho service token.
 | Logout | POST /api/v1/auth/logout with API key revokes that key only |
 | Session | JWT retains Redis session validation; API keys do not auto-refresh |
 | Service boundary | dedicated internal/agent tokens remain separate, not granted to user keys |
-| Deployment | local implementation verified; prod rollout pending |
+| MCP | local `/api/v1/mcp` candidate; official Go SDK v1.8.0; `tools/list` supplies exact input schemas |
+| MCP writes | ordinary user writes direct; existing Assistant action confirmation still required |
+| Deployment | REST full-owner policy deployed; MCP rollout/owner-authenticated staging acceptance remain open |
 
 [API reference](../architecture/API.md), [auth](../architecture/AUTH_API.md),
 [work/proof](../work/tickets/API-KEY-FULL-ACCESS-20261014.md).

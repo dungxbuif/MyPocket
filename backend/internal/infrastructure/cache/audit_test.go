@@ -6,6 +6,14 @@ import (
 	"github.com/mypocket/backend/internal/repository"
 )
 
+func TestAuditFieldsPreserveMCPByteCounts(t *testing.T) {
+	event := repository.AuditEvent{Action: "mcp.wallets.list", RequestBytes: 2, ResponseBytes: 11}
+	fields := auditFields(event)
+	if fields["request_bytes"] != "2" || fields["response_bytes"] != "11" {
+		t.Fatalf("MCP byte counts missing from durable payload: %+v", fields)
+	}
+}
+
 func TestAuditFieldsContainOnlyRedactedFeedbackMetadata(t *testing.T) {
 	fields := auditFields(repository.AuditEvent{
 		RequestID: "req-1", ActorKind: "agent", Action: "feedback.created", FeedbackID: "fb-1", Version: "1.4.2",

@@ -13,6 +13,7 @@ var (
 	ErrAdvisorBusy            = errors.New("advisor conversation busy")
 	ErrAdvisorPurged          = errors.New("advisor history purged")
 	ErrAdvisorLeaseLost       = errors.New("advisor lease lost")
+	ErrAdvisorRuntimeExpired  = errors.New("advisor runtime expired")
 	ErrAdvisorEventsExpired   = errors.New("advisor events expired")
 )
 
@@ -34,6 +35,38 @@ type AdvisorRepository interface {
 	ListMessages(context.Context, string, string, int64, int) ([]entity.AdvisorMessage, error)
 	AppendEvent(context.Context, string, string, string, any) (*entity.AdvisorEvent, error)
 	CreateAssistantMessage(context.Context, string, string, int64, []entity.AdvisorPart) (*entity.AdvisorMessage, error)
+}
+
+// AdvisorRuntimeRepository fences executor writes and makes answer
+// persistence atomic. Implementations must use database time and owner/run/
+// generation/token matching; lease tokens are never client-visible.
+type AdvisorRuntimeRepository interface {
+	ClaimRun(context.Context, string, string, string) (entity.AdvisorRunLease, error)
+	HeartbeatRun(context.Context, entity.AdvisorRunLease) error
+	CompleteRun(context.Context, entity.AdvisorRunLease, entity.AdvisorCompletion) (entity.AdvisorCompletionResult, error)
+	FinishRun(context.Context, entity.AdvisorRunLease, string, string, map[string]any) error
+	ReapExpiredRuns(context.Context, int) (int, error)
+}
+
+// AdvisorContextRepository reads only the current owner's current generation.
+// Reference validation remains the finance service's responsibility.
+type AdvisorContextRepository interface {
+	LoadAdvisorContextState(context.Context, string, string, int64) (entity.AdvisorContextState, error)
+}
+
+// AdvisorRunStatusRepository is an optional low-cost status probe used by a
+// worker that may be executing in a different API process than the caller of
+// the cancel endpoint. Implementations must scope the lookup by ownerID and
+// return ErrNotFound for foreign or missing runs.
+type AdvisorRunStatusRepository interface {
+	GetRunStatus(context.Context, string, string) (string, error)
+}
+
+// AdvisorEventRepository is optional so adapters that only support polling can
+// keep the core contract while PostgreSQL-backed deployments expose replayable
+// SSE events.
+type AdvisorEventRepository interface {
+	ListEvents(context.Context, string, string, int64, int) ([]entity.AdvisorEvent, error)
 }
 
 // AdvisorExpiryRepository is implemented by the PostgreSQL store used by the

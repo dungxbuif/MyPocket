@@ -5,4 +5,6 @@ func (r *Router) RegisterNotificationRoutes(handler *NotificationHandler) {
 	routes.Use(r.AuthMiddleware.RequireAuth)
 	routes.GET("", handler.List)
 	routes.POST("/:id/read", handler.MarkRead)
+	routes.POST("/devices", handler.RegisterPushToken)
+	routes.DELETE("/devices/:id", handler.RevokePushToken)
 }

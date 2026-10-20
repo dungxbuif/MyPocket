@@ -11,6 +11,17 @@ final class ReferenceDisplayTests: XCTestCase {
         XCTAssertEqual(MPSurfaceCardStyle.elevated.cornerRadius, MPMetrics.cornerRadius)
     }
 
+    func testReferenceGeometryUsesCompactSharedInsetsAndApprovedWebRadius() {
+        // These are intentionally token assertions rather than screenshot
+        // pixels: every route must inherit the same geometry from the base.
+        XCTAssertEqual(MPMetrics.referenceCornerRadius, 24)
+        XCTAssertEqual(MPMetrics.cardHorizontalPadding, 12)
+        XCTAssertEqual(MPMetrics.cardVerticalPadding, 8)
+        XCTAssertEqual(MPMetrics.sectionSpacing, 8)
+        XCTAssertLessThanOrEqual(MPMetrics.cardVerticalPadding * 2, 16)
+        XCTAssertLessThanOrEqual(MPMetrics.cardHorizontalPadding * 2, 24)
+    }
+
     func testMetricGridCompactsNormalMetricsAndExpandsForNarrowOrAccessibleContent() {
         let items = [
             MPMetricItem(title: "Số dư đầu tháng", value: "100.000 ₫"),
@@ -57,6 +68,28 @@ final class ReferenceDisplayTests: XCTestCase {
         XCTAssertEqual(narrow.width, 180, accuracy: 1)
         XCTAssertGreaterThan(narrow.height, full.height)
         XCTAssertGreaterThan(accessible.height, full.height)
+    }
+
+    func testSecondaryDestinationsHaveStableTypedRoutePresentation() {
+        let destinations = MoreDestination.allCases
+        XCTAssertEqual(Set(destinations.map(\.id)).count, destinations.count)
+        XCTAssertTrue(destinations.allSatisfy { !$0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        XCTAssertTrue(destinations.allSatisfy { !$0.icon.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty })
+        XCTAssertTrue(MoreReferencePresentation.sections.flatMap(\.items).allSatisfy { destinations.contains($0) })
+    }
+
+    func testFeedbackDockLeavesContentViewportUnchangedAndUsesFooterClearanceOnly() throws {
+        let viewport = CGRect(x: 0, y: 0, width: 390, height: 720)
+        let withFooter = try XCTUnwrap(MPFeedbackBubbleLayout.frame(in: viewport, clearance: 64, obstacles: []))
+        let withoutFooter = try XCTUnwrap(MPFeedbackBubbleLayout.frame(in: viewport, clearance: 0, obstacles: []))
+
+        XCTAssertEqual(withFooter.width, MPShellNavigation.feedbackBubbleDiameter)
+        XCTAssertEqual(withFooter.height, MPShellNavigation.feedbackBubbleDiameter)
+        XCTAssertEqual(withFooter.minX, viewport.maxX - min(MPMetrics.pagePadding, (viewport.width - withFooter.width) / 2) - withFooter.width, accuracy: 0.001)
+        XCTAssertEqual(withoutFooter.minX, withFooter.minX, accuracy: 0.001)
+        XCTAssertGreaterThan(withoutFooter.minY, withFooter.minY)
+        XCTAssertTrue(viewport.contains(withFooter))
+        XCTAssertTrue(viewport.contains(withoutFooter))
     }
 
     private func size<V: View>(_ view: V, width: CGFloat) -> CGSize {

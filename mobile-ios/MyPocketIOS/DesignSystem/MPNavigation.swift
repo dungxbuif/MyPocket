@@ -1,6 +1,76 @@
 import SwiftUI
 import UIKit
 
+/// Scoped to one secondary route; it never replaces the navigation controller
+/// delegate or changes gestures belonging to another window/navigation stack.
+enum MPInteractiveBackPolicy {
+    static func canBegin(depth: Int, isBlocked: Bool, isTransitioning: Bool) -> Bool {
+        depth > 1 && !isBlocked && !isTransitioning
+    }
+}
+
+struct MPInteractiveBackBlockedKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
+struct MPInteractiveBack: UIViewControllerRepresentable {
+    let isBlocked: Bool
+
+    func makeUIViewController(context: Context) -> Controller { Controller() }
+    func updateUIViewController(_ controller: Controller, context: Context) {
+        controller.isBlocked = isBlocked
+        controller.install()
+    }
+    static func dismantleUIViewController(_ controller: Controller, coordinator: ()) { controller.restore() }
+
+    final class Controller: UIViewController, UIGestureRecognizerDelegate {
+        var isBlocked = false
+        private weak var recognizer: UIGestureRecognizer?
+        // Keep the native delegate alive only while this route owns/restores
+        // the gesture. Never retain a disappearing route's bridge controller.
+        private var previousDelegate: (any UIGestureRecognizerDelegate)?
+
+        override func loadView() {
+            view = UIView()
+            view.isUserInteractionEnabled = false
+        }
+        override func viewDidAppear(_ animated: Bool) {
+            super.viewDidAppear(animated)
+            install()
+        }
+        override func viewDidDisappear(_ animated: Bool) {
+            super.viewDidDisappear(animated)
+            restore()
+        }
+        func install() {
+            guard let gesture = navigationController?.interactivePopGestureRecognizer else { return }
+            if gesture.delegate !== self {
+                if let previousBridge = gesture.delegate as? Controller {
+                    previousDelegate = previousBridge.previousDelegate
+                } else {
+                    previousDelegate = gesture.delegate
+                }
+                recognizer = gesture
+                gesture.delegate = self
+            }
+        }
+        func restore() {
+            if recognizer?.delegate === self { recognizer?.delegate = previousDelegate }
+            recognizer = nil
+            previousDelegate = nil
+        }
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let navigationController else { return false }
+            return MPInteractiveBackPolicy.canBegin(
+                depth: navigationController.viewControllers.count,
+                isBlocked: isBlocked || navigationController.presentedViewController != nil,
+                isTransitioning: navigationController.transitionCoordinator != nil
+            )
+        }
+    }
+}
+
 private struct MPKeyboardVisibilityObserver: ViewModifier {
     @Binding var visible: Bool
     func body(content: Content) -> some View {
@@ -11,6 +81,10 @@ private struct MPKeyboardVisibilityObserver: ViewModifier {
 }
 
 extension View {
+    func mpInteractiveBackBlocked(_ blocked: Bool = true) -> some View {
+        preference(key: MPInteractiveBackBlockedKey.self, value: blocked)
+    }
+
     func mpObserveKeyboardVisibility(_ visible: Binding<Bool>) -> some View {
         modifier(MPKeyboardVisibilityObserver(visible: visible))
     }
@@ -73,6 +147,7 @@ struct MPEditorScaffold<Header: View, Fields: View, Footer: View>: View {
         }
         .background(MPColor.canvas.ignoresSafeArea())
         .interactiveDismissDisabled(isBusy)
+        .mpInteractiveBackBlocked()
     }
 }
 

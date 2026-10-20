@@ -338,6 +338,7 @@ final class TransactionsViewModel: ObservableObject {
         isLoading = true
         errorMessage = nil
         cacheWarning = nil
+        await restoreCachedSnapshot()
         defer { isLoading = false }
         do {
             self.transactions = try await api.transactions(ownerID: ownerID)
@@ -379,6 +380,21 @@ final class TransactionsViewModel: ObservableObject {
             } catch { cacheWarning = "Đã tải dữ liệu, nhưng chưa lưu được bản xem khi mất mạng." }
         }
         resolveInitialWeek()
+    }
+
+    private func restoreCachedSnapshot() async {
+        guard transactions.isEmpty, let ownerID, let snapshotCache else { return }
+        do {
+            guard let snapshot = try await snapshotCache.load(ownerID: ownerID) else { return }
+            transactions = snapshot.transactions.sorted { $0.occurredAt > $1.occurredAt }
+            wallets = snapshot.wallets
+            categories = snapshot.categories
+            accountTimezone = snapshot.timezone
+            cachedAt = snapshot.fetchedAt
+            resolveInitialWeek()
+        } catch {
+            // The server remains authoritative; ignore an unavailable cache.
+        }
     }
 
     private func recoverLoad(_ error: Error, message: String) async {
@@ -455,6 +471,7 @@ struct TransactionsView: View {
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let onAIEntry: (() -> Void)?
     let onOpenReports: (() -> Void)?
+    let onEditorDismissed: (() -> Void)?
     @State private var editorPresented = false
     @State private var transferPresented = false
     @State private var transferEditID: String?
@@ -467,11 +484,12 @@ struct TransactionsView: View {
     @State private var selectedIDs = Set<String>()
     @State private var bulkDeleteConfirmation = false
 
-    init(api: FinanceAPI, initialWalletID: String? = nil, ownerID: String? = nil, snapshotCache: FinancialSnapshotCache? = nil, addRequested: Binding<Bool> = .constant(false), onAIEntry: (() -> Void)? = nil, onOpenReports: (() -> Void)? = nil) {
+    init(api: FinanceAPI, initialWalletID: String? = nil, ownerID: String? = nil, snapshotCache: FinancialSnapshotCache? = nil, addRequested: Binding<Bool> = .constant(false), onAIEntry: (() -> Void)? = nil, onOpenReports: (() -> Void)? = nil, onEditorDismissed: (() -> Void)? = nil) {
         _model = StateObject(wrappedValue: TransactionsViewModel(api: api, initialWalletID: initialWalletID, ownerID: ownerID, snapshotCache: snapshotCache))
         _addRequested = addRequested
         self.onAIEntry = onAIEntry
         self.onOpenReports = onOpenReports
+        self.onEditorDismissed = onEditorDismissed
     }
 
     var body: some View {
@@ -636,6 +654,9 @@ struct TransactionsView: View {
             editTarget = nil
             editorPresented = true
             addRequested = false
+        }
+        .onChange(of: editorPresented) { previous, presented in
+            if previous && !presented { onEditorDismissed?() }
         }
         // The reference add/edit flow is a modal form surface. Present it
         // above the shell so the persistent bottom navigation cannot occlude

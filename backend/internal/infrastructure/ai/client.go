@@ -13,6 +13,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/mypocket/backend/internal/entity"
@@ -51,6 +52,9 @@ const (
 	// draft-count cap. Keep a generous provider envelope so complete JSON is
 	// not rejected merely because a large review batch reaches the old 8k cap.
 	modelMaxTokens = 32768
+	// OCR documents are independent, but fan-out remains bounded so a batch
+	// cannot create an unbounded provider burst.
+	ocrConcurrency = 4
 )
 
 var ErrNotConfigured = errors.New("AI provider is not configured")
@@ -220,7 +224,7 @@ func validURL(raw string) bool {
 }
 
 func (c *Client) Configured() bool {
-	return c != nil && validURL(c.config.BaseURL) && strings.TrimSpace(c.config.APIKey) != "" && strings.TrimSpace(c.config.Model) != ""
+	return c != nil && c.config.Validate() == nil
 }
 
 func (c *Client) OCRConfigured() bool {
@@ -258,28 +262,17 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		return Output{}, err
 	}
 	source := input.Text
-	attachmentTexts := make([]string, 0, len(input.Images))
-	for index, img := range input.Images {
-		ocrStarted := time.Now()
-		slog.Info("AI OCR started", "attachment_index", len(attachmentTexts), "mime_type", img.MIMEType, "bytes", len(img.Base64))
-		extracted, err := c.ocr(ctx, img)
-		if err != nil {
-			stage, code, status := "ocr", "ocr_error", 0
-			var diagnostic *AIProviderError
-			if errors.As(err, &diagnostic) {
-				stage, code, status = diagnostic.Diagnostic()
-			}
-			slog.Warn("AI OCR failed", "attachment_index", len(attachmentTexts), "stage", stage, "code", code, "provider_status", status, "latency_ms", time.Since(ocrStarted).Milliseconds())
-			return Output{AttachmentTexts: attachmentTexts}, err
-		}
-		slog.Info("AI OCR completed", "attachment_index", len(attachmentTexts), "text_bytes", len(extracted), "latency_ms", time.Since(ocrStarted).Milliseconds())
-		attachmentTexts = append(attachmentTexts, extracted)
-		source = appendOCRDocument(source, index+1, img.Name, extracted)
+	attachmentTexts, ocrErr := c.extractOCRTexts(ctx, source, input.Images)
+	for index, extracted := range attachmentTexts {
+		source = appendOCRDocument(source, index+1, input.Images[index].Name, extracted)
 		if len(source) > maxSourceBytes {
-			return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: true}, errors.New("OCR source text exceeds limit")
+			return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrErr == nil && len(attachmentTexts) == len(input.Images)}, errors.New("OCR source text exceeds limit")
 		}
 	}
-	ocrComplete := true
+	if ocrErr != nil {
+		return Output{SourceText: source, AttachmentTexts: attachmentTexts}, ocrErr
+	}
+	ocrComplete := len(attachmentTexts) == len(input.Images)
 	messages, err := buildMessages(input, source)
 	if err != nil {
 		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, err
@@ -321,17 +314,19 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		Usage json.RawMessage `json:"usage"`
 	}
 	if json.Unmarshal(body, &response) != nil || len(response.Choices) != 1 {
-		return Output{SourceText: source}, errors.New("invalid AI response envelope")
+		// Keep the upstream body out of the error while preserving a stable
+		// stage/code for the entry use case and operational audit logs.
+		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, wrapProviderError("model", "model_response_invalid", errors.New("invalid AI response envelope"))
 	}
 	choice := response.Choices[0]
 	modelUsage := modelUsage(response.ID, response.Usage, choice.FinishReason, time.Since(modelStarted))
 	modelUsage["model"] = c.config.Model
 	if choice.FinishReason == "length" {
 		slog.Warn("AI provider response truncated", "reason_code", "output_token_limit", "max_tokens", modelMaxTokens, "response_bytes", len(choice.Message.Content), "prompt_tokens", modelUsageInt(modelUsage, "prompt_tokens"), "completion_tokens", modelUsageInt(modelUsage, "completion_tokens"))
-		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, errors.New("AI response exceeded output token limit")
+		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, wrapProviderError("model", "model_response_truncated", errors.New("AI response exceeded output token limit"))
 	}
 	if (choice.FinishReason != "" && choice.FinishReason != "stop") || (len(choice.Message.ToolCalls) > 0 && string(choice.Message.ToolCalls) != "null" && string(choice.Message.ToolCalls) != "[]") || (len(choice.Message.FunctionCall) > 0 && string(choice.Message.FunctionCall) != "null") {
-		return Output{SourceText: source}, errors.New("AI response was incomplete or requested tools")
+		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, wrapProviderError("model", "model_response_incomplete", errors.New("AI response was incomplete or requested tools"))
 	}
 	out, err := parseOutput([]byte(choice.Message.Content))
 	if mismatch := new(SchemaMismatchError); errors.As(err, &mismatch) {
@@ -378,6 +373,104 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		"total_tokens", modelUsageInt(modelUsage, "total_tokens"),
 	)
 	return out, err
+}
+
+// extractOCRTexts submits independent attachments with bounded concurrency,
+// while returning only the contiguous prefix that completed before the first
+// failed attachment. The prefix keeps attachment persistence deterministic and
+// preserves the existing partial-OCR recovery contract.
+func (c *Client) extractOCRTexts(ctx context.Context, source string, images []Image) ([]string, error) {
+	if len(images) == 0 {
+		return nil, nil
+	}
+	workerCount := ocrConcurrency
+	if workerCount > len(images) {
+		workerCount = len(images)
+	}
+	// Keep the small-batch path serial. Besides avoiding needless fan-out for
+	// one or two receipts, this lets source-size and first-failure recovery stop
+	// before submitting the next attachment. Large batches get the timeout win.
+	if len(images) < ocrConcurrency {
+		workerCount = 1
+	}
+	workCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+	jobs := make(chan int)
+	texts := make([]string, len(images))
+	completed := make([]bool, len(images))
+	var mu sync.Mutex
+	var firstErr error
+	firstErrIndex := len(images)
+	var wg sync.WaitGroup
+	worker := func() {
+		defer wg.Done()
+		for index := range jobs {
+			started := time.Now()
+			slog.Info("AI OCR started", "attachment_index", index, "mime_type", images[index].MIMEType, "bytes", len(images[index].Base64))
+			text, err := c.ocr(workCtx, images[index])
+			if err != nil {
+				stage, code, status := "ocr", "ocr_error", 0
+				var diagnostic *AIProviderError
+				if errors.As(err, &diagnostic) {
+					stage, code, status = diagnostic.Diagnostic()
+				}
+				slog.Warn("AI OCR failed", "attachment_index", index, "stage", stage, "code", code, "provider_status", status, "latency_ms", time.Since(started).Milliseconds())
+				mu.Lock()
+				if firstErr == nil || index < firstErrIndex {
+					firstErr, firstErrIndex = err, index
+					cancel()
+				}
+				mu.Unlock()
+				continue
+			}
+			slog.Info("AI OCR completed", "attachment_index", index, "text_bytes", len(text), "latency_ms", time.Since(started).Milliseconds())
+			mu.Lock()
+			candidate := source
+			for prior := 0; prior <= index; prior++ {
+				priorText := text
+				if prior != index {
+					if !completed[prior] {
+						candidate = ""
+						break
+					}
+					priorText = texts[prior]
+				}
+				candidate = appendOCRDocument(candidate, prior+1, images[prior].Name, priorText)
+			}
+			texts[index], completed[index] = text, true
+			if candidate != "" && len(candidate) > maxSourceBytes {
+				if firstErr == nil || index < firstErrIndex {
+					firstErr, firstErrIndex = errors.New("OCR source text exceeds limit"), index
+					cancel()
+				}
+				mu.Unlock()
+				continue
+			}
+			mu.Unlock()
+		}
+	}
+	wg.Add(workerCount)
+	for i := 0; i < workerCount; i++ {
+		go worker()
+	}
+	go func() {
+		defer close(jobs)
+		for index := range images {
+			select {
+			case jobs <- index:
+			case <-workCtx.Done():
+				return
+			}
+		}
+	}()
+	wg.Wait()
+	mu.Lock()
+	defer mu.Unlock()
+	prefix := 0
+	for prefix < len(images) && completed[prefix] {
+		prefix++
+	}
+	return append([]string(nil), texts[:prefix]...), firstErr
 }
 
 func appendOCRDocument(source string, index int, filename, text string) string {

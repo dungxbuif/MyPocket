@@ -28,6 +28,25 @@ func TestFinanceCursorRejectsDifferentScope(t *testing.T) {
 	}
 }
 
+func TestCategoryCursorRejectsDifferentOwnerFilterScope(t *testing.T) {
+	filter := entity.CategoryCatalogFilter{Kind: "expense", Limit: 50}
+	issued, err := encodeCategoryCursor("cat-1", categoryScopeHash("owner-1", filter))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decoded, err := decodeCategoryCursor(issued, categoryScopeHash("owner-1", filter))
+	if err != nil || decoded.ID != "cat-1" {
+		t.Fatalf("category cursor did not decode: %+v %v", decoded, err)
+	}
+	if _, err := decodeCategoryCursor(issued, categoryScopeHash("owner-2", filter)); err == nil {
+		t.Fatal("category cursor must not cross owner scope")
+	}
+	filter.Kind = "income"
+	if _, err := decodeCategoryCursor(issued, categoryScopeHash("owner-1", filter)); err == nil {
+		t.Fatal("category cursor must not cross filter scope")
+	}
+}
+
 func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {

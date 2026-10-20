@@ -10,6 +10,40 @@ struct MPLoadingView: View {
     }
 }
 
+/// Loading policy shared by finance screens. A refresh must not replace an
+/// already-rendered ledger with a full-screen spinner; the existing snapshot
+/// remains visible while the request is in flight.
+enum MPLoadingPresentationPolicy {
+    static func showsBlockingLoader(isLoading: Bool, hasContent: Bool) -> Bool {
+        isLoading && !hasContent
+    }
+
+    /// A refresh keeps the last successful content on screen and only adds a
+    /// compact progress affordance when there is something meaningful to
+    /// preserve. This prevents a fast retry/foreground refresh from flashing
+    /// a full-screen loading state.
+    static func showsInlineProgress(isLoading: Bool, hasContent: Bool) -> Bool {
+        isLoading && hasContent
+    }
+}
+
+struct MPInlineRefreshProgress: View {
+    let label: String
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.small)
+            Text(label)
+                .font(MPFont.bodySmall)
+                .foregroundStyle(MPColor.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .combine)
+        .accessibilityIdentifier("refresh-progress")
+    }
+}
+
 struct MPEmptyView: View {
     let title: String
     let detail: String

@@ -13,6 +13,7 @@ import (
 	"image/png"
 	"reflect"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 )
@@ -54,7 +55,7 @@ func (r *entryRepoStub) CreateAttachments(_ context.Context, attachments []entit
 }
 func (r *entryRepoStub) UpdateAttachmentOCR(_ context.Context, owner, process string, texts []string, completed bool) error {
 	for i := range r.attachments {
-		if i < len(texts) {
+		if i < len(texts) && strings.TrimSpace(texts[i]) != "" {
 			r.attachments[i].OCRText = texts[i]
 			r.attachments[i].OCRStatus = "completed"
 		} else {
@@ -238,6 +239,21 @@ func TestAIEntryKeepsSubmittedImageOrderForOCR(t *testing.T) {
 	}
 }
 
+func TestAIEntryUploadsAttachmentsWithBoundedConcurrency(t *testing.T) {
+	storage := &concurrentAttachmentStoreStub{}
+	service := &AIEntryService{Storage: storage}
+	files := make([]entity.AIImage, 8)
+	for i := range files {
+		files[i] = entity.AIImage{Name: fmt.Sprintf("page-%02d.png", i), MIMEType: "image/png", Base64: base64.StdEncoding.EncodeToString(pngBytes(t))}
+	}
+	if _, _, err := service.storeForOCR(context.Background(), "owner", "session", files); err != nil {
+		t.Fatal(err)
+	}
+	if got := storage.max.Load(); got < 2 || got > int32(aiAttachmentStorageWorkers) {
+		t.Fatalf("attachment upload concurrency=%d want between 2 and %d", got, aiAttachmentStorageWorkers)
+	}
+}
+
 func TestAIEntryAlignsOCRTextToAttachmentPersistenceOrder(t *testing.T) {
 	images := []entity.AIImage{{Name: "page-a.png", AttachmentID: "a"}, {Name: "page-z.png", AttachmentID: "z"}}
 	attachments := []entity.AIEntryAttachment{{ID: "z"}, {ID: "a"}}
@@ -266,6 +282,31 @@ func (*orderedAttachmentStoreStub) Key(_, _, _, filename string) (string, error)
 func (*orderedAttachmentStoreStub) Put(context.Context, string, string, []byte) error { return nil }
 func (*orderedAttachmentStoreStub) Delete(context.Context, string) error              { return nil }
 func (*orderedAttachmentStoreStub) SignedGet(context.Context, string) (string, error) {
+	return "", nil
+}
+
+type concurrentAttachmentStoreStub struct {
+	current atomic.Int32
+	max     atomic.Int32
+}
+
+func (*concurrentAttachmentStoreStub) Key(_, _, _, filename string) (string, error) {
+	return "private/" + filename, nil
+}
+func (s *concurrentAttachmentStoreStub) Put(context.Context, string, string, []byte) error {
+	current := s.current.Add(1)
+	for {
+		max := s.max.Load()
+		if current <= max || s.max.CompareAndSwap(max, current) {
+			break
+		}
+	}
+	time.Sleep(10 * time.Millisecond)
+	s.current.Add(-1)
+	return nil
+}
+func (*concurrentAttachmentStoreStub) Delete(context.Context, string) error { return nil }
+func (*concurrentAttachmentStoreStub) SignedGet(context.Context, string) (string, error) {
 	return "", nil
 }
 

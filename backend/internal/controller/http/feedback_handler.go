@@ -98,11 +98,13 @@ func (h *FeedbackHandler) List(c *gin.Context) {
 // CreateFeedback godoc
 // @Summary Create owner-scoped feedback
 // @Description Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.
+// @Description Send JSON text fields, or multipart/form-data with type, title, description and optional screenshot file. Screenshots must be detected PNG, nonempty and at most 1048576 bytes; the entire multipart body is limited to 2097152 bytes. The x-multipart-form extension describes the alternate file variant without mixing Swagger body and formData parameters.
 // @Tags Feedback
-// @Accept json
+// @Accept json,mpfd
 // @Produce json
 // @Security BearerAuth
-// @Param feedback body feedbackInput true "Feedback"
+// @Param feedback body feedbackInput false "JSON feedback fields; multipart alternative uses the same named fields and optional PNG screenshot"
+// @x-multipart-form {"fields":{"type":{"type":"string"},"title":{"type":"string"},"description":{"type":"string"},"screenshot":{"type":"file","mime_type":"image/png","max_bytes":1048576}},"max_body_bytes":2097152}
 // @Success 201 {object} entity.Feedback
 // @Router /api/v1/feedback [post]
 func (h *FeedbackHandler) Create(c *gin.Context) {

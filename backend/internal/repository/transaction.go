@@ -23,6 +23,7 @@ var (
 	ErrCreditWalletInvalid         = errors.New("invalid credit wallet")
 	ErrCreditPaymentInvalid        = errors.New("invalid credit payment")
 	ErrTransactionCategoryRequired = errors.New("transaction category required")
+	ErrTransactionVersionConflict  = errors.New("transaction version conflict")
 )
 
 type TransferUpdate struct {
@@ -39,6 +40,14 @@ type TransactionRepository interface {
 	BulkDelete(ownerID string, ids []string) error
 	Update(ownerID, id string, updates map[string]any) (*entity.Transaction, error)
 	Delete(ownerID, id string) error
+}
+
+// VersionedTransactionRepository provides atomic compare-and-swap mutations.
+// Legacy repositories may continue implementing TransactionRepository only.
+type VersionedTransactionRepository interface {
+	TransactionRepository
+	UpdateWithVersion(ownerID, id string, expectedVersion int64, updates map[string]any) (*entity.Transaction, error)
+	DeleteWithVersion(ownerID, id string, expectedVersion int64) error
 }
 
 type CreditEntryInput struct {

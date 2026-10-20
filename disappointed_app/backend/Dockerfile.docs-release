@@ -1,0 +1,11 @@
+# A docs-only derivative: do not compile or change production API binaries.
+ARG API_BASE
+FROM node:22-alpine AS docs-build
+WORKDIR /app/docs
+COPY frontend/docs/package.json frontend/docs/package-lock.json ./
+RUN npm ci
+COPY frontend/docs/ .
+RUN npm run build
+
+FROM ${API_BASE}
+COPY --from=docs-build /app/docs/build /app/docs

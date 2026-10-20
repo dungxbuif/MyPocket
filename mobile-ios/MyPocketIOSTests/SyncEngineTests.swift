@@ -6,16 +6,33 @@ private struct SyncFixtureKeys: OutboxKeyProviding {
     func key(for namespace: String, createIfMissing: Bool) throws -> Data { Data(repeating: 0x39, count: 32) }
 }
 
+private final class SyncOwnerBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var current: String
+
+    init(_ current: String) { self.current = current }
+    func read() -> String {
+        lock.lock(); defer { lock.unlock() }
+        return current
+    }
+    func set(_ value: String) {
+        lock.lock(); defer { lock.unlock() }
+        current = value
+    }
+}
+
 private actor SyncBoundary: OfflineSyncAPI {
     var mutations: [OutboxMutation] = []
     var capabilitiesCalls = 0
     var errors: [APIError]
     let supported: Bool
     let holdApply: Bool
+    let afterApply: (@Sendable () -> Void)?
     private var releaseSend: CheckedContinuation<Void, Never>?
     private var sendWaiters: [CheckedContinuation<Void, Never>] = []
-    init(errors: [APIError] = [], supported: Bool = true, holdApply: Bool = false) {
-        self.errors = errors; self.supported = supported; self.holdApply = holdApply
+    init(errors: [APIError] = [], supported: Bool = true, holdApply: Bool = false,
+         afterApply: (@Sendable () -> Void)? = nil) {
+        self.errors = errors; self.supported = supported; self.holdApply = holdApply; self.afterApply = afterApply
     }
     func waitForSend() async {
         if !mutations.isEmpty { return }
@@ -36,6 +53,7 @@ private actor SyncBoundary: OfflineSyncAPI {
             }
         }
         if !errors.isEmpty { throw errors.removeFirst() }
+        afterApply?()
         return ["server-" + mutation.id.uuidString]
     }
 }
@@ -166,5 +184,24 @@ final class SyncEngineTests: XCTestCase {
         XCTAssertEqual(rows.first?.state, .blockedAuth)
         let sent = await api.mutations
         XCTAssertTrue(sent.isEmpty)
+    }
+
+    func testOwnerSwitchAfterTransportCannotPublishLateAcknowledgement() async throws {
+        let owners = SyncOwnerBox("owner-a")
+        let store = try store()
+        _ = try await enqueue(store)
+        let api = SyncBoundary(afterApply: { owners.set("owner-b") })
+        let invalidations = SyncInvalidations()
+        let sync = SyncEngine(store: store, api: api, owner: { owners.read() }, invalidate: { owner, _ in
+            await invalidations.record(owner)
+        })
+
+        let result = try await sync.trigger(accountID: "owner-a", reason: .foreground)
+        XCTAssertEqual(result, .blockedAuth)
+        let rows = try await store.items(accountID: "owner-a")
+        XCTAssertEqual(rows.first?.state, .blockedAuth)
+        XCTAssertTrue(rows.first?.serverResourceIDs.isEmpty == true)
+        let published = await invalidations.owners
+        XCTAssertTrue(published.isEmpty)
     }
 }

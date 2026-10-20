@@ -34,6 +34,7 @@ type PortfolioAsset struct {
 	LatestPriceAt *time.Time `json:"latest_price_at,omitempty"`
 	CreatedAt     time.Time  `json:"created_at"`
 	UpdatedAt     time.Time  `json:"updated_at"`
+	Version       int64      `json:"version" gorm:"not null;default:1"`
 }
 
 // PortfolioTrade is immutable history. QuantityScaled stores quantity in

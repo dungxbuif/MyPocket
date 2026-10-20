@@ -1,5 +1,12 @@
 # Xem giao dịch theo ví và theo tuần
 
+Trên iPhone, nút **+** cũng có ở trang chính **Tài khoản / Mở rộng**. Nhấn để
+thêm giao dịch; **Hủy** hoặc lưu xong sẽ đưa bạn về trang Tài khoản. Trong các
+màn con, dùng nút thêm riêng của chức năng đó. Bạn có thể vuốt từ cạnh trái để
+quay về từ màn con; khi đang sửa bản nháp, hãy dùng **Hủy/Quay lại** trong màn
+để tránh mất nội dung ngoài ý muốn. Các dòng giao dịch có khoảng cách dọc rộng
+hơn, vẫn giữ nguyên số tiền và cách nhóm dữ liệu.
+
 ## Ghi chú trên iPhone
 
 Trong màn thêm/sửa giao dịch, chạm dòng **Ghi chú** để mở ô ghi chú riêng, có thể
@@ -42,6 +49,9 @@ Mỗi dòng cũng dùng biểu tượng và tông màu của danh mục; tiền 
 | Trường | Giá trị |
 | --- | --- |
 | Route | `/transactions` |
+| Native Account Add | Account root → ordinary transaction editor → save/cancel restores Account; child destinations and Assistant hide global Add |
+| Native Back | Scoped native interactive pop for More secondary routes; editors, dirty month notes and Account drafts block gesture; explicit controls remain |
+| Native row geometry | Shared transaction row: 44pt minimum content plus 6pt top/bottom padding; Dynamic Type can expand |
 | Kỳ tuần | Thứ hai 00:00 đến hết Chủ nhật theo `account.timezone`, lọc theo ngày lịch cục bộ (inclusive) |
 | Phạm vi ví | `Tổng cộng` = giao dịch của mọi ví owner trong kỳ đã chọn; ví thường = chỉ giao dịch của ví trong cùng kỳ; ví tín dụng = phạm vi tuần/ngày đang chọn |
 | Biến thể goal | Không có week strip; hiển thị tiến độ mục tiêu và toàn bộ lịch sử thực của ví theo tháng |

@@ -8,6 +8,7 @@ struct MainTabView: View {
     @State private var requestedAccountDestination: MoreDestination?
     @State private var scopedWalletID: String?
     @State private var addTransactionRequested = false
+    @State private var transactionReturnTab: String?
     @State private var feedbackPresented = false
     @State private var feedbackCapturePending = false
     @State private var feedbackScreenshot: Data?
@@ -55,6 +56,7 @@ struct MainTabView: View {
                             snapshotCache: auth.financialCache,
                             addRequested: $addTransactionRequested,
                             onAIEntry: {
+                                transactionReturnTab = nil
                                 addTransactionRequested = false
                                 requestedAccountDestination = .aiEntry
                                 selection = "account"
@@ -62,6 +64,12 @@ struct MainTabView: View {
                             onOpenReports: {
                                 requestedAccountDestination = .reports
                                 selection = "account"
+                            },
+                            onEditorDismissed: {
+                                if let returnTab = transactionReturnTab {
+                                    transactionReturnTab = nil
+                                    selection = returnTab
+                                }
                             }
                         )
                         .id(scopedWalletID ?? "all-wallets")
@@ -133,19 +141,20 @@ struct MainTabView: View {
                         items: MPShellNavigation.primaryItems,
                         selection: $selection,
                         onAdd: {
+                            transactionReturnTab = selection == "account" ? "account" : nil
                             selection = "transactions"
                             addTransactionRequested = true
                         },
                         onLongPressAdd: {
+                            transactionReturnTab = nil
                             addTransactionRequested = false
                             requestedAccountDestination = .aiEntry
                             selection = "account"
                         },
-                        // Account destinations own their own create actions. Hiding
-                        // the shell add affordance there prevents its raised hit
-                        // region from covering wallet/jar/category menu rows while
-                        // the shell navigation remains above feature overlays.
-                        isAddEnabled: selection != "account" && selection != "assistant"
+                        // Account root shares global Add; child routes and chat
+                        // retain their own actions and protected input space.
+                        isAddEnabled: selection != "assistant" &&
+                            (selection != "account" || requestedAccountDestination == nil)
                     )
                     // Route content is bounded above navigation. Keep this narrow
                     // blocker because the selected Account tab can otherwise

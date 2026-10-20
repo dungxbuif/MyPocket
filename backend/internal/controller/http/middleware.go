@@ -113,6 +113,11 @@ func (m *AuthMiddleware) recordAdvisorAudit(c *gin.Context, startedAt time.Time)
 	if m == nil || m.Audit == nil || c == nil || !strings.HasPrefix(c.FullPath(), advisorRoute) {
 		return
 	}
+	if audited, _ := c.Request.Context().Value(mcpAuditedDispatchContextKey{}).(bool); audited {
+		// The outer MCP queue owns this operation's audit. Authentication still
+		// ran above; avoid a duplicate synchronous sink call on inner dispatch.
+		return
+	}
 	status := c.Writer.Status()
 	reason := "allowed"
 	if status >= http.StatusInternalServerError {

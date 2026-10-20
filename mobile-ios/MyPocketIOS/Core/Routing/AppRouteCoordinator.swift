@@ -10,6 +10,15 @@ final class AppRouteCoordinator: ObservableObject {
         pendingRoute = route
     }
 
+    /// Drops a route that was waiting for authentication when the protected
+    /// session was explicitly ended or invalidated. A URL received while no
+    /// session exists is intentionally retained until the first successful
+    /// login; the app root decides when a real session transition invalidates
+    /// it.
+    func discardPendingRoute() {
+        pendingRoute = nil
+    }
+
     func consumeIfAuthenticated(_ phase: AuthPhase) -> AppRoute? {
         guard case .authenticated = phase, let route = pendingRoute else { return nil }
         pendingRoute = nil

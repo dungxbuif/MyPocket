@@ -4,7 +4,7 @@
         "description": "Current implemented API surface for local development.",
         "title": "MyPocket API",
         "contact": {},
-        "version": "1.1.0"
+        "version": "1.2.1"
     },
     "host": "localhost:8080",
     "basePath": "/",
@@ -192,6 +192,13 @@
                 ],
                 "summary": "Read persisted Finance Assistant messages",
                 "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Conversation identifier",
+                        "name": "conversation_id",
+                        "in": "query",
+                        "required": true
+                    },
                     {
                         "type": "integer",
                         "description": "Read messages before sequence",
@@ -422,6 +429,51 @@
                 "responses": {
                     "204": {
                         "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/runs/{id}/events": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "text/event-stream"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Replay persisted Finance Assistant run events as SSE",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Run ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Only return events after this sequence",
+                        "name": "after_seq",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SSE event stream",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
                     }
                 }
             }
@@ -1853,9 +1905,21 @@
                         "schema": {
                             "$ref": "#/definitions/httpapi.categoryInput"
                         }
+                    },
+                    {
+                        "type": "string",
+                        "description": "Stable printable ASCII key (1-128 bytes) reused to replay a category create",
+                        "name": "Idempotency-Key",
+                        "in": "header"
                     }
                 ],
                 "responses": {
+                    "200": {
+                        "description": "Idempotent replay",
+                        "schema": {
+                            "$ref": "#/definitions/entity.Category"
+                        }
+                    },
                     "201": {
                         "description": "Created",
                         "schema": {
@@ -2368,9 +2432,10 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.",
+                "description": "Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.\nSend JSON text fields, or multipart/form-data with type, title, description and optional screenshot file. Screenshots must be detected PNG, nonempty and at most 1048576 bytes; the entire multipart body is limited to 2097152 bytes. The x-multipart-form extension describes the alternate file variant without mixing Swagger body and formData parameters.",
                 "consumes": [
-                    "application/json"
+                    "application/json",
+                    "multipart/form-data"
                 ],
                 "produces": [
                     "application/json"
@@ -2381,10 +2446,9 @@
                 "summary": "Create owner-scoped feedback",
                 "parameters": [
                     {
-                        "description": "Feedback",
+                        "description": "JSON feedback fields; multipart alternative uses the same named fields and optional PNG screenshot",
                         "name": "feedback",
                         "in": "body",
-                        "required": true,
                         "schema": {
                             "$ref": "#/definitions/httpapi.feedbackInput"
                         }
@@ -2397,6 +2461,25 @@
                             "$ref": "#/definitions/entity.Feedback"
                         }
                     }
+                },
+                "x-multipart-form": {
+                    "fields": {
+                        "description": {
+                            "type": "string"
+                        },
+                        "screenshot": {
+                            "max_bytes": 1048576,
+                            "mime_type": "image/png",
+                            "type": "file"
+                        },
+                        "title": {
+                            "type": "string"
+                        },
+                        "type": {
+                            "type": "string"
+                        }
+                    },
+                    "max_body_bytes": 2097152
                 }
             }
         },
@@ -2902,6 +2985,230 @@
                 }
             }
         },
+        "/api/v1/mcp": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses. JWT and mpk_ API keys have identical same-owner user authority without scopes. POST carries initialize, tools/list and tools/call; tools/list publishes authoritative tool names and inputSchema values. Ordinary tools may write directly; Assistant prepared actions retain their canonical confirmation contract. GET and DELETE normally return 405 in stateless mode. Credential bootstrap/exchange and service-token routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors and audit privacy.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MCP"
+                ],
+                "summary": "MCP authenticated user-operation transport",
+                "parameters": [
+                    {
+                        "description": "SDK-owned MCP JSON-RPC request (POST only); discover business schemas through tools/list",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SDK JSON-RPC response; inspect result.isError and structuredContent.status/body for domain outcomes",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted SDK notification",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "SDK invalid protocol request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid, expired or revoked owner credential",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Origin is not allowed",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "405": {
+                        "description": "Stateless transport accepts POST",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "Outer request exceeds configured input bound",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses. JWT and mpk_ API keys have identical same-owner user authority without scopes. POST carries initialize, tools/list and tools/call; tools/list publishes authoritative tool names and inputSchema values. Ordinary tools may write directly; Assistant prepared actions retain their canonical confirmation contract. GET and DELETE normally return 405 in stateless mode. Credential bootstrap/exchange and service-token routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors and audit privacy.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MCP"
+                ],
+                "summary": "MCP authenticated user-operation transport",
+                "parameters": [
+                    {
+                        "description": "SDK-owned MCP JSON-RPC request (POST only); discover business schemas through tools/list",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SDK JSON-RPC response; inspect result.isError and structuredContent.status/body for domain outcomes",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted SDK notification",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "SDK invalid protocol request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid, expired or revoked owner credential",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Origin is not allowed",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "405": {
+                        "description": "Stateless transport accepts POST",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "Outer request exceeds configured input bound",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses. JWT and mpk_ API keys have identical same-owner user authority without scopes. POST carries initialize, tools/list and tools/call; tools/list publishes authoritative tool names and inputSchema values. Ordinary tools may write directly; Assistant prepared actions retain their canonical confirmation contract. GET and DELETE normally return 405 in stateless mode. Credential bootstrap/exchange and service-token routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors and audit privacy.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "MCP"
+                ],
+                "summary": "MCP authenticated user-operation transport",
+                "parameters": [
+                    {
+                        "description": "SDK-owned MCP JSON-RPC request (POST only); discover business schemas through tools/list",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "type": "object"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "SDK JSON-RPC response; inspect result.isError and structuredContent.status/body for domain outcomes",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted SDK notification",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "400": {
+                        "description": "SDK invalid protocol request",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "401": {
+                        "description": "Missing, invalid, expired or revoked owner credential",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "403": {
+                        "description": "Origin is not allowed",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "405": {
+                        "description": "Stateless transport accepts POST",
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    "413": {
+                        "description": "Outer request exceeds configured input bound",
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/months/{month}": {
             "get": {
                 "security": [
@@ -3024,6 +3331,92 @@
                             "items": {
                                 "$ref": "#/definitions/entity.Notification"
                             }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/notifications/devices": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Register an iOS push token for the authenticated owner",
+                "parameters": [
+                    {
+                        "description": "Provider token registration",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/usecase.PushTokenInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PushToken"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/notifications/devices/{id}": {
+            "delete": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Notifications"
+                ],
+                "summary": "Revoke an iOS push token owned by the authenticated user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Push token registration ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
                         }
                     }
                 }
@@ -3180,6 +3573,68 @@
                         }
                     }
                 }
+            },
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Updates symbol and/or name only. Portfolio trades remain immutable and are not rewritten.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Update portfolio asset metadata",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Metadata fields to update",
+                        "name": "asset",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.portfolioAssetUpdateInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PortfolioAsset"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
             }
         },
         "/api/v1/portfolio/assets/{id}/price": {
@@ -3189,6 +3644,7 @@
                         "BearerAuth": []
                     }
                 ],
+                "description": "latest_price must be present: null clears the price, zero records a known zero. Omitting the field or sending a null body returns 400 without modifying valuation.",
                 "consumes": [
                     "application/json"
                 ],
@@ -3222,6 +3678,109 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/entity.PortfolioAsset"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/assets/{id}/trade-corrections": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Commit a portfolio trade correction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stable correction key",
+                        "name": "Idempotency-Key",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Correction",
+                        "name": "correction",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.portfolioTradeCorrectionInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.PortfolioTradeCorrectionResult"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/assets/{id}/trade-corrections/preview": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Preview an immutable portfolio trade correction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Correction",
+                        "name": "correction",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.portfolioTradeCorrectionInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/repository.PortfolioTradeCorrectionResult"
                         }
                     }
                 }
@@ -5285,6 +5844,9 @@
                 "updated_at": {
                     "type": "string"
                 },
+                "version": {
+                    "type": "integer"
+                },
                 "wallet_ids": {
                     "type": "array",
                     "items": {
@@ -5805,6 +6367,9 @@
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "version": {
+                    "type": "integer"
                 }
             }
         },
@@ -5910,6 +6475,35 @@
                 },
                 "unit_price": {
                     "type": "integer"
+                }
+            }
+        },
+        "entity.PushToken": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "device_id": {
+                    "type": "string"
+                },
+                "device_name": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "platform": {
+                    "type": "string"
+                },
+                "revoked_at": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -6182,6 +6776,9 @@
                 },
                 "updated_at": {
                     "type": "string"
+                },
+                "version": {
+                    "type": "integer"
                 },
                 "wallet_id": {
                     "type": "string"
@@ -6661,6 +7258,9 @@
         "httpapi.categoryInput": {
             "type": "object",
             "properties": {
+                "expected_version": {
+                    "type": "integer"
+                },
                 "icon_key": {
                     "type": "string"
                 },
@@ -6868,11 +7468,69 @@
                 }
             }
         },
-        "httpapi.portfolioPriceInput": {
+        "httpapi.portfolioAssetUpdateInput": {
             "type": "object",
             "properties": {
+                "name": {
+                    "type": "string"
+                },
+                "symbol": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.portfolioPriceInput": {
+            "type": "object",
+            "required": [
+                "latest_price"
+            ],
+            "properties": {
                 "latest_price": {
+                    "type": "integer",
+                    "x-nullable": true
+                }
+            }
+        },
+        "httpapi.portfolioTradeCorrectionFields": {
+            "type": "object",
+            "properties": {
+                "fee": {
                     "type": "integer"
+                },
+                "note": {
+                    "type": "string"
+                },
+                "occurred_at": {
+                    "type": "string"
+                },
+                "quantity": {
+                    "type": "string"
+                },
+                "side": {
+                    "type": "string"
+                },
+                "unit_price": {
+                    "type": "integer"
+                }
+            }
+        },
+        "httpapi.portfolioTradeCorrectionInput": {
+            "type": "object",
+            "properties": {
+                "expected_asset_version": {
+                    "type": "integer"
+                },
+                "operation": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "replacement": {
+                    "$ref": "#/definitions/httpapi.portfolioTradeCorrectionFields"
+                },
+                "source_trade_id": {
+                    "type": "string"
                 }
             }
         },
@@ -6969,6 +7627,9 @@
                 "category_id": {
                     "type": "string"
                 },
+                "expected_version": {
+                    "type": "integer"
+                },
                 "included_in_reports": {
                     "type": "boolean"
                 },
@@ -7000,6 +7661,9 @@
                 },
                 "category_id": {
                     "type": "string"
+                },
+                "expected_version": {
+                    "type": "integer"
                 },
                 "included_in_reports": {
                     "type": "boolean"
@@ -7127,6 +7791,29 @@
                 }
             }
         },
+        "repository.PortfolioTradeCorrectionResult": {
+            "type": "object",
+            "properties": {
+                "affected_trade_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "after": {
+                    "$ref": "#/definitions/entity.PortfolioPosition"
+                },
+                "asset_version": {
+                    "type": "integer"
+                },
+                "before": {
+                    "$ref": "#/definitions/entity.PortfolioPosition"
+                },
+                "revision_id": {
+                    "type": "string"
+                }
+            }
+        },
         "usecase.DeviceCredentialOutput": {
             "type": "object",
             "properties": {
@@ -7194,6 +7881,26 @@
                 },
                 "user": {
                     "$ref": "#/definitions/usecase.UserProfile"
+                }
+            }
+        },
+        "usecase.PushTokenInput": {
+            "type": "object",
+            "properties": {
+                "device_id": {
+                    "type": "string"
+                },
+                "device_name": {
+                    "type": "string"
+                },
+                "environment": {
+                    "type": "string"
+                },
+                "platform": {
+                    "type": "string"
+                },
+                "token": {
+                    "type": "string"
                 }
             }
         },

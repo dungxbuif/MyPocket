@@ -2,9 +2,11 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -80,6 +82,51 @@ type advisorBudgetRepositoryStub struct {
 	idempotencyKey string
 }
 
+type advisorTransactionRepositoryStub struct {
+	existing *entity.Transaction
+	updated  map[string]any
+}
+
+func (s *advisorTransactionRepositoryStub) List(string) ([]entity.Transaction, error) {
+	return nil, nil
+}
+func (s *advisorTransactionRepositoryStub) Find(ownerID, id string) (*entity.Transaction, error) {
+	if s.existing == nil || s.existing.OwnerID != ownerID || s.existing.ID != id {
+		return nil, repository.ErrNotFound
+	}
+	return s.existing, nil
+}
+func (s *advisorTransactionRepositoryStub) Create(*entity.Transaction) error           { return nil }
+func (s *advisorTransactionRepositoryStub) CreateAdjustment(*entity.Transaction) error { return nil }
+func (s *advisorTransactionRepositoryStub) BulkDelete(string, []string) error          { return nil }
+func (s *advisorTransactionRepositoryStub) Update(ownerID, id string, updates map[string]any) (*entity.Transaction, error) {
+	if _, err := s.Find(ownerID, id); err != nil {
+		return nil, err
+	}
+	s.updated = updates
+	return s.existing, nil
+}
+func (s *advisorTransactionRepositoryStub) Delete(string, string) error { return nil }
+
+func advisorJarLinkedTransactionView(action, actionID, transactionID, categoryID string) map[string]any {
+	return map[string]any{
+		"action_id": actionID, "action": action, "conversation_id": "conversation-1", "generation": int64(4),
+		"transaction_id": transactionID, "category_id": categoryID, "wallet_id": "22222222-2222-4222-8222-222222222222",
+		"type": entity.TransactionTypeExpense, "amount": int64(100), "occurred_at": "2026-09-10T10:00:00Z", "expected_version": int64(1),
+	}
+}
+
+func advisorJarLinkedTransactionDependencies(transactionID, categoryID, jarID string) (*advisorTransactionRepositoryStub, *transactionWalletRepositoryStub, *transactionCategoryRepositoryStub, *transactionUserRepositoryStub, *transactionJarRepositoryStub) {
+	return &advisorTransactionRepositoryStub{existing: &entity.Transaction{
+			ID: transactionID, OwnerID: "owner-1", WalletID: "22222222-2222-4222-8222-222222222222", CategoryID: &categoryID,
+			JarID: &jarID, Type: entity.TransactionTypeExpense, Amount: 100, OccurredAt: time.Date(2026, 9, 10, 10, 0, 0, 0, time.UTC), Version: 1,
+		}}, &transactionWalletRepositoryStub{wallets: map[string]entity.Wallet{
+			"22222222-2222-4222-8222-222222222222": {ID: "22222222-2222-4222-8222-222222222222", OwnerID: "owner-1", Type: entity.WalletTypeBasic},
+		}}, &transactionCategoryRepositoryStub{categories: []entity.Category{
+			{ID: categoryID, Kind: entity.TransactionTypeExpense, IsActive: true},
+		}}, &transactionUserRepositoryStub{user: entity.User{ID: "owner-1", Timezone: "Asia/Ho_Chi_Minh"}}, &transactionJarRepositoryStub{}
+}
+
 func (s *advisorBudgetRepositoryStub) List(string) ([]entity.Budget, error) { return nil, nil }
 func (s *advisorBudgetRepositoryStub) Save(owner string, budget *entity.Budget, creating bool) error {
 	budget.OwnerID = owner
@@ -149,12 +196,106 @@ func TestAdvisorRoutesExposeConversationSurface(t *testing.T) {
 		"GET /api/v1/ai/advisor/conversation/messages",
 		"POST /api/v1/ai/advisor/conversation/reset",
 		"GET /api/v1/ai/advisor/runs/:id",
+		"GET /api/v1/ai/advisor/runs/:id/events",
 		"POST /api/v1/ai/advisor/runs/:id/cancel",
 		"POST /api/v1/ai/advisor/actions/:action_id/confirm",
 	} {
 		if !routes[expected] {
 			t.Fatalf("missing route %s", expected)
 		}
+	}
+}
+
+func TestAdvisorCapabilitiesAdvertiseBoundedWriteActionContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.GET("/capabilities", (&AdvisorHandler{}).Capabilities)
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/capabilities", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	var envelope struct {
+		Data struct {
+			Enabled              bool     `json:"enabled"`
+			Write                bool     `json:"write"`
+			DirectWrites         bool     `json:"direct_writes"`
+			ProposalActions      bool     `json:"proposal_actions"`
+			ConfirmationRequired bool     `json:"confirmation_required"`
+			RunTimeoutSeconds    int      `json:"run_timeout_seconds"`
+			GroundingVersion     int      `json:"grounding_version"`
+			Tools                []string `json:"tools"`
+			Actions              []string `json:"actions"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &envelope); err != nil {
+		t.Fatal(err)
+	}
+	if envelope.Data.Enabled || envelope.Data.Write {
+		t.Fatalf("unconfigured advisor must remain disabled and non-mutating: %+v", envelope.Data)
+	}
+	if envelope.Data.DirectWrites || !envelope.Data.ProposalActions || !envelope.Data.ConfirmationRequired {
+		t.Fatalf("advisor proposal contract drifted: %+v", envelope.Data)
+	}
+	if envelope.Data.RunTimeoutSeconds != 240 || envelope.Data.GroundingVersion != 1 {
+		t.Fatalf("advisor lifecycle metadata drifted: %+v", envelope.Data)
+	}
+	wantTools := []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget", "propose_create_transaction", "propose_update_transaction", "propose_delete_transaction", "propose_transfer_wallet", "propose_create_category", "propose_update_category", "propose_recategorize_transaction"}
+	wantActions := []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction"}
+	if !reflect.DeepEqual(envelope.Data.Tools, wantTools) {
+		t.Fatalf("capability tool set drifted: got=%v want=%v", envelope.Data.Tools, wantTools)
+	}
+	if !reflect.DeepEqual(envelope.Data.Actions, wantActions) {
+		t.Fatalf("capability action set drifted: got=%v want=%v", envelope.Data.Actions, wantActions)
+	}
+}
+
+type advisorEventStoreStub struct {
+	advisorActionStore
+	run    *entity.AdvisorRun
+	events []entity.AdvisorEvent
+}
+
+func (s *advisorEventStoreStub) GetRun(_ context.Context, ownerID, runID string) (*entity.AdvisorRun, error) {
+	if s.run == nil || ownerID != s.run.OwnerID || runID != s.run.ID {
+		return nil, repository.ErrNotFound
+	}
+	return s.run, nil
+}
+
+func (s *advisorEventStoreStub) ListEvents(_ context.Context, ownerID, runID string, afterSeq int64, _ int) ([]entity.AdvisorEvent, error) {
+	if s.run == nil || ownerID != s.run.OwnerID || runID != s.run.ID {
+		return nil, repository.ErrNotFound
+	}
+	result := make([]entity.AdvisorEvent, 0, len(s.events))
+	for _, event := range s.events {
+		if event.Seq > afterSeq {
+			result = append(result, event)
+		}
+	}
+	return result, nil
+}
+
+func TestAdvisorRunEventsReplaysOwnerScopedSSE(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &advisorEventStoreStub{
+		run:    &entity.AdvisorRun{ID: "run-1", OwnerID: "owner-1", Status: entity.AdvisorStatusCompleted},
+		events: []entity.AdvisorEvent{{RunID: "run-1", Seq: 1, Type: "run.completed", Payload: map[string]any{"text": "ok"}}},
+	}
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
+	engine.GET("/runs/:id/events", (&AdvisorHandler{Service: &usecase.AdvisorService{Store: store}}).RunEvents)
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/runs/run-1/events?after_seq=0", nil))
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if got := recorder.Header().Get("Content-Type"); got != "text/event-stream; charset=utf-8" {
+		t.Fatalf("content type=%q", got)
+	}
+	body := recorder.Body.String()
+	if !strings.Contains(body, "id: 1\nevent: run.completed\ndata:") || !strings.Contains(body, `"run_id":"run-1"`) {
+		t.Fatalf("unexpected SSE body: %s", body)
 	}
 }
 
@@ -293,6 +434,69 @@ func TestAdvisorConfirmBudgetUpdateUsesPersistedProposal(t *testing.T) {
 	}
 }
 
+func TestAdvisorConfirmTransactionUpdatePreservesExistingJar(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	transactionID := "11111111-1111-4111-8111-111111111111"
+	categoryID := "33333333-3333-4333-8333-333333333333"
+	jarID := "44444444-4444-4444-8444-444444444444"
+	transactions, wallets, categories, users, jars := advisorJarLinkedTransactionDependencies(transactionID, categoryID, jarID)
+	store := &advisorActionStore{messages: []entity.AdvisorMessage{{
+		ConversationID: "conversation-1", Generation: 4, Role: entity.AdvisorRoleAssistant,
+		Parts: []entity.AdvisorPart{{Type: "transaction_confirmation", Data: map[string]any{"view": advisorJarLinkedTransactionView("update_transaction", "transaction-update-jar-1", transactionID, categoryID)}}},
+	}}}
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
+	engine.POST("/actions/:action_id/confirm", (&AdvisorHandler{
+		Service: &usecase.AdvisorService{Store: store}, Transactions: transactions, Wallets: wallets,
+		Categories: categories, Users: users, Jars: jars,
+	}).ConfirmAction)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/actions/transaction-update-jar-1/confirm", strings.NewReader(`{"conversation_id":"conversation-1","generation":4}`))
+	request.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	gotJar, ok := transactions.updated["jar_id"].(*string)
+	if !ok || gotJar == nil || *gotJar != jarID {
+		t.Fatalf("AI update cleared existing jar: updates=%#v", transactions.updated)
+	}
+}
+
+func TestAdvisorConfirmRecategorizeJarLinkedTransactionUsesJarValidationDependencies(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	transactionID := "11111111-1111-4111-8111-111111111111"
+	oldCategoryID := "33333333-3333-4333-8333-333333333333"
+	newCategoryID := "55555555-5555-4555-8555-555555555555"
+	jarID := "44444444-4444-4444-8444-444444444444"
+	transactions, wallets, categories, users, jars := advisorJarLinkedTransactionDependencies(transactionID, oldCategoryID, jarID)
+	categories.categories = append(categories.categories, entity.Category{ID: newCategoryID, Kind: entity.TransactionTypeExpense, IsActive: true})
+	store := &advisorActionStore{messages: []entity.AdvisorMessage{{
+		ConversationID: "conversation-1", Generation: 4, Role: entity.AdvisorRoleAssistant,
+		Parts: []entity.AdvisorPart{{Type: "transaction_confirmation", Data: map[string]any{"view": map[string]any{
+			"action_id": "transaction-recat-jar-1", "action": "recategorize_transaction", "conversation_id": "conversation-1", "generation": int64(4),
+			"transaction_id": transactionID, "category_id": newCategoryID, "expected_version": int64(1),
+		}}}},
+	}}}
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
+	engine.POST("/actions/:action_id/confirm", (&AdvisorHandler{
+		Service: &usecase.AdvisorService{Store: store}, Transactions: transactions, Wallets: wallets,
+		Categories: categories, Users: users, Jars: jars,
+	}).ConfirmAction)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/actions/transaction-recat-jar-1/confirm", strings.NewReader(`{"conversation_id":"conversation-1","generation":4}`))
+	request.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	gotJar, ok := transactions.updated["jar_id"].(*string)
+	if !ok || gotJar == nil || *gotJar != jarID {
+		t.Fatalf("recategorization did not preserve jar: updates=%#v", transactions.updated)
+	}
+}
+
 func TestAdvisorConfirmWalletActionRejectsStaleGenerationAndClientFields(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	store := &advisorActionStore{messages: []entity.AdvisorMessage{{
@@ -321,6 +525,28 @@ func TestAdvisorConfirmWalletActionRejectsStaleGenerationAndClientFields(t *test
 	engine.ServeHTTP(tampered, tamperedRequest)
 	if tampered.Code != http.StatusBadRequest {
 		t.Fatalf("tampered action status=%d body=%s", tampered.Code, tampered.Body.String())
+	}
+}
+
+func TestAdvisorConfirmVersionedActionRejectsProposalWithoutExpectedVersion(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &advisorActionStore{messages: []entity.AdvisorMessage{{
+		ConversationID: "conversation-1", Generation: 4, Role: entity.AdvisorRoleAssistant,
+		Parts: []entity.AdvisorPart{{Type: "transaction_confirmation", Data: map[string]any{"view": map[string]any{
+			"action_id": "transaction-update-1", "action": "update_transaction", "conversation_id": "conversation-1", "generation": int64(4),
+			"transaction_id": "11111111-1111-4111-8111-111111111111", "wallet_id": "22222222-2222-4222-8222-222222222222", "type": "expense", "amount": int64(100),
+		}}}},
+	}}}
+	service := &usecase.AdvisorService{Store: store}
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
+	engine.POST("/actions/:action_id/confirm", (&AdvisorHandler{Service: service}).ConfirmAction)
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPost, "/actions/transaction-update-1/confirm", strings.NewReader(`{"conversation_id":"conversation-1","generation":4}`))
+	request.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusConflict || !strings.Contains(recorder.Body.String(), "advisor_action_stale") {
+		t.Fatalf("missing expected version must be rejected before dispatch: status=%d body=%s", recorder.Code, recorder.Body.String())
 	}
 }
 
@@ -354,6 +580,22 @@ func TestAdvisorFailureMapsPurgedHistoryToGone(t *testing.T) {
 	}
 	if errors.Is(repository.ErrAdvisorPurged, repository.ErrAdvisorRequestConflict) {
 		t.Fatal("purged and conflict errors must remain distinct")
+	}
+}
+
+func TestAdvisorFailureMapsProviderOutageToServiceUnavailable(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.GET("/advisor-provider-error", func(c *gin.Context) {
+		advisorFailure(c, usecase.ErrAdvisorProviderUnavailable)
+	})
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/advisor-provider-error", nil))
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("provider outage status=%d, want503; body=%s", recorder.Code, recorder.Body.String())
+	}
+	if !strings.Contains(recorder.Body.String(), "advisor_unavailable") {
+		t.Fatalf("provider outage code missing: %s", recorder.Body.String())
 	}
 }
 

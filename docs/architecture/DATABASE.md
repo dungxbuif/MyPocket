@@ -41,9 +41,27 @@ referenced user data; restore from a database backup is the recovery path.
 | `000030` | Adds category active flag. | Existing categories remain active. |
 | `000031` | Adds protected device sign-in credentials. | Additive owner-linked table. |
 | `000032` | Adds owner feedback resolution fields. | Existing feedback defaults unresolved. |
+| `000033` | Adds advisor idle timestamps and the expiry scan index. | Backfills from existing user messages; no financial rows are deleted. |
+| `000034` | Adds idempotent advisor reset requests. | Content-free owner ledger; no financial rows are changed. |
+| `000035` | Adds versioned recurring budget series and generated-period state. | Additive; existing budgets and ledger rows remain unchanged. |
+| `000036` | Adds owner-scoped iOS push-token registrations. | Additive; registration only, no APNs delivery or token response. |
+| `000037` | Adds the redacted audit delivery outbox. | Additive; unique stream/event keys, leased retries, no financial content. |
+| `000038` | Adds optimistic portfolio asset versions and immutable trade correction revisions. | Additive; original trades remain unchanged, corrections are owner-scoped and replayed from the full history. |
+| `000039` | Adds durable owner-scoped APNs delivery hand-off rows. | Additive; deduped route payloads only, no provider call or token exposure. |
+| `000040` | Adds optimistic-lock versions to ordinary transactions and personal categories. | Additive; existing rows default to version `1`; stale writes fail closed with a conflict. |
 
 The dedicated native fixture database on local55434 is verified version `32`, `dirty=false`;
 the stage-v1 baseline and later additive migrations own the complete schema.
+
+The current unreleased candidate must advance a version-34 production database
+through `000035` → `000036` → `000037` → `000038` → `000039` → `000040` in order.
+The API image must be compatible with the schema before the worker is enabled.
+Validate a custom
+format backup and a clean migration version (`dirty=false`) before the change;
+do not use `force` as a normal rollout or rollback mechanism. The read-only
+checkout preflight is [`scripts/mypocket-rollout-preflight.sh`](../../scripts/mypocket-rollout-preflight.sh);
+the operational sequence and rollback evidence are in
+[`ROLLOUT_READINESS.md`](../operations/ROLLOUT_READINESS.md).
 
 ## Financial replay receipts
 

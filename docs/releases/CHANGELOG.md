@@ -10,6 +10,242 @@ shared_fields: [status]
 
 # Changelog
 
+## 1.2.1 — 2026-10-20
+
+- Fix Advisor proposal/context/evidence/repair/reaper integration.
+- Recover invalid search-range arguments within existing bounds.
+- Keep migration 41 compatible with old API writers during rollout.
+- Native build 1.2.1 (4) includes run observer; Swagger version corrected.
+  [Release evidence](REL-1.2.1-20261020.md).
+- Production API and worker deployed with migration 000041; financial checksums
+  were unchanged and the API-only web topology was preserved.
+- Signed iPhone build 1.2.1 (4) installed and launched. Full device UAT,
+  Face ID, offline and Mobile MCP/WDA acceptance remain separate gates.
+
+## Finance Assistant reliability — unreleased (2026-10-20)
+
+- Review correction: enforce run-local proposal snapshots inside the actual
+  orchestrator, load/revalidate continuation references, enforce context and
+  transcript byte limits, pair repair tool results, retain terminal completion
+  after the finance-tool budget and derive final labels/help from server data.
+- Recheck renewed leases under the reaper lock. Reject duplicate evidence call
+  identities instead of entering a collision loop. Dataset schema checks are
+  explicitly separate from live-model quality acceptance.
+
+- Add owner-scoped category catalog/version snapshots for advisor tools.
+- Add migration 000041 runtime deadlines, lease fencing, independent reaping
+  and atomic assistant completion with replay-safe receipts.
+- Bound advisor context to visible UTF-8 text plus validated references, and add
+  optional typed `finish_answer` evidence rendering so server-owned facts supply
+  financial values.
+- Add typed money/count/version facts for comparison, transaction, wallet,
+  budget, goal, jar and search cards; invalid finals get one bounded repair and
+  then a card-only fallback.
+- Add native run observation metadata and reconnect polling without a fixed
+  iteration cutoff.
+- Feature flags `AI_ADVISOR_RUN_LEASES_ENABLED` and
+  `AI_ADVISOR_GROUNDING_ENABLED` default to false. This local candidate is not
+  silently enabled by this release; integrated/live/device limits remain
+  documented in the release evidence.
+
+## Planning documentation — 2026-10-20 (not a release)
+
+- Add the [Finance Assistant reliability spec](../superpowers/specs/2026-10-20-advisor-reliability-design.md)
+  and [seven-task implementation plan](../superpowers/plans/2026-10-20-advisor-reliability.md).
+  The proposal covers resource versions, recoverable runs, atomic completion,
+  native observation, bounded context and financial grounding. No product code,
+  public runtime API, schema, model configuration or release artifact changes.
+
+## 1.2.0 — 2026-10-20
+
+- Harden Finance Assistant transaction updates so an omitted jar keeps its
+  existing assignment; recategorization and update confirmations use the same
+  owner-scoped dependency set and replay protections.
+- Normalize and bound model usage metadata per provider call, preserving
+  latency/token diagnostics without accepting arbitrary provider payloads.
+- Prevent native Assistant and AI-entry races with stable request IDs,
+  double-submit guards, stale-poll cancellation and per-proposal save locks.
+- Add the official-SDK `/api/v1/mcp` integration surface with 101 authenticated
+  same-owner operations and JWT/API-key authority parity.
+- Publish the Finance Assistant quality fixtures, live-loop opt-in probes,
+  native build handoff, API/MCP references and feedback traceability evidence.
+- Reconcile the Account-root Add regression with the approved UI contract:
+  Account root retains Add; child routes and Assistant hide it.
+- Native release metadata is now `1.2.0 (3)`. This source release does not by
+  itself claim production deployment, physical Face ID/APNs acceptance or
+  owner resolution of production feedback.
+- Production feedback audit: 11 historical unresolved reports are covered by
+  deterministic local evidence, six still require real device/provider/data
+  UAT, and portfolio correction remains a product/accounting contract gap.
+  Two new reports remain open: automatic cleanup scheduling for transient
+  AI-entry attachments and reuse of the canonical transaction card for each
+  extracted proposal.
+
+## MCP/API parity — 2026-10-20 (unreleased)
+
+- Add `/api/v1/mcp` with the official Go SDK v1.8.0, stateless Streamable HTTP
+  JSON responses and authenticated discovery of 101 named user-operation tools.
+  JWT and API-key callers retain equal same-owner authority without scopes.
+- Dispatch ordinary writes through canonical REST validation, receipts and CAS.
+  Assistant prepared actions retain their existing explicit confirmation flow.
+- Preserve async handles, finite advisor event replay, bounded AI-entry
+  multipart uploads and ephemeral attachment resource links with REST fallback.
+- Include optional PNG feedback screenshots (up to 1 MiB), successful screenshot
+  resource links and durable category-create replay receipts. Preserve feedback
+  domain events through bounded MCP audit queues; a stalled audit sink no longer
+  holds MCP advisor/feedback responses. Direct REST audit behavior is preserved.
+- Publish authenticated OpenAPI transport metadata and the
+  [human/agent integration contract](../ai/mcp-api-parity.md), including the
+  19 classified non-tool entries, errors, limits, credential lifecycle and
+  audit privacy. [ADR-025](../decisions/ADR-025-mcp-api-parity.md).
+- Local route, discovery and documentation contracts are checked separately
+  from staging, production, provider and device acceptance. No rollout is
+  performed by this change.
+
+## AI Assistant knowledge/context — 2026-10-20 (unreleased)
+
+- Expanded the source-controlled Finance Assistant handbook and product-help
+  catalog to cover the maintained native navigation and supported proposal
+  boundaries, including explicit unsupported feature boundaries.
+- Added account-local “today” context with deterministic timezone tests. Missing
+  or invalid account timezones fail closed instead of guessing relative dates.
+- Preserved the 12-message visible-text limit and no-hidden-memory rule; no API,
+  provider, database or vector/RAG infrastructure changed.
+- Verification: `go test ./internal/usecase -run 'Advisor|AIEval' -count=1`.
+
+## Native Release build — 2026-10-20
+
+- Reconciled the populated API-backed native UI fixture: 5/5 simulator tests
+  pass against disposable PostgreSQL/Redis data, including weekly ledger,
+  report trend/insider cards, savings transfer-versus-surplus and
+  overview→ledger→wallet transaction parity.
+- Release configuration was built with the production API base URL, signed
+  with the configured Apple Development profile, installed and launched on
+  the paired iPhone 15 Plus. Physical touch, Face ID and manual visual UAT
+  remain separate gates because the device was locked during automation.
+
+## Backlog hardening build — 2026-10-20 (unreleased)
+
+- Added native portfolio trade-correction review UI using shared overflow,
+  editor, preview and confirmation components. Corrections remain immutable,
+  require a reason, asset-version check and idempotency key.
+- Hardened Finance Assistant provider failures to stable `503
+  advisor_unavailable` responses without leaking upstream bodies, URLs,
+  prompts or credentials.
+- Published the capabilities contract explicitly: proposal actions are
+  supported, direct writes remain disabled, and confirmation is required.
+- Reconciled AI action/version-lock documentation and stale backlog entries.
+- Verification: backend `go test ./...` pass, web build/typecheck/design
+  checks pass, native `MyPocketIOSTests` 368/368 pass.
+- Fresh Personal Team Release build installed and launched on the paired
+  iPhone 15 Plus; screenshot evidence is recorded in the physical UAT log.
+
+This is not an App Store/TestFlight release. APNs, live provider/storage UAT,
+production migration readback and full physical touch/Face ID acceptance remain
+open gates.
+
+The production API candidate image is available in the registry as
+`registry.dungxbuif.com/mypocket-api:release-20261020-4e44d364946a` with digest
+`sha256:28e4d2450df20f205e38d82aa923fb6fa86df46dd25ff695a1f4579098983807`.
+The image has not been attached to a production service yet.
+
+## Optimistic locking for AI confirmations — 2026-10-20 (unreleased)
+
+- Add persisted positive row versions for transactions and personal categories
+  through migration `000040`.
+- Require `expected_version` in AI transaction/category edit proposals and
+  reject missing or stale confirmation snapshots with HTTP `409` before any
+  financial write.
+- Increment versions for ordinary edits, category archive/restore, category
+  wallet replacement and paired transfer edits; keep owner scoping and legacy
+  non-AI requests compatible.
+
+## Portfolio correction safety — 2026-10-20 (unreleased)
+
+- Reject portfolio trade-correction previews captured against a missing or stale
+  asset version, so a read-only projection cannot be mistaken for a commit-ready
+  result. The append-only revision/accounting contract is unchanged.
+
+## 1.1.0 production API/UAT rollout — 2026-10-19
+
+- Deployed API and worker image `release-20261019-uat` at digest
+  `sha256:fcada5514b8adc7392e669cd9afc9d2947f5673e795dee61b2ecc6dfa0b6143f`.
+- Follow-up image `release-20261019-uat2` at digest
+  `sha256:17e3842326abb397d5184e6a5d407b51efb37ec05230171ab83128c7626cd6b7`
+  includes provider/OCR diagnostic hardening; API and worker were updated and
+  health, route parity and authenticated UAT regression were rerun.
+- Applied migrations 035–037 after a validated production backup; schema is at
+  version 37 with `dirty=false`. Existing financial data was preserved.
+- Strict public route audit passed with 88 live paths matching the local
+  OpenAPI contract. Production health and Swagger returned successfully.
+- Created an isolated production UAT account and verified login, refresh,
+  profile, wallets, categories, home, savings report, transaction creation and
+  atomic wallet transfer. Credentials are not recorded in source control.
+- Ran the authenticated GET-only UAT regression harness against the deployed
+  API. All populated core read surfaces returned HTTP 200; no additional
+  production mutation was attempted. The harness deliberately leaves
+  provider-backed, APNs, Face ID, offline-network and human visual gates open.
+- A Personal Team debug build (`MyPocket 1.1.0 (2)`) has been installed and
+  launched on the paired iPhone from Xcode. This is not a signed distribution
+  release: Associated Domains/APNs are not enabled for the Personal Team
+  build, and this entry does not claim APNs delivery or full physical touch
+  regression. Distribution signing remains a separate release gate.
+- Harden provider/OCR diagnostics: malformed, incomplete or empty model
+  responses now expose stable stage/code errors without leaking provider
+  response bodies, URLs, source text or credentials.
+
+## Feedback reliability — 2026-10-19 (unreleased)
+
+- Enable Add Transaction from Account and return to the originating tab;
+  restore secondary-screen edge Back without discarding editor changes. Share
+  transaction-row spacing and safely restore gesture delegates across routes.
+- Require explicit `latest_price` when updating portfolio prices: omitted input
+  returns 400 without erasing the saved price, while explicit null still clears
+  it. Serialize asset deletion with trade creation to protect committed trades.
+- Preserve completed OCR evidence across later-image and rejected-model-response
+  failures; do not mark unread attachment slots completed or fabricate drafts.
+  Improve completed-poll error classification and partial-batch status.
+- Add grounded jar guidance to assistant help and allow confirmation of older
+  persisted action cards without enlarging model context or weakening owner,
+  generation and replay checks.
+- Add authenticated persisted advisor-event SSE replay with cursor and owner
+  isolation; add portfolio asset metadata correction while keeping trade
+  history append-only; add timezone-aware budget-threshold inbox production
+  with PostgreSQL deduplication. Add owner-scoped iOS push-token
+  registration/revocation metadata with same-owner device upsert, foreign-token
+  conflict protection and token redaction. APNs credentials, entitlements,
+  provider calls and delivery retries remain an external gate.
+- Harden Redis access-audit delivery with a stable event fingerprint, atomic
+  duplicate suppression for 24 hours, bounded 10,000-entry stream retention,
+  and an explicit three-attempt client retry budget. Durable outbox delivery,
+  alerting and recovery beyond that retry window remain release gates.
+- Preserve owner/server-scoped native snapshots while switching tabs or
+  refreshing; show inline progress when data exists and reserve full-screen
+  loading for the first empty load. Add offline wallet deletion persistence and
+  cache/auth isolation regressions. Reject provider tool calls with missing or
+  duplicate IDs before any finance tool executes, and mark sync capabilities
+  `no-store`.
+- Lock the native iOS app to portrait orientation at the application target and
+  add a UI regression guard for landscape rotation requests.
+- Add a read-only Release artifact preflight that validates the resolved bundle
+  identity/version, production HTTPS API URL, portrait-only orientation and
+  absence of obvious secret-like files; it does not sign or install the app.
+- Verification: backend race gate 499 passed test/subtest results on disposable
+  PostgreSQL/Redis; iOS 361 unit + 6 selected UI tests; portrait-only Release simulator build,
+  vet and base/project guards. Fourteen opt-in live probes were not run.
+- Internal architecture, public Markdown guides/agent sections and generated
+  OpenAPI updated. The API/worker production rollout is recorded in the dated
+  1.1.0 entry above; physical iPhone installation and human acceptance remain
+  external gates. [Remaining work](../work/tickets/FEEDBACK-20261019-REMAINING.md).
+
+> Historical pre-rollout snapshot (superseded by the 2026-10-19 UAT2 entry
+> above): production health remained 200 and
+the API stayed at the previously deployed 78-path `1.1.0` contract. Migration
+preflight, native project/base guards, diff check and a warnings-as-errors
+Release simulator build passed. Physical installation is still not included:
+Xcode has no signed-in account/profile for team `GYRA8D4M54` and
+`com.mypocket.ios`; the connected device remains on `1.1.0 (2)`.
+
 ## Native parity checkpoint — 2026-10-16 (unreleased)
 
 - Added shared native SF Pro typography/icon tokens, selected-tab surface pill,

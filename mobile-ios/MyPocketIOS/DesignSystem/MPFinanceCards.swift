@@ -869,6 +869,29 @@ enum PortfolioReferenceCopy {
     static let saveTradeActionAccessibilityID = "portfolio-save-trade"
 }
 
+/// Stable labels and identity rules for the immutable portfolio correction
+/// flow. The editor uses the same overflow/menu and action vocabulary across
+/// asset cards; feature code must not invent one-off correction controls.
+enum PortfolioCorrectionPresentation {
+    static let replaceAction = "Sửa giao dịch"
+    static let voidAction = "Hủy giao dịch"
+    static let previewAction = "Xem thay đổi"
+    static let confirmAction = "Xác nhận sửa"
+    static let reasonLabel = "Lý do sửa"
+    static let previewTitle = "Xem lại thay đổi"
+    static let confirmationMessage = "Lịch sử gốc vẫn được giữ để đối soát."
+    static let previewAccessibilityID = "portfolio-correction-preview"
+    static let confirmAccessibilityID = "portfolio-correction-confirm"
+
+    static func operationLabel(_ operation: String) -> String {
+        operation == "void" ? voidAction : replaceAction
+    }
+
+    static func menuAccessibilityID(tradeID: String) -> String {
+        "portfolio-trade-menu-\(tradeID)"
+    }
+}
+
 struct MPOverviewReportCard: View {
     let summary: MonthSummaryModel
     let weekIncome: Int64

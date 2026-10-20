@@ -45,6 +45,20 @@ struct NotificationModel: Codable, Identifiable, Equatable, Sendable {
     let createdAt: String
 }
 
+/// Server metadata for an APNs registration. The provider token is deliberately
+/// not represented here: the backend accepts it only for registration and
+/// never returns it to the app or persists it in local state.
+struct PushTokenRegistrationModel: Codable, Identifiable, Equatable, Sendable {
+    let id: String
+    let deviceID: String
+    let deviceName: String
+    let platform: String
+    let environment: String
+    let revokedAt: String?
+    let createdAt: String
+    let updatedAt: String
+}
+
 struct CategoryModel: Codable, Identifiable, Equatable, Sendable {
     let id: String
     var ownerID: String?
@@ -576,6 +590,10 @@ struct PortfolioAssetModel: Codable, Identifiable, Sendable {
     let id: String
     var symbol: String
     var name: String
+    /// Server-side optimistic version used by trade-correction preview/commit.
+    /// Optional keeps older deployed summaries decodable; correction callers
+    /// must refuse to commit when this value is unavailable.
+    var version: Int64?
     var latestPrice: Int64?
     var latestPriceAt: String?
 
@@ -583,6 +601,7 @@ struct PortfolioAssetModel: Codable, Identifiable, Sendable {
         case id
         case symbol
         case name
+        case version
         case latestPrice
         case latestPriceAt
     }

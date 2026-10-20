@@ -56,6 +56,7 @@ struct AdvisorHistoryMetaModel: Sendable, Equatable {
     var lastUserMessageAt: String?
     var expiresAt: String?
     var serverTime: String
+    var activeRun: AdvisorActiveRunModel?
 
     init?(json: JSONValue?) {
         guard case .object(let object) = json,
@@ -67,6 +68,24 @@ struct AdvisorHistoryMetaModel: Sendable, Equatable {
         if case .string(let value) = object["last_user_message_at"] { self.lastUserMessageAt = value } else { self.lastUserMessageAt = nil }
         if case .string(let value) = object["expires_at"] { self.expiresAt = value } else { self.expiresAt = nil }
         self.serverTime = serverTime
+        self.activeRun = AdvisorActiveRunModel(json: object["active_run"])
+    }
+}
+
+struct AdvisorActiveRunModel: Sendable, Equatable {
+    var id: String
+    var status: String
+    var createdAt: String?
+    var deadlineAt: String?
+
+    init?(json: JSONValue?) {
+        guard case .object(let object) = json,
+              case .string(let id) = object["id"], !id.isEmpty,
+              case .string(let status) = object["status"], !status.isEmpty else { return nil }
+        self.id = id
+        self.status = status
+        if case .string(let value) = object["created_at"] { self.createdAt = value } else { self.createdAt = nil }
+        if case .string(let value) = object["deadline_at"] { self.deadlineAt = value } else { self.deadlineAt = nil }
     }
 }
 
@@ -80,6 +99,8 @@ struct AdvisorCapabilitiesModel: Codable, Sendable {
     var write: Bool
     var partsVersion: Int
     var tools: [String]
+    var runTimeoutSeconds: Int? = nil
+    var groundingVersion: Int? = nil
 }
 
 struct AdvisorOverviewModel: Decodable, Sendable {
@@ -114,4 +135,9 @@ struct AdvisorRunModel: Codable, Sendable {
     var conversationID: String
     var status: String
     var errorCode: String?
+    var ownerID: String? = nil
+    var serverTime: String? = nil
+    var deadlineAt: String? = nil
+    var retryAfterMs: Int? = nil
+    var createdAt: String? = nil
 }

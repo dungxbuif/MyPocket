@@ -10,6 +10,38 @@ shared_fields: [status, linked_decisions]
 
 # Architecture
 
+## Authenticated MCP boundary — 2026-10-20
+
+The local API candidate exposes `/api/v1/mcp` through the official
+`github.com/modelcontextprotocol/go-sdk/mcp` v1.8.0 stateless JSON Streamable
+HTTP transport. `NewApplicationRouter` is the single route assembly used by
+`cmd/api/main.go` and the independent route-parity gate. Add route families to
+that seam so every registered method/path must match the authenticated catalog
+or an explicit exclusion. The current catalog contains 101 tools and 19
+non-tool route classifications, including the transport and public docs.
+
+The SDK owns negotiation and protocol framing. Named descriptors own closed
+argument schemas and bounded JSON/query/path/multipart encoding; dispatch
+re-enters the canonical Gin router with the current bearer and request ID.
+Existing middleware/handlers remain authoritative for owner identity,
+validation, CAS, receipts and errors. JWT and persisted API keys have identical
+same-owner authority with no new scopes. Ordinary writes execute directly;
+Assistant prepared actions retain server-owned confirmation provenance.
+
+Async results return canonical handles, advisor replay is a bounded finite
+page, and attachment redirects become ephemeral resource links with an
+authenticated REST fallback. Synchronous dispatch observes caller cancellation;
+per-operation deadlines leave SDK response serialization live. MCP audit keeps
+only redacted metadata and bounded byte counts in a fixed 64-event queue with
+at most one delivery worker per handler; queue overflow drops events and
+durability begins only when the existing outbox accepts them. No schema is
+introduced by the adapter. Local verification is separate from staging,
+production deployment, live-provider and device acceptance.
+
+[ADR-025](../decisions/ADR-025-mcp-api-parity.md),
+[human/agent integration contract](../ai/mcp-api-parity.md),
+[verification](../work/VALIDATION_MATRIX.md).
+
 ## Current native runtime — 2026-10-14
 
 The maintained client is native SwiftUI under `mobile-ios/`; the web client is

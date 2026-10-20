@@ -44,7 +44,8 @@ func NewUserAPIKeyService(keys repository.UserAPIKeyRepository) *UserAPIKeyServi
 }
 
 func (s *UserAPIKeyService) Create(ctx context.Context, input APIKeyCreateInput) (APIKeyCreated, error) {
-	if s == nil || s.Keys == nil || strings.TrimSpace(input.OwnerID) == "" {
+	ownerID := strings.TrimSpace(input.OwnerID)
+	if s == nil || s.Keys == nil || ownerID == "" {
 		return APIKeyCreated{}, ErrAPIKeyUnavailable
 	}
 	name := strings.TrimSpace(input.Name)
@@ -65,7 +66,7 @@ func (s *UserAPIKeyService) Create(ctx context.Context, input APIKeyCreateInput)
 	}
 	lookup := base64.RawURLEncoding.EncodeToString(lookupBytes)
 	secret := "mpk_" + lookup + "." + base64.RawURLEncoding.EncodeToString(secretBytes)
-	key := entity.UserAPIKey{ID: uuid.NewString(), OwnerID: input.OwnerID, LookupID: lookup, Name: name, SecretHash: hashAPIKey(secret), Scopes: []string{}, ExpiresAt: input.ExpiresAt, CreatedAt: now, UpdatedAt: now}
+	key := entity.UserAPIKey{ID: uuid.NewString(), OwnerID: ownerID, LookupID: lookup, Name: name, SecretHash: hashAPIKey(secret), Scopes: []string{}, ExpiresAt: input.ExpiresAt, CreatedAt: now, UpdatedAt: now}
 	if err := s.Keys.Create(ctx, &key); err != nil {
 		return APIKeyCreated{}, err
 	}
@@ -87,7 +88,7 @@ func (s *UserAPIKeyService) Authenticate(ctx context.Context, secret string, _ [
 		return Principal{}, ErrAPIKeyInvalid
 	}
 	key, err := s.Keys.FindByLookup(ctx, parts[0])
-	if err != nil || key == nil || subtle.ConstantTimeCompare([]byte(key.SecretHash), []byte(hashAPIKey(secret))) != 1 || !key.ActiveAt(s.now()) {
+	if err != nil || key == nil || strings.TrimSpace(key.OwnerID) == "" || subtle.ConstantTimeCompare([]byte(key.SecretHash), []byte(hashAPIKey(secret))) != 1 || !key.ActiveAt(s.now()) {
 		return Principal{}, ErrAPIKeyInvalid
 	}
 	_ = s.Keys.TouchLastUsed(ctx, key.ID, s.now())

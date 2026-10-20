@@ -1,13 +1,19 @@
 package httpapi
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
+	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/mypocket/backend/internal/entity"
+	"github.com/mypocket/backend/internal/repository"
+	"github.com/mypocket/backend/internal/usecase"
 )
 
 type notificationRouteStub struct {
@@ -36,7 +42,7 @@ func TestNotificationRoutesExposeOwnerScopedInbox(t *testing.T) {
 	for _, route := range router.Engine.Routes() {
 		routes[route.Method+" "+route.Path] = true
 	}
-	for _, expected := range []string{"GET /api/v1/notifications", "POST /api/v1/notifications/:id/read"} {
+	for _, expected := range []string{"GET /api/v1/notifications", "POST /api/v1/notifications/:id/read", "POST /api/v1/notifications/devices", "DELETE /api/v1/notifications/devices/:id"} {
 		if !routes[expected] {
 			t.Fatalf("missing route %s", expected)
 		}
@@ -46,6 +52,55 @@ func TestNotificationRoutesExposeOwnerScopedInbox(t *testing.T) {
 			t.Fatalf("notification route must not be public: %s", route)
 		}
 	}
+}
+
+func TestPushTokenHandlersForwardOwnerAndNeverReturnToken(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	repo := &pushTokenHTTPRepo{items: map[string]entity.PushToken{}}
+	h := &NotificationHandler{PushTokens: usecase.NewPushTokenInteractor(repo)}
+	r := gin.New()
+	r.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
+	r.POST("/notifications/devices", h.RegisterPushToken)
+	r.DELETE("/notifications/devices/:id", h.RevokePushToken)
+	body, _ := json.Marshal(usecase.PushTokenInput{DeviceID: "iphone", DeviceName: "iPhone", Platform: "ios", Environment: "production", Token: strings.Repeat("a", 64)})
+	resp := httptest.NewRecorder()
+	r.ServeHTTP(resp, httptest.NewRequest(http.MethodPost, "/notifications/devices", bytes.NewReader(body)))
+	if resp.Code != http.StatusOK || strings.Contains(resp.Body.String(), strings.Repeat("a", 64)) {
+		t.Fatalf("token registration leaked/failed: status=%d body=%s", resp.Code, resp.Body.String())
+	}
+	var envelope struct {
+		Data entity.PushToken `json:"data"`
+	}
+	if err := json.Unmarshal(resp.Body.Bytes(), &envelope); err != nil || envelope.Data.ID == "" {
+		t.Fatalf("missing registration metadata: %s", resp.Body.String())
+	}
+	revoke := httptest.NewRecorder()
+	r.ServeHTTP(revoke, httptest.NewRequest(http.MethodDelete, "/notifications/devices/"+envelope.Data.ID, nil))
+	if revoke.Code != http.StatusNoContent || repo.items[envelope.Data.ID].RevokedAt == nil {
+		t.Fatalf("owner revoke failed: status=%d", revoke.Code)
+	}
+}
+
+type pushTokenHTTPRepo struct{ items map[string]entity.PushToken }
+
+func (r *pushTokenHTTPRepo) Save(_ context.Context, item *entity.PushToken) error {
+	for id, old := range r.items {
+		if old.OwnerID == item.OwnerID && old.DeviceID == item.DeviceID && old.Platform == item.Platform && old.Environment == item.Environment {
+			item.ID = id
+		}
+	}
+	r.items[item.ID] = *item
+	return nil
+}
+func (r *pushTokenHTTPRepo) Revoke(_ context.Context, owner, id string) error {
+	item, ok := r.items[id]
+	if !ok || item.OwnerID != owner {
+		return repository.ErrNotFound
+	}
+	now := time.Now()
+	item.RevokedAt = &now
+	r.items[id] = item
+	return nil
 }
 
 func TestNotificationHandlersForwardAuthenticatedOwner(t *testing.T) {

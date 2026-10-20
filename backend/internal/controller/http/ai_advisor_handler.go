@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"strconv"
@@ -66,6 +67,7 @@ func (r *Router) RegisterAdvisorRoutes(h *AdvisorHandler) {
 	g.POST("/messages/async", h.MessagesPostAsync)
 	g.POST("/actions/:action_id/confirm", h.ConfirmAction)
 	g.GET("/runs/:id", h.Run)
+	g.GET("/runs/:id/events", h.RunEvents)
 	g.POST("/runs/:id/cancel", h.Cancel)
 }
 
@@ -106,18 +108,46 @@ func (h *AdvisorHandler) ConfirmAction(c *gin.Context) {
 		advisorBadRequest(c)
 		return
 	}
-	messages, err := h.Service.Store.ListMessages(c.Request.Context(), owner, input.ConversationID, 0, 50)
-	if err != nil {
-		advisorFailure(c, err)
-		return
+	var view map[string]any
+	var found, stale bool
+	var beforeSeq int64
+	for {
+		messages, err := h.Service.Store.ListMessages(c.Request.Context(), owner, input.ConversationID, beforeSeq, 50)
+		if err != nil {
+			advisorFailure(c, err)
+			return
+		}
+		view, found, stale = findPreparedProposal(messages, actionID, input.ConversationID, input.Generation)
+		if found || stale || len(messages) < 50 {
+			break
+		}
+		// Confirmation cards remain actionable when history is paged. Move
+		// backwards without retaining pages or expanding the model context.
+		oldest := messages[0].Seq
+		for _, message := range messages[1:] {
+			if message.Seq < oldest {
+				oldest = message.Seq
+			}
+		}
+		if oldest <= 0 || beforeSeq > 0 && oldest >= beforeSeq {
+			break
+		}
+		beforeSeq = oldest
 	}
-	view, found, stale := findPreparedProposal(messages, actionID, input.ConversationID, input.Generation)
 	if stale {
 		Fail(c, http.StatusConflict, Problem{Code: "advisor_action_stale", Title: problemTitleBadRequest, Detail: "Đề xuất trợ lý đã hết hạn hoặc thuộc thế hệ hội thoại khác."})
 		return
 	}
 	if !found {
 		Fail(c, http.StatusNotFound, Problem{Code: "advisor_action_not_found", Title: problemTitleNotFound, Detail: "Không tìm thấy đề xuất trợ lý."})
+		return
+	}
+	// Versioned edits must carry the snapshot version captured when the card was
+	// prepared. Without it, dispatching through a legacy handler would silently
+	// re-read the current row and turn a stale AI card into an unconditional write.
+	// Force regeneration instead of allowing an unsafe confirmation.
+	if requiresAdvisorExpectedVersion(stringValue(view["action"])) && numberValue(view["expected_version"]) < 1 {
+		Fail(c, http.StatusConflict, Problem{Code: "advisor_action_stale", Title: problemTitleBadRequest, Detail: "Đề xuất trợ lý thiếu phiên bản dữ liệu; hãy tạo lại đề xuất."})
 		return
 	}
 	// Reuse the ordinary domain handler so validation and the durable mutation
@@ -181,8 +211,103 @@ func (h *AdvisorHandler) ConfirmAction(c *gin.Context) {
 		}
 		c.Params = gin.Params{{Key: "id", Value: budgetID}}
 		(&BudgetHandler{Budgets: h.Budgets, Wallets: h.Wallets, Categories: h.Categories, Transactions: h.Transactions, Users: h.Users}).UpdateBudget(c)
+	case "create_transaction":
+		if h.Transactions == nil || h.Wallets == nil || h.Categories == nil {
+			advisorFailure(c, errors.New("transaction action unavailable"))
+			return
+		}
+		NewTransactionHandler(h.Transactions, h.Wallets, h.Categories).CreateTransaction(c)
+	case "update_transaction":
+		if h.Transactions == nil || h.Wallets == nil || h.Categories == nil {
+			advisorFailure(c, errors.New("transaction action unavailable"))
+			return
+		}
+		transactionID := strings.TrimSpace(stringValue(view["transaction_id"]))
+		existing, findErr := h.Transactions.Find(owner, transactionID)
+		if findErr != nil || existing == nil {
+			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
+			return
+		}
+		// The current AI update proposal edits ordinary transaction fields only.
+		// Preserve the server-owned jar assignment instead of letting the complete
+		// replacement payload's omitted jar_id clear it accidentally.
+		view["jar_id"] = existing.JarID
+		payload, marshalErr := json.Marshal(view)
+		if marshalErr != nil {
+			advisorFailure(c, marshalErr)
+			return
+		}
+		request.Body = io.NopCloser(bytes.NewReader(payload))
+		request.ContentLength = int64(len(payload))
+		c.Request = request
+		c.Params = gin.Params{{Key: "id", Value: transactionID}}
+		transactionHandler := NewTransactionHandler(h.Transactions, h.Wallets, h.Categories)
+		transactionHandler.Users, transactionHandler.Jars = h.Users, h.Jars
+		transactionHandler.UpdateTransaction(c)
+	case "delete_transaction":
+		if h.Transactions == nil {
+			advisorFailure(c, errors.New("transaction action unavailable"))
+			return
+		}
+		c.Params = gin.Params{{Key: "id", Value: strings.TrimSpace(stringValue(view["transaction_id"]))}}
+		NewTransactionHandler(h.Transactions, h.Wallets, h.Categories).DeleteTransaction(c)
+	case "transfer_wallet":
+		if h.Transactions == nil || h.Wallets == nil || h.Categories == nil {
+			advisorFailure(c, errors.New("transfer action unavailable"))
+			return
+		}
+		NewTransactionHandler(h.Transactions, h.Wallets, h.Categories).CreateTransfer(c)
+	case "create_category":
+		if h.Categories == nil {
+			advisorFailure(c, errors.New("category action unavailable"))
+			return
+		}
+		(&CategoryHandler{Categories: usecase.NewCategoryInteractor(h.Categories)}).CreateCategory(c)
+	case "update_category":
+		if h.Categories == nil {
+			advisorFailure(c, errors.New("category action unavailable"))
+			return
+		}
+		c.Params = gin.Params{{Key: "id", Value: strings.TrimSpace(stringValue(view["category_id"]))}}
+		(&CategoryHandler{Categories: usecase.NewCategoryInteractor(h.Categories)}).UpdateCategory(c)
+	case "recategorize_transaction":
+		if h.Transactions == nil || h.Wallets == nil || h.Categories == nil {
+			advisorFailure(c, errors.New("transaction action unavailable"))
+			return
+		}
+		id := strings.TrimSpace(stringValue(view["transaction_id"]))
+		existing, findErr := h.Transactions.Find(owner, id)
+		if findErr != nil || existing == nil {
+			Fail(c, http.StatusNotFound, Problem{Code: problemCodeTransactionNotFound, Title: problemTitleNotFound, Detail: transactionNotFoundMessage})
+			return
+		}
+		if existing.TransferID != nil || existing.CreditKind != nil || existing.Type == entity.TransactionTypeAdjustment {
+			transactionBadRequest(c, "Chỉ có thể phân nhóm lại giao dịch thu/chi thông thường.")
+			return
+		}
+		payload, marshalErr := json.Marshal(map[string]any{"wallet_id": existing.WalletID, "category_id": stringValue(view["category_id"]), "jar_id": existing.JarID, "type": existing.Type, "amount": existing.Amount, "occurred_at": existing.OccurredAt.UTC().Format(time.RFC3339), "note": existing.Note, "included_in_reports": existing.IncludedInReports, "expected_version": numberValue(view["expected_version"])})
+		if marshalErr != nil {
+			advisorFailure(c, marshalErr)
+			return
+		}
+		request.Body = io.NopCloser(bytes.NewReader(payload))
+		request.ContentLength = int64(len(payload))
+		c.Request = request
+		c.Params = gin.Params{{Key: "id", Value: id}}
+		transactionHandler := NewTransactionHandler(h.Transactions, h.Wallets, h.Categories)
+		transactionHandler.Users, transactionHandler.Jars = h.Users, h.Jars
+		transactionHandler.UpdateTransaction(c)
 	default:
 		advisorBadRequest(c)
+	}
+}
+
+func requiresAdvisorExpectedVersion(action string) bool {
+	switch action {
+	case "update_transaction", "delete_transaction", "recategorize_transaction", "update_category":
+		return true
+	default:
+		return false
 	}
 }
 
@@ -204,7 +329,7 @@ func findPreparedProposal(messages []entity.AdvisorMessage, actionID, conversati
 			continue
 		}
 		for _, part := range message.Parts {
-			if part.Type != "wallet_confirmation" && part.Type != "jar_confirmation" && part.Type != "budget_confirmation" {
+			if part.Type != "wallet_confirmation" && part.Type != "jar_confirmation" && part.Type != "budget_confirmation" && part.Type != "transaction_confirmation" && part.Type != "transfer_confirmation" && part.Type != "category_confirmation" {
 				continue
 			}
 			encoded, err := json.Marshal(part.Data)
@@ -219,7 +344,7 @@ func findPreparedProposal(messages []entity.AdvisorMessage, actionID, conversati
 			if !ok || strings.TrimSpace(stringValue(view["action_id"])) != actionID || stringValue(view["conversation_id"]) != conversationID {
 				continue
 			}
-			if stringValue(view["action"]) != "create_wallet" && stringValue(view["action"]) != "create_jar" && stringValue(view["action"]) != "update_jar" && stringValue(view["action"]) != "create_budget" && stringValue(view["action"]) != "update_budget" {
+			if !advisorActionAllowed(stringValue(view["action"])) {
 				continue
 			}
 			// Bind the action to both the persisted message generation and the
@@ -232,6 +357,15 @@ func findPreparedProposal(messages []entity.AdvisorMessage, actionID, conversati
 		}
 	}
 	return nil, false, false
+}
+
+func advisorActionAllowed(action string) bool {
+	switch action {
+	case "create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction":
+		return true
+	default:
+		return false
+	}
 }
 
 func stringValue(value any) string {
@@ -299,7 +433,18 @@ func (h *AdvisorHandler) ResetConversation(c *gin.Context) {
 // @Success 200 {object} map[string]any
 // @Router /api/v1/ai/advisor/capabilities [get]
 func (h *AdvisorHandler) Capabilities(c *gin.Context) {
-	OK(c, map[string]any{"enabled": h != nil && h.Service != nil && h.Service.Enabled(), "write": false, "parts_version": 1, "tools": []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget"}, "actions": []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget"}})
+	OK(c, map[string]any{
+		"enabled":               h != nil && h.Service != nil && h.Service.Enabled(),
+		"write":                 false, // Backward-compatible alias: the model never performs direct writes.
+		"direct_writes":         false,
+		"proposal_actions":      true,
+		"confirmation_required": true,
+		"parts_version":         1,
+		"run_timeout_seconds":   240,
+		"grounding_version":     1,
+		"tools":                 []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget", "propose_create_transaction", "propose_update_transaction", "propose_delete_transaction", "propose_transfer_wallet", "propose_create_category", "propose_update_category", "propose_recategorize_transaction"},
+		"actions":               []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction"},
+	})
 }
 
 // AdvisorOverview godoc
@@ -363,6 +508,7 @@ func (h *AdvisorHandler) Overview(c *gin.Context) {
 // @Tags AI Advisor
 // @Produce json
 // @Security BearerAuth
+// @Param conversation_id query string true "Conversation identifier"
 // @Param before_seq query int false "Read messages before sequence"
 // @Description The response keeps the message array in data. The envelope meta may include server-authoritative conversation_id, generation, last_user_message_at, expires_at and server_time.
 // @Success 200 {array} entity.AdvisorMessage
@@ -546,7 +692,98 @@ func (h *AdvisorHandler) Run(c *gin.Context) {
 		advisorFailure(c, err)
 		return
 	}
-	OK(c, run)
+	// Lifecycle metadata is additive and server-authoritative. Keep the
+	// persisted entity's credential/lease fields private while allowing native
+	// clients to schedule recovery without a device clock or a fixed poll cap.
+	response := map[string]any{
+		"id": run.ID, "owner_id": run.OwnerID, "conversation_id": run.ConversationID, "generation": run.Generation,
+		"client_request_id": run.ClientRequestID, "status": run.Status,
+		"error_code": run.ErrorCode, "created_at": run.CreatedAt,
+		"finished_at": run.FinishedAt, "server_time": time.Now().UTC(),
+	}
+	deadline := run.DeadlineAt
+	if deadline == nil && !run.CreatedAt.IsZero() {
+		value := run.CreatedAt.Add(240 * time.Second)
+		deadline = &value
+	}
+	if deadline != nil {
+		response["deadline_at"] = deadline
+	}
+	if run.Status == entity.AdvisorStatusQueued || run.Status == entity.AdvisorStatusRunning {
+		response["retry_after_ms"] = 3000
+	}
+	OK(c, response)
+}
+
+// AdvisorRunEvents godoc
+// @Summary Replay persisted Finance Assistant run events as SSE
+// @Tags AI Advisor
+// @Produce text/event-stream
+// @Security BearerAuth
+// @Param id path string true "Run ID"
+// @Param after_seq query int false "Only return events after this sequence"
+// @Success 200 {string} string "SSE event stream"
+// @Failure 501 {object} Problem
+// @Router /api/v1/ai/advisor/runs/{id}/events [get]
+func (h *AdvisorHandler) RunEvents(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Service == nil || h.Service.Store == nil {
+		advisorFailure(c, errors.New("advisor unavailable"))
+		return
+	}
+	eventsStore, ok := h.Service.Store.(repository.AdvisorEventRepository)
+	if !ok {
+		Fail(c, http.StatusNotImplemented, Problem{Code: "advisor_events_unavailable", Title: "Finance Assistant events unavailable", Detail: "luồng sự kiện trợ lý chưa khả dụng"})
+		return
+	}
+	afterSeq := int64(0)
+	if raw := strings.TrimSpace(c.Query("after_seq")); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 {
+			advisorBadRequest(c)
+			return
+		}
+		afterSeq = parsed
+	} else if raw := strings.TrimSpace(c.GetHeader("Last-Event-ID")); raw != "" {
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil || parsed < 0 {
+			advisorBadRequest(c)
+			return
+		}
+		afterSeq = parsed
+	}
+	runID := strings.TrimSpace(c.Param("id"))
+	if _, err := h.Service.Store.GetRun(c.Request.Context(), owner, runID); err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	events, err := eventsStore.ListEvents(c.Request.Context(), owner, runID, afterSeq, 100)
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	c.Header("Content-Type", "text/event-stream; charset=utf-8")
+	c.Header("Cache-Control", "no-cache, no-store")
+	c.Header("Connection", "keep-alive")
+	c.Header("X-Accel-Buffering", "no")
+	flusher, _ := c.Writer.(http.Flusher)
+	for _, event := range events {
+		payload, marshalErr := json.Marshal(map[string]any{"v": 1, "run_id": runID, "seq": event.Seq, "type": event.Type, "payload": event.Payload})
+		if marshalErr != nil {
+			advisorFailure(c, marshalErr)
+			return
+		}
+		if _, writeErr := fmt.Fprintf(c.Writer, "id: %d\nevent: %s\ndata: %s\n\n", event.Seq, event.Type, payload); writeErr != nil {
+			return
+		}
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
 }
 
 // AdvisorCancel godoc

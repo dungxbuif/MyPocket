@@ -30,6 +30,12 @@ type financeCursor struct {
 	ScopeHash  string    `json:"scope_hash"`
 }
 
+type categoryCursor struct {
+	Version   int    `json:"v"`
+	ID        string `json:"id"`
+	ScopeHash string `json:"scope_hash"`
+}
+
 func encodeFinanceCursor(occurredAt time.Time, id, scopeHash string) (string, error) {
 	if id == "" || scopeHash == "" {
 		return "", ErrFinanceCursor
@@ -52,6 +58,32 @@ func decodeFinanceCursor(value, expectedScope string) (financeCursor, error) {
 	var cursor financeCursor
 	if err := json.Unmarshal(payload, &cursor); err != nil || cursor.Version != 1 || cursor.ID == "" || cursor.ScopeHash != expectedScope || cursor.OccurredAt.IsZero() {
 		return financeCursor{}, ErrFinanceCursor
+	}
+	return cursor, nil
+}
+
+func encodeCategoryCursor(id, scopeHash string) (string, error) {
+	if id == "" || scopeHash == "" {
+		return "", ErrFinanceCursor
+	}
+	payload, err := json.Marshal(categoryCursor{Version: 1, ID: id, ScopeHash: scopeHash})
+	if err != nil {
+		return "", ErrFinanceCursor
+	}
+	return base64.RawURLEncoding.EncodeToString(payload), nil
+}
+
+func decodeCategoryCursor(value, expectedScope string) (categoryCursor, error) {
+	if value == "" || len(value) > 2048 || expectedScope == "" {
+		return categoryCursor{}, ErrFinanceCursor
+	}
+	payload, err := base64.RawURLEncoding.DecodeString(value)
+	if err != nil {
+		return categoryCursor{}, ErrFinanceCursor
+	}
+	var cursor categoryCursor
+	if err := json.Unmarshal(payload, &cursor); err != nil || cursor.Version != 1 || cursor.ID == "" || cursor.ScopeHash != expectedScope {
+		return categoryCursor{}, ErrFinanceCursor
 	}
 	return cursor, nil
 }
@@ -136,6 +168,10 @@ func (r *FinanceQueryPostgresRepository) readQuery(ctx context.Context, tx *gorm
 			return r.readBudgetProgress(ctx, tx, ownerID, location, asOf, query)
 		case "get_jar_progress":
 			return r.readJarProgress(ctx, tx, ownerID, location, asOf, query)
+		case "list_categories":
+			return r.readCategories(ctx, tx, ownerID, location, asOf, query, false)
+		case "get_category":
+			return r.readCategories(ctx, tx, ownerID, location, asOf, query, true)
 		}
 		return entity.FinanceResult{QueryKey: query.Key, Status: "unsupported", Facts: []entity.Fact{}, WarningCodes: []string{"tool_unsupported"}}, nil
 	}
@@ -226,7 +262,16 @@ func (r *FinanceQueryPostgresRepository) readCompare(ctx context.Context, tx *go
 	if err != nil {
 		return entity.FinanceResult{}, err
 	}
-	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "spending_comparison", View: encoded, Facts: []entity.Fact{{ID: query.Key + ".delta", Kind: "money", Integer: int64Ptr(view.Delta), SourceRef: query.Key}}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), StartAt: &query.Filter.Dates.StartAt, EndExclusive: &query.Filter.Dates.EndExclusive, Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
+	currency := entity.WalletCurrencyVND
+	facts := []entity.Fact{
+		{ID: query.Key + ".current_expense", Kind: "money", Integer: int64Ptr(view.CurrentExpense), Currency: &currency, SourceRef: query.Key},
+		{ID: query.Key + ".previous_expense", Kind: "money", Integer: int64Ptr(view.PreviousExpense), Currency: &currency, SourceRef: query.Key},
+		{ID: query.Key + ".delta", Kind: "money", Integer: int64Ptr(view.Delta), Currency: &currency, SourceRef: query.Key},
+	}
+	if view.ChangeBPS != nil {
+		facts = append(facts, entity.Fact{ID: query.Key + ".change_bps", Kind: "basis_points", Integer: view.ChangeBPS, SourceRef: query.Key})
+	}
+	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "spending_comparison", View: encoded, Facts: facts, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), StartAt: &query.Filter.Dates.StartAt, EndExclusive: &query.Filter.Dates.EndExclusive, Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
 }
 
 type financeTransactionView struct {
@@ -238,6 +283,7 @@ type financeTransactionView struct {
 	AdjustmentDirection *string   `json:"adjustment_direction,omitempty"`
 	OccurredAt          time.Time `json:"occurred_at"`
 	Note                *string   `json:"note,omitempty"`
+	Version             int64     `json:"version"`
 }
 
 type financeSearchView struct {
@@ -260,6 +306,154 @@ type financeTransactionDetailView struct {
 	Note                *string   `json:"note,omitempty"`
 	IncludedInReports   bool      `json:"included_in_reports"`
 	TransferID          *string   `json:"transfer_id,omitempty"`
+	Version             int64     `json:"version"`
+}
+
+type financeCategoryView struct {
+	ID        string   `json:"id"`
+	Name      string   `json:"name"`
+	Kind      string   `json:"kind"`
+	ParentID  *string  `json:"parent_id,omitempty"`
+	WalletIDs []string `json:"wallet_ids"`
+	IconKey   string   `json:"icon_key"`
+	IsActive  bool     `json:"is_active"`
+	IsSystem  bool     `json:"is_system"`
+	Editable  bool     `json:"editable"`
+	Version   int64    `json:"version"`
+}
+
+type financeCategoryCatalogView struct {
+	Items      []financeCategoryView `json:"items"`
+	NextCursor string                `json:"next_cursor,omitempty"`
+}
+
+func categoryScopeHash(ownerID string, filter entity.CategoryCatalogFilter) string {
+	payload, _ := json.Marshal(struct {
+		OwnerID string                       `json:"owner_id"`
+		Filter  entity.CategoryCatalogFilter `json:"filter"`
+	}{OwnerID: ownerID, Filter: filter})
+	digest := sha256.Sum256(payload)
+	return fmt.Sprintf("%x", digest[:])
+}
+
+func (r *FinanceQueryPostgresRepository) readCategories(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery, detail bool) (entity.FinanceResult, error) {
+	filter := entity.CategoryCatalogFilter{Limit: 50}
+	if query.CategoryFilter != nil {
+		filter = *query.CategoryFilter
+	}
+	filter.Kind = strings.TrimSpace(filter.Kind)
+	if filter.Kind != "" && filter.Kind != "income" && filter.Kind != "expense" && filter.Kind != "debt" {
+		return entity.FinanceResult{}, ErrFinanceScope
+	}
+	if len(filter.WalletIDs) > 20 {
+		return entity.FinanceResult{}, ErrFinanceScope
+	}
+	for index, walletID := range filter.WalletIDs {
+		filter.WalletIDs[index] = strings.TrimSpace(walletID)
+		if _, err := uuid.Parse(filter.WalletIDs[index]); err != nil {
+			return entity.FinanceResult{}, ErrFinanceScope
+		}
+	}
+	if filter.Limit == 0 {
+		filter.Limit = 50
+	}
+	if filter.Limit < 1 || filter.Limit > 100 {
+		return entity.FinanceResult{}, ErrFinanceScope
+	}
+	base := tx.WithContext(ctx).Model(&entity.Category{}).Where("categories.owner_id = ? OR categories.owner_id IS NULL", ownerID)
+	if filter.Kind != "" {
+		base = base.Where("categories.kind = ?", filter.Kind)
+	}
+	if !filter.IncludeArchived {
+		base = base.Where("categories.is_active = true")
+	}
+	if len(filter.WalletIDs) > 0 {
+		var ownedWallets int64
+		if err := tx.Model(&entity.Wallet{}).Where("owner_id = ? AND id IN ?", ownerID, filter.WalletIDs).Count(&ownedWallets).Error; err != nil {
+			return entity.FinanceResult{}, err
+		}
+		if ownedWallets != int64(len(filter.WalletIDs)) {
+			return entity.FinanceResult{}, ErrFinanceScope
+		}
+		base = base.Where("(NOT EXISTS (SELECT 1 FROM category_wallets cw_any WHERE cw_any.category_id = categories.id) OR EXISTS (SELECT 1 FROM category_wallets cw_match WHERE cw_match.category_id = categories.id AND cw_match.wallet_id IN ?))", filter.WalletIDs)
+	}
+	scopeHash := categoryScopeHash(ownerID, filter)
+	if detail {
+		if len(query.ObjectIDs) != 1 || !validUUID(query.ObjectIDs[0]) {
+			return entity.FinanceResult{}, ErrFinanceScope
+		}
+		var category entity.Category
+		if err := base.Where("categories.id = ?", query.ObjectIDs[0]).First(&category).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				encoded, marshalErr := json.Marshal(map[string]any{"found": false, "category_id": query.ObjectIDs[0]})
+				if marshalErr != nil {
+					return entity.FinanceResult{}, marshalErr
+				}
+				return entity.FinanceResult{QueryKey: query.Key, Status: "not_found", ViewKind: "category_detail", View: encoded, WarningCodes: []string{"category_not_found"}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), AsOf: asOf}}, nil
+			}
+			return entity.FinanceResult{}, err
+		}
+		item, err := r.categoryView(ctx, tx, ownerID, category)
+		if err != nil {
+			return entity.FinanceResult{}, err
+		}
+		encoded, err := json.Marshal(item)
+		if err != nil {
+			return entity.FinanceResult{}, err
+		}
+		return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "category_detail", View: encoded, Facts: []entity.Fact{{ID: query.Key + ".version", Kind: "version", Integer: int64Ptr(category.Version), SourceRef: query.Key}}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), AsOf: asOf}}, nil
+	}
+	if filter.Cursor != "" {
+		cursor, err := decodeCategoryCursor(filter.Cursor, scopeHash)
+		if err != nil {
+			return entity.FinanceResult{}, err
+		}
+		base = base.Where("categories.id > ?", cursor.ID)
+	}
+	var total int64
+	if err := base.Count(&total).Error; err != nil {
+		return entity.FinanceResult{}, err
+	}
+	var categories []entity.Category
+	if err := base.Order("categories.id ASC").Limit(filter.Limit + 1).Find(&categories).Error; err != nil {
+		return entity.FinanceResult{}, err
+	}
+	view := financeCategoryCatalogView{Items: make([]financeCategoryView, 0, len(categories))}
+	if len(categories) > filter.Limit {
+		last := categories[filter.Limit-1]
+		view.NextCursor, _ = encodeCategoryCursor(last.ID, scopeHash)
+		categories = categories[:filter.Limit]
+	}
+	for _, category := range categories {
+		item, err := r.categoryView(ctx, tx, ownerID, category)
+		if err != nil {
+			return entity.FinanceResult{}, err
+		}
+		view.Items = append(view.Items, item)
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil {
+		return entity.FinanceResult{}, err
+	}
+	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "category_catalog", View: encoded, Facts: []entity.Fact{{ID: query.Key + ".count", Kind: "count", Integer: int64Ptr(total), SourceRef: query.Key}}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), AsOf: asOf}}, nil
+}
+
+func validUUID(value string) bool {
+	_, err := uuid.Parse(strings.TrimSpace(value))
+	return err == nil
+}
+
+func (r *FinanceQueryPostgresRepository) categoryView(ctx context.Context, tx *gorm.DB, ownerID string, category entity.Category) (financeCategoryView, error) {
+	var links []entity.CategoryWallet
+	if err := tx.WithContext(ctx).Where("category_id = ?", category.ID).Order("wallet_id ASC").Find(&links).Error; err != nil {
+		return financeCategoryView{}, err
+	}
+	walletIDs := make([]string, 0, len(links))
+	for _, link := range links {
+		walletIDs = append(walletIDs, link.WalletID)
+	}
+	editable := !category.IsSystem && category.OwnerID != nil && *category.OwnerID == ownerID
+	return financeCategoryView{ID: category.ID, Name: category.Name, Kind: category.Kind, ParentID: category.ParentID, WalletIDs: walletIDs, IconKey: category.IconKey, IsActive: category.IsActive, IsSystem: category.IsSystem, Editable: editable, Version: category.Version}, nil
 }
 
 func (r *FinanceQueryPostgresRepository) readTransaction(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery) (entity.FinanceResult, error) {
@@ -277,7 +471,7 @@ func (r *FinanceQueryPostgresRepository) readTransaction(ctx context.Context, tx
 		}
 		return entity.FinanceResult{}, err
 	}
-	view := financeTransactionDetailView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, JarID: row.JarID, Type: row.Type, Amount: row.Amount, AdjustmentDirection: row.AdjustmentDirection, OccurredAt: row.OccurredAt, Note: row.Note, IncludedInReports: row.IncludedInReports, TransferID: row.TransferID}
+	view := financeTransactionDetailView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, JarID: row.JarID, Type: row.Type, Amount: row.Amount, AdjustmentDirection: row.AdjustmentDirection, OccurredAt: row.OccurredAt, Note: row.Note, IncludedInReports: row.IncludedInReports, TransferID: row.TransferID, Version: row.Version}
 	var wallet entity.Wallet
 	if err := tx.WithContext(ctx).Where("id = ? AND owner_id = ?", row.WalletID, ownerID).First(&wallet).Error; err == nil {
 		view.WalletName = wallet.Name
@@ -292,7 +486,10 @@ func (r *FinanceQueryPostgresRepository) readTransaction(ctx context.Context, tx
 	if err != nil {
 		return entity.FinanceResult{}, err
 	}
-	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "transaction_detail", View: encoded, Facts: []entity.Fact{{ID: query.Key + ".amount", Kind: "money", Integer: int64Ptr(row.Amount), Currency: stringPtr(wallet.Currency), SourceRef: query.Key}}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), AsOf: asOf}}, nil
+	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "transaction_detail", View: encoded, Facts: []entity.Fact{
+		{ID: query.Key + ".amount", Kind: "money", Integer: int64Ptr(row.Amount), Currency: stringPtr(wallet.Currency), SourceRef: query.Key},
+		{ID: query.Key + ".version", Kind: "version", Integer: int64Ptr(row.Version), SourceRef: query.Key},
+	}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), AsOf: asOf}}, nil
 }
 
 func (r *FinanceQueryPostgresRepository) readSearch(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery) (entity.FinanceResult, error) {
@@ -309,6 +506,10 @@ func (r *FinanceQueryPostgresRepository) readSearch(ctx context.Context, tx *gor
 	}
 	var total int64
 	if err := queryDB.Count(&total).Error; err != nil {
+		return entity.FinanceResult{}, err
+	}
+	var totalAmount int64
+	if err := queryDB.Session(&gorm.Session{}).Select("COALESCE(SUM(transactions.amount), 0)").Scan(&totalAmount).Error; err != nil {
 		return entity.FinanceResult{}, err
 	}
 	scopeHash := financeScopeHash(query.Kind, filter)
@@ -334,7 +535,7 @@ func (r *FinanceQueryPostgresRepository) readSearch(ctx context.Context, tx *gor
 		rows = rows[:filter.Limit]
 	}
 	for _, row := range rows {
-		view.Items = append(view.Items, financeTransactionView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, Type: row.Type, Amount: row.Amount, AdjustmentDirection: row.AdjustmentDirection, OccurredAt: row.OccurredAt, Note: row.Note})
+		view.Items = append(view.Items, financeTransactionView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, Type: row.Type, Amount: row.Amount, AdjustmentDirection: row.AdjustmentDirection, OccurredAt: row.OccurredAt, Note: row.Note, Version: row.Version})
 	}
 	encoded, err := json.Marshal(view)
 	if err != nil {
@@ -343,7 +544,7 @@ func (r *FinanceQueryPostgresRepository) readSearch(ctx context.Context, tx *gor
 	result := entity.FinanceResult{
 		QueryKey: query.Key,
 		Status:   "ok",
-		Facts:    []entity.Fact{{ID: query.Key + ".total_count", Kind: "count", Integer: int64Ptr(total), SourceRef: query.Key}},
+		Facts:    []entity.Fact{{ID: query.Key + ".total_count", Kind: "count", Integer: int64Ptr(total), SourceRef: query.Key}, {ID: query.Key + ".total_amount", Kind: "money", Integer: int64Ptr(totalAmount), Currency: stringPtr(entity.WalletCurrencyVND), SourceRef: query.Key}},
 		ViewKind: "transaction_search",
 		View:     encoded,
 		Source:   entity.SourceScope{Ref: query.Key, Timezone: location.String(), StartAt: &filter.Dates.StartAt, EndExclusive: &filter.Dates.EndExclusive, Filter: filter.FinanceFilter, AsOf: asOf},
@@ -418,7 +619,18 @@ func (r *FinanceQueryPostgresRepository) readWalletBalances(ctx context.Context,
 	if err != nil {
 		return entity.FinanceResult{}, err
 	}
-	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "wallet_balances", View: encoded, Facts: []entity.Fact{{ID: query.Key + ".count", Kind: "count", Integer: int64Ptr(int64(len(items))), SourceRef: query.Key}}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
+	facts := []entity.Fact{{ID: query.Key + ".count", Kind: "count", Integer: int64Ptr(int64(len(items))), SourceRef: query.Key}}
+	for _, item := range items {
+		currency := item.Currency
+		facts = append(facts, entity.Fact{ID: query.Key + ".wallet." + item.ID + ".balance", Kind: "money", Integer: int64Ptr(item.CurrentBalance), Currency: &currency, SourceRef: query.Key})
+		if item.AvailableCredit != nil {
+			facts = append(facts, entity.Fact{ID: query.Key + ".wallet." + item.ID + ".available_credit", Kind: "money", Integer: item.AvailableCredit, Currency: &currency, SourceRef: query.Key})
+		}
+		if item.TargetRemaining != nil {
+			facts = append(facts, entity.Fact{ID: query.Key + ".wallet." + item.ID + ".target_remaining", Kind: "money", Integer: item.TargetRemaining, Currency: &currency, SourceRef: query.Key})
+		}
+	}
+	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "wallet_balances", View: encoded, Facts: facts, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
 }
 
 func (r *FinanceQueryPostgresRepository) readGoalProgress(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery) (entity.FinanceResult, error) {
@@ -454,7 +666,15 @@ func (r *FinanceQueryPostgresRepository) readGoalProgress(ctx context.Context, t
 	if err != nil {
 		return entity.FinanceResult{}, err
 	}
-	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "goal_progress", View: encoded, Facts: []entity.Fact{{ID: query.Key + ".count", Kind: "count", Integer: int64Ptr(int64(len(items))), SourceRef: query.Key}}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
+	facts := []entity.Fact{{ID: query.Key + ".count", Kind: "count", Integer: int64Ptr(int64(len(items))), SourceRef: query.Key}}
+	for _, item := range items {
+		currency := item.Currency
+		facts = append(facts, entity.Fact{ID: query.Key + ".goal." + item.ID + ".balance", Kind: "money", Integer: int64Ptr(item.CurrentBalance), Currency: &currency, SourceRef: query.Key})
+		if item.TargetRemaining != nil {
+			facts = append(facts, entity.Fact{ID: query.Key + ".goal." + item.ID + ".remaining", Kind: "money", Integer: item.TargetRemaining, Currency: &currency, SourceRef: query.Key})
+		}
+	}
+	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "goal_progress", View: encoded, Facts: facts, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
 }
 
 func (r *FinanceQueryPostgresRepository) readBudgetProgress(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery) (entity.FinanceResult, error) {
@@ -533,7 +753,13 @@ func (r *FinanceQueryPostgresRepository) readBudgetProgress(ctx context.Context,
 	if err != nil {
 		return entity.FinanceResult{}, err
 	}
-	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "budget_progress", View: encoded, Facts: []entity.Fact{{ID: query.Key + ".spent", Kind: "money", Integer: int64Ptr(summary.Spent), SourceRef: query.Key}}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
+	remaining := summary.LimitAmount - summary.Spent
+	facts := []entity.Fact{
+		{ID: query.Key + ".limit", Kind: "money", Integer: int64Ptr(summary.LimitAmount), Currency: stringPtr(entity.WalletCurrencyVND), SourceRef: query.Key},
+		{ID: query.Key + ".spent", Kind: "money", Integer: int64Ptr(summary.Spent), Currency: stringPtr(entity.WalletCurrencyVND), SourceRef: query.Key},
+		{ID: query.Key + ".remaining", Kind: "money", Integer: int64Ptr(remaining), Currency: stringPtr(entity.WalletCurrencyVND), SourceRef: query.Key},
+	}
+	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "budget_progress", View: encoded, Facts: facts, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
 }
 
 func (r *FinanceQueryPostgresRepository) readJarProgress(ctx context.Context, tx *gorm.DB, ownerID string, location *time.Location, asOf time.Time, query entity.NormalizedQuery) (entity.FinanceResult, error) {
@@ -583,7 +809,29 @@ func (r *FinanceQueryPostgresRepository) readJarProgress(ctx context.Context, tx
 	if err != nil {
 		return entity.FinanceResult{}, err
 	}
-	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "jar_progress", View: encoded, Facts: []entity.Fact{{ID: query.Key + ".count", Kind: "count", Integer: int64Ptr(int64(len(items))), SourceRef: query.Key}}, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
+	var totalSpent, totalAllocated int64
+	facts := []entity.Fact{{ID: query.Key + ".count", Kind: "count", Integer: int64Ptr(int64(len(items))), SourceRef: query.Key}}
+	for _, item := range items {
+		if item.Spent > 0 && totalSpent > entity.MaxSafeMoneyAmount-item.Spent {
+			return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
+		}
+		totalSpent += item.Spent
+		if item.AllocationAmount != nil {
+			if *item.AllocationAmount < 0 || totalAllocated > entity.MaxSafeMoneyAmount-*item.AllocationAmount {
+				return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
+			}
+			totalAllocated += *item.AllocationAmount
+		}
+		facts = append(facts, entity.Fact{ID: query.Key + ".jar." + item.JarID + ".spent", Kind: "money", Integer: int64Ptr(item.Spent), Currency: stringPtr(entity.WalletCurrencyVND), SourceRef: query.Key})
+		if item.AllocationAmount != nil {
+			facts = append(facts, entity.Fact{ID: query.Key + ".jar." + item.JarID + ".allocated", Kind: "money", Integer: item.AllocationAmount, Currency: stringPtr(entity.WalletCurrencyVND), SourceRef: query.Key})
+		}
+	}
+	facts = append(facts,
+		entity.Fact{ID: query.Key + ".total_spent", Kind: "money", Integer: int64Ptr(totalSpent), Currency: stringPtr(entity.WalletCurrencyVND), SourceRef: query.Key},
+		entity.Fact{ID: query.Key + ".total_allocated", Kind: "money", Integer: int64Ptr(totalAllocated), Currency: stringPtr(entity.WalletCurrencyVND), SourceRef: query.Key},
+	)
+	return entity.FinanceResult{QueryKey: query.Key, Status: "ok", ViewKind: "jar_progress", View: encoded, Facts: facts, Source: entity.SourceScope{Ref: query.Key, Timezone: location.String(), Filter: query.Filter.FinanceFilter, AsOf: asOf}}, nil
 }
 
 func (r *FinanceQueryPostgresRepository) scopedTransactions(ctx context.Context, tx *gorm.DB, ownerID string, filter entity.NormalizedFinanceFilter) (*gorm.DB, error) {
