@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "provider_mode": "synthetic-only",
+  "clock": {
+    "now": "2026-09-22T10:00:00+07:00",
+    "timezone": "Asia/Ho_Chi_Minh"
+  },
+  "review_policy": {
+    "approval_required": true,
+    "proposal_status_before_owner_action": "pending",
+    "ledger_writes_allowed": false
+  },
+  "duplicate_rows": {
+    "description": "An overlapping OCR page repeats one row; two distinct purchases must remain.",
+    "drafts": [
+      {
+        "type": "expense",
+        "amount": 45000,
+        "wallet_id": "wallet-cash",
+        "category_id": "category-food",
+        "occurred_at": "2026-09-20T08:00:00+07:00",
+        "note": "Cà phê",
+        "included_in_reports": true,
+        "questions": []
+      },
+      {
+        "type": "expense",
+        "amount": 45000,
+        "wallet_id": "wallet-cash",
+        "category_id": "category-food",
+        "occurred_at": "2026-09-20T08:00:00+07:00",
+        "note": "Cà phê",
+        "included_in_reports": true,
+        "questions": ["Dòng lặp từ ảnh chồng lấn."]
+      },
+      {
+        "type": "expense",
+        "amount": 30000,
+        "wallet_id": "wallet-cash",
+        "category_id": "category-food",
+        "occurred_at": "2026-09-20T09:00:00+07:00",
+        "note": "Bánh mì",
+        "included_in_reports": true,
+        "questions": []
+      }
+    ],
+    "expected": {
+      "draft_count": 2,
+      "amounts": [30000, 45000],
+      "merged_question": "Dòng lặp từ ảnh chồng lấn."
+    }
+  },
+  "missing_date": {
+    "raw_occurred_at": "",
+    "expected": {
+      "normalized_occurred_at": "2026-09-22T10:00:00+07:00",
+      "parsed": false,
+      "date_only": false,
+      "review_question_contains": "ngày hiện tại"
+    }
+  },
+  "wallet_inference": {
+    "owner_id": "fixture-owner-a",
+    "wallets": [
+      {"id": "wallet-cash", "owner_id": "fixture-owner-a", "name": "Ví tiền mặt", "type": "basic", "currency": "VND"},
+      {"id": "wallet-bank", "owner_id": "fixture-owner-a", "name": "Tài khoản ngân hàng", "type": "basic", "currency": "VND"}
+    ],
+    "categories": [
+      {"id": "category-food", "owner_id": "fixture-owner-a", "name": "Ăn uống", "kind": "expense", "is_active": true}
+    ],
+    "draft": {
+      "type": "expense",
+      "amount": 35000,
+      "wallet_id": "foreign-wallet",
+      "category_id": "category-food",
+      "occurred_at": "2026-09-22T08:00:00+07:00",
+      "note": "Ăn trưa",
+      "included_in_reports": true,
+      "questions": []
+    },
+    "expected": {
+      "wallet_id": "wallet-cash",
+      "review_question_contains": "Ví được suy đoán",
+      "owner_wallet_only": true
+    }
+  },
+  "owner_safe_tool_args": {
+    "owner_id": "owner-a",
+    "timezone": "Asia/Ho_Chi_Minh",
+    "accepted": {
+      "tool": "get_finance_summary",
+      "arguments": {"range": {"from": "2026-09-01", "to": "2026-09-30"}}
+    },
+    "rejected": [
+      {
+        "tool": "get_finance_summary",
+        "arguments": {"range": {"from": "2026-09-01", "to": "2026-09-30"}, "owner_id": "owner-b"}
+      },
+      {
+        "tool": "get_wallet_balances",
+        "arguments": {"wallet_ids": ["wallet-owner-b"], "owner_id": "owner-b"}
+      },
+      {
+        "tool": "execute_sql",
+        "arguments": {"sql": "SELECT * FROM transactions"}
+      }
+    ],
+    "expected": {
+      "reader_owner": "owner-a",
+      "rejected_reader_calls": 0,
+      "no_auto_approval": true
+    }
+  },
+  "proposal_review": {
+    "owner_id": "owner-a",
+    "tool": "propose_create_wallet",
+    "arguments": {"name": "Du lịch", "type": "basic", "opening_balance": 0},
+    "expected": {
+      "status": "proposed",
+      "view": "wallet_creation_proposal",
+      "requires_explicit_confirmation": true
+    }
+  }
+}

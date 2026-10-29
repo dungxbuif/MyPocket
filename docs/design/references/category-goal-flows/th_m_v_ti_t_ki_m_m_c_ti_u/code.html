@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Thêm Ví</title>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'sans-serif'],
+          },
+          colors: {
+            appBg: '#F3F4F6',
+            cardBg: '#FFFFFF',
+            subText: '#9CA3AF',
+            divider: '#F3F4F6',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-styling">
+    body {
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    /* iOS Switch Checkbox Styling */
+    .ios-switch {
+      position: relative;
+      display: inline-block;
+      width: 51px;
+      height: 31px;
+      flex-shrink: 0;
+    }
+    .ios-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #E5E7EB;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 34px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 27px;
+      width: 27px;
+      left: 2px;
+      bottom: 2px;
+      background-color: white;
+      transition: .3s cubic-bezier(0.4, 0, 0.2, 1);
+      border-radius: 50%;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+    }
+    input:checked + .slider {
+      background-color: #34C759;
+    }
+    input:checked + .slider:before {
+      transform: translateX(20px);
+    }
+  </style>
+</head>
+<body class="bg-[#2C2C2E] min-h-screen flex justify-center items-start sm:py-8 antialiased">
+<!-- Mobile iOS Frame Container -->
+<div class="w-full max-w-[420px] bg-[#F2F2F7] min-h-screen sm:min-h-[890px] sm:rounded-[48px] shadow-2xl overflow-hidden flex flex-col relative">
+<!-- BEGIN: iOS Status Bar -->
+<div class="pt-3.5 px-7 pb-2 flex justify-between items-center text-black z-20">
+<span class="text-[15px] font-bold tracking-tight">22:19</span>
+<div class="flex items-center space-x-1.5">
+<!-- Cellular Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 17 12">
+<rect height="3" rx="0.5" width="2.5" x="0" y="9"></rect>
+<rect height="6" rx="0.5" width="2.5" x="4" y="6"></rect>
+<rect height="8.5" rx="0.5" width="2.5" x="8" y="3.5"></rect>
+<rect height="11.5" rx="0.5" width="2.5" x="12" y="0.5"></rect>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 16 12">
+<path d="M8 9.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3zm-3.8-2.6a5.5 5.5 0 017.6 0 .8.8 0 101.1-1.1 7 7 0 00-9.8 0 .8.8 0 101.1 1.1zm-3-3a9.5 9.5 0 0113.6 0 .8.8 0 101.1-1.1 11 11 0 00-15.8 0 .8.8 0 101.1 1.1z"></path>
+</svg>
+<!-- Battery Icon with Percentage -->
+<div class="flex items-center pl-0.5">
+<div class="relative flex items-center justify-center bg-[#34C759] text-white text-[10px] font-bold px-1.5 py-[1px] rounded-[5px] h-[13px]">
+<span class="leading-none text-[9px] -mr-0.5">36</span>
+<svg class="w-2 h-2.5 ml-0.5 fill-white" viewbox="0 0 24 24">
+<path d="M13 2L4 14h7v8l9-12h-7z"></path>
+</svg>
+</div>
+<div class="w-[2px] h-[4px] bg-black/40 rounded-r-sm ml-[1px]"></div>
+</div>
+</div>
+</div>
+<!-- END: iOS Status Bar -->
+<!-- BEGIN: Modal Header -->
+<header class="relative px-5 pt-3 pb-4 flex items-center justify-between" data-purpose="modal-header">
+<!-- Cancel Button -->
+<button class="px-5 py-2 rounded-full bg-white text-gray-900 text-[15px] font-semibold shadow-sm hover:bg-gray-50 active:scale-95 transition-all" type="button">
+        Huỷ
+      </button>
+<!-- Center Title -->
+<h1 class="text-[17px] font-bold text-gray-900 absolute left-1/2 -translate-x-1/2">
+        Thêm Ví
+      </h1>
+<!-- Save Button (Disabled State) -->
+<button class="px-5 py-2 rounded-full bg-white/70 text-gray-300 text-[15px] font-semibold cursor-not-allowed shadow-sm" disabled="" type="button">
+        Lưu
+      </button>
+</header>
+<!-- END: Modal Header -->
+<!-- BEGIN: Main Content Form -->
+<main class="flex-1 px-4 pt-2 pb-10 space-y-5 overflow-y-auto" data-purpose="form-content">
+<!-- BEGIN: Card 1 - Basic Info -->
+<section class="bg-white rounded-3xl shadow-sm overflow-hidden" data-purpose="basic-info-card">
+<!-- Wallet Name Input Row -->
+<div class="p-3.5 flex items-center gap-3">
+<!-- Icon Picker Preview Button -->
+<div class="flex items-center bg-[#E5EBF0] px-2 py-1.5 rounded-2xl gap-1.5 cursor-pointer active:opacity-75 transition-opacity">
+<div class="w-9 h-9 rounded-xl bg-[#E67E22] flex items-center justify-center text-white shadow-inner relative">
+<!-- Wallet SVG -->
+<svg class="w-5 h-5" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+<span class="w-1.5 h-1.5 rounded-full bg-white/90 absolute right-2 top-3"></span>
+</div>
+<!-- Dual Vertical Chevrons -->
+<svg class="w-3 h-3 text-gray-500 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M8 9l4-4 4 4m0 6l-4 4-4-4" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<!-- Name Input -->
+<input class="flex-1 text-[17px] border-none focus:ring-0 placeholder-gray-400 text-gray-900 p-0 font-medium" placeholder="Tên" type="text"/>
+</div>
+<div class="h-[1px] bg-gray-100 mx-4"></div>
+<!-- Currency Selector Row -->
+<div class="px-4 py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/50 active:bg-gray-100 transition-colors">
+<div class="flex items-center gap-3">
+<div class="w-7 h-7 rounded-full border border-gray-900 flex items-center justify-center font-bold text-gray-900 text-xs">
+              $
+            </div>
+<span class="text-[16px] text-gray-400 font-normal">Đơn vị tiền tệ</span>
+</div>
+<svg class="w-4 h-4 text-gray-300 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</section>
+<!-- END: Card 1 -->
+<!-- BEGIN: Card 2 - Goal Settings -->
+<section class="bg-white rounded-3xl shadow-sm overflow-hidden" data-purpose="goal-settings-card">
+<!-- Target Amount Row -->
+<div class="px-4 py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/50">
+<div class="flex items-center gap-3.5">
+<!-- Icon Placeholder Box -->
+<div class="w-11 h-8 rounded-xl border border-gray-200 bg-white"></div>
+<div>
+<span class="block text-[12px] text-gray-500 font-medium leading-tight mb-0.5">Mục tiêu</span>
+<span class="text-[20px] font-bold text-gray-900 leading-tight">0</span>
+</div>
+</div>
+<svg class="w-4 h-4 text-gray-300 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="h-[1px] bg-gray-100 ml-16 mr-4"></div>
+<!-- Initial Amount Row -->
+<div class="px-4 py-3.5 flex items-center justify-between cursor-pointer hover:bg-gray-50/50">
+<div class="flex items-center gap-3.5">
+<!-- Icon Placeholder Box -->
+<div class="w-11 h-8 rounded-xl border border-gray-200 bg-white"></div>
+<div>
+<span class="block text-[12px] text-gray-500 font-medium leading-tight mb-0.5">Số tiền ban đầu</span>
+<span class="text-[20px] font-bold text-gray-900 leading-tight">0</span>
+</div>
+</div>
+<svg class="w-4 h-4 text-gray-300 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+<div class="h-[1px] bg-gray-100 ml-16 mr-4"></div>
+<!-- End Date Row -->
+<div class="px-4 py-4 flex items-center justify-between cursor-pointer hover:bg-gray-50/50">
+<div class="flex items-center gap-3.5">
+<!-- Calendar Icon -->
+<div class="w-11 flex justify-center text-gray-900">
+<svg class="w-6 h-6 stroke-[1.8]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<rect height="18" rx="3" stroke-width="2" width="18" x="3" y="4"></rect>
+<path d="M16 2v4M8 2v4M3 10h18" stroke-linecap="round" stroke-width="2"></path>
+<circle cx="8" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="12" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="16" cy="14" fill="currentColor" r="1"></circle>
+<circle cx="8" cy="18" fill="currentColor" r="1"></circle>
+<circle cx="12" cy="18" fill="currentColor" r="1"></circle>
+<circle cx="16" cy="18" fill="currentColor" r="1"></circle>
+</svg>
+</div>
+<span class="text-[16px] text-gray-400 font-normal">Ngày kết thúc</span>
+</div>
+<svg class="w-4 h-4 text-gray-300 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round"></path>
+</svg>
+</div>
+</section>
+<!-- END: Card 2 -->
+<!-- BEGIN: Card 3 - Notifications Switch -->
+<section data-purpose="notification-setting">
+<div class="bg-white rounded-3xl p-4 shadow-sm flex items-center justify-between">
+<span class="text-[16px] font-semibold text-gray-900">Bật thông báo</span>
+<label class="ios-switch">
+<input checked="" type="checkbox"/>
+<span class="slider"></span>
+</label>
+</div>
+<p class="px-4 pt-2 text-[13px] text-gray-500 leading-snug">
+          Nhận thông báo khi ví có giao dịch mới.
+        </p>
+</section>
+<!-- END: Card 3 -->
+<!-- BEGIN: Card 4 - Exclude from Total Switch -->
+<section data-purpose="exclude-total-setting">
+<div class="bg-white rounded-3xl p-4 shadow-sm flex items-center justify-between">
+<span class="text-[16px] font-semibold text-gray-900">Không tính vào tổng</span>
+<label class="ios-switch">
+<input type="checkbox"/>
+<span class="slider"></span>
+</label>
+</div>
+<p class="px-4 pt-2 text-[13px] text-gray-500 leading-snug">
+          Bỏ qua ví này và số dư khỏi "Tổng".
+        </p>
+</section>
+<!-- END: Card 4 -->
+</main>
+<!-- END: Main Content Form -->
+<!-- BEGIN: Home Indicator -->
+<div class="pb-2 pt-1 flex justify-center w-full" data-purpose="home-indicator">
+<div class="w-32 h-1 bg-gray-900/40 rounded-full"></div>
+</div>
+<!-- END: Home Indicator -->
+</div>
+</body></html>

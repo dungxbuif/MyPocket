@@ -1,0 +1,336 @@
+import { StatusMessage } from "../atoms/StatusMessage";
+import { Text } from "../atoms/Text";
+import { BaseButton } from "../atoms/BaseButton";
+import { BaseTextInput, FormField } from "../atoms/FormField";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "@tanstack/react-router";
+import { AccountPanel } from "../organisms/AccountPanel";
+import { BudgetsPanel } from "../organisms/BudgetsPanel";
+import { OverviewPanel } from "../organisms/OverviewPanel";
+import { QuickAddSheet } from "../organisms/QuickAddSheet";
+import { AiEntrySheet } from "../organisms/AiEntrySheet";
+import { ReportsPanel } from "../organisms/ReportsPanel";
+import { RecurringPanel } from "../organisms/RecurringPanel";
+import { TravelModePanel } from "../organisms/TravelModePanel";
+import { PortfolioPanel } from "../organisms/PortfolioPanel";
+import { TransactionsPanel } from "../organisms/TransactionsPanel";
+import { GroupManagementPanel } from "../organisms/GroupManagementPanel";
+import { GroupEditorPage } from "../organisms/GroupEditorPage";
+import { WalletManagementPanel } from "../organisms/WalletManagementPanel";
+import { JarManagementPanel } from "../organisms/JarManagementPanel";
+import { MonthDetailPanel } from "../organisms/MonthDetailPanel";
+import { FeedbackPanel } from "../organisms/FeedbackPanel";
+import { FinanceAssistantPanel } from "../organisms/FinanceAssistantPanel";
+import { MobileAppShell } from "../templates/MobileAppShell";
+import { APP_CONFIG, APP_ROUTES, API_ROUTES } from "../../config/app";
+import { AccountTimezoneProvider, DEFAULT_ACCOUNT_TIMEZONE } from "../../services/AccountTimezoneContext";
+import { resolveClientTimezone } from "../../services/accountTime";
+import {
+  clearSession,
+  extractFixtureLoginFromQueryParams,
+  fetchHome,
+  fetchProfile,
+  initializeAccountTimezone,
+  getStoredToken,
+  HomeOutput,
+  isAuthCallbackPath,
+  loginWithPassword,
+  loginWithGoogleCode,
+  loginWithGoogleFixture,
+  writeSession,
+  type LoginOutput,
+  type UserProfile,
+} from "../../services/auth";
+
+export type PrototypeTab = "overview" | "transactions" | "budgets" | "reports" | "assistant" | "account";
+
+type AuthPhase = "checking" | "authenticated" | "unauthenticated";
+
+type AuthState = {
+  phase: AuthPhase;
+  errorMessage: string;
+  user: UserProfile | null;
+  home: HomeOutput | null;
+};
+
+export function FinancePrototypePage() {
+  const [auth, setAuth] = useState<AuthState>({
+    phase: "checking",
+    errorMessage: "",
+    user: null,
+    home: null,
+  });
+  const location = useLocation();
+  const navigate = useNavigate();
+  const tab = tabFromPath(location.pathname);
+  const [masked, setMasked] = useState(false);
+  const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [aiEntryOpen, setAiEntryOpen] = useState(false);
+  const [transactionRefresh, setTransactionRefresh] = useState(0);
+  const [feedbackRefresh, setFeedbackRefresh] = useState(0);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [loginEmail, setLoginEmail] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    const handleAuth = async (): Promise<void> => {
+      const url = new URL(window.location.href);
+      const query = new URLSearchParams(url.search);
+      const statePath = url.pathname;
+
+      try {
+        if (statePath === "/auth/google") {
+          window.location.replace(API_ROUTES.START_GOOGLE_AUTH);
+          return;
+        }
+        if (isAuthCallbackPath(statePath)) {
+          const directLogin = extractFixtureLoginFromQueryParams(query);
+          if (directLogin) {
+            await acceptLogin(directLogin);
+          } else if (query.get("code")) {
+            const loginOutput = await loginWithGoogleCode(query.get("code") ?? "");
+            await acceptLogin(loginOutput);
+          } else if (query.get("subject") && query.get("email")) {
+            const loginOutput = await loginWithGoogleFixture(query);
+            await acceptLogin(loginOutput);
+          } else if (query.get("error")) {
+            setAuth((prev) => ({ ...prev, phase: "unauthenticated", errorMessage: query.get("error") ?? "Đăng nhập Google bị hủy" }));
+          } else {
+            setAuth((prev) => ({ ...prev, phase: "unauthenticated", errorMessage: "Không nhận được thông tin xác thực từ Google" }));
+          }
+          void navigate({ to: "/", search: {}, replace: true });
+          return;
+        }
+
+        const token = getStoredToken();
+        if (!token) {
+          setAuth({ phase: "unauthenticated", errorMessage: "", user: null, home: null });
+          return;
+        }
+        const rawProfile = await fetchProfile(token);
+        const [profile, home] = await Promise.all([initializeAccountTimezone(rawProfile, token), fetchHome(token)]);
+        if (!cancelled) {
+          setAuth({ phase: "authenticated", errorMessage: "", user: profile, home });
+        }
+      } catch (error) {
+        clearSession();
+        if (!cancelled) {
+          setAuth({
+            phase: "unauthenticated",
+            errorMessage: error instanceof Error ? error.message : "Không thể lấy thông tin tài khoản",
+            user: null,
+            home: null,
+          });
+        }
+      }
+    };
+
+    void handleAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const acceptLogin = async (loginOutput: LoginOutput): Promise<void> => {
+    writeSession({
+      token: loginOutput.token,
+      user: loginOutput.user,
+      expiresAt: loginOutput.expires_at,
+      refreshToken: loginOutput.refresh_token,
+      refreshExpiresAt: loginOutput.refresh_expires_at,
+    });
+    const token = loginOutput.token;
+    const rawProfile = await fetchProfile(token);
+    const [profile, home] = await Promise.all([initializeAccountTimezone(rawProfile, token), fetchHome(token)]);
+    setAuth({
+      phase: "authenticated",
+      errorMessage: "",
+      user: profile,
+      home,
+    });
+  };
+
+  const handleGoogleLogin = (): void => {
+    if (isLoggingIn) return;
+    setIsLoggingIn(true);
+    setAuth((current) => ({ ...current, errorMessage: "" }));
+    const frontendCallback = encodeURIComponent(`${window.location.origin}${APP_ROUTES.AUTH_CALLBACK_PATH}`);
+    window.location.href = `${API_ROUTES.START_GOOGLE_AUTH}?frontend_callback=${frontendCallback}`;
+    setIsLoggingIn(false);
+  };
+
+  const handlePasswordLogin = async (): Promise<void> => {
+    if (isLoggingIn || !loginEmail.trim() || !loginPassword) return;
+    setIsLoggingIn(true);
+    setAuth((current) => ({ ...current, errorMessage: "" }));
+    try {
+      await acceptLogin(await loginWithPassword(loginEmail, loginPassword));
+      setLoginPassword("");
+    } catch (error) {
+      setAuth((current) => ({
+        ...current,
+        phase: "unauthenticated",
+        errorMessage: error instanceof Error ? error.message : "Không thể đăng nhập bằng email và mật khẩu",
+      }));
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleLogout = (): void => {
+    clearSession();
+    setAuth({
+      phase: "unauthenticated",
+      errorMessage: "",
+      user: null,
+      home: null,
+    });
+  };
+
+  if (auth.phase === "checking") {
+    return <AuthLoadingScreen />;
+  }
+
+  if (auth.phase === "unauthenticated") {
+    return <AuthGateScreen
+      email={loginEmail}
+      password={loginPassword}
+      isLoading={isLoggingIn}
+      errorMessage={auth.errorMessage}
+      onEmailChange={setLoginEmail}
+      onPasswordChange={setLoginPassword}
+      onPasswordLogin={handlePasswordLogin}
+      onGoogleLogin={handleGoogleLogin}
+    />;
+  }
+
+  const userName = auth.user?.name || "Người dùng";
+
+  return (
+    <AccountTimezoneProvider value={resolveClientTimezone(auth.user?.timezone || DEFAULT_ACCOUNT_TIMEZONE)}>
+    <>
+      <MobileAppShell
+        tab={tab}
+        masked={masked}
+        onTabChange={(nextTab) => void navigate({ to: pathFromTab(nextTab) })}
+        onToggleMask={() => setMasked((value) => !value)}
+        onAdd={() => setQuickAddOpen(true)}
+        onAiAdd={() => { setQuickAddOpen(false); setAiEntryOpen(true); }}
+        onFeedbackSubmitted={() => setFeedbackRefresh(value => value + 1)}
+        refreshKey={transactionRefresh}
+        showHeader={location.pathname !== "/jars" && !location.pathname.startsWith("/months/") && !location.pathname.startsWith("/account/groups") && !location.pathname.startsWith("/account/wallets")}
+      >
+        {location.pathname === "/" ? <OverviewPanel masked={masked} refreshKey={transactionRefresh} /> : null}
+        {location.pathname === "/jars" ? <JarManagementPanel masked={masked} refreshKey={transactionRefresh} /> : null}
+        {/\/months\/[^/]+$/.test(location.pathname) ? <MonthDetailPanel month={decodeURIComponent(location.pathname.split("/").at(-1) ?? "")} masked={masked} refreshKey={transactionRefresh} /> : null}
+        {tab === "transactions" ? <TransactionsPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : null}
+        {tab === "budgets" ? <BudgetsPanel masked={masked} refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh(value=>value+1)} /> : null}
+        {tab === "assistant" ? <FinanceAssistantPanel ownerID={auth.user?.id ?? ""} masked={masked} /> : null}
+        {tab === "reports" ? <ReportsPanel masked={masked} /> : null}
+        {tab === "account" ? (location.pathname === "/account/budgets" ? <BudgetsPanel masked={masked} refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh(value=>value+1)} /> : location.pathname === "/account/recurring" ? <RecurringPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh(value => value + 1)} /> : location.pathname === "/account/travel" ? <TravelModePanel refreshKey={transactionRefresh} /> : location.pathname === "/account/portfolio" ? <PortfolioPanel refreshKey={transactionRefresh} /> : location.pathname === "/account/groups/new" || /\/account\/groups\/[^/]+\/edit$/.test(location.pathname) ? <GroupEditorPage /> : location.pathname.startsWith("/account/groups") ? <GroupManagementPanel /> : location.pathname.startsWith("/account/wallets") ? <WalletManagementPanel refreshKey={transactionRefresh} onChanged={() => setTransactionRefresh((value) => value + 1)} /> : location.pathname.startsWith("/account/feedback") ? <FeedbackPanel refreshKey={feedbackRefresh} /> : <AccountPanel user={auth.user} onLogout={handleLogout} onTimezoneChange={user => setAuth(current => ({ ...current, user }))} />) : null}
+      </MobileAppShell>
+      {quickAddOpen ? <QuickAddSheet onClose={() => setQuickAddOpen(false)} onAiEntry={() => { setQuickAddOpen(false); setAiEntryOpen(true); }} onSaved={() => setTransactionRefresh((value) => value + 1)} /> : null}
+      {aiEntryOpen ? <AiEntrySheet onClose={() => setAiEntryOpen(false)} onSaved={() => setTransactionRefresh(value => value + 1)} /> : null}
+    </>
+    </AccountTimezoneProvider>
+  );
+}
+
+function tabFromPath(pathname: string): PrototypeTab {
+  if (pathname.startsWith("/transactions")) return "transactions";
+  if (pathname.startsWith("/budgets")) return "budgets";
+  if (pathname.startsWith("/reports")) return "reports";
+  if (pathname.startsWith("/assistant")) return "assistant";
+  if (pathname.startsWith("/account")) return "account";
+  return "overview";
+}
+
+function pathFromTab(tab: PrototypeTab): "/" | "/transactions" | "/budgets" | "/reports" | "/assistant" | "/account" {
+  const paths: Record<PrototypeTab, "/" | "/transactions" | "/budgets" | "/reports" | "/assistant" | "/account"> = {
+	 overview: "/",
+	 transactions: "/transactions",
+	 budgets: "/budgets",
+	 reports: "/reports",
+	 assistant: "/assistant",
+    account: "/account",
+  };
+  return paths[tab];
+}
+
+function AuthLoadingScreen() {
+  return (
+    <main className="min-h-screen bg-canvas text-ink">
+      <div className="mx-auto flex min-h-screen max-w-[430px] items-center justify-center bg-canvas px-4">
+        <Text>Đang kiểm tra phiên đăng nhập...</Text>
+      </div>
+    </main>
+  );
+}
+
+function AuthGateScreen({
+  email,
+  password,
+  isLoading,
+  errorMessage,
+  onEmailChange,
+  onPasswordChange,
+  onPasswordLogin,
+  onGoogleLogin,
+}: {
+  email: string;
+  password: string;
+  isLoading: boolean;
+  errorMessage: string;
+  onEmailChange: (value: string) => void;
+  onPasswordChange: (value: string) => void;
+  onPasswordLogin: () => void;
+  onGoogleLogin: () => void;
+}) {
+  return (
+    <main className="min-h-screen bg-canvas text-ink">
+      <div className="mx-auto flex min-h-screen max-w-[430px] flex-col items-center justify-center gap-4 px-6">
+        <div className="grid h-16 w-16 place-items-center rounded-full bg-action text-2xl font-bold text-card">M</div>
+        <Text as="h1" size="2xl" weight="bold" className="text-center">MyPocket</Text>
+        <Text size="sm" tone="secondary" className="text-center">Đăng nhập bằng email và mật khẩu để tiếp tục.</Text>
+        {errorMessage ? <StatusMessage tone="danger">{errorMessage}</StatusMessage> : null}
+        <form className="mt-2 flex w-full flex-col gap-3" onSubmit={(event) => { event.preventDefault(); onPasswordLogin(); }}>
+          <FormField label="Email">
+            <BaseTextInput
+              aria-label="Email"
+              autoComplete="username"
+              inputMode="email"
+              required
+              value={email}
+              onChange={(event) => onEmailChange(event.target.value)}
+              placeholder="you@example.com"
+            />
+          </FormField>
+          <FormField label="Mật khẩu">
+            <BaseTextInput
+              aria-label="Mật khẩu"
+              autoComplete="current-password"
+              required
+              type="password"
+              value={password}
+              onChange={(event) => onPasswordChange(event.target.value)}
+              placeholder="Nhập mật khẩu"
+            />
+          </FormField>
+          <BaseButton variant="primary" size="md" type="submit" disabled={isLoading} loading={isLoading}>
+            Đăng nhập
+          </BaseButton>
+        </form>
+        <div className="flex w-full items-center gap-3 py-1" aria-hidden="true">
+          <span className="h-px flex-1 bg-line" />
+          <Text size="xs" tone="muted">hoặc</Text>
+          <span className="h-px flex-1 bg-line" />
+        </div>
+        <BaseButton variant="secondary" size="md" type="button" onClick={onGoogleLogin} disabled={isLoading}>
+          Đăng nhập bằng Google
+        </BaseButton>
+      </div>
+    </main>
+  );
+}

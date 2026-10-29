@@ -1,0 +1,121 @@
+# Quản lý ví — đặc tả màn hình chuẩn
+
+## Task 4 — grouped native migration
+
+The Money Lover reference redesign migrates the native wallet family without
+changing wallet, ledger, transfer, credit, or offline contracts. The screen
+composes `MPSelectionScreenHeader`, `MPWalletSelectionList`,
+`MPSurfaceCard(.grouped)`, `MPGroupedRow`, `MPInsetDivider`, `MPSectionHeader`,
+`MPWalletScopeSelector`, `MPEditorScaffold`, and the existing shared
+loading/empty/error/queue presentations. `WalletsView.swift` may provide only
+layout, state, API orchestration, and domain copy; it must not define a local
+color, radius, spacing scale, header, row, selector surface, or pinned footer.
+
+Task 4 preserves the current owner-scoped snapshot hydration and transient
+fallback, paired-transfer create/edit/delete behavior, transfer report
+exclusion, category/accounting rules, privacy masking, immutable saved wallet
+type/opening balance, and offline queue recovery. Focused proof is owned by
+`WalletsReferenceTests`; simulator/build proof remains required before visual
+completion is claimed.
+
+## Cập nhật implementation mới nhất
+
+BaseSelect đã thay tương tác picker loại khi tạo. Danh sách ví iOS và web dùng cùng contract WalletSelectionList: header “Chọn Ví” với Sửa/Xong; dòng “Tổng cộng” chỉ cộng ví có `is_in_total=true`; hai nhóm ví tính/không tính vào tổng; card hành động Thêm ví và Liên kết dịch vụ (disabled). Ở chế độ thường, chạm dòng ví mở sổ giao dịch đã lọc; chạm “Chi tiết” mở WalletDetailPanel/CreditWalletPanel. Ở chế độ Sửa, chạm dòng mở form sửa; xác nhận xóa nằm trong form sửa. Goal giữ progress/target, credit giữ hạn mức khả dụng ở dòng ví. Khi không có ví, vẫn hiện hành động Thêm ví. Goal hỗ trợ target_date qua API và UI. Sổ giao dịch có select đầu màn hình cho `Tổng cộng` hoặc từng ví; ví thường dùng cùng layout/kỳ với `Tổng cộng` và chỉ lọc giao dịch của ví được chọn. Xem [savings](../savings/README.md).
+
+## Quyết định hiện hành
+
+Owner chốt dùng **FormField + BaseSelect** chọn loại khi tạo: Ví thường / Ví tiết kiệm / Ví tín dụng. Cho phép đổi trong draft, lưu xong loại bất biến ở UI và API. Không cần sheet chọn loại. Tài liệu này gom danh sách, thêm và sửa ví; không đánh đồng thiết kế đích với implementation hiện tại.
+
+## Bố cục và base
+
+| Vùng | Base | Contract |
+| --- | --- | --- |
+| Header quản lý | `MPSelectionScreenHeader` | Tựa đề Chọn Ví căn giữa; Đóng và Sửa/Xong là capsule cân hai bên theo Stitch; hành động quay lại và edit-mode giữ nguyên |
+| Danh sách ví | MPWalletSelectionList + MPSurfaceCard + MPWalletRow + MPButton | Tổng cộng dùng globe badge tone teal và chỉ cộng ví được bật; chia hai nhóm `is_in_total`; mỗi row xếp tên và số dư theo cột, đánh dấu scope đang chọn; chọn dòng mở ledger scope; native `Chi tiết` là action trailing gọn trên cùng hàng và giữ route detail; goal/credit giữ thông tin chuyên loại |
+| Hành động danh sách | MPWalletSelectionList + MPButton | Thêm ví luôn hiện kể cả danh sách rỗng; Liên kết dịch vụ disabled |
+| Chế độ sửa | MPWalletSelectionList + WalletEditorView | Tap dòng mở sửa; xóa trong form sửa và có xác nhận; Sửa/Xong không đổi API |
+| Thêm ví | BaseBottomSheet presentation=form | Hủy / Thêm Ví / Lưu; focus trap, Escape, khôi phục focus |
+| Loại ví | FormField + BaseSelect | Chỉ chọn trong draft tạo; không dùng ảnh Chọn Ví làm picker loại |
+| Thông tin chung | SurfaceCard, Divider, BaseTextInput, IconBadge | Tên, VND cố định, số dư đầu phù hợp loại; không ghi chú khi tạo |
+| Trường theo loại | FormField + BaseTextInput | Target/limit dương theo loại; ngày/sao kê chưa hỗ trợ phải ghi rõ |
+| Không tính vào tổng | BaseSwitch + SurfaceCard + Text | checked = is_in_total false; mặc định tính vào tổng |
+| Thông báo ví tiết kiệm | BaseSwitch + SurfaceCard / MPBooleanSelector | Goal wallets persist `goal_notifications_enabled`; mặc định tắt và hiện trong inbox nội bộ |
+| Trạng thái | StatusMessage | Empty plain; lỗi alert; giữ draft khi lỗi |
+
+Màu, font, bo góc theo [tokens](../../system/TOKENS.md) và [base contracts](../../system/BASE_COMPONENTS.md), không copy CSS/device frame từ ảnh. Liên kết dịch vụ hiện disabled với giải thích chưa hỗ trợ. Backend mặc định tính ví mới vào tổng; khi request truyền rõ `is_in_total=false`, repository phải giữ nguyên false thay vì để GORM áp default true.
+
+## Hành vi riêng từng loại
+
+| Loại | Khi tạo | Sau khi mở ví — thiết kế nghiệp vụ | Hiện trạng |
+| --- | --- | --- | --- |
+| Thường | Tên, VND, số dư đầu, tính vào tổng | Chọn dòng mở sổ giao dịch scoped; “Chi tiết” hiển thị số dư/lịch sử; chuyển ví/điều chỉnh là luồng riêng | CRUD, sổ giao dịch scoped, màn chi tiết và thu/chi có |
+| Tiết kiệm | Trường chung, mục tiêu > 0, hạn tùy chọn | Đã có, còn thiếu, tiến độ theo số dư thật; nạp/rút cập nhật tiến độ; không tự tính lãi ngân hàng | Có target/ngày mục tiêu trong form/API, tiến độ và lịch sử thực trong chi tiết; visual UAT còn thiếu |
+| Tín dụng | Tên, VND, hạn mức > 0; tùy chọn dư nợ sao kê/ngày sao kê/ngày đến hạn | Dư nợ, hạn mức khả dụng, mua/hoàn tiền/phí/lãi, thanh toán và sổ tín dụng; không dùng ledger thu/chi thường | API, cycle metadata, status, migration, atomic payment pair và CreditWalletPanel đã triển khai; phân bổ kỳ với ngân hàng thật vẫn là follow-up |
+
+Không suy diễn số dư sao kê bằng dư nợ hiện tại. Màn chi tiết theo loại cần contract và proof riêng trước khi coi hoàn thành; các trường dữ liệu mới cần detail design API/schema.
+
+Ví tín dụng hiện đã có sổ nợ và API ghi mua/hoàn/phí/lãi, thanh toán cặp nguyên tử, hạn mức khả dụng, metadata kỳ sao kê/ngày đến hạn, amount due/status và danh sách statement. Form ghi bút toán tín dụng dùng cây danh mục tìm kiếm được trong cùng action sheet; mua/phí/lãi chỉ chọn nhóm chi phù hợp ví, hoàn tiền chỉ chọn nhóm thu phù hợp ví. Chọn nhóm giữ nguyên loại, số tiền và ghi chú đang nhập. Thanh toán thẻ không đổi. Phân bổ thanh toán với dữ liệu sao kê ngân hàng thật chưa được triển khai; UI chỉ dùng metadata người dùng cung cấp.
+
+Trong native, các action **Thêm giao dịch** và **Thanh toán thẻ** mở `MPFormBottomSheet` — presentation chung cho form dạng sheet; trường nhập/selector và nút lưu vẫn dùng base components. Hủy hoặc kéo đóng không ghi dữ liệu; khi đang lưu không cho dismiss; khi lưu lỗi giữ form và bản nháp; thành công đóng form rồi tải lại sổ. API, category rules và cặp bút toán thanh toán không thay đổi. Automated UI proof covers both sheet routes; visual screenshot/device acceptance remains open.
+
+Du lịch hiện là `Travel Mode`/sự kiện gắn giao dịch theo [TICKET-05-03](../../../work/tickets/TICKET-05-03-su-kien-travel-mode.md), không phải loại ví thứ tư. Runtime web và native đã có màn quản lý sự kiện, active state, khoảng ngày, gắn/gỡ giao dịch thường và xác nhận xóa; báo cáo narrative riêng theo chuyến và offline/backfill vẫn là gap. Không hiển thị nhãn “ví du lịch” hoặc hứa rằng số dư ví thuộc riêng chuyến đi. Khi thiết kế màn chuyến đi, cần phân biệt tổng thu/chi của giao dịch liên kết với số dư của các ví nguồn.
+
+## Sự kiện và trạng thái
+
+- Vào màn: tải dữ liệu thật; loading → ready/empty/error; không thay lỗi bằng mock.
+- Thêm: draft mới, basic, số dư 0, tính vào tổng bật. Đổi select hiện trường phù hợp và chỉ gửi dữ liệu liên quan loại đã chọn.
+- Lưu: tên không trống, tiền nguyên VND hợp lệ, target/limit dương khi cần; khóa gửi lặp. Thành công đóng sheet và refresh; thất bại giữ draft và lỗi trong sheet.
+- Hủy/Escape/backdrop: bỏ draft khi không đang lưu; không autosave.
+- Sửa: loại và opening_balance chỉ đọc. Metadata sửa theo loại; ghi chú cũ trong edit vẫn giữ. Điều chỉnh số dư không phải sửa opening_balance.
+- Xóa: xác nhận xóa vĩnh viễn, nêu số giao dịch và ảnh hưởng; refresh sau thành công. Liên kết chuyển ví/tín dụng cần thiết kế riêng trước mở rộng.
+- Field có label, select dùng keyboard native, modal dùng focus trap/return focus. Server kiểm tra quyền sở hữu và validation cuối cùng.
+
+## Phân biệt Chọn Ví và quản lý ví
+
+[Ảnh Chọn Ví](../../references/wallet-selector/README.md) chọn ví đã tồn tại hoặc Tổng cộng cho một màn tiêu thụ; không chọn loại. Runtime dùng lựa chọn này trong màn quản lý ví và bộ lọc đầu sổ giao dịch; [Ảnh Thêm Ví](../../references/add-wallet/README.md) là tham chiếu bố cục form.
+
+## Nguồn Money Lover đã kiểm tra
+
+- [Tạo/sửa ví](https://moneylover.zendesk.com/hc/en-us/articles/34974522779417-Create-edit-archive-and-delete-wallets): form theo loại, ảnh thao tác; tín dụng có hạn mức, số dư sao kê, ngày sao kê và hạn trả.
+- [Tiết kiệm](https://moneylover.zendesk.com/hc/en-us/articles/36976160006809-How-to-manage-your-financial-goals-savings-effectively): mục tiêu, hạn, đã có/còn thiếu, tiến độ, dòng tiền; không tính lãi ngân hàng.
+- [Tín dụng](https://moneylover.zendesk.com/hc/en-us/articles/37006112179609-How-to-manage-credit-cards-effectively): số dư/dư nợ, hạn trả, hạn mức khả dụng và dòng tiền.
+- [Báo cáo](https://moneylover.zendesk.com/hc/en-us/articles/34533897137177-Report-Definition-and-Usage): thông tin riêng theo loại nằm trong báo cáo khi chọn ví; chưa đủ bằng chứng về dashboard độc lập khi mở ví.
+
+Khóa loại sau tạo là quyết định MyPocket, không gán cho Money Lover. Tài liệu Money Lover có nhắc chuyển basic sang linked. Nguồn tham khảo không tự phê duyệt thay đổi nghiệp vụ/API MyPocket.
+
+## Acceptance và khoảng trống
+
+Runtime dùng WalletTypePicker cho loại ví, WalletDetailPanel cho basic/goal và CreditWalletPanel cho credit. Chọn dòng ví route về sổ giao dịch scoped; chọn Tổng cộng route về toàn bộ ledger; action “Chi tiết” là luồng detail riêng. `MPWalletSelectionList` sở hữu nhóm/tổng hợp/list actions ở native và `WalletSelectionList` ở web. Native policy + repository persistence regression pass; API-backed iPhone 16 UI test verifies included/excluded groups, aggregate total/route, edit, detail and footer actions. Linked-service integration and real-bank statement allocation remain product gaps. Chạy check:design, test:design, build khi môi trường frontend có Node.
+
+Task 4 verification plan: run the focused Wallets, Categories/Recurring, and
+Jars/Months reference tests; the native base/project guards; and a Release
+simulator build. Categories, jars, recurring, and credit implementation remains
+in `Features/Secondary/SecondaryFeatureViews.swift`, outside this worker's
+write ownership. Any missing shared-base adoption in those flows must be
+completed by that file's owner instead of duplicated in Wallets.
+
+Implementation reconciliation (2026-10-26): Wallet detail, goal detail,
+transaction groups, summaries, editor sections and pinned actions now compose
+the named shared bases. Focused Wallets/Categories/Recurring/Jars/Months tests
+pass 13/13 on the iPhone 16 simulator; native base/project guards pass; and the
+Release simulator build passes with Swift warnings treated as errors. Populated
+small-phone, dark-mode, Dynamic Type and physical-device visual acceptance are
+still separate gates.
+
+Goal-detail wallet selection is owner-state driven: choosing another available
+goal updates `WalletsView.selectedWalletID` and remounts detail for that wallet.
+The goal-only selector rejects aggregate, basic, credit, missing, or stale IDs;
+it no longer invokes the external transaction-route callback or remains pinned
+to the original wallet.
+
+[Backlog](../../../work/BACKLOG.md) · [Validation](../../../work/VALIDATION_MATRIX.md) · [Ticket](../../../work/tickets/TICKET-01-02-quan-ly-vi.md) · [Release](../../../releases/CHANGELOG.md).
+
+## Bản triển khai trước quyết định select — chỉ để đối chiếu
+
+Route `/account/wallets`. [Work/design](../../../work/tickets/UI-WALLET-02-DETAIL_DESIGN.md), [reference](../../references/add-wallet/README.md).
+
+Add opens one BaseBottomSheet, canvas/form presentation, with Hủy / Thêm Ví / Lưu header. SurfaceCard groups IconBadge + inline title input, fixed VND, and opening balance. Divider separates rows. No note. A row opens the three-type picker; goal requires positive target and credit positive limit. Service linking is disabled and labeled unavailable. BaseSwitch “Không tính vào tổng” inversely maps to is_in_total.
+
+Type picker uses shared row buttons, IconBadge, Text and selected check. Selecting returns to the preserved draft; back/Escape returns without saving. One dialog owns focus trap, scroll lock and restore. Save is unavailable for blank name, invalid balance, invalid type-specific amount or pending request. Successful API save closes and refreshes; failure keeps draft and displays alert inside sheet. Full cancel discards draft. Edit continues existing immutable type/opening-balance behavior.
+
+No new public API, currency selector, icon persistence or bank-link integration. Use shared tokens even where export uses different colors or larger corners. Empty wallet messages remain plain. Proof: shared SSR contracts, design regressions and production build; user visual acceptance pending.

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+
+<html lang="vi"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport"/>
+<title>Chọn Ví</title>
+<!-- Google Fonts: Manrope -->
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&amp;display=swap" rel="stylesheet"/>
+<!-- Tailwind CSS v3 -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Manrope', 'sans-serif'],
+          },
+          colors: {
+            appBg: '#F2F2F7',
+            sheetBg: '#F8F8FA',
+            brandGreen: '#16A34A',
+            brandBlue: '#007AFF',
+          },
+          borderRadius: {
+            '4xl': '2rem',
+          }
+        }
+      }
+    }
+  </script>
+<style data-purpose="custom-overrides">
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+  </style>
+</head>
+<body class="bg-[#B3B3B3] flex justify-center items-center min-h-screen p-0 sm:p-4 font-sans text-slate-900 antialiased">
+<!-- Mobile Frame Screen Wrapper -->
+<div class="w-full max-w-[430px] h-[932px] bg-white sm:rounded-[50px] shadow-2xl relative overflow-hidden flex flex-col justify-between">
+<!-- Top Modal / Sheet View Container -->
+<div class="relative w-full h-full bg-[#F3F4F6] flex flex-col">
+<!-- BEGIN: iOS Status Bar -->
+<header class="w-full pt-3 px-8 flex justify-between items-center z-20 text-black">
+<!-- Time -->
+<span class="text-[15px] font-semibold tracking-tight">22:45</span>
+<!-- Icons (Cellular, Wifi, Battery) -->
+<div class="flex items-center space-x-2">
+<!-- Signal Icon -->
+<svg class="w-4 h-3.5 fill-current" viewbox="0 0 17 12">
+<rect height="3" rx="0.75" width="2.5" x="0" y="9"></rect>
+<rect height="6" rx="0.75" width="2.5" x="4.5" y="6"></rect>
+<rect height="9" rx="0.75" width="2.5" x="9" y="3"></rect>
+<rect height="12" rx="0.75" width="2.5" x="13.5" y="0"></rect>
+</svg>
+<!-- Wifi Icon -->
+<svg class="w-4 h-3 fill-current" viewbox="0 0 16 12">
+<path d="M8 9.5a1.5 1.5 0 100 3 1.5 1.5 0 000-3z"></path>
+<path d="M12.24 6.76a6 6 0 00-8.48 0 .8.8 0 01-1.13-1.13 7.6 7.6 0 0110.74 0 .8.8 0 01-1.13 1.13z"></path>
+<path d="M14.83 4.17a9.6 9.6 0 00-13.66 0 .8.8 0 01-1.13-1.13 11.2 11.2 0 0115.92 0 .8.8 0 01-1.13 1.13z"></path>
+</svg>
+<!-- Battery Icon -->
+<div class="flex items-center">
+<div class="w-6 h-[12px] border border-black/80 rounded-[4px] p-0.5 flex items-center justify-start">
+<div class="bg-black/90 h-full w-[48%] rounded-[1.5px]"></div>
+</div>
+<div class="w-[1.5px] h-1 bg-black/80 rounded-r-sm -ml-px"></div>
+<span class="text-[11px] font-bold ml-1">48</span>
+</div>
+</div>
+</header>
+<!-- END: iOS Status Bar -->
+<!-- Main Sheet Container with rounded top edges -->
+<div class="flex-1 bg-[#F4F4F6] rounded-t-[36px] mt-2 px-4 pt-4 pb-8 flex flex-col overflow-y-auto">
+<!-- BEGIN: Navigation Header -->
+<nav aria-label="Sheet Navigation" class="flex items-center justify-between px-1 mb-6">
+<!-- Close Button (Đóng) -->
+<button class="h-10 px-5 rounded-full bg-white text-slate-800 text-[15px] font-semibold shadow-sm active:scale-95 transition flex items-center justify-center" type="button">
+            Đóng
+          </button>
+<!-- Screen Title -->
+<h1 class="text-lg font-bold text-slate-900 tracking-tight">
+            Chọn Ví
+          </h1>
+<!-- Edit Button (Sửa) -->
+<button class="h-10 px-5 rounded-full bg-white text-slate-800 text-[15px] font-semibold shadow-sm active:scale-95 transition flex items-center justify-center" type="button">
+            Sửa
+          </button>
+</nav>
+<!-- END: Navigation Header -->
+<!-- BEGIN: Total Aggregate Section -->
+<section aria-label="Tổng cộng" class="mb-5">
+<div class="w-full bg-white rounded-3xl p-4 shadow-sm flex items-center justify-between cursor-pointer active:bg-slate-50 transition-colors">
+<div class="flex items-center space-x-3.5">
+<!-- Globe Icon for Total Aggregate -->
+<div class="w-12 h-12 rounded-full bg-[#307B7A] flex items-center justify-center text-white shrink-0 overflow-hidden shadow-inner">
+<svg class="w-7 h-7 text-[#F5C242]" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.8" viewbox="0 0 24 24">
+<circle cx="12" cy="12" r="10"></circle>
+<line x1="2" x2="22" y1="12" y2="12"></line>
+<path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+</svg>
+</div>
+<!-- Info -->
+<div class="flex flex-col">
+<span class="text-[17px] font-bold text-slate-900 leading-tight">Tổng cộng</span>
+<span class="text-[14px] font-medium text-slate-600 tracking-tight mt-0.5">1.083.096 đ</span>
+</div>
+</div>
+<!-- Active Checkmark Indicator -->
+<div class="text-[#007AFF] pr-2">
+<svg class="w-5 h-5 stroke-[2.5]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<polyline points="20 6 9 17 4 12"></polyline>
+</svg>
+</div>
+</div>
+</section>
+<!-- END: Total Aggregate Section -->
+<!-- BEGIN: Section Header: TÍNH VÀO TỔNG -->
+<div class="px-3 pb-2.5">
+<h2 class="text-[13px] font-bold tracking-wider text-slate-400 uppercase">TÍNH VÀO TỔNG</h2>
+</div>
+<!-- END: Section Header: TÍNH VÀO TỔNG -->
+<!-- BEGIN: Individual Wallets List -->
+<section aria-label="Danh sách ví" class="mb-5">
+<div class="bg-white rounded-3xl overflow-hidden shadow-sm">
+<!-- Wallet Item 1: Ví tín dụng -->
+<div class="p-4 flex items-center space-x-3.5 active:bg-slate-50 transition cursor-pointer">
+<!-- Credit Card Icon -->
+<div class="w-12 h-12 rounded-full bg-[#4DA8A6] flex items-center justify-center text-white shrink-0 shadow-inner">
+<svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="1.8" viewbox="0 0 24 24">
+<rect height="14" rx="2" width="20" x="2" y="5"></rect>
+<line x1="2" x2="22" y1="10" y2="10"></line>
+<line stroke-linecap="round" stroke-width="2.2" x1="5" x2="8" y1="15" y2="15"></line>
+</svg>
+</div>
+<!-- Text details -->
+<div class="flex flex-col justify-center">
+<span class="text-[16px] font-bold text-slate-900 leading-tight">Ví tín dụng</span>
+<span class="text-[14px] font-medium text-slate-600 mt-0.5">-3.711.104 đ</span>
+</div>
+</div>
+<!-- Subtle Separator with Indent -->
+<div class="ml-[72px] border-b border-slate-100"></div>
+<!-- Wallet Item 2: Techcombank -->
+<div class="p-4 flex items-center space-x-3.5 active:bg-slate-50 transition cursor-pointer">
+<!-- Red Diamond Bank Icon -->
+<div class="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center shrink-0 border border-slate-100">
+<div class="flex items-center space-x-0.5">
+<div class="w-3.5 h-3.5 bg-[#E61B23] transform rotate-45"></div>
+<div class="w-3.5 h-3.5 bg-[#E61B23] transform rotate-45"></div>
+</div>
+</div>
+<!-- Text details -->
+<div class="flex flex-col justify-center">
+<span class="text-[16px] font-bold text-slate-900 leading-tight">Techcombank</span>
+<span class="text-[14px] font-medium text-slate-600 mt-0.5">4.710.200 đ</span>
+</div>
+</div>
+<!-- Subtle Separator with Indent -->
+<div class="ml-[72px] border-b border-slate-100"></div>
+<!-- Wallet Item 3: Tiền Mặt -->
+<div class="p-4 flex items-center space-x-3.5 active:bg-slate-50 transition cursor-pointer">
+<!-- Physical Cash Wallet Icon -->
+<div class="w-12 h-12 rounded-full bg-[#354756] flex items-center justify-center shrink-0 shadow-inner">
+<div class="relative w-6 h-5 bg-[#E8833A] rounded-md flex items-center justify-end pr-0.5">
+<!-- Wallet flap accent -->
+<div class="w-2.5 h-2.5 bg-[#D5702A] rounded-full border border-amber-200/40 flex items-center justify-center">
+<div class="w-0.5 h-0.5 bg-white rounded-full"></div>
+</div>
+</div>
+</div>
+<!-- Text details -->
+<div class="flex flex-col justify-center">
+<span class="text-[16px] font-bold text-slate-900 leading-tight">Tiền Mặt</span>
+<span class="text-[14px] font-medium text-slate-600 mt-0.5">84.000 đ</span>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Individual Wallets List -->
+<!-- BEGIN: Action Links Section -->
+<section aria-label="Thao tác thêm ví" class="mt-1">
+<div class="bg-white rounded-3xl overflow-hidden shadow-sm">
+<!-- Action 1: Add Wallet (Thêm ví) -->
+<button class="w-full p-4 flex items-center space-x-4 text-left active:bg-slate-50 transition" type="button">
+<div class="w-7 h-7 rounded-full bg-[#22C55E] flex items-center justify-center text-white shrink-0">
+<svg class="w-4 h-4 stroke-[3]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<line x1="12" x2="12" y1="5" y2="19"></line>
+<line x1="5" x2="19" y1="12" y2="12"></line>
+</svg>
+</div>
+<span class="text-[16px] font-semibold text-[#16A34A]">Thêm ví</span>
+</button>
+<!-- Subtle Separator with Indent -->
+<div class="ml-[56px] border-b border-slate-100"></div>
+<!-- Action 2: Link Service (Liên kết dịch vụ) -->
+<button class="w-full p-4 flex items-center space-x-4 text-left active:bg-slate-50 transition" type="button">
+<div class="w-7 h-7 rounded-full bg-[#22C55E] flex items-center justify-center text-white shrink-0">
+<svg class="w-4 h-4 stroke-[2.2]" fill="none" stroke="currentColor" viewbox="0 0 24 24">
+<path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path>
+<path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path>
+</svg>
+</div>
+<span class="text-[16px] font-semibold text-[#16A34A]">Liên kết dịch vụ</span>
+</button>
+</div>
+</section>
+<!-- END: Action Links Section -->
+</div>
+<!-- END: Main Content -->
+<!-- Home Indicator Bar (iOS) -->
+<div class="w-full pb-2 pt-1 flex justify-center bg-[#F4F4F6]">
+<div class="w-36 h-1 bg-black/20 rounded-full"></div>
+</div>
+</div>
+</div>
+</body></html>

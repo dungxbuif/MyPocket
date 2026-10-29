@@ -1,0 +1,23 @@
+:root {
+  --ifm-color-primary: #2dbd4f;
+  --ifm-color-primary-dark: #28a946;
+  --ifm-color-primary-darker: #24993f;
+  --ifm-color-primary-darkest: #1d7e33;
+  --ifm-color-primary-light: #39c85f;
+  --ifm-color-primary-lighter: #4dce71;
+  --ifm-color-primary-lightest: #6dd88a;
+  --ifm-code-font-size: 95%;
+  --docusaurus-highlighted-code-line-bg: rgba(0,0,0,0.1);
+}
+
+[data-theme='dark'] {
+  --docusaurus-highlighted-code-line-bg: rgba(255,255,255,0.1);
+}
+
+.navbar__title {
+  font-weight: 700;
+}
+
+.footer {
+  font-size: 0.85rem;
+}

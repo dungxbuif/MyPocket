@@ -1,0 +1,18 @@
+# Edit group — component contract
+
+Source IMG-03, code.html and editable enable.html reference: [extraction](../../system/SOURCE_EXTRACTION.md). [Page](../../pages/account-groups/README.md).
+
+## Composition
+
+PageBackHeader → metadata SurfaceCard → read-only explanation → ApplicableWalletsCard → actions/status.
+CategoryEditForm owns name/kind/parent/icon/wallet selections; InlineControlRow slots own geometry, BaseTextInput title and BaseSelect inline own field styling. Icon picker opens BaseBottomSheet; selected IconButton has base-owned ring.
+Wallet applicability uses the shared native `MPWalletApplicabilityCard` and
+`MPCheckboxRow`, not a collapsed menu. The card owns empty-means-all display and
+selection-summary copy; feature code supplies owner wallets and selected IDs.
+All colors come from the shared catalog.
+
+## Behavior
+
+System metadata is read-only; explanation says only wallet applicability can change. Personal group exposes editable metadata and delete on screen header. Kind change resets parent selection. Parent choices are roots of matching kind excluding self. Required trimmed name is checked before save. Save forwards input to screen; errors and persistence are screen/API responsibilities.
+Applicable wallet choices are multi-select, not single-select radio. No selected wallets is displayed as áp dụng tất cả ví by current contract. Do not infer backend semantics from a static empty list.
+Current editing uses routes new/edit; icon selection alone uses a sheet. Source image's “Sửa” action is visual reference, not an instruction to create a second system-metadata editing mode.

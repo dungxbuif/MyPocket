@@ -1,0 +1,110 @@
+# MyPocket native base guideline
+
+Status: owner approved 2026-10-14: keep the app palette, improve UI/UX across
+native iOS using the proposed common families. [Screen registry](ios-screen-registry.md).
+Goal: a small set of composable families, not a unique component per feature.
+Existing Go business/auth contracts remain authoritative; UI must not invent totals.
+
+## Five families
+
+| Family | Shared responsibility | Existing bases to keep/consolidate |
+| --- | --- | --- |
+| Shell/layout | Bounded viewport, one header anatomy, gutters, pinned footer, section rhythm | MainTabView/MPBottomNavigation/MPScreenHeader/MPFormBottomSheet |
+| Surface/list | One flat group surface; reusable title/value/meta/icon row and semantic finance mapping | MPSurfaceCard/MPMenuRow/MPTransactionRow/MPWalletRow/MPMetric |
+| Form/input | Labels/errors, text/password, money, decimal quantity, integer count, note, dates | MPTextField/MPSecureField/MPAmountField/MPAmountKeypad/MPTextEditor/MPDateField |
+| Selection/presentation | Segmented/filter tabs, checkbox, searchable selection, short sheet vs long editor route, confirmation | MPSegmentedControl/MPCheckboxRow/MPOptionSelector/MPCategoryTree/mpFormBottomSheet/mpFullScreenCover/mpConfirmDialog |
+| Feedback/state | Loading/empty/error/disabled, attachment source+thumb, chat composer/messages and action results | MPAsyncStates/MPAttachmentViews/MPMarkdown/shared financial cards |
+
+These are families, not a demand for five giant files/components. Features own
+domain data/validation/actions; bases own appearance and interaction geometry.
+Do not rename every existing component or duplicate it as a new v2 hierarchy.
+
+## Geometry and visual authority
+
+- Keep current semantic green/neutral palette, system SF Pro metrics and
+  tokenized text styles.
+  No new color/font choice from search output; existing owner choices prevail.
+- Page horizontal gutter16; card horizontal inset12, vertical8. This preserves
+  compact vertical rhythm while increasing horizontal breathing room requested
+  in feedback. Section gap8, internal row gap4. Card corners12/button8.
+- Header, group heading and row leading icon use consistent alignment columns;
+  row title starts after the shared32 icon+8 gap. Remove per-screen heading inset,
+  negative padding and arbitrary horizontal overrides.
+- Minimum interactive target44pt. Normal finance row44 minimum, content-driven
+  expansion for long copy/Dynamic Type. No fixed maximum height/font shrinking.
+  Transaction rows add a shared6pt top/bottom inset for separation; wallet rows
+  keep their existing compact geometry.
+- No card-in-card. A section owns one surface; internal metrics/rows/dividers
+  are flat content. Cards are not a universal wrapper for every label/action.
+- One content scroll area per screen. The shell Feedback host is a transparent
+  overlay above the route and does not reserve content height; keyboard-safe
+  composer/editor actions remain reachable. Feedback hides during keyboard input
+  and returns on dismissal; pinned footer actions remain inside the route
+  viewport. The lower-right anchor is stable; obstacle reports do not move it
+  between rows/sides. Populated-screen/device reachability remains a separate
+  visual gate.
+- The iOS app is portrait-only. The app target declares only
+  `UIInterfaceOrientationPortrait`; feature screens must not add orientation
+  overrides or landscape-specific layout branches. UI tests must verify that a
+  landscape device request leaves the app viewport portrait.
+
+## Interaction rules
+
+### Reference shell and editor contract
+
+- `MPBottomNavigation` is the only owner of the floating navigation capsule,
+  selected-tab surface and raised center Add geometry. Shell feature views pass
+  route state and actions only; they do not add local colors, radii or spacing.
+- `MPReferenceScreenHeader` owns centered editor titles and the leading Cancel
+  action. `MPEditorScaffold` owns one scrolling field region plus a fixed footer
+  outside that scroll region so Save remains reachable when the keyboard is
+  shown or hidden.
+- `MainTabView` divides the safe-area viewport into route content and the shared
+  navigation region, then layers the transparent Feedback host above the route.
+  Feedback is hidden while the keyboard is visible and returns to the same
+  lower-trailing position after dismissal; Assistant and Account/More remain
+  reachable through the canonical shell.
+- Verification runs the same shell geometry and transaction-editor assertions
+  on a compact iPhone SE and a current large iPhone, then runs the native base
+  and project guards. Screenshots remain review evidence, not a substitute for
+  frame, hit-target and keyboard-reachability assertions.
+
+- One primary entry per destination: profile→account; bell→notifications;
+  Assistant tab→advisor. Remove duplicate More rows, retain route identifiers
+  for intentional deep links/navigation callbacks.
+- Long create/edit form opens dedicated editor, not expanding above a list.
+  Short choice/confirmation opens shared sheet/dialog. Save/cancel/dismiss rules,
+  dirty form and pending submit states are the same across consumers.
+  In a mounted management screen, cancel leaves input unsaved but keeps the local
+  draft for reopening the same item. A different item/create starts a distinct
+  draft; success resets it. Jar month changes invalidate the draft. No durable
+  draft/restart promise is implied; offline persistence is a separate contract.
+- More secondary routes support native leading-edge Back through a scoped
+  shared bridge. Editors and unsaved Account/month fields block that gesture;
+  use their explicit Cancel/Back actions. Account root retains global Add and
+  returns there after the transaction editor closes; child routes hide Add.
+- Money is integer minor-unit/VND input formatted through one money base/parser.
+  Quantity is decimal, frequency interval integer, allocation percent bounded
+  percentage: separate input semantics, same field styling. Never strip decimals
+  from investment quantity or show a currency keypad for a recurrence count.
+- Attachment chooser defaults Photos; visible Files tab supports PDF/import.
+  Thumbnail/remove, remaining count, file errors and loading belong to the base.
+- Advisor overview stays pinned/compact; chat takes remaining height with
+  suggestions inside the chat region. Composer grows a few lines then scrolls;
+  no full-sized note editor for every message. Read-only AI boundary unchanged.
+- Resolution checkbox means owner confirmation, not dev status. Face ID state
+  must remain visible and independent of app-lock/refresh/session/logout.
+
+## Evidence and guard policy
+
+Every registry screen needs entry/back/save/cancel/error/empty/pending specs;
+each migrated screen requires populated small-phone screenshot and UI action
+proof, plus API state re-read for writes. Shared-base unit tests cover normal/
+long text, Dynamic Type, 44pt targets and no nested card expansion. Static raw
+control guard alone is insufficient. No release note until owner acceptance.
+
+UI/UX Pro Max was used for native touch, consistent geometry and presentation
+guidance. Two design-system searches returned marketing/enterprise landing
+patterns rather than a valid native in-app pattern; those outputs were not
+persisted/adopted. This proposal uses verified SwiftUI navigation/spacing advice
+and native pro-rules with the project's existing palette, not an invented match.

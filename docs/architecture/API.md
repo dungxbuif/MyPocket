@@ -1,0 +1,357 @@
+---
+artifact_type: api_contract_index
+id: API-MASTER
+status: draft
+owner: shared
+human_fields: [contract_intent, approval]
+ai_fields: [contract_rows, errors, auth_notes, versioning, linked_decisions]
+shared_fields: [status, trace]
+---
+
+# API
+
+## MCP integration candidate — 2026-10-20
+
+The local candidate adds authenticated `/api/v1/mcp` using the official Go SDK
+v1.8.0, stateless Streamable HTTP and JSON responses. POST carries protocol
+requests; GET/DELETE remain authenticated SDK entry points and normally return
+405 in stateless mode. `tools/list` is the machine-readable source for the
+current 101 named tool input schemas. OpenAPI documents the transport and REST
+contracts, rather than duplicating the dynamic tool catalog.
+
+JWT, full-owner `mpk_` API keys and MCP have identical same-owner user authority,
+with no scopes. Named tools dispatch to the canonical REST router with the
+original bearer; owner selectors and arbitrary paths are rejected. Ordinary
+write tools execute directly. Assistant proposals still require the existing
+owner/conversation/generation-bound confirmation; AI-entry review is unchanged.
+Credential bootstrap/exchange, service-token agent/internal routes, public
+surfaces and the MCP transport itself are the 19 explicit non-tool entries.
+
+The [human and AI-agent MCP contract](../ai/mcp-api-parity.md) covers connection,
+discovery, `_meta.idempotency_key`, CAS, async handles, bounded persisted event
+replay, multipart files, attachment resource links, errors, limits, credential
+revocation and audit privacy. [ADR-025](../decisions/ADR-025-mcp-api-parity.md)
+records the transport and dispatch boundary. Local route/SDK/docs tests do not
+claim production deployment or staging/provider/device acceptance.
+
+The final review corrections include canonical optional PNG feedback uploads,
+successful feedback screenshot ResourceLinks, nonblocking MCP advisor/feedback
+audit delivery and committed durable category-create receipts. Category replay
+returns `200` for the same owner/key/payload, changed payload returns `409`, and
+category, wallet links and receipt commit atomically in the existing ledger.
+See [correction evidence](../work/bugs/MCP-FINAL-REVIEW-20261020.md).
+
+## Production access — 2026-10-13
+
+The production API base URL is `https://money.dungxbuif.com/api/v1`. The
+production host now routes directly to the Go API; the root URL `/` does not
+serve the web application. Health is available at `/api/v1/health`, and the
+interactive Swagger UI is `/api/v1/docs/index.html`. This is a deployment
+topology change only: existing API paths, authentication, and request/response
+contracts are unchanged. The native app should continue using the same API base
+URL. See the [production runbook](../operations/DEPLOYMENT.md).
+
+## Local candidate: savings, recurring budget and forecast — 2026-10-16
+
+Owner JWT and full-owner API keys use the same authorization for these
+additive routes; the authenticated owner is never supplied by request payload.
+
+| Method | Path | Contract |
+| --- | --- | --- |
+| GET | `/api/v1/reports/savings` | Goal balances/activity and separate account-wide surplus |
+| GET | `/api/v1/reports/savings/transactions` | Section/kind/month/wallet-scoped pagination |
+| GET, POST | `/api/v1/budget-series` | List revisions or create canonical recurring periods |
+| PATCH | `/api/v1/budget-series/{id}` | Replace next-period configuration using version + idempotency key |
+| POST | `/api/v1/budget-series/{id}/stop` | Stop future generation and preserve existing periods |
+| GET | `/api/v1/budgets/{id}/report` | Effective limit, linear forecast and daily spend |
+| GET | `/api/v1/budgets/{id}/transactions` | Same expense/descendant/date predicates as report |
+
+References: [savings](../guides/savings-report-api.md),
+[recurrence](../guides/budget-recurrence-api.md),
+[forecast](../guides/budget-report-api.md), [ADR-023](../decisions/ADR-023-ledger-savings-recurring-budgets.md).
+These Markdown guides and generated OpenAPI are the agent-readable contracts.
+Migrations 035–037 and these runtime surfaces are deployed in the immutable
+`release-20261019-uat2` API/worker image (digest is recorded in the deployment
+runbook). The post-rollout strict parity audit passed with 88/88 paths.
+Existing interval budgets keep their base `limit_amount` semantics.
+
+The checked-in candidate OpenAPI now contains 91 paths. The additional two
+portfolio correction operations and the MCP transport are local candidate
+routes only; production
+still serves the 88-path `release-20261019-uat2` contract until migrations
+038–040 and the matching API/worker image are explicitly rolled out. Do not
+infer production availability from the generated files in `backend/docs/`.
+
+### Route/method/auth parity audit — 2026-10-20
+
+The read-only `scripts/mypocket-production-readonly-audit.sh` compares both
+paths, HTTP operations and operation-level `security` metadata. The
+2026-10-20 run with `REQUIRE_ROUTE_PARITY=1` passed for the then-deployed
+88-path release; the current candidate is intentionally 91 paths because of
+the two portfolio correction operations and MCP transport described above.
+Its default mode
+reports drift without failing; strict mode remains the release gate for the
+next rollout.
+
+The checked-in parity test registers the same candidate route groups as
+`backend/cmd/api/main.go`, then verifies every candidate operation is present
+in `backend/docs/swagger.json` and carries the authenticated security
+contract. Route-specific tests additionally prove owner isolation and the
+same full-owner JWT/API-key authorization policy. This parity check does not
+prove a valid owner credential or provider/device behavior; those remain
+separate UAT gates. No production route or database was changed by this
+audit.
+
+## Offline implementation status — 2026-10-19
+
+Offline is not available on iOS yet and the native client still fails closed
+until it sees an authenticated capability response. The server contract is now
+deployed in API/worker image `release-20261019-uat2` at digest
+`sha256:17e3842326abb397d5184e6a5d407b51efb37ec05230171ab83128c7626cd6b7`.
+Local HTTP/DB
+tests now verify create requests with Idempotency-Key: first201, replay200, unchanged
+data object/array plus meta.mutation (operation/key/status/replayed). Typed JSON
+is hashed before generated defaults; completed receipt lookup precedes mutable
+wallet/category validation. Invalid explicit keys fail400; changed body409
+IDEMPOTENCY_KEY_REUSED; missing durable capability fails closed, not a plain write.
+No-header requests retain legacy online behavior/meta:null and are unsafe to
+automatically retry. Real router/PostgreSQL/Redis verification confirms JWT/session
+owner binding and expiry/logout rejection before replay. Per owner's2026-10-14
+decision, all user routes now also accept full-owner API keys, including financial
+writes/replay; no per-key scopes. Revocation/expiry/owner isolation remain enforced.
+The server route is deployed and production returns it behind auth; required-key
+rollout and native cache/sync/UI remain gates; encrypted outbox storage/leases
+are implemented locally. An owner-authenticated production capability response
+is still required before enabling the native sender.
+[Human/agent guide](../guides/offline-sync-api.md), [auth proof](../work/tickets/OFFLINE-AUTH-HTTP-20261014.md).
+
+GET /api/v1/sync/capabilities is locally implemented under JWT/session or owner key
+auth: contract_version1,enabled,operations,receipt_metadata=/meta/mutation,
+idempotency_key_required_for_offline=true,legacy_unkeyed_online=true. Operations
+are transaction.create/transfer.create only when durable repository+transfer
+writer configured; otherwise enabled=false/operations=[]. Read-only, no DB health
+claim. Old404/unsupported version/policy blocks future
+outbox sends; revalidate each drain, not stale cache after server rollback.
+Native getter/policy tests pass; no sync engine/UI wiring or prod activation yet.
+[Capability work](../work/tickets/OFFLINE-SERVER-CAPABILITY-20261014.md).
+
+2026-10-14 frozen-create addition (local, not deployed): POST /transactions uses
+create-only auto_link_travel boolean. Omitted/null/true retains active-trip fallback;
+false uses only validated explicit travel_event_id or no trip. New DTO embeds the
+old update DTO and omits nil policy from canonical receipt hash; pre-change
+receipts replay unchanged. A changed explicit policy conflicts under the same key.
+Capability transaction_create_context="explicit_travel_v1" is advertised only
+with configured durable writer; iOS ordinary-create sends require this exact value.
+Transfers have no active-trip fallback. Outbox freezes false before persistence,
+retaining supplied trip/time. No sync/UI or production availability claim.
+[Proof](../work/tickets/OFFLINE-FROZEN-TRAVEL-20261014.md).
+
+Full-owner API keys are deployed through common RequireAuth, without
+scope checks in authentication/advisor/feedback. [Design/proof](../work/tickets/API-KEY-FULL-ACCESS-20261014.md)
+and [human/agent guide](../guides/api-keys.md). The owner invariant and
+fail-closed handling for malformed ownerless rows are covered by the
+[owner contract](../work/tickets/API-KEY-OWNER-CONTRACT-20261019.md). Existing
+valid keys gain the same owner's capabilities; no key regeneration or SQL
+migration was required for this rollout.
+[Work/evidence](../work/tickets/OFFLINE-CREATE-RECEIPTS-20261014.md).
+
+Shared SQL diagnostic redaction is locally verified (not deployed): statement
+class/timing/rows/SQLSTATE only, no query text/parameters/raw driver error values.
+The logging change does not alter responses/errors/auth. This does not establish safety of every
+application log call. [Logging contract](../decisions/ADR-019-financial-sql-log-redaction.md).
+
+## AI entry review — 2026-09-21
+
+Extraction policy (updated 2026-10-27): `proposals` are reviewable suggestions, not booked transactions. For images/PDF, separate source lines remain separate even when their dates, amounts and descriptions match; missing dates and unverified VND amounts remain unapprovable. For supported XLSX statements, a bounded standard-library OOXML parser owns source ID, date, amount, direction, currency and reference. Structured rows are sent to the model in batches of at most 25 for semantic enrichment only; every `source_id` must return exactly once, and model text cannot replace parser-owned financial fields. Identical rows remain distinct. XLSX mixed with JPEG/PNG/PDF is rejected before storage/provider work in this slice. No automatic currency conversion or existing-ledger deduplication occurs. Each provider response remains bounded at 32768 tokens and 256 KiB; a truncated or source-set-invalid response fails atomically. See [deterministic ingestion design](../superpowers/specs/2026-10-26-ai-entry-deterministic-financial-ingestion-design.md).
+
+The multipart `text` field is sent as `user_instruction`. For OCR sources it may filter recognizable rows; for structured XLSX it affects semantics only and cannot omit source rows. OCR/source text remains untrusted evidence and cannot override application policy. `AI_STORE_USAGE=true` (default) stores normalized provider/model request metadata and provider usage on the owner-scoped process/run; usage is never returned publicly. Logs contain stage/count/size/latency/status/token metadata only, never prompts, cell values, OCR text, credentials or financial content.
+
+Authenticated routes under `/api/v1/ai/entry`: `GET /capabilities`, `POST /process`, `GET /requests/{request_id}`, `PATCH /proposals/{id}`, `POST /proposals/{id}/approve`, and `POST /proposals/{id}/reject`. No session, message, history, or latest-record route is public. `POST /process` accepts one multipart request (`request_id`, `text`, `timezone`, up to 20 `files`); retrying an identical request key returns the stored outcome without repeating provider work. `GET /requests/{request_id}` is read-only recovery. Client retry rule: after a transport/decoding failure or server error where POST acceptance is uncertain, keep the original `request_id` and fetch `GET /requests/{request_id}`; do not generate a new ID or automatically POST again. If GET finds the request, continue with that result (poll GET while `processing=true`). A confirmed GET 404 means that request ID was not accepted/found and allows the client to offer an explicit retry using the retained draft. [Stateless contract](../superpowers/specs/2026-09-21-stateless-ai-entry-design.md), [AI-ENTRY-02](../work/tickets/AI-ENTRY-02-BATCH-ATTACHMENTS-DETAIL_DESIGN.md), [ADR-005](../decisions/ADR-005-ai-entry-review.md).
+
+Authenticated `GET /api/v1/transactions/{id}/attachments/{attachmentId}/download` verifies both transaction ownership and an existing approval link, then returns `302` to a five-minute private S3 URL. Approved proposal responses include opaque `attachment_ids`; bucket and object keys remain server-only.
+
+Each file must be JPEG/PNG/PDF/XLSX, <=5 MiB, and match detected content; invalid files are rejected before provider work with 400. XLSX must be a supported, passive OOXML workbook: archive/XML bounds apply and formulas, macros, external links, embedded/ActiveX content, unsafe relationships, duplicate required headers and monetary rows without dates fail closed. The backend stores originals in private environment-qualified S3. Images/PDF use OCR; XLSX bypasses OCR and contributes canonical rows. Mixed structured and OCR files are rejected. The LLM receives only user text, OCR text or bounded row structures and minimal catalogs, never file bytes/Base64/private URLs. `GET /capabilities` keeps `files_configured` for OCR-backed uploads and adds `structured_files_configured` for XLSX availability. Approval/link/download/cleanup and review-only behavior remain unchanged.
+
+Same request ID/payload does not repeat extraction. Different payload with same ID, stale edits and conflicting terminal decisions return 409; invalid input 400, unavailable/unconfigured provider 503, wrong owner 404, missing auth 401. A completed AI entry response includes the model's bounded user-facing `reply` alongside `proposals`; this is persisted for request recovery and does not contain provider diagnostics. There is currently no per-user AI/OCR usage cap; provider-cost controls are a future provider-selection concern. Expired processing lease shows interruption; no automatic resubmission. Environment capability booleans indicate configuration, not successful provider authentication or quality.
+
+## Budget and savings integration — 2026-09-20
+
+Authenticated `GET/POST /api/v1/budgets`, `PATCH/DELETE /api/v1/budgets/{id}` implemented. Explicit calendar interval input uses `start_date` and `end_date` (`YYYY-MM-DD`), inclusive in the account's saved timezone; it is not an RFC3339 instant. Other inputs are name, positive safe-integer `limit_amount`, nullable owner `wallet_id` and visible expense `category_id`. List returns items with ledger-derived spent/days_remaining/ended and active limit_amount/spent summary (transaction IDs deduplicated). Category scope includes descendants. Only report-included expenses count. Exact same scope and overlapping dates returns 409; ended budgets cannot be edited. Delete configuration leaves transactions unchanged. [Design/proof](../work/tickets/API-SCREENS-01-DETAIL_DESIGN.md), [ADR-004](../decisions/ADR-004-budget-api-data.md), [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md).
+
+Goal transaction categories must use real catalog keys income_transfer_in/income_interest for income or expense_transfer_out for expense, in addition to kind/wallet applicability. Ordinary income/expense and credit entries require a visible active category; clients prefill the first applicable group when the user has not chosen one. Only adjustment rows are intentionally uncategorized. External savings entries affect one wallet and retain report inclusion default true. Internal transfers use the dedicated paired endpoint below. Category archival is soft and reversible: it never rewrites ledger or report history. The request fails with `400 category_inactive` when a new assignment uses an archived category; an edit may retain the exact category already attached to its existing transaction.
+
+`POST /api/v1/transactions/transfer` atomically creates two owner-scoped rows: an `expense_transfer_out` row on the source wallet and an `income_transfer_in` row on the destination wallet. The wallets must be different, owned by the caller, and non-credit. The server chooses the system categories; both rows share `transfer_id`, have no jar, and set `included_in_reports=false`. `PATCH` and `DELETE /api/v1/transactions/transfer/{transfer_id}` mutate the exact pair atomically and require an `Idempotency-Key`; replaying the same key/payload returns the stored result, while a changed payload returns 409.
+
+The transfer `PATCH` body is `{amount, occurred_at, note}`; both linked rows update atomically, while source and destination wallet IDs stay fixed for that transfer ID. A transfer cannot be moved between wallets by this endpoint.
+
+`POST /api/v1/transactions/adjustment` records an explicit balance correction for an owned basic or goal wallet. The body is `{wallet_id, amount, direction, occurred_at?, note?}`, where `amount` is a positive integer and `direction` is `increase` or `decrease`. The server stores `type=adjustment`, always sets `included_in_reports=false`, and excludes the row from income/expense reports while applying its signed effect to wallet balances. Adjustment rows are immutable through ordinary transaction edit/delete routes; create a compensating adjustment instead.
+
+`POST /api/v1/transactions/bulk-delete` accepts `{transaction_ids: string[]}` with 1–100 unique IDs. The owner-scoped repository locks and validates every requested row before deleting any row. If an ID is missing/not owned, a transfer pair is included, or an immutable adjustment is included, the entire request is rejected and no row is deleted. The endpoint returns `204` only after all rows are deleted.
+
+Recurring schedules are exposed at `GET/POST /api/v1/recurring`, `PATCH/DELETE /api/v1/recurring/{id}`, and `POST /api/v1/recurring/run-due`. Schedules are owner-scoped ordinary income/expense templates with a positive amount, frequency (`daily|weekly|monthly|yearly`), interval, next local-time occurrence and optional end. `run-due` is bounded to 100 occurrences and records a unique `(schedule_id, due_at)` marker in the same transaction as the generated row; retries do not duplicate transactions. Pausing/deleting a schedule leaves generated rows intact, and generated notes default to `Giao dịch định kỳ — {name}`.
+
+Credit wallets use a separate debt ledger. `POST /api/v1/credit/wallets/{wallet_id}/entries` records a `purchase`, `refund`, `fee`, or `interest` row; purchases/fees/interest are expenses and refunds are income. A category is required, must match the entry direction and its applicable-wallet scope, and is rejected when restricted to another wallet. `POST /api/v1/credit/wallets/{wallet_id}/payments` atomically records an excluded source-wallet expense paired with an excluded credit-wallet `payment` income row. The source must be a different non-credit wallet. `GET /api/v1/credit/wallets/{wallet_id}/statement` returns the credit limit, signed outstanding balance, available credit (`limit + balance`), configured statement balance/cycle, amount due, payment status (`not_configured|due|partial|paid|overdue`) and credit rows, with optional `from`/`to` `YYYY-MM-DD` filters. Credit wallet create/update accepts optional `last_statement_balance`, `statement_day` and `payment_due_day` (days 1–31). Credit rows cannot be created through ordinary transaction, adjustment, transfer, or bulk-delete routes; this preserves payment pairing and statement semantics. All routes are owner-scoped and accept JWT/session or a full-owner user API key.
+
+Travel Mode is an owner-scoped event dimension, not a fourth wallet type. `GET/POST/PATCH/DELETE /api/v1/travel/events`, `POST /api/v1/travel/events/{id}/activate`, and `POST /api/v1/travel/events/{id}/deactivate` manage events with at most one active event per owner. Ordinary income/expense creation auto-links the active event when no explicit event is supplied unless auto_link_travel=false; recurring, transfer, adjustment and AI approval paths do not auto-link. `PATCH /api/v1/transactions/{id}/travel` links or clears one ordinary transaction. Deleting an event clears links without deleting transactions or changing report inclusion. See [Travel Mode page contract](../design/pages/travel/README.md) and [implementation plan](../superpowers/plans/2026-10-01-travel-mode.md).
+
+2026-09-21 ownership correction: system category wallet applicability is read/replaced within the authenticated owner's wallets. Changing a shared category's selection preserves other owners' assignments. AI catalog and confirmation use the same scope.
+
+## Account timezone and calendar dates — Stage v1 baseline
+
+`GET/PATCH /api/v1/auth/profile` reads or updates the authenticated account's IANA `timezone`; invalid zone names return 400. The new-account browser-zone initialization is conditional and does not silently change an existing confirmed setting. Timestamp fields such as `transactions.occurred_at` remain RFC3339 instants; date labels are `YYYY-MM-DD` and month keys are `YYYY-MM`. Month/report intervals are derived from the account timezone as half-open UTC instants.
+
+Wallet create/update accepts optional `target_date` as `YYYY-MM-DD` for goal wallets. PostgreSQL stores it as `date`; omission preserves the date and an empty string clears it. Budget `start_date`/`end_date` are also date-only calendar labels interpreted in the account timezone. [ADR-008](../decisions/ADR-008-account-timezone-and-calendar-dates.md) records the migration and timezone rules.
+
+Goal-wallet create/update also accepts `goal_notifications_enabled` (default
+`false`). The field is accepted only for goal wallets and is owner-scoped. The
+current delivery surface is the in-app inbox: `GET /api/v1/notifications`
+returns the authenticated owner's newest-first items and
+`POST /api/v1/notifications/{id}/read` is an idempotent owner-scoped operation.
+Native clients register an iOS provider address through
+`POST /api/v1/notifications/devices` and revoke it through
+`DELETE /api/v1/notifications/devices/{id}`. Registration is JWT/full-owner
+API-key authenticated, upserts the same owner's device/environment, rejects a
+token already owned by another account, and never returns the token. This is a
+registration-only contract; APNs delivery and provider credentials are not
+enabled by these routes.
+The worker now materializes budget threshold items at 80% and 100% of the
+effective limit, using account timezone and an owner-scoped dedupe key. Push/APNs
+and device registration remain separate and are not claimed by this inbox API.
+
+`POST /api/v1/transactions` and transaction edits require an applicable category for ordinary income/expense rows and accept optional `jar_id` (null clears it). `included_in_reports` defaults to true and the create route persists an explicit false value; false keeps the transaction in the ledger and wallet balance but excludes it from report totals and trend aggregation. A jar is valid only for an ordinary expense and an active configuration for that owner's transaction month. Income and transfer-out categories cannot be assigned. Adjustment rows remain the only uncategorized transaction type.
+
+Portfolio routes are owner-scoped and intentionally separate from wallet ledger balances: `GET /api/v1/portfolio/summary`, `GET/POST/PATCH /api/v1/portfolio/assets`, `DELETE /api/v1/portfolio/assets/{id}`, `PATCH /api/v1/portfolio/assets/{id}/price`, and `GET/POST /api/v1/portfolio/assets/{id}/trades`. Asset metadata PATCH accepts a partial `symbol` and/or `name` body, trims and validates values, and may rename an asset without rewriting its trade history; duplicate symbols return `409`. Assets hold an optional manual latest-price snapshot and optimistic `version`. Trades are immutable `buy`/`sell` events with decimal-string quantity (up to eight fractional places), integer VND unit price and fee. The server stores fixed-point quantity, applies weighted-average cost before every sale, rejects sales above the available position with `409 PORTFOLIO_INSUFFICIENT_QUANTITY`, and never mutates wallet balances or ordinary reports. Price PATCH requires an explicit `latest_price`: `{}` or a top-level `null` returns 400 without changing the saved value. `{"latest_price":null}` clears the price; `{"latest_price":0}` records a known zero. Clearing returns valuation to an explicit unknown state. Asset deletion is allowed only without trade history and serializes with trade creation to preserve committed trades. Trade corrections use immutable revisions: preview with `POST /api/v1/portfolio/assets/{id}/trade-corrections/preview`, then commit `POST /api/v1/portfolio/assets/{id}/trade-corrections` with `Idempotency-Key`. A correction requires `source_trade_id`, `expected_asset_version`, `operation` (`replace` or `void`) and a non-empty reason; replacement fields are fully validated, the complete history is replayed chronologically, later oversells return `409`, stale versions return `409`, and retries replay the same receipt. Original rows remain audit history; no wallet cash entry is created. The native adapter mirrors both routes and requires explicit user confirmation before commit.
+
+Authenticated jar routes: `GET/POST /api/v1/jars`, `PUT/DELETE /api/v1/jars/{jar_id}/months/{month}`, and `GET /api/v1/jars/{jar_id}/report?from=YYYY-MM&to=YYYY-MM`. Month routes: `GET /api/v1/months/{month}`, `PUT /api/v1/months/{month}/note`, and `DELETE /api/v1/months/{month}/note`. Month figures are live ledger calculations; completion is derived from the current account-local month, and the note is independently user-authored. There is no scheduled or immutable close/report snapshot in CORE-03.
+
+## Field Ownership
+
+- Human owns public contract intent and approval for contract changes.
+- AI maintains contract rows, errors, auth notes, versioning, and linked decisions.
+
+## API Surface
+
+The current local Gin API will use a code-first Swagger contract: each Gin handler owns its Swagger annotations, and generated artifacts are derived from the Go source. Keep the generated surface limited to endpoints that exist in the running implementation; add annotations only when the corresponding handler and verification exist.
+
+Swagger UI is available at `/api/v1/docs/index.html`; the unauthenticated public
+entry point `/docs/` (and `/docs`) redirects there for stable links. Generated
+artifacts live under `backend/docs/`. Run `go generate ./cmd/api` from
+`backend/`: the generator declaration stays beside the Go API entry point, and
+endpoint annotations stay beside their handlers. There is no separate Swagger
+configuration file.
+
+Frontend navigation is client-side and does not change the API base path. TanStack Router exposes `/`, `/transactions`, `/budgets`, `/reports`, `/assistant`, `/account`, `/account/groups`, `/account/wallets`, `/account/feedback`, `/account/recurring`, `/account/travel`, `/account/portfolio`, `/jars`, and `/months/{YYYY-MM}`. The global quick-add sheet persists the implemented basic income/expense contract with optional jar assignment. Reports are mounted at `/reports` and use the owner-scoped insider/month/transaction endpoints; no fixture totals are rendered.
+
+Google login starts from the frontend origin using the relative `/api/v1/auth/google` path. Vite proxies that request during development, and the backend redirects the completed OAuth flow back to the same frontend origin at `/auth/callback`.
+
+Document HTTP endpoints, RPC methods, events, CLI commands, or any other public contract.
+
+| Contract | Type | Auth | Status | Notes |
+| --- | --- | --- | --- | --- |
+| `/api/v1/auth/devices`, `/auth/device-login`, `/auth/devices/{id}`, `/auth/logout` | HTTP REST | Enrollment/revoke accept JWT or owner key; device login uses its own credential | auth deployed; full-key extension local | Password confirmation still required to enroll. JWT logout revokes family; key logout revokes itself only. See [AUTH_API](AUTH_API.md). |
+| OCR Platform document recognition | HTTP REST | `Authorization: Bearer sk_ocr_...` for protected requests | ready | See `docs/architecture/OCR_API.md`. |
+| MyPocket local API | HTTP REST | JWT + rotating refresh, or full-owner mpk_ user key | deployed in `release-20261019-uat2`; route parity 88/88 | See [authentication contract](AUTH_API.md); key secrets shown once/stored as hashes. Login/refresh/device exchange retain own credential contracts. |
+| `/api/v1/api-keys` | HTTP REST | JWT or owner API key | deployed and covered by UAT | `POST` name/optional expires_at creates full-owner key and returns secret once; `GET` metadata only; `DELETE /:id` revokes. No scopes; legacy input ignored, old stored metadata has no authority. |
+| `/api/v1/auth/mobile/google/exchange` | HTTP REST | Public route; exact `platform=ios`/PKCE/redirect allowlist | implemented; native production use remains configuration-gated | Exchanges a native iOS Google authorization code for the existing JWT + rotating refresh session. No client secret or token is sent in the app callback URL. Invalid profile is `401 GOOGLE_MOBILE_LOGIN_INVALID`; local owner persistence failure is `503 GOOGLE_USER_STORE_UNAVAILABLE`. |
+| `/api/v1/categories` | HTTP REST | JWT or owner API key | implemented | `GET` returns all owner-visible categories, including inactive rows for historical labels and hierarchy; each row includes `is_active`. `POST`/`PATCH` accept name, kind, parent and owner-scoped applicable wallet IDs (empty means all owner wallets); category creation persists the category and selected links atomically; `DELETE` removes a personal group and returns its personal children to root. |
+| `/api/v1/categories/{id}/status` | HTTP REST | JWT or owner API key | deployed in `release-20261019-uat2` | `PATCH {"is_active":false}` archives a personal category; `true` restores it. The response is the complete category model, with `wallet_ids` always an array (empty when no explicit wallet links exist), so native clients can decode it directly. Idempotent and owner-scoped; system or other-owner categories return not found. Existing transactions, reports, budgets and recurring schedules are preserved. New transaction, credit, budget, recurring and AI-entry assignments reject inactive categories with `400 category_inactive`; edits may retain an unchanged historical reference. |
+| `/api/v1/categories/:id/wallets` | HTTP REST | JWT or owner API key | implemented | Replaces applicable-wallet selections for a visible personal or system category. System metadata remains immutable. |
+| `/api/v1/wallets` | HTTP REST | JWT or owner API key | implemented; core UAT verified | Create/list/update/delete owner-scoped VND wallets. List returns `opening_balance` and ledger-derived `current_balance`; goal requires positive target and credit requires positive limit. A confirmed create may send exactly one ASCII `Idempotency-Key` (1–128 bytes); with the PostgreSQL mutation ledger, same-key/same-payload replays the original wallet, while changed payload returns `409`. Invalid or duplicate headers return `400`. A keyed request cannot fall back to a legacy adapter: missing durable support returns `503 mutation_unavailable`. Missing key keeps legacy online behavior. |
+| `/api/v1/notifications` | HTTP REST | JWT or owner API key | deployed and covered by UAT | Owner-scoped in-app inbox; `GET` lists newest-first and `POST /:id/read` is idempotent. Worker emits deduped budget threshold rows; no push delivery. |
+| `/api/v1/notifications/devices` and `/devices/{id}` | HTTP REST | JWT or owner API key | deployed; APNs delivery pending | Register/revoke an owner-scoped iOS token. Token is never returned/logged; duplicate owner/device registration updates the row, foreign token ownership returns 409. No provider call. |
+| `/api/v1/transactions` | HTTP REST | JWT or owner API key | implemented; basic ledger UAT verified | Create/list/update/delete owner-scoped income and expense entries for basic/goal wallets. Category is required for ordinary rows and must match kind/applicable-wallet scope; credit mutations use the dedicated ledger. Adjustment rows are read through this collection but cannot be edited/deleted here. |
+| `/api/v1/transactions/transfer` | HTTP REST | JWT or owner API key | implemented; automated proof, owner UAT pending | Atomically create paired source-expense/destination-income rows for an internal transfer; pair edit/delete require an idempotency key. Transfers are excluded from reports and jars. |
+| `/api/v1/transactions/adjustment` | HTTP REST | JWT or owner API key | implemented; automated proof, owner UAT pending | Record a signed increase/decrease correction for a basic or goal wallet. Corrections affect wallet balance but never report totals and are immutable. |
+| `/api/v1/transactions/bulk-delete` | HTTP REST | JWT or owner API key | implemented; automated proof, owner UAT pending | All-or-nothing deletion of 1–100 ordinary owner-scoped transactions. Transfer pairs and adjustments are rejected explicitly. |
+| `/api/v1/recurring` | HTTP REST | JWT or owner API key | implemented; automated proof, owner UAT pending | CRUD recurring ordinary income/expense schedules and bounded idempotent due materialization. Generated rows remain normal ledger transactions. |
+| `/api/v1/credit/wallets/{id}/entries` | HTTP REST | JWT or owner API key | implemented; automated backend/frontend checks | Dedicated purchase/refund/fee/interest entries for credit wallets. |
+| `/api/v1/credit/wallets/{id}/payments` | HTTP REST | JWT or owner API key | implemented; automated backend checks | Atomic payment pair from a non-credit source wallet; both rows are excluded from reports. |
+| `/api/v1/credit/wallets/{id}/statement` | HTTP REST | JWT or owner API key | implemented; automated backend checks | Owner-scoped credit statement with debt balance and available limit. |
+| `/api/v1/travel/events` | HTTP REST | JWT or owner API key | implemented; automated backend checks | Owner-scoped event CRUD with one active event; deleting an event clears transaction links without deleting ledger rows. |
+| `/api/v1/transactions/{id}/travel` | HTTP REST | JWT or owner API key | implemented; automated backend checks | Link or clear one ordinary income/expense transaction; transfers, adjustments and credit rows are rejected. |
+| `/api/v1/portfolio/*` | HTTP REST | JWT or owner API key | implemented; unit/API contract checks | Owner-scoped assets, metadata rename, append-only buy/sell trades, weighted-average positions and optional manual valuation. Portfolio rows never mutate wallet/report ledger. |
+| `/api/v1/reports/insider` | HTTP REST | JWT or full-owner API key | implemented; unit/API contract checks | Deterministic Money Insider summary for an account-local month: report-included totals, previous-period comparison, average/day, zero-safe spending/income ratio, top three categories and top five expenses. Optional owner wallet/category filters. |
+| `/api/v1/auth/profile` | HTTP REST | JWT or owner API key | implemented | Reads/updates account IANA timezone; initial browser-zone adoption is initialize-only. |
+| `/api/v1/jars` and `/api/v1/jars/{id}/...` | HTTP REST | JWT or owner API key | implemented; owner UAT pending | Stable jar IDs, month snapshots, optional ordinary-expense assignment and cumulative live report. `POST /api/v1/jars` accepts an optional ASCII `Idempotency-Key`; advisor confirmations use operation `jar.create` in the shared mutation ledger. Config removal does not delete transactions or historic snapshots. |
+| `/api/v1/months/{YYYY-MM}` | HTTP REST | JWT or owner API key | implemented; owner UAT pending | Live account-local totals and independent note CRUD; completion is derived, not a close operation. |
+
+## Errors
+
+All MyPocket success responses use `{data, meta}`. Errors use RFC 9457-style Problem Details with `code` and `request_id`; handlers use shared helpers in `backend/internal/controller/http/response.go`.
+
+| Error | Meaning | Consumer Impact |
+| --- | --- | --- |
+| `400 INVALID_INPUT` | OCR request/options invalid. | Show OCR failure and keep manual receipt entry available. |
+| `404 NOT_FOUND` | OCR document ID unknown, expired metadata, or wrong owner. | Mark OCR job unavailable; retain attachment/manual entry. |
+| `410 RESULT_EXPIRED` | OCR result TTL expired. | Use persisted MyPocket result if available or request re-scan. |
+| `413 URL_CONTENT_TOO_LARGE` | File exceeds OCR deployment limit. | Show max upload size and ask user to reduce/split file. |
+| `415 UNSUPPORTED_MEDIA_TYPE` | Unsupported input type. | Block unsupported upload in UI where possible. |
+
+## Versioning
+
+External public contracts use provider versioning where available. OCR Platform uses `/v1` REST paths. MyPocket should wrap provider calls behind an internal adapter so provider changes do not leak into frontend components.
+
+## Linked Decisions
+
+- `docs/architecture/OCR_API.md`
+### Travel optional-field PATCH semantics
+
+For `PATCH /api/v1/travel/events/{id}`, omitted or JSON-null `context`,
+`starts_on`, and `ends_on` retain the current value. Send an empty string to
+explicitly clear one of these fields. Dates otherwise use `YYYY-MM-DD`.
+Example: `{"context":"","starts_on":"","ends_on":"2026-10-31"}` clears
+description/start while setting the end. Native full-form updates encode this
+intent explicitly; create may omit optional values. Owner scope is unchanged.
+
+## Feedback and changelog
+
+Owner confirmation is separate from dev lifecycle: PATCH
+`/api/v1/feedback/{id}/resolution` with explicit `resolved` boolean, JWT or
+full-owner user key. Owner-scoped, reversible and idempotent, retaining
+dev/changelog history. See feedback reference for failure codes.
+
+The owner-scoped feedback lifecycle and the redacted service-token agent surface are documented in [FEEDBACK_API.md](FEEDBACK_API.md). User feedback routes accept full-owner API keys with no scopes. Public changelog never exposes raw feedback. The Feedback service token remains separate: user keys cannot access service/admin routes or all-user feedback.
+
+## Finance query foundation — local implementation
+
+Lifecycle addition deployed in the current API/worker image: `POST /api/v1/ai/advisor/conversation/reset`
+requires `Idempotency-Key`, rotates the owner conversation generation, and stores
+only a content-free reset ledger. It never touches wallets, transactions,
+reports, or confirmed financial actions.
+
+The shared backend finance query layer now provides owner-scoped, repeatable-read summaries, transaction search with all-scope counts and keyset cursors, category subtree filters, period comparison with zero-baseline semantics, wallet/goal/budget views, and a SELECT-only jar progress view. It is the internal service boundary used by the local advisor surface. Transfer rows and system transfer categories are excluded from report summaries, while search can inspect the full ledger scope.
+
+Prepared wallet proposal confirmations use `POST /api/v1/ai/advisor/actions/{action_id}/confirm` with only `conversation_id` and `generation`. The backend resolves the owner-bound persisted proposal, rejects stale generations and client-supplied financial fields, and delegates to the durable wallet idempotency ledger. Legacy cards without action context retain the ordinary wallet endpoint fallback. This dispatcher is deployed; owner-authenticated confirmation UAT remains open.
+The same confirmation contract now dispatches persisted, owner-bound proposals for ordinary transaction create/update/delete, atomic internal wallet transfer, category create/update, and ordinary-transaction recategorization. The model never supplies an owner or confirmation amount; the server uses the stored proposal view and canonical domain handlers. Transaction/category edits carry a required positive `expected_version`; repository compare-and-swap returns `409` on a stale snapshot and performs no write. Credit payments, external/bank transfers and category rules remain separate contracts. These new proposal tools are implemented in the current branch; production rollout remains gated on the combined release checklist.
+Jar proposal confirmations use the same dispatcher. `propose_create_jar` returns
+an explicit `jar_creation_proposal` and uses the `jar.create` mutation ledger;
+`propose_update_jar` requires a UUID `jar_id` and returns a
+`jar_update_proposal`. After confirmation, update dispatches to the
+owner-scoped `PUT /api/v1/jars/{jar_id}/months/{month}` route, replacing that
+month's configuration without creating a new jar. Both are deployed; owner-
+authenticated confirmation UAT remains open.
+Budget proposals use the same owner/generation-bound dispatcher. The
+read-only `propose_create_budget` tool returns a `budget_creation_proposal`;
+confirmation delegates to `POST /api/v1/budgets` with `budget.create` mutation
+ledger protection. The client sends only the action binding, while the server
+revalidates the existing budget/wallet/category/date contract.
+
+`propose_update_budget` returns a `budget_update_proposal` containing a UUID
+budget ID and replacement fields. Confirmation still sends only the
+conversation/generation binding; the dispatcher resolves the persisted
+proposal and delegates to the owner-scoped `PATCH /api/v1/budgets/{id}` route.
+
+The Finance Assistant surface is mounted in production behind JWT/session or a user API key: `GET /api/v1/ai/advisor/capabilities`, `GET /api/v1/ai/advisor/overview`, `POST /api/v1/ai/advisor/messages`, `POST /api/v1/ai/advisor/messages/async`, `GET /api/v1/ai/advisor/conversation/messages`, `POST /api/v1/ai/advisor/conversation/reset`, `GET /api/v1/ai/advisor/runs/{id}`, `GET /api/v1/ai/advisor/runs/{id}/events`, `POST /api/v1/ai/advisor/runs/{id}/cancel`, and `POST /api/v1/ai/advisor/actions/{action_id}/confirm`. Overview reads real report data without calling the model; the `/reports` web route consumes this summary plus the owner-scoped month category breakdown and never renders fixture numbers. Chat persists one owner conversation/run and executes bounded read tools plus non-mutating write proposals that require explicit confirmation. The capabilities response keeps the legacy `write:false` alias for direct model writes and additionally exposes `direct_writes:false`, `proposal_actions:true`, `confirmation_required:true`, `run_timeout_seconds:240`, and `grounding_version:1`, so clients do not mistake supported confirmation cards (including hũ creation/update) for missing permission. Advisor history now has a server-authoritative 30-minute idle retention boundary: reads, polling and assistant output do not extend it; expired content is purged by generation and old request retries return `410 advisor_history_expired` without provider work. Financial tables and confirmed writes are never purged. The worker performs bounded cleanup for owners who do not return. Reset is owner-scoped, idempotent and content-free; it also cancels queued/running provider contexts in the current process, while generation/lease guards reject late writes. This additive behavior is deployed in the current API/worker image; the new continuation migrations/routes remain pending production rollout. History reads may add lifecycle metadata in `meta` (`generation`, `last_user_message_at`, `expires_at`, `server_time`, and active `run_id`/status/deadline); run reads add `server_time`, `deadline_at`, and `retry_after_ms`; old clients may ignore these fields and reads never extend the deadline. Advisor auth is audited to Redis stream `mypocket:audit:advisor` through a redacted, idempotent fast path and a PostgreSQL `audit_outbox` delivery buffer (migration 000037); `runs/{id}/events` replays up to 100 owner-scoped persisted events after `after_seq` or `Last-Event-ID` as SSE and never calls the model. It is replay-only, not token streaming. Production migration, worker health, bounded retention/dead-letter alerting and provider/device acceptance remain rollout gates; see [rollout readiness](../operations/ROLLOUT_READINESS.md).
+
+The local reliability candidate adds migration 000041 lease fencing and atomic
+completion behind `AI_ADVISOR_RUN_LEASES_ENABLED`, and typed `finish_answer`
+financial rendering behind `AI_ADVISOR_GROUNDING_ENABLED`; both flags default
+false until migration/provider gates pass. These changes are not a production
+rollout claim.
+
+The review correction adds no REST/MCP route or confirmation-body change.
+Unvalidated proposal references now produce internal correlated tool errors
+before a confirmation card is persisted. `finish_answer.source_id` is a
+provider-only handbook reference and `question_id` selects a bounded
+clarification prompt; client message parts remain compatible.
+See [tool and context contract](AI_ADVISOR_TOOLS.md#review-closure-snapshots-context-and-grounded-finals).

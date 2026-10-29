@@ -1,0 +1,120 @@
+package entity
+
+import "time"
+
+const (
+	WalletTypeBasic   = "basic"
+	WalletTypeGoal    = "goal"
+	WalletTypeCredit  = "credit"
+	WalletCurrencyVND = "VND"
+)
+
+const (
+	TransactionTypeIncome     = "income"
+	TransactionTypeExpense    = "expense"
+	TransactionTypeAdjustment = "adjustment"
+
+	AdjustmentDirectionIncrease = "increase"
+	AdjustmentDirectionDecrease = "decrease"
+
+	CreditKindPurchase = "purchase"
+	CreditKindRefund   = "refund"
+	CreditKindFee      = "fee"
+	CreditKindInterest = "interest"
+	CreditKindPayment  = "payment"
+)
+
+type Wallet struct {
+	ID                       string        `json:"id" gorm:"primaryKey"`
+	OwnerID                  string        `json:"owner_id" gorm:"index;not null"`
+	Name                     string        `json:"name" gorm:"not null"`
+	Type                     string        `json:"type" gorm:"not null"`
+	Currency                 string        `json:"currency" gorm:"not null;default:VND"`
+	OpeningBalance           int64         `json:"opening_balance"`
+	CurrentBalance           int64         `json:"current_balance" gorm:"-"`
+	AvailableCredit          int64         `json:"available_credit,omitempty" gorm:"-"`
+	IsInTotal                bool          `json:"is_in_total" gorm:"not null;default:true"`
+	Description              *string       `json:"description,omitempty"`
+	TargetAmount             *int64        `json:"target_amount,omitempty"`
+	TargetDate               *CalendarDate `json:"target_date,omitempty" gorm:"column:target_date;type:date"`
+	CreditLimit              *int64        `json:"credit_limit,omitempty"`
+	LastStatementBalance     *int64        `json:"last_statement_balance,omitempty"`
+	StatementDay             *int          `json:"statement_day,omitempty"`
+	PaymentDueDay            *int          `json:"payment_due_day,omitempty"`
+	GoalNotificationsEnabled bool          `json:"goal_notifications_enabled" gorm:"column:goal_notifications_enabled;not null;default:false"`
+	CreatedAt                time.Time     `json:"created_at"`
+	UpdatedAt                time.Time     `json:"updated_at"`
+}
+
+type Category struct {
+	ID        string    `json:"id" gorm:"primaryKey"`
+	OwnerID   *string   `json:"owner_id,omitempty" gorm:"index"`
+	ParentID  *string   `json:"parent_id,omitempty" gorm:"index"`
+	Kind      string    `json:"kind" gorm:"not null"`
+	Name      string    `json:"name" gorm:"not null"`
+	SystemKey *string   `json:"system_key,omitempty" gorm:"uniqueIndex"`
+	IconKey   string    `json:"icon_key" gorm:"not null;default:tag"`
+	IsSystem  bool      `json:"is_system" gorm:"not null;default:false"`
+	IsActive  bool      `json:"is_active" gorm:"not null;default:true"`
+	Version   int64     `json:"version" gorm:"not null;default:1"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+	WalletIDs []string  `json:"wallet_ids" gorm:"-"`
+}
+
+type CategoryWallet struct {
+	CategoryID string    `json:"category_id" gorm:"primaryKey"`
+	WalletID   string    `json:"wallet_id" gorm:"primaryKey"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type Transaction struct {
+	ID                  string    `json:"id" gorm:"primaryKey"`
+	OwnerID             string    `json:"owner_id" gorm:"index;not null"`
+	WalletID            string    `json:"wallet_id" gorm:"index;not null"`
+	CategoryID          *string   `json:"category_id,omitempty" gorm:"index"`
+	JarID               *string   `json:"jar_id,omitempty" gorm:"column:jar_id;index"`
+	JarName             string    `json:"jar_name,omitempty" gorm:"-"`
+	Type                string    `json:"type" gorm:"not null"`
+	Amount              int64     `json:"amount" gorm:"not null"`
+	AdjustmentDirection *string   `json:"adjustment_direction,omitempty" gorm:"column:adjustment_direction"`
+	CreditKind          *string   `json:"credit_kind,omitempty" gorm:"column:credit_kind"`
+	CreditPaymentID     *string   `json:"credit_payment_id,omitempty" gorm:"column:credit_payment_id;index"`
+	TravelEventID       *string   `json:"travel_event_id,omitempty" gorm:"column:travel_event_id;index"`
+	OccurredAt          time.Time `json:"occurred_at" gorm:"index;not null"`
+	Note                *string   `json:"note,omitempty"`
+	IncludedInReports   bool      `json:"included_in_reports" gorm:"not null;default:true"`
+	TransferID          *string   `json:"transfer_id,omitempty" gorm:"column:transfer_id;index"`
+	CreatedAt           time.Time `json:"created_at"`
+	UpdatedAt           time.Time `json:"updated_at"`
+	Version             int64     `json:"version" gorm:"not null;default:1"`
+}
+
+type TravelEvent struct {
+	ID        string        `json:"id" gorm:"primaryKey"`
+	OwnerID   string        `json:"owner_id" gorm:"index;not null"`
+	Name      string        `json:"name" gorm:"not null"`
+	Context   *string       `json:"context,omitempty"`
+	StartsOn  *CalendarDate `json:"starts_on,omitempty" gorm:"column:starts_on;type:date"`
+	EndsOn    *CalendarDate `json:"ends_on,omitempty" gorm:"column:ends_on;type:date"`
+	Active    bool          `json:"active" gorm:"not null;default:false"`
+	CreatedAt time.Time     `json:"created_at"`
+	UpdatedAt time.Time     `json:"updated_at"`
+}
+
+// CreditStatement is the read model for a credit wallet's debt ledger.
+// Balance is the signed outstanding debt (expense rows reduce it, payment/refund
+// rows increase it), so available credit is credit limit plus balance.
+type CreditStatement struct {
+	WalletID             string        `json:"wallet_id"`
+	CreditLimit          int64         `json:"credit_limit"`
+	Balance              int64         `json:"balance"`
+	AvailableCredit      int64         `json:"available_credit"`
+	LastStatementBalance *int64        `json:"last_statement_balance,omitempty"`
+	StatementDay         *int          `json:"statement_day,omitempty"`
+	PaymentDueDay        *int          `json:"payment_due_day,omitempty"`
+	AmountDue            int64         `json:"amount_due"`
+	PaymentStatus        string        `json:"payment_status"`
+	PaymentDueAt         *time.Time    `json:"payment_due_at,omitempty"`
+	Items                []Transaction `json:"items"`
+}

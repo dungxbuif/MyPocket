@@ -1,0 +1,236 @@
+package main
+
+import (
+	"context"
+	"errors"
+	"log"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	_ "github.com/mypocket/backend/docs"
+	"github.com/mypocket/backend/internal/config"
+	httpapi "github.com/mypocket/backend/internal/controller/http"
+	"github.com/mypocket/backend/internal/entity"
+	"github.com/mypocket/backend/internal/infrastructure/ai"
+	"github.com/mypocket/backend/internal/infrastructure/auth"
+	"github.com/mypocket/backend/internal/infrastructure/cache"
+	"github.com/mypocket/backend/internal/infrastructure/db"
+	repo "github.com/mypocket/backend/internal/infrastructure/repository"
+	"github.com/mypocket/backend/internal/infrastructure/storage"
+	transactionrepo "github.com/mypocket/backend/internal/repository"
+	"github.com/mypocket/backend/internal/usecase"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
+)
+
+//go:generate go run github.com/swaggo/swag/cmd/swag@v1.16.6 init -g main.go -d .,../../internal/controller/http,../../internal/usecase,../../internal/entity,../../internal/repository -o ../../docs --parseInternal
+
+// @title MyPocket API
+// @version 1.2.1
+// @description Current implemented API surface for local development.
+// @host localhost:8080
+// @BasePath /
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+func main() {
+	if err := config.LoadLocalEnv(".env.local"); err != nil {
+		log.Fatal(err)
+	}
+	cfg := config.Load()
+
+	database, err := db.NewPostgres(cfg.DatabaseURL)
+	if err != nil {
+		log.Fatalf("connect postgres failed: %v", err)
+	}
+	sqlDB, err := database.DB()
+	if err != nil {
+		log.Fatalf("open sql database handle failed: %v", err)
+	}
+	defer func() {
+		_ = sqlDB.Close()
+	}()
+
+	cacheRepo, err := cache.NewRedis(cfg.RedisURL)
+	if err != nil {
+		log.Fatalf("connect redis failed: %v", err)
+	}
+	defer func() {
+		_ = cacheRepo.Close()
+	}()
+	// Persist redacted audit hand-offs before the Redis fast path so a brief
+	// cache outage cannot lose auth/feedback audit evidence.
+	cacheRepo.SetAuditOutbox(repo.NewAuditOutboxPostgresRepository(database))
+
+	passwordSvc := auth.NewPasswordService()
+
+	hashed, err := passwordSvc.Hash(cfg.SeedPassword)
+	if err != nil {
+		log.Fatalf("seed hash failed: %v", err)
+	}
+	seedUser := &entity.User{
+		ID:           uuid.NewString(),
+		Name:         cfg.SeedName,
+		Email:        cfg.SeedEmail,
+		PasswordHash: hashed,
+	}
+	if err := db.SeedDefaultUser(database, seedUser); err != nil {
+		log.Fatalf("seed default user failed: %v", err)
+	}
+
+	userRepo := repo.NewUserPostgresRepository(database)
+	jarRepository := repo.NewJarPostgresRepository(database)
+	monthNotes := repo.NewMonthPostgresRepository(database)
+	jwtSvc := auth.NewJWT(cfg.JWTSecret, cfg.JWTTTL)
+	googleOAuth := auth.NewGoogleOAuth(auth.GoogleOAuthConfig{
+		ClientID:     cfg.GoogleClientID,
+		ClientSecret: cfg.GoogleClientSecret,
+		RedirectURL:  cfg.GoogleRedirectURL,
+	})
+	mobileGoogleOAuth := auth.NewMobileGoogleOAuth(auth.MobileGoogleOAuthConfig{
+		ClientID:     cfg.GoogleMobileClientID,
+		ClientSecret: cfg.GoogleMobileClientSecret,
+		RedirectURL:  cfg.GoogleMobileRedirectURL,
+	})
+	authUc := usecase.NewAuthInteractor(userRepo, passwordSvc, jwtSvc, cacheRepo, googleOAuth)
+	authUc.RefreshTTL = cfg.RefreshTTL
+	authUc.Devices = repo.NewDeviceCredentialPostgresRepository(database)
+	authUc.MobileGoogleOAuth = mobileGoogleOAuth
+
+	authHandler := httpapi.NewAuthHandler(
+		authUc,
+		cfg.OAuthFixtureMode,
+		cfg.AllowedLoginEmails,
+	)
+	profileHandler := httpapi.NewProfileHandler(authUc)
+	homeHandler := httpapi.NewHomeHandler(authUc)
+	categoryRepository := repo.NewCategoryPostgresRepository(database)
+	categoryHandler := httpapi.NewCategoryHandler(usecase.NewCategoryInteractor(categoryRepository))
+	walletRepository := repo.NewWalletPostgresRepository(database)
+	walletHandler := httpapi.NewWalletHandler(walletRepository)
+	transactionRepository := repo.NewTransactionPostgresRepository(database)
+	transactionHandler := httpapi.NewTransactionHandler(transactionRepository, walletRepository, categoryRepository)
+	transactionHandler.Users = userRepo
+	transactionHandler.Jars = jarRepository
+	travelRepository := repo.NewTravelPostgresRepository(database)
+	transactionHandler.Travel = travelRepository
+	verifySession := func(sessionID string) (string, error) {
+		return authUc.VerifySession(context.Background(), sessionID)
+	}
+	middleware := httpapi.NewAuthMiddleware(jwtSvc, verifySession)
+	apiKeyService := usecase.NewUserAPIKeyService(repo.NewUserAPIKeyPostgresRepository(database))
+	middleware.APIKeys = apiKeyService
+	middleware.Audit = cacheRepo
+	handlers := httpapi.ApplicationHandlers{
+		Auth: authHandler, Profile: profileHandler, Home: homeHandler,
+		Category: categoryHandler, Wallet: walletHandler,
+		Transaction: transactionHandler, Middleware: middleware,
+	}
+	handlers.Notification = &httpapi.NotificationHandler{
+		Notifications: repo.NewNotificationPostgresRepository(database),
+		PushTokens:    usecase.NewPushTokenInteractor(repo.NewPushTokenPostgresRepository(database)),
+	}
+	handlers.APIKey = &httpapi.APIKeyHandler{Service: apiKeyService}
+	budgetRepository := repo.NewBudgetPostgresRepository(database)
+	budgetSeriesRepository := repo.NewBudgetSeriesPostgresRepository(database)
+	handlers.Budget = &httpapi.BudgetHandler{Budgets: budgetRepository, Series: budgetSeriesRepository, Wallets: walletRepository, Categories: categoryRepository, Transactions: transactionRepository, Users: userRepo}
+	handlers.BudgetSeries = &httpapi.BudgetSeriesHandler{Series: budgetSeriesRepository, Users: userRepo}
+	handlers.BudgetReport = &httpapi.BudgetReportHandler{Budgets: budgetRepository, Transactions: transactionRepository, Categories: categoryRepository, Users: userRepo}
+	handlers.Savings = &httpapi.SavingsReportHandler{Wallets: walletRepository, Transactions: transactionRepository, Users: userRepo}
+	handlers.Jar = &httpapi.JarHandler{Jars: jarRepository, Users: userRepo}
+	handlers.Month = &httpapi.MonthHandler{Users: userRepo, Transactions: transactionRepository, Categories: categoryRepository, Jars: jarRepository, Notes: monthNotes}
+	recurringRepository := repo.NewRecurringPostgresRepository(database)
+	handlers.Recurring = &httpapi.RecurringHandler{Schedules: recurringRepository, Wallets: walletRepository, Categories: categoryRepository, Users: userRepo}
+	creditRepository, _ := transactionRepository.(transactionrepo.CreditRepository)
+	handlers.Credit = &httpapi.CreditHandler{Credits: creditRepository, Wallets: walletRepository, Categories: categoryRepository}
+	handlers.Travel = &httpapi.TravelHandler{Events: travelRepository}
+	portfolioRepository := repo.NewPortfolioPostgresRepository(database)
+	handlers.Portfolio = &httpapi.PortfolioHandler{Portfolio: portfolioRepository}
+	insiderRepository := repo.NewInsiderPostgresRepository(database)
+	handlers.Insider = &httpapi.InsiderHandler{Reader: insiderRepository, Users: userRepo}
+	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
+	attachmentStorage, err := newAttachmentStorage(cfg)
+	if err != nil {
+		log.Fatalf("configure private attachment storage failed: %v", err)
+	}
+	// Do not assign a nil *storage.S3 directly to an interface. In development
+	// storage is intentionally optional; a typed-nil interface would compare
+	// non-nil and panic when feedback/AI attachment code calls Key or Put.
+	aiAttachmentStorage, feedbackStorage := optionalAttachmentStores(attachmentStorage)
+	handlers.AIEntry = &httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: aiAttachmentStorage, Users: userRepo}}
+	financeReader := repo.NewFinanceQueryPostgresRepository(database)
+	financeQueryService := usecase.NewFinanceQueryService(financeReader)
+	advisorProvider := ai.NewAdvisorClient(ai.AdvisorClientConfig{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, StoreUsage: cfg.AIStoreUsage})
+	advisorStore := repo.NewAdvisorPostgresRepository(database)
+	advisorOrchestrator := usecase.NewAdvisorOrchestrator(advisorProvider, usecase.NewAdvisorToolRegistry(financeQueryService))
+	advisorOrchestrator.GroundingEnabled = cfg.AIAdvisorGroundingEnabled
+	advisorOrchestrator.Validator = usecase.AdvisorPrincipalValidatorFunc(func(ctx context.Context, principal usecase.Principal) error {
+		switch principal.CredentialKind {
+		case "user_api_key":
+			return apiKeyService.ValidatePrincipal(ctx, principal)
+		case "session":
+			if !principal.ExpiresAt.IsZero() && !principal.ExpiresAt.After(time.Now().UTC()) {
+				return usecase.ErrAdvisorPrincipalInvalid
+			}
+			ownerID, err := verifySession(principal.CredentialID)
+			if err != nil || ownerID != principal.OwnerID {
+				return usecase.ErrAdvisorPrincipalInvalid
+			}
+			return nil
+		default:
+			return usecase.ErrAdvisorPrincipalInvalid
+		}
+	})
+	advisorService := usecase.NewAdvisorServiceWithRuntime(advisorStore, advisorOrchestrator, cfg.AIAdvisorRunLeasesEnabled)
+	handlers.Advisor = &httpapi.AdvisorHandler{
+		Service:      advisorService,
+		Users:        userRepo,
+		Finance:      financeQueryService,
+		Wallets:      walletRepository,
+		Jars:         jarRepository,
+		Budgets:      budgetRepository,
+		Categories:   categoryRepository,
+		Transactions: transactionRepository,
+	}
+	feedbackRepository := repo.NewFeedbackPostgresRepository(database)
+	changelogRepository := repo.NewChangelogPostgresRepository(database)
+	feedbackService := usecase.NewFeedbackServiceWithStorage(feedbackRepository, cacheRepo, feedbackStorage, time.Now)
+	changelogService := usecase.NewChangelogService(feedbackRepository, changelogRepository, cacheRepo, time.Now)
+	if cfg.AppEnv != "development" && strings.TrimSpace(cfg.FeedbackAgentToken) == "" {
+		log.Fatal("FEEDBACK_AGENT_TOKEN must be configured outside development")
+	}
+	handlers.Feedback = &httpapi.FeedbackHandler{Service: feedbackService}
+	handlers.Changelog = &httpapi.ChangelogHandler{Service: changelogService}
+	handlers.FeedbackAgent = httpapi.NewFeedbackAgentMiddleware(cfg.FeedbackAgentToken)
+	router := httpapi.NewApplicationRouter(handlers, httpapi.ApplicationRouterOptions{
+		AllowedOrigins: cfg.CORSAllowedOrigins,
+		DocsHandler:    ginSwagger.WrapHandler(swaggerFiles.Handler),
+	})
+
+	if err := router.Engine.Run(cfg.HTTPAddr); err != nil {
+		log.Fatalf("server failed: %v", err)
+	}
+}
+
+func newAttachmentStorage(cfg config.Config) (*storage.S3, error) {
+	configured := cfg.S3Endpoint != "" || cfg.S3Region != "" || cfg.S3Bucket != "" || cfg.S3AccessKeyID != "" || cfg.S3SecretAccessKey != ""
+	if !configured {
+		if cfg.AppEnv != "development" {
+			return nil, errors.New("private attachment storage must be configured outside development")
+		}
+		return nil, nil
+	}
+	return storage.NewS3(storage.S3Config{Endpoint: cfg.S3Endpoint, Region: cfg.S3Region, Bucket: cfg.S3Bucket, Prefix: cfg.S3Prefix, Environment: cfg.AppEnv, AccessKeyID: cfg.S3AccessKeyID, SecretAccessKey: cfg.S3SecretAccessKey, ForcePathStyle: cfg.S3ForcePathStyle})
+}
+
+// optionalAttachmentStores keeps an unconfigured development *storage.S3 from
+// becoming a non-nil interface value. Both consumers intentionally treat nil
+// as "attachments unavailable" and return a controlled API error instead of
+// dereferencing a typed-nil pointer.
+func optionalAttachmentStores(s3 *storage.S3) (usecase.AttachmentStorage, usecase.FeedbackStorage) {
+	if s3 == nil {
+		return nil, nil
+	}
+	return s3, s3
+}

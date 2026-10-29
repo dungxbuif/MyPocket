@@ -1,0 +1,173 @@
+package usecase
+
+import (
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/mypocket/backend/internal/entity"
+)
+
+type authCacheStub struct {
+	values map[string]string
+}
+
+func (c *authCacheStub) Set(key, value string, _ time.Duration) error {
+	if c.values == nil {
+		c.values = map[string]string{}
+	}
+	c.values[key] = value
+	return nil
+}
+func (c *authCacheStub) Get(key string) (string, bool, error) {
+	value, ok := c.values[key]
+	return value, ok, nil
+}
+func (c *authCacheStub) Delete(key string) error {
+	delete(c.values, key)
+	return nil
+}
+func (c *authCacheStub) GetAndDelete(key string) (string, bool, error) {
+	value, ok := c.values[key]
+	delete(c.values, key)
+	return value, ok, nil
+}
+
+type authUserStub struct{ user *entity.User }
+
+func (s authUserStub) FindByEmail(string) (*entity.User, error) { return s.user, nil }
+func (s authUserStub) FindByID(id string) (*entity.User, error) {
+	if s.user != nil && s.user.ID == id {
+		return s.user, nil
+	}
+	return nil, errors.New("not found")
+}
+func (s authUserStub) FindOrCreateGoogleUser(entity.GoogleProfile) (*entity.User, error) {
+	return s.user, nil
+}
+func (s authUserStub) SetTimezone(string, string, bool) (*entity.User, error) { return s.user, nil }
+func (s authUserStub) Create(*entity.User) error                              { return nil }
+
+type failingGoogleUserStub struct{ err error }
+
+func (s failingGoogleUserStub) FindByEmail(string) (*entity.User, error) { return nil, s.err }
+func (s failingGoogleUserStub) FindByID(string) (*entity.User, error)    { return nil, s.err }
+func (s failingGoogleUserStub) FindOrCreateGoogleUser(entity.GoogleProfile) (*entity.User, error) {
+	return nil, s.err
+}
+func (s failingGoogleUserStub) SetTimezone(string, string, bool) (*entity.User, error) {
+	return nil, s.err
+}
+func (s failingGoogleUserStub) Create(*entity.User) error { return s.err }
+
+type authTokenStub struct{ calls int }
+
+type authPasswordStub struct{}
+
+type mobileGoogleStub struct {
+	profile entity.GoogleProfile
+	err     error
+}
+
+func (s mobileGoogleStub) IsReady() bool { return true }
+func (s mobileGoogleStub) ExchangeCodeWithPKCE(string, string, string) (entity.GoogleProfile, error) {
+	return s.profile, s.err
+}
+
+func (authPasswordStub) Hash(string) (string, error) { return "hash", nil }
+func (authPasswordStub) Check(string, string) bool   { return true }
+
+func (s *authTokenStub) Generate(userID, email, name, sessionID string) (string, time.Time, error) {
+	s.calls++
+	return "access-" + sessionID, time.Now().Add(time.Hour), nil
+}
+func (*authTokenStub) Verify(string) (*TokenClaims, error) { return nil, ErrInvalidToken }
+
+func TestAuthRefreshRotatesTokenAndRejectsReplay(t *testing.T) {
+	cache := &authCacheStub{values: map[string]string{}}
+	service := NewAuthInteractor(
+		authUserStub{user: &entity.User{ID: "user-1", Email: "user@example.com", Name: "User"}},
+		authPasswordStub{},
+		&authTokenStub{},
+		cache,
+		nil,
+	)
+
+	first, err := service.Login(nil, LoginInput{Email: "user@example.com"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.RefreshToken == "" || first.RefreshExpiresAt.IsZero() {
+		t.Fatalf("login did not return refresh credentials: %#v", first)
+	}
+
+	rotated, err := service.Refresh(nil, first.RefreshToken)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if rotated.RefreshToken == first.RefreshToken || rotated.Token == first.Token {
+		t.Fatalf("refresh credentials were not rotated: first=%#v rotated=%#v", first, rotated)
+	}
+	if _, err := service.Refresh(nil, first.RefreshToken); !errors.Is(err, ErrInvalidRefreshToken) {
+		t.Fatalf("replayed refresh token should be rejected, got %v", err)
+	}
+}
+
+func TestMobileGoogleLoginRequiresVerifiedEmail(t *testing.T) {
+	cache := &authCacheStub{values: map[string]string{}}
+	service := NewAuthInteractor(
+		authUserStub{user: &entity.User{ID: "user-1", Email: "user@example.com", Name: "User"}},
+		authPasswordStub{},
+		&authTokenStub{},
+		cache,
+		nil,
+	)
+	service.MobileGoogleOAuth = mobileGoogleStub{profile: entity.GoogleProfile{Subject: "sub", Email: "user@example.com", EmailVerified: false}}
+	if _, err := service.LoginWithMobileGoogleCode(nil, "code", "verifier", "mypocket://oauth/callback"); !errors.Is(err, ErrInvalidGoogleProfile) {
+		t.Fatalf("unverified native profile should be rejected, got %v", err)
+	}
+}
+
+func TestGoogleLoginPreservesUserStoreFailureClassification(t *testing.T) {
+	storeErr := errors.New("database connection refused")
+	service := NewAuthInteractor(
+		failingGoogleUserStub{err: storeErr},
+		authPasswordStub{},
+		&authTokenStub{},
+		&authCacheStub{values: map[string]string{}},
+		nil,
+	)
+
+	_, err := service.LoginWithGoogle(nil, entity.GoogleProfile{
+		Subject:       "fixture-ios-user",
+		Email:         "fixture@example.com",
+		EmailVerified: true,
+	})
+	if !errors.Is(err, ErrGoogleUserStore) {
+		t.Fatalf("expected user-store sentinel, got %v", err)
+	}
+	if !errors.Is(err, storeErr) {
+		t.Fatalf("expected underlying store error to remain inspectable, got %v", err)
+	}
+}
+
+func TestMobileGoogleLoginPreservesUserStoreFailureClassification(t *testing.T) {
+	storeErr := errors.New("database connection refused")
+	service := NewAuthInteractor(
+		failingGoogleUserStub{err: storeErr},
+		authPasswordStub{},
+		&authTokenStub{},
+		&authCacheStub{values: map[string]string{}},
+		nil,
+	)
+	service.MobileGoogleOAuth = mobileGoogleStub{profile: entity.GoogleProfile{
+		Subject:       "fixture-ios-user",
+		Email:         "fixture@example.com",
+		EmailVerified: true,
+	}}
+
+	_, err := service.LoginWithMobileGoogleCode(nil, "fixture-code", "fixture-verifier", "mypocket://oauth/callback")
+	if !errors.Is(err, ErrGoogleUserStore) || !errors.Is(err, storeErr) {
+		t.Fatalf("expected mobile login to preserve user-store failure, got %v", err)
+	}
+}

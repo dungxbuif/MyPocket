@@ -1,0 +1,93 @@
+package repository
+
+import (
+	"context"
+	"fmt"
+	"os"
+	"testing"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/mypocket/backend/internal/entity"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+)
+
+func TestFeedbackPostgresOwnerScopeAndChangelogAtomicity(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("requires migrated local TEST_DATABASE_URL")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, other := uuid.NewString(), uuid.NewString()
+	version := fmt.Sprintf("1.4.2-test-%s", owner[:8])
+	for _, id := range []string{owner, other} {
+		if err := db.Create(&entity.User{ID: id, Email: id + "@feedback.test", GoogleSubject: id}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		db.Where("user_id IN ?", []string{owner, other}).Delete(&entity.Feedback{})
+		db.Where("version = ?", version).Delete(&entity.Changelog{})
+		db.Where("id IN ?", []string{owner, other}).Delete(&entity.User{})
+	})
+
+	feedbackRepo := NewFeedbackPostgresRepository(db)
+	changelogRepo := NewChangelogPostgresRepository(db)
+	first := &entity.Feedback{ID: uuid.NewString(), UserID: owner, Type: entity.FeedbackTypeBug, Title: "Owner issue", Description: "Private details", Status: entity.FeedbackStatusOpen}
+	second := &entity.Feedback{ID: uuid.NewString(), UserID: other, Type: entity.FeedbackTypeBug, Title: "Other issue", Description: "Other private details", Status: entity.FeedbackStatusOpen}
+	if err := feedbackRepo.Create(context.Background(), first); err != nil {
+		t.Fatal(err)
+	}
+	if err := feedbackRepo.Create(context.Background(), second); err != nil {
+		t.Fatal(err)
+	}
+	rows, err := feedbackRepo.ListByOwner(context.Background(), owner)
+	if err != nil || len(rows) != 1 || rows[0].ID != first.ID {
+		t.Fatalf("owner scope mismatch: rows=%+v err=%v", rows, err)
+	}
+	if _, err := feedbackRepo.FindByOwner(context.Background(), other, first.ID); err == nil {
+		t.Fatal("cross-owner feedback read must fail")
+	}
+	if _, err := feedbackRepo.UpdateStatus(context.Background(), first.ID, entity.FeedbackStatusTriaged, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := feedbackRepo.UpdateStatus(context.Background(), first.ID, entity.FeedbackStatusInProgress, time.Now().UTC()); err != nil {
+		t.Fatal(err)
+	}
+
+	changelog := &entity.Changelog{ID: uuid.NewString(), Version: version, Title: "Feedback fix", Description: "Fixed the issue", PublishedAt: time.Now().UTC()}
+	if err := changelogRepo.Publish(context.Background(), changelog, []string{first.ID}); err != nil {
+		t.Fatal(err)
+	}
+	fixed, err := feedbackRepo.FindByOwner(context.Background(), owner, first.ID)
+	if err != nil || fixed.Status != entity.FeedbackStatusFixed || fixed.ChangelogID == nil || *fixed.ChangelogID != changelog.ID || fixed.FixedAt == nil {
+		t.Fatalf("feedback was not finalized: %+v err=%v", fixed, err)
+	}
+	now := time.Date(2026, 10, 14, 1, 0, 0, 0, time.UTC)
+	resolved, err := feedbackRepo.UpdateResolution(context.Background(), owner, first.ID, true, now)
+	if err != nil || !resolved.Resolved || resolved.ResolvedAt == nil || !resolved.ResolvedAt.Equal(now) || resolved.Status != fixed.Status || *resolved.ChangelogID != *fixed.ChangelogID {
+		t.Fatalf("resolution changed dev lifecycle or did not persist: %+v err=%v", resolved, err)
+	}
+	repeat, err := feedbackRepo.UpdateResolution(context.Background(), owner, first.ID, true, now.Add(time.Hour))
+	if err != nil || repeat.ResolvedAt == nil || !repeat.ResolvedAt.Equal(now) {
+		t.Fatalf("retry not idempotent: %+v %v", repeat, err)
+	}
+	if _, err := feedbackRepo.UpdateResolution(context.Background(), other, first.ID, false, now); err == nil {
+		t.Fatal("cross-owner resolution must fail")
+	}
+	reopened, err := feedbackRepo.UpdateResolution(context.Background(), owner, first.ID, false, now.Add(2*time.Hour))
+	if err != nil || reopened.Resolved || reopened.ResolvedAt != nil || reopened.Status != fixed.Status || reopened.FixedAt == nil {
+		t.Fatalf("reopen lost developer history: %+v %v", reopened, err)
+	}
+	persisted, err := feedbackRepo.FindByOwner(context.Background(), owner, first.ID)
+	if err != nil || persisted.Resolved || persisted.ResolvedAt != nil {
+		t.Fatalf("reopen did not persist: %+v %v", persisted, err)
+	}
+	if err := changelogRepo.Publish(context.Background(), &entity.Changelog{ID: uuid.NewString(), Version: version, Title: "Duplicate", Description: "Duplicate", PublishedAt: time.Now().UTC()}, []string{second.ID}); err == nil {
+		t.Fatal("duplicate changelog version must fail")
+	}
+}

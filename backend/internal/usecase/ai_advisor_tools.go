@@ -1,0 +1,978 @@
+package usecase
+
+import (
+	"bytes"
+	"context"
+	"encoding/json"
+	"errors"
+	"io"
+	"math"
+	"strings"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/mypocket/backend/internal/entity"
+)
+
+var (
+	ErrAdvisorToolInvalid     = errors.New("advisor tool arguments are invalid")
+	ErrAdvisorToolUnsupported = errors.New("advisor tool is unsupported")
+)
+
+type Principal struct {
+	OwnerID        string
+	CredentialID   string
+	CredentialKind string
+	ExpiresAt      time.Time
+	Timezone       string
+}
+
+type ToolDefinition struct {
+	Name        string
+	Description string
+	Parameters  map[string]any
+}
+
+type AdvisorTool interface {
+	Name() string
+	Definition() ToolDefinition
+	Execute(context.Context, Principal, json.RawMessage) (entity.FinanceResult, error)
+}
+
+type AdvisorToolRegistry struct {
+	tools map[string]AdvisorTool
+}
+
+func NewAdvisorToolRegistry(finance *FinanceQueryService) *AdvisorToolRegistry {
+	registry := &AdvisorToolRegistry{tools: make(map[string]AdvisorTool)}
+	for _, tool := range []AdvisorTool{
+		&summaryTool{finance: finance}, &searchTool{finance: finance}, &compareTool{finance: finance},
+		&walletTool{finance: finance}, &budgetTool{finance: finance}, &goalTool{finance: finance}, &jarTool{finance: finance},
+		&transactionTool{finance: finance}, &categoryCatalogTool{finance: finance}, &categoryDetailTool{finance: finance}, &productHelpTool{}, &walletProposalTool{}, &jarProposalTool{}, &jarUpdateProposalTool{}, &budgetProposalTool{}, &budgetUpdateProposalTool{},
+		&transactionCreateProposalTool{}, &transactionUpdateProposalTool{}, &transactionDeleteProposalTool{}, &walletTransferProposalTool{},
+		&categoryCreateProposalTool{}, &categoryUpdateProposalTool{}, &transactionRecategorizeProposalTool{},
+	} {
+		registry.tools[tool.Name()] = tool
+	}
+	return registry
+}
+
+func (r *AdvisorToolRegistry) Lookup(name string) (AdvisorTool, bool) {
+	if r == nil {
+		return nil, false
+	}
+	tool, ok := r.tools[name]
+	return tool, ok
+}
+
+func DecodeAdvisorToolArgs(raw json.RawMessage, destination any) error {
+	if len(raw) == 0 || len(raw) > 16*1024 {
+		return ErrAdvisorToolInvalid
+	}
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(destination); err != nil {
+		return ErrAdvisorToolInvalid
+	}
+	var extra any
+	if err := decoder.Decode(&extra); err != io.EOF {
+		return ErrAdvisorToolInvalid
+	}
+	return nil
+}
+
+type summaryArgs struct {
+	Range           entity.DateRange `json:"range"`
+	WalletIDs       []string         `json:"wallet_ids"`
+	CategoryIDs     []string         `json:"category_ids"`
+	IncludeChildren bool             `json:"include_children"`
+}
+
+type searchArgs struct {
+	Range           entity.DateRange `json:"range"`
+	WalletIDs       []string         `json:"wallet_ids"`
+	CategoryIDs     []string         `json:"category_ids"`
+	IncludeChildren bool             `json:"include_children"`
+	Type            string           `json:"type"`
+	ReportScope     string           `json:"report_scope"`
+	NoteContains    string           `json:"note_contains"`
+	MinAmount       *int64           `json:"min_amount"`
+	MaxAmount       *int64           `json:"max_amount"`
+	Limit           int              `json:"limit"`
+	Cursor          string           `json:"cursor"`
+}
+
+type compareArgs struct {
+	Current         entity.DateRange `json:"current"`
+	Previous        entity.DateRange `json:"previous"`
+	WalletIDs       []string         `json:"wallet_ids"`
+	CategoryIDs     []string         `json:"category_ids"`
+	IncludeChildren bool             `json:"include_children"`
+}
+
+type objectArgs struct {
+	IDs []string `json:"wallet_ids"`
+}
+
+type budgetArgs struct {
+	BudgetIDs []string `json:"budget_ids"`
+	ActiveOn  string   `json:"active_on"`
+}
+
+type jarArgs struct {
+	Month  string   `json:"month"`
+	JarIDs []string `json:"jar_ids"`
+}
+
+type transactionArgs struct {
+	TransactionID string `json:"transaction_id"`
+}
+
+type categoryCatalogArgs struct {
+	Kind            string   `json:"kind"`
+	WalletIDs       []string `json:"wallet_ids"`
+	IncludeArchived bool     `json:"include_archived"`
+	Limit           int      `json:"limit"`
+	Cursor          string   `json:"cursor"`
+}
+
+type categoryDetailArgs struct {
+	CategoryID string `json:"category_id"`
+}
+
+type walletProposalArgs struct {
+	Name                 string `json:"name"`
+	Type                 string `json:"type"`
+	OpeningBalance       int64  `json:"opening_balance"`
+	IsInTotal            *bool  `json:"is_in_total"`
+	Description          string `json:"description"`
+	TargetAmount         *int64 `json:"target_amount"`
+	TargetDate           string `json:"target_date"`
+	CreditLimit          *int64 `json:"credit_limit"`
+	LastStatementBalance *int64 `json:"last_statement_balance"`
+	StatementDay         *int   `json:"statement_day"`
+	PaymentDueDay        *int   `json:"payment_due_day"`
+}
+
+type jarProposalArgs struct {
+	Month             string   `json:"month"`
+	Name              string   `json:"name"`
+	AllocationMode    string   `json:"allocation_mode"`
+	AllocationAmount  *int64   `json:"allocation_amount"`
+	AllocationPercent *float64 `json:"allocation_percent"`
+}
+
+type jarUpdateProposalArgs struct {
+	JarID             string   `json:"jar_id"`
+	Month             string   `json:"month"`
+	Name              string   `json:"name"`
+	AllocationMode    string   `json:"allocation_mode"`
+	AllocationAmount  *int64   `json:"allocation_amount"`
+	AllocationPercent *float64 `json:"allocation_percent"`
+}
+
+type budgetProposalArgs struct {
+	Name        string  `json:"name"`
+	LimitAmount int64   `json:"limit_amount"`
+	WalletID    *string `json:"wallet_id"`
+	CategoryID  *string `json:"category_id"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
+}
+
+type budgetUpdateProposalArgs struct {
+	BudgetID    string  `json:"budget_id"`
+	Name        string  `json:"name"`
+	LimitAmount int64   `json:"limit_amount"`
+	WalletID    *string `json:"wallet_id"`
+	CategoryID  *string `json:"category_id"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
+}
+
+type transactionCreateProposalArgs struct {
+	WalletID          string  `json:"wallet_id"`
+	CategoryID        *string `json:"category_id"`
+	Type              string  `json:"type"`
+	Amount            int64   `json:"amount"`
+	OccurredAt        string  `json:"occurred_at"`
+	Note              *string `json:"note"`
+	IncludedInReports *bool   `json:"included_in_reports"`
+}
+type transactionUpdateProposalArgs struct {
+	TransactionID string `json:"transaction_id"`
+	transactionCreateProposalArgs
+	ExpectedVersion *int64 `json:"expected_version"`
+}
+type transactionDeleteProposalArgs struct {
+	TransactionID   string `json:"transaction_id"`
+	ExpectedVersion *int64 `json:"expected_version"`
+}
+type walletTransferProposalArgs struct {
+	SourceWalletID      string  `json:"source_wallet_id"`
+	DestinationWalletID string  `json:"destination_wallet_id"`
+	Amount              int64   `json:"amount"`
+	OccurredAt          string  `json:"occurred_at"`
+	Note                *string `json:"note"`
+}
+type categoryCreateProposalArgs struct {
+	Name      string   `json:"name"`
+	Kind      string   `json:"kind"`
+	ParentID  *string  `json:"parent_id"`
+	WalletIDs []string `json:"wallet_ids"`
+	IconKey   string   `json:"icon_key"`
+}
+type categoryUpdateProposalArgs struct {
+	CategoryID string `json:"category_id"`
+	categoryCreateProposalArgs
+	ExpectedVersion *int64 `json:"expected_version"`
+}
+type transactionRecategorizeProposalArgs struct {
+	TransactionID   string `json:"transaction_id"`
+	CategoryID      string `json:"category_id"`
+	ExpectedVersion *int64 `json:"expected_version"`
+}
+
+type summaryTool struct{ finance *FinanceQueryService }
+
+func (t *summaryTool) Name() string { return "get_finance_summary" }
+func (t *summaryTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Read report-included income, expense and net totals for a calendar range", map[string]any{
+		"range": rangeSchema(), "wallet_ids": stringArraySchema(), "category_ids": stringArraySchema(), "include_children": boolSchema(),
+	}, []string{"range"})
+}
+func (t *summaryTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args summaryArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	filter, err := normalizeToolFilter(args.Range, principal.Timezone, entity.FinanceFilter{WalletIDs: args.WalletIDs, CategoryIDs: args.CategoryIDs, IncludeChildren: args.IncludeChildren})
+	if err != nil {
+		return entity.FinanceResult{}, err
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), Filter: filter})
+}
+
+type searchTool struct{ finance *FinanceQueryService }
+
+func (t *searchTool) Name() string { return "search_transactions" }
+func (t *searchTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Search owner-scoped transactions with bounded keyset pagination", map[string]any{
+		"range": rangeSchema(), "wallet_ids": stringArraySchema(), "category_ids": stringArraySchema(), "include_children": boolSchema(),
+		"type":         map[string]any{"type": "string", "enum": []string{"all", "income", "expense"}},
+		"report_scope": map[string]any{"type": "string", "enum": []string{"all", "included", "excluded"}}, "note_contains": stringSchema(200),
+		"min_amount": integerSchema(), "max_amount": integerSchema(), "limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 50}, "cursor": stringSchema(2048),
+	}, []string{"range"})
+}
+func (t *searchTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args searchArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	filter, err := normalizeToolFilter(args.Range, principal.Timezone, entity.FinanceFilter{WalletIDs: args.WalletIDs, CategoryIDs: args.CategoryIDs, IncludeChildren: args.IncludeChildren, Type: args.Type, ReportScope: args.ReportScope, NoteContains: args.NoteContains, MinAmount: args.MinAmount, MaxAmount: args.MaxAmount, Limit: args.Limit})
+	if err != nil {
+		return entity.FinanceResult{}, err
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), Filter: filter, Cursor: strings.TrimSpace(args.Cursor)})
+}
+
+type compareTool struct{ finance *FinanceQueryService }
+
+func (t *compareTool) Name() string { return "compare_spending_periods" }
+func (t *compareTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Compare report-included spending between two calendar ranges", map[string]any{
+		"current": rangeSchema(), "previous": rangeSchema(), "wallet_ids": stringArraySchema(), "category_ids": stringArraySchema(), "include_children": boolSchema(),
+	}, []string{"current", "previous"})
+}
+func (t *compareTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args compareArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	filter, err := normalizeToolFilter(args.Current, principal.Timezone, entity.FinanceFilter{WalletIDs: args.WalletIDs, CategoryIDs: args.CategoryIDs, IncludeChildren: args.IncludeChildren})
+	if err != nil {
+		return entity.FinanceResult{}, err
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), Filter: filter, CompareRange: &args.Previous})
+}
+
+type walletTool struct{ finance *FinanceQueryService }
+
+func (t *walletTool) Name() string { return "get_wallet_balances" }
+func (t *walletTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Read current balances for owner wallets", map[string]any{"wallet_ids": stringArraySchema()}, nil)
+}
+func (t *walletTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args objectArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: args.IDs})
+}
+
+type budgetTool struct{ finance *FinanceQueryService }
+
+func (t *budgetTool) Name() string { return "get_budget_progress" }
+func (t *budgetTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Read budget limits and report-included spending", map[string]any{"budget_ids": stringArraySchema(), "active_on": dateSchema()}, nil)
+}
+func (t *budgetTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args budgetArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: args.BudgetIDs, ActiveOn: args.ActiveOn})
+}
+
+type goalTool struct{ finance *FinanceQueryService }
+
+func (t *goalTool) Name() string { return "get_goal_progress" }
+func (t *goalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Read goal-wallet balances and target dates", map[string]any{"wallet_ids": stringArraySchema()}, nil)
+}
+func (t *goalTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args objectArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: args.IDs})
+}
+
+type jarTool struct{ finance *FinanceQueryService }
+
+func (t *jarTool) Name() string { return "get_jar_progress" }
+func (t *jarTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Read jar allocations and spending without creating month rows", map[string]any{"month": monthSchema(), "jar_ids": stringArraySchema()}, []string{"month"})
+}
+func (t *jarTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args jarArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	if strings.TrimSpace(args.Month) == "" {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: args.JarIDs, Month: args.Month})
+}
+
+type transactionTool struct{ finance *FinanceQueryService }
+
+func (t *transactionTool) Name() string { return "get_transaction" }
+func (t *transactionTool) Definition() ToolDefinition {
+	return ToolDefinition{
+		Name:        t.Name(),
+		Description: "Read one owner-scoped transaction, including transfer/report metadata",
+		Parameters: map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []string{"transaction_id"},
+			"properties": map[string]any{
+				"transaction_id": map[string]any{"type": "string", "minLength": 1, "maxLength": 128},
+			},
+		},
+	}
+}
+func (t *transactionTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args transactionArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil || strings.TrimSpace(args.TransactionID) == "" || len(args.TransactionID) > 128 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: []string{strings.TrimSpace(args.TransactionID)}})
+}
+
+type categoryCatalogTool struct{ finance *FinanceQueryService }
+
+func (t *categoryCatalogTool) Name() string { return "list_categories" }
+func (t *categoryCatalogTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "List owner-visible categories with stable pagination; duplicate names remain separate choices", map[string]any{
+		"kind":       map[string]any{"type": "string", "enum": []string{CategoryKindIncome, CategoryKindExpense, CategoryKindDebt}},
+		"wallet_ids": stringArraySchema(), "include_archived": boolSchema(),
+		"limit": map[string]any{"type": "integer", "minimum": 1, "maximum": 100}, "cursor": stringSchema(2048),
+	}, nil)
+}
+func (t *categoryCatalogTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args categoryCatalogArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil || strings.TrimSpace(principal.OwnerID) == "" {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	args.Kind = strings.TrimSpace(args.Kind)
+	if args.Kind != "" && args.Kind != CategoryKindIncome && args.Kind != CategoryKindExpense && args.Kind != CategoryKindDebt {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if len(args.WalletIDs) > 20 || args.Limit < 0 || args.Limit > 100 || len(args.Cursor) > 2048 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	for index := range args.WalletIDs {
+		args.WalletIDs[index] = strings.TrimSpace(args.WalletIDs[index])
+		if !validID(args.WalletIDs[index]) {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), CategoryFilter: &entity.CategoryCatalogFilter{Kind: args.Kind, WalletIDs: args.WalletIDs, IncludeArchived: args.IncludeArchived, Limit: args.Limit, Cursor: strings.TrimSpace(args.Cursor)}})
+}
+
+type categoryDetailTool struct{ finance *FinanceQueryService }
+
+func (t *categoryDetailTool) Name() string { return "get_category" }
+func (t *categoryDetailTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Read one owner-visible category, including version and whether it is editable", map[string]any{
+		"category_id": map[string]any{"type": "string", "format": "uuid"},
+	}, []string{"category_id"})
+}
+func (t *categoryDetailTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args categoryDetailArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil || strings.TrimSpace(principal.OwnerID) == "" || !validID(args.CategoryID) {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: []string{strings.TrimSpace(args.CategoryID)}})
+}
+
+// walletProposalTool intentionally validates only. The returned action card is
+// confirmed by the client through the normal wallet API, so a model/tool call
+// can never mutate an owner's wallet without an explicit user action.
+type walletProposalTool struct{}
+
+func (t *walletProposalTool) Name() string { return "propose_create_wallet" }
+func (t *walletProposalTool) Definition() ToolDefinition {
+	return ToolDefinition{
+		Name:        t.Name(),
+		Description: "Prepare a wallet creation proposal for the user to review and confirm; never create the wallet directly",
+		Parameters: map[string]any{
+			"type":                 "object",
+			"additionalProperties": false,
+			"required":             []string{"name", "type"},
+			"properties": map[string]any{
+				"name":                   map[string]any{"type": "string", "minLength": 1, "maxLength": 80},
+				"type":                   map[string]any{"type": "string", "enum": []string{entity.WalletTypeBasic, entity.WalletTypeGoal, entity.WalletTypeCredit}},
+				"opening_balance":        map[string]any{"type": "integer", "minimum": 0},
+				"is_in_total":            map[string]any{"type": "boolean"},
+				"description":            map[string]any{"type": "string", "maxLength": 512},
+				"target_amount":          map[string]any{"type": "integer", "minimum": 1},
+				"target_date":            map[string]any{"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"},
+				"credit_limit":           map[string]any{"type": "integer", "minimum": 1},
+				"last_statement_balance": map[string]any{"type": "integer", "minimum": 0},
+				"statement_day":          map[string]any{"type": "integer", "minimum": 1, "maximum": 31},
+				"payment_due_day":        map[string]any{"type": "integer", "minimum": 1, "maximum": 31},
+			},
+		},
+	}
+}
+
+func (t *walletProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args walletProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.Name = strings.TrimSpace(args.Name)
+	args.Type = strings.TrimSpace(args.Type)
+	args.Description = strings.TrimSpace(args.Description)
+	args.TargetDate = strings.TrimSpace(args.TargetDate)
+	if args.Name == "" || len(args.Name) > 80 || args.Description != "" && len(args.Description) > 512 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if args.Type != entity.WalletTypeBasic && args.Type != entity.WalletTypeGoal && args.Type != entity.WalletTypeCredit {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if err := entity.ValidateMoneyAmount(args.OpeningBalance); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if args.IsInTotal == nil {
+		value := true
+		args.IsInTotal = &value
+	}
+	if args.TargetDate != "" {
+		if parsed, err := time.Parse("2006-01-02", args.TargetDate); err != nil || parsed.Format("2006-01-02") != args.TargetDate {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+	}
+	if args.Type == entity.WalletTypeGoal {
+		if args.TargetAmount == nil || *args.TargetAmount <= 0 || entity.ValidateMoneyAmount(*args.TargetAmount) != nil {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+	} else if args.TargetAmount != nil || args.TargetDate != "" {
+		args.TargetAmount, args.TargetDate = nil, ""
+	}
+	if args.Type == entity.WalletTypeCredit {
+		if args.CreditLimit == nil || *args.CreditLimit <= 0 || entity.ValidateMoneyAmount(*args.CreditLimit) != nil {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+		if args.LastStatementBalance != nil && (entity.ValidateMoneyAmount(*args.LastStatementBalance) != nil || *args.LastStatementBalance < 0) {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+		for _, day := range []*int{args.StatementDay, args.PaymentDueDay} {
+			if day != nil && (*day < 1 || *day > 31) {
+				return entity.FinanceResult{}, ErrAdvisorToolInvalid
+			}
+		}
+	} else {
+		args.CreditLimit, args.LastStatementBalance, args.StatementDay, args.PaymentDueDay = nil, nil, nil, nil
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id":              uuid.NewString(),
+		"action":                 "create_wallet",
+		"name":                   args.Name,
+		"type":                   args.Type,
+		"opening_balance":        args.OpeningBalance,
+		"is_in_total":            *args.IsInTotal,
+		"description":            args.Description,
+		"target_amount":          args.TargetAmount,
+		"target_date":            nullableString(args.TargetDate),
+		"credit_limit":           args.CreditLimit,
+		"last_statement_balance": args.LastStatementBalance,
+		"statement_day":          args.StatementDay,
+		"payment_due_day":        args.PaymentDueDay,
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "wallet_proposal", Status: "proposed", ViewKind: "wallet_creation_proposal", View: view}, nil
+}
+
+// jarProposalTool validates a jar creation request but never mutates data.
+// The persisted proposal is confirmed through the action endpoint so a model
+// response cannot create a financial object on its own.
+type jarProposalTool struct{}
+
+func (t *jarProposalTool) Name() string { return "propose_create_jar" }
+func (t *jarProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare a monthly spending jar for the user to review and confirm; never create it directly", map[string]any{
+		"month":              monthSchema(),
+		"name":               map[string]any{"type": "string", "minLength": 1, "maxLength": 100},
+		"allocation_mode":    map[string]any{"type": "string", "enum": []string{entity.JarAllocationNone, entity.JarAllocationFixed, entity.JarAllocationPercent}},
+		"allocation_amount":  map[string]any{"type": "integer", "minimum": 1},
+		"allocation_percent": map[string]any{"type": "number", "minimum": 0, "maximum": 100, "multipleOf": 0.01},
+	}, []string{"month", "name", "allocation_mode"})
+}
+
+func (t *jarProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args jarProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	if err := validateJarProposal(&args.Month, &args.Name, &args.AllocationMode, args.AllocationAmount, args.AllocationPercent); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id": uuid.NewString(), "action": "create_jar", "month": args.Month, "name": args.Name,
+		"allocation_mode": args.AllocationMode, "allocation_amount": args.AllocationAmount, "allocation_percent": args.AllocationPercent,
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "jar_proposal", Status: "proposed", ViewKind: "jar_creation_proposal", View: view}, nil
+}
+
+// jarUpdateProposalTool prepares a replacement for one jar's month-specific
+// configuration. It deliberately does not read or mutate the jar: the
+// owner-scoped PUT handler remains the single write path after confirmation.
+type jarUpdateProposalTool struct{}
+
+func (t *jarUpdateProposalTool) Name() string { return "propose_update_jar" }
+func (t *jarUpdateProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare an update to one monthly spending jar for review and confirmation; never update it directly", map[string]any{
+		"jar_id":             map[string]any{"type": "string", "minLength": 1, "maxLength": 128},
+		"month":              monthSchema(),
+		"name":               map[string]any{"type": "string", "minLength": 1, "maxLength": 100},
+		"allocation_mode":    map[string]any{"type": "string", "enum": []string{entity.JarAllocationNone, entity.JarAllocationFixed, entity.JarAllocationPercent}},
+		"allocation_amount":  map[string]any{"type": "integer", "minimum": 1},
+		"allocation_percent": map[string]any{"type": "number", "minimum": 0, "maximum": 100, "multipleOf": 0.01},
+	}, []string{"jar_id", "month", "name", "allocation_mode"})
+}
+
+func (t *jarUpdateProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args jarUpdateProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.JarID = strings.TrimSpace(args.JarID)
+	if args.JarID == "" || len(args.JarID) > 128 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if _, err := uuid.Parse(args.JarID); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if err := validateJarProposal(&args.Month, &args.Name, &args.AllocationMode, args.AllocationAmount, args.AllocationPercent); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id": uuid.NewString(), "action": "update_jar", "jar_id": args.JarID, "month": args.Month, "name": args.Name,
+		"allocation_mode": args.AllocationMode, "allocation_amount": args.AllocationAmount, "allocation_percent": args.AllocationPercent,
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "jar_update_proposal", Status: "proposed", ViewKind: "jar_update_proposal", View: view}, nil
+}
+
+func validateJarProposal(month, name, mode *string, amount *int64, percent *float64) error {
+	*month = strings.TrimSpace(*month)
+	*name = strings.TrimSpace(*name)
+	*mode = strings.TrimSpace(*mode)
+	if _, err := entity.ParseMonth(*month); err != nil || *name == "" || len(*name) > 100 {
+		return ErrAdvisorToolInvalid
+	}
+	switch *mode {
+	case entity.JarAllocationNone:
+		if amount != nil || percent != nil {
+			return ErrAdvisorToolInvalid
+		}
+	case entity.JarAllocationFixed:
+		if amount == nil || *amount <= 0 || entity.ValidateMoneyAmount(*amount) != nil || percent != nil {
+			return ErrAdvisorToolInvalid
+		}
+	case entity.JarAllocationPercent:
+		if percent == nil || math.IsNaN(*percent) || math.IsInf(*percent, 0) || *percent < 0 || *percent > 100 || math.Round(*percent*100) != *percent*100 || amount != nil {
+			return ErrAdvisorToolInvalid
+		}
+	default:
+		return ErrAdvisorToolInvalid
+	}
+	return nil
+}
+
+// budgetProposalTool validates a budget request without mutating the ledger.
+// Confirmation delegates to the ordinary budget handler with a durable
+// idempotency key, so retries cannot create a second budget.
+type budgetProposalTool struct{}
+
+func (t *budgetProposalTool) Name() string { return "propose_create_budget" }
+func (t *budgetProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare an expense budget for review and confirmation; never create it directly", map[string]any{
+		"name":         map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
+		"limit_amount": map[string]any{"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+		"wallet_id":    map[string]any{"type": "string", "format": "uuid"},
+		"category_id":  map[string]any{"type": "string", "format": "uuid"},
+		"start_date":   dateSchema(),
+		"end_date":     dateSchema(),
+	}, []string{"name", "limit_amount", "start_date", "end_date"})
+}
+
+func (t *budgetProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args budgetProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.Name = strings.TrimSpace(args.Name)
+	if args.Name == "" || len(args.Name) > 200 || args.LimitAmount <= 0 || args.LimitAmount > 9007199254740991 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	start, startErr := entity.ParseCalendarDate(strings.TrimSpace(args.StartDate))
+	end, endErr := entity.ParseCalendarDate(strings.TrimSpace(args.EndDate))
+	if startErr != nil || endErr != nil || end.Time.Before(start.Time) {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	for _, id := range []*string{args.WalletID, args.CategoryID} {
+		if id != nil {
+			trimmed := strings.TrimSpace(*id)
+			if _, err := uuid.Parse(trimmed); err != nil {
+				return entity.FinanceResult{}, ErrAdvisorToolInvalid
+			}
+			*id = trimmed
+		}
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id": uuid.NewString(), "action": "create_budget", "name": args.Name, "limit_amount": args.LimitAmount,
+		"wallet_id": args.WalletID, "category_id": args.CategoryID, "start_date": start.Format("2006-01-02"), "end_date": end.Format("2006-01-02"),
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "budget_proposal", Status: "proposed", ViewKind: "budget_creation_proposal", View: view}, nil
+}
+
+// budgetUpdateProposalTool prepares a replacement for an existing budget. It
+// deliberately does not read or mutate the budget; confirmation dispatches to
+// the owner-scoped PATCH handler so all domain validation stays centralized.
+type budgetUpdateProposalTool struct{}
+
+func (t *budgetUpdateProposalTool) Name() string { return "propose_update_budget" }
+func (t *budgetUpdateProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare a replacement for one expense budget for review and confirmation; never update it directly", map[string]any{
+		"budget_id":    map[string]any{"type": "string", "format": "uuid"},
+		"name":         map[string]any{"type": "string", "minLength": 1, "maxLength": 200},
+		"limit_amount": map[string]any{"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+		"wallet_id":    map[string]any{"type": "string", "format": "uuid"},
+		"category_id":  map[string]any{"type": "string", "format": "uuid"},
+		"start_date":   dateSchema(),
+		"end_date":     dateSchema(),
+	}, []string{"budget_id", "name", "limit_amount", "start_date", "end_date"})
+}
+
+func (t *budgetUpdateProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args budgetUpdateProposalArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.BudgetID = strings.TrimSpace(args.BudgetID)
+	if _, err := uuid.Parse(args.BudgetID); err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	args.Name = strings.TrimSpace(args.Name)
+	if args.Name == "" || len(args.Name) > 200 || args.LimitAmount <= 0 || args.LimitAmount > 9007199254740991 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	start, startErr := entity.ParseCalendarDate(strings.TrimSpace(args.StartDate))
+	end, endErr := entity.ParseCalendarDate(strings.TrimSpace(args.EndDate))
+	if startErr != nil || endErr != nil || end.Time.Before(start.Time) {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	for _, id := range []*string{args.WalletID, args.CategoryID} {
+		if id != nil {
+			trimmed := strings.TrimSpace(*id)
+			if _, err := uuid.Parse(trimmed); err != nil {
+				return entity.FinanceResult{}, ErrAdvisorToolInvalid
+			}
+			*id = trimmed
+		}
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id": uuid.NewString(), "action": "update_budget", "budget_id": args.BudgetID,
+		"name": args.Name, "limit_amount": args.LimitAmount, "wallet_id": args.WalletID,
+		"category_id": args.CategoryID, "start_date": start.Format("2006-01-02"), "end_date": end.Format("2006-01-02"),
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "budget_update_proposal", Status: "proposed", ViewKind: "budget_update_proposal", View: view}, nil
+}
+
+// The following proposal tools are deliberately side-effect free. They only
+// validate the model arguments and persist an action card; the confirmation
+// endpoint re-validates ownership and invokes the canonical HTTP/domain
+// handler with the action id as its replay key.
+func proposalResult(action, viewKind string, payload any) (entity.FinanceResult, error) {
+	view, err := json.Marshal(payload)
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: action + "_proposal", Status: "proposed", ViewKind: viewKind, View: view}, nil
+}
+func validID(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || len(value) > 128 {
+		return false
+	}
+	_, err := uuid.Parse(value)
+	return err == nil
+}
+func validateTransactionProposal(a transactionCreateProposalArgs) error {
+	if !validID(a.WalletID) || a.Type != entity.TransactionTypeIncome && a.Type != entity.TransactionTypeExpense || a.Amount <= 0 || entity.ValidateMoneyAmount(a.Amount) != nil {
+		return ErrAdvisorToolInvalid
+	}
+	if strings.TrimSpace(a.OccurredAt) != "" {
+		if _, err := time.Parse(time.RFC3339, strings.TrimSpace(a.OccurredAt)); err != nil {
+			return ErrAdvisorToolInvalid
+		}
+	}
+	if a.CategoryID != nil && !validID(*a.CategoryID) {
+		return ErrAdvisorToolInvalid
+	}
+	if a.Note != nil && len(*a.Note) > 1024 {
+		return ErrAdvisorToolInvalid
+	}
+	return nil
+}
+func transactionProposalProperties() map[string]any {
+	return map[string]any{
+		"wallet_id": map[string]any{"type": "string", "format": "uuid"}, "category_id": map[string]any{"type": "string", "format": "uuid"},
+		"type": map[string]any{"type": "string", "enum": []string{entity.TransactionTypeIncome, entity.TransactionTypeExpense}}, "amount": map[string]any{"type": "integer", "minimum": 1, "maximum": 9007199254740991},
+		"occurred_at": map[string]any{"type": "string", "format": "date-time"}, "note": map[string]any{"type": "string", "maxLength": 1024}, "included_in_reports": map[string]any{"type": "boolean"},
+	}
+}
+
+type transactionCreateProposalTool struct{}
+
+func (t *transactionCreateProposalTool) Name() string { return "propose_create_transaction" }
+func (t *transactionCreateProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare one owner-scoped income or expense transaction for explicit review; never write directly", transactionProposalProperties(), []string{"wallet_id", "type", "amount"})
+}
+func (t *transactionCreateProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var a transactionCreateProposalArgs
+	if DecodeAdvisorToolArgs(raw, &a) != nil || validateTransactionProposal(a) != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if a.IncludedInReports == nil {
+		v := true
+		a.IncludedInReports = &v
+	}
+	return proposalResult("create_transaction", "transaction_creation_proposal", map[string]any{"action_id": uuid.NewString(), "action": "create_transaction", "wallet_id": a.WalletID, "category_id": a.CategoryID, "type": a.Type, "amount": a.Amount, "occurred_at": a.OccurredAt, "note": a.Note, "included_in_reports": *a.IncludedInReports})
+}
+
+type transactionUpdateProposalTool struct{}
+
+func (t *transactionUpdateProposalTool) Name() string { return "propose_update_transaction" }
+func (t *transactionUpdateProposalTool) Definition() ToolDefinition {
+	p := transactionProposalProperties()
+	p["transaction_id"] = map[string]any{"type": "string", "format": "uuid"}
+	p["expected_version"] = map[string]any{"type": "integer", "minimum": 1}
+	return readDefinition(t.Name(), "Prepare an owner-scoped transaction edit for review; transfer and credit rows remain on their dedicated flows", p, []string{"transaction_id", "wallet_id", "type", "amount", "expected_version"})
+}
+func (t *transactionUpdateProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var a transactionUpdateProposalArgs
+	if DecodeAdvisorToolArgs(raw, &a) != nil || !validID(a.TransactionID) || !validExpectedVersion(a.ExpectedVersion) || validateTransactionProposal(a.transactionCreateProposalArgs) != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return proposalResult("update_transaction", "transaction_update_proposal", map[string]any{"action_id": uuid.NewString(), "action": "update_transaction", "transaction_id": a.TransactionID, "wallet_id": a.WalletID, "category_id": a.CategoryID, "type": a.Type, "amount": a.Amount, "occurred_at": a.OccurredAt, "note": a.Note, "included_in_reports": a.IncludedInReports, "expected_version": a.ExpectedVersion})
+}
+
+type transactionDeleteProposalTool struct{}
+
+func (t *transactionDeleteProposalTool) Name() string { return "propose_delete_transaction" }
+func (t *transactionDeleteProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare deletion of one ordinary owner-scoped transaction; never delete directly", map[string]any{"transaction_id": map[string]any{"type": "string", "format": "uuid"}, "expected_version": map[string]any{"type": "integer", "minimum": 1}}, []string{"transaction_id", "expected_version"})
+}
+func (t *transactionDeleteProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var a transactionDeleteProposalArgs
+	if DecodeAdvisorToolArgs(raw, &a) != nil || !validID(a.TransactionID) || !validExpectedVersion(a.ExpectedVersion) {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return proposalResult("delete_transaction", "transaction_delete_proposal", map[string]any{"action_id": uuid.NewString(), "action": "delete_transaction", "transaction_id": a.TransactionID, "expected_version": a.ExpectedVersion})
+}
+
+type walletTransferProposalTool struct{}
+
+func (t *walletTransferProposalTool) Name() string { return "propose_transfer_wallet" }
+func (t *walletTransferProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare an atomic internal wallet-to-wallet transfer for review; never write directly", map[string]any{"source_wallet_id": map[string]any{"type": "string", "format": "uuid"}, "destination_wallet_id": map[string]any{"type": "string", "format": "uuid"}, "amount": map[string]any{"type": "integer", "minimum": 1, "maximum": 9007199254740991}, "occurred_at": map[string]any{"type": "string", "format": "date-time"}, "note": map[string]any{"type": "string", "maxLength": 1024}}, []string{"source_wallet_id", "destination_wallet_id", "amount"})
+}
+func (t *walletTransferProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var a walletTransferProposalArgs
+	if DecodeAdvisorToolArgs(raw, &a) != nil || !validID(a.SourceWalletID) || !validID(a.DestinationWalletID) || a.SourceWalletID == a.DestinationWalletID || a.Amount <= 0 || entity.ValidateMoneyAmount(a.Amount) != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	if strings.TrimSpace(a.OccurredAt) != "" {
+		if _, err := time.Parse(time.RFC3339, a.OccurredAt); err != nil {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+	}
+	return proposalResult("transfer_wallet", "wallet_transfer_proposal", map[string]any{"action_id": uuid.NewString(), "action": "transfer_wallet", "source_wallet_id": a.SourceWalletID, "destination_wallet_id": a.DestinationWalletID, "amount": a.Amount, "occurred_at": a.OccurredAt, "note": a.Note})
+}
+
+func validateCategoryProposal(a categoryCreateProposalArgs) error {
+	a.Name = strings.TrimSpace(a.Name)
+	if a.Name == "" || len(a.Name) > 200 {
+		return ErrAdvisorToolInvalid
+	}
+	if a.Kind != CategoryKindExpense && a.Kind != CategoryKindIncome && a.Kind != CategoryKindDebt {
+		return ErrAdvisorToolInvalid
+	}
+	if a.ParentID != nil && !validID(*a.ParentID) {
+		return ErrAdvisorToolInvalid
+	}
+	if len(a.WalletIDs) > 100 {
+		return ErrAdvisorToolInvalid
+	}
+	for _, id := range a.WalletIDs {
+		if !validID(id) {
+			return ErrAdvisorToolInvalid
+		}
+	}
+	if len(a.IconKey) > 64 {
+		return ErrAdvisorToolInvalid
+	}
+	return nil
+}
+func categoryProperties(includeID bool) map[string]any {
+	p := map[string]any{"name": map[string]any{"type": "string", "minLength": 1, "maxLength": 200}, "kind": map[string]any{"type": "string", "enum": []string{CategoryKindExpense, CategoryKindIncome, CategoryKindDebt}}, "parent_id": map[string]any{"type": "string", "format": "uuid"}, "wallet_ids": map[string]any{"type": "array", "maxItems": 100, "items": map[string]any{"type": "string", "format": "uuid"}}, "icon_key": map[string]any{"type": "string", "maxLength": 64}}
+	if includeID {
+		p["category_id"] = map[string]any{"type": "string", "format": "uuid"}
+	}
+	return p
+}
+
+type categoryCreateProposalTool struct{}
+
+func (t *categoryCreateProposalTool) Name() string { return "propose_create_category" }
+func (t *categoryCreateProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare a personal category for explicit review; never create directly", categoryProperties(false), []string{"name", "kind"})
+}
+func (t *categoryCreateProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var a categoryCreateProposalArgs
+	if DecodeAdvisorToolArgs(raw, &a) != nil || validateCategoryProposal(a) != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return proposalResult("create_category", "category_creation_proposal", map[string]any{"action_id": uuid.NewString(), "action": "create_category", "name": strings.TrimSpace(a.Name), "kind": a.Kind, "parent_id": a.ParentID, "wallet_ids": a.WalletIDs, "icon_key": a.IconKey})
+}
+
+type categoryUpdateProposalTool struct{}
+
+func (t *categoryUpdateProposalTool) Name() string { return "propose_update_category" }
+func (t *categoryUpdateProposalTool) Definition() ToolDefinition {
+	p := categoryProperties(true)
+	p["expected_version"] = map[string]any{"type": "integer", "minimum": 1}
+	return readDefinition(t.Name(), "Prepare an owner-scoped category edit for explicit review; never update directly", p, []string{"category_id", "name", "kind", "expected_version"})
+}
+func (t *categoryUpdateProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var a categoryUpdateProposalArgs
+	if DecodeAdvisorToolArgs(raw, &a) != nil || !validID(a.CategoryID) || !validExpectedVersion(a.ExpectedVersion) || validateCategoryProposal(a.categoryCreateProposalArgs) != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return proposalResult("update_category", "category_update_proposal", map[string]any{"action_id": uuid.NewString(), "action": "update_category", "category_id": a.CategoryID, "name": strings.TrimSpace(a.Name), "kind": a.Kind, "parent_id": a.ParentID, "wallet_ids": a.WalletIDs, "icon_key": a.IconKey, "expected_version": a.ExpectedVersion})
+}
+
+type transactionRecategorizeProposalTool struct{}
+
+func (t *transactionRecategorizeProposalTool) Name() string {
+	return "propose_recategorize_transaction"
+}
+func (t *transactionRecategorizeProposalTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Prepare changing one ordinary transaction's category for review; transfer and credit rows are rejected by the canonical handler", map[string]any{"transaction_id": map[string]any{"type": "string", "format": "uuid"}, "category_id": map[string]any{"type": "string", "format": "uuid"}, "expected_version": map[string]any{"type": "integer", "minimum": 1}}, []string{"transaction_id", "category_id", "expected_version"})
+}
+func (t *transactionRecategorizeProposalTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var a transactionRecategorizeProposalArgs
+	if DecodeAdvisorToolArgs(raw, &a) != nil || !validID(a.TransactionID) || !validID(a.CategoryID) || !validExpectedVersion(a.ExpectedVersion) {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return proposalResult("recategorize_transaction", "transaction_recategorize_proposal", map[string]any{"action_id": uuid.NewString(), "action": "recategorize_transaction", "transaction_id": a.TransactionID, "category_id": a.CategoryID, "expected_version": a.ExpectedVersion})
+}
+
+func validExpectedVersion(value *int64) bool {
+	return value != nil && *value >= 1
+}
+
+func nullableString(value string) any {
+	if strings.TrimSpace(value) == "" {
+		return nil
+	}
+	return value
+}
+
+func readDefinition(name, description string, properties map[string]any, required []string) ToolDefinition {
+	parameters := map[string]any{"type": "object", "additionalProperties": false, "properties": properties}
+	if len(required) > 0 {
+		parameters["required"] = required
+	}
+	return ToolDefinition{Name: name, Description: description, Parameters: parameters}
+}
+
+func rangeSchema() map[string]any {
+	return map[string]any{"type": "object", "additionalProperties": false, "required": []string{"from", "to"}, "properties": map[string]any{
+		"from": dateSchema(), "to": dateSchema(),
+	}}
+}
+
+func dateSchema() map[string]any {
+	return map[string]any{"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$"}
+}
+func monthSchema() map[string]any {
+	return map[string]any{"type": "string", "pattern": "^[0-9]{4}-[0-9]{2}$"}
+}
+func stringSchema(maxLength int) map[string]any {
+	return map[string]any{"type": "string", "maxLength": maxLength}
+}
+func stringArraySchema() map[string]any {
+	return map[string]any{"type": "array", "items": map[string]any{"type": "string", "maxLength": 128}, "maxItems": 100}
+}
+func boolSchema() map[string]any    { return map[string]any{"type": "boolean"} }
+func integerSchema() map[string]any { return map[string]any{"type": "integer", "minimum": 0} }
+
+func normalizeToolFilter(dateRange entity.DateRange, timezone string, input entity.FinanceFilter) (entity.NormalizedFinanceFilter, error) {
+	if strings.TrimSpace(timezone) == "" || timezone == "Local" {
+		return entity.NormalizedFinanceFilter{}, ErrAdvisorToolInvalid
+	}
+	location, err := time.LoadLocation(timezone)
+	if err != nil {
+		return entity.NormalizedFinanceFilter{}, ErrAdvisorToolInvalid
+	}
+	return entity.NormalizeFinanceFilter(entity.FinanceFilter{Range: dateRange, WalletIDs: input.WalletIDs, CategoryIDs: input.CategoryIDs, IncludeChildren: input.IncludeChildren, Type: input.Type, ReportScope: input.ReportScope, NoteContains: input.NoteContains, MinAmount: input.MinAmount, MaxAmount: input.MaxAmount, Limit: input.Limit}, location)
+}

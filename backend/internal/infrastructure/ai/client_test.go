@@ -1,0 +1,1101 @@
+package ai
+
+import (
+	"bytes"
+	"context"
+	"encoding/base64"
+	"encoding/binary"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"hash/crc32"
+	"image"
+	"image/jpeg"
+	"image/png"
+	"io"
+	"log/slog"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"sync/atomic"
+	"testing"
+	"time"
+
+	"github.com/mypocket/backend/internal/entity"
+)
+
+const validDraft = `{"type":"transfer","amount":9007199254740991,"wallet_id":"unverified-id","category_id":null,"occurred_at":"","note":"","included_in_reports":false,"questions":["Which destination wallet?"],"source_currency":"VND"}`
+
+func structuredDraft(sourceID string) string {
+	return fmt.Sprintf(`{"source_id":%q,"type":"income","amount":1,"wallet_id":"w","category_id":null,"occurred_at":"2030-01-01T00:00:00Z","note":"semantic","included_in_reports":false,"questions":[],"source_currency":"foreign"}`, sourceID)
+}
+
+func TestStructuredExtractionCarriesRowsAndAcceptsExactSourceIDs(t *testing.T) {
+	rows := []entity.AIStructuredRow{{SourceID: "source-a", OccurredAt: "2026-10-26T00:00:00+07:00", Type: "expense", Amount: 50000, SourceCurrency: "VND", Description: "Coffee", Reference: "REF-1"}}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Messages       []chatMessage  `json:"messages"`
+			ResponseFormat map[string]any `json:"response_format"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(request.Messages[1].Content, `"structured_rows":[{"source_id":"source-a"`) {
+			t.Fatalf("canonical row missing from provider input: %s", request.Messages[1].Content)
+		}
+		if !strings.Contains(request.Messages[0].Content, "structured instruction affects semantics only") || !strings.Contains(request.Messages[0].Content, "must not filter or omit structured rows") {
+			t.Fatalf("structured row inclusion policy is ambiguous: %s", request.Messages[0].Content)
+		}
+		schema, _ := request.ResponseFormat["json_schema"].(map[string]any)
+		encoded, _ := json.Marshal(schema)
+		if !strings.Contains(string(encoded), `"source_id"`) {
+			t.Fatalf("structured response schema does not require source_id: %s", encoded)
+		}
+		modelResponse(w, `{"reply":"review","drafts":[`+structuredDraft("source-a")+`]}`)
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "enrich statement", Instruction: "only include September rows", Timezone: "Asia/Ho_Chi_Minh", StructuredRows: rows})
+	if err != nil || len(out.Drafts) != 1 || out.Drafts[0].SourceID != "source-a" {
+		t.Fatalf("exact structured response rejected: drafts=%#v err=%v", out.Drafts, err)
+	}
+}
+
+func TestStructuredExtractionRejectsOCRFilesBeforeAnyProviderCall(t *testing.T) {
+	rows := make([]entity.AIStructuredRow, 51)
+	for i := range rows {
+		rows[i] = entity.AIStructuredRow{SourceID: fmt.Sprintf("mixed-%02d", i), OccurredAt: "2026-10-26T00:00:00Z", Type: "expense", Amount: 1, SourceCurrency: "VND", Description: "row"}
+	}
+	var providerCalls atomic.Int32
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		providerCalls.Add(1)
+		http.Error(w, "mixed input reached provider", http.StatusInternalServerError)
+	})
+	_, err := c.Extract(context.Background(), Input{Timezone: "UTC", Images: []Image{pngImage(t)}, StructuredRows: rows})
+	if err == nil {
+		t.Fatal("mixed structured and OCR input was accepted")
+	}
+	if providerCalls.Load() != 0 {
+		t.Fatalf("mixed input reached OCR/model %d times", providerCalls.Load())
+	}
+}
+
+func TestStructuredExtractionRequiresExactSourceIDs(t *testing.T) {
+	rows := []entity.AIStructuredRow{{SourceID: "source-a", OccurredAt: "2026-10-26T00:00:00+07:00", Type: "expense", Amount: 50000, SourceCurrency: "VND", Description: "Coffee"}, {SourceID: "source-b", OccurredAt: "2026-10-26T00:00:00+07:00", Type: "expense", Amount: 50000, SourceCurrency: "VND", Description: "Coffee"}}
+	tests := []struct {
+		name    string
+		content string
+	}{
+		{name: "missing", content: `{"reply":"review","drafts":[` + structuredDraft("source-a") + `]}`},
+		{name: "duplicate", content: `{"reply":"review","drafts":[` + structuredDraft("source-a") + `,` + structuredDraft("source-a") + `]}`},
+		{name: "unknown", content: `{"reply":"review","drafts":[` + structuredDraft("source-a") + `,` + structuredDraft("foreign") + `]}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) { modelResponse(w, tt.content) })
+			if _, err := c.Extract(context.Background(), Input{Text: "enrich statement", Timezone: "Asia/Ho_Chi_Minh", StructuredRows: rows}); err == nil {
+				t.Fatal("structured response with a mismatched source-ID set was accepted")
+			}
+		})
+	}
+}
+
+func TestStructuredExtractionUsesBoundedBatchesAndAggregatesUsage(t *testing.T) {
+	rows := make([]entity.AIStructuredRow, 51)
+	for i := range rows {
+		rows[i] = entity.AIStructuredRow{SourceID: fmt.Sprintf("source-%02d", i), OccurredAt: "2026-10-26T00:00:00Z", Type: "expense", Amount: int64(i + 1), SourceCurrency: "VND", Description: "row"}
+	}
+	var calls atomic.Int32
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var request struct {
+			Messages []chatMessage `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		var input struct {
+			StructuredRows []entity.AIStructuredRow `json:"structured_rows"`
+		}
+		if err := json.Unmarshal([]byte(request.Messages[1].Content), &input); err != nil {
+			t.Fatal(err)
+		}
+		if len(input.StructuredRows) == 0 || len(input.StructuredRows) > 50 {
+			t.Fatalf("structured batch size=%d want 1..50", len(input.StructuredRows))
+		}
+		drafts := make([]string, len(input.StructuredRows))
+		for i, row := range input.StructuredRows {
+			drafts[i] = structuredDraft(row.SourceID)
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":      fmt.Sprintf("batch-%d", calls.Load()),
+			"choices": []any{map[string]any{"message": map[string]any{"content": `{"reply":"review","drafts":[` + strings.Join(drafts, ",") + `]}`}, "finish_reason": "stop"}},
+			"usage":   map[string]any{"prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30},
+		})
+	})
+	c.config.StoreUsage = true
+	out, err := c.Extract(context.Background(), Input{Text: "enrich statement", Timezone: "UTC", StructuredRows: rows})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if calls.Load() < 2 || len(out.Drafts) != len(rows) {
+		t.Fatalf("calls=%d drafts=%d want multiple calls and drafts=%d", calls.Load(), len(out.Drafts), len(rows))
+	}
+	if modelUsageInt(out.ModelUsage, "total_tokens") != 30*int64(calls.Load()) || modelUsageInt(out.ModelUsage, "batch_count") != int64(calls.Load()) {
+		t.Fatalf("usage was not aggregated: %#v", out.ModelUsage)
+	}
+}
+
+func TestStructuredExtractionBatchesRowsBeforePromptLimit(t *testing.T) {
+	rows := make([]entity.AIStructuredRow, 50)
+	for i := range rows {
+		rows[i] = entity.AIStructuredRow{SourceID: fmt.Sprintf("large-%02d", i), OccurredAt: "2026-10-26T00:00:00Z", Type: "expense", Amount: 1, SourceCurrency: "VND", Description: strings.Repeat("x", 2048), Reference: strings.Repeat("r", 512)}
+	}
+	var calls atomic.Int32
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		var request struct {
+			Messages []chatMessage `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		var input struct {
+			StructuredRows []entity.AIStructuredRow `json:"structured_rows"`
+		}
+		if err := json.Unmarshal([]byte(request.Messages[1].Content), &input); err != nil {
+			t.Fatal(err)
+		}
+		drafts := make([]string, len(input.StructuredRows))
+		for i, row := range input.StructuredRows {
+			drafts[i] = structuredDraft(row.SourceID)
+		}
+		modelResponse(w, `{"reply":"review","drafts":[`+strings.Join(drafts, ",")+`]}`)
+	})
+	out, err := c.Extract(context.Background(), Input{Timezone: "UTC", StructuredRows: rows})
+	if err != nil || len(out.Drafts) != len(rows) || calls.Load() < 2 {
+		t.Fatalf("large canonical rows were not safely batched: calls=%d drafts=%d err=%v", calls.Load(), len(out.Drafts), err)
+	}
+}
+
+func TestAIExtractionKeepsSourceCurrencyEvidence(t *testing.T) {
+	raw := `{"reply":"review","drafts":[{"type":"expense","amount":222,"wallet_id":"w","category_id":null,"occurred_at":"","note":"Ticket","included_in_reports":true,"questions":[],"source_currency":"foreign"}]}`
+	out, err := parseOutput([]byte(raw))
+	if err != nil || len(out.Drafts) != 1 {
+		t.Fatalf("source currency evidence rejected: drafts=%d err=%v", len(out.Drafts), err)
+	}
+}
+
+func modelResponse(w http.ResponseWriter, content string) {
+	_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"role": "assistant", "content": content}, "finish_reason": "stop"}}})
+}
+
+func testClient(t *testing.T, handler http.HandlerFunc) *Client {
+	t.Helper()
+	s := httptest.NewServer(handler)
+	t.Cleanup(s.Close)
+	return NewClient(Config{BaseURL: s.URL + "/v1/", APIKey: "test-model-key", Model: "test-model", OCRURL: s.URL, OCRKey: "test-ocr-key"})
+}
+
+func pngImage(t *testing.T) Image {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 2, 2))); err != nil {
+		t.Fatal(err)
+	}
+	return Image{Name: "receipt.png", MIMEType: "image/png", Base64: base64.StdEncoding.EncodeToString(buf.Bytes())}
+}
+
+func TestConfigured(t *testing.T) {
+	for _, cfg := range []Config{{}, {BaseURL: "http://localhost/v1", Model: "m"}, {BaseURL: "ftp://host/v1", APIKey: "test", Model: "m"}, {BaseURL: "https://user:pass@host/v1", APIKey: "test", Model: "m"}} {
+		c := NewClient(cfg)
+		if c.Configured() {
+			t.Fatal("invalid configuration accepted")
+		}
+		if _, err := c.Extract(context.Background(), Input{Text: "coffee"}); !errors.Is(err, ErrNotConfigured) {
+			t.Fatalf("error = %v", err)
+		}
+	}
+	c := NewClient(Config{BaseURL: "https://example.invalid/v1", APIKey: "test", Model: "m"})
+	if !c.Configured() || c.OCRConfigured() {
+		t.Fatal("incorrect capabilities")
+	}
+	c = NewClient(Config{OCRURL: "https://example.invalid", OCRKey: "test"})
+	if !c.OCRConfigured() || c.Configured() {
+		t.Fatal("OCR independent of model")
+	}
+}
+
+func TestImageExtractionFailsClosedWhenOCRIsUnconfigured(t *testing.T) {
+	// An AI key alone must never cause an image request to reach the model.
+	c := NewClient(Config{BaseURL: "https://example.invalid/v1", APIKey: "model-key", Model: "model"})
+	_, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}})
+	if !errors.Is(err, ErrNotConfigured) {
+		t.Fatalf("image extraction without OCR credentials must fail closed: %v", err)
+	}
+}
+
+func TestExtractionBudgetIncludesColdModelStart(t *testing.T) {
+	if modelTimeout < 120*time.Second {
+		t.Fatalf("model timeout %s is too short for a multi-image batch", modelTimeout)
+	}
+	if extractTimeout <= modelTimeout {
+		t.Fatalf("extract timeout %s must exceed model timeout %s", extractTimeout, modelTimeout)
+	}
+}
+
+func TestExtractionRejectsTruncatedBatchWithoutRetry(t *testing.T) {
+	var calls int
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls++
+		// Even apparently valid partial JSON must not be treated as a complete batch.
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{
+			"message":       map[string]any{"content": `{"reply":"partial","drafts":[` + validDraft + `]}`},
+			"finish_reason": "length",
+		}}})
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "batch of receipts"})
+	if err == nil || len(out.Drafts) != 0 || calls != 1 {
+		t.Fatalf("truncated batch must fail without partial proposals or retry: error=%v drafts=%d calls=%d", err, len(out.Drafts), calls)
+	}
+}
+
+func TestExtractionAcceptsCompleteThirtyDraftBatch(t *testing.T) {
+	drafts := make([]string, 30)
+	for i := range drafts {
+		drafts[i] = validDraft
+	}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":"Review before saving","drafts":[`+strings.Join(drafts, ",")+`]}`)
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "batch of receipts"})
+	if err != nil || len(out.Drafts) != 30 {
+		t.Fatalf("complete batch rejected: error=%v drafts=%d", err, len(out.Drafts))
+	}
+}
+
+func TestExtractionAcceptsMoreThanThirtyDrafts(t *testing.T) {
+	drafts := make([]string, 31)
+	for i := range drafts {
+		drafts[i] = validDraft
+	}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":"Review all rows","drafts":[`+strings.Join(drafts, ",")+`]}`)
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "large batch"})
+	if err != nil || len(out.Drafts) != 31 {
+		t.Fatalf("large batch rejected: error=%v drafts=%d", err, len(out.Drafts))
+	}
+}
+
+func TestExtractionSeparatesUserInstructionAndStoresUsageWhenEnabled(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		var request struct {
+			Messages []chatMessage `json:"messages"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(request.Messages[1].Content, `"user_instruction":"chỉ lấy giao dịch tháng 9"`) {
+			t.Fatal("user instruction was not sent as a separate field")
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"id":      "provider-request-1",
+			"choices": []any{map[string]any{"message": map[string]any{"content": `{"reply":"Đã lọc theo tháng","drafts":[` + validDraft + `]}`}, "finish_reason": "stop"}},
+			"usage":   map[string]any{"prompt_tokens": 101, "completion_tokens": 23, "total_tokens": 124, "prompt_tokens_details": map[string]any{"cached_tokens": 7}},
+		})
+	})
+	c.config.StoreUsage = true
+	out, err := c.Extract(context.Background(), Input{Text: "giao dịch chứng từ", Instruction: "chỉ lấy giao dịch tháng 9", Timezone: "Asia/Ho_Chi_Minh", Now: time.Now()})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.ModelUsage == nil || modelUsageInt(out.ModelUsage, "total_tokens") != 124 || out.ModelUsage["request_id"] != "provider-request-1" {
+		t.Fatalf("usage metadata not retained: %#v", out.ModelUsage)
+	}
+}
+
+func TestExtractionCarriesUserInstructionAlongsideOCRSource(t *testing.T) {
+	img := pngImage(t)
+	var modelInput string
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			_, _ = io.WriteString(w, `{"status":"completed","documentId":"doc_prompt_image","result":{"text":"Highlands 45.000 ngày 2026-09-20"}}`)
+		case "/v1/chat/completions":
+			var request struct {
+				Messages []chatMessage `json:"messages"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			if len(request.Messages) != 2 {
+				t.Fatalf("expected system and user messages, got %d", len(request.Messages))
+			}
+			modelInput = request.Messages[1].Content
+			modelResponse(w, `{"reply":"Đã lọc theo chỉ thị","drafts":[]}`)
+		default:
+			t.Fatalf("unexpected provider path: %s", r.URL.Path)
+		}
+	})
+	_, err := c.Extract(context.Background(), Input{
+		Text:        "các giao dịch trong ảnh",
+		Instruction: "chỉ lấy giao dịch tháng 9",
+		Timezone:    "Asia/Ho_Chi_Minh",
+		Now:         time.Date(2026, 9, 30, 12, 0, 0, 0, time.FixedZone("ICT", 7*3600)),
+		Images:      []Image{img},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(modelInput, `"user_instruction":"chỉ lấy giao dịch tháng 9"`) {
+		t.Fatalf("user instruction was lost when an image was attached: %s", modelInput)
+	}
+	if !strings.Contains(modelInput, "Highlands 45.000") || !strings.Contains(modelInput, "OCR document 1") {
+		t.Fatalf("OCR source was not carried alongside the instruction: %s", modelInput)
+	}
+	if strings.Contains(modelInput, img.Base64) || strings.Contains(modelInput, "image_url") {
+		t.Fatal("model request leaked original image bytes")
+	}
+}
+
+func TestTextOnlyRequestAndUnverifiedIDs(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != "POST" || r.URL.Path != "/v1/chat/completions" || r.Header.Get("Authorization") != "Bearer test-model-key" {
+			t.Errorf("incorrect model request")
+		}
+		var req map[string]json.RawMessage
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			t.Error(err)
+		}
+		if _, ok := req["tools"]; ok {
+			t.Error("must not supply tools")
+		}
+		var responseFormat struct {
+			Type       string `json:"type"`
+			JSONSchema struct {
+				Name   string         `json:"name"`
+				Strict bool           `json:"strict"`
+				Schema map[string]any `json:"schema"`
+			} `json:"json_schema"`
+		}
+		if err := json.Unmarshal(req["response_format"], &responseFormat); err != nil {
+			t.Errorf("decode response format: %v", err)
+		}
+		if responseFormat.Type != "json_schema" || responseFormat.JSONSchema.Name != "transaction_proposal" || !responseFormat.JSONSchema.Strict {
+			t.Errorf("response format must use strict OpenAI-compatible JSON Schema: %+v", responseFormat)
+		}
+		var maxTokens int
+		if err := json.Unmarshal(req["max_tokens"], &maxTokens); err != nil || maxTokens != modelMaxTokens {
+			t.Errorf("model output must be explicitly bounded: got %s", string(req["max_tokens"]))
+		}
+		var templateKwargs map[string]any
+		if err := json.Unmarshal(req["chat_template_kwargs"], &templateKwargs); err != nil || templateKwargs["enable_thinking"] != false {
+			t.Errorf("thinking must be disabled for bounded extraction: %s", string(req["chat_template_kwargs"]))
+		}
+		if properties, ok := responseFormat.JSONSchema.Schema["properties"].(map[string]any); !ok || properties["drafts"] == nil {
+			t.Errorf("schema missing drafts property: %+v", responseFormat.JSONSchema.Schema)
+		}
+		var messages []chatMessage
+		var wireMessages []map[string]json.RawMessage
+		if err := json.Unmarshal(req["messages"], &wireMessages); err != nil {
+			t.Error(err)
+		}
+		for _, message := range wireMessages {
+			if _, ok := message["role"]; !ok {
+				t.Error("provider message missing lowercase role")
+			}
+			if _, ok := message["content"]; !ok {
+				t.Error("provider message missing lowercase content")
+			}
+		}
+		if err := json.Unmarshal(req["messages"], &messages); err != nil {
+			t.Error(err)
+		}
+		if len(messages) != 2 || messages[0].Role != "system" {
+			t.Errorf("one-shot request must have only system and input messages: %d", len(messages))
+		}
+		last := messages[len(messages)-1].Content
+		if !strings.Contains(last, "coffee") || !strings.Contains(last, "wallet-1") || !strings.Contains(last, `"description":"Daily cash for food and transit"`) || !strings.Contains(last, "wallet_assignment_policy") || strings.Contains(last, "private-owner") {
+			t.Errorf("incorrect catalog projection")
+		}
+		if !strings.Contains(messages[0].Content, "descriptions") || !strings.Contains(messages[0].Content, "untrusted data") {
+			t.Errorf("system prompt must treat wallet descriptions as untrusted reference data")
+		}
+		if !strings.Contains(messages[0].Content, "wallet_assignment_policy") || !strings.Contains(messages[0].Content, "every recognizable entry") {
+			t.Errorf("system prompt must require wallet selection when a single wallet is supplied")
+		}
+		if !strings.Contains(messages[0].Content, "MUST return one or more drafts") || !strings.Contains(messages[0].Content, "forbidden to return drafts:[]") {
+			t.Errorf("system prompt must forbid empty results caused only by wallet labels")
+		}
+		if !strings.Contains(messages[0].Content, "paid invoices and receipts for goods/services are expenses") || !strings.Contains(messages[0].Content, "refund/return/reimbursement received") {
+			t.Errorf("system prompt must classify paid receipts as expenses unless they are explicit income")
+		}
+		if !strings.Contains(messages[0].Content, "exactly one transfer draft per explicitly stated transfer event") || !strings.Contains(messages[0].Content, "never split one transfer amount") {
+			t.Errorf("system prompt must preserve one transfer event and amount")
+		}
+		modelResponse(w, `{"reply":"Please clarify","drafts":[`+validDraft+`]}`)
+	})
+	description := "Daily cash for food and transit"
+	out, err := c.Extract(context.Background(), Input{Text: "coffee", Timezone: "Asia/Ho_Chi_Minh", Now: time.Now(), Wallets: []entity.Wallet{{ID: "wallet-1", OwnerID: "private-owner", Name: "Cash", Description: &description}}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(out.Drafts) != 1 || out.Drafts[0].WalletID != "unverified-id" || out.Drafts[0].Type != "transfer" || out.Drafts[0].Amount != 9007199254740991 || out.SourceText != "coffee" {
+		t.Fatalf("wrong output: %+v", out)
+	}
+}
+
+func TestBuildMessagesRejectsOversizedWalletDescription(t *testing.T) {
+	description := strings.Repeat("x", 2049)
+	_, err := buildMessages(Input{Text: "test", Wallets: []entity.Wallet{{ID: "wallet-1", Name: "Cash", Description: &description}}}, "test")
+	if err == nil {
+		t.Fatal("oversized wallet descriptions must be rejected before provider submission")
+	}
+}
+
+func TestSchemaValidation(t *testing.T) {
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewTextHandler(io.Discard, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+	cases := []string{`null`, `[]`, `{}`, `{"reply":null,"drafts":[]}`, `{"reply":"?","drafts":null}`, `{"reply":"?","drafts":[],"tool":"write"}`, `{"reply":"?","drafts":[]} trailing`, `{"reply":"?","reply":"duplicate","drafts":[]}`, `{"reply":"?","drafts":[{}]}`,
+		`{"reply":"?","drafts":[` + strings.Replace(validDraft, "9007199254740991", "9007199254740992", 1) + `]}`,
+		`{"reply":"?","drafts":[` + strings.Replace(validDraft, "9007199254740991", "-1", 1) + `]}`,
+		`{"reply":"?","drafts":[` + strings.Replace(validDraft, "9007199254740991", "1.5", 1) + `]}`,
+		`{"reply":"?","drafts":[` + strings.Replace(validDraft, `"included_in_reports":false`, `"included_in_reports":null`, 1) + `]}`,
+	}
+	for i, content := range cases {
+		t.Run(string(rune('A'+i)), func(t *testing.T) {
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) { modelResponse(w, content) })
+			if _, err := c.Extract(context.Background(), Input{Text: "test"}); err == nil {
+				t.Fatal("malformed output accepted")
+			}
+		})
+	}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":"Which wallet?","drafts":[]}`)
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "test"})
+	if err != nil || out.Drafts == nil || len(out.Drafts) != 0 {
+		t.Fatalf("clarification rejected: %v", err)
+	}
+}
+
+func TestSchemaMismatchLogReportsStructureWithoutLoggingModelContent(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	privateText := "private transaction narrative sentinel"
+	privateValue := "private amount value sentinel"
+	content, err := json.Marshal(map[string]any{
+		"reply": privateText,
+		"drafts": []any{map[string]any{
+			"type":                   "expense",
+			"amount":                 privateValue,
+			"private_account_123456": "must not log values or model-provided identifier keys",
+			privateText:              "must not log model-provided key names",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) { modelResponse(w, string(content)) })
+	if _, err := c.Extract(context.Background(), Input{Text: "not-for-logs", Timezone: "Asia/Ho_Chi_Minh"}); err == nil {
+		t.Fatal("schema-invalid output was accepted")
+	} else if err.Error() != errSchema.Error() {
+		t.Fatalf("client-facing schema error must stay generic, got %q", err)
+	}
+	output := logs.String()
+	for _, want := range []string{"AI provider response rejected", "schema_mismatch", "issue_0_code", "object_fields", "issue_0_path", "$.drafts[0]", "issue_0_expected", "issue_0_actual", "amount", "<unrecognized_field>", "test-model", "finish_reason", "stop", "response_bytes", "latency_ms"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("diagnostic log missing %q: %s", want, output)
+		}
+	}
+	for _, secret := range []string{privateText, privateValue, "private_account_123456", "must not log values", "not-for-logs"} {
+		if strings.Contains(output, secret) {
+			t.Errorf("diagnostic log exposed model/input content %q", secret)
+		}
+	}
+}
+
+func TestSuccessfulExtractionLogReportsOnlySafeMetadata(t *testing.T) {
+	var logs bytes.Buffer
+	previous := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logs, nil)))
+	t.Cleanup(func() { slog.SetDefault(previous) })
+
+	privateText := "private source narrative sentinel"
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":"`+privateText+`","drafts":[]}`)
+	})
+	if _, err := c.Extract(context.Background(), Input{Text: privateText, Timezone: "Asia/Ho_Chi_Minh"}); err != nil {
+		t.Fatal(err)
+	}
+	output := logs.String()
+	for _, want := range []string{"AI provider extraction completed", "model", "test-model", "latency_ms", "ocr_attachments", "draft_count", "reply_bytes"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("safe extraction diagnostic missing %q: %s", want, output)
+		}
+	}
+	if strings.Contains(output, privateText) {
+		t.Fatalf("extraction diagnostic exposed source/reply content: %s", output)
+	}
+}
+
+func TestSchemaDiagnosticShowsArrayElementShapeWithoutValues(t *testing.T) {
+	_, err := parseOutput([]byte(`[{"type":"expense","amount":"private amount","note":"private note","category":"food"}]`))
+	var mismatch *SchemaMismatchError
+	if !errors.As(err, &mismatch) {
+		t.Fatalf("expected a typed schema mismatch, got %v", err)
+	}
+	serialized, marshalErr := json.Marshal(mismatch.Issues)
+	if marshalErr != nil {
+		t.Fatal(marshalErr)
+	}
+	shape := string(serialized)
+	for _, want := range []string{"root_type", "array_item_shape", "unrecognized_field", "amount,note,type"} {
+		if !strings.Contains(shape, want) {
+			t.Errorf("schema diagnostic missing %q: %s", want, shape)
+		}
+	}
+	for _, private := range []string{"private amount", "private note"} {
+		if strings.Contains(shape, private) {
+			t.Errorf("schema diagnostic exposed value %q", private)
+		}
+	}
+}
+
+func TestOCRBeforeModel(t *testing.T) {
+	var submits, polls, models atomic.Int32
+	img := pngImage(t)
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			submits.Add(1)
+			if r.Method != "POST" || r.Header.Get("Authorization") != "Bearer test-ocr-key" {
+				t.Error("incorrect OCR submission")
+			}
+			var body struct {
+				Mode          string `json:"mode"`
+				WaitTimeoutMs int    `json:"waitTimeoutMs"`
+				Input         struct {
+					Base64 string `json:"base64"`
+				} `json:"input"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Mode != "wait" || body.WaitTimeoutMs != 15000 || body.Input.Base64 != img.Base64 {
+				t.Errorf("invalid wait OCR request: mode=%q wait=%d base64=%t", body.Mode, body.WaitTimeoutMs, body.Input.Base64 != "")
+			}
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = io.WriteString(w, `{"documentId":"doc_123","status":"completed","result":{"text":"Receipt total 42000"}}`)
+		case "/v1/chat/completions":
+			models.Add(1)
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), img.Base64) || strings.Contains(string(body), "image_url") || !strings.Contains(string(body), "Receipt total 42000") {
+				t.Error("model must receive only extracted text")
+			}
+			modelResponse(w, `{"reply":"Which wallet?","drafts":[]}`)
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	out, err := c.Extract(context.Background(), Input{Text: "lunch", Images: []Image{img}})
+	if err != nil || !strings.Contains(out.SourceText, "Receipt total 42000") || submits.Load() != 1 || polls.Load() != 0 || models.Load() != 1 {
+		t.Fatalf("OCR flow failed: %v %+v", err, out)
+	}
+}
+
+func TestExtractionMarksEachOCRDocumentBoundary(t *testing.T) {
+	var submissions atomic.Int32
+	var modelSource string
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			index := submissions.Add(1)
+			text := "OCR-A"
+			if index == 2 {
+				text = "OCR-B"
+			}
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"documentId":"doc","status":"completed","result":{"text":"`+text+`"}}`)
+		case "/v1/chat/completions":
+			var request struct {
+				Messages []chatMessage `json:"messages"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+				t.Fatal(err)
+			}
+			modelSource = request.Messages[1].Content
+			modelResponse(w, `{"reply":"review","drafts":[]}`)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	first := pngImage(t)
+	first.Name = "statement-page-1.png"
+	second := pngImage(t)
+	second.Name = "statement-page-2.png"
+	if _, err := c.Extract(context.Background(), Input{Images: []Image{first, second}}); err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"OCR document 1", "statement-page-1.png", "OCR document 2", "statement-page-2.png"} {
+		if !strings.Contains(modelSource, want) {
+			t.Fatalf("model source missing document marker %q: %s", want, modelSource)
+		}
+	}
+	if strings.Index(modelSource, "OCR-A") > strings.Index(modelSource, "OCR-B") {
+		t.Fatalf("OCR blocks were reordered: %s", modelSource)
+	}
+}
+
+func TestExtractionOCRUsesBoundedConcurrencyForLargeBatches(t *testing.T) {
+	var inFlight, maxInFlight, submissions atomic.Int32
+	updateMax := func(value int32) {
+		for {
+			current := maxInFlight.Load()
+			if value <= current || maxInFlight.CompareAndSwap(current, value) {
+				return
+			}
+		}
+	}
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			submissions.Add(1)
+			current := inFlight.Add(1)
+			updateMax(current)
+			time.Sleep(35 * time.Millisecond)
+			inFlight.Add(-1)
+			w.WriteHeader(http.StatusOK)
+			_, _ = io.WriteString(w, `{"documentId":"doc","status":"completed","result":{"text":"receipt"}}`)
+		case "/v1/chat/completions":
+			modelResponse(w, `{"reply":"review","drafts":[]}`)
+		default:
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	images := make([]Image, 8)
+	for i := range images {
+		images[i] = pngImage(t)
+		images[i].Name = fmt.Sprintf("receipt-%d.png", i)
+	}
+	started := time.Now()
+	if _, err := c.Extract(context.Background(), Input{Images: images}); err != nil {
+		t.Fatal(err)
+	}
+	if submissions.Load() != int32(len(images)) {
+		t.Fatalf("OCR submissions=%d want=%d", submissions.Load(), len(images))
+	}
+	if maxInFlight.Load() < 2 || maxInFlight.Load() > ocrConcurrency {
+		t.Fatalf("OCR concurrency=%d want between 2 and %d", maxInFlight.Load(), ocrConcurrency)
+	}
+	if elapsed := time.Since(started); elapsed >= 8*35*time.Millisecond {
+		t.Fatalf("OCR batch still appears serial: elapsed=%s", elapsed)
+	}
+}
+
+func TestOCRWaitModeFallsBackOnlyForUnknownMode(t *testing.T) {
+	var submissions atomic.Int32
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/documents" || r.Method != http.MethodPost {
+			t.Fatalf("unexpected OCR request: %s %s", r.Method, r.URL.Path)
+		}
+		submissions.Add(1)
+		var request struct {
+			Mode          string `json:"mode"`
+			WaitTimeoutMs int    `json:"waitTimeoutMs"`
+			Input         struct {
+				Base64 string `json:"base64"`
+			} `json:"input"`
+		}
+		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
+			t.Fatal(err)
+		}
+		if submissions.Load() == 1 {
+			if request.Mode != "wait" || request.WaitTimeoutMs != ocrWaitTimeout || request.Input.Base64 == "" {
+				t.Fatalf("first OCR request must use wait mode: %+v", request)
+			}
+			w.WriteHeader(http.StatusBadRequest)
+			_, _ = io.WriteString(w, `{"detail":"json: unknown field \"mode\""}`)
+			return
+		}
+		if request.Mode != "" || request.WaitTimeoutMs != 0 || request.Input.Base64 == "" {
+			t.Fatalf("compatibility OCR request must use queue contract: %+v", request)
+		}
+		_, _ = io.WriteString(w, `{"documentId":"doc_legacy","status":"completed","result":{"text":"legacy receipt"}}`)
+	})
+	text, err := c.ocr(context.Background(), pngImage(t))
+	if err != nil || text != "legacy receipt" || submissions.Load() != 2 {
+		t.Fatalf("OCR compatibility flow failed: text=%q err=%v submissions=%d", text, err, submissions.Load())
+	}
+}
+
+func TestPDFIsUploadedToOCRPrivatelyBeforeTextOnlyModel(t *testing.T) {
+	pdf := []byte("%PDF-1.7\nexample receipt bytes\n%%EOF")
+	var ocrSubmissions, uploads, models atomic.Int32
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/uploads/presign":
+			if r.Method != http.MethodPost || r.Header.Get("Authorization") != "Bearer test-ocr-key" {
+				t.Error("invalid OCR presign request")
+			}
+			var request struct {
+				Filename    string `json:"filename"`
+				SizeBytes   int    `json:"sizeBytes"`
+				ContentType string `json:"contentType"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Filename != "statement.pdf" || request.SizeBytes != len(pdf) || request.ContentType != "application/pdf" {
+				t.Errorf("invalid presign payload: %+v (%v)", request, err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"method": "PUT", "uploadUrl": "http://" + r.Host + "/upload-target", "sourceUrl": "s3://ocr-source/doc.pdf", "headers": map[string]string{"Content-Length": fmt.Sprint(len(pdf)), "Content-Type": "application/pdf"}})
+		case "/upload-target":
+			uploads.Add(1)
+			body, _ := io.ReadAll(r.Body)
+			if r.Method != http.MethodPut || r.Header.Get("Content-Type") != "application/pdf" || !bytes.Equal(body, pdf) {
+				t.Error("PDF bytes were not uploaded with the signed content type")
+			}
+			w.WriteHeader(http.StatusOK)
+		case "/v1/documents":
+			ocrSubmissions.Add(1)
+			var request struct {
+				Mode          string `json:"mode"`
+				WaitTimeoutMs int    `json:"waitTimeoutMs"`
+				Input         struct {
+					URL string `json:"url"`
+				} `json:"input"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Mode != "wait" || request.WaitTimeoutMs != 15000 || request.Input.URL != "s3://ocr-source/doc.pdf" {
+				t.Error("OCR source URL was not submitted")
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"documentId": "doc_pdf_1", "status": "queued"})
+		case "/v1/documents/doc_pdf_1":
+			_ = json.NewEncoder(w).Encode(map[string]any{"status": "completed", "result": map[string]string{"text": "Transfer 35000 VND"}})
+		case "/v1/chat/completions":
+			models.Add(1)
+			body, _ := io.ReadAll(r.Body)
+			if bytes.Contains(body, pdf) || strings.Contains(string(body), base64.StdEncoding.EncodeToString(pdf)) || strings.Contains(string(body), "s3://ocr-source/doc.pdf") || bytes.Contains(body, []byte("image_url")) || !bytes.Contains(body, []byte("Transfer 35000 VND")) {
+				t.Error("LLM must receive OCR text only, never a file or its URL")
+			}
+			modelResponse(w, `{"reply":"Review","drafts":[]}`)
+		default:
+			t.Errorf("unexpected provider path %s", r.URL.Path)
+		}
+	}))
+	defer server.Close()
+	c := NewClient(Config{BaseURL: server.URL + "/v1/", APIKey: "test-model-key", Model: "test-model", OCRURL: server.URL, OCRKey: "test-ocr-key"})
+	out, err := c.Extract(context.Background(), Input{Images: []Image{{Name: "statement.pdf", MIMEType: "application/pdf", Base64: base64.StdEncoding.EncodeToString(pdf)}}})
+	if err != nil || !strings.Contains(out.SourceText, "Transfer 35000 VND") || !strings.Contains(out.SourceText, "OCR document 1") || uploads.Load() != 1 || ocrSubmissions.Load() != 1 || models.Load() != 1 {
+		t.Fatalf("PDF OCR flow failed: out=%+v err=%v upload=%d submit=%d model=%d", out, err, uploads.Load(), ocrSubmissions.Load(), models.Load())
+	}
+}
+
+func TestPrivateStoredImageUsesSignedURLForOCRAndTextOnlyForModel(t *testing.T) {
+	const signedURL = "https://private-storage.invalid/receipt.png?signature=temporary"
+	var models atomic.Int32
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			var request struct {
+				Input struct {
+					URL string `json:"url"`
+				} `json:"input"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&request); err != nil || request.Input.URL != signedURL {
+				t.Errorf("OCR must receive the private signed URL: %+v %v", request, err)
+			}
+			_ = json.NewEncoder(w).Encode(map[string]string{"documentId": "private_1", "status": "queued"})
+		case "/v1/documents/private_1":
+			_, _ = io.WriteString(w, `{"status":"completed","result":{"text":"OCR amount 42000"}}`)
+		case "/v1/chat/completions":
+			models.Add(1)
+			body, _ := io.ReadAll(r.Body)
+			if strings.Contains(string(body), "private-storage.invalid") || strings.Contains(string(body), "base64") || !strings.Contains(string(body), "OCR amount 42000") {
+				t.Error("LLM boundary leaked file reference or omitted OCR text")
+			}
+			modelResponse(w, `{"reply":"review","drafts":[]}`)
+		default:
+			t.Errorf("unexpected path: %s", r.URL.Path)
+		}
+	})
+	_, err := c.Extract(context.Background(), Input{Text: "receipt", Timezone: "UTC", Images: []Image{{Name: "receipt.png", MIMEType: "image/png", SourceURL: signedURL}}})
+	if err != nil || models.Load() != 1 {
+		t.Fatalf("private OCR flow failed: %v models=%d", err, models.Load())
+	}
+}
+
+func TestInvalidImagesFailBeforeSubmission(t *testing.T) {
+	good := pngImage(t)
+	wrong := good
+	wrong.MIMEType = "image/jpeg"
+	wrongPDF := good
+	wrongPDF.MIMEType = "application/pdf"
+	bad := good
+	bad.Base64 = base64.StdEncoding.EncodeToString([]byte("not an image"))
+	badPDF := Image{Name: "spoof.pdf", MIMEType: "application/pdf", Base64: base64.StdEncoding.EncodeToString([]byte("not a PDF"))}
+	large := good
+	large.Base64 = strings.Repeat("A", 7*1024*1024)
+	largePDF := Image{Name: "large.pdf", MIMEType: "application/pdf", Base64: base64.StdEncoding.EncodeToString(append([]byte("%PDF-1.7\n"), bytes.Repeat([]byte("x"), maxImageBytes)...))}
+	pixels := good
+	data, _ := base64.StdEncoding.DecodeString(good.Base64)
+	binary.BigEndian.PutUint32(data[16:20], 100000)
+	binary.BigEndian.PutUint32(data[20:24], 100000)
+	binary.BigEndian.PutUint32(data[29:33], crc32.ChecksumIEEE(data[12:29]))
+	pixels.Base64 = base64.StdEncoding.EncodeToString(data)
+	for _, images := range [][]Image{{wrong}, {wrongPDF}, {bad}, {badPDF}, {large}, {largePDF}, {pixels}, {good, wrong}, {good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good, good}} {
+		c := testClient(t, func(w http.ResponseWriter, r *http.Request) { t.Error("invalid image triggered provider call") })
+		if _, err := c.Extract(context.Background(), Input{Images: images}); err == nil {
+			t.Fatal("invalid image accepted")
+		}
+	}
+}
+
+func TestJPEGAndTwentyImages(t *testing.T) {
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 2, 2)), nil); err != nil {
+		t.Fatal(err)
+	}
+	img := Image{Name: "photo.jpg", MIMEType: "image/jpeg", Base64: base64.StdEncoding.EncodeToString(buf.Bytes())}
+	var submissions atomic.Int32
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			submissions.Add(1)
+			w.WriteHeader(202)
+			_, _ = io.WriteString(w, `{"documentId":"doc_1"}`)
+		case "/v1/documents/doc_1":
+			_, _ = io.WriteString(w, `{"status":"completed","result":{"text":"receipt"}}`)
+		case "/v1/chat/completions":
+			modelResponse(w, `{"reply":"Review","drafts":[]}`)
+		default:
+			t.Error("unexpected path")
+		}
+	})
+	images := make([]Image, 20)
+	for i := range images {
+		images[i] = img
+	}
+	out, err := c.Extract(context.Background(), Input{Images: images})
+	if err != nil || submissions.Load() != 20 || strings.Count(out.SourceText, "receipt") != 20 {
+		t.Fatalf("twenty JPEG flow failed: %v submissions=%d", err, submissions.Load())
+	}
+}
+
+func TestProviderProtocolFailures(t *testing.T) {
+	for _, response := range []string{`{}`, `{"choices":[]}`, `{"choices":[{"message":{"content":"{}"},"finish_reason":"length"}]}`, `{"choices":[{"message":{"content":"{}","tool_calls":[{}]},"finish_reason":"tool_calls"}]}`, strings.Repeat("x", 262145)} {
+		c := testClient(t, func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, response) })
+		if _, err := c.Extract(context.Background(), Input{Text: "test"}); err == nil {
+			t.Fatal("invalid envelope accepted")
+		}
+	}
+}
+
+func TestOCRSubmissionNeverRetriedOrRedirected(t *testing.T) {
+	for _, status := range []int{http.StatusTemporaryRedirect, http.StatusBadGateway} {
+		var calls atomic.Int32
+		c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+			calls.Add(1)
+			w.Header().Set("Location", "/must-not-follow")
+			http.Error(w, "sensitive synthetic failure", status)
+		})
+		if _, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}}); err == nil || calls.Load() != 1 {
+			t.Fatalf("unexpected retry or redirect: %v calls=%d", err, calls.Load())
+		}
+	}
+}
+
+func TestOCRSubmissionFailureCarriesSafeProviderStage(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		http.Error(w, "private OCR provider details", http.StatusBadRequest)
+	})
+	_, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}})
+	var providerErr *AIProviderError
+	if !errors.As(err, &providerErr) || providerErr.Stage != "ocr_submit" || providerErr.HTTPStatus != http.StatusBadRequest {
+		t.Fatalf("expected safe OCR submission stage, got %T %+v", err, err)
+	}
+	if strings.Contains(err.Error(), "private OCR provider details") || strings.Contains(err.Error(), "test-ocr-key") {
+		t.Fatalf("provider details leaked: %v", err)
+	}
+}
+
+func TestOCRPollingFailureCarriesSafeProviderStage(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			w.WriteHeader(http.StatusAccepted)
+			_, _ = io.WriteString(w, `{"documentId":"doc_failed"}`)
+			return
+		}
+		_, _ = io.WriteString(w, `{"status":"failed"}`)
+	})
+	_, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}})
+	var providerErr *AIProviderError
+	if !errors.As(err, &providerErr) || providerErr.Stage != "ocr_poll" || providerErr.Code != "ocr_failed" {
+		t.Fatalf("expected safe OCR polling stage, got %T %+v", err, err)
+	}
+}
+
+func TestModelFailureCarriesSafeProviderStage(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/v1/chat/completions" {
+			http.Error(w, "private model provider details", http.StatusBadGateway)
+			return
+		}
+		t.Error("unexpected OCR request")
+	})
+	_, err := c.Extract(context.Background(), Input{Text: "test"})
+	var providerErr *AIProviderError
+	if !errors.As(err, &providerErr) || providerErr.Stage != "model" || providerErr.HTTPStatus != http.StatusBadGateway {
+		t.Fatalf("expected safe model stage, got %T %+v", err, err)
+	}
+	if strings.Contains(err.Error(), "private model provider details") {
+		t.Fatalf("provider details leaked: %v", err)
+	}
+}
+
+func TestSchemaMismatchCarriesSafeProviderStage(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		modelResponse(w, `{"reply":null,"drafts":[]}`)
+	})
+	_, err := c.Extract(context.Background(), Input{Text: "test"})
+	var providerErr *AIProviderError
+	if !errors.As(err, &providerErr) || providerErr.Stage != "schema" || providerErr.Code != "schema_mismatch" {
+		t.Fatalf("expected safe schema stage, got %T %+v", err, err)
+	}
+}
+
+func TestModelFailurePreservesOCRSource(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/documents":
+			w.WriteHeader(202)
+			_, _ = io.WriteString(w, `{"documentId":"doc_1"}`)
+		case "/v1/documents/doc_1":
+			_, _ = io.WriteString(w, `{"status":"completed","result":{"text":"source evidence"}}`)
+		default:
+			http.Error(w, "private provider diagnostic", 500)
+		}
+	})
+	out, err := c.Extract(context.Background(), Input{Images: []Image{pngImage(t)}})
+	if err == nil || !strings.Contains(out.SourceText, "source evidence") || !strings.Contains(out.SourceText, "OCR document 1") || len(out.Drafts) != 0 {
+		t.Fatal("lost OCR evidence or produced drafts on model failure")
+	}
+}
+
+func TestOCRTerminalFailuresAndPartialFailure(t *testing.T) {
+	for _, status := range []string{"failed", "cancelled", "canceled", "expired", "unknown", "http410", "past-expiry", "partial"} {
+		t.Run(status, func(t *testing.T) {
+			var submits atomic.Int32
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if r.Method == "POST" && r.URL.Path == "/v1/documents" {
+					submits.Add(1)
+					w.WriteHeader(202)
+					_, _ = io.WriteString(w, `{"documentId":"doc_1","status":"queued"}`)
+					return
+				}
+				if r.Method == "GET" {
+					if status == "http410" {
+						http.Error(w, "private upstream details", 410)
+						return
+					}
+					if status == "past-expiry" {
+						_, _ = io.WriteString(w, `{"status":"completed","resultExpiresAt":"2000-01-01T00:00:00Z","result":{"text":"old"}}`)
+						return
+					}
+					state := status
+					if status == "partial" && submits.Load() == 1 {
+						_, _ = io.WriteString(w, `{"status":"completed","result":{"text":"first receipt"}}`)
+						return
+					}
+					if status == "partial" {
+						state = "failed"
+					}
+					_ = json.NewEncoder(w).Encode(map[string]string{"status": state})
+					return
+				}
+				t.Error("model must not run on failed OCR")
+			})
+			images := []Image{pngImage(t)}
+			want := int32(1)
+			if status == "partial" {
+				images = append(images, pngImage(t))
+				want = 2
+			}
+			out, err := c.Extract(context.Background(), Input{Images: images})
+			if err == nil || len(out.Drafts) != 0 || submits.Load() != want || strings.Contains(err.Error(), "private") {
+				t.Fatalf("unsafe OCR failure: %v", err)
+			}
+		})
+	}
+}
+
+func TestErrorsAreRedactedAndNotRetried(t *testing.T) {
+	var calls atomic.Int32
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+		calls.Add(1)
+		http.Error(w, "test-model-key private content", 500)
+	})
+	_, err := c.Extract(context.Background(), Input{Text: "test"})
+	if err == nil || strings.Contains(err.Error(), "test-model-key") || strings.Contains(err.Error(), "private content") || calls.Load() != 1 {
+		t.Fatalf("unsafe upstream error: %v", err)
+	}
+}
+
+func TestContextTimeoutAndCancellation(t *testing.T) {
+	for _, ocr := range []bool{false, true} {
+		t.Run(map[bool]string{false: "model", true: "OCR"}[ocr], func(t *testing.T) {
+			release := make(chan struct{})
+			defer close(release)
+			c := testClient(t, func(w http.ResponseWriter, r *http.Request) {
+				if ocr {
+					if r.Method == "POST" {
+						w.WriteHeader(202)
+						_, _ = io.WriteString(w, `{"documentId":"doc_1"}`)
+					} else {
+						w.Header().Set("Retry-After", "120")
+						_, _ = io.WriteString(w, `{"status":"processing"}`)
+					}
+					return
+				}
+				_, _ = io.Copy(io.Discard, r.Body)
+				select {
+				case <-r.Context().Done():
+				case <-release:
+				}
+			})
+			ctx, cancel := context.WithTimeout(context.Background(), 40*time.Millisecond)
+			defer cancel()
+			in := Input{Text: "test"}
+			if ocr {
+				in.Images = []Image{pngImage(t)}
+			}
+			start := time.Now()
+			_, err := c.Extract(ctx, in)
+			if !errors.Is(err, context.DeadlineExceeded) {
+				t.Fatalf("expected deadline: %v", err)
+			}
+			if ocr {
+				// A stuck OCR queue must remain attributable to the OCR poll stage;
+				// otherwise the use case records an opaque generic provider failure.
+				var providerErr *AIProviderError
+				if !errors.As(err, &providerErr) || providerErr.Stage != "ocr_poll" || providerErr.Code != "ocr_poll_wait" {
+					t.Fatalf("expected safe OCR polling timeout diagnostic: %T %+v", err, err)
+				}
+			}
+			if time.Since(start) > time.Second {
+				t.Fatal("deadline not respected")
+			}
+			ctx2, cancel2 := context.WithCancel(context.Background())
+			cancel2()
+			if _, err := c.Extract(ctx2, in); !errors.Is(err, context.Canceled) {
+				t.Fatalf("expected cancellation: %v", err)
+			}
+		})
+	}
+}
+
+func TestInputBounds(t *testing.T) {
+	c := testClient(t, func(w http.ResponseWriter, r *http.Request) { t.Error("invalid input sent upstream") })
+	for _, in := range []Input{{Text: strings.Repeat("x", 32769)}, {}} {
+		if _, err := c.Extract(context.Background(), in); err == nil {
+			t.Fatal("invalid input accepted")
+		}
+	}
+}

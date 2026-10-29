@@ -1,0 +1,5100 @@
+basePath: /
+definitions:
+  entity.AIEntryDraft:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      included_in_reports:
+        type: boolean
+      jar_id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      type:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.AIEntryProposal:
+    properties:
+      attachment_ids:
+        items:
+          type: string
+        type: array
+      created_at:
+        type: string
+      draft:
+        $ref: '#/definitions/entity.AIEntryDraft'
+      id:
+        type: string
+      process_id:
+        type: string
+      questions:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      transaction_id:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+    type: object
+  entity.AdvisorMessage:
+    properties:
+      conversation_id:
+        type: string
+      created_at:
+        type: string
+      generation:
+        type: integer
+      id:
+        type: string
+      parts:
+        items:
+          $ref: '#/definitions/entity.AdvisorPart'
+        type: array
+      parts_version:
+        type: integer
+      role:
+        type: string
+      run_id:
+        type: string
+      seq:
+        type: integer
+    type: object
+  entity.AdvisorPart:
+    properties:
+      data: {}
+      text:
+        type: string
+      type:
+        type: string
+    type: object
+  entity.AdvisorResetResult:
+    properties:
+      conversation_id:
+        type: string
+      generation:
+        type: integer
+      replayed:
+        type: boolean
+      server_time:
+        type: string
+    type: object
+  entity.AdvisorRun:
+    properties:
+      client_request_id:
+        type: string
+      conversation_id:
+        type: string
+      created_at:
+        type: string
+      credential_kind:
+        type: string
+      error_code:
+        type: string
+      finished_at:
+        type: string
+      generation:
+        type: integer
+      id:
+        type: string
+      last_event_seq:
+        type: integer
+      owner_id:
+        type: string
+      status:
+        type: string
+    type: object
+  entity.Budget:
+    properties:
+      base_limit_amount:
+        type: integer
+      carryover_amount:
+        type: integer
+      carryover_enabled:
+        type: boolean
+      category_id:
+        type: string
+      created_at:
+        type: string
+      days_remaining:
+        type: integer
+      effective_limit_amount:
+        type: integer
+      end_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      ended:
+        type: boolean
+      id:
+        type: string
+      limit_amount:
+        type: integer
+      name:
+        type: string
+      owner_id:
+        type: string
+      series_id:
+        type: string
+      spent:
+        type: integer
+      start_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      updated_at:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.BudgetDailySpend:
+    properties:
+      date:
+        type: string
+      spent:
+        type: integer
+    type: object
+  entity.BudgetForecast:
+    properties:
+      elapsed_days:
+        type: integer
+      method:
+        type: string
+      over_budget:
+        type: boolean
+      projected_remaining:
+        type: integer
+      projected_spent:
+        type: integer
+      status:
+        type: string
+      total_days:
+        type: integer
+    type: object
+  entity.BudgetReport:
+    properties:
+      as_of:
+        type: string
+      base_limit_amount:
+        type: integer
+      budget_id:
+        type: string
+      carryover_amount:
+        type: integer
+      daily:
+        items:
+          $ref: '#/definitions/entity.BudgetDailySpend'
+        type: array
+      effective_limit_amount:
+        type: integer
+      end_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      forecast:
+        $ref: '#/definitions/entity.BudgetForecast'
+      remaining:
+        type: integer
+      spent:
+        type: integer
+      start_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      timezone:
+        type: string
+    type: object
+  entity.BudgetSeries:
+    properties:
+      active:
+        type: boolean
+      cadence:
+        type: string
+      created_at:
+        type: string
+      current_config:
+        $ref: '#/definitions/entity.BudgetSeriesConfig'
+      generation_error:
+        type: string
+      id:
+        type: string
+      owner_id:
+        type: string
+      pending_config:
+        $ref: '#/definitions/entity.BudgetSeriesConfig'
+      start_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      updated_at:
+        type: string
+      version:
+        type: integer
+    type: object
+  entity.BudgetSeriesConfig:
+    properties:
+      carryover_enabled:
+        type: boolean
+      category_id:
+        type: string
+      effective_start_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      limit_amount:
+        type: integer
+      name:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.BudgetSummary:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/entity.Budget'
+        type: array
+      limit_amount:
+        type: integer
+      spent:
+        type: integer
+    type: object
+  entity.CalendarDate:
+    properties:
+      time.Time:
+        type: string
+    type: object
+  entity.Category:
+    properties:
+      created_at:
+        type: string
+      icon_key:
+        type: string
+      id:
+        type: string
+      is_active:
+        type: boolean
+      is_system:
+        type: boolean
+      kind:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      parent_id:
+        type: string
+      system_key:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+      wallet_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  entity.Changelog:
+    properties:
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      published_at:
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  entity.CreditStatement:
+    properties:
+      amount_due:
+        type: integer
+      available_credit:
+        type: integer
+      balance:
+        type: integer
+      credit_limit:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      last_statement_balance:
+        type: integer
+      payment_due_at:
+        type: string
+      payment_due_day:
+        type: integer
+      payment_status:
+        type: string
+      statement_day:
+        type: integer
+      wallet_id:
+        type: string
+    type: object
+  entity.Feedback:
+    properties:
+      changelog_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      fixed_at:
+        type: string
+      id:
+        type: string
+      resolved:
+        type: boolean
+      resolved_at:
+        type: string
+      screenshot_available:
+        type: boolean
+      status:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.InsiderCategoryTotal:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      count:
+        type: integer
+      name:
+        type: string
+    type: object
+  entity.InsiderExpenseRow:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      category_name:
+        type: string
+      id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      wallet_id:
+        type: string
+      wallet_name:
+        type: string
+    type: object
+  entity.InsiderSummary:
+    properties:
+      average_daily_expense:
+        type: integer
+      category_filter:
+        type: string
+      days_considered:
+        type: integer
+      estimated:
+        type: boolean
+      expense:
+        type: integer
+      expense_change_bps:
+        type: integer
+      expense_delta:
+        type: integer
+      income:
+        type: integer
+      is_current:
+        type: boolean
+      month:
+        type: string
+      net:
+        type: integer
+      next_start_at:
+        type: string
+      previous_expense:
+        type: integer
+      spending_income_ratio_bps:
+        type: integer
+      start_at:
+        type: string
+      timezone:
+        type: string
+      top_categories:
+        items:
+          $ref: '#/definitions/entity.InsiderCategoryTotal'
+        type: array
+      top_expenses:
+        items:
+          $ref: '#/definitions/entity.InsiderExpenseRow'
+        type: array
+      wallet_filter:
+        type: string
+    type: object
+  entity.JarCumulativeMonth:
+    properties:
+      allocation_covered:
+        type: boolean
+      calculated_allocation:
+        type: integer
+      month:
+        type: string
+      name:
+        type: string
+      spent:
+        type: integer
+    type: object
+  entity.JarCumulativeSummary:
+    properties:
+      allocation_months:
+        type: integer
+      allocation_variance:
+        type: integer
+      from_month:
+        type: string
+      jar_id:
+        type: string
+      months:
+        items:
+          $ref: '#/definitions/entity.JarCumulativeMonth'
+        type: array
+      months_in_range:
+        type: integer
+      name:
+        type: string
+      to_month:
+        type: string
+      total_allocated:
+        type: integer
+      total_spent:
+        type: integer
+    type: object
+  entity.JarIdentity:
+    properties:
+      jar_id:
+        type: string
+      name:
+        type: string
+    type: object
+  entity.JarMonthConfig:
+    properties:
+      active:
+        type: boolean
+      allocation_amount:
+        type: integer
+      allocation_mode:
+        type: string
+      created_at:
+        type: string
+      jar_id:
+        type: string
+      month:
+        $ref: '#/definitions/entity.CalendarDate'
+      name:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.JarMonthItem:
+    properties:
+      active:
+        type: boolean
+      allocation_amount:
+        type: integer
+      allocation_mode:
+        type: string
+      allocation_percent:
+        type: number
+      calculated_allocation:
+        type: integer
+      jar_id:
+        type: string
+      name:
+        type: string
+      spent:
+        type: integer
+    type: object
+  entity.JarMonthSummary:
+    properties:
+      actual_income:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/entity.JarMonthItem'
+        type: array
+      jars:
+        items:
+          $ref: '#/definitions/entity.JarIdentity'
+        type: array
+      month:
+        type: string
+      over_income:
+        type: boolean
+      over_one_hundred_percent:
+        type: boolean
+      timezone:
+        type: string
+      total_allocated:
+        type: integer
+      total_allocation_percent:
+        type: number
+      total_spent:
+        type: integer
+      unassigned_spent:
+        type: integer
+    type: object
+  entity.MonthCategoryTotal:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      count:
+        type: integer
+      name:
+        type: string
+      type:
+        type: string
+    type: object
+  entity.MonthSummary:
+    properties:
+      calculated_at:
+        type: string
+      categories:
+        items:
+          $ref: '#/definitions/entity.MonthCategoryTotal'
+        type: array
+      expense:
+        type: integer
+      income:
+        type: integer
+      is_complete:
+        type: boolean
+      is_current:
+        type: boolean
+      jar_summary:
+        $ref: '#/definitions/entity.JarMonthSummary'
+      month:
+        type: string
+      net:
+        type: integer
+      next_start_at:
+        type: string
+      note:
+        type: string
+      start_at:
+        type: string
+      timezone:
+        type: string
+      transaction_count:
+        type: integer
+    type: object
+  entity.Notification:
+    properties:
+      body:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      owner_id:
+        type: string
+      read_at:
+        type: string
+      title:
+        type: string
+    type: object
+  entity.PortfolioAsset:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: string
+      latest_price:
+        type: integer
+      latest_price_at:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      symbol:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+    type: object
+  entity.PortfolioPosition:
+    properties:
+      asset_id:
+        type: string
+      average_cost:
+        type: integer
+      cost_basis:
+        type: integer
+      latest_price:
+        type: integer
+      latest_price_at:
+        type: string
+      market_value:
+        type: integer
+      name:
+        type: string
+      quantity:
+        type: string
+      realized_pnl:
+        type: integer
+      symbol:
+        type: string
+      unrealized_pnl:
+        type: integer
+    type: object
+  entity.PortfolioSummary:
+    properties:
+      assets:
+        items:
+          $ref: '#/definitions/entity.PortfolioAsset'
+        type: array
+      positions:
+        items:
+          $ref: '#/definitions/entity.PortfolioPosition'
+        type: array
+      total_cost_basis:
+        type: integer
+      total_market_value:
+        type: integer
+      total_unrealized_pnl:
+        type: integer
+      trades:
+        items:
+          $ref: '#/definitions/entity.PortfolioTrade'
+        type: array
+    type: object
+  entity.PortfolioTrade:
+    properties:
+      asset_id:
+        type: string
+      created_at:
+        type: string
+      fee:
+        type: integer
+      id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      owner_id:
+        type: string
+      quantity:
+        type: string
+      side:
+        type: string
+      unit_price:
+        type: integer
+    type: object
+  entity.PushToken:
+    properties:
+      created_at:
+        type: string
+      device_id:
+        type: string
+      device_name:
+        type: string
+      environment:
+        type: string
+      id:
+        type: string
+      platform:
+        type: string
+      revoked_at:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  entity.RecurringSchedule:
+    properties:
+      active:
+        type: boolean
+      amount:
+        type: integer
+      anchor_day:
+        type: integer
+      anchor_month:
+        type: integer
+      category_id:
+        type: string
+      created_at:
+        type: string
+      ends_at:
+        type: string
+      frequency:
+        type: string
+      id:
+        type: string
+      interval:
+        type: integer
+      name:
+        type: string
+      next_run_at:
+        type: string
+      note:
+        type: string
+      owner_id:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.SavingsGoalItem:
+    properties:
+      adjustments:
+        type: integer
+      closing_balance:
+        type: integer
+      deposits:
+        type: integer
+      initial_balance_added:
+        type: integer
+      internal_transfers:
+        type: integer
+      name:
+        type: string
+      net_change:
+        type: integer
+      opening_balance:
+        type: integer
+      progress_bps:
+        type: integer
+      reached:
+        type: boolean
+      remaining:
+        type: integer
+      target_amount:
+        type: integer
+      target_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      transaction_count:
+        type: integer
+      wallet_id:
+        type: string
+      withdrawals:
+        type: integer
+    type: object
+  entity.SavingsGoals:
+    properties:
+      adjustments:
+        type: integer
+      closing_balance:
+        type: integer
+      deposits:
+        type: integer
+      initial_balance_added:
+        type: integer
+      internal_transfers:
+        type: integer
+      items:
+        items:
+          $ref: '#/definitions/entity.SavingsGoalItem'
+        type: array
+      net_change:
+        type: integer
+      opening_balance:
+        type: integer
+      withdrawals:
+        type: integer
+    type: object
+  entity.SavingsReport:
+    properties:
+      as_of:
+        type: string
+      goals:
+        $ref: '#/definitions/entity.SavingsGoals'
+      month:
+        type: string
+      surplus:
+        $ref: '#/definitions/entity.SavingsSurplus'
+      timezone:
+        type: string
+    type: object
+  entity.SavingsSurplus:
+    properties:
+      expense:
+        type: integer
+      income:
+        type: integer
+      net:
+        type: integer
+      savings_rate_bps:
+        type: integer
+      scope:
+        type: string
+      transaction_count:
+        type: integer
+    type: object
+  entity.SavingsTransactionPage:
+    properties:
+      as_of:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      limit:
+        type: integer
+      month:
+        type: string
+      offset:
+        type: integer
+      timezone:
+        type: string
+      total:
+        type: integer
+    type: object
+  entity.Transaction:
+    properties:
+      adjustment_direction:
+        type: string
+      amount:
+        type: integer
+      category_id:
+        type: string
+      created_at:
+        type: string
+      credit_kind:
+        type: string
+      credit_payment_id:
+        type: string
+      id:
+        type: string
+      included_in_reports:
+        type: boolean
+      jar_id:
+        type: string
+      jar_name:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      owner_id:
+        type: string
+      transfer_id:
+        type: string
+      travel_event_id:
+        type: string
+      type:
+        type: string
+      updated_at:
+        type: string
+      version:
+        type: integer
+      wallet_id:
+        type: string
+    type: object
+  entity.TravelEvent:
+    properties:
+      active:
+        type: boolean
+      context:
+        type: string
+      created_at:
+        type: string
+      ends_on:
+        $ref: '#/definitions/entity.CalendarDate'
+      id:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      starts_on:
+        $ref: '#/definitions/entity.CalendarDate'
+      updated_at:
+        type: string
+    type: object
+  entity.UserAPIKey:
+    properties:
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        type: string
+      last_used_at:
+        type: string
+      name:
+        type: string
+      owner_id:
+        type: string
+      revoked_at:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+      updated_at:
+        type: string
+    type: object
+  entity.Wallet:
+    properties:
+      available_credit:
+        type: integer
+      created_at:
+        type: string
+      credit_limit:
+        type: integer
+      currency:
+        type: string
+      current_balance:
+        type: integer
+      description:
+        type: string
+      goal_notifications_enabled:
+        type: boolean
+      id:
+        type: string
+      is_in_total:
+        type: boolean
+      last_statement_balance:
+        type: integer
+      name:
+        type: string
+      opening_balance:
+        type: integer
+      owner_id:
+        type: string
+      payment_due_day:
+        type: integer
+      statement_day:
+        type: integer
+      target_amount:
+        type: integer
+      target_date:
+        $ref: '#/definitions/entity.CalendarDate'
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  httpapi.BudgetTransactionPage:
+    properties:
+      as_of:
+        type: string
+      budget_id:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      limit:
+        type: integer
+      offset:
+        type: integer
+      timezone:
+        type: string
+      total:
+        type: integer
+    type: object
+  httpapi.CreateMutationMeta:
+    properties:
+      mutation:
+        $ref: '#/definitions/httpapi.CreateMutationMetadata'
+    type: object
+  httpapi.CreateMutationMetadata:
+    properties:
+      idempotency_key:
+        type: string
+      operation:
+        type: string
+      replayed:
+        type: boolean
+      status:
+        type: string
+    type: object
+  httpapi.CreateTransactionResponse:
+    properties:
+      data:
+        $ref: '#/definitions/entity.Transaction'
+      meta:
+        $ref: '#/definitions/httpapi.CreateMutationMeta'
+    type: object
+  httpapi.CreateTransferResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/entity.Transaction'
+        type: array
+      meta:
+        $ref: '#/definitions/httpapi.CreateMutationMeta'
+    type: object
+  httpapi.Problem:
+    properties:
+      code:
+        type: string
+      detail:
+        type: string
+      instance:
+        type: string
+      request_id:
+        type: string
+      status:
+        type: integer
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  httpapi.Response:
+    properties:
+      data: {}
+      meta: {}
+    type: object
+  httpapi.SyncCapabilitiesResponse:
+    properties:
+      contract_version:
+        type: integer
+      enabled:
+        type: boolean
+      idempotency_key_required_for_offline:
+        type: boolean
+      legacy_unkeyed_online:
+        type: boolean
+      operations:
+        items:
+          type: string
+        type: array
+      receipt_metadata:
+        type: string
+      transaction_create_context:
+        type: string
+    type: object
+  httpapi.adjustmentInput:
+    properties:
+      amount:
+        type: integer
+      direction:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  httpapi.advisorAsyncSubmitResponse:
+    properties:
+      conversation_id:
+        type: string
+      run_id:
+        type: string
+      status:
+        type: string
+    type: object
+  httpapi.advisorConfirmActionInput:
+    properties:
+      conversation_id:
+        type: string
+      generation:
+        type: integer
+    type: object
+  httpapi.advisorMessageInput:
+    properties:
+      client_request_id:
+        type: string
+      text:
+        type: string
+    type: object
+  httpapi.advisorSubmitResponse:
+    properties:
+      conversation_id:
+        type: string
+      run_id:
+        type: string
+      status:
+        type: string
+      text:
+        type: string
+    type: object
+  httpapi.aiProposalDecision:
+    properties:
+      version:
+        type: integer
+    type: object
+  httpapi.aiProposalEdit:
+    properties:
+      draft:
+        $ref: '#/definitions/entity.AIEntryDraft'
+      version:
+        type: integer
+    type: object
+  httpapi.apiKeyCreateInput:
+    properties:
+      expires_at:
+        type: string
+      name:
+        type: string
+    type: object
+  httpapi.apiKeyCreatedResponse:
+    properties:
+      expires_at:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      scopes:
+        items:
+          type: string
+        type: array
+      secret:
+        type: string
+    type: object
+  httpapi.budgetInput:
+    properties:
+      category_id:
+        type: string
+      end_date:
+        type: string
+      limit_amount:
+        type: integer
+      name:
+        type: string
+      start_date:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  httpapi.budgetSeriesInput:
+    properties:
+      cadence:
+        type: string
+      carryover_enabled:
+        type: boolean
+      category_id:
+        type: string
+      limit_amount:
+        type: integer
+      name:
+        type: string
+      start_date:
+        type: string
+      version:
+        type: integer
+      wallet_id:
+        type: string
+    type: object
+  httpapi.budgetSeriesList:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/entity.BudgetSeries'
+        type: array
+    type: object
+  httpapi.bulkDeleteInput:
+    properties:
+      transaction_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  httpapi.categoryInput:
+    properties:
+      expected_version:
+        type: integer
+      icon_key:
+        type: string
+      kind:
+        type: string
+      name:
+        type: string
+      parent_id:
+        type: string
+      wallet_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  httpapi.categoryStatusInput:
+    properties:
+      is_active:
+        type: boolean
+    type: object
+  httpapi.categoryWalletInput:
+    properties:
+      wallet_ids:
+        items:
+          type: string
+        type: array
+    type: object
+  httpapi.changelogInput:
+    properties:
+      description:
+        type: string
+      feedback_ids:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  httpapi.creditEntryInput:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      kind:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+    type: object
+  httpapi.creditPaymentInput:
+    properties:
+      amount:
+        type: integer
+      note:
+        type: string
+      occurred_at:
+        type: string
+      source_wallet_id:
+        type: string
+    type: object
+  httpapi.deviceLoginRequest:
+    properties:
+      id:
+        type: string
+      secret:
+        type: string
+    type: object
+  httpapi.feedbackInput:
+    properties:
+      description:
+        type: string
+      title:
+        type: string
+      type:
+        type: string
+    type: object
+  httpapi.feedbackResolutionInput:
+    properties:
+      resolved:
+        type: boolean
+    required:
+    - resolved
+    type: object
+  httpapi.feedbackStatusInput:
+    properties:
+      status:
+        type: string
+    type: object
+  httpapi.jarInput:
+    properties:
+      allocation_amount:
+        type: integer
+      allocation_mode:
+        type: string
+      allocation_percent:
+        type: number
+      month:
+        type: string
+      name:
+        type: string
+    type: object
+  httpapi.loginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    type: object
+  httpapi.mobileGoogleExchangeRequest:
+    properties:
+      code:
+        type: string
+      code_verifier:
+        type: string
+      platform:
+        type: string
+      redirect_uri:
+        type: string
+    type: object
+  httpapi.monthNoteInput:
+    properties:
+      note:
+        type: string
+    type: object
+  httpapi.portfolioAssetInput:
+    properties:
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
+  httpapi.portfolioAssetUpdateInput:
+    properties:
+      name:
+        type: string
+      symbol:
+        type: string
+    type: object
+  httpapi.portfolioPriceInput:
+    properties:
+      latest_price:
+        type: integer
+        x-nullable: true
+    required:
+    - latest_price
+    type: object
+  httpapi.portfolioTradeCorrectionFields:
+    properties:
+      fee:
+        type: integer
+      note:
+        type: string
+      occurred_at:
+        type: string
+      quantity:
+        type: string
+      side:
+        type: string
+      unit_price:
+        type: integer
+    type: object
+  httpapi.portfolioTradeCorrectionInput:
+    properties:
+      expected_asset_version:
+        type: integer
+      operation:
+        type: string
+      reason:
+        type: string
+      replacement:
+        $ref: '#/definitions/httpapi.portfolioTradeCorrectionFields'
+      source_trade_id:
+        type: string
+    type: object
+  httpapi.portfolioTradeInput:
+    properties:
+      fee:
+        type: integer
+      note:
+        type: string
+      occurred_at:
+        type: string
+      quantity:
+        type: string
+      side:
+        type: string
+      unit_price:
+        type: integer
+    type: object
+  httpapi.recurringInput:
+    properties:
+      active:
+        type: boolean
+      amount:
+        type: integer
+      category_id:
+        type: string
+      ends_at:
+        type: string
+      frequency:
+        type: string
+      interval:
+        type: integer
+      name:
+        type: string
+      next_run_at:
+        type: string
+      note:
+        type: string
+      type:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  httpapi.refreshRequest:
+    properties:
+      refresh_token:
+        type: string
+    type: object
+  httpapi.timezoneInput:
+    properties:
+      initialize_only:
+        type: boolean
+      timezone:
+        type: string
+    type: object
+  httpapi.transactionCreateInput:
+    properties:
+      amount:
+        type: integer
+      auto_link_travel:
+        description: False freezes explicit no-trip/selected-trip intent; omitted
+          keeps online defaults.
+        type: boolean
+      category_id:
+        type: string
+      expected_version:
+        type: integer
+      included_in_reports:
+        type: boolean
+      jar_id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      travel_event_id:
+        type: string
+      type:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  httpapi.transactionInput:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      expected_version:
+        type: integer
+      included_in_reports:
+        type: boolean
+      jar_id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      travel_event_id:
+        type: string
+      type:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  httpapi.transferInput:
+    properties:
+      amount:
+        type: integer
+      destination_wallet_id:
+        type: string
+      note:
+        type: string
+      occurred_at:
+        type: string
+      source_wallet_id:
+        type: string
+    type: object
+  httpapi.transferUpdateInput:
+    properties:
+      amount:
+        type: integer
+      note:
+        type: string
+      occurred_at:
+        type: string
+    type: object
+  httpapi.travelEventInput:
+    properties:
+      active:
+        type: boolean
+      context:
+        type: string
+      ends_on:
+        type: string
+      name:
+        type: string
+      starts_on:
+        type: string
+    type: object
+  httpapi.travelTransactionInput:
+    properties:
+      event_id:
+        type: string
+    type: object
+  httpapi.walletInput:
+    properties:
+      credit_limit:
+        type: integer
+      description:
+        type: string
+      goal_notifications_enabled:
+        type: boolean
+      is_in_total:
+        type: boolean
+      last_statement_balance:
+        type: integer
+      name:
+        type: string
+      opening_balance:
+        type: integer
+      payment_due_day:
+        type: integer
+      statement_day:
+        type: integer
+      target_amount:
+        type: integer
+      target_date:
+        type: string
+      type:
+        type: string
+    type: object
+  repository.PortfolioTradeCorrectionResult:
+    properties:
+      affected_trade_ids:
+        items:
+          type: string
+        type: array
+      after:
+        $ref: '#/definitions/entity.PortfolioPosition'
+      asset_version:
+        type: integer
+      before:
+        $ref: '#/definitions/entity.PortfolioPosition'
+      revision_id:
+        type: string
+    type: object
+  usecase.DeviceCredentialOutput:
+    properties:
+      expires_at:
+        type: string
+      id:
+        type: string
+      secret:
+        type: string
+    type: object
+  usecase.DeviceEnrollmentInput:
+    properties:
+      device_id:
+        type: string
+      device_name:
+        type: string
+      password:
+        type: string
+    type: object
+  usecase.HomeOutput:
+    properties:
+      greeting:
+        type: string
+      notice:
+        type: string
+      stats:
+        properties:
+          notes_count:
+            type: integer
+          wallet_count:
+            type: integer
+        type: object
+    type: object
+  usecase.LoginOutput:
+    properties:
+      expires_at:
+        type: string
+      refresh_expires_at:
+        type: string
+      refresh_token:
+        type: string
+      token:
+        type: string
+      user:
+        $ref: '#/definitions/usecase.UserProfile'
+    type: object
+  usecase.PushTokenInput:
+    properties:
+      device_id:
+        type: string
+      device_name:
+        type: string
+      environment:
+        type: string
+      platform:
+        type: string
+      token:
+        type: string
+    type: object
+  usecase.UserProfile:
+    properties:
+      created_at:
+        type: string
+      email:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      timezone:
+        type: string
+      timezone_confirmed:
+        type: boolean
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: Current implemented API surface for local development.
+  title: MyPocket API
+  version: 1.2.1
+paths:
+  /api/v1/agent/feedback:
+    get:
+      parameters:
+      - description: open, triaged, in_progress, fixed, rejected
+        in: query
+        name: status
+        type: string
+      - description: Maximum rows (1-100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Feedback'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List feedback for the local development agent
+      tags:
+      - Feedback Agent
+  /api/v1/agent/feedback/{id}/screenshot:
+    get:
+      parameters:
+      - description: Feedback ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "302":
+          description: Found
+      security:
+      - BearerAuth: []
+      summary: Get a short-lived feedback screenshot URL for the local agent
+      tags:
+      - Feedback Agent
+  /api/v1/ai/advisor/actions/{action_id}/confirm:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Persisted action identity
+        in: path
+        name: action_id
+        required: true
+        type: string
+      - description: Conversation binding
+        in: body
+        name: action
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.advisorConfirmActionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "201":
+          description: Created
+          schema:
+            additionalProperties: true
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Confirm a persisted Finance Assistant action
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/capabilities:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Read Finance Assistant capabilities
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/conversation/messages:
+    get:
+      description: The response keeps the message array in data. The envelope meta
+        may include server-authoritative conversation_id, generation, last_user_message_at,
+        expires_at and server_time.
+      parameters:
+      - description: Conversation identifier
+        in: query
+        name: conversation_id
+        required: true
+        type: string
+      - description: Read messages before sequence
+        in: query
+        name: before_seq
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.AdvisorMessage'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: Read persisted Finance Assistant messages
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/conversation/reset:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stable reset request key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AdvisorResetResult'
+      security:
+      - BearerAuth: []
+      summary: Explicitly clear the owner's Finance Assistant conversation
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/messages:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Question
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.advisorMessageInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.advisorSubmitResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit a Finance Assistant read-only question
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/messages/async:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Question
+        in: body
+        name: message
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.advisorMessageInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Idempotent replay
+          schema:
+            $ref: '#/definitions/httpapi.advisorAsyncSubmitResponse'
+        "202":
+          description: Accepted
+          schema:
+            $ref: '#/definitions/httpapi.advisorAsyncSubmitResponse'
+      security:
+      - BearerAuth: []
+      summary: Queue a Finance Assistant question and return its run immediately
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/overview:
+    get:
+      parameters:
+      - description: Account-local calendar month YYYY-MM
+        in: query
+        name: month
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Read Finance Assistant overview without calling the model
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/runs/{id}:
+    get:
+      parameters:
+      - description: Run ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AdvisorRun'
+      security:
+      - BearerAuth: []
+      summary: Read one Finance Assistant run
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/runs/{id}/cancel:
+    post:
+      parameters:
+      - description: Run ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Cancel a queued or running Finance Assistant run
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/runs/{id}/events:
+    get:
+      parameters:
+      - description: Run ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Only return events after this sequence
+        in: query
+        name: after_seq
+        type: integer
+      produces:
+      - text/event-stream
+      responses:
+        "200":
+          description: SSE event stream
+          schema:
+            type: string
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Replay persisted Finance Assistant run events as SSE
+      tags:
+      - AI Advisor
+  /api/v1/ai/entry/capabilities:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.Response'
+      security:
+      - BearerAuth: []
+      summary: AI entry configuration availability
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/process:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Idempotency UUID
+        in: formData
+        name: request_id
+        required: true
+        type: string
+      - description: Transaction description
+        in: formData
+        name: text
+        type: string
+      - description: IANA timezone
+        in: formData
+        name: timezone
+        required: true
+        type: string
+      - description: JPEG, PNG, or PDF, up to twenty files
+        in: formData
+        name: files
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Process one text and optional file submission into reviewable transaction
+        proposals
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/proposals/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Proposal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Draft and expected version
+        in: body
+        name: proposal
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.aiProposalEdit'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntryProposal'
+      security:
+      - BearerAuth: []
+      summary: Edit a pending AI proposal without changing ledger
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/proposals/{id}/approve:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Proposal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Expected version
+        in: body
+        name: decision
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.aiProposalDecision'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntryProposal'
+      security:
+      - BearerAuth: []
+      summary: Approve a proposal and atomically create its ledger transaction once
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/proposals/{id}/reject:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Proposal ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Expected version
+        in: body
+        name: decision
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.aiProposalDecision'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.AIEntryProposal'
+      security:
+      - BearerAuth: []
+      summary: Reject a proposal without changing ledger
+      tags:
+      - AI Entry
+  /api/v1/ai/entry/requests/{request_id}:
+    get:
+      parameters:
+      - description: Idempotency UUID
+        in: path
+        name: request_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.Response'
+      security:
+      - BearerAuth: []
+      summary: Read one-shot AI process status and proposals by idempotency key
+      tags:
+      - AI Entry
+  /api/v1/api-keys:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.UserAPIKey'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List current user's API keys
+      tags:
+      - API Keys
+    post:
+      consumes:
+      - application/json
+      description: Keys have full access to the authenticated owner's operations.
+        No scopes are selected or enforced; old scope input is ignored. Expiry and
+        revocation still apply.
+      parameters:
+      - description: API key configuration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.apiKeyCreateInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpapi.apiKeyCreatedResponse'
+      security:
+      - BearerAuth: []
+      summary: Create a user API key
+      tags:
+      - API Keys
+  /api/v1/api-keys/{id}:
+    delete:
+      parameters:
+      - description: API key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Revoke a current user's API key
+      tags:
+      - API Keys
+  /api/v1/auth/device-login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Device credential
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.deviceLoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      summary: Exchange a remembered device credential for a new access/refresh session
+      tags:
+      - Authentication
+  /api/v1/auth/devices:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Device enrollment
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/usecase.DeviceEnrollmentInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.DeviceCredentialOutput'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Remember a device for biometric sign-in (password confirmation required)
+      tags:
+      - Authentication
+  /api/v1/auth/devices/{id}:
+    delete:
+      parameters:
+      - description: Device credential ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Forget a remembered device owned by the authenticated user
+      tags:
+      - Authentication
+  /api/v1/auth/google:
+    get:
+      parameters:
+      - description: Absolute frontend callback URL
+        in: query
+        name: frontend_callback
+        type: string
+      produces:
+      - application/json
+      responses:
+        "302":
+          description: Redirect to Google authorization
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "501":
+          description: Not Implemented
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Start Google OAuth login
+      tags:
+      - Authentication
+  /api/v1/auth/google/callback:
+    get:
+      parameters:
+      - description: Google authorization code
+        in: query
+        name: code
+        type: string
+      - description: OAuth state
+        in: query
+        name: state
+        type: string
+      - description: OAuth error
+        in: query
+        name: error
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "302":
+          description: Redirect to frontend callback
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "403":
+          description: Forbidden
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Complete Google OAuth login
+      tags:
+      - Authentication
+  /api/v1/auth/logout:
+    post:
+      consumes:
+      - application/json
+      description: JWT logout revokes its access/refresh family. API-key logout revokes
+        only that user key; no refresh token is needed for API keys.
+      parameters:
+      - description: Current refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.refreshRequest'
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Revoke the current access/refresh session family; keep remembered device
+        enrollment
+      tags:
+      - Authentication
+  /api/v1/auth/mobile/google/exchange:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Native Google PKCE exchange
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.mobileGoogleExchangeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "501":
+          description: Not Implemented
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      summary: Exchange a native Google PKCE code for a MyPocket session
+      tags:
+      - Authentication
+  /api/v1/auth/profile:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.UserProfile'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get authenticated user profile
+      tags:
+      - Account
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: IANA timezone
+        in: body
+        name: timezone
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.timezoneInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.UserProfile'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Set the authenticated account timezone
+      tags:
+      - Account
+  /api/v1/auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Refresh token
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.refreshRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Rotate a refresh token and issue a new login session
+      tags:
+      - Authentication
+  /api/v1/budget-series:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.budgetSeriesList'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List recurring budget series and current/pending revisions
+      tags:
+      - Budget series
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stable ASCII mutation key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Series configuration
+        in: body
+        name: series
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetSeriesInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetSeries'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.BudgetSeries'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a recurring budget series with canonical calendar periods
+      tags:
+      - Budget series
+  /api/v1/budget-series/{id}:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Series ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stable ASCII mutation key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Complete configuration and version; cadence/start_date omitted
+        in: body
+        name: series
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetSeriesInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetSeries'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Replace next-period recurring configuration with version protection
+      tags:
+      - Budget series
+  /api/v1/budget-series/{id}/stop:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Series ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Stable ASCII mutation key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Current version
+        in: body
+        name: series
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetSeriesInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetSeries'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Stop future generation while preserving existing budget periods
+      tags:
+      - Budget series
+  /api/v1/budgets:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetSummary'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List budgets with ledger-derived progress and active deduplicated totals
+      tags:
+      - Budgets
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Budget input
+        in: body
+        name: budget
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetInput'
+      - description: Stable ASCII key reused to replay a confirmed budget write
+        in: header
+        name: Idempotency-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Budget'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a budget for an explicit interval
+      tags:
+      - Budgets
+  /api/v1/budgets/{id}:
+    delete:
+      parameters:
+      - description: Budget ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete budget configuration without changing transactions
+      tags:
+      - Budgets
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Budget ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Budget input
+        in: body
+        name: budget
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.budgetInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Budget'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Replace budget configuration before its interval has ended
+      tags:
+      - Budgets
+  /api/v1/budgets/{id}/report:
+    get:
+      parameters:
+      - description: Owned budget UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.BudgetReport'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Read deterministic budget forecast and daily spend
+      tags:
+      - Budgets
+  /api/v1/budgets/{id}/transactions:
+    get:
+      parameters:
+      - description: Owned budget UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page size 1..100, default 50
+        in: query
+        name: limit
+        type: integer
+      - description: Offset, default 0
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.BudgetTransactionPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List transactions matching exactly the budget report scope
+      tags:
+      - Budgets
+  /api/v1/categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Category'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List visible categories
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category input
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.categoryInput'
+      - description: Stable printable ASCII key (1-128 bytes) reused to replay a category
+          create
+        in: header
+        name: Idempotency-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Idempotent replay
+          schema:
+            $ref: '#/definitions/entity.Category'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a personal category
+      tags:
+      - Categories
+  /api/v1/categories/{id}:
+    delete:
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete a personal category without children
+      tags:
+      - Categories
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category input
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.categoryInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update a personal category
+      tags:
+      - Categories
+  /api/v1/categories/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Category active state
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.categoryStatusInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Archive or restore a personal category
+      tags:
+      - Categories
+  /api/v1/categories/{id}/wallets:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Applicable wallets
+        in: body
+        name: wallets
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.categoryWalletInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Category'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update wallets applicable to a visible category
+      tags:
+      - Categories
+  /api/v1/changelog:
+    get:
+      parameters:
+      - description: Maximum rows (1-100)
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Changelog'
+            type: array
+      summary: List published changelog entries
+      tags:
+      - Changelog
+  /api/v1/changelog/{id}:
+    get:
+      parameters:
+      - description: Changelog ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Changelog'
+      summary: Get one published changelog entry
+      tags:
+      - Changelog
+  /api/v1/credit/wallets/{wallet_id}/entries:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credit wallet ID
+        in: path
+        name: wallet_id
+        required: true
+        type: string
+      - description: Credit entry
+        in: body
+        name: entry
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.creditEntryInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Record a purchase, refund, fee, or interest entry on a credit wallet
+      tags:
+      - Credit
+  /api/v1/credit/wallets/{wallet_id}/payments:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Credit wallet ID
+        in: path
+        name: wallet_id
+        required: true
+        type: string
+      - description: Credit payment
+        in: body
+        name: payment
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.creditPaymentInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            items:
+              $ref: '#/definitions/entity.Transaction'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Record a payment from another wallet to a credit wallet
+      tags:
+      - Credit
+  /api/v1/credit/wallets/{wallet_id}/statement:
+    get:
+      parameters:
+      - description: Credit wallet ID
+        in: path
+        name: wallet_id
+        required: true
+        type: string
+      - description: Inclusive date YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: Exclusive date YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.CreditStatement'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Read a credit wallet statement and available credit
+      tags:
+      - Credit
+  /api/v1/feedback:
+    get:
+      description: Accepts a normal JWT/session or a full-owner user API key; legacy
+        scopes are ignored.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Feedback'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List the authenticated user's feedback
+      tags:
+      - Feedback
+    post:
+      consumes:
+      - application/json
+      - multipart/form-data
+      description: |-
+        Accepts a normal JWT/session or a full-owner user API key; legacy scopes are ignored.
+        Send JSON text fields, or multipart/form-data with type, title, description and optional screenshot file. Screenshots must be detected PNG, nonempty and at most 1048576 bytes; the entire multipart body is limited to 2097152 bytes. The x-multipart-form extension describes the alternate file variant without mixing Swagger body and formData parameters.
+      parameters:
+      - description: JSON feedback fields; multipart alternative uses the same named
+          fields and optional PNG screenshot
+        in: body
+        name: feedback
+        schema:
+          $ref: '#/definitions/httpapi.feedbackInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Feedback'
+      security:
+      - BearerAuth: []
+      summary: Create owner-scoped feedback
+      tags:
+      - Feedback
+      x-multipart-form:
+        fields:
+          description:
+            type: string
+          screenshot:
+            max_bytes: 1048576
+            mime_type: image/png
+            type: file
+          title:
+            type: string
+          type:
+            type: string
+        max_body_bytes: 2097152
+  /api/v1/feedback/{id}:
+    get:
+      description: Accepts a normal JWT/session or a full-owner user API key; legacy
+        scopes are ignored.
+      parameters:
+      - description: Feedback ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Feedback'
+      security:
+      - BearerAuth: []
+      summary: Get one feedback item owned by the authenticated user
+      tags:
+      - Feedback
+  /api/v1/feedback/{id}/resolution:
+    patch:
+      consumes:
+      - application/json
+      description: Independent of developer status/changelog. JWT or full-owner user
+        API key; legacy scopes are ignored. Repeating the same value is idempotent.
+        Other owners' IDs return 404.
+      parameters:
+      - description: Feedback ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Owner confirmation
+        in: body
+        name: resolution
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.feedbackResolutionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Feedback'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Confirm or reopen the authenticated owner's feedback
+      tags:
+      - Feedback
+  /api/v1/feedback/{id}/screenshot:
+    get:
+      description: Accepts a normal JWT/session or a full-owner user API key; legacy
+        scopes are ignored.
+      parameters:
+      - description: Feedback ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "302":
+          description: Found
+      security:
+      - BearerAuth: []
+      summary: Get a short-lived private feedback screenshot URL
+      tags:
+      - Feedback
+  /api/v1/home:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.HomeOutput'
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Get authenticated home summary
+      tags:
+      - Account
+  /api/v1/internal/changelog:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Changelog
+        in: body
+        name: changelog
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.changelogInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Changelog'
+      security:
+      - BearerAuth: []
+      summary: Publish a changelog and mark referenced in-progress feedback fixed
+      tags:
+      - Feedback Agent
+  /api/v1/internal/feedback/{id}/status:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Feedback ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Next status
+        in: body
+        name: status
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.feedbackStatusInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Feedback'
+      security:
+      - BearerAuth: []
+      summary: Advance feedback status through the agent lifecycle
+      tags:
+      - Feedback Agent
+  /api/v1/jars:
+    get:
+      parameters:
+      - description: Calendar month YYYY-MM; defaults to account-local current month
+        in: query
+        name: month
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.JarMonthSummary'
+      security:
+      - BearerAuth: []
+      summary: Get account jars and derived spending for a month
+      tags:
+      - Jars
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Jar configuration
+        in: body
+        name: jar
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.jarInput'
+      - description: Stable ASCII key (1-128 bytes) reused to replay a confirmed jar
+          write
+        in: header
+        name: Idempotency-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.JarMonthConfig'
+      security:
+      - BearerAuth: []
+      summary: Create a stable jar and its configuration for one month
+      tags:
+      - Jars
+  /api/v1/jars/{jar_id}/months/{month}:
+    delete:
+      parameters:
+      - description: Stable jar ID
+        in: path
+        name: jar_id
+        required: true
+        type: string
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Remove a jar from one month's active configuration and preserve its
+        history
+      tags:
+      - Jars
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stable jar ID
+        in: path
+        name: jar_id
+        required: true
+        type: string
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      - description: Jar month configuration
+        in: body
+        name: jar
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.jarInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.JarMonthConfig'
+      security:
+      - BearerAuth: []
+      summary: Update one jar's month-specific configuration
+      tags:
+      - Jars
+  /api/v1/jars/{jar_id}/report:
+    get:
+      parameters:
+      - description: Stable jar ID
+        in: path
+        name: jar_id
+        required: true
+        type: string
+      - description: First month YYYY-MM; omitted means full history
+        in: query
+        name: from
+        type: string
+      - description: Last month YYYY-MM; omitted means account-local current month
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.JarCumulativeSummary'
+      security:
+      - BearerAuth: []
+      summary: Get a stable jar's monthly history through an inclusive end month
+      tags:
+      - Jars
+  /api/v1/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login credentials
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.loginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/usecase.LoginOutput'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: Login with email and password
+      tags:
+      - Authentication
+  /api/v1/mcp:
+    delete:
+      consumes:
+      - application/json
+      description: Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses.
+        JWT and mpk_ API keys have identical same-owner user authority without scopes.
+        POST carries initialize, tools/list and tools/call; tools/list publishes authoritative
+        tool names and inputSchema values. Ordinary tools may write directly; Assistant
+        prepared actions retain their canonical confirmation contract. GET and DELETE
+        normally return 405 in stateless mode. Credential bootstrap/exchange and service-token
+        routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors
+        and audit privacy.
+      parameters:
+      - description: SDK-owned MCP JSON-RPC request (POST only); discover business
+          schemas through tools/list
+        in: body
+        name: request
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SDK JSON-RPC response; inspect result.isError and structuredContent.status/body
+            for domain outcomes
+          schema:
+            additionalProperties: true
+            type: object
+        "202":
+          description: Accepted SDK notification
+          schema:
+            type: string
+        "400":
+          description: SDK invalid protocol request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Missing, invalid, expired or revoked owner credential
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Origin is not allowed
+          schema:
+            type: string
+        "405":
+          description: Stateless transport accepts POST
+          schema:
+            type: string
+        "413":
+          description: Outer request exceeds configured input bound
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: MCP authenticated user-operation transport
+      tags:
+      - MCP
+    get:
+      consumes:
+      - application/json
+      description: Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses.
+        JWT and mpk_ API keys have identical same-owner user authority without scopes.
+        POST carries initialize, tools/list and tools/call; tools/list publishes authoritative
+        tool names and inputSchema values. Ordinary tools may write directly; Assistant
+        prepared actions retain their canonical confirmation contract. GET and DELETE
+        normally return 405 in stateless mode. Credential bootstrap/exchange and service-token
+        routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors
+        and audit privacy.
+      parameters:
+      - description: SDK-owned MCP JSON-RPC request (POST only); discover business
+          schemas through tools/list
+        in: body
+        name: request
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SDK JSON-RPC response; inspect result.isError and structuredContent.status/body
+            for domain outcomes
+          schema:
+            additionalProperties: true
+            type: object
+        "202":
+          description: Accepted SDK notification
+          schema:
+            type: string
+        "400":
+          description: SDK invalid protocol request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Missing, invalid, expired or revoked owner credential
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Origin is not allowed
+          schema:
+            type: string
+        "405":
+          description: Stateless transport accepts POST
+          schema:
+            type: string
+        "413":
+          description: Outer request exceeds configured input bound
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: MCP authenticated user-operation transport
+      tags:
+      - MCP
+    post:
+      consumes:
+      - application/json
+      description: Official Go SDK v1.8.0 stateless Streamable HTTP with JSON responses.
+        JWT and mpk_ API keys have identical same-owner user authority without scopes.
+        POST carries initialize, tools/list and tools/call; tools/list publishes authoritative
+        tool names and inputSchema values. Ordinary tools may write directly; Assistant
+        prepared actions retain their canonical confirmation contract. GET and DELETE
+        normally return 405 in stateless mode. Credential bootstrap/exchange and service-token
+        routes are excluded. See docs/ai/mcp-api-parity.md for recovery, limits, errors
+        and audit privacy.
+      parameters:
+      - description: SDK-owned MCP JSON-RPC request (POST only); discover business
+          schemas through tools/list
+        in: body
+        name: request
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: SDK JSON-RPC response; inspect result.isError and structuredContent.status/body
+            for domain outcomes
+          schema:
+            additionalProperties: true
+            type: object
+        "202":
+          description: Accepted SDK notification
+          schema:
+            type: string
+        "400":
+          description: SDK invalid protocol request
+          schema:
+            additionalProperties: true
+            type: object
+        "401":
+          description: Missing, invalid, expired or revoked owner credential
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "403":
+          description: Origin is not allowed
+          schema:
+            type: string
+        "405":
+          description: Stateless transport accepts POST
+          schema:
+            type: string
+        "413":
+          description: Outer request exceeds configured input bound
+          schema:
+            type: string
+      security:
+      - BearerAuth: []
+      summary: MCP authenticated user-operation transport
+      tags:
+      - MCP
+  /api/v1/months/{month}:
+    get:
+      parameters:
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.MonthSummary'
+      security:
+      - BearerAuth: []
+      summary: Get live account-local month figures, jars, and independent note
+      tags:
+      - Months
+  /api/v1/months/{month}/note:
+    delete:
+      parameters:
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete the user's note for one account month
+      tags:
+      - Months
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Calendar month YYYY-MM
+        in: path
+        name: month
+        required: true
+        type: string
+      - description: User note
+        in: body
+        name: note
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.monthNoteInput'
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Save the user's independent note for an account month
+      tags:
+      - Months
+  /api/v1/notifications:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Notification'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List in-app notifications for the authenticated owner
+      tags:
+      - Notifications
+  /api/v1/notifications/{id}/read:
+    post:
+      parameters:
+      - description: Notification ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Mark one in-app notification as read
+      tags:
+      - Notifications
+  /api/v1/notifications/devices:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Provider token registration
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/usecase.PushTokenInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PushToken'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Register an iOS push token for the authenticated owner
+      tags:
+      - Notifications
+  /api/v1/notifications/devices/{id}:
+    delete:
+      parameters:
+      - description: Push token registration ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Revoke an iOS push token owned by the authenticated user
+      tags:
+      - Notifications
+  /api/v1/portfolio/assets:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.PortfolioAsset'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List owner-scoped portfolio assets
+      tags:
+      - Portfolio
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Portfolio asset
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioAssetInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.PortfolioAsset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a portfolio asset
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}:
+    delete:
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete an unused portfolio asset
+      tags:
+      - Portfolio
+    patch:
+      consumes:
+      - application/json
+      description: Updates symbol and/or name only. Portfolio trades remain immutable
+        and are not rewritten.
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Metadata fields to update
+        in: body
+        name: asset
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioAssetUpdateInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PortfolioAsset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update portfolio asset metadata
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/price:
+    patch:
+      consumes:
+      - application/json
+      description: 'latest_price must be present: null clears the price, zero records
+        a known zero. Omitting the field or sending a null body returns 400 without
+        modifying valuation.'
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Latest price; null clears it
+        in: body
+        name: price
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioPriceInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PortfolioAsset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update or clear the latest manual portfolio price
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/trade-corrections:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Stable correction key
+        in: header
+        name: Idempotency-Key
+        required: true
+        type: string
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Correction
+        in: body
+        name: correction
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioTradeCorrectionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.PortfolioTradeCorrectionResult'
+      security:
+      - BearerAuth: []
+      summary: Commit a portfolio trade correction
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/trade-corrections/preview:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Correction
+        in: body
+        name: correction
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioTradeCorrectionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/repository.PortfolioTradeCorrectionResult'
+      security:
+      - BearerAuth: []
+      summary: Preview an immutable portfolio trade correction
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/trades:
+    get:
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.PortfolioTrade'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List immutable portfolio trades for an asset
+      tags:
+      - Portfolio
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Portfolio trade
+        in: body
+        name: trade
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioTradeInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.PortfolioTrade'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Append a buy or sell trade to a portfolio asset
+      tags:
+      - Portfolio
+  /api/v1/portfolio/summary:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PortfolioSummary'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Read owner-scoped portfolio positions and valuation
+      tags:
+      - Portfolio
+  /api/v1/recurring:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.RecurringSchedule'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List recurring transaction schedules
+      tags:
+      - Recurring
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Recurring schedule
+        in: body
+        name: schedule
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.recurringInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.RecurringSchedule'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a recurring transaction schedule
+      tags:
+      - Recurring
+  /api/v1/recurring/{id}:
+    delete:
+      parameters:
+      - description: Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Delete a recurring transaction schedule
+      tags:
+      - Recurring
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Schedule ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Recurring schedule
+        in: body
+        name: schedule
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.recurringInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.RecurringSchedule'
+      security:
+      - BearerAuth: []
+      summary: Update a recurring transaction schedule
+      tags:
+      - Recurring
+  /api/v1/recurring/run-due:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: integer
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Materialize due recurring transaction occurrences
+      tags:
+      - Recurring
+  /api/v1/reports/insider:
+    get:
+      parameters:
+      - description: Calendar month YYYY-MM; defaults to account-local current month
+        in: query
+        name: month
+        type: string
+      - description: Optional owner wallet filter
+        in: query
+        name: wallet_id
+        type: string
+      - description: Optional owner category filter
+        in: query
+        name: category_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.InsiderSummary'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Read the deterministic Money Insider report
+      tags:
+      - Reports
+  /api/v1/reports/savings:
+    get:
+      parameters:
+      - description: Account-local YYYY-MM; defaults to current month
+        in: query
+        name: month
+        type: string
+      - description: Owned goal wallet; only filters goals
+        in: query
+        name: wallet_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.SavingsReport'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Report monthly goal-wallet activity and separate account-wide surplus
+      tags:
+      - Reports
+  /api/v1/reports/savings/transactions:
+    get:
+      parameters:
+      - description: Account-local YYYY-MM
+        in: query
+        name: month
+        type: string
+      - description: Owned goal wallet (goals only)
+        in: query
+        name: wallet_id
+        type: string
+      - description: goals or surplus
+        in: query
+        name: section
+        required: true
+        type: string
+      - description: all, deposit, withdrawal, adjustment, transfer, income, expense
+        in: query
+        name: kind
+        type: string
+      - description: 1..100; default 50
+        in: query
+        name: limit
+        type: integer
+      - description: Nonnegative; default 0
+        in: query
+        name: offset
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.SavingsTransactionPage'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Page transactions using the same savings report scope and predicates
+      tags:
+      - Reports
+  /api/v1/sync/capabilities:
+    get:
+      description: JWT/session or full-owner API key required. This read-only endpoint
+        advertises configured implementation, not database health. Old-server404/disabled/unsupported
+        version must block outbox sends. No-header online creates remain legacy and
+        unsafe to retry.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/httpapi.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/httpapi.SyncCapabilitiesResponse'
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Inspect durable offline-create contract support
+      tags:
+      - Transactions
+  /api/v1/transactions:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Transaction'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List transactions
+      tags:
+      - Transactions
+    post:
+      consumes:
+      - application/json
+      description: |-
+        auto_link_travel=false disables active-trip fallback; explicit travel_event_id remains owner-validated. Omitted/null/true preserves online auto-link behavior. Offline clients must freeze date/trip and send false.
+        Supply a stable Idempotency-Key for durable replay. Missing key is legacy online-only behavior, not safe automatic retry. Replay keeps the original data object and adds meta.mutation.
+        Accepts JWT/session or a full-owner user API key. Legacy scope metadata does not restrict access; owner/domain validation still applies.
+      parameters:
+      - description: Transaction create input
+        in: body
+        name: transaction
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.transactionCreateInput'
+      - description: One ASCII key, 1-128 bytes, reused with the same typed request
+        in: header
+        name: Idempotency-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.CreateTransactionResponse'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpapi.CreateTransactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create an income or expense transaction
+      tags:
+      - Transactions
+  /api/v1/transactions/{id}:
+    delete:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete a transaction
+      tags:
+      - Transactions
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Transaction input
+        in: body
+        name: transaction
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.transactionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update an income or expense transaction
+      tags:
+      - Transactions
+  /api/v1/transactions/{id}/attachments/{attachmentId}/download:
+    get:
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Attachment ID
+        in: path
+        name: attachmentId
+        required: true
+        type: string
+      produces:
+      - application/octet-stream
+      responses:
+        "302":
+          description: Redirect to a short-lived private object URL
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Download a private attachment linked to an owned transaction
+      tags:
+      - Transactions
+  /api/v1/transactions/{id}/travel:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Travel event link; null clears the link
+        in: body
+        name: link
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.travelTransactionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Link or unlink an ordinary transaction to a travel event
+      tags:
+      - Transactions
+  /api/v1/transactions/adjustment:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Balance adjustment input
+        in: body
+        name: adjustment
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.adjustmentInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Transaction'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Record an explicit wallet balance adjustment
+      tags:
+      - Transactions
+  /api/v1/transactions/bulk-delete:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transaction IDs
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.bulkDeleteInput'
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete multiple ordinary transactions atomically
+      tags:
+      - Transactions
+  /api/v1/transactions/transfer:
+    post:
+      consumes:
+      - application/json
+      description: |-
+        Supply a stable Idempotency-Key for durable replay. Missing key is legacy online-only behavior, not safe automatic retry. Replay keeps the original data array and adds meta.mutation.
+        Accepts JWT/session or a full-owner user API key. Legacy scope metadata does not restrict access; owner/domain validation still applies.
+      parameters:
+      - description: Internal transfer input
+        in: body
+        name: transfer
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.transferInput'
+      - description: One ASCII key, 1-128 bytes, reused with the same typed request
+        in: header
+        name: Idempotency-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.CreateTransferResponse'
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/httpapi.CreateTransferResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create an atomic internal wallet transfer
+      tags:
+      - Transactions
+  /api/v1/transactions/transfer/{transfer_id}:
+    delete:
+      parameters:
+      - description: Transfer ID
+        in: path
+        name: transfer_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete both rows of an internal wallet transfer
+      tags:
+      - Transactions
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Transfer ID
+        in: path
+        name: transfer_id
+        required: true
+        type: string
+      - description: Transfer update
+        in: body
+        name: transfer
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.transferUpdateInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Transaction'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update both rows of an internal wallet transfer
+      tags:
+      - Transactions
+  /api/v1/travel/events:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.TravelEvent'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List travel events
+      tags:
+      - Travel
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Travel event
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.travelEventInput'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.TravelEvent'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a travel event
+      tags:
+      - Travel
+  /api/v1/travel/events/{id}:
+    delete:
+      parameters:
+      - description: Travel event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Delete a travel event and clear its transaction links
+      tags:
+      - Travel
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Travel event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Travel event
+        in: body
+        name: event
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.travelEventInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.TravelEvent'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update a travel event
+      tags:
+      - Travel
+  /api/v1/travel/events/{id}/activate:
+    post:
+      parameters:
+      - description: Travel event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.TravelEvent'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Activate one travel event
+      tags:
+      - Travel
+  /api/v1/travel/events/{id}/deactivate:
+    post:
+      parameters:
+      - description: Travel event ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.TravelEvent'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Deactivate a travel event
+      tags:
+      - Travel
+  /api/v1/wallets:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.Wallet'
+            type: array
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: List wallets
+      tags:
+      - Wallets
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wallet input
+        in: body
+        name: wallet
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.walletInput'
+      - description: Stable ASCII key (1-128 bytes) reused to replay a confirmed wallet
+          write
+        in: header
+        name: Idempotency-Key
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/entity.Wallet'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Create a wallet
+      tags:
+      - Wallets
+  /api/v1/wallets/{id}:
+    delete:
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Permanently delete a wallet
+      tags:
+      - Wallets
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Wallet ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Wallet input
+        in: body
+        name: wallet
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.walletInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.Wallet'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Update a wallet
+      tags:
+      - Wallets
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
