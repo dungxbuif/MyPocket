@@ -18,16 +18,15 @@ shared_fields:
 updated: 2026-11-01
 ---
 
-## Native UI density/chat/icons — release 1.3.0 build 7, 2026-11-01
+## Native UI density/chat/icons — released 1.3.0 build 7, 2026-11-01
 
 Owner-requested [design](tickets/NATIVE-CHAT-COMPOSER-20261031-DETAIL_DESIGN.md)
 and [implementation plan](../superpowers/plans/2026-10-31-mypocket-ui-density-chat-icons.md):
 retain cards/colors and feedback bubble; refine typography, adaptive chat layout,
 reading position, first-class Hũ flows, and semantic icon family. Local
-implementation is authorized, and the bounded candidate is frozen for the
-`1.3.0 (7)` release. Production API/worker deployment evidence, simulator
-installation and remaining owner/device/provider gates are tracked in the
-[release note](../releases/REL-1.3.0-20261101.md).
+implementation is authorized, and the bounded candidate is released as
+`1.3.0 (7)`. Production API/worker deployment evidence, simulator installation
+and remaining owner/device/provider gates are tracked in the [release note](../releases/REL-1.3.0-20261101.md).
 The native integrator has landed the shared typography/density bases, full-screen
 Assistant route, additive typed-entry/report/asset contracts, report drilldown
 and analysis states, accumulated-asset unit/source UI, and icon catalog fallback.
@@ -35,8 +34,8 @@ Fresh verification passes for the backend Go suite, signed native 442-test
 unit target, Release artifact preflight, project/base/icon guards and
 `git diff --check`. The aggregate UI scheme run was interrupted after a
 simulator-runner stall and is not presented as a pass. Owner visual/device
-review and provider freshness remain separate gates. The candidate's rollout
-must not delete or mutate feedback rows.
+review and provider freshness remain separate gates. The rollout used the
+same schema-52 database and did not delete or mutate feedback rows.
 
 ## Production feedback refresh — 2026-11-01
 

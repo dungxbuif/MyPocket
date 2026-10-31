@@ -1,19 +1,19 @@
 ---
 artifact_type: release_note
 id: REL-1.3.0-20261101
-status: release-candidate
+status: done
 version: 1.3.0
 build: 7
 date: 2026-11-01
-deployment: pending
+deployment: api_worker_production_and_simulator
 ---
 
 # MyPocket 1.3.0 build 7
 
-Status: release candidate. Production image, migration readback, service
-convergence and health evidence are filled after the approved rollout. The
-native artifact is a simulator Release build installed on the owner's existing
-iPhone 16 simulator; no physical-device install is claimed here.
+Status: released. The production API/worker rollout and native simulator
+installation completed under the owner's explicit release instruction. The
+native artifact is installed on the owner's existing iPhone 16 simulator; no
+physical-device install is claimed here.
 
 ## Included
 
@@ -47,14 +47,23 @@ iPhone 16 simulator; no physical-device install is claimed here.
 
 ## Deployment record
 
-Filled after rollout:
-
-- Source commit: pending
-- Image: pending
-- Digest: pending
-- Backup and SHA-256: pending
-- Migration version/dirty state: pending
-- API/worker convergence and health: pending
+- Source commit: `fe5344fc053a1c26ea7283b96174414290861b59`
+- Image: `registry.dungxbuif.com/mypocket-api:release-1.3.0-build7-fe5344fc`
+- Immutable digest: `sha256:f0bf37e65759d8d6fef61389b93acdb1e7154151ca1966f2d4d011da3cdf7a44`
+- Platform: `linux/amd64`, API and worker use the same digest
+- Backup: `/var/backups/mypocket/release-1.3.0-build7-20261031T214222Z/pre-release.dump`
+- Backup SHA-256: `48be77ce25b2169927b242fe73ab48dd5e165fd264b0b2da3c7e7a57df6f4cc4`
+- Migration readback/apply/readback: `version: 52 dirty: false`; `up` was a
+  clean no-op because the target was already current
+- Services: `mypocket-api 1/1`, `mypocket-worker 1/1`
+- Health: `https://money.dungxbuif.com/api/v1/health` returned HTTP `200`,
+  `data.status=ok`
+- Read-only OpenAPI parity: `96 live / 96 local`
+- Worker post-rollout scan: no panic, fatal, missing schema or migration-dirty
+  pattern in the observed five-minute log window
+- Native install/launch: `MyPocket-iPhone-16`
+  (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`), `xcrun simctl launch` returned PID
+  `89323`
 
 ## Known gates
 
@@ -62,6 +71,10 @@ Filled after rollout:
   the safe default.
 - Physical-device, owner visual acceptance, Dynamic Type and provider freshness
   remain separate UAT gates.
+- The aggregate native UI scheme run was interrupted after the simulator UI
+  runner produced no completion result for more than eleven minutes. Signed
+  native unit coverage is complete at 442/442; this is a remaining UI-runner
+  environment gate, not a reported product assertion failure.
 - Rollback: restore the previous API/worker immutable image. Native rollback is
   reinstalling the previous signed artifact; no destructive database reset is
   part of this release.

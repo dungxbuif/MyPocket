@@ -1,7 +1,7 @@
 ---
 artifact_type: operational_runbook
 id: ROLLOUT_READINESS
-status: deployed-plan-2026-11-01
+status: deployed-release-1.3.0-build7-2026-11-01
 owner: shared
 trace:
   database: ../architecture/DATABASE.md
@@ -12,6 +12,20 @@ trace:
 ---
 
 # Release rollout readiness
+
+## Current release — 1.3.0 build 7 — 2026-11-01
+
+The release image
+`registry.dungxbuif.com/mypocket-api:release-1.3.0-build7-fe5344fc` at
+`sha256:f0bf37e65759d8d6fef61389b93acdb1e7154151ca1966f2d4d011da3cdf7a44`
+is deployed to both API and worker. The pre-release backup was validated at
+`/var/backups/mypocket/release-1.3.0-build7-20261031T214222Z/pre-release.dump`
+with SHA-256
+`48be77ce25b2169927b242fe73ab48dd5e165fd264b0b2da3c7e7a57df6f4cc4`.
+Production readback is `version: 52 dirty: false`; both services are `1/1`,
+health is HTTP 200 and strict route parity is `96/96`. The native `1.3.0 (7)`
+simulator artifact is installed/launched. APNs remains disabled by default;
+live Apple/device delivery and owner physical UAT remain open.
 
 This runbook is for the current native/API candidate. The repository preflight
 commands remain read-only. The 2026-11-01 rollout evidence is recorded first;

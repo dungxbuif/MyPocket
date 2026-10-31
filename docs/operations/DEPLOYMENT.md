@@ -1,5 +1,40 @@
 # Deployment
 
+## Release 1.3.0 build 7 rollout — 2026-11-01
+
+The explicit owner-approved release instruction deployed the same immutable
+API/worker image to production:
+
+```text
+registry.dungxbuif.com/mypocket-api:release-1.3.0-build7-fe5344fc
+sha256:f0bf37e65759d8d6fef61389b93acdb1e7154151ca1966f2d4d011da3cdf7a44
+```
+
+The `linux/amd64` image was built from commit
+`fe5344fc053a1c26ea7283b96174414290861b59` and contains the API, migration
+and worker binaries plus migrations through 000052. Before the rollout, a
+custom-format PostgreSQL backup was created and validated with
+`pg_restore --list`:
+
+```text
+/var/backups/mypocket/release-1.3.0-build7-20261031T214222Z/pre-release.dump
+sha256: 48be77ce25b2169927b242fe73ab48dd5e165fd264b0b2da3c7e7a57df6f4cc4
+```
+
+The release image read `version: 52 dirty: false`; migration `up` completed as
+a clean no-op because the target was already current. Both `mypocket-api` and
+`mypocket-worker` converged to `1/1` on the same digest. The public health
+endpoint returned HTTP 200 with `status=ok`, and the read-only OpenAPI audit
+reported `96 live / 96 local` paths. The observed worker log window contained
+no panic, fatal, missing-schema or migration-dirty pattern. No feedback rows or
+financial data were deleted or reset.
+
+The native `1.3.0 (7)` Release simulator artifact was installed and launched
+on `MyPocket-iPhone-16` (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`). This does not
+claim physical-device acceptance, APNs delivery, Dynamic Type or owner visual
+UAT. APNs remains disabled by default until Apple credentials, entitlements and
+a signed-device delivery check are available.
+
 ## API-only production mode — 2026-10-13
 
 The production origin routes directly to the Go API. `mypocket-api` and

@@ -25,6 +25,7 @@ updated: 2026-11-01
 | Release compiler/artifact | `/tmp/mypocket-release-1.3.0-build7-20261101`; `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`; `release-artifact-preflight.sh` | PASS: `BUILD SUCCEEDED`; bundle `com.mypocket.ios`, version `1.3.0`, build `7`, portrait-only, production HTTPS API |
 | Static/project guards | `verify-project.sh`, `check-base-components.sh`, `check-icon-catalog.sh`, `git diff --check` | PASS |
 | Simulator install/launch | `xcrun simctl install ... MyPocketIOS.app`; `xcrun simctl launch ... com.mypocket.ios` on `MyPocket-iPhone-16` (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`) | PASS: launch returned a process ID |
+| Production rollout | Immutable image `registry.dungxbuif.com/mypocket-api:release-1.3.0-build7-fe5344fc@sha256:f0bf37e65759d8d6fef61389b93acdb1e7154151ca1966f2d4d011da3cdf7a44`; backup validated with `pg_restore --list`; migration readback; service/health/route checks | PASS: backup SHA `48be77ce25b2169927b242fe73ab48dd5e165fd264b0b2da3c7e7a57df6f4cc4`, schema `52/clean`, API/worker `1/1`, health `200`, route parity `96/96` |
 | Aggregate native UI scheme | `xcodebuild ... test` including UI target | BLOCKED/NOT CLAIMED: simulator UI runner produced no completion result for more than 11 minutes and the run was interrupted; no product assertion failure was used as release evidence |
 | APNs live delivery | Apple credentials, entitlements and signed device | OPEN: transport is shipped but `APNS_ENABLED=false` remains the production default |
 

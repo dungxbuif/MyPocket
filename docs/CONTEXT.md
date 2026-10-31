@@ -22,19 +22,20 @@ shared_fields:
 updated: 2026-11-01
 ---
 
-## Release 1.3.0 build 7 — release candidate, 2026-11-01
+## Release 1.3.0 build 7 — released, 2026-11-01
 
 The unified native Assistant, report/insider surfaces, accumulated-asset units
 and source UI, shared typography/density bases, Phosphor icon catalog fallback,
 privacy-safe AI attachment diagnostics, and APNs transport are frozen as the
-`1.3.0 (7)` release candidate. The native Release simulator artifact passed
+`1.3.0 (7)` release. The native Release simulator artifact passed
 metadata preflight and was installed/launched on `MyPocket-iPhone-16`. Signed
 native units pass 442/442 and the backend suite passes; the aggregate UI scheme
 run was interrupted after the simulator runner made no completion progress for
 more than eleven minutes, so it is not claimed as a full UI-suite pass. APNs
 remains disabled by default pending Apple credentials/entitlements and signed
-device delivery acceptance. Production deployment evidence is recorded in the
-[release note](releases/REL-1.3.0-20261101.md).
+device delivery acceptance. Production is running the same immutable API/worker
+digest with schema 52 clean, health 200 and route parity 96/96. Full evidence
+is recorded in the [release note](releases/REL-1.3.0-20261101.md).
 
 ## AI attachment diagnostics and APNs transport — 2026-11-01
 
