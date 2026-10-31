@@ -127,7 +127,8 @@ Nguồn: [UI Quản lý nhóm](../design/system/DESIGN.md#account--quản-lý-nh
 | `transaction_attachments` | Private S3 receipt metadata and OCR text/state | User/process | Migration `000011`–`000012`; object key is backend-only; 24-hour unlinked cleanup lifecycle. |
 | `transaction_attachment_links` | Approved transaction-to-receipt relation | User via both FKs | Unique transaction/attachment pair; only created inside proposal approval. |
 | `notifications` | Owner-scoped in-app notification inbox | User | Migration `000029`; unique `(owner_id, dedupe_key)` and newest-first index. |
-| `push_tokens` | Owner-scoped iOS provider addresses for future push delivery | User | Migration `000036`; token excluded from JSON/logs, unique by `(platform, environment, token)` and owner/device upsert key. Registration only; no APNs delivery. |
+| `push_tokens` | Owner-scoped iOS provider addresses for optional push delivery | User | Migration `000036`; token excluded from JSON/logs, unique by `(platform, environment, token)` and owner/device upsert key. The worker reads/revokes tokens server-side only. |
+| `push_deliveries` | Durable notification-to-device APNs jobs | User/notification/token | Migration `000039`; unique by `(notification_id, push_token_id, environment)`, lease-fenced status/retry state, app-owned route payload only. |
 
 ## Relationships
 

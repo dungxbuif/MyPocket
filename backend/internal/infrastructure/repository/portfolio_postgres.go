@@ -54,7 +54,7 @@ func (r *PortfolioPostgresRepository) CreateAsset(ownerID string, input portfoli
 	row := &entity.PortfolioAsset{ID: uuid.NewString(), OwnerID: ownerID, Symbol: symbol, Name: name, PriceMode: priceMode}
 	if input.UnitLabel != nil {
 		unit := strings.TrimSpace(*input.UnitLabel)
-		if unit == "" || len(unit) > 64 {
+		if !entity.IsPortfolioGoldUnit(unit) {
 			return nil, portfoliorepo.ErrPortfolioAssetUnitInvalid
 		}
 		row.UnitLabel = &unit
@@ -72,7 +72,7 @@ func (r *PortfolioPostgresRepository) CreateAsset(ownerID string, input portfoli
 			}
 			return nil, err
 		}
-		if err := validateMarketProductForAsset(row, product); err != nil {
+		if err := validateMarketProductForAsset(*row, product); err != nil {
 			return nil, err
 		}
 		row.MarketProductID = &productID
@@ -91,7 +91,7 @@ func (r *PortfolioPostgresRepository) ConfirmAssetUnit(ownerID, assetID string, 
 		return nil, portfoliorepo.ErrPortfolioAssetInvalid
 	}
 	unitLabel = strings.TrimSpace(unitLabel)
-	if unitLabel == "" || len(unitLabel) > 64 {
+	if !entity.IsPortfolioGoldUnit(unitLabel) {
 		return nil, portfoliorepo.ErrPortfolioAssetUnitInvalid
 	}
 	var row entity.PortfolioAsset
@@ -104,6 +104,11 @@ func (r *PortfolioPostgresRepository) ConfirmAssetUnit(ownerID, assetID string, 
 		}
 		if row.Version != expectedVersion {
 			return portfoliorepo.ErrPortfolioAssetConflictVersion
+		}
+		if row.PriceMode == entity.PortfolioPriceModeAuto && row.MarketProductID != nil {
+			if row.UnitLabel == nil || strings.TrimSpace(*row.UnitLabel) != unitLabel {
+				return portfoliorepo.ErrMarketBindingUnitMismatch
+			}
 		}
 		if row.UnitConfirmed && (row.UnitLabel == nil || strings.TrimSpace(*row.UnitLabel) != unitLabel) {
 			var tradeCount int64

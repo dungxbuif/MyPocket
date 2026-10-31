@@ -19,7 +19,7 @@ func NewAssetMarketPostgresRepository(db *gorm.DB) marketrepo.MarketRepository {
 type AssetMarketPostgresRepository struct{ db *gorm.DB }
 
 func validateMarketProductForAsset(asset entity.PortfolioAsset, product entity.MarketProduct) error {
-	if !product.Enabled || strings.TrimSpace(product.ID) == "" || strings.TrimSpace(product.ProviderKey) == "" || strings.TrimSpace(product.ExternalProductID) == "" || strings.TrimSpace(product.Currency) != "VND" || product.ValuationSide != "buyback" {
+	if !product.Enabled || product.Kind != entity.PortfolioAssetKindGold || strings.TrimSpace(product.ID) == "" || strings.TrimSpace(product.ProviderKey) == "" || strings.TrimSpace(product.ExternalProductID) == "" || strings.TrimSpace(product.Currency) != "VND" || product.ValuationSide != "buyback" || !entity.IsPortfolioGoldUnit(product.Unit) {
 		return marketrepo.ErrMarketBindingInvalid
 	}
 	if !asset.UnitConfirmed || asset.UnitLabel == nil || strings.TrimSpace(*asset.UnitLabel) == "" {
@@ -152,14 +152,20 @@ func (r *AssetMarketPostgresRepository) ClaimMarketPoll(providerKey string, slot
 	var result marketrepo.MarketPollClaim
 	err := r.db.Transaction(func(tx *gorm.DB) error {
 		candidate := entity.MarketPollClaim{ProviderKey: providerKey, SlotAt: slotAt.UTC(), LeaseToken: uuid.NewString(), LeaseUntil: now.UTC().Add(lease), Status: "running"}
-		if err := tx.Exec(`INSERT INTO market_poll_claims (provider_key, slot_at, lease_token, lease_until, status) VALUES (?, ?, ?, ?, ?) ON CONFLICT (provider_key, slot_at) DO NOTHING`, candidate.ProviderKey, candidate.SlotAt, candidate.LeaseToken, candidate.LeaseUntil, candidate.Status).Error; err != nil {
-			return err
+		insert := tx.Exec(`INSERT INTO market_poll_claims (provider_key, slot_at, lease_token, lease_until, status) VALUES (?, ?, ?, ?, ?) ON CONFLICT (provider_key, slot_at) DO NOTHING`, candidate.ProviderKey, candidate.SlotAt, candidate.LeaseToken, candidate.LeaseUntil, candidate.Status)
+		if insert.Error != nil {
+			return insert.Error
 		}
+		inserted := insert.RowsAffected == 1
 		var row entity.MarketPollClaim
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("provider_key = ? AND slot_at = ?", providerKey, slotAt.UTC()).First(&row).Error; err != nil {
 			return err
 		}
 		result.Claim = row
+		if inserted {
+			result.Acquired = true
+			return nil
+		}
 		if row.Status == "completed" || row.Status == "failed" || row.LeaseUntil.After(now.UTC()) {
 			return nil
 		}

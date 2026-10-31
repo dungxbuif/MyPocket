@@ -15,23 +15,40 @@ ai_fields:
 shared_fields:
   - queue_items
   - status
-updated: 2026-10-26
+updated: 2026-11-01
 ---
 
-## Native UI density/chat/icons — implementation candidate, 2026-11-01
+## Native UI density/chat/icons — release 1.3.0 build 7, 2026-11-01
 
 Owner-requested [design](tickets/NATIVE-CHAT-COMPOSER-20261031-DETAIL_DESIGN.md)
 and [implementation plan](../superpowers/plans/2026-10-31-mypocket-ui-density-chat-icons.md):
 retain cards/colors and feedback bubble; refine typography, adaptive chat layout,
 reading position, first-class Hũ flows, and semantic icon family. Local
-implementation is authorized; production/release is not.
+implementation is authorized, and the bounded candidate is frozen for the
+`1.3.0 (7)` release. Production API/worker deployment evidence, simulator
+installation and remaining owner/device/provider gates are tracked in the
+[release note](../releases/REL-1.3.0-20261101.md).
 The native integrator has landed the shared typography/density bases, full-screen
 Assistant route, additive typed-entry/report/asset contracts, report drilldown
 and analysis states, accumulated-asset unit/source UI, and icon catalog fallback.
-Tests/builds were intentionally not run in this owner-requested pass.
-Next: focused native verification and owner visual review.
-No deployment, physical install, model/API/schema change or feedback deletion is
-included.
+Fresh verification passes for the backend Go suite, signed native 442-test
+unit target, Release artifact preflight, project/base/icon guards and
+`git diff --check`. The aggregate UI scheme run was interrupted after a
+simulator-runner stall and is not presented as a pass. Owner visual/device
+review and provider freshness remain separate gates. The candidate's rollout
+must not delete or mutate feedback rows.
+
+## Production feedback refresh — 2026-11-01
+
+Production feedback audit returned 55 records. After the owner's explicit test
+request, all 55 are `resolved=true` with `resolved_at`; developer lifecycle
+status remains `status=open`. Twenty-one map to existing local artifacts; four
+newer rows were triaged separately. Live route parity is 96/96 and migration
+state is 52/clean. The four new rows are
+`3c84bb23` (needs a bounded wallet-linked behavior contract), `3bd966ea` and
+`e74797d6` (wallet UI acceptance), and `f86570e5` (populated transaction-search
+acceptance). See
+[production feedback reconciliation](audits/PRODUCTION-FEEDBACK-PLAN-RECONCILIATION-20261101.md).
 
 ## Deterministic XLSX ingestion — local candidate, 2026-10-27
 
@@ -69,18 +86,29 @@ signed `MyPocketIOSTests` passes 392/392; Release build and guards pass. Keep
 owner physical-device acceptance. Do not treat this local candidate as a
 deployment, feedback resolution or server-wide/advanced search contract.
 
-## Feedback baca2415 — per-file diagnosis and deployed cleanup open
+## Feedback baca2415 — per-file diagnosis implemented; cleanup deployment gate open
 
-The 20-file picker/removal path and local cleanup contract pass focused tests.
-Per-file OCR/provider failure remains invisible in the native/API result and
-needs an approved privacy-safe response/UI design with RED tests. The deployed
-worker's cleanup pass is disabled by missing S3 credential environment
-variables; aligning worker secrets is a separate owner-authorized release
-operation. The owner's three-PDF benchmark measured 106.326s model time and
-3.691s serial OCR, plus unsafe proposal candidates; quality/latency work needs
-its own local design and cannot be credited to OCR concurrency. [Work note](bugs/FEEDBACK-baca2415-ai-entry-attachments.md)
-stays `in_review`; this audit changed no production objects, statuses, finances
-or deployment.
+The API now returns privacy-safe `attachment_diagnostics` for each accepted
+file (position, basename, stage, status and allow-listed error code), and the
+native AI-entry review shows the result beside the corresponding file while
+retaining successful evidence. The contract omits OCR text, object keys,
+provider URLs and raw upstream errors; it does not auto-retry. Deterministic
+mixed-file and native legacy-decoding tests cover the path. The 24-hour
+unlinked-object cleanup remains configuration-gated in the deployed worker and
+still needs its S3 secret rollout/health probe. The owner's three-PDF benchmark
+measured 106.326s model time and 3.691s serial OCR, plus unsafe proposal
+candidates; quality/latency remains a separate design. [Work note](bugs/FEEDBACK-baca2415-ai-entry-attachments.md)
+stays `in_review` for deployment/device acceptance.
+
+## APNs transport — implementation complete; live device gate open
+
+The backend now has a real ES256 token-authenticated APNs HTTP/2 transport,
+sandbox/production endpoint selection, Retry-After parsing, bounded retry,
+410 token revocation with rotation fencing, and a lease-fenced
+`push_deliveries` worker queue. `APNS_ENABLED` remains false by default and
+invalid enabled configuration fails worker startup. HTTP/provider and worker
+tests are deterministic; Apple credentials, entitlements and a signed-device
+delivery check remain external gates.
 
 ## Feedback 824dea29 Finance Assistant jar creation — UAT pending
 

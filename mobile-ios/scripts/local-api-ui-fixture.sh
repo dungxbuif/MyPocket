@@ -55,6 +55,50 @@ wait_for() {
   return 1
 }
 
+seed_history_fixture() {
+  local db_name="$1"
+  [[ "${MP_LOCAL_API_UI_HISTORY_FIXTURE:-0}" == "1" ]] || return 0
+  psql -v ON_ERROR_STOP=1 -h "$PGHOST_VALUE" -p "$PGPORT_VALUE" -U "$PGUSER_VALUE" -d "$db_name" <<'SQL'
+BEGIN;
+INSERT INTO public."user" (id, google_subject, name, email, email_verified, avatar_url, password_hash)
+VALUES (
+  'e4aedf4a-1aa7-4918-ba09-0287c95b154c',
+  'fixture-ios-user',
+  'Fixture History User',
+  'fixture@example.com',
+  true,
+  '',
+  ''
+);
+INSERT INTO advisor_conversations (id, owner_id, next_message_seq)
+VALUES ('native-history-e2e-20261015-e8080c47', 'e4aedf4a-1aa7-4918-ba09-0287c95b154c', 52);
+INSERT INTO advisor_runs (id, owner_id, conversation_id, generation, client_request_id, payload_hash, credential_kind, credential_id, status, finished_at)
+SELECT
+  'native-history-e2e-20261015-e8080c47-run-' || n,
+  'e4aedf4a-1aa7-4918-ba09-0287c95b154c',
+  'native-history-e2e-20261015-e8080c47',
+  1,
+  'native-history-e2e-20261015-e8080c47-request-' || n,
+  'synthetic-history-only-no-provider',
+  'session',
+  'synthetic-history-only',
+  'completed',
+  now()
+FROM generate_series(1, 26) AS n;
+INSERT INTO advisor_messages (id, conversation_id, generation, seq, run_id, role, parts)
+SELECT
+  'native-history-e2e-20261015-e8080c47-message-' || n,
+  'native-history-e2e-20261015-e8080c47',
+  1,
+  n,
+  'native-history-e2e-20261015-e8080c47-run-' || ((n + 1) / 2),
+  CASE WHEN n % 2 = 1 THEN 'user' ELSE 'assistant' END,
+  jsonb_build_array(jsonb_build_object('type', 'text', 'text', 'Native History Fixture ' || lpad(n::text, 2, '0')))
+FROM generate_series(1, 51) AS n;
+COMMIT;
+SQL
+}
+
 start() {
   [[ ! -f "$STATE_FILE" ]] || die "fixture already appears to be running; use status or stop"
   mkdir -p "$STATE_DIR"
@@ -75,6 +119,7 @@ start() {
     sed -n '1,120p' "$STATE_DIR/migrate.log" >&2
     die "migrations failed; generated database will be dropped"
   }
+  seed_history_fixture "$db_name"
   api_bin="$STATE_DIR/api"
   (cd "$BACKEND" && go build -o "$api_bin" ./cmd/api)
   redis_log="$STATE_DIR/redis.log"

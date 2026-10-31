@@ -6,6 +6,7 @@ import (
 	"log"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/mypocket/backend/internal/config"
@@ -13,6 +14,8 @@ import (
 	"github.com/mypocket/backend/internal/infrastructure/ai"
 	"github.com/mypocket/backend/internal/infrastructure/cache"
 	"github.com/mypocket/backend/internal/infrastructure/db"
+	"github.com/mypocket/backend/internal/infrastructure/marketdata"
+	"github.com/mypocket/backend/internal/infrastructure/push"
 	repo "github.com/mypocket/backend/internal/infrastructure/repository"
 	"github.com/mypocket/backend/internal/infrastructure/storage"
 	"github.com/mypocket/backend/internal/repository"
@@ -51,6 +54,30 @@ func main() {
 	entryRepository := repo.NewAIEntryPostgresRepository(database)
 	reportAnalysisRepository := repo.NewReportAnalysisPostgresRepository(database)
 	reportSnapshotRepository := repo.NewReportSnapshotPostgresRepository(database)
+	marketRepository := repo.NewAssetMarketPostgresRepository(database)
+	marketPriceService := usecase.NewMarketPriceService(marketRepository, marketdata.DefaultGoldProviders()...)
+	var pushDeliveryRepository repository.PushDeliveryRepository
+	var pushTokenDeliveryRepository repository.PushTokenDeliveryRepository
+	var pushTransport push.Transport
+	if cfg.APNsEnabled {
+		apnsConfig := push.Config{
+			Enabled:     true,
+			TeamID:      cfg.APNsTeamID,
+			KeyID:       cfg.APNsKeyID,
+			Topic:       cfg.APNsTopic,
+			PrivateKey:  cfg.APNsPrivateKey,
+			Environment: cfg.APNsEnvironment,
+		}
+		if err := apnsConfig.Validate(); err != nil {
+			log.Fatalf("APNs transport configuration invalid; configure APNS_* secrets")
+		} else if transport, transportErr := push.NewAPNsTransport(apnsConfig, push.APNsTransportOptions{}); transportErr != nil {
+			log.Fatalf("APNs transport initialization failed")
+		} else {
+			pushTransport = transport
+			pushDeliveryRepository = repo.NewPushDeliveryPostgresRepository(database)
+			pushTokenDeliveryRepository = repo.NewPushTokenPostgresRepository(database)
+		}
+	}
 	reportAnalysisProvider := ai.NewReportAnalysisProvider(ai.NewAdvisorClient(ai.AdvisorClientConfig{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, StoreUsage: cfg.AIStoreUsage}))
 	reportAnalysisWorker := usecase.NewReportAnalysisWorker(reportAnalysisRepository, reportSnapshotRepository, reportAnalysisProvider)
 	advisorExpiry, _ := advisorRepository.(repository.AdvisorExpiryRepository)
@@ -92,6 +119,11 @@ func main() {
 		if err := runBudgetNotificationPass(database, time.Now().UTC()); err != nil {
 			log.Printf("budget notification worker pass failed: %v", err)
 		}
+		if pushTransport != nil {
+			if processed, err := runPushDeliveryPass(context.Background(), pushDeliveryRepository, pushTokenDeliveryRepository, pushTransport, strings.ToLower(strings.TrimSpace(cfg.APNsEnvironment)), time.Now().UTC()); err != nil {
+				log.Printf("push delivery worker pass failed after %d delivery(s): %v", processed, err)
+			}
+		}
 		if advisorExpiry != nil {
 			if _, err := runAdvisorExpiryPass(context.Background(), advisorExpiry, time.Now().UTC()); err != nil {
 				log.Printf("advisor expiry worker pass failed: %v", err)
@@ -108,6 +140,11 @@ func main() {
 		}
 		if _, err := runReportRetentionPass(context.Background(), reportAnalysisRepository, reportSnapshotRepository, time.Now().UTC()); err != nil {
 			log.Printf("report retention worker pass failed: %v", err)
+		}
+		if result, err := runMarketPricePass(context.Background(), marketPriceService, time.Now().UTC()); err != nil {
+			log.Printf("market price worker pass failed after %d quote(s): %v", result.QuotesAccepted, err)
+		} else if result.Claimed > 0 || result.Skipped > 0 {
+			log.Printf("market price worker pass providers=%d claimed=%d skipped=%d accepted=%d rejected=%d failed=%d", result.Providers, result.Claimed, result.Skipped, result.QuotesAccepted, result.QuotesRejected, result.Failed)
 		}
 		if attachmentCleanup != nil {
 			deleted, cleanupErr := runAttachmentCleanupPass(context.Background(), attachmentCleanup)

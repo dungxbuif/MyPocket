@@ -601,9 +601,7 @@ struct PortfolioAssetModel: Codable, Identifiable, Sendable {
     var unitLabel: String?
     var unitConfirmed: Bool?
     var priceMode: String?
-    var marketSourceName: String?
-    var marketPriceStatus: String?
-    var marketPriceObservedAt: String?
+    var latestPriceSource: String?
     var marketProductID: String?
 
     enum CodingKeys: String, CodingKey {
@@ -616,11 +614,11 @@ struct PortfolioAssetModel: Codable, Identifiable, Sendable {
         case unitLabel
         case unitConfirmed
         case priceMode
-        case marketSourceName
-        case marketPriceStatus
-        case marketPriceObservedAt
+        case latestPriceSource
         case marketProductID
     }
+
+    var marketSourceName: String? { latestPriceSource }
 }
 
 struct PortfolioPositionModel: Codable, Identifiable, Sendable {
@@ -637,9 +635,9 @@ struct PortfolioPositionModel: Codable, Identifiable, Sendable {
     var latestPrice: Int64?
     var unitLabel: String?
     var unitConfirmed: Bool?
-    var marketSourceName: String?
-    var marketPriceStatus: String?
-    var marketPriceObservedAt: String?
+    var priceSource: String?
+    var priceAsOf: String?
+    var priceStatus: String?
 
     enum CodingKeys: String, CodingKey {
         case assetID
@@ -654,10 +652,14 @@ struct PortfolioPositionModel: Codable, Identifiable, Sendable {
         case latestPrice
         case unitLabel
         case unitConfirmed
-        case marketSourceName
-        case marketPriceStatus
-        case marketPriceObservedAt
+        case priceSource
+        case priceAsOf
+        case priceStatus
     }
+
+    var marketSourceName: String? { priceSource }
+    var marketPriceStatus: String? { priceStatus }
+    var marketPriceObservedAt: String? { priceAsOf }
 }
 
 struct PortfolioSummaryModel: Codable, Sendable {
@@ -667,6 +669,9 @@ struct PortfolioSummaryModel: Codable, Sendable {
     var totalCostBasis: Int64
     var totalMarketValue: Int64?
     var totalUnrealizedPnL: Int64?
+    var knownMarketValue: Int64?
+    var unknownAssetCount: Int? = nil
+    var staleAssetCount: Int? = nil
 
     enum CodingKeys: String, CodingKey {
         case assets
@@ -675,6 +680,9 @@ struct PortfolioSummaryModel: Codable, Sendable {
         case totalCostBasis
         case totalMarketValue
         case totalUnrealizedPnL
+        case knownMarketValue
+        case unknownAssetCount
+        case staleAssetCount
     }
 }
 
@@ -682,21 +690,75 @@ struct PortfolioAssetUnitModel: Codable, Identifiable, Sendable, Equatable {
     var id: String { code }
     var code: String
     var label: String
-    var source: String
-    var requiresConfirmation: Bool
+    var automaticPricing: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case code
+        case label
+        case automaticPricing
+    }
+}
+
+struct PortfolioAssetTypeModel: Codable, Identifiable, Sendable, Equatable {
+    var id: String { code }
+    var code: String
+    var name: String
+    var units: [PortfolioAssetUnitModel]
+}
+
+struct PortfolioMarketProductModel: Codable, Identifiable, Sendable, Equatable {
+    let id: String
+    var providerKey: String
+    var externalProductID: String
+    var name: String
+    var kind: String
+    var unit: String
+    var currency: String
+    var valuationSide: String
+    var enabled: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case id
+        case providerKey
+        case externalProductID
+        case name
+        case kind
+        case unit
+        case currency
+        case valuationSide
+        case enabled
+    }
 }
 
 struct PortfolioMarketCatalogModel: Codable, Sendable {
-    var units: [PortfolioAssetUnitModel]
-    var priceModes: [String]
+    var assetTypes: [PortfolioAssetTypeModel]
+    var products: [PortfolioMarketProductModel]
+
+    var units: [PortfolioAssetUnitModel] {
+        assetTypes.first?.units ?? []
+    }
 }
 
 struct PortfolioPriceSourceModel: Codable, Sendable {
-    var assetID: String
-    var mode: String
-    var sourceName: String?
+    var expectedVersion: Int64
+    var priceMode: String
     var productID: String?
-    var confirmed: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case expectedVersion
+        case priceMode
+        case productID
+    }
+}
+
+struct PortfolioAssetUnitConfirmationModel: Codable, Sendable {
+    var expectedVersion: Int64
+    var unitLabel: String
+
+    enum CodingKeys: String, CodingKey {
+        case expectedVersion
+        case unitLabel
+    }
 }
 
 struct CreditStatementModel: Codable, Sendable {

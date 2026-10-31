@@ -27,12 +27,53 @@ struct EntryProposalModel: Codable, Identifiable, Sendable {
     var transactionID: String?
 }
 
+struct EntryAttachmentDiagnosticModel: Codable, Identifiable, Sendable {
+    let position: Int
+    let filename: String
+    let stage: String
+    let status: String
+    let errorCode: String?
+
+    var id: String { "\(position)-\(stage)" }
+}
+
 struct EntryProcessModel: Codable, Identifiable, Sendable {
     let id: String
     var proposals: [EntryProposalModel]
     var processing: Bool
     var reply: String?
     var error: String?
+    var attachmentDiagnostics: [EntryAttachmentDiagnosticModel] = []
+
+    private enum CodingKeys: String, CodingKey {
+        case id, proposals, processing, reply, error, attachmentDiagnostics
+    }
+
+    init(
+        id: String,
+        proposals: [EntryProposalModel],
+        processing: Bool,
+        reply: String?,
+        error: String?,
+        attachmentDiagnostics: [EntryAttachmentDiagnosticModel] = []
+    ) {
+        self.id = id
+        self.proposals = proposals
+        self.processing = processing
+        self.reply = reply
+        self.error = error
+        self.attachmentDiagnostics = attachmentDiagnostics
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        proposals = try container.decode([EntryProposalModel].self, forKey: .proposals)
+        processing = try container.decode(Bool.self, forKey: .processing)
+        reply = try container.decodeIfPresent(String.self, forKey: .reply)
+        error = try container.decodeIfPresent(String.self, forKey: .error)
+        attachmentDiagnostics = try container.decodeIfPresent([EntryAttachmentDiagnosticModel].self, forKey: .attachmentDiagnostics) ?? []
+    }
 }
 
 struct AdvisorPartModel: Decodable, Sendable {
@@ -97,6 +138,52 @@ struct AdvisorEntryTaskModel: Decodable, Sendable {
     var createdAt: String
     var updatedAt: String
     var completedAt: String?
+
+    private enum CodingKeys: String, CodingKey {
+        case task
+        case id, ownerID, conversationID, generation, clientRequestID, sessionID, status, stage, batchID, batchVersion, errorCode, createdAt, updatedAt, completedAt
+    }
+
+    private struct Payload: Decodable {
+        var id: String
+        var ownerID: String
+        var conversationID: String
+        var generation: Int64
+        var clientRequestID: String
+        var sessionID: String
+        var status: String
+        var stage: String?
+        var batchID: String?
+        var batchVersion: Int64?
+        var errorCode: String?
+        var createdAt: String
+        var updatedAt: String
+        var completedAt: String?
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let payload: Payload
+        if container.contains(.task) {
+            payload = try container.decode(Payload.self, forKey: .task)
+        } else {
+            payload = try Payload(from: decoder)
+        }
+        id = payload.id
+        ownerID = payload.ownerID
+        conversationID = payload.conversationID
+        generation = payload.generation
+        clientRequestID = payload.clientRequestID
+        sessionID = payload.sessionID
+        status = payload.status
+        stage = payload.stage
+        batchID = payload.batchID
+        batchVersion = payload.batchVersion
+        errorCode = payload.errorCode
+        createdAt = payload.createdAt
+        updatedAt = payload.updatedAt
+        completedAt = payload.completedAt
+    }
 }
 
 struct AdvisorMessageModel: Decodable, Identifiable, Sendable {
@@ -210,6 +297,7 @@ struct AdvisorRunModel: Codable, Sendable {
 /// responses simply omit this payload and remain renderable as read-only chat.
 struct AdvisorEntryBatchItemModel: Codable, Identifiable, Sendable {
     var id: String
+    var version: Int
     var status: String
     var draft: EntryDraftModel?
     var proposalID: String?
@@ -259,7 +347,8 @@ struct AdvisorEntryBatchEnvelopeModel: Codable, Sendable {
             let proposalID = item["proposal_id"].flatMap { value in if case .string(let value) = value { return value }; return nil }
             let error = item["error"].flatMap { value in if case .string(let value) = value { return value }; return nil }
             let sourceLabel = item["source_label"].flatMap { value in if case .string(let value) = value { return value }; return nil }
-            decodedItems.append(AdvisorEntryBatchItemModel(id: id, status: status, draft: draft, proposalID: proposalID, error: error, sourceLabel: sourceLabel))
+            let version = item["version"].flatMap { value in if case .number(let value) = value { return Int(exactly: value) }; return nil } ?? 1
+            decodedItems.append(AdvisorEntryBatchItemModel(id: id, version: version, status: status, draft: draft, proposalID: proposalID, error: error, sourceLabel: sourceLabel))
         }
         self.init(taskID: taskID, batchID: batchID, version: exactVersion, items: decodedItems, summary: object["summary"].flatMap { value in if case .string(let value) = value { return value }; return nil })
     }
@@ -288,6 +377,7 @@ enum AssistantEntryRowState: String, Codable, CaseIterable, Sendable {
 struct AdvisorEntryInputModel: Codable, Sendable {
     var clientRequestID: String
     var conversationID: String
+    var generation: Int64
     var text: String
     var timezone: String?
     var attachmentIDs: [String]?
@@ -298,6 +388,17 @@ struct AdvisorEntryDecisionModel: Codable, Sendable {
     var batchID: String
     var batchVersion: Int64
     var itemID: String
+    var itemVersion: Int
     var decision: String
     var clientRequestID: String
+
+    enum CodingKeys: String, CodingKey {
+        case taskID = "task_id"
+        case batchID = "batch_id"
+        case batchVersion = "batch_version"
+        case itemID = "item_id"
+        case itemVersion = "item_version"
+        case decision
+        case clientRequestID = "client_request_id"
+    }
 }

@@ -87,13 +87,14 @@ final class MoreFeedbackReferenceTests: XCTestCase {
         )
     }
 
-    func testReferenceIconRegistryKeepsAccountGlyphsOnNativeSymbols() {
-        XCTAssertEqual(MPReferenceIcon.account, "person.crop.circle")
-        XCTAssertEqual(MPReferenceIcon.wallet, "wallet.pass")
-        XCTAssertEqual(MPReferenceIcon.group, "shippingbox")
-        XCTAssertEqual(MPReferenceIcon.bankLink, "link.circle")
-        XCTAssertEqual(MPReferenceIcon.recurring, "repeat")
-        XCTAssertEqual(MPReferenceIcon.feedback, "bubble.left.and.bubble.right")
+    func testReferenceIconRegistryUsesBundledSemanticAssets() {
+        XCTAssertEqual(MPReferenceIcon.account, MPIconCatalog.assetName(for: .account))
+        XCTAssertEqual(MPReferenceIcon.wallet, MPIconCatalog.assetName(for: .wallet))
+        XCTAssertEqual(MPReferenceIcon.group, MPIconCatalog.assetName(for: .group))
+        XCTAssertEqual(MPReferenceIcon.bankLink, MPIconCatalog.assetName(for: .bankLink))
+        XCTAssertEqual(MPReferenceIcon.recurring, MPIconCatalog.assetName(for: .recurring))
+        XCTAssertEqual(MPReferenceIcon.feedback, MPIconCatalog.assetName(for: .feedback))
+        XCTAssertTrue(MPReferenceIcon.account.hasPrefix("mp-icon-"))
     }
 
     private func proposal(type: String, occurredAt: String) -> EntryProposalModel {

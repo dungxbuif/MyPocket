@@ -129,6 +129,21 @@ enum MPFormat {
         return String(amount)
     }
 
+    /// Keeps a money field stable while the user is typing. Live grouping can
+    /// move the caret between keystrokes, so the editor uses canonical digits
+    /// until it resigns first responder and only then applies separators.
+    static func groupedIntegerDisplay(_ raw: String, isEditing: Bool) -> String {
+        guard !isEditing, let amount = parseNonNegativeInteger(raw) else { return raw }
+        guard String(amount) == raw else { return raw }
+        let formatter = NumberFormatter()
+        formatter.locale = Locale(identifier: "vi_VN")
+        formatter.numberStyle = .decimal
+        formatter.groupingSeparator = "."
+        formatter.groupingSize = 3
+        formatter.maximumFractionDigits = 0
+        return formatter.string(from: NSNumber(value: amount)) ?? raw
+    }
+
     static func signedMoney(_ value: Int64) -> String {
         if value == 0 { return money(0) }
         return (value > 0 ? "+" : "−") + money(abs(value))

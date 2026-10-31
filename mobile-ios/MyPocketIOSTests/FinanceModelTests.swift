@@ -103,7 +103,7 @@ final class FinanceModelTests: XCTestCase {
         let row = MPTransactionRow(transaction: item, category: category, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!, masked: false)
         XCTAssertEqual(row.title, "Cà phê")
         XCTAssertEqual(row.subtitle, "Highlands sáng")
-        XCTAssertEqual(row.iconName, "cup.and.saucer")
+        XCTAssertEqual(row.iconName, MPIconCatalog.assetName(for: .coffee))
         XCTAssertEqual(row.amount, MPFormat.signedMoney(-10_000))
         XCTAssertEqual(row.amountTone, .expense)
     }
@@ -114,7 +114,7 @@ final class FinanceModelTests: XCTestCase {
         item.type = "income"
         let transfer = MPTransactionRow(transaction: item, timeZone: .gmt, masked: false)
         XCTAssertEqual(transfer.title, "Nhận chuyển ví")
-        XCTAssertEqual(transfer.iconName, "building.columns.fill")
+        XCTAssertEqual(transfer.iconName, MPIconCatalog.assetName(for: .transfer))
         XCTAssertEqual(transfer.amountTone, .neutral)
         XCTAssertEqual(transfer.amount, MPFormat.signedMoney(10_000))
         item.transferID = nil
@@ -691,6 +691,29 @@ final class FinanceModelTests: XCTestCase {
         XCTAssertEqual(summary.trades.first?.quantity, "1.25")
         XCTAssertEqual(summary.positions.first?.realizedPnL, 1000)
         XCTAssertEqual(summary.totalUnrealizedPnL, 5000)
+    }
+
+    func testAccumulatedAssetCatalogAndUnitPriceContractDecode() throws {
+        let data = Data(#"{"asset_types":[{"code":"gold","name":"Vàng","units":[{"code":"chỉ","label":"Chỉ","automatic_pricing":true},{"code":"lượng","label":"Lượng","automatic_pricing":false},{"code":"phân","label":"Phân","automatic_pricing":false}]}],"products":[]}"#.utf8)
+        let catalog = try JSONDecoder.mypocket.decode(PortfolioMarketCatalogModel.self, from: data)
+        XCTAssertEqual(catalog.assetTypes.map(\.code), ["gold"])
+        XCTAssertEqual(catalog.units.map(\.code), ["chỉ", "lượng", "phân"])
+        XCTAssertTrue(catalog.units.first?.automaticPricing == true)
+        XCTAssertFalse(catalog.units.dropFirst().contains(where: \.automaticPricing))
+
+        XCTAssertEqual(PortfolioView.PortfolioTradePresentation.draftTotal(quantity: "2", unitPrice: "8000000", fee: "0", side: "buy"), 16_000_000)
+        XCTAssertEqual(PortfolioView.PortfolioTradePresentation.draftTotal(quantity: "0,5", unitPrice: "8000000", fee: "100", side: "buy"), 4_000_100)
+        XCTAssertEqual(PortfolioView.PortfolioTradePresentation.draftTotal(quantity: "1", unitPrice: "8000000", fee: "100", side: "sell"), 7_999_900)
+    }
+
+    func testAccumulatedAssetSummaryKeepsUnknownValuationDistinctFromZero() throws {
+        let data = Data(#"{"assets":[],"positions":[],"trades":[],"total_cost_basis":100,"known_market_value":0,"unknown_asset_count":1,"stale_asset_count":0}"#.utf8)
+        let summary = try JSONDecoder.mypocket.decode(PortfolioSummaryModel.self, from: data)
+        XCTAssertNil(summary.totalMarketValue)
+        XCTAssertEqual(summary.knownMarketValue, 0)
+        XCTAssertEqual(summary.unknownAssetCount, 1)
+        XCTAssertEqual(summary.staleAssetCount, 0)
+        XCTAssertEqual(PortfolioReferencePresentation.summaryItems(summary, masked: false)[1].value, "Biết được 0 ₫")
     }
 
     func testGoalNotificationPreferenceAndInboxDecode() throws {

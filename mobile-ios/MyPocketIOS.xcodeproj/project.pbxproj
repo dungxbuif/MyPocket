@@ -26,6 +26,7 @@
 		294A3E2B0E3D97ACDA8AA605 /* AIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5538D1540DC36C708A32D692 /* AIModels.swift */; };
 		2AE426DFDBCDDBA89B1EE9D4 /* MoreView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 615C4A51829E4935FA4F94CF /* MoreView.swift */; };
 		2CC673F9D78975D9F0B3ED6F /* Manrope-Variable.ttf in Resources */ = {isa = PBXBuildFile; fileRef = 636AC06D79CA2D4C7DAB987C /* Manrope-Variable.ttf */; };
+		C10000000000000000000019 /* Phosphor-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000018 /* Phosphor-LICENSE.txt */; };
 		C10000000000000000000020 /* MonthlyReportsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000021 /* MonthlyReportsTests.swift */; };
 		C10000000000000000000022 /* ReportAnalysisTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000023 /* ReportAnalysisTests.swift */; };
 		2E55F27BF80C827272EADA3B /* OverviewReferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 86181FC7F1539738541F39CC /* OverviewReferenceTests.swift */; };
@@ -161,6 +162,7 @@
 		615C4A51829E4935FA4F94CF /* MoreView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MoreView.swift; sourceTree = "<group>"; };
 		62EB1C4C8DD824002B72A996 /* MPFinancialQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPFinancialQueue.swift; sourceTree = "<group>"; };
 		636AC06D79CA2D4C7DAB987C /* Manrope-Variable.ttf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "Manrope-Variable.ttf"; sourceTree = "<group>"; };
+		C10000000000000000000018 /* Phosphor-LICENSE.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = "Phosphor-LICENSE.txt"; sourceTree = "<group>"; };
 		C10000000000000000000021 /* MonthlyReportsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyReportsTests.swift; sourceTree = "<group>"; };
 		C10000000000000000000023 /* ReportAnalysisTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportAnalysisTests.swift; sourceTree = "<group>"; };
 		64C86136B430A28FF9F19E63 /* JarsMonthsReferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarsMonthsReferenceTests.swift; sourceTree = "<group>"; };
@@ -405,6 +407,7 @@
 				4339F20DF12E511A5DD53D88 /* Info.plist */,
 				636AC06D79CA2D4C7DAB987C /* Manrope-Variable.ttf */,
 				E116ED5BB4CBA52E296F143C /* OFL-Manrope.txt */,
+				C10000000000000000000018 /* Phosphor-LICENSE.txt */,
 			);
 			path = Resources;
 			sourceTree = "<group>";
@@ -665,6 +668,7 @@
 				BBDD848A99621B7EB1F1959D /* Assets.xcassets in Resources */,
 				2CC673F9D78975D9F0B3ED6F /* Manrope-Variable.ttf in Resources */,
 				93412B41CF2578D56136ED47 /* OFL-Manrope.txt in Resources */,
+				C10000000000000000000019 /* Phosphor-LICENSE.txt in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

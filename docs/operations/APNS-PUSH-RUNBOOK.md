@@ -27,16 +27,12 @@ The configuration loader accepts `APNS_ENABLED`, `APNS_TEAM_ID`,
 never put it in a migration, API response, log, or client bundle. Disabled
 APNs is valid and is the expected Personal Team/local mode.
 
-**Current implementation boundary (2026-10-20):** the worker currently runs
-the in-app notification producer and audit/outbox passes only. It does not
-lease `push_deliveries`, construct an APNs HTTP/2 request, or call a remote
-provider. `APNS_ENABLED` is therefore a reserved configuration value for the
-future adapter, not an activation switch. Do not set it in production and
-infer that push is enabled; no delivery claim is valid until the provider
-adapter, queue lease/revoke integration, and signed-device acceptance are
-implemented and verified together. This explicit boundary prevents a false
-green rollout when migration `000039` is present but no delivery worker is
-running.
+The worker now leases `push_deliveries`, constructs a token-authenticated APNs
+HTTP/2 request, and calls the configured sandbox or production endpoint.
+`APNS_ENABLED` is an explicit activation switch: it remains false by default,
+and enabling it validates all credentials at worker startup. A successful
+worker/provider request still does not prove a signed device has received the
+push; that remains a separate external acceptance gate.
 
 Apply migration `000039_push_deliveries` only after a validated backup and the
 matching API/worker image. The migration is additive and has a disposable down
@@ -44,11 +40,11 @@ file; it is not a production rollback mechanism.
 
 ## Release gates
 
-The Go contract tests cover success, stale-token revocation, retry scheduling,
-attempt bounds, and invalid credential/topic responses using an injected mock
-transport. They prove classification only; they do not prove that the worker
-calls that transport. Real APNs delivery still requires an Apple
-capability/profile and a provider key. A local notification or a registered
-token is not evidence of remote delivery. See the Apple [capability
+The Go tests cover JWT signing/request headers through an `httptest` APNs
+endpoint, Retry-After parsing, success, stale-token revocation, retry
+scheduling, attempt bounds, and invalid credential/topic responses through the
+worker's injected transport. Live APNs delivery still requires an Apple
+capability/profile, provider key and registered device. A local notification or
+a registered token is not evidence of remote delivery. See the Apple [capability
 reference](https://developer.apple.com/help/account/reference/supported-capabilities-ios)
 and [signing workflow](https://help.apple.com/xcode/mac/current/en.lproj/dev60b6fbbc7.html).

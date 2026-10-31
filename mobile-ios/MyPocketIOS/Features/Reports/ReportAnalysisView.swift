@@ -18,7 +18,7 @@ struct ReportAnalysisView: View {
                 }
                 switch state {
                 case .completed(_, let revision, let article):
-                    if let revision, revision != report.revision {
+                    if let revision, let reportRevision = report.dataRevision, revision != reportRevision {
                         MPStatusMessage(text: "Bài phân tích thuộc phiên bản cũ; số liệu mới vẫn là nguồn chính.", tone: .info)
                     }
                     MPText(masked ? AssistantPrivacyPolicy.maskedText : article, style: .body)
@@ -82,17 +82,27 @@ struct ReportAnalysisView: View {
         let requestID = UUID().uuidString
         state = .queued(requestID: requestID)
         do {
-            _ = try await api.requestReportAnalysis(ReportAnalysisRequestModel(requestID: requestID, month: report.month, ownerID: ownerID, revision: report.revision))
-            state = .running(requestID: requestID)
-            try await Task.sleep(for: .seconds(1))
-            let result = try await api.reportAnalysis(requestID: requestID)
-            switch result.status.lowercased() {
-            case "completed": state = .completed(requestID: requestID, revision: result.revision, article: result.article ?? "Chưa có bài phân tích.")
-            case "expired": state = .expired
-            case "cancelled": state = .cancelled
-            case "queued": state = .queued(requestID: requestID)
-            default: state = .running(requestID: requestID)
+            guard let snapshotID = report.snapshotID, !snapshotID.isEmpty else {
+                state = .failed(message: "Báo cáo hiện tại chưa có bản chụp để phân tích.")
+                return
             }
+            let accepted = try await api.requestReportAnalysis(ReportAnalysisRequestModel(snapshotID: snapshotID, clientRequestID: requestID))
+            let analysisID = accepted.id.isEmpty ? requestID : accepted.id
+            state = .running(requestID: analysisID)
+            for _ in 0..<30 {
+                try await Task.sleep(for: .seconds(1))
+                let result = try await api.reportAnalysis(requestID: analysisID)
+                switch result.status.lowercased() {
+                case "completed":
+                    state = .completed(requestID: analysisID, revision: result.revision, article: result.renderedArticle.isEmpty ? "Chưa có bài phân tích." : result.renderedArticle)
+                    return
+                case "expired": state = .expired; return
+                case "cancelled": state = .cancelled; return
+                case "failed": state = .failed(message: "Máy chủ chưa tạo được phân tích."); return
+                default: state = .running(requestID: analysisID)
+                }
+            }
+            state = .failed(message: "Phân tích đang mất nhiều thời gian hơn dự kiến. Bạn có thể tải lại sau.")
         } catch {
             state = .failed(message: "Chưa thể tạo phân tích sâu trên máy chủ hiện tại.")
         }

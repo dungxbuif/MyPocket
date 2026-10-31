@@ -45,10 +45,7 @@ struct MonthlyReportsView: View {
                         masked: false,
                         accessibilityKey: "reports"
                     ) {
-                        MPReportBarChart(title: "Thu và chi", points: [
-                            ReportPoint(label: "Thu", value: report.income, comparison: nil),
-                            ReportPoint(label: "Chi", value: report.expense, comparison: nil)
-                        ], masked: masked, tone: MPColor.categoryTeal) { selectedPoint = $0 }
+                        MPReportComparisonChart(income: report.income, expense: report.expense)
                     } content: {
                         MPMetricGrid(items: [
                             MPMetricItem(title: "Thu nhập", value: MPFormat.money(report.income), masked: masked),
@@ -56,7 +53,21 @@ struct MonthlyReportsView: View {
                             MPMetricItem(title: "Giao dịch", value: "\(report.transactionCount)", masked: false)
                         ], masked: false)
                     }
-                    if !report.weekly.isEmpty {
+                    if let insider = model.insider {
+                        MPReportsInsiderCard(value: insider, masked: masked)
+                    }
+                    if !report.daily.isEmpty {
+                        MPSurfaceCard(style: .grouped) {
+                            MPTrendChart(
+                                points: report.daily.compactMap { point in
+                                    let income = point.comparison ?? 0
+                                    guard income != 0 || point.value != 0 else { return nil }
+                                    return MPTrendPoint(dayKey: point.label, income: income, expense: point.value)
+                                },
+                                masked: masked
+                            )
+                        }
+                    } else if !report.weekly.isEmpty {
                         MPSurfaceCard(style: .grouped) {
                             MPReportBarChart(title: "Xu hướng theo tuần", points: report.weekly, masked: masked) { selectedPoint = $0 }
                         }

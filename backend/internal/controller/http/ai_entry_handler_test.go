@@ -53,6 +53,28 @@ func TestAIEntryRoutesExposeOneShotProcessInsteadOfSessions(t *testing.T) {
 	}
 }
 
+func TestAIEntryProcessResponseIncludesSafeAttachmentDiagnostics(t *testing.T) {
+	response := processResponse(&entity.AIEntrySession{
+		ID: "request-1",
+		AttachmentDiagnostics: []entity.AIEntryAttachmentDiagnostic{{
+			Position: 2, Filename: "second.pdf", Stage: "ocr", Status: "failed", ErrorCode: "ocr_failed",
+		}},
+	})
+	encoded, err := json.Marshal(response)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		AttachmentDiagnostics []entity.AIEntryAttachmentDiagnostic `json:"attachment_diagnostics"`
+	}
+	if err := json.Unmarshal(encoded, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if len(decoded.AttachmentDiagnostics) != 1 || decoded.AttachmentDiagnostics[0].Position != 2 || decoded.AttachmentDiagnostics[0].ErrorCode != "ocr_failed" {
+		t.Fatalf("attachment diagnostics missing from process response: %s", encoded)
+	}
+}
+
 func TestAIEntryCapabilitiesAdvertiseStructuredFilesWithoutOCR(t *testing.T) {
 	handler := &AIEntryHandler{Service: &usecase.AIEntryService{
 		Extractor: ai.NewClient(ai.Config{BaseURL: "https://llm.invalid/v1", APIKey: "test", Model: "test"}),
@@ -253,8 +275,8 @@ func TestAIEntryHTTPReviewEditApproveRejectWithRealDatabase(t *testing.T) {
 		if r.URL.Path != "/chat/completions" {
 			t.Errorf("wrong path %s", r.URL.Path)
 		}
-		draft := map[string]any{"type": "expense", "amount": 35000, "wallet_id": wallet.ID, "category_id": nil, "occurred_at": "2026-09-21T10:00:00+07:00", "note": "ăn sáng", "included_in_reports": true, "questions": []string{}}
-		secondDraft := map[string]any{"type": "expense", "amount": 36000, "wallet_id": wallet.ID, "category_id": nil, "occurred_at": "2026-09-21T12:00:00+07:00", "note": "ăn trưa", "included_in_reports": true, "questions": []string{}}
+		draft := map[string]any{"type": "expense", "amount": 35000, "wallet_id": wallet.ID, "category_id": nil, "occurred_at": "2026-09-21T10:00:00+07:00", "note": "ăn sáng", "included_in_reports": true, "questions": []string{}, "source_currency": "VND"}
+		secondDraft := map[string]any{"type": "expense", "amount": 36000, "wallet_id": wallet.ID, "category_id": nil, "occurred_at": "2026-09-21T12:00:00+07:00", "note": "ăn trưa", "included_in_reports": true, "questions": []string{}, "source_currency": "VND"}
 		content, _ := json.Marshal(map[string]any{"reply": "Bạn kiểm tra các đề xuất trước khi duyệt nhé.", "drafts": []any{draft, secondDraft}})
 		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]any{"content": string(content)}, "finish_reason": "stop"}}})
 	}))
@@ -345,7 +367,7 @@ func TestAIEntryHTTPReviewEditApproveRejectWithRealDatabase(t *testing.T) {
 	request("PATCH", "/proposals/"+p.ID, map[string]any{"version": p.Version, "draft": p.Draft}, 200, &p)
 	request("POST", "/proposals/"+p.ID+"/approve", map[string]any{"version": 1}, 409, nil)
 	request("POST", "/proposals/"+p.ID+"/approve", map[string]any{"version": p.Version}, 200, &p)
-	if p.Status != "approved" || p.TransactionID == nil {
+	if p.Status != entity.AIProposalApplied || p.TransactionID == nil {
 		t.Fatal("approval not persisted")
 	}
 	request("POST", "/proposals/"+p.ID+"/approve", map[string]any{"version": 2}, 200, &p)

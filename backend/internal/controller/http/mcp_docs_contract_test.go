@@ -95,8 +95,8 @@ func TestMCPAgentDocsCatalogLocatorAndExclusions(t *testing.T) {
 	if contract.ToolCount != 101 || len(mcpInventorySet()) != contract.ToolCount {
 		t.Fatalf("published tool count=%d; authenticated inventory=%d", contract.ToolCount, len(mcpInventorySet()))
 	}
-	if len(contract.ExcludedOperations) != 19 || len(mcpExcludedRouteInventory) != 19 {
-		t.Fatal("published exclusions must classify all 19 non-tool routes")
+	if len(contract.ExcludedOperations) != 32 || len(mcpExcludedRouteInventory) != 32 {
+		t.Fatal("published exclusions must classify all 32 non-tool routes")
 	}
 	seen := map[string]bool{}
 	for _, excluded := range contract.ExcludedOperations {

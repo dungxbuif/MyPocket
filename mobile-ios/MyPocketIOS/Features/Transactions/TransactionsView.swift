@@ -606,9 +606,9 @@ struct TransactionsView: View {
                 }
                 if model.selectedWalletType != "goal" {
                     MPScreenHeader(title: "", leading: {
-                        if model.selectedWalletType != "credit" {
-                            MPIconButton(systemName: "plus", label: "Thêm giao dịch") { editTarget = nil; editorPresented = true }
-                        }
+                        Color.clear
+                            .frame(width: MPMetrics.hitTarget, height: MPMetrics.hitTarget)
+                            .accessibilityHidden(true)
                     }, trailing: {
                         if !searchPresented, TransactionsPresentation.searchIsAvailable(
                             walletType: model.selectedWalletType,

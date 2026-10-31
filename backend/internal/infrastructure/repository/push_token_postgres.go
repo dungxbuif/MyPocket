@@ -14,7 +14,7 @@ import (
 
 type PushTokenPostgresRepository struct{ db *gorm.DB }
 
-func NewPushTokenPostgresRepository(db *gorm.DB) domain.PushTokenRepository {
+func NewPushTokenPostgresRepository(db *gorm.DB) *PushTokenPostgresRepository {
 	return &PushTokenPostgresRepository{db: db}
 }
 

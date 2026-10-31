@@ -19,6 +19,8 @@ import (
 
 type advisorActionStore struct {
 	messages []entity.AdvisorMessage
+	replaced map[string]any
+	marked   []string
 }
 
 func (s *advisorActionStore) StartRun(context.Context, repository.AdvisorRunInput) (*entity.AdvisorRun, *entity.AdvisorMessage, bool, error) {
@@ -46,6 +48,26 @@ func (s *advisorActionStore) AppendEvent(context.Context, string, string, string
 }
 func (s *advisorActionStore) CreateAssistantMessage(context.Context, string, string, int64, []entity.AdvisorPart) (*entity.AdvisorMessage, error) {
 	return nil, nil
+}
+func (s *advisorActionStore) ReplaceAction(_ context.Context, ownerID, conversationID string, generation int64, actionID string, revision int64, patch map[string]any) (map[string]any, error) {
+	if ownerID != "owner-1" || conversationID != "conversation-1" || generation != 4 || actionID == "" || revision != 1 {
+		return nil, repository.ErrNotFound
+	}
+	s.replaced = patch
+	return map[string]any{
+		"action_id": "replacement-1",
+		"action":    "create_wallet",
+		"revision":  2,
+		"status":    entity.AIProposalPending,
+		"name":      patch["name"],
+	}, nil
+}
+func (s *advisorActionStore) MarkAction(_ context.Context, ownerID, conversationID string, generation int64, actionID, status string, _ map[string]any) error {
+	if ownerID != "owner-1" || conversationID != "conversation-1" || generation != 4 || actionID == "" {
+		return repository.ErrNotFound
+	}
+	s.marked = append(s.marked, status)
+	return nil
 }
 
 type advisorOverviewUsers struct{}
@@ -322,6 +344,28 @@ func TestAdvisorConfirmWalletActionUsesPersistedProposalAndMutationKey(t *testin
 	}
 	if wallets.idempotencyKey != "action-1" || wallets.created == nil || wallets.created.Name != "Du lịch" {
 		t.Fatalf("dispatcher did not use persisted proposal: key=%q wallet=%+v", wallets.idempotencyKey, wallets.created)
+	}
+}
+
+func TestAdvisorReplaceActionUsesOwnerGenerationAndRevisionContract(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	store := &advisorActionStore{}
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
+	engine.PATCH("/actions/:action_id/replace", (&AdvisorHandler{Service: &usecase.AdvisorService{Store: store}}).ReplaceAction)
+
+	recorder := httptest.NewRecorder()
+	request := httptest.NewRequest(http.MethodPatch, "/actions/action-1/replace", strings.NewReader(`{"conversation_id":"conversation-1","generation":4,"revision":1,"patch":{"name":"Du lịch mới"}}`))
+	request.Header.Set("Content-Type", "application/json")
+	engine.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if got, ok := store.replaced["name"].(string); !ok || got != "Du lịch mới" {
+		t.Fatalf("replacement patch was not forwarded: %#v", store.replaced)
+	}
+	if !strings.Contains(recorder.Body.String(), `"replacement-1"`) {
+		t.Fatalf("replacement response did not return new action identity: %s", recorder.Body.String())
 	}
 }
 

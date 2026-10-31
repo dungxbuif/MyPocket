@@ -71,7 +71,7 @@ func TestApplicationRouterMCPInheritsAuditPrincipalAndOrigins(t *testing.T) {
 		t.Fatalf("factory SDK call = %+v %v", result, err)
 	}
 	found := false
-	for _, event := range audit.snapshot() {
+	for _, event := range audit.await(t, 1) {
 		if event.Action == "mcp.account.api_key.list" {
 			found = true
 			if !event.Allowed || event.Status != "200" || event.ActorKind != "user_api_key" || event.CredentialID != created.Key.ID {

@@ -37,7 +37,7 @@ second static list of schemas in Swagger. Each entry publishes its stable
 domain-qualified `name`, a description containing its canonical `METHOD /path`,
 and an `inputSchema` with a closed object (`additionalProperties: false`). Path
 parameters are required fields; handler business validation still applies.
-The current tested inventory is 101 named tools and 19 explicitly excluded
+The current tested inventory is 101 named tools and 32 explicitly excluded
 method/path entries. New routes must update the catalog or exclusion manifest;
 route parity tests fail on unclassified growth.
 
@@ -71,6 +71,19 @@ are route classifications, not permission scopes:
     "POST /api/v1/mcp",
     "DELETE /api/v1/mcp",
     "GET /api/v1/docs/*any",
+    "GET /api/v1/reports/monthly",
+    "POST /api/v1/reports/analyses",
+    "GET /api/v1/reports/analyses/{id}",
+    "POST /api/v1/reports/analyses/{id}/cancel",
+    "POST /api/v1/ai/advisor/entries",
+    "GET /api/v1/ai/advisor/entries/{id}",
+    "POST /api/v1/ai/advisor/entries/{id}/decisions",
+    "POST /api/v1/ai/advisor/entries/{id}/cancel",
+    "PATCH /api/v1/ai/advisor/actions/{action_id}/replace",
+    "GET /api/v1/portfolio/catalog",
+    "GET /api/v1/portfolio/catalog-config",
+    "PATCH /api/v1/portfolio/assets/{id}/unit",
+    "PATCH /api/v1/portfolio/assets/{id}/price-source",
     "GET /docs",
     "GET /docs/"
   ]

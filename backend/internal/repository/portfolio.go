@@ -15,6 +15,7 @@ var (
 	ErrPortfolioAssetConflict        = errors.New("portfolio asset already exists")
 	ErrPortfolioAssetHasTrades       = errors.New("portfolio asset has trades")
 	ErrPortfolioAssetInvalid         = errors.New("portfolio asset is invalid")
+	ErrPortfolioAssetUnitInvalid     = entity.ErrPortfolioAssetUnitInvalid
 	ErrPortfolioAssetUnitConflict    = errors.New("portfolio asset unit cannot change after trades")
 	ErrPortfolioAssetAutomaticPrice  = errors.New("automatic portfolio price cannot be changed manually")
 	ErrPortfolioTradeNotFound        = errors.New("portfolio trade not found")

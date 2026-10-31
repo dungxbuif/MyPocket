@@ -46,9 +46,9 @@ enum MPIconID: String, CaseIterable, Hashable {
     case adjustment
 }
 
-/// Presentation weight requested by the icon study. The current repository
-/// has no verified/pinned vector subset, so both styles intentionally use the
-/// SF Symbol fallback in `MPIconCatalog.assetName(for:style:)`.
+/// Presentation weight requested by the icon study. The shipped subset uses
+/// Phosphor Regular vectors; `.duotone` remains a compatibility style until
+/// a two-layer tintable subset is needed by a consumer.
 enum MPIconStyle: String, CaseIterable, Hashable {
     case regular
     case duotone
@@ -58,10 +58,9 @@ enum MPIconStyle: String, CaseIterable, Hashable {
 /// icon roles. This is deliberately data-only: it does not fetch SVGs at
 /// runtime and it does not rename or migrate a persisted key.
 enum MPIconCatalog {
-    /// True only after a verified, pinned vector subset is added to the iOS
-    /// asset catalog. It remains false while SF Symbols are the intentional
-    /// fallback because no real bundled Phosphor/Lucide asset is present yet.
-    static let usesVerifiedAssets = false
+    /// True because the semantic subset is bundled in the asset catalog. Any
+    /// missing/unknown key still falls back to a platform symbol safely.
+    static let usesVerifiedAssets = true
 
     /// Maps a legacy key, system-name alias, or known category family to a
     /// semantic role. Unknown keys intentionally become a visible tag.
@@ -76,17 +75,17 @@ enum MPIconCatalog {
         return .tag
     }
 
-    /// Returns the asset/system name for a semantic icon. Until a verified
-    /// vector asset bundle exists, this returns deliberately chosen SF Symbol
-    /// fallbacks for both `.regular` and `.duotone`; no guessed asset names
-    /// are introduced.
+    /// Returns the bundled Phosphor asset name for a semantic icon. The
+    /// regular vectors are used for both styles for now; callers retain the
+    /// style parameter so a later duotone layer does not change persisted
+    /// icon keys or call sites.
     static func assetName(for icon: MPIconID, style: MPIconStyle = .regular) -> String {
-        // Keep the style in the API now so a later verified bundle can switch
-        // weights without changing call sites or persisted icon keys.
-        switch style {
-        case .regular, .duotone:
-            return fallbackSystemNames[icon, default: fallbackSystemNames[.tag] ?? "tag.fill"]
-        }
+        _ = style
+        return bundledAssetNames[icon] ?? fallbackSystemNames[icon, default: "tag"]
+    }
+
+    static func isBundledAssetName(_ name: String) -> Bool {
+        name.hasPrefix("mp-icon-")
     }
 
     /// Useful for pure compatibility tests and future catalog tooling. The
@@ -308,8 +307,26 @@ enum MPIconCatalog {
         FamilyAlias(prefix: "debt_", icon: .debt)
     ]
 
-    // Intentional SF fallbacks. These are not claims about an unbundled
-    // Phosphor/Lucide asset name and must not be replaced by guessed assets.
+    /// Bundled Phosphor Regular asset names. Several semantic roles share a
+    /// recognizable source glyph; this keeps category/icon identity stable
+    /// without creating a second ad-hoc icon family.
+    private static let bundledAssetNames: [MPIconID: String] = [
+        .tag: "mp-icon-tag", .home: "mp-icon-house", .ledger: "mp-icon-list",
+        .assistant: "mp-icon-sparkle", .account: "mp-icon-users-three", .feedback: "mp-icon-chat-circle",
+        .wallet: "mp-icon-wallet", .group: "mp-icon-package", .bankLink: "mp-icon-link",
+        .recurring: "mp-icon-repeat", .report: "mp-icon-chart-bar", .search: "mp-icon-magnifying-glass",
+        .bell: "mp-icon-bell", .add: "mp-icon-plus", .send: "mp-icon-paper-plane-tilt",
+        .food: "mp-icon-fork-knife", .coffee: "mp-icon-coffee", .snacks: "mp-icon-leaf",
+        .meals: "mp-icon-bowl-food", .shopping: "mp-icon-shopping-bag", .transport: "mp-icon-car",
+        .health: "mp-icon-heart", .bills: "mp-icon-receipt", .education: "mp-icon-graduation-cap",
+        .travel: "mp-icon-airplane", .savings: "mp-icon-piggy-bank", .family: "mp-icon-house",
+        .entertainment: "mp-icon-game-controller", .gifts: "mp-icon-gift", .insurance: "mp-icon-shield-check",
+        .investment: "mp-icon-trend-up", .business: "mp-icon-briefcase", .transfer: "mp-icon-arrows-left-right",
+        .income: "mp-icon-bank", .debt: "mp-icon-hand", .credit: "mp-icon-credit-card",
+        .aggregate: "mp-icon-globe", .adjustment: "mp-icon-arrows-down-up"
+    ]
+
+    // Platform fallbacks remain for a damaged asset catalog or future roles.
     private static let fallbackSystemNames: [MPIconID: String] = [
         .tag: "tag",
         .home: "house",

@@ -121,6 +121,51 @@ func (s *AdvisorEntryService) Cancel(ctx context.Context, ownerID, taskID string
 	return s.Tasks.CancelTask(ctx, ownerID, taskID)
 }
 
+// Decide applies one authoritative proposal from a durable entry batch. The
+// task and batch identifiers are checked before the existing AI-entry
+// repository performs its owner/version/idempotent ledger mutation.
+func (s *AdvisorEntryService) Decide(ctx context.Context, ownerID, taskID, batchID string, batchVersion int64, itemID string, itemVersion int, decision string) (*entity.AdvisorEntryTaskView, error) {
+	if s == nil || s.Tasks == nil || s.Entries == nil || strings.TrimSpace(ownerID) == "" {
+		return nil, repository.ErrNotFound
+	}
+	task, err := s.Tasks.GetTask(ctx, ownerID, taskID)
+	if err != nil {
+		return nil, err
+	}
+	if task.BatchID != strings.TrimSpace(batchID) || task.BatchVersion != batchVersion || batchVersion <= 0 || itemVersion <= 0 {
+		return nil, repository.ErrAIConflict
+	}
+	batch, err := s.Entries.Batch(ctx, ownerID, task.BatchID, task.BatchVersion)
+	if err != nil {
+		return nil, err
+	}
+	found := false
+	for _, item := range batch.Items {
+		if item.ID == strings.TrimSpace(itemID) {
+			found = true
+			if item.Version != itemVersion {
+				return nil, repository.ErrAIConflict
+			}
+			break
+		}
+	}
+	if !found {
+		return nil, repository.ErrNotFound
+	}
+	approve := false
+	switch strings.ToLower(strings.TrimSpace(decision)) {
+	case "apply", "approve":
+		approve = true
+	case "reject":
+	default:
+		return nil, repository.ErrAIInvalid
+	}
+	if _, err := s.Entries.Entries.DecideProposal(ctx, ownerID, strings.TrimSpace(itemID), itemVersion, approve); err != nil {
+		return nil, err
+	}
+	return s.Get(ctx, ownerID, taskID)
+}
+
 func (s *AdvisorEntryService) ProcessClaimed(ctx context.Context, lease repository.AdvisorEntryTaskLease) error {
 	if s == nil || s.Tasks == nil || s.Entries == nil {
 		return ErrAdvisorProviderUnavailable

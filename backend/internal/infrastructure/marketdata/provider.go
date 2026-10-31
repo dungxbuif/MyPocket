@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 )
@@ -17,10 +18,10 @@ const (
 )
 
 var (
-	ErrProviderNotConfigured   = errors.New("market provider is not configured")
-	ErrProviderBodyTooLarge    = errors.New("market provider response is too large")
-	ErrProviderBadResponse     = errors.New("market provider returned an invalid response")
-	ErrWaitingExternalContract = errors.New("waiting_external_contract")
+	ErrProviderNotConfigured = errors.New("market provider is not configured")
+	ErrProviderBodyTooLarge  = errors.New("market provider response is too large")
+	ErrProviderBadResponse   = errors.New("market provider returned an invalid response")
+	ErrProviderPartial       = errors.New("market provider returned partial data")
 )
 
 // ProviderQuote is the normalized provider boundary. Adapters must map their
@@ -41,10 +42,47 @@ type MarketPriceProvider interface {
 	Fetch(context.Context) ([]ProviderQuote, error)
 }
 
-// DefaultGoldProviders is deliberately disabled until each real source's
-// endpoint, response contract, authentication and product mapping is supplied.
+type GoldProviderSettings struct {
+	BTMCEndpoint string
+	BTMHEndpoint string
+}
+
+const (
+	DefaultBTMCEndpoint = "https://btmc.vn/"
+	DefaultBTMHEndpoint = "https://baotinmanhhai.vn/bang-gia-vang"
+)
+
+// DefaultGoldProviders returns backend-owned provider adapters. The endpoint
+// values can be overridden by deployment configuration, but are never accepted
+// from a user request. Adding a new source means adding another definition to
+// this registry rather than changing the poller or catalog identity rules.
 func DefaultGoldProviders() []MarketPriceProvider {
-	return []MarketPriceProvider{NewGoldSourceAProvider(), NewGoldSourceBProvider()}
+	return NewGoldProviders(GoldProviderSettings{
+		BTMCEndpoint: defaultString("GOLD_BTMC_ENDPOINT", DefaultBTMCEndpoint),
+		BTMHEndpoint: defaultString("GOLD_BTMH_ENDPOINT", DefaultBTMHEndpoint),
+	})
+}
+
+func NewGoldProviders(settings GoldProviderSettings) []MarketPriceProvider {
+	return []MarketPriceProvider{
+		NewGoldSourceAProvider(settings.BTMCEndpoint),
+		NewGoldSourceBProvider(settings.BTMHEndpoint),
+	}
+}
+
+func defaultString(key, fallback string) string {
+	if value := strings.TrimSpace(getenv(key)); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func getenv(key string) string {
+	// Kept in this small package boundary so provider configuration stays
+	// deployment-owned without coupling marketdata to the application config
+	// package. Secrets must be supplied through the endpoint by the deployer and
+	// are never logged by the poller.
+	return strings.TrimSpace(os.Getenv(key))
 }
 
 func ConfiguredProviderKeys(providers []MarketPriceProvider) map[string]struct{} {
@@ -64,6 +102,7 @@ type HTTPJSONProvider struct {
 	ProviderKey string
 	Endpoint    string
 	Client      *http.Client
+	Headers     map[string]string
 	Decode      func([]byte) ([]ProviderQuote, error)
 }
 
@@ -104,6 +143,9 @@ func (p *HTTPJSONProvider) Fetch(ctx context.Context) ([]ProviderQuote, error) {
 	if err != nil {
 		return nil, fmt.Errorf("%w: request construction", ErrProviderBadResponse)
 	}
+	for name, value := range p.Headers {
+		request.Header.Set(name, value)
+	}
 	response, err := p.Client.Do(request)
 	if err != nil {
 		return nil, err
@@ -121,7 +163,7 @@ func (p *HTTPJSONProvider) Fetch(ctx context.Context) ([]ProviderQuote, error) {
 	}
 	quotes, err := p.Decode(body)
 	if err != nil {
-		return nil, fmt.Errorf("%w: decode response", ErrProviderBadResponse)
+		return nil, fmt.Errorf("%w: decode response: %w", ErrProviderBadResponse, err)
 	}
 	return quotes, nil
 }

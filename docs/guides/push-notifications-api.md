@@ -1,8 +1,9 @@
 # Native push-token registration
 
-MyPocket currently materializes budget alerts in the authenticated in-app
-inbox. Native iOS may register its APNs address so a future provider adapter
-can deliver the same owner-scoped events.
+MyPocket materializes budget alerts in the authenticated in-app inbox. Native
+iOS may register its APNs address; a separate worker can deliver the same
+owner-scoped events through the server-side APNs transport when explicitly
+configured.
 
 ## Register
 
@@ -38,10 +39,12 @@ reported as `404 PUSH_TOKEN_NOT_FOUND`.
 
 ## Delivery boundary
 
-These routes persist registration metadata only. They do not call APNs or send
-push notifications. Provider credentials, Apple entitlements, environment
-selection, retry/dead-letter handling, token invalidation from provider errors
-and signed-device delivery acceptance are separate deployment gates.
+These routes persist registration metadata only and do not call APNs. The
+worker's `push_deliveries` queue uses ES256 token authentication, sandbox or
+production endpoint selection, lease-fenced retries, and 410 token revocation.
+Set `APNS_ENABLED=true` only with valid server-side credentials; it is disabled
+by default. Apple entitlements, a registered signed device, and live provider
+delivery acceptance remain deployment gates.
 
 AI-agent contract: use the exact routes and fields above; never infer that a
 successful registration means delivery succeeded. See [OpenAPI](../architecture/API.md)

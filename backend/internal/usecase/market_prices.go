@@ -11,7 +11,7 @@ import (
 )
 
 const (
-	MarketPollInterval = 30 * time.Minute
+	MarketPollInterval = 10 * time.Minute
 	MarketPollLease    = 2 * time.Minute
 	MarketClockSkew    = 5 * time.Minute
 )

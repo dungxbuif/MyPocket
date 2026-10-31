@@ -548,6 +548,31 @@ definitions:
       unassigned_spent:
         type: integer
     type: object
+  entity.MarketProduct:
+    properties:
+      created_at:
+        type: string
+      currency:
+        type: string
+      enabled:
+        type: boolean
+      external_product_id:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      name:
+        type: string
+      provider_key:
+        type: string
+      unit:
+        type: string
+      updated_at:
+        type: string
+      valuation_side:
+        type: string
+    type: object
   entity.MonthCategoryTotal:
     properties:
       amount:
@@ -594,6 +619,70 @@ definitions:
       transaction_count:
         type: integer
     type: object
+  entity.MonthlyReport:
+    properties:
+      as_of:
+        type: string
+      budgets:
+        items:
+          $ref: '#/definitions/entity.ReportBudgetPreview'
+        type: array
+      categories:
+        items:
+          $ref: '#/definitions/entity.ReportCategoryBreakdown'
+        type: array
+      comparison:
+        $ref: '#/definitions/entity.ReportComparison'
+      comparison_range:
+        $ref: '#/definitions/entity.ReportRange'
+      contributors:
+        items:
+          $ref: '#/definitions/entity.ReportContributor'
+        type: array
+      currency:
+        type: string
+      current_range:
+        $ref: '#/definitions/entity.ReportRange'
+      data_revision:
+        type: integer
+      drilldown:
+        $ref: '#/definitions/entity.ReportDrilldown'
+      insights:
+        items:
+          $ref: '#/definitions/entity.ReportInsight'
+        type: array
+      jars:
+        items:
+          $ref: '#/definitions/entity.ReportJarPreview'
+        type: array
+      quality_flags:
+        items:
+          type: string
+        type: array
+      rule_version:
+        type: string
+      scope:
+        $ref: '#/definitions/entity.MonthlyReportScope'
+      series:
+        items:
+          $ref: '#/definitions/entity.ReportSeriesPoint'
+        type: array
+      snapshot_id:
+        type: string
+      timezone:
+        type: string
+      totals:
+        $ref: '#/definitions/entity.ReportTotals'
+    type: object
+  entity.MonthlyReportScope:
+    properties:
+      granularity:
+        type: string
+      month:
+        type: string
+      wallet_id:
+        type: string
+    type: object
   entity.Notification:
     properties:
       body:
@@ -621,11 +710,21 @@ definitions:
         type: integer
       latest_price_at:
         type: string
+      latest_price_source:
+        type: string
+      market_product_id:
+        type: string
       name:
         type: string
       owner_id:
         type: string
+      price_mode:
+        type: string
       symbol:
+        type: string
+      unit_confirmed:
+        type: boolean
+      unit_label:
         type: string
       updated_at:
         type: string
@@ -648,11 +747,21 @@ definitions:
         type: integer
       name:
         type: string
+      price_as_of:
+        type: string
+      price_mode:
+        type: string
+      price_source:
+        type: string
+      price_status:
+        type: string
       quantity:
         type: string
       realized_pnl:
         type: integer
       symbol:
+        type: string
+      unit_label:
         type: string
       unrealized_pnl:
         type: integer
@@ -663,10 +772,14 @@ definitions:
         items:
           $ref: '#/definitions/entity.PortfolioAsset'
         type: array
+      known_market_value:
+        type: integer
       positions:
         items:
           $ref: '#/definitions/entity.PortfolioPosition'
         type: array
+      stale_asset_count:
+        type: integer
       total_cost_basis:
         type: integer
       total_market_value:
@@ -677,6 +790,8 @@ definitions:
         items:
           $ref: '#/definitions/entity.PortfolioTrade'
         type: array
+      unknown_asset_count:
+        type: integer
     type: object
   entity.PortfolioTrade:
     properties:
@@ -756,6 +871,186 @@ definitions:
         type: string
       wallet_id:
         type: string
+    type: object
+  entity.ReportBudgetPreview:
+    properties:
+      category_id:
+        type: string
+      fact_ref:
+        type: string
+      id:
+        type: string
+      limit_amount:
+        type: integer
+      name:
+        type: string
+      over_limit:
+        type: boolean
+      remaining:
+        type: integer
+      spent:
+        type: integer
+      wallet_id:
+        type: string
+    type: object
+  entity.ReportCategoryBreakdown:
+    properties:
+      amount:
+        type: integer
+      category_id:
+        type: string
+      name:
+        type: string
+      transaction_count:
+        type: integer
+    type: object
+  entity.ReportComparison:
+    properties:
+      common_days:
+        type: integer
+      comparable:
+        type: boolean
+      current:
+        $ref: '#/definitions/entity.ReportTotals'
+      expense_change_bps:
+        type: integer
+      expense_delta:
+        type: integer
+      income_change_bps:
+        type: integer
+      income_delta:
+        type: integer
+      net_delta:
+        type: integer
+      previous:
+        $ref: '#/definitions/entity.ReportTotals'
+    type: object
+  entity.ReportContributor:
+    properties:
+      category_id:
+        type: string
+      change_bps:
+        type: integer
+      current_amount:
+        type: integer
+      current_count:
+        type: integer
+      delta:
+        type: integer
+      fact_ref:
+        type: string
+      name:
+        type: string
+      previous_amount:
+        type: integer
+      previous_count:
+        type: integer
+    type: object
+  entity.ReportDrilldown:
+    properties:
+      category_ids:
+        items:
+          type: string
+        type: array
+      end_exclusive:
+        type: string
+      from:
+        type: string
+      type:
+        type: string
+      wallet_id:
+        type: string
+    type: object
+  entity.ReportInsight:
+    properties:
+      as_of:
+        type: string
+      body:
+        type: string
+      drilldown:
+        $ref: '#/definitions/entity.ReportDrilldown'
+      end_exclusive:
+        type: string
+      fact_refs:
+        items:
+          type: string
+        type: array
+      from:
+        type: string
+      id:
+        type: string
+      kind:
+        type: string
+      rule_version:
+        type: string
+      scope:
+        $ref: '#/definitions/entity.MonthlyReportScope'
+      title:
+        type: string
+    type: object
+  entity.ReportJarPreview:
+    properties:
+      active:
+        type: boolean
+      allocation_amount:
+        type: integer
+      allocation_mode:
+        type: string
+      calculated_allocation:
+        type: integer
+      fact_ref:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      scope:
+        type: string
+      spent:
+        type: integer
+    type: object
+  entity.ReportRange:
+    properties:
+      days:
+        type: integer
+      end_exclusive:
+        type: string
+      from:
+        type: string
+      is_partial:
+        type: boolean
+    type: object
+  entity.ReportSeriesPoint:
+    properties:
+      end_exclusive:
+        type: string
+      expense:
+        type: integer
+      from:
+        type: string
+      income:
+        type: integer
+      label:
+        type: string
+      net:
+        type: integer
+      transaction_count:
+        type: integer
+    type: object
+  entity.ReportTotals:
+    properties:
+      expense:
+        type: integer
+      expense_count:
+        type: integer
+      income:
+        type: integer
+      income_count:
+        type: integer
+      net:
+        type: integer
+      transaction_count:
+        type: integer
     type: object
   entity.SavingsGoalItem:
     properties:
@@ -1161,6 +1456,37 @@ definitions:
       secret:
         type: string
     type: object
+  httpapi.assetCatalogConfig:
+    properties:
+      asset_types:
+        items:
+          $ref: '#/definitions/httpapi.assetCatalogType'
+        type: array
+      products:
+        items:
+          $ref: '#/definitions/entity.MarketProduct'
+        type: array
+    type: object
+  httpapi.assetCatalogType:
+    properties:
+      code:
+        type: string
+      name:
+        type: string
+      units:
+        items:
+          $ref: '#/definitions/httpapi.assetCatalogUnit'
+        type: array
+    type: object
+  httpapi.assetCatalogUnit:
+    properties:
+      automatic_pricing:
+        type: boolean
+      code:
+        type: string
+      label:
+        type: string
+    type: object
   httpapi.budgetInput:
     properties:
       category_id:
@@ -1343,7 +1669,13 @@ definitions:
     properties:
       name:
         type: string
+      price_mode:
+        type: string
+      product_id:
+        type: string
       symbol:
+        type: string
+      unit_label:
         type: string
     type: object
   httpapi.portfolioAssetUpdateInput:
@@ -1360,6 +1692,15 @@ definitions:
         x-nullable: true
     required:
     - latest_price
+    type: object
+  httpapi.portfolioPriceSourceInput:
+    properties:
+      expected_version:
+        type: integer
+      price_mode:
+        type: string
+      product_id:
+        type: string
     type: object
   httpapi.portfolioTradeCorrectionFields:
     properties:
@@ -1403,6 +1744,13 @@ definitions:
         type: string
       unit_price:
         type: integer
+    type: object
+  httpapi.portfolioUnitInput:
+    properties:
+      expected_version:
+        type: integer
+      unit_label:
+        type: string
     type: object
   httpapi.recurringInput:
     properties:
@@ -1977,7 +2325,7 @@ paths:
         name: timezone
         required: true
         type: string
-      - description: JPEG, PNG, or PDF, up to twenty files
+      - description: JPEG, PNG, PDF, or XLSX, up to twenty files
         in: formData
         name: files
         type: file
@@ -4008,6 +4356,46 @@ paths:
       summary: Update or clear the latest manual portfolio price
       tags:
       - Portfolio
+  /api/v1/portfolio/assets/{id}/price-source:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Price source binding
+        in: body
+        name: source
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioPriceSourceInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PortfolioAsset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Bind or unlink an accumulated-asset price source
+      tags:
+      - Portfolio
   /api/v1/portfolio/assets/{id}/trade-corrections:
     post:
       consumes:
@@ -4124,6 +4512,76 @@ paths:
       security:
       - BearerAuth: []
       summary: Append a buy or sell trade to a portfolio asset
+      tags:
+      - Portfolio
+  /api/v1/portfolio/assets/{id}/unit:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Asset ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Expected asset version and unit label
+        in: body
+        name: unit
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.portfolioUnitInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.PortfolioAsset'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/httpapi.Problem'
+      security:
+      - BearerAuth: []
+      summary: Confirm a portfolio asset unit
+      tags:
+      - Portfolio
+  /api/v1/portfolio/catalog:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/entity.MarketProduct'
+            type: array
+      security:
+      - BearerAuth: []
+      summary: List enabled accumulated-asset market products
+      tags:
+      - Portfolio
+  /api/v1/portfolio/catalog-config:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/httpapi.assetCatalogConfig'
+      security:
+      - BearerAuth: []
+      summary: List accumulated-asset types and units
       tags:
       - Portfolio
   /api/v1/portfolio/summary:
@@ -4286,6 +4744,33 @@ paths:
       security:
       - BearerAuth: []
       summary: Read the deterministic Money Insider report
+      tags:
+      - Reports
+  /api/v1/reports/monthly:
+    get:
+      parameters:
+      - description: Calendar month YYYY-MM
+        in: query
+        name: month
+        type: string
+      - description: Optional owner wallet filter
+        in: query
+        name: wallet_id
+        type: string
+      - description: 'Series granularity: week or day'
+        in: query
+        name: granularity
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/entity.MonthlyReport'
+      security:
+      - BearerAuth: []
+      summary: Read the deterministic monthly report read model
       tags:
       - Reports
   /api/v1/reports/savings:

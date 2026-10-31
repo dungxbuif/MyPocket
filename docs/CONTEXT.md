@@ -19,8 +19,51 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-10-26
+updated: 2026-11-01
 ---
+
+## Release 1.3.0 build 7 — release candidate, 2026-11-01
+
+The unified native Assistant, report/insider surfaces, accumulated-asset units
+and source UI, shared typography/density bases, Phosphor icon catalog fallback,
+privacy-safe AI attachment diagnostics, and APNs transport are frozen as the
+`1.3.0 (7)` release candidate. The native Release simulator artifact passed
+metadata preflight and was installed/launched on `MyPocket-iPhone-16`. Signed
+native units pass 442/442 and the backend suite passes; the aggregate UI scheme
+run was interrupted after the simulator runner made no completion progress for
+more than eleven minutes, so it is not claimed as a full UI-suite pass. APNs
+remains disabled by default pending Apple credentials/entitlements and signed
+device delivery acceptance. Production deployment evidence is recorded in the
+[release note](releases/REL-1.3.0-20261101.md).
+
+## AI attachment diagnostics and APNs transport — 2026-11-01
+
+Backlog item #8 is implemented locally: `POST /ai/entry/process` and request
+recovery now return owner-scoped per-file diagnostics using position, validated
+basename, stage, status and allow-listed error code only. Native AI Entry renders
+the diagnostic next to the corresponding selected file and keeps successful
+evidence visible; OCR text, object keys, provider URLs and raw errors remain
+private. The backend also now constructs real APNs ES256 JWT requests and the
+worker hands notifications through the durable `push_deliveries` queue with
+lease-fenced retry/revoke/fail transitions. APNs stays disabled by default until
+server secrets, Apple entitlements and signed-device acceptance are available.
+Backend/native verification and docs reconciliation pass locally; live APNs,
+signed-device delivery and production cleanup configuration remain external
+gates.
+
+## Native UI execution — 2026-10-31
+
+Owner wants to retain the liked simulator's overall card/color styling and the
+floating feedback bubble, with smaller/lighter typography, a more usable AI
+composer, first-class Hũ screens/entry points, and Money Lover-inspired category
+icons. [Design](work/tickets/NATIVE-CHAT-COMPOSER-20261031-DETAIL_DESIGN.md) and
+[plan](superpowers/plans/2026-10-31-mypocket-ui-density-chat-icons.md) now govern
+local execution. Four earlier runtime-file edits remain unbuilt/unverified; do
+not treat them as the accepted simulator baseline. Hũ behavior is already
+API-backed (monthly configs, cumulative report, transaction/AI assignment); this
+slice polishes its navigation and presentation without changing API/DB/auth.
+Proposed icon family is Phosphor Regular/Duotone, with a comparison preview
+before adoption. No production release or physical install is implied.
 
 ## Deterministic XLSX ingestion candidate — 2026-10-27
 

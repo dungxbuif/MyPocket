@@ -16,6 +16,20 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## MyPocket 1.3.0 build 7 release gate — 2026-11-01
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Backend full suite | `rtk proxy go test ./... -count=1` in `backend/` | PASS: all packages completed with exit 0 |
+| Native signed unit target | `/tmp/mypocket-release-unit-signed-20261101.xcresult`; `xcodebuild ... -only-testing:MyPocketIOSTests ... CODE_SIGNING_ALLOWED=YES DEVELOPMENT_TEAM=AU442S3MN3` | PASS: 442/442, 0 failures, 0 skips, 0 runtime warnings |
+| Release compiler/artifact | `/tmp/mypocket-release-1.3.0-build7-20261101`; `SWIFT_TREAT_WARNINGS_AS_ERRORS=YES`; `release-artifact-preflight.sh` | PASS: `BUILD SUCCEEDED`; bundle `com.mypocket.ios`, version `1.3.0`, build `7`, portrait-only, production HTTPS API |
+| Static/project guards | `verify-project.sh`, `check-base-components.sh`, `check-icon-catalog.sh`, `git diff --check` | PASS |
+| Simulator install/launch | `xcrun simctl install ... MyPocketIOS.app`; `xcrun simctl launch ... com.mypocket.ios` on `MyPocket-iPhone-16` (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`) | PASS: launch returned a process ID |
+| Aggregate native UI scheme | `xcodebuild ... test` including UI target | BLOCKED/NOT CLAIMED: simulator UI runner produced no completion result for more than 11 minutes and the run was interrupted; no product assertion failure was used as release evidence |
+| APNs live delivery | Apple credentials, entitlements and signed device | OPEN: transport is shipped but `APNS_ENABLED=false` remains the production default |
+
+[Release note](../releases/REL-1.3.0-20261101.md).
+
 ## Unified native Assistant local acceptance — 2026-11-01
 
 | Gate | Evidence | Result |
@@ -23,6 +37,16 @@ updated: 2026-11-01
 | TDD-focused native XCTest | `xcodebuild test` on iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`, selecting `AdvisorRunObserverTests`, Assistant batch/read-only/lifecycle/composer/scroll tests, canonical transaction-row parity, and the AI-entry attachment policy | PASS: 12 focused tests, 0 failures |
 | Assistant batch state/row implementation | `AssistantEntryBatchPolicy`, `AssistantEntryBatchPresentation`, `AssistantActionCard` | PASS: server states map to review/saving/applied/rejected/conflict; batch preview uses shared `MPTransactionRow` signs and hierarchy; saving hides duplicate actions |
 | Provider/device/production evidence | Not run or claimed in this local-only pass | OPEN; owner/provider/physical-device acceptance remains separate |
+
+## AI attachment diagnostics and APNs transport — 2026-11-01
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Per-file diagnostic safety | `backend/internal/entity/ai_entry_attachment_diagnostic_test.go`; repository/session projection; mixed-success recovery fixtures | PASS locally: stable position/basename/stage/status/allow-listed code only; OCR text, object key, hash, bytes and raw provider body are absent |
+| Native diagnostic decoding/presentation | `AIModelsTests.testEntryProcessDecodesPerFileDiagnosticsAndKeepsLegacyPayloadCompatible`; `AIEntryView` diagnostic card | PASS locally: new field decodes and omitted legacy field remains compatible; successful and failed files are distinguishable |
+| APNs request transport | `backend/internal/infrastructure/push/apns_http_test.go` | PASS locally: ES256 JWT, topic/collapse/push headers, sandbox/production endpoints, Retry-After and non-leaking response handling |
+| APNs durable worker | `backend/cmd/worker/push_deliveries_test.go`; `go test ./... -count=1` | PASS locally: enqueue/lease, success, 410 current-token revoke, token-rotation fence, retry bound and permanent failure |
+| Full backend and native build | `go test ./... -count=1`; `xcodebuild ... build-for-testing`; focused native model tests | PASS locally; live Apple credentials, entitlements, signed-device delivery and deployed S3 cleanup remain OPEN |
 
 ## MyPocket 1.3.0 physical release candidate — 2026-10-27
 

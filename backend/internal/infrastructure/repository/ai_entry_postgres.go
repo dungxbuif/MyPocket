@@ -123,6 +123,15 @@ func (r *AIEntryPostgresRepository) Session(ctx context.Context, owner, id strin
 		}
 		s.Messages = []entity.AIEntryMessage{}
 		s.Proposals = []entity.AIEntryProposal{}
+		var attachments []entity.AIEntryAttachment
+		if err := tx.Where("session_id = ? AND owner_id = ?", id, owner).
+			Order("input_order ASC, created_at ASC, id ASC").Find(&attachments).Error; err != nil {
+			return err
+		}
+		s.AttachmentDiagnostics = make([]entity.AIEntryAttachmentDiagnostic, 0, len(attachments))
+		for _, attachment := range attachments {
+			s.AttachmentDiagnostics = append(s.AttachmentDiagnostics, attachment.Diagnostic())
+		}
 		// One-shot processes deliberately do not load or expose conversation history.
 		return tx.Where("session_id = ? AND owner_id = ?", id, owner).Order("created_at, id").Find(&s.Proposals).Error
 	})

@@ -7,7 +7,7 @@ set -euo pipefail
 
 repo_root="$(CDPATH= cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 migrations_dir="${MIGRATIONS_DIR:-${repo_root}/backend/migrations}"
-expected_latest="${EXPECTED_MIGRATION_VERSION:-000041}"
+expected_latest="${EXPECTED_MIGRATION_VERSION:-000052}"
 
 fail() {
   printf 'FAIL: %s\n' "$*" >&2
@@ -39,7 +39,7 @@ done
 latest="${migration_versions[${#migration_versions[@]}-1]}"
 [[ "${latest}" == "${expected_latest}" ]] || fail "latest migration ${latest}, expected ${expected_latest}"
 
-for version in 000035 000036 000037 000038 000039 000040 000041; do
+for version in 000035 000036 000037 000038 000039 000040 000041 000042 000043 000044 000045 000046 000047 000048 000049 000050 000051 000052; do
   [[ "$(printf '%s\n' "${migration_versions[@]}" | grep -Fx "${version}" || true)" == "${version}" ]] \
     || fail "required migration ${version} is missing"
 done
@@ -50,7 +50,18 @@ for pair in \
   "000038_portfolio_trade_corrections.up.sql 000038_portfolio_trade_corrections.down.sql" \
   "000039_push_deliveries.up.sql 000039_push_deliveries.down.sql" \
   "000040_row_versions.up.sql 000040_row_versions.down.sql" \
-  "000041_advisor_runtime.up.sql 000041_advisor_runtime.down.sql"; do
+  "000041_advisor_runtime.up.sql 000041_advisor_runtime.down.sql" \
+  "000042_advisor_entry_tasks.up.sql 000042_advisor_entry_tasks.down.sql" \
+  "000043_asset_units.up.sql 000043_asset_units.down.sql" \
+  "000044_asset_market.up.sql 000044_asset_market.down.sql" \
+  "000045_market_poll_claims.up.sql 000045_market_poll_claims.down.sql" \
+  "000046_advisor_entry_input.up.sql 000046_advisor_entry_input.down.sql" \
+  "000047_report_snapshots.up.sql 000047_report_snapshots.down.sql" \
+  "000048_report_analyses.up.sql 000048_report_analyses.down.sql" \
+  "000049_gold_market_catalog.up.sql 000049_gold_market_catalog.down.sql" \
+  "000050_report_revision_delete_guard.up.sql 000050_report_revision_delete_guard.down.sql" \
+  "000051_ai_entry_proposal_lifecycle.up.sql 000051_ai_entry_proposal_lifecycle.down.sql" \
+  "000052_ai_entry_proposal_receipt_check.up.sql 000052_ai_entry_proposal_receipt_check.down.sql"; do
   read -r up down <<<"${pair}"
   [[ -f "${migrations_dir}/${up}" ]] || fail "missing ${up}"
   [[ -f "${migrations_dir}/${down}" ]] || fail "missing ${down}"
@@ -80,7 +91,7 @@ else
   printf 'SKIP: database version check (set CHECK_DATABASE_VERSION=1 explicitly)\n'
 fi
 
-printf 'PASS: migration files are ordered through %s; 035→036→037→038→039→040→041 is the required forward path\n' "${expected_latest}"
+printf 'PASS: migration files are ordered through %s; 035→…→052 is the required forward path\n' "${expected_latest}"
 printf '\nOperator commands (not executed by this script):\n'
 printf '  cd <release-image-shell> && /app/migrate version\n'
 printf '  cd <release-image-shell> && /app/migrate up\n'

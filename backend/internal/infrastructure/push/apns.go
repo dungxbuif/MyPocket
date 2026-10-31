@@ -55,8 +55,9 @@ type Request struct {
 }
 
 type Response struct {
-	StatusCode int
-	RetryAfter time.Duration
+	StatusCode  int
+	RetryAfter  time.Duration
+	FailureCode string
 }
 
 type Transport interface {
@@ -78,6 +79,7 @@ type DeliveryResult struct {
 	State       State
 	RetryAt     *time.Time
 	RevokeToken bool
+	FailureCode string
 }
 
 // Deliver classifies one provider response. It does not sleep or send again;
@@ -92,21 +94,35 @@ func Deliver(ctx context.Context, transport Transport, request Request, attempt 
 	}
 	response, err := transport.Send(ctx, request)
 	if err != nil {
-		return retryResult(attempt.Number, now, 0), fmt.Errorf("%w: %v", ErrTransport, err)
+		result := retryResult(attempt.Number, now, 0)
+		result.FailureCode = "transport_error"
+		return result, ErrTransport
 	}
 	switch {
 	case response.StatusCode >= 200 && response.StatusCode < 300:
 		return DeliveryResult{State: StateSent}, nil
 	case response.StatusCode == 410:
 		// Revoke only this registration; a newer token for the same device stays.
-		return DeliveryResult{State: StateRevokeToken, RevokeToken: true}, nil
+		return DeliveryResult{State: StateRevokeToken, RevokeToken: true, FailureCode: responseFailureCode(response)}, nil
 	case response.StatusCode == 429 || response.StatusCode >= 500:
-		return retryResult(attempt.Number, now, response.RetryAfter), nil
+		result := retryResult(attempt.Number, now, response.RetryAfter)
+		result.FailureCode = responseFailureCode(response)
+		return result, nil
 	default:
 		// 400/403 include malformed payload and invalid credentials/topic. They
 		// are operator-visible permanent failures, not retryable user jobs.
-		return DeliveryResult{State: StateFailed}, nil
+		return DeliveryResult{State: StateFailed, FailureCode: responseFailureCode(response)}, nil
 	}
+}
+
+func responseFailureCode(response Response) string {
+	if response.FailureCode != "" {
+		return response.FailureCode
+	}
+	if response.StatusCode > 0 {
+		return fmt.Sprintf("apns_http_%d", response.StatusCode)
+	}
+	return "apns_unknown_response"
 }
 
 func retryResult(attempt int, now time.Time, retryAfter time.Duration) DeliveryResult {

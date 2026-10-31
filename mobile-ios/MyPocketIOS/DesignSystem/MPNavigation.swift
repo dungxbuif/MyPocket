@@ -572,8 +572,10 @@ enum MPShellNavigation {
 
     static let addActionAccessibilityID = "add-transaction-button"
     static let selectedTabStyle: TabSelectionStyle = .surfacePill
-    static let bottomNavigationCornerRadius: CGFloat = 28
-    static let selectedTabCornerRadius: CGFloat = 22
+    // A compact liquid surface: material supplies the translucency, while
+    // restrained radii keep the shell closer to the app's square card language.
+    static let bottomNavigationCornerRadius: CGFloat = 16
+    static let selectedTabCornerRadius: CGFloat = 10
     static let addButtonDiameter: CGFloat = 56
     static let feedbackBubbleDiameter: CGFloat = 52
     static let feedbackDockHeight: CGFloat = feedbackBubbleDiameter + 8
@@ -718,13 +720,20 @@ struct MPBottomNavigation: View {
             .padding(.top, 6)
             .padding(.bottom, 2)
             .background(
-                MPColor.surface,
+                .ultraThinMaterial,
                 in: RoundedRectangle(
                     cornerRadius: MPShellNavigation.bottomNavigationCornerRadius,
                     style: .continuous
                 )
             )
-            .shadow(color: MPColor.ink.opacity(0.08), radius: 14, y: 4)
+            .overlay {
+                RoundedRectangle(
+                    cornerRadius: MPShellNavigation.bottomNavigationCornerRadius,
+                    style: .continuous
+                )
+                .stroke(MPColor.line.opacity(0.7), lineWidth: MPMetrics.inputBorderWidth)
+            }
+            .shadow(color: MPColor.ink.opacity(0.08), radius: 10, y: 4)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("bottom-navigation")
             .padding(.horizontal, 16)

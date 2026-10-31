@@ -451,7 +451,7 @@ struct MPTransactionGlyph: View {
     var size: CGFloat = MPMetrics.hitTarget
 
     var body: some View {
-        Image(systemName: systemName)
+        MPIconImage(systemName: systemName)
             .font(MPFont.bodyEmphasis)
             .foregroundStyle(foreground)
             .frame(width: size, height: size)

@@ -548,7 +548,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "file",
-                        "description": "JPEG, PNG, or PDF, up to twenty files",
+                        "description": "JPEG, PNG, PDF, or XLSX, up to twenty files",
                         "name": "files",
                         "in": "formData"
                     }
@@ -3695,6 +3695,69 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/portfolio/assets/{id}/price-source": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Bind or unlink an accumulated-asset price source",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Price source binding",
+                        "name": "source",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.portfolioPriceSourceInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PortfolioAsset"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/portfolio/assets/{id}/trade-corrections": {
             "post": {
                 "security": [
@@ -3878,6 +3941,120 @@ const docTemplate = `{
                         "description": "Conflict",
                         "schema": {
                             "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/assets/{id}/unit": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "Confirm a portfolio asset unit",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Asset ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Expected asset version and unit label",
+                        "name": "unit",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.portfolioUnitInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.PortfolioAsset"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/catalog": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "List enabled accumulated-asset market products",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/entity.MarketProduct"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/portfolio/catalog-config": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Portfolio"
+                ],
+                "summary": "List accumulated-asset types and units",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.assetCatalogConfig"
                         }
                     }
                 }
@@ -4142,6 +4319,50 @@ const docTemplate = `{
                         "description": "Not Found",
                         "schema": {
                             "$ref": "#/definitions/httpapi.Problem"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/monthly": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Read the deterministic monthly report read model",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Calendar month YYYY-MM",
+                        "name": "month",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Optional owner wallet filter",
+                        "name": "wallet_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Series granularity: week or day",
+                        "name": "granularity",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/entity.MonthlyReport"
                         }
                     }
                 }
@@ -6251,6 +6472,44 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.MarketProduct": {
+            "type": "object",
+            "properties": {
+                "created_at": {
+                    "type": "string"
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "external_product_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "provider_key": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "valuation_side": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.MonthCategoryTotal": {
             "type": "object",
             "properties": {
@@ -6321,6 +6580,103 @@ const docTemplate = `{
                 }
             }
         },
+        "entity.MonthlyReport": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "budgets": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.ReportBudgetPreview"
+                    }
+                },
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.ReportCategoryBreakdown"
+                    }
+                },
+                "comparison": {
+                    "$ref": "#/definitions/entity.ReportComparison"
+                },
+                "comparison_range": {
+                    "$ref": "#/definitions/entity.ReportRange"
+                },
+                "contributors": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.ReportContributor"
+                    }
+                },
+                "currency": {
+                    "type": "string"
+                },
+                "current_range": {
+                    "$ref": "#/definitions/entity.ReportRange"
+                },
+                "data_revision": {
+                    "type": "integer"
+                },
+                "drilldown": {
+                    "$ref": "#/definitions/entity.ReportDrilldown"
+                },
+                "insights": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.ReportInsight"
+                    }
+                },
+                "jars": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.ReportJarPreview"
+                    }
+                },
+                "quality_flags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "rule_version": {
+                    "type": "string"
+                },
+                "scope": {
+                    "$ref": "#/definitions/entity.MonthlyReportScope"
+                },
+                "series": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.ReportSeriesPoint"
+                    }
+                },
+                "snapshot_id": {
+                    "type": "string"
+                },
+                "timezone": {
+                    "type": "string"
+                },
+                "totals": {
+                    "$ref": "#/definitions/entity.ReportTotals"
+                }
+            }
+        },
+        "entity.MonthlyReportScope": {
+            "type": "object",
+            "properties": {
+                "granularity": {
+                    "type": "string"
+                },
+                "month": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
         "entity.Notification": {
             "type": "object",
             "properties": {
@@ -6362,13 +6718,28 @@ const docTemplate = `{
                 "latest_price_at": {
                     "type": "string"
                 },
+                "latest_price_source": {
+                    "type": "string"
+                },
+                "market_product_id": {
+                    "type": "string"
+                },
                 "name": {
                     "type": "string"
                 },
                 "owner_id": {
                     "type": "string"
                 },
+                "price_mode": {
+                    "type": "string"
+                },
                 "symbol": {
+                    "type": "string"
+                },
+                "unit_confirmed": {
+                    "type": "boolean"
+                },
+                "unit_label": {
                     "type": "string"
                 },
                 "updated_at": {
@@ -6403,6 +6774,18 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "price_as_of": {
+                    "type": "string"
+                },
+                "price_mode": {
+                    "type": "string"
+                },
+                "price_source": {
+                    "type": "string"
+                },
+                "price_status": {
+                    "type": "string"
+                },
                 "quantity": {
                     "type": "string"
                 },
@@ -6410,6 +6793,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "symbol": {
+                    "type": "string"
+                },
+                "unit_label": {
                     "type": "string"
                 },
                 "unrealized_pnl": {
@@ -6426,11 +6812,17 @@ const docTemplate = `{
                         "$ref": "#/definitions/entity.PortfolioAsset"
                     }
                 },
+                "known_market_value": {
+                    "type": "integer"
+                },
                 "positions": {
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/entity.PortfolioPosition"
                     }
+                },
+                "stale_asset_count": {
+                    "type": "integer"
                 },
                 "total_cost_basis": {
                     "type": "integer"
@@ -6446,6 +6838,9 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/entity.PortfolioTrade"
                     }
+                },
+                "unknown_asset_count": {
+                    "type": "integer"
                 }
             }
         },
@@ -6566,6 +6961,281 @@ const docTemplate = `{
                 },
                 "wallet_id": {
                     "type": "string"
+                }
+            }
+        },
+        "entity.ReportBudgetPreview": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "fact_ref": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "limit_amount": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "over_limit": {
+                    "type": "boolean"
+                },
+                "remaining": {
+                    "type": "integer"
+                },
+                "spent": {
+                    "type": "integer"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.ReportCategoryBreakdown": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "category_id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "transaction_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.ReportComparison": {
+            "type": "object",
+            "properties": {
+                "common_days": {
+                    "type": "integer"
+                },
+                "comparable": {
+                    "type": "boolean"
+                },
+                "current": {
+                    "$ref": "#/definitions/entity.ReportTotals"
+                },
+                "expense_change_bps": {
+                    "type": "integer"
+                },
+                "expense_delta": {
+                    "type": "integer"
+                },
+                "income_change_bps": {
+                    "type": "integer"
+                },
+                "income_delta": {
+                    "type": "integer"
+                },
+                "net_delta": {
+                    "type": "integer"
+                },
+                "previous": {
+                    "$ref": "#/definitions/entity.ReportTotals"
+                }
+            }
+        },
+        "entity.ReportContributor": {
+            "type": "object",
+            "properties": {
+                "category_id": {
+                    "type": "string"
+                },
+                "change_bps": {
+                    "type": "integer"
+                },
+                "current_amount": {
+                    "type": "integer"
+                },
+                "current_count": {
+                    "type": "integer"
+                },
+                "delta": {
+                    "type": "integer"
+                },
+                "fact_ref": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "previous_amount": {
+                    "type": "integer"
+                },
+                "previous_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.ReportDrilldown": {
+            "type": "object",
+            "properties": {
+                "category_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "end_exclusive": {
+                    "type": "string"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "wallet_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.ReportInsight": {
+            "type": "object",
+            "properties": {
+                "as_of": {
+                    "type": "string"
+                },
+                "body": {
+                    "type": "string"
+                },
+                "drilldown": {
+                    "$ref": "#/definitions/entity.ReportDrilldown"
+                },
+                "end_exclusive": {
+                    "type": "string"
+                },
+                "fact_refs": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "from": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "rule_version": {
+                    "type": "string"
+                },
+                "scope": {
+                    "$ref": "#/definitions/entity.MonthlyReportScope"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "entity.ReportJarPreview": {
+            "type": "object",
+            "properties": {
+                "active": {
+                    "type": "boolean"
+                },
+                "allocation_amount": {
+                    "type": "integer"
+                },
+                "allocation_mode": {
+                    "type": "string"
+                },
+                "calculated_allocation": {
+                    "type": "integer"
+                },
+                "fact_ref": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "scope": {
+                    "type": "string"
+                },
+                "spent": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.ReportRange": {
+            "type": "object",
+            "properties": {
+                "days": {
+                    "type": "integer"
+                },
+                "end_exclusive": {
+                    "type": "string"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "is_partial": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "entity.ReportSeriesPoint": {
+            "type": "object",
+            "properties": {
+                "end_exclusive": {
+                    "type": "string"
+                },
+                "expense": {
+                    "type": "integer"
+                },
+                "from": {
+                    "type": "string"
+                },
+                "income": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "net": {
+                    "type": "integer"
+                },
+                "transaction_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "entity.ReportTotals": {
+            "type": "object",
+            "properties": {
+                "expense": {
+                    "type": "integer"
+                },
+                "expense_count": {
+                    "type": "integer"
+                },
+                "income": {
+                    "type": "integer"
+                },
+                "income_count": {
+                    "type": "integer"
+                },
+                "net": {
+                    "type": "integer"
+                },
+                "transaction_count": {
+                    "type": "integer"
                 }
             }
         },
@@ -7187,6 +7857,54 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.assetCatalogConfig": {
+            "type": "object",
+            "properties": {
+                "asset_types": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.assetCatalogType"
+                    }
+                },
+                "products": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.MarketProduct"
+                    }
+                }
+            }
+        },
+        "httpapi.assetCatalogType": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "units": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/httpapi.assetCatalogUnit"
+                    }
+                }
+            }
+        },
+        "httpapi.assetCatalogUnit": {
+            "type": "object",
+            "properties": {
+                "automatic_pricing": {
+                    "type": "boolean"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.budgetInput": {
             "type": "object",
             "properties": {
@@ -7469,7 +8187,16 @@ const docTemplate = `{
                 "name": {
                     "type": "string"
                 },
+                "price_mode": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "string"
+                },
                 "symbol": {
+                    "type": "string"
+                },
+                "unit_label": {
                     "type": "string"
                 }
             }
@@ -7494,6 +8221,20 @@ const docTemplate = `{
                 "latest_price": {
                     "type": "integer",
                     "x-nullable": true
+                }
+            }
+        },
+        "httpapi.portfolioPriceSourceInput": {
+            "type": "object",
+            "properties": {
+                "expected_version": {
+                    "type": "integer"
+                },
+                "price_mode": {
+                    "type": "string"
+                },
+                "product_id": {
+                    "type": "string"
                 }
             }
         },
@@ -7560,6 +8301,17 @@ const docTemplate = `{
                 },
                 "unit_price": {
                     "type": "integer"
+                }
+            }
+        },
+        "httpapi.portfolioUnitInput": {
+            "type": "object",
+            "properties": {
+                "expected_version": {
+                    "type": "integer"
+                },
+                "unit_label": {
+                    "type": "string"
                 }
             }
         },

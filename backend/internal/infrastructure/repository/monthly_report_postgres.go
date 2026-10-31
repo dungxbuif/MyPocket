@@ -134,11 +134,8 @@ func (r *MonthlyReportPostgresRepository) resolveScope(ctx context.Context, tx *
 	if monthYear > localNow.Year() || (monthYear == localNow.Year() && monthNumber > localNow.Month()) {
 		return reportQueryScope{}, entity.ErrMonthlyReportFuture
 	}
-	granularity := strings.TrimSpace(scope.Granularity)
+	granularity := entity.NormalizeMonthlyReportGranularity(scope.Granularity)
 	if granularity == "" {
-		granularity = "week"
-	}
-	if granularity != "week" && granularity != "day" {
 		return reportQueryScope{}, entity.ErrMonthlyReportScopeInvalid
 	}
 	walletID := strings.TrimSpace(scope.WalletID)

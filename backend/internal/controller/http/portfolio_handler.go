@@ -192,10 +192,12 @@ func (h *PortfolioHandler) CreateAsset(c *gin.Context) {
 		return
 	}
 	var unitLabel *string
-	if input.UnitLabel != nil {
-		value := strings.TrimSpace(*input.UnitLabel)
-		unitLabel = &value
+	if input.UnitLabel == nil || !entity.IsPortfolioGoldUnit(*input.UnitLabel) {
+		portfolioBadRequest(c, "Hãy chọn một đơn vị vàng hợp lệ từ danh mục.")
+		return
 	}
+	value := strings.TrimSpace(*input.UnitLabel)
+	unitLabel = &value
 	var productID *string
 	if input.ProductID != nil {
 		value := strings.TrimSpace(*input.ProductID)

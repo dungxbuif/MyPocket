@@ -5,8 +5,8 @@ set -euo pipefail
 # sign, install, contact production, or print sensitive plist values.
 APP_PATH="${APP_PATH:-${1:-}}"
 EXPECTED_BUNDLE_ID="${EXPECTED_BUNDLE_ID:-com.mypocket.ios}"
-EXPECTED_VERSION="${EXPECTED_VERSION:-1.2.1}"
-EXPECTED_BUILD="${EXPECTED_BUILD:-4}"
+EXPECTED_VERSION="${EXPECTED_VERSION:-1.3.0}"
+EXPECTED_BUILD="${EXPECTED_BUILD:-7}"
 EXPECTED_API_URL="${EXPECTED_API_URL:-https://money.dungxbuif.com/api/v1}"
 
 if [[ -z "$APP_PATH" ]]; then

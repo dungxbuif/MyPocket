@@ -48,4 +48,16 @@ final class AIModelsTests: XCTestCase {
         XCTAssertEqual(task.status, "review_ready")
         XCTAssertEqual(task.batchVersion, 2)
     }
+
+    func testEntryProcessDecodesPerFileDiagnosticsAndKeepsLegacyPayloadCompatible() throws {
+        let fixture = #"{"id":"request-1","processing":false,"error":"Không đọc được nội dung","error_code":"ocr_failed","proposals":[],"attachment_diagnostics":[{"position":1,"filename":"bank.pdf","stage":"ocr","status":"failed","error_code":"ocr_failed"},{"position":2,"filename":"receipt.png","stage":"ocr","status":"succeeded"}]}"#
+        let process = try JSONDecoder.mypocket.decode(EntryProcessModel.self, from: Data(fixture.utf8))
+        XCTAssertEqual(process.attachmentDiagnostics.map(\.position), [1, 2])
+        XCTAssertEqual(process.attachmentDiagnostics.first?.errorCode, "ocr_failed")
+        XCTAssertEqual(process.attachmentDiagnostics.last?.status, "succeeded")
+
+        let legacy = #"{"id":"request-2","processing":false,"proposals":[]}"#
+        let legacyProcess = try JSONDecoder.mypocket.decode(EntryProcessModel.self, from: Data(legacy.utf8))
+        XCTAssertTrue(legacyProcess.attachmentDiagnostics.isEmpty)
+    }
 }

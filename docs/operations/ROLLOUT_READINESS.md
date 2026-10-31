@@ -1,7 +1,7 @@
 ---
 artifact_type: operational_runbook
 id: ROLLOUT_READINESS
-status: deployed-uat-2026-10-19
+status: deployed-plan-2026-11-01
 owner: shared
 trace:
   database: ../architecture/DATABASE.md
@@ -14,20 +14,20 @@ trace:
 # Release rollout readiness
 
 This runbook is for the current native/API candidate. The repository preflight
-commands remain read-only, while the approved 2026-10-19 change window is
-recorded in the current-status section below. No preflight command applies a
+commands remain read-only. The 2026-11-01 rollout evidence is recorded first;
+older change-window notes below are historical. No preflight command applies a
 migration, updates a Swarm service, or writes to a database.
 
 ## Current schema path
 
 ### Release 1.2.1 — 2026-10-20
 
-Production currently uses release-20261020-a2de756 and schema 40. The new image
-requires additive migration 000041 before API/worker update. Its deadline
-default preserves old API inserts during transition. Back up and compare
-financial checksums. Keep runtime/grounding flags off for this patch; broader
-quality acceptance remains open. The preflight script now requires 000041.
-Older upgrade paths below are historical context.
+Production currently runs the plan candidate at schema 52 (`dirty=false`) on
+both API and worker. The immutable image digest, validated backup and strict
+route-parity evidence are recorded in the current-status section below. Runtime
+and grounding flags remain off by design for mixed rollout; broader provider
+and owner acceptance remains open. Older upgrade paths below are historical
+context.
 
 ### MCP local candidate — 2026-10-20
 
@@ -76,7 +76,7 @@ From the repository root:
 ./scripts/mypocket-rollout-preflight.sh
 ```
 
-This checks migration naming/order, requires 035–040, verifies the API
+This checks migration naming/order, requires 035–049, verifies the API
 image contains both `/app/migrate` and `/app/worker`, and prints (without
 executing) the operator commands. It warns when no backup is supplied. To
 validate an already-created custom-format archive without exposing its
@@ -104,8 +104,8 @@ cd backend
 go test ./migrations -count=1
 ```
 
-It proves strict ordering, latest version 040, reversible disposable down
-files for 036–040, required owner/uniqueness/CAS constraints, and the absence
+It proves strict ordering, latest version 049, reversible disposable down
+files for 036–049, required owner/uniqueness/CAS constraints, and the absence
 of destructive statements in the additive up files.
 
 ## Native release-artifact preflight
@@ -243,6 +243,30 @@ rows, so it is intentionally not part of the default preflight script.
 
 ## Current status
 
+### Plan rollout — 2026-11-01
+
+The candidate image was built for `linux/amd64`, pushed and applied to both
+services:
+
+```text
+registry.dungxbuif.com/mypocket-api:plan-20261101
+sha256:e18a80cd3d7a406744c61ec7150a8c83ca68e74618472ded56729799389a8883
+```
+
+The pre-release custom-format backup was validated with `pg_restore --list`:
+
+```text
+/var/backups/mypocket/plan-20261101-20261031T202332Z/pre-release.dump
+sha256: de2f418be6b509ce3fbe84bdcde2d6462706e4863b0e5ce657132e0edec8c82d
+```
+
+Production reports `version: 52 dirty: false`; API health is green; both
+Swarm services are `1/1`; strict OpenAPI parity is `96 live / 96 local`.
+The worker emitted a successful market pass with two providers and four
+accepted quotes. Feedback was re-read without changing owner resolution:
+55 total, 0 unresolved, all `status=open`; owner `resolved=true` is now set
+for the current test batch.
+
 ### Read-only rollout dry-run — 2026-10-20
 
 The current candidate was built for `linux/amd64` and pushed as an immutable
@@ -254,7 +278,7 @@ sha256:28e4d2450df20f205e38d82aa923fb6fa86df46dd25ff695a1f4579098983807
 ```
 
 It contains `/app/api`, `/app/migrate`, `/app/worker` and migrations through
-`000040`. Service update remains blocked until the validated production backup
+`000049`. Service update remains blocked until the validated production backup
 and manager-path migration version readback are available.
 
 The production-readiness checks were rerun without an authenticated database

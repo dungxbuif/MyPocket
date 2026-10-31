@@ -16,6 +16,11 @@ import (
 
 type AdvisorPostgresRepository struct{ db *gorm.DB }
 
+func stringValue(value any) string {
+	text, _ := value.(string)
+	return text
+}
+
 func NewAdvisorPostgresRepository(db *gorm.DB) contract.AdvisorRepository {
 	return &AdvisorPostgresRepository{db: db}
 }

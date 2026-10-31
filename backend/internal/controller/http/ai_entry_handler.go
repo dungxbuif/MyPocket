@@ -76,16 +76,17 @@ func (h *AIEntryHandler) DownloadAttachment(c *gin.Context) {
 }
 
 type aiEntryProcessResponse struct {
-	ID         string                   `json:"id"`
-	Processing bool                     `json:"processing"`
-	Error      string                   `json:"error,omitempty"`
-	ErrorCode  string                   `json:"error_code,omitempty"`
-	Reply      string                   `json:"reply,omitempty"`
-	Proposals  []entity.AIEntryProposal `json:"proposals"`
+	ID                    string                               `json:"id"`
+	Processing            bool                                 `json:"processing"`
+	Error                 string                               `json:"error,omitempty"`
+	ErrorCode             string                               `json:"error_code,omitempty"`
+	Reply                 string                               `json:"reply,omitempty"`
+	Proposals             []entity.AIEntryProposal             `json:"proposals"`
+	AttachmentDiagnostics []entity.AIEntryAttachmentDiagnostic `json:"attachment_diagnostics,omitempty"`
 }
 
 func processResponse(process *entity.AIEntrySession) aiEntryProcessResponse {
-	return aiEntryProcessResponse{ID: process.ID, Processing: process.Processing, Error: process.Error, ErrorCode: process.ErrorCode, Reply: process.Reply, Proposals: process.Proposals}
+	return aiEntryProcessResponse{ID: process.ID, Processing: process.Processing, Error: process.Error, ErrorCode: process.ErrorCode, Reply: process.Reply, Proposals: process.Proposals, AttachmentDiagnostics: process.AttachmentDiagnostics}
 }
 
 // Process godoc

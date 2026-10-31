@@ -2,6 +2,27 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+private struct AssistantViewportHeightPreferenceKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
+    }
+}
+
+private struct AssistantContentFramePreferenceKey: PreferenceKey {
+    static let defaultValue = CGRect.zero
+    static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
+        value = nextValue()
+    }
+}
+
+private struct AssistantMessageFramesPreferenceKey: PreferenceKey {
+    static let defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { _, new in new })
+    }
+}
+
 enum AssistantComposerPolicy {
     static func canSend(enabled: Bool, text: String, activeRunID: String?, isLocallySending: Bool = false) -> Bool {
         enabled
@@ -310,7 +331,10 @@ struct AssistantView: View {
     @State private var advisorSubmitUncertain = false
     @State private var chatState: AssistantChatState = .idle
     @State private var shouldFollowLatest = true
-    @State private var pendingRestoreMessageID: String?
+    @State private var pendingRestoreAnchor: AssistantScrollAnchor?
+    @State private var scrollViewportHeight: CGFloat = 0
+    @State private var scrollDistanceFromBottom: CGFloat = 0
+    @State private var visibleMessageAnchor: AssistantScrollAnchor?
     @StateObject private var runObserver: AdvisorRunObserver
 
     private let suggestions = [
@@ -388,12 +412,19 @@ struct AssistantView: View {
                         ])
                     }
                 }
+                MPIconButton(systemName: "xmark", label: "Đóng trợ lý", action: onBack)
+                    .accessibilityIdentifier("assistant-close")
             })
                 .padding(.horizontal, MPMetrics.pagePadding)
-            MPChatSurface {
-                ScrollViewReader { proxy in
+            VStack(spacing: 0) {
+                MPChatSurface {
+                    ScrollViewReader { proxy in
                     ScrollView {
-                        LazyVStack(alignment: .leading, spacing: 16) {
+                        // Assistant history is paged by the API. A regular stack
+                        // keeps the composer layout deterministic while typing;
+                        // LazyVStack can repeatedly invalidate placement when
+                        // the welcome composer becomes a conversation composer.
+                        VStack(alignment: .leading, spacing: 16) {
                             if !shouldFollowLatest && !messages.isEmpty {
                                 MPButton("Tin mới", style: .secondary, fullWidth: false) {
                                     shouldFollowLatest = true
@@ -427,6 +458,17 @@ struct AssistantView: View {
                                 MPButton("Tải tin cũ", style: .secondary, isLoading: loadingOlder) { Task { await loadOlderMessages() } }
                             }
                             ForEach(messages) { message in
+                                if let restoreAnchor = pendingRestoreAnchor,
+                                   restoreAnchor.messageID == message.id {
+                                    // ScrollViewReader can restore an item, but
+                                    // it cannot express a pixel offset. A
+                                    // temporary spacer before the item keeps the
+                                    // visible reading position after older
+                                    // messages are prepended.
+                                    Color.clear
+                                        .frame(height: AssistantScrollPolicy.restoreSpacerHeight(for: restoreAnchor))
+                                        .id("assistant-restore-anchor")
+                                }
                                 MPChatMessage(isUser: message.role == "user") {
                                     VStack(alignment: .leading, spacing: 8) {
                                         ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
@@ -456,6 +498,14 @@ struct AssistantView: View {
                                     }
                                 }
                                 .id(message.id)
+                                .background {
+                                    GeometryReader { geometry in
+                                        Color.clear.preference(
+                                            key: AssistantMessageFramesPreferenceKey.self,
+                                            value: [message.id: geometry.frame(in: .named("assistant-scroll"))]
+                                        )
+                                    }
+                                }
                             }
                             if sending || activeRunID != nil {
                                 let label = runObserver.connectionState == .reconnecting
@@ -474,56 +524,102 @@ struct AssistantView: View {
                             Color.clear.frame(height: 1).id("assistant-latest")
                         }
                         .padding(MPMetrics.pagePadding)
+                        .background {
+                            GeometryReader { geometry in
+                                Color.clear.preference(
+                                    key: AssistantContentFramePreferenceKey.self,
+                                    value: geometry.frame(in: .named("assistant-scroll"))
+                                )
+                            }
+                        }
                     }
                     .accessibilityIdentifier("assistant-conversation")
+                    .coordinateSpace(name: "assistant-scroll")
+                    .background {
+                        GeometryReader { geometry in
+                            Color.clear.preference(key: AssistantViewportHeightPreferenceKey.self, value: geometry.size.height)
+                        }
+                    }
                     .scrollDismissesKeyboard(.interactively)
                     .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in
                         shouldFollowLatest = false
                     })
+                    .onPreferenceChange(AssistantViewportHeightPreferenceKey.self) { height in
+                        scrollViewportHeight = height
+                    }
+                    .onPreferenceChange(AssistantContentFramePreferenceKey.self) { frame in
+                        let distance = AssistantScrollPolicy.distanceFromBottom(
+                            contentFrame: frame,
+                            viewportHeight: scrollViewportHeight
+                        )
+                        scrollDistanceFromBottom = distance
+                        if AssistantScrollPolicy.shouldFollowLatest(distanceFromBottom: distance, isLoadingOlder: loadingOlder) {
+                            shouldFollowLatest = true
+                        }
+                    }
+                    .onPreferenceChange(AssistantMessageFramesPreferenceKey.self) { frames in
+                        visibleMessageAnchor = AssistantScrollPolicy.visibleAnchor(
+                            messageFrames: frames,
+                            viewportHeight: scrollViewportHeight
+                        )
+                    }
                     .onChange(of: messages.last?.id) { _, _ in
                         if AssistantScrollPolicy.shouldFollowLatest(
-                            distanceFromBottom: shouldFollowLatest ? 0 : 65,
+                            distanceFromBottom: scrollDistanceFromBottom,
                             isLoadingOlder: loadingOlder
                         ) {
                             withAnimation { proxy.scrollTo("assistant-latest", anchor: .bottom) }
                         }
                     }
                     .onChange(of: messages.first?.id) { _, firstID in
-                        guard let firstID, pendingRestoreMessageID == firstID else { return }
-                        pendingRestoreMessageID = nil
+                        guard firstID != nil, pendingRestoreAnchor != nil else { return }
+                        pendingRestoreAnchor = nil
                         DispatchQueue.main.async {
-                            proxy.scrollTo(firstID, anchor: .top)
+                            proxy.scrollTo("assistant-restore-anchor", anchor: .top)
                         }
                     }
                 }
-                HStack(alignment: .bottom, spacing: MPMetrics.sectionSpacing) {
-                    MPChatComposer(
-                        text: inputBinding,
-                        isBusy: sending || activeRunID != nil,
-                        isEnabled: capabilities?.enabled == true && !advisorSubmitUncertain,
-                        onSend: { Task { await send() } },
-                        onCancel: activeRunID.map { runID in { Task { await cancel(runID: runID) }; return () } },
-                        mode: composerMode,
-                        isKeyboardVisible: keyboardVisible,
-                        focusRequest: composerFocusRequest,
-                        dismissKeyboardRequest: dismissKeyboardRequest
-                    )
-                    .frame(maxWidth: .infinity)
-                    .disabled(advisorSubmitUncertain)
+                    HStack(alignment: .bottom, spacing: MPMetrics.sectionSpacing) {
+                        MPChatComposer(
+                            text: inputBinding,
+                            isBusy: sending || activeRunID != nil,
+                            isEnabled: capabilities?.enabled == true && !advisorSubmitUncertain,
+                            onSend: { Task { await send() } },
+                            onCancel: activeRunID.map { runID in { Task { await cancel(runID: runID) }; return () } },
+                            mode: composerMode,
+                            isKeyboardVisible: keyboardVisible,
+                            focusRequest: composerFocusRequest,
+                            dismissKeyboardRequest: dismissKeyboardRequest
+                        )
+                        .frame(maxWidth: .infinity)
+                        .disabled(advisorSubmitUncertain)
+                    }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 12)
+                    .overlay(alignment: .top) {
+                        Rectangle()
+                            .fill(MPColor.line)
+                            .frame(height: MPMetrics.inputBorderWidth)
+                    }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 12)
-                .overlay(alignment: .top) {
-                    Rectangle()
-                        .fill(MPColor.line)
-                        .frame(height: MPMetrics.inputBorderWidth)
-                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .padding(.horizontal, MPMetrics.pagePadding)
+                .padding(.bottom, 8)
             }
-            .padding(.horizontal, MPMetrics.pagePadding)
-            .padding(.bottom, 8)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+            .accessibilityElement(children: .contain)
             .accessibilityIdentifier("assistant-chat-frame")
         }
         .background(MPColor.canvas.ignoresSafeArea())
+        .simultaneousGesture(
+            DragGesture(minimumDistance: 20).onEnded { value in
+                guard value.startLocation.x <= 28,
+                      value.translation.width >= 72,
+                      abs(value.translation.width) > abs(value.translation.height)
+                else { return }
+                onBack()
+            }
+        )
         .mpObserveKeyboardVisibility($keyboardVisible)
         .task { await loadInitialState() }
         .onChange(of: scenePhase) { _, phase in
@@ -688,7 +784,11 @@ struct AssistantView: View {
 
     private func loadOlderMessages() async {
         guard !conversationID.isEmpty, let first = messages.first, !loadingOlder, hasOlder else { return }
-        pendingRestoreMessageID = first.id
+        // Restore the message the owner was actually reading, not merely the
+        // oldest currently loaded message. Geometry provides the measured
+        // anchor; the scroll policy test keeps this deterministic without a
+        // live provider.
+        pendingRestoreAnchor = visibleMessageAnchor ?? AssistantScrollAnchor(messageID: first.id, offsetFromViewportTop: 0)
         let requestedConversationID = conversationID
         let requestToken = UUID()
         historyRequestToken = requestToken
@@ -829,6 +929,7 @@ struct AssistantView: View {
                 batchID: batch.batchID,
                 batchVersion: batch.version,
                 itemID: item.id,
+                itemVersion: item.version,
                 decision: decision,
                 clientRequestID: UUID().uuidString
             ))
@@ -1576,6 +1677,29 @@ struct AIEntryView: View {
                     MPStatusMessage(text: "Yêu cầu có thể đã được tiếp nhận. Tải lại kết quả để kiểm tra trước khi gửi nội dung khác. Không tự động gửi lại.", tone: .info)
                 }
                 if let process {
+                    if !process.attachmentDiagnostics.isEmpty {
+                        MPSurfaceCard(style: AIEntryReferencePresentation.proposalSurfaceStyle) {
+                            VStack(alignment: .leading, spacing: 10) {
+                                MPText("Trạng thái chứng từ", style: .emphasis)
+                                ForEach(process.attachmentDiagnostics) { diagnostic in
+                                    HStack(alignment: .top, spacing: 10) {
+                                        MPIcon(
+                                            systemName: attachmentDiagnosticIcon(diagnostic.status),
+                                            color: attachmentDiagnosticColor(diagnostic.status),
+                                            size: 20
+                                        )
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            MPText("Tệp \(diagnostic.position): \(diagnostic.filename)", style: .body)
+                                                .lineLimit(1)
+                                            MPText(attachmentDiagnosticSummary(diagnostic), style: .secondary)
+                                        }
+                                        Spacer(minLength: 0)
+                                    }
+                                }
+                            }
+                        }
+                        .accessibilityIdentifier("ai-entry-attachment-diagnostics")
+                    }
                     if let processError = process.error { MPStatusMessage(text: processError, tone: .danger) }
                     if let reply = process.reply { MPAssistantCard(title: "Phản hồi của AI") { MPMarkdown(content: reply) } }
                     if !process.processing && process.proposals.isEmpty && process.reply == nil && process.error == nil { MPEmptyView(title: "Chưa có đề xuất", detail: "Hãy thêm mô tả rõ hơn hoặc đính kèm chứng từ.") }
@@ -1653,6 +1777,39 @@ struct AIEntryView: View {
 
     private func loadCapabilities() async { do { capabilities = try await api.entryCapabilities() } catch { self.error = "Không thể tải trạng thái AI entry." } }
     private func loadReferenceData() async { do { async let walletList = api.wallets(); async let categoryList = api.categories(); async let profile = api.profile(); wallets = try await walletList; categories = try await categoryList; if let profile = try? await profile { accountTimezone = profile.timezone } } catch { self.error = "Không thể tải danh sách ví và danh mục." } }
+
+    private func attachmentDiagnosticSummary(_ diagnostic: EntryAttachmentDiagnosticModel) -> String {
+        switch diagnostic.status {
+        case "succeeded": return diagnostic.stage == "validation" ? "Đã kiểm tra tệp." : "Đã đọc được nội dung."
+        case "failed":
+            switch diagnostic.errorCode {
+            case "ocr_failed": return "Không đọc được nội dung tệp này. Bạn có thể kiểm tra lại ảnh hoặc PDF."
+            case "structured_file_failed": return "Không kiểm tra được bảng dữ liệu này."
+            case "attachment_cleanup_failed": return "Tệp đã xử lý nhưng chưa dọn dẹp được bản lưu tạm."
+            default: return "Tệp này cần được kiểm tra lại."
+            }
+        case "skipped": return "Tệp không còn trong phiên xử lý."
+        default: return "Đang xử lý tệp."
+        }
+    }
+
+    private func attachmentDiagnosticIcon(_ status: String) -> String {
+        switch status {
+        case "succeeded": return "checkmark.circle.fill"
+        case "failed": return "exclamationmark.triangle.fill"
+        case "skipped": return "minus.circle"
+        default: return "clock"
+        }
+    }
+
+    private func attachmentDiagnosticColor(_ status: String) -> Color {
+        switch status {
+        case "succeeded": return MPColor.income
+        case "failed": return MPColor.danger
+        default: return MPColor.secondaryText
+        }
+    }
+
     private func processEntry() async {
         guard AIEntryRequestRecoveryPolicy.canSubmit(isUncertain: uncertain, isProcessing: process?.processing == true, isLocallyProcessing: processing) else { return }
         guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || !files.isEmpty else { error = "Nhập mô tả hoặc đính kèm chứng từ trước khi phân tích."; return }

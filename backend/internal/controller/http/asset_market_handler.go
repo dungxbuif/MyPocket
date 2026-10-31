@@ -16,6 +16,23 @@ type AssetMarketHandler struct {
 	ConfiguredProviders map[string]struct{}
 }
 
+type assetCatalogUnit struct {
+	Code             string `json:"code"`
+	Label            string `json:"label"`
+	AutomaticPricing bool   `json:"automatic_pricing"`
+}
+
+type assetCatalogType struct {
+	Code  string             `json:"code"`
+	Name  string             `json:"name"`
+	Units []assetCatalogUnit `json:"units"`
+}
+
+type assetCatalogConfig struct {
+	AssetTypes []assetCatalogType     `json:"asset_types"`
+	Products   []entity.MarketProduct `json:"products"`
+}
+
 type portfolioPriceSourceInput struct {
 	ExpectedVersion int64   `json:"expected_version"`
 	PriceMode       string  `json:"price_mode"`
@@ -45,7 +62,58 @@ func (r *Router) RegisterAssetMarketRoutes(h *AssetMarketHandler) {
 	g := r.Engine.Group("/api/v1/portfolio")
 	g.Use(r.AuthMiddleware.RequireAuth)
 	g.GET("/catalog", h.Catalog)
+	g.GET("/catalog-config", h.CatalogConfig)
 	g.PATCH("/assets/:id/price-source", h.UpdatePriceSource)
+}
+
+// CatalogConfig exposes the user-selectable accumulated-asset taxonomy. The
+// taxonomy is backend-owned so adding another asset kind or unit later does
+// not require accepting arbitrary labels from the client. A unit can be used
+// for manual valuation before a matching automatic source is configured.
+// @Summary List accumulated-asset types and units
+// @Tags Portfolio
+// @Produce json
+// @Security BearerAuth
+// @Success 200 {object} assetCatalogConfig
+// @Router /api/v1/portfolio/catalog-config [get]
+func (h *AssetMarketHandler) CatalogConfig(c *gin.Context) {
+	if _, ok := transactionOwner(c); !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Market == nil {
+		portfolioUnavailable(c)
+		return
+	}
+	products, err := h.Market.ListEnabledMarketProducts()
+	if err != nil {
+		portfolioFailure(c)
+		return
+	}
+	configured := make([]entity.MarketProduct, 0, len(products))
+	automaticUnits := make(map[string]bool)
+	for _, product := range products {
+		if product.Kind != entity.PortfolioAssetKindGold || !entity.IsPortfolioGoldUnit(product.Unit) {
+			continue
+		}
+		if _, ok := h.ConfiguredProviders[product.ProviderKey]; !ok {
+			continue
+		}
+		configured = append(configured, product)
+		automaticUnits[strings.TrimSpace(product.Unit)] = true
+	}
+	OK(c, assetCatalogConfig{
+		AssetTypes: []assetCatalogType{{
+			Code: "gold",
+			Name: "Vàng",
+			Units: []assetCatalogUnit{
+				{Code: "chỉ", Label: "Chỉ", AutomaticPricing: automaticUnits["chỉ"]},
+				{Code: "lượng", Label: "Lượng", AutomaticPricing: automaticUnits["lượng"]},
+				{Code: "phân", Label: "Phân", AutomaticPricing: automaticUnits["phân"]},
+			},
+		}},
+		Products: configured,
+	})
 }
 
 // Catalog lists only enabled, backend-configured products. It contains no

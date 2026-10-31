@@ -459,8 +459,8 @@ final class DesignSystemTests: XCTestCase {
 
     func testBottomNavigationUsesReferenceSelectedPillAndSharedGeometry() {
         XCTAssertEqual(MPShellNavigation.selectedTabStyle, .surfacePill)
-        XCTAssertEqual(MPShellNavigation.bottomNavigationCornerRadius, 28)
-        XCTAssertEqual(MPShellNavigation.selectedTabCornerRadius, 22)
+        XCTAssertEqual(MPShellNavigation.bottomNavigationCornerRadius, 16)
+        XCTAssertEqual(MPShellNavigation.selectedTabCornerRadius, 10)
         XCTAssertEqual(MPShellNavigation.addButtonDiameter, 56)
         XCTAssertEqual(MPShellNavigation.feedbackBubbleDiameter, 52)
     }
@@ -630,8 +630,8 @@ final class DesignSystemTests: XCTestCase {
     }
 
     func testPortfolioActionAnatomyMatchesWebPanelContract() {
-        XCTAssertEqual(PortfolioReferenceCopy.subtitle, "Theo dõi mua bán độc lập với số dư ví")
-        XCTAssertEqual(PortfolioReferenceCopy.summaryTitle, "Tổng danh mục")
+        XCTAssertEqual(PortfolioReferenceCopy.subtitle, "Theo dõi tài sản, số lượng và đơn giá độc lập với số dư ví")
+        XCTAssertEqual(PortfolioReferenceCopy.summaryTitle, "Tổng tài sản tích lũy")
         XCTAssertEqual(PortfolioReferenceCopy.refreshAction, "Làm mới")
         XCTAssertEqual(PortfolioReferenceCopy.refreshActionAccessibilityID, "portfolio-refresh")
         XCTAssertEqual(PortfolioReferenceCopy.addAssetAction, "Thêm tài sản")
@@ -1225,6 +1225,11 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
         XCTAssertNil(MPFormat.normalizedGroupedVNDInput("12a34"))
     }
 
+    func testGroupedIntegerDisplayKeepsRawDigitsWhileEditing() {
+        XCTAssertEqual(MPFormat.groupedIntegerDisplay("120000", isEditing: true), "120000")
+        XCTAssertEqual(MPFormat.groupedIntegerDisplay("120000", isEditing: false), "120.000")
+    }
+
     func testWalletManagementBalanceLabelsRespectGlobalPrivacyMask() {
         XCTAssertEqual(MPWalletSelectionList.balanceLabel(100_000, masked: true), MPFormat.maskedValue)
         XCTAssertEqual(MPWalletSelectionList.balanceLabel(-75_000, masked: true), MPFormat.maskedValue)
@@ -1244,8 +1249,98 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
         XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: "bag.fill"), .shopping)
         XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: "expense_food_coffee"), .coffee)
         XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: "unknown-custom-key"), .tag)
-        XCTAssertEqual(MPIconCatalog.assetName(for: .shopping), "bag")
-        XCTAssertEqual(MPIconCatalog.assetName(for: .feedback), "bubble.left.and.bubble.right")
+        XCTAssertTrue(MPIconCatalog.usesVerifiedAssets)
+        XCTAssertEqual(MPIconCatalog.assetName(for: .shopping), "mp-icon-shopping-bag")
+        XCTAssertEqual(MPIconCatalog.assetName(for: .feedback), "mp-icon-chat-circle")
+        XCTAssertTrue(MPIconCatalog.isBundledAssetName(MPIconCatalog.assetName(for: .wallet)))
+        for icon in MPIconID.allCases {
+            XCTAssertTrue(MPIconCatalog.isBundledAssetName(MPIconCatalog.assetName(for: icon)), "missing bundled asset for \(icon)")
+        }
+    }
+
+    func testSemanticIconCatalogResolvesCoreAliasesAndStylesWithoutChangingPersistedKeys() {
+        let aliases: [(String, MPIconID)] = [
+            ("  BAG.FILL  ", .shopping),
+            ("expense_food_meals", .meals),
+            ("expense_transfer_out", .transfer),
+            ("income_salary", .income),
+            ("debt_root", .debt),
+            ("creditcard.fill", .credit),
+            ("unknown-custom-key", .tag)
+        ]
+        for (legacyKey, expectedID) in aliases {
+            XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: legacyKey), expectedID, legacyKey)
+        }
+
+        for icon in MPIconID.allCases {
+            let regular = MPIconCatalog.assetName(for: icon, style: .regular)
+            let duotone = MPIconCatalog.assetName(for: icon, style: .duotone)
+            XCTAssertTrue(MPIconCatalog.isBundledAssetName(regular), "regular asset missing for \(icon)")
+            XCTAssertEqual(regular, duotone, "duotone must remain the documented regular fallback for \(icon)")
+            XCTAssertEqual(MPIcon(iconID: icon, style: .regular).systemName, regular)
+        }
+
+        XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: "bag.fill").rawValue, "shopping")
+        XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: "income_salary").rawValue, "income")
+
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: "expense_food_coffee", type: "expense").systemName,
+            MPIconCatalog.assetName(for: .coffee)
+        )
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: "expense_food_custom", type: "expense").systemName,
+            MPIconCatalog.assetName(for: .food)
+        )
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: "unknown-custom-key", type: "expense").systemName,
+            MPIconCatalog.assetName(for: .tag)
+        )
+        XCTAssertEqual(
+            MPTransactionPresentation.glyph(systemKey: nil, type: "adjustment").systemName,
+            MPIconCatalog.assetName(for: .adjustment)
+        )
+    }
+
+    func testAssistantComposerUsesARealMultilineReadingAreaAcrossModes() {
+        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .welcome, accessibilitySize: false), 3...5)
+        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .conversation, accessibilitySize: false), 2...5)
+        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .conversation, accessibilitySize: true), 2...3)
+        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .welcome, keyboardVisible: false, accessibilitySize: false), 104)
+        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .conversation, keyboardVisible: false, accessibilitySize: false), 92)
+        XCTAssertGreaterThan(
+            MPChatComposerMetrics.minimumHeight(mode: .conversation, keyboardVisible: true, accessibilitySize: false),
+            44
+        )
+    }
+
+    func testAssistantScrollPolicyOnlyFollowsWhenNearTheBottom() {
+        XCTAssertTrue(AssistantScrollPolicy.shouldFollowLatest(distanceFromBottom: 0, isLoadingOlder: false))
+        XCTAssertTrue(AssistantScrollPolicy.shouldFollowLatest(distanceFromBottom: 64, isLoadingOlder: false))
+        XCTAssertFalse(AssistantScrollPolicy.shouldFollowLatest(distanceFromBottom: 65, isLoadingOlder: false))
+        XCTAssertFalse(AssistantScrollPolicy.shouldFollowLatest(distanceFromBottom: 0, isLoadingOlder: true))
+        XCTAssertEqual(
+            AssistantScrollPolicy.distanceFromBottom(contentFrame: CGRect(x: 0, y: -420, width: 300, height: 900), viewportHeight: 400),
+            80
+        )
+        XCTAssertEqual(
+            AssistantScrollPolicy.visibleAnchor(
+                messageFrames: [
+                    "first": CGRect(x: 0, y: -80, width: 300, height: 60),
+                    "reading": CGRect(x: 0, y: 18, width: 300, height: 90),
+                    "next": CGRect(x: 0, y: 120, width: 300, height: 80)
+                ],
+                viewportHeight: 400
+            ),
+            AssistantScrollAnchor(messageID: "reading", offsetFromViewportTop: 18)
+        )
+        XCTAssertEqual(
+            AssistantScrollPolicy.restoreSpacerHeight(for: AssistantScrollAnchor(messageID: "reading", offsetFromViewportTop: 18)),
+            18
+        )
+        XCTAssertEqual(
+            AssistantScrollPolicy.restoreSpacerHeight(for: AssistantScrollAnchor(messageID: "partial", offsetFromViewportTop: -12)),
+            0
+        )
     }
 
     func testReportsInsiderCopyUsesSafeFallbacksAndMasking() {

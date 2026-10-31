@@ -3,6 +3,7 @@ package entity
 import (
 	"errors"
 	"math/big"
+	"strings"
 	"time"
 )
 
@@ -23,6 +24,20 @@ type MonthlyReportScope struct {
 	Month       string `json:"month"`
 	WalletID    string `json:"wallet_id,omitempty"`
 	Granularity string `json:"granularity"`
+}
+
+// NormalizeMonthlyReportGranularity keeps the wire contract compatible with
+// native clients that historically called the weekly series "weekly" while
+// the report read model uses the canonical "week" value.
+func NormalizeMonthlyReportGranularity(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "week", "weekly":
+		return "week"
+	case "day":
+		return "day"
+	default:
+		return ""
+	}
 }
 
 type ReportRange struct {

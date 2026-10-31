@@ -2006,7 +2006,7 @@ enum PortfolioReferencePresentation {
             MPMetricItem(title: "Giá vốn", value: MPFormat.money(summary.totalCostBasis), masked: masked),
             MPMetricItem(
                 title: "Giá trị hiện tại",
-                value: summary.totalMarketValue.map(MPFormat.money) ?? "Chưa có giá",
+                value: summary.totalMarketValue.map(MPFormat.money) ?? (summary.knownMarketValue.map { "Biết được \(MPFormat.money($0))" } ?? "Chưa có giá"),
                 masked: masked && summary.totalMarketValue != nil
             ),
             MPMetricItem(
@@ -2039,14 +2039,14 @@ struct PortfolioView: View {
     @State private var editSymbol = ""
     @State private var editName = ""
     @State private var editError: String?
+    @State private var assetTypeCode = "gold"
+    @State private var assetUnitCode = ""
     @State private var tradeEditorPresented = false
     @State private var priceTarget: PortfolioAssetModel?
     @State private var unitTarget: PortfolioAssetModel?
     @State private var unitCatalog: PortfolioMarketCatalogModel?
     @State private var selectedUnitCode = ""
-    @State private var customUnitLabel = ""
     @State private var sourceMode = "manual"
-    @State private var sourceName = ""
     @State private var sourceProductID = ""
     @State private var unitSourceError: String?
     @State private var deleteTarget: PortfolioAssetModel?
@@ -2076,7 +2076,13 @@ struct PortfolioView: View {
                 MPText(PortfolioReferenceCopy.subtitle, style: .secondary)
                     .accessibilityIdentifier("portfolio-subtitle")
                 HStack(spacing: MPMetrics.sectionSpacing) {
-                    MPButton("Thêm tài sản", style: .secondary) { error = nil; assetEditorPresented = true }
+                    MPButton("Thêm tài sản", style: .secondary) {
+                        error = nil
+                        Task {
+                            await loadMarketCatalog()
+                            assetEditorPresented = true
+                        }
+                    }
                         .accessibilityIdentifier("portfolio-open-asset-editor")
                     MPButton("Ghi giao dịch", style: .secondary, isDisabled: summary?.assets.isEmpty != false) { error = nil; tradeEditorPresented = true }
                         .accessibilityIdentifier("portfolio-open-trade-editor")
@@ -2087,6 +2093,9 @@ struct PortfolioView: View {
                         VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
                             MPSectionHeader(title: PortfolioReferenceCopy.summaryTitle)
                             MPMetricGrid(items: PortfolioReferencePresentation.summaryItems(summary, masked: masked))
+                                if let unknown = summary.unknownAssetCount, unknown > 0 {
+                                    MPStatusMessage(text: "Chưa đủ dữ liệu định giá cho \(unknown) tài sản; tổng hiện tại chưa phải toàn bộ danh mục.", tone: .info)
+                                }
                         }
                     }
                     .accessibilityIdentifier("portfolio-summary")
@@ -2106,11 +2115,31 @@ struct PortfolioView: View {
         .task { await load() }
         .mpFullScreenCover(isPresented: $assetEditorPresented) {
             MPEditorScaffold(title: "Thêm tài sản", isBusy: saving, onCancel: { assetEditorPresented = false }) {
+                if let catalog = unitCatalog, !catalog.assetTypes.isEmpty {
+                    MPOptionSelector(
+                        title: "Loại tài sản",
+                        options: catalog.assetTypes.map { MPSelectionOption(id: $0.code, label: $0.name) },
+                        selectionID: $assetTypeCode,
+                        emptyLabel: "Chọn loại tài sản",
+                        accessibilityIdentifier: "portfolio-asset-type"
+                    )
+                    let units = catalog.assetTypes.first(where: { $0.code == assetTypeCode })?.units ?? []
+                    MPOptionSelector(
+                        title: "Đơn vị",
+                        options: units.map { MPSelectionOption(id: $0.code, label: $0.label) },
+                        selectionID: $assetUnitCode,
+                        emptyLabel: "Chọn đơn vị",
+                        accessibilityIdentifier: "portfolio-asset-unit"
+                    )
+                    MPText("Đơn vị dùng để nhập khối lượng và đơn giá. Bạn phải chọn trước khi lưu.", style: .secondary)
+                } else {
+                    MPStatusMessage(text: "Chưa tải được danh mục loại tài sản.", tone: .danger)
+                }
                 MPTextField(title: "Mã", text: $symbol, placeholder: "VN30F")
                 MPTextField(title: "Tên", text: $assetName, placeholder: "Quỹ chỉ số")
                 if let error { MPStatusMessage(text: error, tone: .danger) }
             } footer: {
-                MPButton(PortfolioReferenceCopy.addAssetAction, isLoading: saving, isDisabled: PortfolioAssetDraftValidator.normalized(symbol: symbol, name: assetName) == nil) { Task { await createAsset() } }
+                MPButton(PortfolioReferenceCopy.addAssetAction, isLoading: saving, isDisabled: PortfolioAssetDraftValidator.normalized(symbol: symbol, name: assetName) == nil || assetUnitCode.isEmpty) { Task { await createAsset() } }
                     .accessibilityIdentifier(PortfolioReferenceCopy.addAssetActionAccessibilityID)
             }
         }
@@ -2135,10 +2164,13 @@ struct PortfolioView: View {
             MPEditorScaffold(title: "Ghi giao dịch đầu tư", isBusy: saving, onCancel: { tradeEditorPresented = false }) {
                 MPOptionSelector(title: "Tài sản", options: (summary?.assets ?? []).map { MPSelectionOption(id: $0.id, label: "\($0.symbol) · \($0.name)") }, selectionID: $tradeAssetID, emptyLabel: "Chọn tài sản", accessibilityIdentifier: "portfolio-trade-asset")
                 MPWalletSelector(title: "Loại", options: ["buy", "sell"], selection: $tradeSide)
-                MPNumberField(title: "Khối lượng", text: $tradeQuantity, kind: .decimal, placeholder: "1,5")
-                MPAmountField(title: "Giá đơn vị", text: $tradePrice, groupsDigits: true)
+                MPNumberField(title: "Số lượng (\(selectedTradeAsset?.unitLabel ?? "đơn vị"))", text: $tradeQuantity, kind: .decimal, placeholder: "1,5")
+                MPAmountField(title: "Đơn giá (đ/\(selectedTradeAsset?.unitLabel ?? "đơn vị"))", text: $tradePrice, groupsDigits: true)
                 MPAmountField(title: "Phí", text: $tradeFee, groupsDigits: true)
                 MPDateField(title: "Ngày", date: $tradeDate, timeZone: accountTimezone)
+                if let total = PortfolioTradePresentation.draftTotal(quantity: tradeQuantity, unitPrice: tradePrice, fee: tradeFee, side: tradeSide) {
+                    MPMetricRow(title: "Tổng dự kiến", value: MPFormat.money(total, masked: masked))
+                }
                 if let error { MPStatusMessage(text: error, tone: .danger) }
             } footer: {
                 MPButton(PortfolioReferenceCopy.saveTradeAction, isLoading: saving, isDisabled: selectedTradeAsset == nil || !PortfolioTradeDraftValidator.isValid(side: tradeSide, quantity: tradeQuantity, unitPrice: tradePrice, fee: tradeFee)) { Task { await saveTrade() } }
@@ -2161,25 +2193,32 @@ struct PortfolioView: View {
         .mpFormBottomSheet(isPresented: Binding(get: { unitTarget != nil }, set: { if !$0 && !saving { unitTarget = nil } }), title: "Đơn vị và nguồn giá", accessibilityIdentifier: "portfolio-unit-source-editor", isDismissDisabled: saving, onClose: { if !saving { unitTarget = nil } }) {
             if let target = unitTarget {
                 MPText(target.symbol + " · " + target.name, style: .emphasis)
-                let options = unitCatalog?.units.map { MPSelectionOption(id: $0.code, label: $0.label) } ?? [
-                    MPSelectionOption(id: "share", label: "Đơn vị"),
-                    MPSelectionOption(id: "gram", label: "Gram"),
-                    MPSelectionOption(id: "custom", label: "Tự nhập")
-                ]
-                MPOptionSelector(title: "Đơn vị", options: options, selectionID: $selectedUnitCode)
-                if selectedUnitCode == "custom" {
-                    MPTextField(title: "Tên đơn vị", text: $customUnitLabel, placeholder: "chỉ vàng / chứng chỉ")
+                let options = unitCatalog?.units.map { MPSelectionOption(id: $0.code, label: $0.label) } ?? []
+                MPOptionSelector(title: "Đơn vị", options: options, selectionID: $selectedUnitCode, emptyLabel: "Chọn đơn vị")
+                MPOptionSelector(title: "Nguồn giá", options: [MPSelectionOption(id: "manual", label: "Nhập thủ công"), MPSelectionOption(id: "automatic", label: "Giá tự động")], selectionID: $sourceMode)
+                if sourceMode == "automatic" {
+                    let products = unitCatalog?.products.filter { $0.unit == selectedUnitCode } ?? []
+                    if products.isEmpty {
+                        MPStatusMessage(text: "Đơn vị này chưa có nguồn giá tự động; hãy chọn Nhập thủ công.", tone: .info)
+                    } else {
+                        MPOptionSelector(
+                            title: "Nguồn giá",
+                            options: products.map { MPSelectionOption(id: $0.id, label: "\($0.name) · \($0.unit)") },
+                            selectionID: $sourceProductID,
+                            emptyLabel: "Chọn nguồn giá"
+                        )
+                    }
                 }
-                MPOptionSelector(title: "Nguồn giá", options: [MPSelectionOption(id: "manual", label: "Nhập thủ công"), MPSelectionOption(id: "catalog", label: "Nguồn thị trường")], selectionID: $sourceMode)
-                if sourceMode == "catalog" {
-                    MPTextField(title: "Tên nguồn", text: $sourceName, placeholder: "Chưa có nguồn tự động")
-                    MPTextField(title: "Mã sản phẩm", text: $sourceProductID, placeholder: "Không bắt buộc")
-                }
-                MPButton("Tải danh mục đơn vị", style: .plain, fullWidth: false) { Task { await loadMarketCatalog() } }
+                MPButton("Tải lại danh mục", style: .plain, fullWidth: false) { Task { await loadMarketCatalog() } }
                 if let unitSourceError { MPStatusMessage(text: unitSourceError, tone: .danger) }
             }
         } footer: {
-            MPButton("Lưu đơn vị / nguồn giá", isLoading: saving, isDisabled: unitTarget == nil) { Task { await saveUnitAndSource() } }
+            MPButton("Lưu đơn vị / nguồn giá", isLoading: saving, isDisabled: unitTarget == nil || selectedUnitCode.isEmpty || (sourceMode == "automatic" && sourceProductID.isEmpty)) { Task { await saveUnitAndSource() } }
+        }
+        .onChange(of: selectedUnitCode) { _, newUnit in
+            if let selectedProduct = unitCatalog?.products.first(where: { $0.id == sourceProductID }), selectedProduct.unit != newUnit {
+                sourceProductID = ""
+            }
         }
         .mpFullScreenCover(
             isPresented: Binding(
@@ -2245,9 +2284,9 @@ struct PortfolioView: View {
                 VStack(alignment: .leading, spacing: MPMetrics.rowSpacing) {
                     MPText("\(asset.symbol) · \(asset.name)", style: .emphasis).lineLimit(2)
                     MPText("Số lượng: \(position?.quantity ?? "0") · Đơn vị: \(asset.unitLabel ?? position?.unitLabel ?? "chưa xác nhận")", style: .secondary)
-                    MPText(asset.latestPrice.map { "Giá / đơn vị: \(MPFormat.money($0, masked: masked))" } ?? "Chưa có giá / đơn vị", style: .secondary)
-                    if let source = asset.marketSourceName, !source.isEmpty {
-                        MPText("Nguồn: \(source) · \(asset.marketPriceStatus ?? "chưa xác định")", style: .secondary)
+                    MPText(position?.latestPrice.map { "Giá / đơn vị: \(MPFormat.money($0, masked: masked))" } ?? "Chưa có giá / đơn vị", style: .secondary)
+                    if let source = position?.priceSource, !source.isEmpty {
+                        MPText("Nguồn: \(source) · \(position?.priceStatus ?? "chưa xác định")", style: .secondary)
                     } else {
                         MPText("Nguồn giá: Nhập thủ công", style: .secondary)
                     }
@@ -2287,14 +2326,14 @@ struct PortfolioView: View {
                     assetEditTarget = asset
                 }
                 .accessibilityIdentifier("portfolio-edit-\(asset.id)")
-                MPButton("Cập nhật giá", style: .secondary, fullWidth: false) { error = nil; priceTarget = asset }
-                    .accessibilityIdentifier("portfolio-price-update-\(asset.id)")
+                if asset.priceMode != "automatic" {
+                    MPButton("Cập nhật giá", style: .secondary, fullWidth: false) { error = nil; priceTarget = asset }
+                        .accessibilityIdentifier("portfolio-price-update-\(asset.id)")
+                }
                 MPButton("Đơn vị / nguồn", style: .secondary, fullWidth: false) {
                     unitSourceError = nil
-                    selectedUnitCode = asset.unitLabel == nil ? "share" : (asset.unitLabel ?? "share")
-                    customUnitLabel = ""
-                    sourceMode = asset.priceMode == "catalog" ? "catalog" : "manual"
-                    sourceName = asset.marketSourceName ?? ""
+                    selectedUnitCode = asset.unitLabel ?? ""
+                    sourceMode = asset.priceMode == "automatic" ? "automatic" : "manual"
                     sourceProductID = asset.marketProductID ?? ""
                     unitTarget = asset
                 }
@@ -2356,6 +2395,22 @@ struct PortfolioView: View {
                 roundingMode: .plain, scale: 0, raiseOnExactness: false, raiseOnOverflow: false,
                 raiseOnUnderflow: false, raiseOnDivideByZero: false
             ))
+            return rounded.int64Value
+        }
+
+        static func draftTotal(quantity: String, unitPrice: String, fee: String, side: String) -> Int64? {
+            guard let quantity = Decimal(string: quantity.replacingOccurrences(of: ",", with: "."), locale: Locale(identifier: "en_US_POSIX")),
+                  let unitPrice = Int64(unitPrice.filter(\.isNumber)),
+                  let fee = Int64(fee.filter(\.isNumber).isEmpty ? "0" : fee.filter(\.isNumber)),
+                  quantity >= 0, unitPrice >= 0, fee >= 0 else { return nil }
+            let gross = NSDecimalNumber(decimal: quantity).multiplying(by: NSDecimalNumber(value: unitPrice))
+            let net = side == "sell" ? gross.subtracting(NSDecimalNumber(value: fee)) : gross.adding(NSDecimalNumber(value: fee))
+            let rounded = net.rounding(accordingToBehavior: NSDecimalNumberHandler(
+                roundingMode: .plain, scale: 0, raiseOnExactness: false, raiseOnOverflow: false,
+                raiseOnUnderflow: false, raiseOnDivideByZero: false
+            ))
+            guard rounded.compare(NSDecimalNumber(value: Int64.max)) != .orderedDescending,
+                  rounded.compare(NSDecimalNumber(value: Int64.min)) != .orderedAscending else { return nil }
             return rounded.int64Value
         }
     }
@@ -2515,6 +2570,7 @@ struct PortfolioView: View {
             summary = loadedSummary
             tradeHistory = loadedTrades
             if let profile = try? await profile { accountTimezone = profile.timezone }
+            if unitCatalog == nil { unitCatalog = try? await api.marketCatalog() }
             self.error = nil
         } catch { self.error = "Không thể tải danh mục đầu tư." }
     }
@@ -2522,27 +2578,30 @@ struct PortfolioView: View {
     private func loadMarketCatalog() async {
         do {
             unitCatalog = try await api.marketCatalog()
+            if let firstType = unitCatalog?.assetTypes.first {
+                if !firstType.code.isEmpty && !firstType.code.elementsEqual(assetTypeCode) { assetTypeCode = firstType.code }
+            }
             unitSourceError = nil
         } catch {
-            unitSourceError = "Danh mục đơn vị chưa khả dụng trên máy chủ hiện tại. Bạn có thể dùng đơn vị thủ công."
+            unitSourceError = "Danh mục loại tài sản chưa khả dụng trên máy chủ hiện tại."
         }
     }
 
     private func saveUnitAndSource() async {
         guard !saving, let target = unitTarget else { return }
-        let unit = selectedUnitCode == "custom" ? customUnitLabel.trimmingCharacters(in: .whitespacesAndNewlines) : selectedUnitCode
-        guard !unit.isEmpty else { unitSourceError = "Chọn hoặc nhập đơn vị trước khi lưu."; return }
+        let unit = selectedUnitCode.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !unit.isEmpty, let expectedVersion = target.version, expectedVersion > 0 else { unitSourceError = "Tài sản chưa có phiên bản để lưu an toàn. Hãy tải lại."; return }
+        if sourceMode == "automatic" && sourceProductID.isEmpty { unitSourceError = "Chọn nguồn giá tự động hoặc chuyển sang nhập thủ công."; return }
         saving = true
         unitSourceError = nil
         defer { saving = false }
         do {
-            _ = try await api.confirmAssetUnit(assetID: target.id, unitCode: unit)
+            let confirmed = try await api.confirmAssetUnit(assetID: target.id, expectedVersion: expectedVersion, unitCode: unit)
+            let nextVersion = confirmed.version ?? expectedVersion
             _ = try await api.updateAssetPriceSource(assetID: target.id, source: PortfolioPriceSourceModel(
-                assetID: target.id,
-                mode: sourceMode,
-                sourceName: sourceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : sourceName,
-                productID: sourceProductID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : sourceProductID,
-                confirmed: sourceMode == "manual" || !sourceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                expectedVersion: nextVersion,
+                priceMode: sourceMode,
+                productID: sourceMode == "automatic" ? sourceProductID : nil
             ))
             unitTarget = nil
             await load()
@@ -2559,10 +2618,12 @@ struct PortfolioView: View {
         saving = true; error = nil
         defer { saving = false }
         do {
-            let created = try await api.createPortfolioAsset(symbol: draft.symbol, name: draft.name)
+            guard !assetUnitCode.isEmpty else { error = "Chọn loại tài sản và đơn vị."; return }
+            let created = try await api.createPortfolioAsset(symbol: draft.symbol, name: draft.name, unitLabel: assetUnitCode)
             if tradeAssetID.isEmpty { tradeAssetID = created.id }
             symbol = ""
             assetName = ""
+            assetUnitCode = ""
             assetEditorPresented = false
             await load()
         }

@@ -32,6 +32,19 @@ func TestParsePortfolioQuantityUsesEightFixedDecimals(t *testing.T) {
 	}
 }
 
+func TestPortfolioGoldUnitsAreBackendOwned(t *testing.T) {
+	for _, unit := range []string{"chỉ", "lượng", "phân"} {
+		if !IsPortfolioGoldUnit(unit) {
+			t.Fatalf("IsPortfolioGoldUnit(%q) = false", unit)
+		}
+	}
+	for _, unit := range []string{"", "gram", "cổ phiếu", "Chỉ", "custom"} {
+		if IsPortfolioGoldUnit(unit) {
+			t.Fatalf("IsPortfolioGoldUnit(%q) = true; free-text/case variants must be rejected", unit)
+		}
+	}
+}
+
 func TestParsePortfolioQuantityRejectsMoreThanEightDecimals(t *testing.T) {
 	if _, err := ParsePortfolioQuantity("1.000000001"); !errors.Is(err, ErrPortfolioQuantityInvalid) {
 		t.Fatalf("ParsePortfolioQuantity() error = %v, want ErrPortfolioQuantityInvalid", err)
@@ -64,17 +77,17 @@ func TestComputePortfolioPositionUsesWeightedAverageCost(t *testing.T) {
 }
 
 func TestComputePortfolioPositionMultipliesUnitPriceByFractionalQuantity(t *testing.T) {
-    position, err := ComputePortfolioPosition([]PortfolioTrade{{
-        ID: "buy-1", AssetID: "asset-1", Side: PortfolioTradeBuy,
-        QuantityScaled: 150000000, UnitPrice: 100000, Fee: 2500,
-        OccurredAt: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC),
-    }})
-    if err != nil {
-        t.Fatalf("ComputePortfolioPosition() error = %v", err)
-    }
-    if position.Quantity != "1.5" || position.CostBasis != 152500 || position.AverageCost != 101667 {
-        t.Fatalf("position = %+v, want 1.5 units at 100000 VND plus 2500 fee", position)
-    }
+	position, err := ComputePortfolioPosition([]PortfolioTrade{{
+		ID: "buy-1", AssetID: "asset-1", Side: PortfolioTradeBuy,
+		QuantityScaled: 150000000, UnitPrice: 100000, Fee: 2500,
+		OccurredAt: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC),
+	}})
+	if err != nil {
+		t.Fatalf("ComputePortfolioPosition() error = %v", err)
+	}
+	if position.Quantity != "1.5" || position.CostBasis != 152500 || position.AverageCost != 101667 {
+		t.Fatalf("position = %+v, want 1.5 units at 100000 VND plus 2500 fee", position)
+	}
 }
 
 func TestComputePortfolioPositionRejectsSellOverPosition(t *testing.T) {

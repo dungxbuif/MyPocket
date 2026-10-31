@@ -134,7 +134,10 @@ extension MPButton where Label == AnyView {
         action: @escaping () -> Void
     ) {
         self.init(style: style, isLoading: isLoading, isDisabled: isDisabled, fullWidth: fullWidth, action: action) {
-            AnyView(SwiftUI.Label(title, systemImage: systemName))
+            AnyView(HStack(spacing: 8) {
+                MPIconImage(systemName: systemName)
+                Text(title)
+            })
         }
     }
 }
@@ -147,7 +150,7 @@ struct MPIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemName)
+            MPIconImage(systemName: systemName)
                 .frame(width: MPMetrics.hitTarget, height: MPMetrics.hitTarget)
                 .contentShape(Rectangle())
         }
@@ -170,7 +173,7 @@ struct MPActionIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemName)
+            MPIconImage(systemName: systemName)
                 .font(MPFont.bodyEmphasis)
                 .frame(width: 56, height: 56)
                 .foregroundStyle(.white)
@@ -192,7 +195,7 @@ struct MPHeaderIconButton: View {
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemName)
+            MPIconImage(systemName: systemName)
                 .font(MPFont.bodyEmphasis)
                 .frame(width: 52, height: 52)
                 .foregroundStyle(MPColor.ink)

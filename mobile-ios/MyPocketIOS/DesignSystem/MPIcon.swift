@@ -1,5 +1,20 @@
 import SwiftUI
 
+/// Renders a catalog asset or a platform symbol through one base boundary.
+/// Callers can continue passing legacy system names while migrated semantic
+/// roles use the bundled Phosphor asset names.
+struct MPIconImage: View {
+    let systemName: String
+
+    var body: some View {
+        if MPIconCatalog.isBundledAssetName(systemName) {
+            Image(systemName)
+        } else {
+            Image(systemName: systemName)
+        }
+    }
+}
+
 /// Native SF Symbol contract for reference surfaces. Feature screens consume
 /// these names instead of embedding icon strings in their own layout code.
 enum MPReferenceIcon {
@@ -41,11 +56,18 @@ struct MPIcon: View {
     }
 
     var body: some View {
-        Image(systemName: systemName)
+        iconImage
             .foregroundStyle(color)
             .frame(width: size, height: size)
             .contentShape(Rectangle())
             .modifier(MPIconAccessibility(label: label))
+    }
+
+    private var iconImage: Image {
+        if MPIconCatalog.isBundledAssetName(systemName) {
+            return Image(systemName)
+        }
+        return Image(systemName: systemName)
     }
 }
 

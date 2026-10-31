@@ -1,48 +1,54 @@
 ---
 artifact_type: ticket
 id: GOLD-SOURCE-CONTRACT
-status: waiting_external_contract
+status: implemented
 updated: 2026-11-01
-lane: blocked
+lane: active
 ---
 
 # Gold price-source contract gate
 
 ## Scope
 
-This ticket records the external information required before MyPocket can
-enable automatic gold pricing. It does not authorize a live request, a
-catalog seed, or production configuration.
+This ticket records the source contract shared by MyPocket's market poller and
+the production n8n Hanoi gold workflow.
 
-## Required owner input
+## Captured contract
 
-For each of `gold_source_a` and `gold_source_b`, provide a sanitized contract
-containing:
+The configured source keys are `btmc` and `btmh`. Both are official HTML GET
+endpoints, with no user-provided URL and no credential-bearing request in the
+MyPocket default configuration:
 
-- endpoint and HTTP method;
-- authentication method and the names of required secret settings (never the
-  secret values);
-- a sanitized example response and its error/partial-response behavior;
-- stable external product IDs and the product-to-unit mapping;
-- currency and buy/sell meaning, including which field is the store buyback
-  price;
-- source timestamp field and timezone/format, including behavior when missing.
+- BTMC: `https://btmc.vn/`, `GET`; the table exposes rows identified by
+  `VÀNG MIẾNG VRTL BẢO TÍN MINH CHÂU` and `NHẪN TRÒN TRƠN BẢO TÍN MINH CHÂU`.
+  The source labels values as `1 = 1.000 VNĐ`; the adapter stores the first
+  (buy) field as VND per `chỉ`.
+- BTMH: `https://baotinmanhhai.vn/bang-gia-vang`, `GET`; embedded product
+  records expose `Trang sức - Nhẫn tròn BTMH` and `Vàng trang sức 24K (999.9)`.
+  The first numeric price after each stable row marker is the buy field in VND
+  per `chỉ`.
+- Source timestamps are parsed in `Asia/Ho_Chi_Minh`; a missing or malformed
+  timestamp, missing product, invalid response, or partial source fails that
+  provider poll closed. Existing quotes are retained on failure.
+- Stable external product IDs are `btmc-vrtl-buy`, `btmc-ring-buy`,
+  `btmh-jewelry-ring-buy`, and `btmh-jewelry-24k-buy`. All are `VND/chỉ` with
+  `valuation_side=buyback`.
 
 ## Current implementation state
 
-Both adapters exist only as disabled provider shells and report
-`waiting_external_contract`. They do not contain an invented URL, schema,
-credential, product mapping, fixture claimed as live, or enabled catalog row.
-The shared HTTP transport already bounds timeout to 10 seconds and response
-body to 1 MiB once a real adapter contract is supplied.
+Both adapters are enabled in the backend provider registry. The shared HTTP
+transport bounds timeout to 10 seconds and response body to 1 MiB. Migration
+`000049` enables the four catalog rows. The worker polls each provider once per
+10-minute slot using `market_poll_claims`; source endpoint overrides remain
+deployment-only through `GOLD_BTMC_ENDPOINT` and `GOLD_BTMH_ENDPOINT`.
 
-## Unblock criteria
+## Verification criteria
 
-After the owner supplies both contracts, add sanitized fixture tests for
-buyback mapping, identity, unit/currency validation, source timestamp parsing,
-malformed/partial/error responses, and one bounded read-only integration check
-per source. Enable catalog entries only after those checks identify the exact
-products. Never convert units, average sources, or fall back across providers.
+Sanitized fixture tests cover buyback mapping, identity, unit/currency,
+timestamp parsing, partial responses, and bounded transport. The n8n production
+deployment record is the read-only source of truth for the two official
+endpoints and their 10-minute schedule. The adapter never averages sources or
+falls back across providers.
 
 ## Links
 

@@ -10,6 +10,23 @@ shared_fields: [status]
 
 # Changelog
 
+## 1.3.0 build 7 — 2026-11-01
+
+- Add privacy-safe per-file AI attachment diagnostics to process/recovery
+  responses and native AI Entry review, including mixed-success OCR states
+  without exposing document contents or provider errors.
+- Connect the worker to real APNs token-authenticated transport and the durable
+  `push_deliveries` queue with ES256 signing, bounded Retry-After handling,
+  lease fencing and stale-token revocation. APNs remains disabled by default;
+  live Apple/device acceptance is not claimed.
+- Ship the unified Assistant, compact shared native typography/density bases,
+  reports/insider drilldown, accumulated-asset units and price-source UI, and
+  the bundled Phosphor icon catalog fallback from the reviewed native candidate.
+- Native metadata advances to build 7; production API/worker rollout and
+  simulator installation are recorded in the versioned release note.
+
+[Release note](REL-1.3.0-20261101.md).
+
 ## 1.3.0 build 6 follow-up — 2026-10-29
 
 - Move the native Feedback trigger into a transparent floating overlay so it no

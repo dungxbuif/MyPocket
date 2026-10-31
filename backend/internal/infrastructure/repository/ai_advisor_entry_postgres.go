@@ -286,7 +286,7 @@ func (r *AdvisorEntryPostgresRepository) AppendEvent(ctx context.Context, lease 
 	return &event, nil
 }
 
-func (r *AdvisorEntryPostgresRepository) ListEvents(ctx context.Context, ownerID, taskID string, afterSeq, limit int) ([]entity.AdvisorEntryTaskEvent, error) {
+func (r *AdvisorEntryPostgresRepository) ListEvents(ctx context.Context, ownerID, taskID string, afterSeq int64, limit int) ([]entity.AdvisorEntryTaskEvent, error) {
 	if strings.TrimSpace(ownerID) == "" || strings.TrimSpace(taskID) == "" || afterSeq < 0 {
 		return nil, contract.ErrNotFound
 	}

@@ -141,7 +141,7 @@ final class FinanceAPI: @unchecked Sendable {
     /// Additive report read. Older deployments may return 404; native callers
     /// should fall back to existing aggregate endpoints, never to a full
     /// ledger read just to draw a chart.
-    func monthlyReport(month: String, walletID: String? = nil, granularity: String = "weekly", ownerID: String? = nil) async throws -> MonthlyReportModel {
+    func monthlyReport(month: String, walletID: String? = nil, granularity: String = "day", ownerID: String? = nil) async throws -> MonthlyReportModel {
         var items = [URLQueryItem(name: "month", value: month), URLQueryItem(name: "granularity", value: granularity)]
         if let walletID { items.append(URLQueryItem(name: "wallet_id", value: walletID)) }
         var components = URLComponents()
@@ -150,17 +150,17 @@ final class FinanceAPI: @unchecked Sendable {
     }
 
     func requestReportAnalysis(_ input: ReportAnalysisRequestModel) async throws -> ReportAnalysisModel {
-        try await client.send(APIRequest(path: "/reports/analysis", method: .post, body: try body(input), idempotencyKey: input.requestID))
+        try await client.send(APIRequest(path: "/reports/analyses", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
     }
 
     func reportAnalysis(requestID: String) async throws -> ReportAnalysisModel {
         let escaped = requestID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? requestID
-        return try await client.send(APIRequest(path: "/reports/analysis/\(escaped)"))
+        return try await client.send(APIRequest(path: "/reports/analyses/\(escaped)"))
     }
 
     func cancelReportAnalysis(requestID: String) async throws {
         let escaped = requestID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? requestID
-        let _: EmptyResponse = try await client.send(APIRequest(path: "/reports/analysis/\(escaped)", method: .delete))
+        let _: ReportAnalysisModel = try await client.send(APIRequest(path: "/reports/analyses/\(escaped)/cancel", method: .post))
     }
 
     func applyOutbox(_ mutation: OutboxMutation) async throws -> [String] {
@@ -388,8 +388,8 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/portfolio/summary"))
     }
 
-    func createPortfolioAsset(symbol: String, name: String) async throws -> PortfolioAssetModel {
-        try await client.send(APIRequest(path: "/portfolio/assets", method: .post, body: try body(["symbol": symbol, "name": name]), idempotencyKey: UUID().uuidString))
+    func createPortfolioAsset(symbol: String, name: String, unitLabel: String) async throws -> PortfolioAssetModel {
+        try await client.send(APIRequest(path: "/portfolio/assets", method: .post, body: try body(["symbol": symbol, "name": name, "unit_label": unitLabel]), idempotencyKey: UUID().uuidString))
     }
 
     func updatePortfolioAsset(assetID: String, symbol: String, name: String) async throws -> PortfolioAssetModel {
@@ -404,15 +404,14 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/price", method: .patch, body: try body(["latest_price": latestPrice])))
     }
 
-    /// Optional accumulated-assets metadata endpoints. They are additive to
-    /// the existing portfolio API and are only called after an explicit user
-    /// action from native UI.
+    /// Backend-owned accumulated-assets catalog. The client can only select
+    /// returned asset types/units; it does not invent a unit label.
     func marketCatalog() async throws -> PortfolioMarketCatalogModel {
-        try await client.send(APIRequest(path: "/portfolio/market-catalog"))
+        try await client.send(APIRequest(path: "/portfolio/catalog-config"))
     }
 
-    func confirmAssetUnit(assetID: String, unitCode: String) async throws -> PortfolioAssetModel {
-        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/unit", method: .patch, body: try body(["unit": unitCode])))
+    func confirmAssetUnit(assetID: String, expectedVersion: Int64, unitCode: String) async throws -> PortfolioAssetModel {
+        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/unit", method: .patch, body: try body(PortfolioAssetUnitConfirmationModel(expectedVersion: expectedVersion, unitLabel: unitCode))))
     }
 
     func updateAssetPriceSource(assetID: String, source: PortfolioPriceSourceModel) async throws -> PortfolioAssetModel {
@@ -514,7 +513,7 @@ final class FinanceAPI: @unchecked Sendable {
     /// request contract so an older backend can continue to serve OCR/text
     /// proposals without decoding a new envelope.
     func advisorEntryTask(id: String) async throws -> AdvisorEntryTaskModel {
-        try await client.send(APIRequest(path: "/ai/advisor/entries/tasks/\(id)"))
+        try await client.send(APIRequest(path: "/ai/advisor/entries/\(id)"))
     }
 
     func processEntry(requestID: String, text: String, timezone: String, files: [MultipartFile] = []) async throws -> EntryProcessModel {
@@ -570,8 +569,19 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/advisor/runs/\(id)"))
     }
 
-    func beginAdvisorEntry(_ input: AdvisorEntryInputModel) async throws -> AdvisorEntryTaskModel {
-        try await client.send(APIRequest(path: "/ai/advisor/entries", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
+    func beginAdvisorEntry(_ input: AdvisorEntryInputModel, files: [MultipartFile] = []) async throws -> AdvisorEntryTaskModel {
+        try await client.sendMultipart(
+            path: "/ai/advisor/entries",
+            fields: [
+                "client_request_id": input.clientRequestID,
+                "conversation_id": input.conversationID,
+                "generation": String(input.generation),
+                "text": input.text,
+                "timezone": input.timezone ?? ""
+            ],
+            files: files,
+            idempotencyKey: input.clientRequestID
+        )
     }
 
     func decideAdvisorEntry(_ input: AdvisorEntryDecisionModel) async throws -> AdvisorEntryTaskModel {

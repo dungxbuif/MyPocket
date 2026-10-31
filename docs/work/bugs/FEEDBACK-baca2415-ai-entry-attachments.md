@@ -93,18 +93,26 @@ regression/evaluation gate, informed by the
 and [PDF safety work](AI-ENTRY-PDF-REVIEW-SAFETY-20261026.md). No broad
 architecture or production change is authorized by this feedback audit.
 
-## Decision needed before a fix
+## Implemented local follow-up — 2026-11-01
 
-1. **Per-file diagnosis:** approve a small owner-scoped, privacy-safe API
-   response/recovery contract (for example stable attachment position plus
-   stage/status and safe error code) and native presentation for the affected
-   file. Do not expose OCR text, original bytes, object keys, provider URLs or
-   raw upstream errors. Define how a failed file remains associated with the
-   request after an uncertain submit; do not auto-retry uploads or OCR. This
-   changes a public response and error UX, so it is outside the approved
-   cleanup/card detail designs. Test first with a deterministic two-file OCR
-   failure: backend API/recovery must identify only the failed position, and
-   native UI must show it next to that file while retaining successful evidence.
+The bounded response contract is implemented locally. Process and
+request-recovery responses expose `attachment_diagnostics[]` with only a stable
+1-based input position, validated basename, stage, status and allow-listed
+error code. The native AI-entry screen renders each diagnostic next to its
+corresponding file and leaves successful evidence available for review. No OCR
+text, object key, source bytes, hash, provider URL or raw upstream error is
+returned, and the client does not auto-retry.
+
+The same implementation slice adds the server-side APNs transport and durable
+worker queue described in the APNs runbook. It is independently
+configuration-gated and does not change this ticket's attachment cleanup
+retention policy.
+
+## Remaining acceptance decisions
+
+1. **Per-file diagnosis:** IMPLEMENTED LOCALLY as the bounded contract above.
+   Keep owner/device acceptance open until a populated two-file run confirms
+   that the UI association is useful.
 2. **Deployed cleanup:** owner-approved worker service configuration/release
    must provide its existing S3 credentials through the established secret
    path, then verify a healthy worker pass. Review non-sensitive logs and a
@@ -123,9 +131,8 @@ Docs review: the [assistant screen contract](../../design/pages/assistant/README
 [AI-entry API reference](../../architecture/API.md), and
 [deployment runbook](../../operations/DEPLOYMENT.md) distinguish implemented
 conditional scheduling from the currently unconfigured deployed worker. The
-existing Markdown AI-entry reference is both human- and agent-readable. No
-schema, configuration default, or API behavior changed in this audit; a new
-per-file public response remains gated on the first decision. The in-flight
+existing Markdown AI-entry reference is both human- and agent-readable. The
+per-file public response is now additive and privacy-safe; the in-flight
 `docs/guides/ai-entry.md` is unchanged because this audit did not ship new
 user behavior; the current-limit statement lives in the existing API and
 screen references.

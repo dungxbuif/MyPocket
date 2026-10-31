@@ -1,13 +1,13 @@
 # ADR-024: owner-scoped APNs token lifecycle
 
-Status: Accepted for local registration only (2026-10-19)
+Status: Accepted; registration and config-gated provider delivery (2026-11-01)
 
 ## Context
 
 In-app notifications are persisted and read by owner, but native push delivery
 needs a durable token registration. Registering tokens without owner checks could
-send a future notification to the wrong account. Provider delivery is not yet
-configured.
+send a future notification to the wrong account. Provider delivery is
+configuration-gated and must remain off for local/Personal Team deployments.
 
 ## Decision
 
@@ -31,8 +31,10 @@ by the same owner/device is an upsert.
 The database contains a sensitive provider identifier, so it is excluded from
 JSON and logs and requires normal database access controls. The API is usable by
 native clients now, while delivery remains an explicit deployment/provider gate.
-Future provider work must add encryption-at-rest or equivalent secret handling,
-retry/dead-letter policy, token invalidation on provider response, and signed
-device acceptance before enabling push.
+The backend now stores durable route-only delivery jobs and uses an in-memory
+APNs private key with ES256 signing, bounded retries, lease fencing and
+current-token-only invalidation on provider response. Apple entitlement, secret
+provisioning and signed-device acceptance remain required before enabling push
+in an environment.
 
 Links: [detail design](../work/tickets/APNS-DEVICE-TOKENS-20261019-DETAIL_DESIGN.md), [API](../architecture/API.md), [ERD](../architecture/ERD.md).

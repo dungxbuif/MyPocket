@@ -81,11 +81,13 @@ Each pending row exposes prefilled type, amount, wallet, required applicable cat
 
 Optional files: up to 20 JPEG/PNG/PDF, <=5 MiB each. Browser sends raw multipart files, not base64, from either picker or drag/drop. Backend validates the detected file signature/type (the client part MIME header is not trusted), stores originals in environment-qualified private S3, then runs OCR before LLM extraction; the LLM receives only user text plus OCR text and a minimal reference catalog, never file bytes, base64, URLs or image input. OCR failure prevents LLM invocation. Approval links evidence to the transaction and authenticated download is owner/link-scoped. Capabilities expose `files_configured` (OCR plus private storage); if false, attachment selection is disabled while text entry remains available. No provider secrets or mocks in runtime.
 
-Current native and browser entry UIs show selected files with individual removal,
-but processing failures are batch-level. The API response does not expose a
-per-file failure status, so a multi-file OCR failure cannot yet identify the
-affected file in the review UI. This is open under [feedback baca2415](../../../work/bugs/FEEDBACK-baca2415-ai-entry-attachments.md),
-not an accepted per-file diagnostic claim. Successfully uploaded unlinked
+Current native and browser entry UIs show selected files with individual removal.
+The native review surface now renders the additive `attachment_diagnostics[]`
+projection beside the corresponding file: position, validated basename, stage,
+status and safe error code only. It retains successful evidence and does not
+expose OCR text, source bytes, object keys or provider details. Owner/device
+acceptance remains open under [feedback baca2415](../../../work/bugs/FEEDBACK-baca2415-ai-entry-attachments.md).
+Successfully uploaded unlinked
 originals become cleanup candidates after 24 hours; approved linked evidence
 is retained. The regular worker runs bounded cleanup only when its private
 storage is configured, which the deployed worker is not as of the read-only
@@ -118,6 +120,6 @@ Commands from `app/` (run with `rtk`):
 | `npm run build` | PASS: TypeScript and Vite production bundle, 1,756 modules. |
 | `git diff --check` (repository root) | PASS. |
 
-Historical browser tests used real React components and deterministic HTTP fixtures in `app/tests/ai-entry.tsx`; this is not evidence of current native rendering. Current iOS work uses shared MyPocket bases and separate native/runtime proof. Physical-device touch UAT and live AI/OCR extraction are not proven by old browser fixtures.
+Historical browser tests used real React components and deterministic HTTP fixtures in `app/tests/ai-entry.tsx`; this is not evidence of current native rendering. Current iOS work uses shared MyPocket bases and separate native/runtime proof. Physical-device touch UAT and live AI/OCR extraction are not proven by old browser fixtures. The same card-parity rule applies to conversational Assistant finance previews: reuse the `Thêm giao dịch` transaction surface/row language and keep chat-only chrome outside the transaction content.
 
 Docs review: the screen spec and base inventory map the composer, upload and grouped result card. The API contract is one-shot and no-history; AI-ENTRY-02 remaining scope is live S3/OCR and browser attachment download UAT. Unsent text/files and unsaved row edits are local until submit/save; approved rows refresh wallet/transaction/budget data.

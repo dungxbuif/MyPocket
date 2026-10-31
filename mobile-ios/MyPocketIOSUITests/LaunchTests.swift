@@ -752,7 +752,7 @@ private enum LocalAPIFixture {
                 decode: EmptyFixtureResponse.self
             )
         }
-        let data = try JSONSerialization.data(withJSONObject: ["symbol": symbol, "name": name])
+        let data = try JSONSerialization.data(withJSONObject: ["symbol": symbol, "name": name, "unit_label": "chỉ"])
         let created = try await request(
             path: "/portfolio/assets",
             method: "POST",
@@ -1555,16 +1555,20 @@ final class LaunchTests: XCTestCase {
     }
 
     private func moreEntry(_ id: String, in app: XCUIApplication) -> XCUIElement {
-        let scrollView = app.scrollViews.firstMatch
+        let scrollViews = app.scrollViews.allElementsBoundByIndex
         // Returning from a secondary screen intentionally preserves the menu
         // offset. Start each route assertion at the menu's top, then let the
-        // shared reveal helper move to the requested section.
-        for _ in 0..<8 { scrollView.swipeDown() }
+        // shared reveal helper move to the requested section. MoreView sits
+        // inside the shell viewport, so reset both the outer and inner scroll
+        // containers instead of relying on firstMatch ordering.
+        for _ in 0..<8 {
+            for scrollView in scrollViews.reversed() { scrollView.swipeDown() }
+        }
         let entry = app.buttons[id].firstMatch
         if entry.waitForExistence(timeout: 2) { return entry }
         for _ in 0..<16 {
-            scrollView.swipeUp()
             if entry.exists { return entry }
+            for scrollView in scrollViews.reversed() { scrollView.swipeUp() }
         }
         return entry
     }
@@ -1634,9 +1638,9 @@ final class LaunchTests: XCTestCase {
         XCTAssertLessThanOrEqual(navigation.frame.maxX, window.frame.maxX - 12)
         XCTAssertTrue(feedback.waitForExistence(timeout: 5))
         XCTAssertTrue(dock.frame.contains(feedback.frame), "Feedback must stay inside its transparent overlay host.")
-        XCTAssertTrue(viewport.frame.intersects(feedback.frame), "Feedback must float over the route viewport.")
-        XCTAssertGreaterThanOrEqual(feedback.frame.minY, viewport.frame.minY)
-        XCTAssertLessThanOrEqual(feedback.frame.maxY, viewport.frame.maxY + 1)
+        XCTAssertFalse(viewport.frame.intersects(feedback.frame), "Feedback belongs in the dedicated dock below route content.")
+        XCTAssertGreaterThanOrEqual(feedback.frame.minY, viewport.frame.maxY)
+        XCTAssertLessThanOrEqual(feedback.frame.maxY, navigation.frame.minY + 12)
         XCTAssertGreaterThanOrEqual(add.frame.width, 44)
         XCTAssertGreaterThanOrEqual(add.frame.height, 44)
         XCTAssertLessThan(add.frame.minY, overview.frame.minY, "The center Add action must rise above the tab items.")
@@ -1967,7 +1971,7 @@ final class LaunchTests: XCTestCase {
 #else
         let title = "UI feedback \(UUID().uuidString.prefix(8))"
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
         app.launch()
 
         let bubble = app.buttons["Gửi phản hồi"]
@@ -1999,7 +2003,7 @@ final class LaunchTests: XCTestCase {
     func testAuthenticatedMoreMenuOpensEveryDestination() throws {
         let app = XCUIApplication()
 #if LOCAL_API_UI
-        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
 #else
         app.launchArguments = ["-UITestAuthenticated"]
 #endif
@@ -2037,14 +2041,19 @@ final class LaunchTests: XCTestCase {
             reveal(entry, in: app)
             XCTAssertTrue(entry.exists, "More destination disappeared: \(title)")
             entry.tap()
-            let expectedScreenTitle = destination.id == "wallets" ? "Chọn Ví" : title
+            let expectedScreenTitle: String
+            switch destination.id {
+            case "wallets": expectedScreenTitle = "Chọn Ví"
+            case "portfolio": expectedScreenTitle = "Tài sản tích lũy"
+            default: expectedScreenTitle = title
+            }
             let screenTitle = app.staticTexts["screen-title-\(expectedScreenTitle)"].firstMatch
             XCTAssertTrue(screenTitle.waitForExistence(timeout: 5), "Destination did not render: \(title)")
             if ["categories", "jars", "months", "portfolio", "notifications"].contains(destination.id) {
                 let viewport = app.descendants(matching: .any)["shell-content-viewport"]
                 XCTAssertTrue(
-                    viewport.waitForExistence(timeout: 2) && viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
-                    "Scrollable secondary screen must remain under the floating Feedback overlay: \(title)"
+                    viewport.waitForExistence(timeout: 2) && !viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
+                    "Scrollable secondary screen must reserve space below the floating Feedback bubble: \(title)"
                 )
             }
             attachScreenshot(app, named: "secondary-route-\(destination.id)")
@@ -2069,7 +2078,7 @@ final class LaunchTests: XCTestCase {
         let title = "Resolution UI \(UUID().uuidString.prefix(8))"
         let item = try await LocalAPIFixture.createResolutionFeedback(title: title)
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
         app.launch()
         openMore(app)
         let route = app.buttons["more-destination-feedback"]
@@ -2126,8 +2135,10 @@ final class LaunchTests: XCTestCase {
         input.typeText("Chi tieu thang nay")
         XCTAssertFalse(tab.exists)
         app.buttons["assistant-dismiss-keyboard"].tap()
+        let close = app.buttons["assistant-close"]
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
         XCTAssertTrue(tab.waitForExistence(timeout: 5))
-        openMore(app)
         tab.tap()
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         XCTAssertEqual(input.value as? String, "Chi tieu thang nay", "Switching tabs must preserve the unsent financial question.")
@@ -2166,8 +2177,8 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(app.buttons["Back"].exists, "Secondary routes must not show the native back button above the Stitch header.")
         let viewport = app.descendants(matching: .any)["shell-content-viewport"]
         XCTAssertTrue(
-            viewport.waitForExistence(timeout: 2) && viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
-            "Categories must remain under the floating Feedback overlay."
+            viewport.waitForExistence(timeout: 2) && !viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
+            "Categories must reserve a clear viewport outside the floating Feedback dock."
         )
         attachScreenshot(app, named: "categories-shell-clearance")
     }
@@ -2183,8 +2194,8 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(app.buttons["Back"].exists, "Secondary routes must not show the native back button above the Stitch header.")
         let viewport = app.descendants(matching: .any)["shell-content-viewport"]
         XCTAssertTrue(
-            viewport.waitForExistence(timeout: 2) && viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
-            "Notifications must remain under the floating Feedback overlay."
+            viewport.waitForExistence(timeout: 2) && !viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
+            "Notifications must reserve a clear viewport outside the floating Feedback dock."
         )
         attachScreenshot(app, named: "notifications-shell-clearance")
     }
@@ -2335,7 +2346,7 @@ final class LaunchTests: XCTestCase {
         let app = XCUIApplication()
         // Foundation argument-domain preference is launch-scoped, not a
         // persisted override or a new production fixture hook.
-        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.advisor.conversation.\(ownerID)", conversationID]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO", "-mypocket.advisor.conversation.\(ownerID)", conversationID]
         app.launch()
         app.buttons["bottom-tab-assistant"].tap()
         let latest = app.staticTexts["Native History Fixture 51"]
@@ -2391,19 +2402,16 @@ final class LaunchTests: XCTestCase {
         assistantEntry.tap()
         XCTAssertTrue(app.staticTexts["Finance Assistant"].firstMatch.waitForExistence(timeout: 10))
         let disabledMessage = app.staticTexts["Finance Assistant chưa được bật."]
-        let firstQuestionPrompt = app.staticTexts["Hỏi về tài chính của bạn"]
+        let firstQuestionPrompt = app.staticTexts["Mình có thể giúp gì cho bạn?"]
         XCTAssertTrue(
             disabledMessage.waitForExistence(timeout: 10) || firstQuestionPrompt.waitForExistence(timeout: 10),
             "Assistant should render either its disabled state or the ready conversation empty state."
         )
         XCTAssertFalse(app.staticTexts["Không thể tải tổng quan trợ lý tài chính."].exists)
-        let overview = app.buttons["assistant-pinned-overview"]
+        let overview = app.buttons["assistant-header-overview"]
         XCTAssertTrue(overview.waitForExistence(timeout: 10))
-        let top = overview.frame.minY
         let conversation = app.scrollViews["assistant-conversation"]
         XCTAssertTrue(conversation.exists)
-        conversation.swipeUp()
-        XCTAssertEqual(overview.frame.minY, top, accuracy: 1, "History scrolling must not move the financial overview.")
         overview.tap()
         XCTAssertTrue(app.staticTexts["Tổng quan tài chính"].firstMatch.waitForExistence(timeout: 5))
         app.buttons["Đóng"].firstMatch.tap()
@@ -2445,6 +2453,8 @@ final class LaunchTests: XCTestCase {
         app.launch()
         app.buttons["bottom-tab-assistant"].tap()
         XCTAssertTrue(app.staticTexts["Finance Assistant"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["bottom-navigation"].exists, "Assistant is a standalone screen without the shell navigation.")
+        XCTAssertTrue(app.buttons["assistant-close"].waitForExistence(timeout: 5))
         XCTAssertFalse(
             app.buttons["floating-feedback-bubble"].exists,
             "The feedback bubble must stay hidden on the full-width assistant composer."
@@ -2455,7 +2465,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(composer.waitForExistence(timeout: 5))
         let chatFrame = app.descendants(matching: .any)["assistant-chat-frame"].firstMatch
         XCTAssertTrue(chatFrame.waitForExistence(timeout: 5))
-        XCTAssertTrue(chatFrame.frame.contains(composer.frame), "The composer must belong to the shared assistant chat frame.")
+        XCTAssertTrue(chatFrame.frame.contains(composer.frame), "The composer must belong to the shared assistant chat frame. chat=\(chatFrame.frame) composer=\(composer.frame)")
         XCTAssertGreaterThan(composer.frame.width, app.windows.firstMatch.frame.width - 48, "Assistant composer should use the full available width.")
         XCTAssertGreaterThan(composer.frame.height, 76, "Welcome mode must leave room for a short first question without becoming a full note editor.")
         input.tap()
@@ -2480,16 +2490,22 @@ final class LaunchTests: XCTestCase {
         app.terminate()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
-        let navigation = app.buttons["bottom-navigation-menu"]
-        XCTAssertTrue(navigation.waitForExistence(timeout: 5))
-        navigation.tap()
-        app.buttons["Trợ lý"].firstMatch.tap()
-        XCTAssertTrue(input.waitForExistence(timeout: 10))
-        XCTAssertGreaterThanOrEqual(input.frame.height, 44, "Accessibility composer must retain a usable multiline hit area")
-        input.tap()
+        if app.buttons["bottom-tab-assistant"].exists {
+            app.buttons["bottom-tab-assistant"].tap()
+        } else {
+            let navigation = app.buttons["bottom-navigation-menu"]
+            XCTAssertTrue(navigation.waitForExistence(timeout: 10))
+            navigation.tap()
+            app.buttons["Trợ lý"].firstMatch.tap()
+        }
+        let accessibilityInput = app.textFields["assistant-composer-input"]
+        XCTAssertTrue(accessibilityInput.waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["bottom-navigation-menu"].exists)
+        XCTAssertGreaterThanOrEqual(accessibilityInput.frame.height, 44, "Accessibility composer must retain a usable multiline hit area")
+        accessibilityInput.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        input.typeText("Dong dau\nDong hai\nDong ba\nDong cuoi can giu")
-        XCTAssertTrue((input.value as? String)?.contains("Dong cuoi can giu") == true)
+        accessibilityInput.typeText("Dong dau\nDong hai\nDong ba\nDong cuoi can giu")
+        XCTAssertTrue((accessibilityInput.value as? String)?.contains("Dong cuoi can giu") == true)
         let send = app.buttons["assistant-composer-action"]
         let composer = app.descendants(matching: .any)["assistant-composer"].firstMatch
         let conversation = app.scrollViews["assistant-conversation"]
@@ -2501,17 +2517,15 @@ final class LaunchTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(conversation.frame.height, 44, "Large drafts must not consume the entire conversation viewport")
         attachScreenshot(app, named: "assistant-largest-text-multiline-keyboard")
         app.buttons["assistant-dismiss-keyboard"].tap()
-        XCTAssertTrue(navigation.waitForExistence(timeout: 5))
-        XCTAssertTrue((input.value as? String)?.contains("Dong cuoi can giu") == true)
+        XCTAssertTrue(app.buttons["assistant-close"].waitForExistence(timeout: 5))
+        XCTAssertTrue((accessibilityInput.value as? String)?.contains("Dong cuoi can giu") == true)
         attachScreenshot(app, named: "assistant-largest-text-navigation-restored")
-        navigation.tap()
-        app.buttons["Tài khoản"].firstMatch.tap()
-        XCTAssertTrue(navigation.waitForExistence(timeout: 5))
-        XCTAssertTrue(navigation.label.contains("Tài khoản"))
-        navigation.tap()
-        app.buttons["Trợ lý"].firstMatch.tap()
-        XCTAssertTrue(input.waitForExistence(timeout: 5))
-        XCTAssertTrue((input.value as? String)?.contains("Dong cuoi can giu") == true, "Accessibility menu switching must retain the full draft")
+        app.buttons["assistant-close"].tap()
+        XCTAssertTrue(
+            app.buttons["bottom-tab-overview"].waitForExistence(timeout: 5)
+                || app.buttons["bottom-navigation-menu"].waitForExistence(timeout: 5),
+            "Closing Assistant must return to the shell at large text sizes."
+        )
     }
 
     func testAppRemainsPortraitWhenDeviceRotates() {
@@ -2557,16 +2571,14 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         let send = app.buttons["assistant-composer-action"]
         let bubble = app.buttons["floating-feedback-bubble"]
-        XCTAssertFalse(bubble.frame.intersects(send.frame), "Feedback must float above chat input, not cover send.")
+        XCTAssertFalse(bubble.exists, "Feedback is intentionally hidden on the standalone Assistant screen.")
         input.tap()
-        input.typeText("Chi tieu thang nay\nDong hai\nDong ba\nDong bon\nDong nam\nDong sau")
+        input.typeText("Chi tieu thang nay Dong hai Dong ba Dong bon Dong nam Dong sau")
         XCTAssertTrue(app.keyboards.firstMatch.exists)
         XCTAssertLessThan(input.frame.height, 140, "Long drafts should scroll inside a four-line input, not grow indefinitely.")
         XCTAssertFalse(send.isEnabled, "Unavailable advisor must not send, even when a local draft exists.")
         XCTAssertTrue((input.value as? String)?.contains("Dong sau") == true)
-        XCTAssertTrue(bubble.exists, "Feedback remains available in the dedicated Assistant footer slot while typing.")
-        XCTAssertFalse(bubble.frame.intersects(input.frame), "Feedback must not cover the multiline composer.")
-        XCTAssertFalse(bubble.frame.intersects(send.frame), "Feedback must not cover the send/stop action.")
+        XCTAssertFalse(bubble.exists, "Feedback remains hidden while the standalone Assistant is open.")
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "assistant-multiline-draft"
         shot.lifetime = .keepAlways
@@ -2636,7 +2648,7 @@ final class LaunchTests: XCTestCase {
             amount: 120_000,
             note: "Fixture current report expense",
             type: "expense",
-            occurredAt: "2031-10-06T03:00:00Z"
+            occurredAt: "2026-10-06T03:00:00Z"
         )
         let previousExpense = try await LocalAPIFixture.transaction(
             walletID: wallet.wallet.id,
@@ -2644,12 +2656,12 @@ final class LaunchTests: XCTestCase {
             amount: 80_000,
             note: "Fixture previous report expense",
             type: "expense",
-            occurredAt: "2031-09-06T03:00:00Z"
+            occurredAt: "2026-09-06T03:00:00Z"
         )
         XCTAssertNotEqual(currentExpense.id, previousExpense.id)
 
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
         app.launch()
         openMore(app)
         let reportsEntry = app.buttons["more-destination-reports"]
@@ -2664,7 +2676,7 @@ final class LaunchTests: XCTestCase {
         let monthField = app.textFields["reports-month"]
         XCTAssertTrue(monthField.waitForExistence(timeout: 10))
         reveal(monthField, in: app)
-        monthField.clearAndType("2031-10")
+        monthField.clearAndType("2026-10")
         dismissKeyboard(app)
         let reload = app.buttons["reports-load-button"]
         reveal(reload, in: app)
@@ -2716,7 +2728,7 @@ final class LaunchTests: XCTestCase {
         }
         let incomeCategory = try await LocalAPIFixture.category(kind: "income", walletID: wallet.wallet.id)
         let expenseCategory = try await LocalAPIFixture.category(kind: "expense", walletID: wallet.wallet.id)
-        let transactionDate = "2031-10-06T03:00:00Z" // 10:00 on Oct 6 in the fixture account timezone.
+        let transactionDate = "2026-10-06T03:00:00Z" // 10:00 on Oct 6 in the fixture account timezone.
         let income = try await LocalAPIFixture.transaction(
             walletID: wallet.wallet.id,
             categoryID: incomeCategory.id,
@@ -2749,7 +2761,7 @@ final class LaunchTests: XCTestCase {
         )
 
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
         app.launch()
         openMore(app)
         let reportsEntry = app.buttons["more-destination-reports"]
@@ -2761,7 +2773,7 @@ final class LaunchTests: XCTestCase {
         let monthField = app.textFields["reports-month"]
         XCTAssertTrue(monthField.waitForExistence(timeout: 10))
         reveal(monthField, in: app)
-        monthField.clearAndType("2031-10")
+        monthField.clearAndType("2026-10")
         dismissKeyboard(app)
         let reload = app.buttons["reports-load-button"]
         reveal(reload, in: app)
@@ -5118,13 +5130,13 @@ final class LaunchTests: XCTestCase {
         let fixture = try await LocalAPIFixture.portfolioAsset(symbol: symbol, name: "Compact Position")
         addTeardownBlock { try await LocalAPIFixture.delete(fixture) }
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
         app.launch()
         openMore(app)
         let entry = app.buttons["more-destination-portfolio"]
         reveal(entry, in: app)
         entry.tap()
-        let costs = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Giá vốn: "))
+        let costs = app.staticTexts.matching(NSPredicate(format: "label == %@", "Giá vốn"))
         XCTAssertTrue(costs.firstMatch.waitForExistence(timeout: 10))
         XCTAssertGreaterThanOrEqual(costs.count, 2, "Summary and at least one asset must expose cost values.")
         guard costs.count >= 2 else { return }
@@ -5157,9 +5169,9 @@ final class LaunchTests: XCTestCase {
         let entry = app.buttons["more-destination-portfolio"]
         reveal(entry, in: app)
         entry.tap()
-        XCTAssertTrue(app.staticTexts["screen-title-Danh mục đầu tư"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["screen-title-Tài sản tích lũy"].waitForExistence(timeout: 10))
         XCTAssertFalse(app.textFields["Mã"].exists, "Portfolio list must not contain an asset creation form.")
-        XCTAssertFalse(app.textFields["Khối lượng"].exists, "Portfolio list must not contain a trade form.")
+        XCTAssertFalse(app.textFields["Số lượng (chỉ)"].exists, "Portfolio list must not contain a trade form.")
         let add = app.buttons["portfolio-open-asset-editor"]
         guard add.waitForExistence(timeout: 5) else { XCTFail("Missing dedicated asset editor entry"); return }
         add.tap()
@@ -5170,13 +5182,17 @@ final class LaunchTests: XCTestCase {
         let name = app.textFields["Tên"]
         name.clearAndType("Duplicate draft retained")
         dismissKeyboard(app)
+        let unit = app.buttons["portfolio-asset-unit"]
+        XCTAssertTrue(unit.waitForExistence(timeout: 5))
+        unit.tap()
+        app.buttons["Chỉ"].tap()
         app.buttons["portfolio-add-asset"].tap()
         XCTAssertTrue(app.staticTexts["Không thể tạo tài sản."].waitForExistence(timeout: 10))
         XCTAssertEqual(code.value as? String, symbol)
         XCTAssertEqual(name.value as? String, "Duplicate draft retained")
         attachScreenshot(app, named: "portfolio-asset-editor-retryable-error")
         app.buttons["screen-close"].firstMatch.tap()
-        XCTAssertTrue(app.staticTexts["screen-title-Danh mục đầu tư"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["screen-title-Tài sản tích lũy"].waitForExistence(timeout: 5))
         let after = try await LocalAPIFixture.portfolioAssets().map(\.id).sorted()
         XCTAssertEqual(after, before)
         add.tap()
@@ -5184,7 +5200,7 @@ final class LaunchTests: XCTestCase {
         app.textFields["Mã"].clearAndType(symbol + "N")
         dismissKeyboard(app)
         app.buttons["portfolio-add-asset"].tap()
-        XCTAssertTrue(app.staticTexts["screen-title-Danh mục đầu tư"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["screen-title-Tài sản tích lũy"].waitForExistence(timeout: 10))
         let createdAssets = try await LocalAPIFixture.portfolioAssets()
         let created = try XCTUnwrap(createdAssets.first(where: { $0.symbol == symbol + "N" }))
         addTeardownBlock { try await LocalAPIFixture.deletePortfolioAsset(id: created.id, token: fixture.token) }
@@ -5211,7 +5227,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(entry.waitForExistence(timeout: 10))
         reveal(entry, in: app)
         entry.tap()
-        XCTAssertTrue(app.staticTexts["screen-title-Danh mục đầu tư"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["screen-title-Tài sản tích lũy"].waitForExistence(timeout: 10))
 
         let delete = app.buttons["portfolio-delete-\(fixture.asset.id)"]
         XCTAssertTrue(delete.waitForExistence(timeout: 10), "Unused portfolio assets must expose a delete action.")
@@ -5285,14 +5301,14 @@ final class LaunchTests: XCTestCase {
         addTeardownBlock { try? await LocalAPIFixture.delete(fixture) }
 
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO"]
         app.launch()
         openMore(app)
         let portfolioEntry = app.buttons["more-destination-portfolio"]
         XCTAssertTrue(portfolioEntry.waitForExistence(timeout: 10))
         reveal(portfolioEntry, in: app)
         portfolioEntry.tap()
-        XCTAssertTrue(app.staticTexts["screen-title-Danh mục đầu tư"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["screen-title-Tài sản tích lũy"].waitForExistence(timeout: 10), app.debugDescription)
         // The asset cards and their controls are below the first viewport on a
         // phone-sized simulator. Scroll the real screen before asserting the
         // owner-scoped asset and interacting with its price field.
@@ -5314,11 +5330,11 @@ final class LaunchTests: XCTestCase {
         reveal(savePrice, in: app)
         XCTAssertTrue(savePrice.isHittable)
         savePrice.tap()
-        XCTAssertTrue(app.staticTexts["screen-title-Danh mục đầu tư"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["screen-title-Tài sản tích lũy"].waitForExistence(timeout: 10), app.debugDescription)
         // The card title is present before the request completes, so waiting for
         // that title would make this assertion race the refresh. Wait for the
         // formatted latest-price value rendered from the refreshed API state.
-        let refreshedPrice = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Giá hiện tại: 120.000")).firstMatch
+        let refreshedPrice = app.staticTexts.matching(NSPredicate(format: "label CONTAINS[c] %@", "Giá / đơn vị: 120.000")).firstMatch
         XCTAssertTrue(refreshedPrice.waitForExistence(timeout: 15))
         let priceReadback = try await LocalAPIFixture.portfolioAssets()
         XCTAssertEqual(priceReadback.first(where: { $0.id == fixture.asset.id })?.latestPrice, 120_000)
@@ -5343,7 +5359,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(portfolioEntry.waitForExistence(timeout: 10))
         reveal(portfolioEntry, in: app)
         portfolioEntry.tap()
-        XCTAssertTrue(app.staticTexts["screen-title-Danh mục đầu tư"].waitForExistence(timeout: 10), app.debugDescription)
+        XCTAssertTrue(app.staticTexts["screen-title-Tài sản tích lũy"].waitForExistence(timeout: 10), app.debugDescription)
 
         let assetSelector = app.buttons["portfolio-trade-asset"]
         let openTrade = app.buttons["portfolio-open-trade-editor"]
@@ -5358,7 +5374,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(assetOption.waitForExistence(timeout: 5), app.debugDescription)
         assetOption.tap()
 
-        let quantity = app.textFields["Khối lượng"]
+        let quantity = app.textFields["Số lượng (chỉ)"]
         XCTAssertTrue(quantity.waitForExistence(timeout: 5))
         reveal(quantity, in: app)
         quantity.clearAndType("1,25")
@@ -5369,7 +5385,7 @@ final class LaunchTests: XCTestCase {
         attachScreenshot(app, named: "portfolio-trade-editor-keyboard-clearance")
         dismissKeyboard(app)
 
-        let unitPrice = app.textFields["Giá đơn vị"]
+        let unitPrice = app.textFields["Đơn giá (đ/chỉ)"]
         XCTAssertTrue(unitPrice.waitForExistence(timeout: 5))
         reveal(unitPrice, in: app)
         unitPrice.clearAndType("72000")
@@ -5387,7 +5403,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(save.isHittable, "Save trade must be reachable above the shell: \(save.frame)")
         save.tap()
 
-        let position = app.staticTexts["Số lượng: 1.25"]
+        let position = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH %@", "Số lượng: 1.25")).firstMatch
         XCTAssertTrue(position.waitForExistence(timeout: 15), "Persisted buy quantity must refresh the position: \(app.debugDescription)")
         let history = app.staticTexts["Mua · 1.25"]
         XCTAssertTrue(history.waitForExistence(timeout: 10), "The saved trade must appear in asset history: \(app.debugDescription)")

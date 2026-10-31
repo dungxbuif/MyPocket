@@ -10,7 +10,7 @@ and values are untouched; never rerun a previously applied migration.
 
 The current candidate is additive after the deployed version-34 baseline and
 must be applied in order through the existing `000046`, followed by
-`000047` and `000048`. Migration `000043` remains reserved by accumulated-assets;
+`000047`, `000048`, and `000049`. Migration `000043` remains reserved by accumulated-assets;
 this reports feature does not reuse or edit it. Verify a validated custom-format
 backup and `dirty=false` before applying the forward path. The API image must be
 deployed with the matching worker only after version 048 is
@@ -62,7 +62,7 @@ Stage v1 starts with one baseline migration pair and uses additive forward migra
 - `000036_push_tokens.up.sql` adds owner-scoped iOS push-token registration metadata. It does not call APNs, send notifications, alter financial rows or expose the token in API responses. Apply only after backup/version verification; provider entitlements and delivery remain a separate gate.
 - `000037_audit_outbox.up.sql` adds a private redacted audit delivery buffer with idempotent stream/event keys and leased worker retries. It contains no prompts, OCR text, credentials or financial rows; apply only after backup/version checks and worker rollout readiness.
 - `000038_portfolio_trade_corrections.up.sql` adds optimistic portfolio asset versions and immutable owner-scoped replace/void revisions. Existing trades and wallet balances remain unchanged; apply only after backup/version verification.
-- `000039_push_deliveries.up.sql` adds the durable owner-scoped APNs delivery hand-off. It is deduped per notification/token/environment, stores only an app-owned route payload, and does not call APNs by itself; apply only after backup/version checks and matching worker rollout.
+- `000039_push_deliveries.up.sql` adds the durable owner-scoped APNs delivery queue. It is deduped per notification/token/environment, stores only an app-owned route payload, and is consumed by the config-gated worker transport; apply only after backup/version checks and matching worker rollout.
 - `000040_row_versions.up.sql` adds positive, non-null optimistic-lock versions to ordinary transactions and personal categories. Existing rows start at version `1`; the migration does not rewrite financial values or category relationships. Apply only after backup/version checks and deploy the matching API before enabling clients that send `expected_version`.
 - `000041_advisor_runtime.up.sql` adds the server-authoritative `advisor_runs.deadline_at` backfill/check and reaper index, then verifies duplicate assistant completions before installing an idempotent partial uniqueness guard. Existing advisor/financial rows are preserved; apply only after backup/version checks. Its down file is disposable-fixture-only.
 - `000042_advisor_entry_tasks.up.sql` adds owner-bound assistant entry tasks, ordered events, and private attachment bindings without changing existing entry sessions, proposals, advisor runs, or financial rows. Apply after `000041` with the matching API and worker. Its down file is disposable-fixture-only; see [ADR-026](../../docs/decisions/ADR-026-ai-conversation-entry-lifecycle.md).
@@ -72,6 +72,10 @@ Stage v1 starts with one baseline migration pair and uses additive forward migra
 - `000046_advisor_entry_input.up.sql` stores the private accepted text/timezone needed for worker restart recovery. It does not expose prompt data in task JSON or event payloads; its down file is disposable-fixture-only.
 - `000047_report_snapshots.up.sql` adds owner-scoped report revisions, durable report snapshots, and canonical-writer invalidation triggers. It stores only bounded report DTOs and never rewrites ledger data; its down file is disposable-fixture-only.
 - `000048_report_analyses.up.sql` adds durable on-demand grounded analysis jobs with fenced leases, bounded provider output, and owner-scoped dedupe. It stores no raw ledger, notes, images, or prompts; its down file is disposable-fixture-only.
+- `000049_gold_market_catalog.up.sql` enables the four stable BTMC/BTMH gold products already covered by the n8n production pipeline. It stores buyback prices in VND per chỉ and does not rewrite existing portfolio assets or trades.
+- `000050_report_revision_delete_guard.up.sql` prevents the owner-delete report revision trigger from recreating a revision row after the owner FK has been deleted. The down file is intentionally a disposable no-op; `000047` owns the trigger function lifecycle.
+- `000051_ai_entry_proposal_lifecycle.up.sql` extends legacy AI entry proposals with the unified server-owned lifecycle statuses while retaining compatibility with existing `approved` rows.
+- `000052_ai_entry_proposal_receipt_check.up.sql` keeps the ledger-receipt invariant valid for both legacy `approved` and canonical `applied` proposal rows.
 
 The previous incremental migration files were squashed for the stage reset. Existing databases whose migration table is at version 19 must be recreated or explicitly reset to version 1 in a disposable environment before running this baseline. Do not force or drop a production database.
 

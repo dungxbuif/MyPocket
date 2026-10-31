@@ -67,6 +67,59 @@ type AIEntryAttachment struct {
 
 func (AIEntryAttachment) TableName() string { return "transaction_attachments" }
 
+// AIEntryAttachmentDiagnostic is the owner-safe projection of attachment
+// processing state. It deliberately omits attachment IDs, object keys, OCR
+// text and provider details; input position plus the validated filename is
+// enough for the client to identify the selected file without exposing stored
+// document metadata beyond the user's own upload.
+type AIEntryAttachmentDiagnostic struct {
+	Position  int    `json:"position"`
+	Filename  string `json:"filename"`
+	Stage     string `json:"stage"`
+	Status    string `json:"status"`
+	ErrorCode string `json:"error_code,omitempty"`
+}
+
+func (a AIEntryAttachment) Diagnostic() AIEntryAttachmentDiagnostic {
+	position := a.InputOrder + 1
+	if position < 1 {
+		position = 1
+	}
+	diagnostic := AIEntryAttachmentDiagnostic{
+		Position: position,
+		Filename: a.Filename,
+		Stage:    "ocr",
+		Status:   "processing",
+	}
+	if a.MIMEType == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" {
+		diagnostic.Stage = "validation"
+	}
+	switch a.OCRStatus {
+	case "completed":
+		diagnostic.Status = "succeeded"
+	case "failed":
+		diagnostic.Status = "failed"
+		if diagnostic.Stage == "validation" {
+			diagnostic.ErrorCode = "structured_file_failed"
+		} else {
+			diagnostic.ErrorCode = "ocr_failed"
+		}
+	case "deleted", "deleting":
+		diagnostic.Stage = "cleanup"
+		diagnostic.Status = "skipped"
+		diagnostic.ErrorCode = "attachment_expired"
+	case "delete_failed":
+		diagnostic.Stage = "cleanup"
+		diagnostic.Status = "failed"
+		diagnostic.ErrorCode = "attachment_cleanup_failed"
+	default:
+		// Pending and unknown internal values stay a non-sensitive processing
+		// state rather than leaking an implementation-specific database value.
+		diagnostic.Status = "processing"
+	}
+	return diagnostic
+}
+
 type AIEntryAttachmentLink struct {
 	TransactionID string `gorm:"primaryKey"`
 	AttachmentID  string `gorm:"primaryKey"`
@@ -93,19 +146,20 @@ type AIExtractOutput struct {
 }
 
 type AIEntrySession struct {
-	ID              string            `json:"id" gorm:"primaryKey"`
-	OwnerID         string            `json:"-"`
-	RequestToken    string            `json:"-"`
-	ProcessingUntil *time.Time        `json:"-"`
-	Processing      bool              `json:"processing" gorm:"-"`
-	Error           string            `json:"error,omitempty"`
-	ErrorCode       string            `json:"error_code,omitempty"`
-	Reply           string            `json:"reply,omitempty"`
-	ModelUsage      map[string]any    `json:"-" gorm:"serializer:json;type:jsonb"`
-	Messages        []AIEntryMessage  `json:"messages" gorm:"-"`
-	Proposals       []AIEntryProposal `json:"proposals" gorm:"-"`
-	CreatedAt       time.Time         `json:"created_at"`
-	UpdatedAt       time.Time         `json:"updated_at"`
+	ID                    string                        `json:"id" gorm:"primaryKey"`
+	OwnerID               string                        `json:"-"`
+	RequestToken          string                        `json:"-"`
+	ProcessingUntil       *time.Time                    `json:"-"`
+	Processing            bool                          `json:"processing" gorm:"-"`
+	Error                 string                        `json:"error,omitempty"`
+	ErrorCode             string                        `json:"error_code,omitempty"`
+	Reply                 string                        `json:"reply,omitempty"`
+	ModelUsage            map[string]any                `json:"-" gorm:"serializer:json;type:jsonb"`
+	Messages              []AIEntryMessage              `json:"messages" gorm:"-"`
+	Proposals             []AIEntryProposal             `json:"proposals" gorm:"-"`
+	AttachmentDiagnostics []AIEntryAttachmentDiagnostic `json:"attachment_diagnostics,omitempty" gorm:"-"`
+	CreatedAt             time.Time                     `json:"created_at"`
+	UpdatedAt             time.Time                     `json:"updated_at"`
 }
 type AIEntryMessage struct {
 	ID         string    `json:"id" gorm:"primaryKey"`

@@ -14,12 +14,25 @@ const (
 	QuantityScale               int64 = 100000000
 	PortfolioTradeBuy                 = "buy"
 	PortfolioTradeSell                = "sell"
+	PortfolioAssetKindGold            = "gold"
 	PortfolioPriceModeManual          = "manual"
 	PortfolioPriceModeAuto            = "automatic"
 	PortfolioQuoteStatusFresh         = "fresh"
 	PortfolioQuoteStatusStale         = "stale"
 	PortfolioQuoteStatusUnknown       = "unknown"
 )
+
+// IsPortfolioGoldUnit is the initial backend-owned unit catalog. New asset
+// kinds/units must be added here and to CatalogConfig together; callers never
+// get to invent a free-text unit label.
+func IsPortfolioGoldUnit(unit string) bool {
+	switch strings.TrimSpace(unit) {
+	case "chỉ", "lượng", "phân":
+		return true
+	default:
+		return false
+	}
+}
 
 const PortfolioQuoteFreshness = time.Hour
 

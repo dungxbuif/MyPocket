@@ -69,6 +69,22 @@ enum MPChatComposerMode: Equatable {
     case conversation
 }
 
+/// Shared geometry rules for the assistant composer. The editor remains
+/// content-driven, but a conversation draft needs a useful reading area even
+/// before the first line has been typed. Keeping these values here prevents
+/// individual screens from inventing their own chat heights.
+enum MPChatComposerMetrics {
+    static func lineLimit(mode: MPChatComposerMode, accessibilitySize: Bool) -> ClosedRange<Int> {
+        if accessibilitySize { return 2...3 }
+        return mode == .welcome ? 3...5 : 2...5
+    }
+
+    static func minimumHeight(mode: MPChatComposerMode, keyboardVisible: Bool, accessibilitySize: Bool) -> CGFloat {
+        if keyboardVisible { return accessibilitySize ? 76 : 84 }
+        return mode == .welcome ? 104 : 92
+    }
+}
+
 /// Conversational input, not a note editor. Features retain the draft and own
 /// request lifecycle; the base owns the writing area, action row and focus.
 struct MPChatComposer: View {
@@ -84,12 +100,8 @@ struct MPChatComposer: View {
     @FocusState private var focused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
-    private var visibleLines: ClosedRange<Int> {
-        if dynamicTypeSize.isAccessibilitySize { return 1...2 }
-        if mode == .welcome {
-            return 3...5
-        }
-        return isKeyboardVisible || focused ? 2...4 : 1...4
+    private var visibleLineCount: ClosedRange<Int> {
+        MPChatComposerMetrics.lineLimit(mode: mode, accessibilitySize: dynamicTypeSize.isAccessibilitySize)
     }
 
     private var sendDisabled: Bool {
@@ -99,14 +111,21 @@ struct MPChatComposer: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Bạn muốn hỏi điều gì về tiền của mình?", text: $text, axis: .vertical)
-                .lineLimit(visibleLines)
+                .lineLimit(visibleLineCount)
                 .font(MPFont.chatBody)
                 .foregroundStyle(MPColor.ink)
                 .focused($focused)
                 .disabled(isBusy)
                 .padding(.horizontal, 4)
                 .padding(.vertical, 4)
-                .frame(minHeight: mode == .welcome && !isKeyboardVisible ? 96 : nil, alignment: .top)
+                .frame(
+                    minHeight: MPChatComposerMetrics.minimumHeight(
+                        mode: mode,
+                        keyboardVisible: isKeyboardVisible,
+                        accessibilitySize: dynamicTypeSize.isAccessibilitySize
+                    ),
+                    alignment: .top
+                )
                 .accessibilityLabel("Tin nhắn cho trợ lý")
                 .accessibilityIdentifier("assistant-composer-input")
             HStack(alignment: .center, spacing: 12) {
@@ -133,6 +152,16 @@ struct MPChatComposer: View {
         .overlay {
             RoundedRectangle(cornerRadius: MPMetrics.groupedSurfaceCornerRadius, style: .continuous)
                 .stroke(focused ? MPColor.action : MPColor.line, lineWidth: MPMetrics.inputBorderWidth)
+        }
+        // Keep a full-size accessibility anchor for the shared composer card.
+        // A 1x1 overlay makes UI tests (and assistive navigation) treat the
+        // card as a tiny point even though the input/action row is full-width.
+        .background {
+            Color.clear
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .accessibilityElement()
+                .accessibilityLabel("Ô nhập trợ lý")
+                .accessibilityIdentifier("assistant-composer")
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("assistant-composer")
@@ -423,8 +452,10 @@ private struct MPNumberPadTextField: UIViewRepresentable {
     }
 
     private static func display(_ raw: String, presentation: Presentation) -> String {
+        if presentation == .groupedControl {
+            return MPFormat.groupedIntegerDisplay(raw, isEditing: false)
+        }
         guard presentation != .control, let amount = MPFormat.parseNonNegativeInteger(raw) else { return raw }
-        if presentation == .groupedControl && raw != String(amount) { return raw }
         let formatter = NumberFormatter()
         formatter.locale = Locale(identifier: "vi_VN")
         formatter.numberStyle = .decimal
@@ -460,8 +491,9 @@ private struct MPNumberPadTextField: UIViewRepresentable {
 
     func updateUIView(_ field: UITextField, context: Context) {
         context.coordinator.presentation = presentation
-        if field.text != displayValue {
-            field.text = displayValue
+        let targetDisplay = presentation == .groupedControl && field.isFirstResponder ? text : displayValue
+        if field.text != targetDisplay {
+            field.text = targetDisplay
             if field.isFirstResponder, let end = field.position(from: field.beginningOfDocument, offset: field.text?.utf16.count ?? 0) {
                 field.selectedTextRange = field.textRange(from: end, to: end)
             }
@@ -486,6 +518,14 @@ private struct MPNumberPadTextField: UIViewRepresentable {
             self.presentation = presentation
         }
 
+        private static func canonicalGroupedDraft(_ raw: String) -> String? {
+            if raw.utf8.allSatisfy({ (48...57).contains($0) }) {
+                guard MPFormat.parseNonNegativeInteger(raw) != nil else { return nil }
+                return raw
+            }
+            return MPFormat.normalizedGroupedVNDInput(raw)
+        }
+
         @objc func valueChanged(_ sender: UITextField) {
             let value = sender.text ?? ""
             switch presentation {
@@ -501,31 +541,61 @@ private struct MPNumberPadTextField: UIViewRepresentable {
         func textField(_ sender: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
             guard presentation == .groupedControl,
                   let current = sender.text,
-                  current == MPNumberPadTextField.display(text.wrappedValue, presentation: .groupedControl),
-                  let displayRange = Range(range, in: current),
-                  string.isEmpty || (string.utf8.count == 1 && string.utf8.allSatisfy { (48...57).contains($0) }) else {
+                  let swiftRange = Range(range, in: current) else {
                 return true
             }
-            let prefix = current[..<displayRange.lowerBound]
-            let selected = current[displayRange]
-            var raw = text.wrappedValue
-            let start = raw.index(raw.startIndex, offsetBy: prefix.filter(\.isNumber).count)
-            let end = raw.index(start, offsetBy: selected.filter(\.isNumber).count)
-            raw.replaceSubrange(start..<end, with: string)
-            sender.text = MPNumberPadTextField.display(raw, presentation: .groupedControl)
-            text.wrappedValue = raw
-            if sender.isFirstResponder {
-                let position = sender.endOfDocument
+            let isEditingRawDigits = sender.isFirstResponder
+            if !isEditingRawDigits && current != text.wrappedValue && !string.isEmpty && string.filter(\.isNumber).count != string.count {
+                return true
+            }
+            let currentRaw = Self.canonicalGroupedDraft(current) ?? text.wrappedValue
+            let startOffset = current[..<swiftRange.lowerBound].filter(\.isNumber).count
+            let selectedLength = current[swiftRange].filter(\.isNumber).count
+            guard let start = currentRaw.index(currentRaw.startIndex, offsetBy: startOffset, limitedBy: currentRaw.endIndex),
+                  let end = currentRaw.index(start, offsetBy: selectedLength, limitedBy: currentRaw.endIndex) else {
+                return false
+            }
+            let replacement = string.filter(\.isNumber)
+            var candidateRaw = currentRaw
+            candidateRaw.replaceSubrange(start..<end, with: replacement)
+            let normalized: String
+            if string.isEmpty || string.utf8.allSatisfy({ (48...57).contains($0) }) {
+                guard let canonical = Self.canonicalGroupedDraft(candidateRaw) else { return false }
+                normalized = canonical
+            } else {
+                let candidate = current.replacingCharacters(in: swiftRange, with: string)
+                guard let canonical = Self.canonicalGroupedDraft(candidate) else { return false }
+                normalized = canonical
+            }
+            text.wrappedValue = normalized
+            sender.text = MPFormat.groupedIntegerDisplay(normalized, isEditing: isEditingRawDigits)
+            let prefixDigits = current[..<swiftRange.lowerBound].filter(\.isNumber).count
+            let replacementDigits = replacement.count
+            let caretOffset = prefixDigits + replacementDigits
+            if let position = sender.position(from: sender.beginningOfDocument, offset: isEditingRawDigits ? caretOffset : sender.text?.utf16.count ?? 0) {
                 sender.selectedTextRange = sender.textRange(from: position, to: position)
             }
             return false
         }
 
         @objc func editingDidBegin(_ sender: UITextField) {
+            if presentation == .groupedControl {
+                sender.text = text.wrappedValue
+                let position = sender.endOfDocument
+                sender.selectedTextRange = sender.textRange(from: position, to: position)
+            }
             applyStyle(to: sender, focused: true, presentation: presentation)
         }
 
         @objc func editingDidEnd(_ sender: UITextField) {
+            if presentation == .groupedControl {
+                if let normalized = Self.canonicalGroupedDraft(sender.text ?? "") {
+                    text.wrappedValue = normalized
+                    sender.text = MPFormat.groupedIntegerDisplay(normalized, isEditing: false)
+                } else {
+                    sender.text = MPFormat.groupedIntegerDisplay(text.wrappedValue, isEditing: false)
+                }
+            }
             applyStyle(to: sender, focused: false, presentation: presentation)
         }
 
@@ -725,6 +795,7 @@ struct MPAmountKeypad: View {
         case "C":
             expression = ""
         case "⌫":
+            guard !expression.isEmpty else { return }
             expression.removeLast()
         case "=":
             evaluate(commit: false)

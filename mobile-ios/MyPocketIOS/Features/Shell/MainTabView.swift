@@ -31,14 +31,16 @@ struct MainTabView: View {
 
     var body: some View {
         GeometryReader { geometry in
-        let navigationVisible = !(selection == "assistant" && keyboardVisible)
+        let navigationVisible = selection != "assistant" && !keyboardVisible
+        let dockVisible = selection != "assistant" && !keyboardVisible && !feedbackPresented && !feedbackCapturePending
         let navigationHeight = navigationVisible ? MPMetrics.bottomNavigationHeight : 0
+        let dockHeight = dockVisible ? MPShellNavigation.feedbackDockHeight : 0
         let contentHeight = MPShellContentLayout.routeHeight(
             containerHeight: geometry.size.height,
-            navigationHeight: navigationHeight
+            navigationHeight: navigationHeight + dockHeight
         )
-        VStack(spacing: 0) {
         ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
             VStack(spacing: 0) {
                 Group {
                     switch selection {
@@ -119,9 +121,7 @@ struct MainTabView: View {
                 .accessibilityIdentifier("shell-content-viewport")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            .coordinateSpace(name: MPFeedbackBubbleLayout.coordinateSpace)
-
-            if !(selection == "assistant" || (selection == "account" && requestedAccountDestination == .assistant)) && !keyboardVisible {
+            if dockVisible {
                 MPFeedbackDock(isVisible: !feedbackPresented && !feedbackCapturePending) {
                     // Hide the trigger for a rendered frame before capture.
                     feedbackCapturePending = true
@@ -133,20 +133,10 @@ struct MainTabView: View {
                         feedbackPresented = true
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .bottomTrailing)
-                .padding(.bottom, footerClearance)
+                .frame(height: dockHeight)
             }
-
-            if feedbackPresented {
-                FeedbackOverlay(api: auth.financeAPI, screenshot: feedbackScreenshot) { feedbackPresented = false }
-                    .padding(MPMetrics.pagePadding)
-                    .background(.ultraThinMaterial)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
-        }
-        .frame(height: max(0, geometry.size.height - navigationHeight))
             if navigationVisible {
-            ZStack(alignment: .bottom) {
+                ZStack(alignment: .bottom) {
                     MPBottomNavigation(
                         items: MPShellNavigation.primaryItems,
                         selection: $selection,
@@ -190,6 +180,13 @@ struct MainTabView: View {
             }
             .frame(height: MPMetrics.bottomNavigationHeight)
             }
+            }
+        }
+        if feedbackPresented {
+            FeedbackOverlay(api: auth.financeAPI, screenshot: feedbackScreenshot) { feedbackPresented = false }
+                .padding(MPMetrics.pagePadding)
+                .background(.ultraThinMaterial)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
         }
         }
         .environment(\.mpFinancialValuesMasked, masked)

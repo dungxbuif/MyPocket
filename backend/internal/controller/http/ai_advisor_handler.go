@@ -65,6 +65,16 @@ type advisorReplaceActionInput struct {
 	Patch          map[string]any `json:"patch"`
 }
 
+type advisorEntryDecisionInput struct {
+	TaskID          string `json:"task_id"`
+	BatchID         string `json:"batch_id"`
+	BatchVersion    int64  `json:"batch_version"`
+	ItemID          string `json:"item_id"`
+	ItemVersion     int    `json:"item_version"`
+	Decision        string `json:"decision"`
+	ClientRequestID string `json:"client_request_id"`
+}
+
 func (r *Router) RegisterAdvisorRoutes(h *AdvisorHandler) {
 	g := r.Engine.Group(advisorRoute)
 	g.Use(r.AuthMiddleware.RequireAdvisorAuth)
@@ -79,6 +89,7 @@ func (r *Router) RegisterAdvisorRoutes(h *AdvisorHandler) {
 	g.POST("/entries", h.EntryPost)
 	g.GET("/entries/:id", h.EntryGet)
 	g.POST("/entries/:id/cancel", h.EntryCancel)
+	g.POST("/entries/:id/decisions", h.EntryDecision)
 	g.GET("/runs/:id", h.Run)
 	g.GET("/runs/:id/events", h.RunEvents)
 	g.POST("/runs/:id/cancel", h.Cancel)
@@ -456,6 +467,35 @@ func (h *AdvisorHandler) EntryCancel(c *gin.Context) {
 	NoContent(c)
 }
 
+// EntryDecision applies one row from an accepted durable entry batch. The
+// decision body carries the batch/item versions; the task path remains the
+// owner-scoped recovery identity.
+func (h *AdvisorHandler) EntryDecision(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Entry == nil {
+		advisorFailure(c, errors.New("advisor entry unavailable"))
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16*1024)
+	var input advisorEntryDecisionInput
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&input) != nil || strings.TrimSpace(input.TaskID) == "" || input.TaskID != c.Param("id") || strings.TrimSpace(input.BatchID) == "" || input.BatchVersion <= 0 || strings.TrimSpace(input.ItemID) == "" || input.ItemVersion <= 0 || strings.TrimSpace(input.ClientRequestID) == "" {
+		advisorBadRequest(c)
+		return
+	}
+	view, err := h.Entry.Decide(c.Request.Context(), owner, c.Param("id"), input.BatchID, input.BatchVersion, input.ItemID, input.ItemVersion, input.Decision)
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	OK(c, view)
+}
+
 func advisorActionReceipt(view map[string]any, actionID string) map[string]any {
 	receipt := map[string]any{"action_id": actionID}
 	for _, key := range []string{"transaction_id", "wallet_id", "jar_id", "budget_id", "category_id"} {
@@ -713,8 +753,8 @@ func (h *AdvisorHandler) Messages(c *gin.Context) {
 		advisorFailure(c, err)
 		return
 	}
-	if h.Entry != nil {
-		rows, err = h.Entry.HydrateAdvisorMessages(c.Request.Context(), owner, rows)
+	if h.Entry != nil && h.Entry.Entries != nil {
+		rows, err = h.Entry.Entries.HydrateAdvisorMessages(c.Request.Context(), owner, rows)
 		if err != nil {
 			advisorFailure(c, err)
 			return

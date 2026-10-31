@@ -1,0 +1,2 @@
+-- Intentionally left as a no-op. Migration 000047 owns the function and its
+-- disposable rollback removes it together with the report revision tables.
