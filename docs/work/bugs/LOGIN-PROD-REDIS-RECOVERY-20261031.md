@@ -45,3 +45,30 @@ from the manager path before making this workaround permanent.
   container to `mypocket-redis-net` with the `redis-prod` alias, then update
   `mypocket-api`/`mypocket-worker` through Swarm and remove the emergency
   container after health/login verification.
+
+## AI image-processing follow-up
+
+The first authenticated image-processing request on 2026-10-31 reached
+MyPocket successfully but failed at OCR submission with provider HTTP `503`.
+The OCR proxy's `/readyz` reports `storage backend unavailable` because its
+`redis-prod` hostname is missing from `macocr-redis-net`; the proxy's
+`/healthz` and public OpenAPI endpoints remain available, which can otherwise
+hide the dependency failure.
+
+The temporary TCP forwarder created during diagnosis is not the desired fix and
+must not be treated as production topology. The durable repair is to attach the
+existing `redis-prod` container on the Pi5 Docker manager to both overlay
+networks with the `redis-prod` alias, then converge the affected Swarm services.
+
+The current workstation can reach the manager's private Semaphore API and has
+the read-only Pi5 observer path, but it has no approved mutation key for the
+manager. The observer identity is intentionally forced to `host-audit` and the
+existing release identities are scoped to unrelated jobs. Therefore the
+manager-side `docker network connect` cannot be safely executed from this
+workspace until the approved manager/release key is restored or the operator
+runs the fixed commands on Pi5.
+
+Verification after the durable repair: authenticated Redis `PING` from both
+overlay namespaces, MyPocket `/api/v1/health`, OCR `/readyz`, one authenticated
+image-processing smoke request, then removal of the emergency API and TCP
+forwarder only after the native Swarm tasks are healthy.
