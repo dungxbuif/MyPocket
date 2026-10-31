@@ -39,6 +39,59 @@ struct AdvisorPartModel: Decodable, Sendable {
     var type: String
     var text: String?
     var data: JSONValue?
+
+    var entryBatch: AdvisorEntryBatchModel? {
+        guard type == "entry_batch" else { return nil }
+        return AdvisorEntryBatchModel(json: data)
+    }
+}
+
+struct AdvisorEntryBatchModel: Sendable {
+    var taskID: String
+    var batchID: String
+    var version: Int64
+    var itemIDs: [String]
+    var itemCount: Int
+    var summary: String
+
+    init?(json: JSONValue?) {
+        guard case .object(let object) = json,
+              case .string(let taskID) = object["task_id"], !taskID.isEmpty,
+              case .string(let batchID) = object["batch_id"], !batchID.isEmpty,
+              case .number(let version) = object["version"], let exactVersion = Int64(exactly: version), exactVersion > 0,
+              case .array(let rawIDs) = object["item_ids"],
+              case .number(let count) = object["item_count"], let exactCount = Int(exactly: count), exactCount >= 0,
+              case .string(let summary) = object["summary"] else { return nil }
+        var ids: [String] = []
+        for rawID in rawIDs {
+            guard case .string(let id) = rawID else { return nil }
+            ids.append(id)
+        }
+        guard ids.count == exactCount else { return nil }
+        self.taskID = taskID
+        self.batchID = batchID
+        self.version = exactVersion
+        self.itemIDs = ids
+        self.itemCount = exactCount
+        self.summary = summary
+    }
+}
+
+struct AdvisorEntryTaskModel: Decodable, Sendable {
+    var id: String
+    var ownerID: String
+    var conversationID: String
+    var generation: Int64
+    var clientRequestID: String
+    var sessionID: String
+    var status: String
+    var stage: String?
+    var batchID: String?
+    var batchVersion: Int64?
+    var errorCode: String?
+    var createdAt: String
+    var updatedAt: String
+    var completedAt: String?
 }
 
 struct AdvisorMessageModel: Decodable, Identifiable, Sendable {
@@ -101,6 +154,12 @@ struct AdvisorCapabilitiesModel: Codable, Sendable {
     var tools: [String]
     var runTimeoutSeconds: Int? = nil
     var groundingVersion: Int? = nil
+    var entryIntegration: Bool? = nil
+    var supportedPartKinds: [String]? = nil
+    var actionKinds: [String]? = nil
+    var attachmentFormats: [String]? = nil
+    var attachmentMaxCount: Int? = nil
+    var attachmentMaxBytes: Int64? = nil
 }
 
 struct AdvisorOverviewModel: Decodable, Sendable {

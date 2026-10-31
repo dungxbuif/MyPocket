@@ -10,9 +10,9 @@ and values are untouched; never rerun a previously applied migration.
 
 The current candidate is additive after the deployed version-34 baseline and
 must be applied in order: `000035` → `000036` → `000037` → `000038` → `000039` →
-`000040` → `000041`. Verify a validated
+`000040` → `000041` → `000042`. Verify a validated
 custom-format backup and `dirty=false` before applying the forward path. The
-API image must be deployed with the matching worker only after version 041 is
+API image must be deployed with the matching worker only after version 042 is
 clean. See [`docs/operations/ROLLOUT_READINESS.md`](../../docs/operations/ROLLOUT_READINESS.md)
 and run the read-only repository preflight:
 
@@ -64,6 +64,7 @@ Stage v1 starts with one baseline migration pair and uses additive forward migra
 - `000039_push_deliveries.up.sql` adds the durable owner-scoped APNs delivery hand-off. It is deduped per notification/token/environment, stores only an app-owned route payload, and does not call APNs by itself; apply only after backup/version checks and matching worker rollout.
 - `000040_row_versions.up.sql` adds positive, non-null optimistic-lock versions to ordinary transactions and personal categories. Existing rows start at version `1`; the migration does not rewrite financial values or category relationships. Apply only after backup/version checks and deploy the matching API before enabling clients that send `expected_version`.
 - `000041_advisor_runtime.up.sql` adds the server-authoritative `advisor_runs.deadline_at` backfill/check and reaper index, then verifies duplicate assistant completions before installing an idempotent partial uniqueness guard. Existing advisor/financial rows are preserved; apply only after backup/version checks. Its down file is disposable-fixture-only.
+- `000042_advisor_entry_tasks.up.sql` adds owner-bound assistant entry tasks, ordered events, and private attachment bindings without changing existing entry sessions, proposals, advisor runs, or financial rows. Apply after `000041` with the matching API and worker. Its down file is disposable-fixture-only; see [ADR-026](../../docs/decisions/ADR-026-ai-conversation-entry-lifecycle.md).
 
 The previous incremental migration files were squashed for the stage reset. Existing databases whose migration table is at version 19 must be recreated or explicitly reset to version 1 in a disposable environment before running this baseline. Do not force or drop a production database.
 

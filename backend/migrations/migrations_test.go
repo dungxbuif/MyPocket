@@ -54,16 +54,16 @@ func TestMigrationHistoryIsOrderedAndHasCurrentRolloutFiles(t *testing.T) {
 		}
 	}
 
-	for _, version := range []int{35, 36, 37, 38, 39, 40, 41} {
+	for _, version := range []int{35, 36, 37, 38, 39, 40, 41, 42} {
 		if _, ok := versions[version]; !ok {
 			t.Fatalf("current release migration %06d is missing", version)
 		}
 	}
-	if got := ordered[len(ordered)-1]; got != 41 {
-		t.Fatalf("latest migration=%06d, want 000041", got)
+	if got := ordered[len(ordered)-1]; got != 42 {
+		t.Fatalf("latest migration=%06d, want 000042", got)
 	}
 
-	for _, version := range []int{36, 37, 38, 39, 40, 41} {
+	for _, version := range []int{36, 37, 38, 39, 40, 41, 42} {
 		name := fmt.Sprintf("%06d_", version)
 		foundDown := false
 		for _, entry := range entries {
@@ -93,6 +93,28 @@ func TestAdvisorRuntimeMigrationAddsDeadlineAndDuplicateGuard(t *testing.T) {
 	} {
 		if !strings.Contains(sql, strings.ToUpper(required)) {
 			t.Errorf("000041_advisor_runtime.up.sql missing runtime safety contract %q", required)
+		}
+	}
+}
+
+func TestAdvisorEntryMigrationBindsTasksEventsAndAttachmentsToOwner(t *testing.T) {
+	contents, err := migrationFiles.ReadFile("000042_advisor_entry_tasks.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := strings.ToUpper(string(contents))
+	for _, required := range []string{
+		"CREATE TABLE advisor_entry_tasks", "CREATE TABLE advisor_entry_events", "CREATE TABLE advisor_entry_attachment_bindings",
+		"UNIQUE (owner_id, conversation_id, generation, client_request_id)",
+		"FOREIGN KEY (conversation_id, owner_id) REFERENCES advisor_conversations(id, owner_id)",
+		"FOREIGN KEY (session_id, owner_id) REFERENCES ai_entry_sessions(id, owner_id)",
+		"FOREIGN KEY (attachment_id, owner_id) REFERENCES transaction_attachments(id, owner_id)",
+		"CHECK (length(trim(payload_hash)) > 0)", "CHECK (batch_version > 0)",
+		"CHECK (status IN ('accepted', 'processing', 'review_ready', 'failed', 'cancelled'))",
+		"PRIMARY KEY (task_id, seq)", "lease_until", "deadline_at",
+	} {
+		if !strings.Contains(sql, strings.ToUpper(required)) {
+			t.Errorf("migration 42 missing %q", required)
 		}
 	}
 }
