@@ -423,7 +423,7 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertEqual(MPMetrics.groupedSurfaceCornerRadius, 24)
         XCTAssertEqual(MPMetrics.groupedRowMinHeight, 44)
         XCTAssertEqual(MPMetrics.groupedRowHorizontalPadding, 16)
-        XCTAssertEqual(MPMetrics.groupedRowVerticalPadding, 10)
+        XCTAssertEqual(MPMetrics.groupedRowVerticalPadding, 6)
         XCTAssertEqual(MPMetrics.groupedSeparatorLeadingInset, 56)
         XCTAssertEqual(MPSurfaceCardStyle.grouped.cornerRadius, MPMetrics.groupedSurfaceCornerRadius)
         XCTAssertEqual(MPSurfaceCardStyle.grouped.horizontalPadding, 0)
@@ -1185,11 +1185,11 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
         XCTAssertEqual(MPSelectionLabels.display(for: "unknown-provider-value"), "unknown-provider-value")
     }
 
-    func testJarAllocationRejectsZeroPercentAndStaleModeValues() {
+    func testJarAllocationMatchesBackendModesAndStaleModeValues() {
         XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "none", amount: nil, percent: nil))
         XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "fixed", amount: 1, percent: nil))
         XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 100))
-        XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 0))
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 0))
         XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 12.34))
         XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 12.345))
         XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: .infinity))
@@ -1236,8 +1236,16 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
         XCTAssertEqual(MPSegmentedControl.transitionDuration(reduceMotion: true), 0)
     }
 
-    func testAssistantCardUsesSharedElevatedSurface() {
-        XCTAssertEqual(MPAssistantCard<Text>.surfaceStyle, .elevated)
+    func testAssistantCardUsesSharedReferenceSurface() {
+        XCTAssertEqual(MPAssistantCard<Text>.surfaceStyle, .reference)
+    }
+
+    func testSemanticIconCatalogPreservesLegacyKeysWithLighterFallbacks() {
+        XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: "bag.fill"), .shopping)
+        XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: "expense_food_coffee"), .coffee)
+        XCTAssertEqual(MPIconCatalog.icon(forLegacyKey: "unknown-custom-key"), .tag)
+        XCTAssertEqual(MPIconCatalog.assetName(for: .shopping), "bag")
+        XCTAssertEqual(MPIconCatalog.assetName(for: .feedback), "bubble.left.and.bubble.right")
     }
 
     func testReportsInsiderCopyUsesSafeFallbacksAndMasking() {

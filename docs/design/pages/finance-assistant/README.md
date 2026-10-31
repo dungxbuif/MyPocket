@@ -93,6 +93,19 @@ Run responses may include additive `server_time`, `deadline_at` and
 remain valid. Capabilities advertise `run_timeout_seconds` and
 `grounding_version` when present.
 
+## Native full-screen implementation candidate — 2026-11-01
+
+The native Assistant route is a single full-screen transcript and composer.
+The shell feedback bubble is hidden only while this route is visible; Reports,
+Overview and other surfaces retain it. The shared composer owns welcome versus
+conversation density, Dynamic Type line ranges, 44pt send/stop controls and
+focus requests. Typed entry batches are read-only until explicit per-row or
+valid-batch decisions, and ordinary proposal editing reuses the shared
+transaction fields and jar policy.
+
+Tests and builds were intentionally not run for this owner-requested native
+implementation pass.
+
 ## Contract
 
 - The composer uses `AssistantComposer mode="advisor"`, hides receipt uploads and keeps the shared `BaseTextArea`/`BaseButton` controls.
@@ -102,7 +115,7 @@ remain valid. Capabilities advertise `run_timeout_seconds` and
 - Finance tools in V1 are read-only. A structured wallet-creation proposal is a separate, explicitly user-confirmed UI action through the existing wallet API; its confirmation is disabled while saving and disappears after success, while errors remain retryable. No transaction mutation, bank connection, payment, or arbitrary model URL is exposed.
 - When the AI provider is missing, the screen shows a configuration state instead of fake finance numbers.
 - Assistant text is rendered through the shared `FinanceAssistantMarkdown` molecule: headings, emphasis, lists, inline code and pipe tables become semantic UI; raw Markdown delimiters are not shown as plain text. The renderer accepts text only and never injects model HTML.
-- Structured list cards stay compact like web: transaction results show at most five rows; wallet, goal, budget and jar lists show at most eight. The full server-side total remains visible where supplied; these presentation caps do not paginate or discard backend data.
+- Structured list cards stay compact like web: transaction results show at most five rows; wallet, goal, budget and jar lists show at most eight. The full server-side total remains visible where supplied; these presentation caps do not paginate or discard backend data. Transaction result/preview rows use the same native reference/grouped card language as `Thêm giao dịch` (shared category glyph footprint, money/date/note hierarchy and action treatment); Assistant conversation chrome must not invent a second transaction-card variant.
 
 ## Navigation
 

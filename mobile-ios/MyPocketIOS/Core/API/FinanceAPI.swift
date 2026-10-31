@@ -138,6 +138,31 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/transactions", expectedOwnerID: ownerID))
     }
 
+    /// Additive report read. Older deployments may return 404; native callers
+    /// should fall back to existing aggregate endpoints, never to a full
+    /// ledger read just to draw a chart.
+    func monthlyReport(month: String, walletID: String? = nil, granularity: String = "weekly", ownerID: String? = nil) async throws -> MonthlyReportModel {
+        var items = [URLQueryItem(name: "month", value: month), URLQueryItem(name: "granularity", value: granularity)]
+        if let walletID { items.append(URLQueryItem(name: "wallet_id", value: walletID)) }
+        var components = URLComponents()
+        components.queryItems = items
+        return try await client.send(APIRequest(path: "/reports/monthly?\(components.percentEncodedQuery ?? "")", expectedOwnerID: ownerID))
+    }
+
+    func requestReportAnalysis(_ input: ReportAnalysisRequestModel) async throws -> ReportAnalysisModel {
+        try await client.send(APIRequest(path: "/reports/analysis", method: .post, body: try body(input), idempotencyKey: input.requestID))
+    }
+
+    func reportAnalysis(requestID: String) async throws -> ReportAnalysisModel {
+        let escaped = requestID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? requestID
+        return try await client.send(APIRequest(path: "/reports/analysis/\(escaped)"))
+    }
+
+    func cancelReportAnalysis(requestID: String) async throws {
+        let escaped = requestID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? requestID
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/reports/analysis/\(escaped)", method: .delete))
+    }
+
     func applyOutbox(_ mutation: OutboxMutation) async throws -> [String] {
         guard mutation.state == .sending, mutation.leaseID != nil,
               let expires = mutation.leaseExpiresAt, expires > Date() else {
@@ -379,6 +404,21 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/price", method: .patch, body: try body(["latest_price": latestPrice])))
     }
 
+    /// Optional accumulated-assets metadata endpoints. They are additive to
+    /// the existing portfolio API and are only called after an explicit user
+    /// action from native UI.
+    func marketCatalog() async throws -> PortfolioMarketCatalogModel {
+        try await client.send(APIRequest(path: "/portfolio/market-catalog"))
+    }
+
+    func confirmAssetUnit(assetID: String, unitCode: String) async throws -> PortfolioAssetModel {
+        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/unit", method: .patch, body: try body(["unit": unitCode])))
+    }
+
+    func updateAssetPriceSource(assetID: String, source: PortfolioPriceSourceModel) async throws -> PortfolioAssetModel {
+        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/price-source", method: .patch, body: try body(source)))
+    }
+
     func createPortfolioTrade(assetID: String, input: PortfolioTradeInputModel) async throws -> PortfolioTradeModel {
         try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/trades", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
     }
@@ -470,6 +510,13 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/entry/requests/\(id)"))
     }
 
+    /// Optional typed-entry task read. Kept separate from the legacy entry
+    /// request contract so an older backend can continue to serve OCR/text
+    /// proposals without decoding a new envelope.
+    func advisorEntryTask(id: String) async throws -> AdvisorEntryTaskModel {
+        try await client.send(APIRequest(path: "/ai/advisor/entries/tasks/\(id)"))
+    }
+
     func processEntry(requestID: String, text: String, timezone: String, files: [MultipartFile] = []) async throws -> EntryProcessModel {
         try await client.sendMultipart(path: "/ai/entry/process", fields: ["request_id": requestID, "text": text, "timezone": timezone], files: files)
     }
@@ -521,6 +568,15 @@ final class FinanceAPI: @unchecked Sendable {
 
     func advisorRun(id: String) async throws -> AdvisorRunModel {
         try await client.send(APIRequest(path: "/ai/advisor/runs/\(id)"))
+    }
+
+    func beginAdvisorEntry(_ input: AdvisorEntryInputModel) async throws -> AdvisorEntryTaskModel {
+        try await client.send(APIRequest(path: "/ai/advisor/entries", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
+    }
+
+    func decideAdvisorEntry(_ input: AdvisorEntryDecisionModel) async throws -> AdvisorEntryTaskModel {
+        let escapedTask = input.taskID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? input.taskID
+        return try await client.send(APIRequest(path: "/ai/advisor/entries/\(escapedTask)/decisions", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
     }
 
     func submitAdvisorMessage(_ input: AdvisorMessageInputModel) async throws -> AdvisorSubmitModel {

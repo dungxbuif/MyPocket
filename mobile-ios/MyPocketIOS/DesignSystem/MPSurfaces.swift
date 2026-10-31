@@ -44,6 +44,28 @@ struct MPSurfaceCard<Content: View>: View {
     }
 }
 
+/// Shared conversation surface. Messages, structured finance cards and the
+/// composer stay inside one continuous panel instead of becoming unrelated
+/// floating cards or a detached footer.
+struct MPChatSurface<Content: View>: View {
+    private let content: () -> Content
+
+    init(@ViewBuilder content: @escaping () -> Content) {
+        self.content = content
+    }
+
+    var body: some View {
+        content()
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.referenceCornerRadius, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: MPMetrics.referenceCornerRadius, style: .continuous)
+                    .stroke(MPColor.line, lineWidth: MPMetrics.inputBorderWidth)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: MPMetrics.referenceCornerRadius, style: .continuous))
+    }
+}
+
 /// A grouped-list row owns readable insets and a minimum target while allowing
 /// multiline content to expand naturally at accessibility text sizes.
 struct MPGroupedRow<Content: View>: View {
@@ -223,7 +245,7 @@ struct MPMetricRow: View {
 
     private var amount: some View {
         Text(displayValue)
-            .font(MPFont.bodyEmphasis.monospacedDigit())
+            .font(MPFont.amount)
             .foregroundStyle(tone == .neutral ? MPColor.ink : tone.color)
             .fixedSize(horizontal: false, vertical: true)
     }
@@ -493,6 +515,11 @@ enum MPTransactionPresentation {
     struct Glyph: Equatable {
         let systemName: String
         let tone: String
+
+        init(systemName: String, tone: String) {
+            self.systemName = MPIconCatalog.assetName(for: MPIconCatalog.icon(forLegacyKey: systemName))
+            self.tone = tone
+        }
     }
     static func glyph(systemKey: String?, type: String) -> Glyph {
         if type == "adjustment" { return Glyph(systemName: "arrow.up.and.down", tone: "categorySlate") }

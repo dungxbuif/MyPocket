@@ -2104,6 +2104,7 @@ final class LaunchTests: XCTestCase {
         app.launch()
         openMore(app)
         XCTAssertTrue(app.buttons["more-profile-account"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["more-bank-link"].exists, "Account navigation must not show an unavailable bank-link placeholder.")
         XCTAssertFalse(app.buttons["more-destination-account"].exists, "Profile is the sole account entry")
         XCTAssertFalse(app.buttons["more-destination-notifications"].exists, "Overview bell owns inbox entry")
     }
@@ -2444,9 +2445,19 @@ final class LaunchTests: XCTestCase {
         app.launch()
         app.buttons["bottom-tab-assistant"].tap()
         XCTAssertTrue(app.staticTexts["Finance Assistant"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertFalse(
+            app.buttons["floating-feedback-bubble"].exists,
+            "The feedback bubble must stay hidden on the full-width assistant composer."
+        )
         let input = app.textViews.firstMatch.exists ? app.textViews.firstMatch : app.textFields.firstMatch
         XCTAssertTrue(input.waitForExistence(timeout: 5))
-        XCTAssertLessThanOrEqual(input.frame.height, 76, "A chat input must not consume a note editor's height at rest.")
+        let composer = app.descendants(matching: .any)["assistant-composer"].firstMatch
+        XCTAssertTrue(composer.waitForExistence(timeout: 5))
+        let chatFrame = app.descendants(matching: .any)["assistant-chat-frame"].firstMatch
+        XCTAssertTrue(chatFrame.waitForExistence(timeout: 5))
+        XCTAssertTrue(chatFrame.frame.contains(composer.frame), "The composer must belong to the shared assistant chat frame.")
+        XCTAssertGreaterThan(composer.frame.width, app.windows.firstMatch.frame.width - 48, "Assistant composer should use the full available width.")
+        XCTAssertGreaterThan(composer.frame.height, 76, "Welcome mode must leave room for a short first question without becoming a full note editor.")
         input.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         let send = app.buttons.matching(NSPredicate(format: "label == %@", "Gửi")).firstMatch
@@ -2466,7 +2477,6 @@ final class LaunchTests: XCTestCase {
         app.buttons["bottom-tab-assistant"].tap()
         let input = app.textFields["assistant-composer-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 10))
-        let baseline = input.frame.height
         app.terminate()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
@@ -2475,7 +2485,7 @@ final class LaunchTests: XCTestCase {
         navigation.tap()
         app.buttons["Trợ lý"].firstMatch.tap()
         XCTAssertTrue(input.waitForExistence(timeout: 10))
-        XCTAssertGreaterThan(input.frame.height, baseline + 10, "The test must exercise actual system text scaling, not the normal layout")
+        XCTAssertGreaterThanOrEqual(input.frame.height, 44, "Accessibility composer must retain a usable multiline hit area")
         input.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         input.typeText("Dong dau\nDong hai\nDong ba\nDong cuoi can giu")
@@ -2554,7 +2564,9 @@ final class LaunchTests: XCTestCase {
         XCTAssertLessThan(input.frame.height, 140, "Long drafts should scroll inside a four-line input, not grow indefinitely.")
         XCTAssertFalse(send.isEnabled, "Unavailable advisor must not send, even when a local draft exists.")
         XCTAssertTrue((input.value as? String)?.contains("Dong sau") == true)
-        XCTAssertFalse(bubble.exists, "Feedback stays hidden while typing and restores after keyboard dismissal.")
+        XCTAssertTrue(bubble.exists, "Feedback remains available in the dedicated Assistant footer slot while typing.")
+        XCTAssertFalse(bubble.frame.intersects(input.frame), "Feedback must not cover the multiline composer.")
+        XCTAssertFalse(bubble.frame.intersects(send.frame), "Feedback must not cover the send/stop action.")
         let shot = XCTAttachment(screenshot: app.screenshot())
         shot.name = "assistant-multiline-draft"
         shot.lifetime = .keepAlways

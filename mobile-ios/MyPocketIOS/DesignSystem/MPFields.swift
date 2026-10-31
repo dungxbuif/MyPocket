@@ -64,53 +64,79 @@ struct MPSensitiveValue: View {
     }
 }
 
+enum MPChatComposerMode: Equatable {
+    case welcome
+    case conversation
+}
+
 /// Conversational input, not a note editor. Features retain the draft and own
-/// request lifecycle; the base owns keyboard focus and compact touch geometry.
+/// request lifecycle; the base owns the writing area, action row and focus.
 struct MPChatComposer: View {
     @Binding var text: String
     let isBusy: Bool
     let isEnabled: Bool
     let onSend: () -> Void
     var onCancel: (() -> Void)?
+    var mode: MPChatComposerMode = .conversation
+    var isKeyboardVisible = false
+    var focusRequest = 0
     var dismissKeyboardRequest = 0
     @FocusState private var focused: Bool
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+
+    private var visibleLines: ClosedRange<Int> {
+        if dynamicTypeSize.isAccessibilitySize { return 1...2 }
+        if mode == .welcome {
+            return 3...5
+        }
+        return isKeyboardVisible || focused ? 2...4 : 1...4
+    }
+
+    private var sendDisabled: Bool {
+        onCancel == nil && (!isEnabled || isBusy || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+    }
 
     var body: some View {
-        HStack(alignment: .bottom, spacing: 8) {
-            TextField("Hỏi về tiền của bạn...", text: $text, axis: .vertical)
-                .lineLimit(1...4)
-                .font(MPFont.body)
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Bạn muốn hỏi điều gì về tiền của mình?", text: $text, axis: .vertical)
+                .lineLimit(visibleLines)
+                .font(MPFont.chatBody)
                 .foregroundStyle(MPColor.ink)
                 .focused($focused)
                 .disabled(isBusy)
-                .padding(.vertical, 10)
-                .padding(.leading, 12)
+                .padding(.horizontal, 4)
+                .padding(.vertical, 4)
+                .frame(minHeight: mode == .welcome && !isKeyboardVisible ? 96 : nil, alignment: .top)
                 .accessibilityLabel("Tin nhắn cho trợ lý")
                 .accessibilityIdentifier("assistant-composer-input")
-            Button {
-                if let onCancel { onCancel() }
-                else { onSend() }
-            } label: {
-                Image(systemName: onCancel == nil ? "arrow.up" : "stop.fill")
-                    .font(MPFont.bodyEmphasis)
-                    .frame(width: MPMetrics.hitTarget, height: MPMetrics.hitTarget)
-                    .foregroundStyle(.white)
-                    .background(MPColor.action, in: RoundedRectangle(cornerRadius: MPMetrics.buttonCornerRadius))
+            HStack(alignment: .center, spacing: 12) {
+                Spacer(minLength: 0)
+                Button {
+                    if let onCancel { onCancel() }
+                    else { onSend() }
+                } label: {
+                    Image(systemName: onCancel == nil ? "arrow.up" : "stop.fill")
+                        .font(MPFont.bodyEmphasis)
+                        .frame(width: MPMetrics.hitTarget, height: MPMetrics.hitTarget)
+                        .foregroundStyle(.white)
+                        .background(MPColor.action, in: Circle())
+                }
+                .buttonStyle(.plain)
+                .disabled(sendDisabled)
+                .opacity(sendDisabled ? 0.5 : 1)
+                .accessibilityLabel(onCancel == nil ? "Gửi" : "Dừng xử lý")
+                .accessibilityIdentifier("assistant-composer-action")
             }
-            .buttonStyle(.plain)
-            .disabled(onCancel == nil && (!isEnabled || isBusy || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
-            .opacity(onCancel == nil && (!isEnabled || isBusy || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty) ? 0.5 : 1)
-            .accessibilityLabel(onCancel == nil ? "Gửi" : "Dừng xử lý")
-            .accessibilityIdentifier("assistant-composer-action")
         }
-        .padding(4)
-        .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
+        .padding(12)
+        .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.groupedSurfaceCornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: MPMetrics.cornerRadius)
+            RoundedRectangle(cornerRadius: MPMetrics.groupedSurfaceCornerRadius, style: .continuous)
                 .stroke(focused ? MPColor.action : MPColor.line, lineWidth: MPMetrics.inputBorderWidth)
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier("assistant-composer")
+        .onChange(of: focusRequest) { _, _ in focused = true }
         .onChange(of: dismissKeyboardRequest) { _, _ in focused = false }
     }
 }
@@ -1738,15 +1764,15 @@ struct MPCategoryIconOption: Identifiable, Hashable {
 
 enum MPCategoryIconCatalog {
     static let options: [MPCategoryIconOption] = [
-        MPCategoryIconOption(id: "tag", label: "Nhãn", systemName: "tag.fill", tone: "categorySlate"),
+        MPCategoryIconOption(id: "tag", label: "Nhãn", systemName: MPIconCatalog.assetName(for: .tag), tone: "categorySlate"),
         MPCategoryIconOption(id: "expense_food", label: "Ăn uống", systemName: "fork.knife", tone: "categoryOrange"),
         MPCategoryIconOption(id: "expense_bills", label: "Hóa đơn", systemName: "receipt", tone: "categoryBlue"),
-        MPCategoryIconOption(id: "expense_shopping", label: "Mua sắm", systemName: "bag.fill", tone: "categoryViolet"),
-        MPCategoryIconOption(id: "expense_family", label: "Gia đình", systemName: "house.fill", tone: "categoryRose"),
-        MPCategoryIconOption(id: "expense_transport", label: "Di chuyển", systemName: "car.fill", tone: "categorySky"),
-        MPCategoryIconOption(id: "expense_health", label: "Sức khỏe", systemName: "heart.text.square.fill", tone: "categoryRed"),
-        MPCategoryIconOption(id: "expense_entertainment", label: "Giải trí", systemName: "gamecontroller.fill", tone: "categoryFuchsia"),
-        MPCategoryIconOption(id: "expense_savings", label: "Tiết kiệm", systemName: "banknote.fill", tone: "categoryLime"),
+        MPCategoryIconOption(id: "expense_shopping", label: "Mua sắm", systemName: MPIconCatalog.assetName(for: .shopping), tone: "categoryViolet"),
+        MPCategoryIconOption(id: "expense_family", label: "Gia đình", systemName: MPIconCatalog.assetName(for: .family), tone: "categoryRose"),
+        MPCategoryIconOption(id: "expense_transport", label: "Di chuyển", systemName: MPIconCatalog.assetName(for: .transport), tone: "categorySky"),
+        MPCategoryIconOption(id: "expense_health", label: "Sức khỏe", systemName: MPIconCatalog.assetName(for: .health), tone: "categoryRed"),
+        MPCategoryIconOption(id: "expense_entertainment", label: "Giải trí", systemName: MPIconCatalog.assetName(for: .entertainment), tone: "categoryFuchsia"),
+        MPCategoryIconOption(id: "expense_savings", label: "Tiết kiệm", systemName: MPIconCatalog.assetName(for: .savings), tone: "categoryLime"),
         MPCategoryIconOption(id: "expense_travel", label: "Du lịch", systemName: "airplane", tone: "categoryCyan")
     ]
 

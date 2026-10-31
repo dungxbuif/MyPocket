@@ -596,6 +596,15 @@ struct PortfolioAssetModel: Codable, Identifiable, Sendable {
     var version: Int64?
     var latestPrice: Int64?
     var latestPriceAt: String?
+    /// Additive accumulated-assets metadata. Legacy portfolio responses omit
+    /// these fields and continue to decode with an explicit unknown state.
+    var unitLabel: String?
+    var unitConfirmed: Bool?
+    var priceMode: String?
+    var marketSourceName: String?
+    var marketPriceStatus: String?
+    var marketPriceObservedAt: String?
+    var marketProductID: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -604,6 +613,13 @@ struct PortfolioAssetModel: Codable, Identifiable, Sendable {
         case version
         case latestPrice
         case latestPriceAt
+        case unitLabel
+        case unitConfirmed
+        case priceMode
+        case marketSourceName
+        case marketPriceStatus
+        case marketPriceObservedAt
+        case marketProductID
     }
 }
 
@@ -619,6 +635,11 @@ struct PortfolioPositionModel: Codable, Identifiable, Sendable {
     var marketValue: Int64?
     var unrealizedPnL: Int64?
     var latestPrice: Int64?
+    var unitLabel: String?
+    var unitConfirmed: Bool?
+    var marketSourceName: String?
+    var marketPriceStatus: String?
+    var marketPriceObservedAt: String?
 
     enum CodingKeys: String, CodingKey {
         case assetID
@@ -631,6 +652,11 @@ struct PortfolioPositionModel: Codable, Identifiable, Sendable {
         case marketValue
         case unrealizedPnL
         case latestPrice
+        case unitLabel
+        case unitConfirmed
+        case marketSourceName
+        case marketPriceStatus
+        case marketPriceObservedAt
     }
 }
 
@@ -650,6 +676,27 @@ struct PortfolioSummaryModel: Codable, Sendable {
         case totalMarketValue
         case totalUnrealizedPnL
     }
+}
+
+struct PortfolioAssetUnitModel: Codable, Identifiable, Sendable, Equatable {
+    var id: String { code }
+    var code: String
+    var label: String
+    var source: String
+    var requiresConfirmation: Bool
+}
+
+struct PortfolioMarketCatalogModel: Codable, Sendable {
+    var units: [PortfolioAssetUnitModel]
+    var priceModes: [String]
+}
+
+struct PortfolioPriceSourceModel: Codable, Sendable {
+    var assetID: String
+    var mode: String
+    var sourceName: String?
+    var productID: String?
+    var confirmed: Bool
 }
 
 struct CreditStatementModel: Codable, Sendable {

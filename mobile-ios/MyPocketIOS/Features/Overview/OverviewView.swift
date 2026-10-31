@@ -22,6 +22,8 @@ enum OverviewReferenceSection: String, CaseIterable {
 
 enum OverviewReferenceCopy {
     static let walletAction = "Quản lý"
+    static let jarsAction = "Xem hũ tháng"
+    static let jarsActionAccessibilityID = "overview-open-jars"
 }
 
 enum OverviewPresentation {
@@ -292,7 +294,8 @@ struct OverviewView: View {
                             if !summary.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 MPText(summary.note, style: .secondary).lineLimit(2)
                             }
-                            MPButton("Hũ tháng", style: .plain, fullWidth: false, action: onOpenJars)
+                            MPButton(OverviewReferenceCopy.jarsAction, style: .plain, fullWidth: false, action: onOpenJars)
+                                .accessibilityIdentifier(OverviewReferenceCopy.jarsActionAccessibilityID)
                         }
                     }
                 }

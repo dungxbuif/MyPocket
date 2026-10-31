@@ -1052,6 +1052,7 @@ struct TransactionEditorView: View {
     @State private var jarSummary: JarMonthSummaryModel?
     @State private var jarsLoading = false
     @State private var jarLoadError: String?
+
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var showDetails = false

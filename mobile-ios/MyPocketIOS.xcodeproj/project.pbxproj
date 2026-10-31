@@ -57,6 +57,7 @@
 		9CE12A9D12A04E1AA5BB754F /* LaunchTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 42613E8B37F2BA38C98F27A0 /* LaunchTests.swift */; };
 		9F4C3A8C99CF8A1300CA772A /* Environment.swift in Sources */ = {isa = PBXBuildFile; fileRef = DB39E134293E3AE9A08C8030 /* Environment.swift */; };
 		9F9599550AC40228B99D9E38 /* AppRouteCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = E029E3BC328D666F2455D4D2 /* AppRouteCoordinator.swift */; };
+		A1B2C3D4E5F60718293A4B5D /* MPIconCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D4E5F60718293A4B5C /* MPIconCatalog.swift */; };
 		A3339E68F30BA1AA34C38301 /* OutboxDatabase.swift in Sources */ = {isa = PBXBuildFile; fileRef = 25000C33E4494D584AA80D21 /* OutboxDatabase.swift */; };
 		A35A86C7CEF1066F382D6CB1 /* MPFinanceCards.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5037ACF09441D0E5AD368D59 /* MPFinanceCards.swift */; };
 		A9E5AB47D879F8C44AA78475 /* PlaceholderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = E4857264234927FC415152BC /* PlaceholderTests.swift */; };
@@ -85,6 +86,19 @@
 		F630BB6DFAA8AB209BE280E3 /* MPAttachmentViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = D83806CE062DD340921F8C7C /* MPAttachmentViews.swift */; };
 		F9EBB10F5B73EA7C2E34D4EA /* WalletsReferenceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3CE79886FDD98A27539CF6C6 /* WalletsReferenceTests.swift */; };
 		FF89C3C262650A9C81311B2D /* DesignSystemTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1C68B9CB3283E502E49DB649 /* DesignSystemTests.swift */; };
+		B10000000000000000000001 /* MPChatLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000001 /* MPChatLayout.swift */; };
+		B10000000000000000000002 /* MPReportCharts.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000002 /* MPReportCharts.swift */; };
+		B10000000000000000000003 /* ReportModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000003 /* ReportModels.swift */; };
+		B10000000000000000000004 /* AssistantChatState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000004 /* AssistantChatState.swift */; };
+		B10000000000000000000005 /* AdvisorEntryObserver.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000005 /* AdvisorEntryObserver.swift */; };
+		B10000000000000000000006 /* AssistantScrollPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000006 /* AssistantScrollPolicy.swift */; };
+		B10000000000000000000007 /* AssistantEntryBatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000007 /* AssistantEntryBatchView.swift */; };
+		B10000000000000000000008 /* AssistantActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000008 /* AssistantActionCard.swift */; };
+		B10000000000000000000009 /* MonthlyReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C10000000000000000000009 /* MonthlyReportsView.swift */; };
+		B1000000000000000000000A /* MonthlyReportsViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000000000000000000000A /* MonthlyReportsViewModel.swift */; };
+		B1000000000000000000000B /* ReportAnalysisView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000000000000000000000B /* ReportAnalysisView.swift */; };
+		B1000000000000000000000C /* ReportAnalysisState.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000000000000000000000C /* ReportAnalysisState.swift */; };
+		B1000000000000000000000D /* TransactionEditorFields.swift in Sources */ = {isa = PBXBuildFile; fileRef = C1000000000000000000000D /* TransactionEditorFields.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -154,6 +168,7 @@
 		80112FF79FDF4111B8533AFE /* AssistantViews.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantViews.swift; sourceTree = "<group>"; };
 		9F3E57DB1BA3D25FF121248C /* AdvisorRunObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisorRunObserver.swift; sourceTree = "<group>"; };
 		8208510DDD2862B20EE3F111 /* MyPocketIOS.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = MyPocketIOS.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A1B2C3D4E5F60718293A4B5C /* MPIconCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPIconCatalog.swift; sourceTree = "<group>"; };
 		83C5D72DC4F43C1C2B504A02 /* AuthView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthView.swift; sourceTree = "<group>"; };
 		86181FC7F1539738541F39CC /* OverviewReferenceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OverviewReferenceTests.swift; sourceTree = "<group>"; };
 		863A1D951CDA51F951E3E8A1 /* MyPocketIOSUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MyPocketIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -191,6 +206,19 @@
 		F3BC41A8EAE91C2D8E5BA4F6 /* FinancialMutationQueue.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialMutationQueue.swift; sourceTree = "<group>"; };
 		FCDA24F9E7FEA60F0479FEF2 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		FD52BBEB98763E1968763956 /* RefreshCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RefreshCoordinator.swift; sourceTree = "<group>"; };
+		C10000000000000000000001 /* MPChatLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPChatLayout.swift; sourceTree = "<group>"; };
+		C10000000000000000000002 /* MPReportCharts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MPReportCharts.swift; sourceTree = "<group>"; };
+		C10000000000000000000003 /* ReportModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportModels.swift; sourceTree = "<group>"; };
+		C10000000000000000000004 /* AssistantChatState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantChatState.swift; sourceTree = "<group>"; };
+		C10000000000000000000005 /* AdvisorEntryObserver.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvisorEntryObserver.swift; sourceTree = "<group>"; };
+		C10000000000000000000006 /* AssistantScrollPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantScrollPolicy.swift; sourceTree = "<group>"; };
+		C10000000000000000000007 /* AssistantEntryBatchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantEntryBatchView.swift; sourceTree = "<group>"; };
+		C10000000000000000000008 /* AssistantActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantActionCard.swift; sourceTree = "<group>"; };
+		C10000000000000000000009 /* MonthlyReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyReportsView.swift; sourceTree = "<group>"; };
+		C1000000000000000000000A /* MonthlyReportsViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyReportsViewModel.swift; sourceTree = "<group>"; };
+		C1000000000000000000000B /* ReportAnalysisView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportAnalysisView.swift; sourceTree = "<group>"; };
+		C1000000000000000000000C /* ReportAnalysisState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReportAnalysisState.swift; sourceTree = "<group>"; };
+		C1000000000000000000000D /* TransactionEditorFields.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TransactionEditorFields.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -198,6 +226,11 @@
 			isa = PBXGroup;
 			children = (
 				9F3E57DB1BA3D25FF121248C /* AdvisorRunObserver.swift */,
+				C10000000000000000000004 /* AssistantChatState.swift */,
+				C10000000000000000000005 /* AdvisorEntryObserver.swift */,
+				C10000000000000000000006 /* AssistantScrollPolicy.swift */,
+				C10000000000000000000007 /* AssistantEntryBatchView.swift */,
+				C10000000000000000000008 /* AssistantActionCard.swift */,
 				80112FF79FDF4111B8533AFE /* AssistantViews.swift */,
 			);
 			path = Assistant;
@@ -415,6 +448,7 @@
 		B3F7541623139BBCBB362B16 /* Transactions */ = {
 			isa = PBXGroup;
 			children = (
+				C1000000000000000000000D /* TransactionEditorFields.swift */,
 				E553CBF0778DF943E05D4F9F /* TransactionsView.swift */,
 			);
 			path = Transactions;
@@ -436,6 +470,7 @@
 				5538D1540DC36C708A32D692 /* AIModels.swift */,
 				7CEF369D3890DBE74E6C77F0 /* FeedbackModels.swift */,
 				EB520CDEDE9521362E6396EB /* FinanceModels.swift */,
+				C10000000000000000000003 /* ReportModels.swift */,
 			);
 			path = Models;
 			sourceTree = "<group>";
@@ -485,6 +520,10 @@
 		EC72D9D3E38F0E9E96B5439F /* Reports */ = {
 			isa = PBXGroup;
 			children = (
+				C10000000000000000000009 /* MonthlyReportsView.swift */,
+				C1000000000000000000000A /* MonthlyReportsViewModel.swift */,
+				C1000000000000000000000B /* ReportAnalysisView.swift */,
+				C1000000000000000000000C /* ReportAnalysisState.swift */,
 				BBE43CE7A4EFC6D8ECDC3C6C /* SavingsReportsView.swift */,
 			);
 			path = Reports;
@@ -493,14 +532,17 @@
 		ED1B4746EAE334A86391AE88 /* DesignSystem */ = {
 			isa = PBXGroup;
 			children = (
+				C10000000000000000000001 /* MPChatLayout.swift */,
 				EF06226981996882999FEF3F /* MPAsyncStates.swift */,
 				D83806CE062DD340921F8C7C /* MPAttachmentViews.swift */,
 				A54636EF0318CE0AE3B391CC /* MPButton.swift */,
 				2B831652B4462A6E4B510620 /* MPFields.swift */,
 				5037ACF09441D0E5AD368D59 /* MPFinanceCards.swift */,
+				C10000000000000000000002 /* MPReportCharts.swift */,
 				62EB1C4C8DD824002B72A996 /* MPFinancialQueue.swift */,
 				381BDBBD19AD4CD5F8F572DA /* MPFormat.swift */,
 				68646A0098E8C401829641F2 /* MPIcon.swift */,
+				A1B2C3D4E5F60718293A4B5C /* MPIconCatalog.swift */,
 				5B88B6E4C88F6F3AF1E7C7E0 /* MPNavigation.swift */,
 				147352154CAC3695022A44B9 /* MPSurfaces.swift */,
 				0B71F92D1A807AEA18B09C48 /* MPText.swift */,
@@ -643,6 +685,11 @@
 				9F9599550AC40228B99D9E38 /* AppRouteCoordinator.swift in Sources */,
 				5266CE12460C77697FFB3D32 /* AdvisorRunObserver.swift in Sources */,
 				D8B0F589768ED47534D378D9 /* AssistantViews.swift in Sources */,
+				B10000000000000000000004 /* AssistantChatState.swift in Sources */,
+				B10000000000000000000005 /* AdvisorEntryObserver.swift in Sources */,
+				B10000000000000000000006 /* AssistantScrollPolicy.swift in Sources */,
+				B10000000000000000000007 /* AssistantEntryBatchView.swift in Sources */,
+				B10000000000000000000008 /* AssistantActionCard.swift in Sources */,
 				9C32FC80D819E0E7B0D33DF5 /* AuthView.swift in Sources */,
 				79B0ADD4F4D0023C8B5A2B3D /* AuthViewModel.swift in Sources */,
 				24C787F114A1420FFAE253D3 /* BiometricUnlockView.swift in Sources */,
@@ -654,6 +701,7 @@
 				70554355FE8B5AE90E53193D /* FeedbackView.swift in Sources */,
 				358F88DFB1F38E5A9A01661A /* FinanceAPI.swift in Sources */,
 				3C431D6AE2B0B17FFEE4A555 /* FinanceModels.swift in Sources */,
+				B10000000000000000000003 /* ReportModels.swift in Sources */,
 				0B6961177ABCE78B6273D186 /* FinancialMutationQueue.swift in Sources */,
 				3E21AA875904ABB0FCEE2E35 /* FinancialSnapshotCache.swift in Sources */,
 				8AA02D24B63D44AC0B9A2C41 /* InMemorySessionStore.swift in Sources */,
@@ -663,9 +711,12 @@
 				5E06C090E6962D3656A7A514 /* MPButton.swift in Sources */,
 				F3E03A4838A7C5B416544FD6 /* MPFields.swift in Sources */,
 				A35A86C7CEF1066F382D6CB1 /* MPFinanceCards.swift in Sources */,
+				B10000000000000000000001 /* MPChatLayout.swift in Sources */,
+				B10000000000000000000002 /* MPReportCharts.swift in Sources */,
 				DF3F41960E2E333152AE37EA /* MPFinancialQueue.swift in Sources */,
 				F348769583358C628CEEF6AA /* MPFormat.swift in Sources */,
 				3B23C891392F9EF8FE4F9F31 /* MPIcon.swift in Sources */,
+				A1B2C3D4E5F60718293A4B5D /* MPIconCatalog.swift in Sources */,
 				68B9E0F3E4EE03055CF21D1A /* MPNavigation.swift in Sources */,
 				8769C7AA9309C9BD4A6195FB /* MPSurfaces.swift in Sources */,
 				5403FFF0BB1B23CCAA54CFD5 /* MPText.swift in Sources */,
@@ -680,12 +731,17 @@
 				D5A07A2E66ADCF31F7D37489 /* OverviewView.swift in Sources */,
 				22BB6A2E48EB82D70C21860E /* RefreshCoordinator.swift in Sources */,
 				E5D21F5822BB29F497767758 /* SavingsReportsView.swift in Sources */,
+				B10000000000000000000009 /* MonthlyReportsView.swift in Sources */,
+				B1000000000000000000000A /* MonthlyReportsViewModel.swift in Sources */,
+				B1000000000000000000000B /* ReportAnalysisView.swift in Sources */,
+				B1000000000000000000000C /* ReportAnalysisState.swift in Sources */,
 				6B045E4A1F70C5EC9B1AECED /* ScreenSnapshot.swift in Sources */,
 				F32CA0418336F225D59D0235 /* SecondaryFeatureViews.swift in Sources */,
 				65D4614B446F5BEF88CDF414 /* Session.swift in Sources */,
 				159FF9F009D9FF3B97B16B74 /* SyncEngine.swift in Sources */,
 				7CA91D523F8FF4900070A614 /* Tokens.swift in Sources */,
 				D7F3FB7B1F6E4FA047D542D1 /* TransactionsView.swift in Sources */,
+				B1000000000000000000000D /* TransactionEditorFields.swift in Sources */,
 				9C84A36C5218325E661E84AE /* WalletsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

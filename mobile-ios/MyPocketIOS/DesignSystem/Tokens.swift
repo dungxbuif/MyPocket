@@ -92,7 +92,9 @@ enum MPMetrics {
     static let groupedSurfaceCornerRadius: CGFloat = 24
     static let groupedRowMinHeight: CGFloat = 44
     static let groupedRowHorizontalPadding: CGFloat = 16
-    static let groupedRowVerticalPadding: CGFloat = 10
+    // Keep grouped rows compact while preserving the shared 44pt hit target.
+    // Screens should use this base value instead of inventing local row rhythm.
+    static let groupedRowVerticalPadding: CGFloat = 6
     static let groupedSeparatorLeadingInset: CGFloat = 56
     static let inputHorizontalPadding: CGFloat = 12
     static let inputBorderWidth: CGFloat = 1
@@ -115,26 +117,32 @@ enum MPMetrics {
 /// platform chrome match the device reference. Keeping the decision here
 /// prevents individual screens from drifting to unrelated font families.
 enum MPFont {
-    static let display = custom(size: 28, relativeTo: .largeTitle, weight: .bold).leading(.tight)
-    static let balance = custom(size: MPMetrics.balanceTextSize, relativeTo: .largeTitle, weight: .bold).monospacedDigit()
-    static let headline = custom(size: 18, relativeTo: .title2, weight: .semibold)
-    static let subheadline = custom(size: 16, relativeTo: .headline, weight: .semibold)
-    static let body = custom(size: 15, relativeTo: .body, weight: .medium)
-    static let bodyEmphasis = custom(size: 15, relativeTo: .body, weight: .semibold)
-    static let bodySmall = custom(size: 13, relativeTo: .footnote, weight: .medium)
-    static let label = custom(size: 14, relativeTo: .subheadline, weight: .semibold)
-    static let labelSmall = custom(size: 12, relativeTo: .caption, weight: .medium)
-    static let currency = custom(size: 20, relativeTo: .title, weight: .semibold).monospacedDigit()
+    static let display = semantic(.title, weight: .semibold).leading(.tight)
+    static let balance = semantic(.largeTitle, weight: .semibold).monospacedDigit()
+    static let headline = semantic(.headline, weight: .semibold)
+    static let section = semantic(.subheadline, weight: .semibold)
+    static let subheadline = semantic(.subheadline, weight: .semibold)
+    static let body = semantic(.subheadline, weight: .regular)
+    // Chat drafts are prose: use regular weight while retaining native scaling.
+    static let chatBody = semantic(.subheadline, weight: .regular)
+    static let chatCaption = Font.system(.footnote, design: .default).weight(.regular)
+    static let bodyEmphasis = semantic(.subheadline, weight: .medium)
+    static let bodySmall = semantic(.footnote, weight: .regular)
+    static let label = semantic(.caption, weight: .semibold)
+    static let labelSmall = semantic(.caption, weight: .regular)
+    /// Compact money rows use a distinct role so transaction and report
+    /// amounts do not inherit prose sizing or introduce local font choices.
+    static let amount = semantic(.callout, weight: .medium).monospacedDigit()
+    static let currency = semantic(.title3, weight: .medium).monospacedDigit()
 
     /// UIKit-backed fields use the same system family as SwiftUI and preserve
     /// the device's native text metrics.
     static let uiBody: UIFont = UIFont.systemFont(ofSize: 16)
 
-    private static func custom(size: CGFloat, relativeTo style: Font.TextStyle, weight: Font.Weight = .regular) -> Font {
-        // Use the native text style so Dynamic Type scales the same way as
-        // iOS controls. The `size` argument remains part of the token call
-        // sites as the reference hierarchy's design-time documentation.
-        _ = size
+    private static func semantic(_ style: Font.TextStyle, weight: Font.Weight = .regular) -> Font {
+        // Use native semantic styles so Dynamic Type remains automatic. The
+        // hierarchy is expressed by the selected style and weight, rather
+        // than a fixed point size that would stop scaling with the system.
         return Font.system(style, design: .default).weight(weight)
     }
 }

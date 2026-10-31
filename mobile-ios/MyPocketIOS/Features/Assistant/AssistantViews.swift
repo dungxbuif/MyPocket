@@ -301,12 +301,16 @@ struct AssistantView: View {
     @State private var overviewPresented = false
     @State private var keyboardVisible = false
     @State private var dismissKeyboardRequest = 0
+    @State private var composerFocusRequest = 0
     @State private var resetConfirmation = false
     @State private var resetting = false
     @State private var historyRequestToken = UUID()
     @State private var advisorPollToken = UUID()
     @State private var advisorSubmitRequestID: String?
     @State private var advisorSubmitUncertain = false
+    @State private var chatState: AssistantChatState = .idle
+    @State private var shouldFollowLatest = true
+    @State private var pendingRestoreMessageID: String?
     @StateObject private var runObserver: AdvisorRunObserver
 
     private let suggestions = [
@@ -339,6 +343,12 @@ struct AssistantView: View {
 
     private var inputBinding: Binding<String> { draft ?? $localInput }
 
+    private var composerMode: MPChatComposerMode {
+        messages.isEmpty && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? .welcome
+            : .conversation
+    }
+
     /// Drop only the local conversation pointer after the server has expired
     /// the idle history. The composer is intentionally left untouched so a
     /// question that was being retried is never silently lost.
@@ -353,18 +363,19 @@ struct AssistantView: View {
         runObserver.reset()
         advisorSubmitRequestID = nil
         advisorSubmitUncertain = false
+        chatState = .idle
         UserDefaults.standard.removeObject(forKey: Self.conversationKey(ownerID: ownerID))
     }
 
     var body: some View {
         VStack(spacing: 0) {
             MPScreenHeader(title: "Finance Assistant", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
-                if keyboardVisible {
-                    HStack(spacing: 8) {
-                        if overview != nil {
-                            MPIconButton(systemName: "chart.bar", label: "Tổng quan tài chính") { overviewPresented = true }
-                                .accessibilityIdentifier("assistant-header-overview")
-                        }
+                HStack(spacing: 8) {
+                    if overview != nil {
+                        MPIconButton(systemName: MPIconCatalog.assetName(for: .report), label: "Tổng quan tài chính") { overviewPresented = true }
+                            .accessibilityIdentifier("assistant-header-overview")
+                    }
+                    if keyboardVisible {
                         MPIconButton(systemName: "keyboard.chevron.compact.down", label: "Đóng bàn phím") { dismissKeyboardRequest += 1 }
                             .accessibilityIdentifier("assistant-dismiss-keyboard")
                     }
@@ -379,97 +390,138 @@ struct AssistantView: View {
                 }
             })
                 .padding(.horizontal, MPMetrics.pagePadding)
-            if overview != nil && !keyboardVisible {
-                MPChatOverview(income: overviewMoney("income"), expense: overviewMoney("expense")) {
-                    overviewPresented = true
-                }
-                .padding(.horizontal, MPMetrics.pagePadding)
-                .padding(.bottom, 8)
-            }
-            ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(alignment: .leading, spacing: 16) {
-                    if let capabilities, !capabilities.enabled { MPStatusMessage(text: "Finance Assistant chưa được bật.", tone: .info) }
-                    if let walletActionMessage { MPStatusMessage(text: walletActionMessage, tone: .success) }
-                    if !historyLoading && messages.isEmpty {
-                            VStack(alignment: .leading, spacing: 10) {
-                                MPText("Hỏi về tài chính của bạn", style: .title)
-                                MPText("Khám phá chi tiêu, tìm giao dịch hoặc so sánh các kỳ.", style: .secondary)
-                                ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
-                                    MPButton(suggestion, style: .secondary) {
-                                        input = suggestion
-                                    }
-                                    .accessibilityIdentifier("assistant-suggestion-\(index)")
+            MPChatSurface {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 16) {
+                            if !shouldFollowLatest && !messages.isEmpty {
+                                MPButton("Tin mới", style: .secondary, fullWidth: false) {
+                                    shouldFollowLatest = true
+                                    withAnimation { proxy.scrollTo("assistant-latest", anchor: .bottom) }
                                 }
+                                .accessibilityIdentifier("assistant-new-messages")
                             }
-                    }
-                    if historyLoading {
-                        MPLoadingView(label: "Đang tải lịch sử trợ lý...")
-                    }
-                    if hasOlder {
-                        MPButton("Tải tin cũ", style: .secondary, isLoading: loadingOlder) { Task { await loadOlderMessages() } }
-                    }
-                    ForEach(messages) { message in
-                        MPChatMessage(isUser: message.role == "user") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
-                                    if let text = part.text {
-                                        if masked {
-                                            MPText(AssistantPrivacyPolicy.maskedText, style: .secondary)
-                                        } else if message.role == "assistant" {
-                                            MPMarkdown(content: text)
-                                        } else {
-                                            MPText(text)
+                            if let capabilities, !capabilities.enabled { MPStatusMessage(text: "Finance Assistant chưa được bật.", tone: .info) }
+                            if let walletActionMessage { MPStatusMessage(text: walletActionMessage, tone: .success) }
+                            if !historyLoading && messages.isEmpty {
+                                VStack(alignment: .leading, spacing: 10) {
+                                    MPText("Mình có thể giúp gì cho bạn?", style: .title)
+                                    MPText("Hỏi về chi tiêu, tìm một giao dịch hoặc cùng xem lại tháng này.", style: .secondary)
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: MPMetrics.rowSpacing) {
+                                        ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
+                                            MPButton(suggestion, style: .secondary, fullWidth: false) {
+                                                input = suggestion
+                                                composerFocusRequest += 1
+                                            }
+                                            .accessibilityIdentifier("assistant-suggestion-\(index)")
                                         }
                                     }
-                                    else if let data = part.data {
-                                        AssistantStructuredCard(type: part.type, data: data, masked: masked, onCreateWallet: createWalletFromAssistant, onConfirmWalletAction: confirmWalletAction, onConfirmJarAction: confirmJarAction, onConfirmBudgetAction: confirmBudgetAction)
-                                    } else { MPText("Đã nhận thẻ dữ liệu tài chính.", style: .secondary) }
+                                    }
                                 }
                             }
+                            if historyLoading {
+                                MPLoadingView(label: "Đang tải lịch sử trợ lý...")
+                            }
+                            if hasOlder {
+                                MPButton("Tải tin cũ", style: .secondary, isLoading: loadingOlder) { Task { await loadOlderMessages() } }
+                            }
+                            ForEach(messages) { message in
+                                MPChatMessage(isUser: message.role == "user") {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
+                                            if let text = part.text {
+                                                if masked {
+                                                    MPText(AssistantPrivacyPolicy.maskedText, style: .secondary)
+                                                } else if message.role == "assistant" {
+                                                    MPMarkdown(content: text)
+                                                } else {
+                                                    MPText(text)
+                                                }
+                                            }
+                                            else if let batch = part.entryBatchEnvelope {
+                                                AssistantEntryBatchView(
+                                                    batch: batch,
+                                                    timeZone: TimeZone.current,
+                                                    masked: masked,
+                                                    onEdit: { _ in composerFocusRequest += 1 },
+                                                    onSaveOne: { item in Task { await decideTypedEntry(batch: batch, item: item, decision: "apply") } },
+                                                    onSaveValid: { items in Task { for item in items { await decideTypedEntry(batch: batch, item: item, decision: "apply") } } },
+                                                    onSkip: { item in Task { await decideTypedEntry(batch: batch, item: item, decision: "reject") } }
+                                                )
+                                            } else if let data = part.data {
+                                                AssistantStructuredCard(type: part.type, data: data, masked: masked, onCreateWallet: createWalletFromAssistant, onConfirmWalletAction: confirmWalletAction, onConfirmJarAction: confirmJarAction, onConfirmBudgetAction: confirmBudgetAction)
+                                            } else { MPText("Đã nhận thẻ dữ liệu tài chính.", style: .secondary) }
+                                        }
+                                    }
+                                }
+                                .id(message.id)
+                            }
+                            if sending || activeRunID != nil {
+                                let label = runObserver.connectionState == .reconnecting
+                                    ? "Kết nối gián đoạn. Yêu cầu vẫn được theo dõi..."
+                                    : "Trợ lý đang phân tích..."
+                                MPLoadingView(label: label)
+                            }
+                            if let error { MPStatusMessage(text: error, tone: .danger) }
+                            if advisorSubmitUncertain {
+                                MPStatusMessage(text: "Yêu cầu có thể đã được tiếp nhận. Giữ nguyên nội dung và dùng nút thử lại để tiếp tục; không tạo yêu cầu mới.", tone: .info)
+                                MPButton("Thử lại yêu cầu", style: .secondary, isLoading: sending) {
+                                    Task { await retryUncertainAdvisorSubmit() }
+                                }
+                                .accessibilityIdentifier("assistant-retry-submit")
+                            }
+                            Color.clear.frame(height: 1).id("assistant-latest")
                         }
-                        .id(message.id)
+                        .padding(MPMetrics.pagePadding)
                     }
-                    if sending || activeRunID != nil {
-                        let label = runObserver.connectionState == .reconnecting
-                            ? "Kết nối gián đoạn. Yêu cầu vẫn được theo dõi..."
-                            : "Trợ lý đang phân tích..."
-                        MPLoadingView(label: label)
-                    }
-                    if let error { MPStatusMessage(text: error, tone: .danger) }
-                    if advisorSubmitUncertain {
-                        MPStatusMessage(text: "Yêu cầu có thể đã được tiếp nhận. Giữ nguyên nội dung và dùng nút thử lại để tiếp tục; không tạo yêu cầu mới.", tone: .info)
-                        MPButton("Thử lại yêu cầu", style: .secondary, isLoading: sending) {
-                            Task { await retryUncertainAdvisorSubmit() }
+                    .accessibilityIdentifier("assistant-conversation")
+                    .scrollDismissesKeyboard(.interactively)
+                    .simultaneousGesture(DragGesture(minimumDistance: 8).onChanged { _ in
+                        shouldFollowLatest = false
+                    })
+                    .onChange(of: messages.last?.id) { _, _ in
+                        if AssistantScrollPolicy.shouldFollowLatest(
+                            distanceFromBottom: shouldFollowLatest ? 0 : 65,
+                            isLoadingOlder: loadingOlder
+                        ) {
+                            withAnimation { proxy.scrollTo("assistant-latest", anchor: .bottom) }
                         }
-                        .accessibilityIdentifier("assistant-retry-submit")
                     }
-                    Color.clear.frame(height: 1).id("assistant-latest")
+                    .onChange(of: messages.first?.id) { _, firstID in
+                        guard let firstID, pendingRestoreMessageID == firstID else { return }
+                        pendingRestoreMessageID = nil
+                        DispatchQueue.main.async {
+                            proxy.scrollTo(firstID, anchor: .top)
+                        }
+                    }
                 }
-                .padding(MPMetrics.pagePadding)
+                HStack(alignment: .bottom, spacing: MPMetrics.sectionSpacing) {
+                    MPChatComposer(
+                        text: inputBinding,
+                        isBusy: sending || activeRunID != nil,
+                        isEnabled: capabilities?.enabled == true && !advisorSubmitUncertain,
+                        onSend: { Task { await send() } },
+                        onCancel: activeRunID.map { runID in { Task { await cancel(runID: runID) }; return () } },
+                        mode: composerMode,
+                        isKeyboardVisible: keyboardVisible,
+                        focusRequest: composerFocusRequest,
+                        dismissKeyboardRequest: dismissKeyboardRequest
+                    )
+                    .frame(maxWidth: .infinity)
+                    .disabled(advisorSubmitUncertain)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 12)
+                .overlay(alignment: .top) {
+                    Rectangle()
+                        .fill(MPColor.line)
+                        .frame(height: MPMetrics.inputBorderWidth)
+                }
             }
-            .accessibilityIdentifier("assistant-conversation")
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: messages.last?.id) { _, _ in
-                proxy.scrollTo("assistant-latest", anchor: .bottom)
-            }
-            }
-            MPChatComposer(
-                text: inputBinding,
-                isBusy: sending || activeRunID != nil,
-                isEnabled: capabilities?.enabled == true && !advisorSubmitUncertain,
-                onSend: { Task { await send() } },
-                onCancel: activeRunID.map { runID in { Task { await cancel(runID: runID) }; return () } },
-                dismissKeyboardRequest: dismissKeyboardRequest
-            )
             .padding(.horizontal, MPMetrics.pagePadding)
-            .padding(.vertical, 8)
-            .disabled(advisorSubmitUncertain)
-            .background {
-                GeometryReader { geometry in
-                    Color.clear.preference(key: MPFloatingActionClearanceKey.self, value: geometry.size.height)
-                }
-            }
+            .padding(.bottom, 8)
+            .accessibilityIdentifier("assistant-chat-frame")
         }
         .background(MPColor.canvas.ignoresSafeArea())
         .mpObserveKeyboardVisibility($keyboardVisible)
@@ -636,6 +688,7 @@ struct AssistantView: View {
 
     private func loadOlderMessages() async {
         guard !conversationID.isEmpty, let first = messages.first, !loadingOlder, hasOlder else { return }
+        pendingRestoreMessageID = first.id
         let requestedConversationID = conversationID
         let requestToken = UUID()
         historyRequestToken = requestToken
@@ -711,6 +764,7 @@ struct AssistantView: View {
         sending = true; error = nil; defer { sending = false }
         let clientRequestID = advisorSubmitRequestID ?? UUID().uuidString
         advisorSubmitRequestID = clientRequestID
+        chatState = .sending(requestID: clientRequestID)
         do {
             let result = try await api.beginAdvisorMessage(AdvisorMessageInputModel(clientRequestID: clientRequestID, text: text))
             advisorSubmitRequestID = nil
@@ -718,10 +772,12 @@ struct AssistantView: View {
             conversationID = result.conversationID
             UserDefaults.standard.set(result.conversationID, forKey: Self.conversationKey(ownerID: ownerID))
             activeRunID = result.runID
+            chatState = .accepted(runID: result.runID)
             let pollToken = UUID()
             advisorPollToken = pollToken
             input = ""
             if result.status == "queued" || result.status == "running" {
+                chatState = .processing(runID: result.runID)
                 await runObserver.observe(ownerID: ownerID, runID: result.runID)
                 guard advisorPollToken == pollToken, activeRunID == result.runID else { return }
                 if let run = runObserver.terminalResult {
@@ -737,6 +793,7 @@ struct AssistantView: View {
             await reloadHistory()
             guard advisorPollToken == pollToken, activeRunID == result.runID else { return }
             activeRunID = nil
+            chatState = .idle
         } catch let apiError as APIError {
             if AssistantHistoryExpiryPolicy.isExpired(apiError) {
                 input = text
@@ -744,19 +801,40 @@ struct AssistantView: View {
                 self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
             } else if advisorSubmitRequestID != nil && AssistantAdvisorRecoveryPolicy.shouldReplay(after: apiError) {
                 advisorSubmitUncertain = true
+                chatState = .uncertain(requestID: clientRequestID)
                 self.error = "Không thể xác nhận phản hồi của máy chủ. Giữ nguyên nội dung và tải lại yêu cầu trước khi gửi lại."
             } else {
                 if advisorSubmitRequestID != nil { advisorSubmitRequestID = nil }
+                chatState = .failed(message: apiError.userMessage)
                 self.error = apiError.userMessage
             }
         }
         catch {
             if advisorSubmitRequestID != nil {
                 advisorSubmitUncertain = true
+                chatState = .uncertain(requestID: clientRequestID)
                 self.error = "Không thể xác nhận máy chủ đã tiếp nhận yêu cầu. Giữ nguyên nội dung và thử lại yêu cầu này."
             } else {
+                chatState = .failed(message: "Không thể xử lý yêu cầu trợ lý tài chính.")
                 self.error = "Không thể xử lý yêu cầu trợ lý tài chính."
             }
+        }
+    }
+
+    private func decideTypedEntry(batch: AdvisorEntryBatchEnvelopeModel, item: AdvisorEntryBatchItemModel, decision: String) async {
+        guard !batch.taskID.isEmpty, !batch.batchID.isEmpty else { return }
+        do {
+            _ = try await api.decideAdvisorEntry(AdvisorEntryDecisionModel(
+                taskID: batch.taskID,
+                batchID: batch.batchID,
+                batchVersion: batch.version,
+                itemID: item.id,
+                decision: decision,
+                clientRequestID: UUID().uuidString
+            ))
+            await reloadHistory()
+        } catch {
+            self.error = "Chưa thể cập nhật đề xuất giao dịch. Dữ liệu vẫn được giữ nguyên để thử lại."
         }
     }
 
@@ -774,6 +852,7 @@ struct AssistantView: View {
             runObserver.reset()
             sending = false
             activeRunID = nil
+            chatState = .cancelled
             error = "Đã hủy yêu cầu."
         }
         catch { self.error = "Không thể hủy yêu cầu đang chạy." }
@@ -869,6 +948,10 @@ enum AssistantCardType {
             return "\(wallet) · \(category)"
         }
         return wallet
+    }
+
+    static func transactionDetailWallet(_ view: [String: JSONValue]) -> String {
+        "Ví: \(string(view["wallet_name"]) ?? "Ví")"
     }
 
     static func transactionDetailFlags(_ view: [String: JSONValue]) -> String {
@@ -1065,12 +1148,26 @@ struct AssistantStructuredCard: View {
     }
 
     @ViewBuilder private func transactionDetailView(_ view: [String: JSONValue]) -> some View {
-        MPText(AssistantCardType.transactionDetailSummary(view), style: .emphasis)
-        if number(view["amount"]) != nil {
-            MPText(money(view["amount"]), style: .emphasis)
+        if let exactAmount = AssistantCardType.monetaryValue(view["amount"]) {
+            MPTransactionRow(
+                type: string(view["type"]) ?? "expense",
+                rawAmount: exactAmount,
+                categoryName: string(view["category_name"]),
+                systemKey: string(view["category_system_key"]),
+                iconKey: string(view["category_icon_key"]),
+                note: string(view["note"]),
+                occurredAt: string(view["occurred_at"]) ?? "",
+                timeZone: timeZone,
+                masked: masked,
+                transferID: string(view["transfer_id"]),
+                adjustmentDirection: string(view["adjustment_direction"]),
+                creditKind: string(view["credit_kind"])
+            )
+            .accessibilityIdentifier("assistant-transaction-detail-row")
         } else {
             MPText("Chưa có dữ liệu", style: .secondary)
         }
+        MPText(AssistantCardType.transactionDetailWallet(view), style: .secondary)
         MPText(AssistantCardType.transactionDetailFlags(view), style: .secondary)
     }
 
@@ -1823,22 +1920,22 @@ struct EntryProposalEditor: View {
 
     var body: some View {
         MPEditorScaffold(title: "Sửa đề xuất", isBusy: saving, onCancel: onCancel) {
-            MPAmountField(title: "Số tiền", text: $amount)
-            MPOptionSelector(title: "Loại giao dịch", options: AIEntryProposalReview.supportedTypes, selectionID: $type, emptyLabel: "Chưa xác định — chọn loại")
-            MPOptionSelector(title: "Ví", options: TransactionsViewModel.ordinaryTransactionWallets(wallets).map { MPSelectionOption(id: $0.id, label: $0.name) }, selectionID: $walletID)
-            MPOptionSelector(title: "Danh mục", options: categoryOptions, selectionID: $categoryID)
-            if canUseJar {
-                MPOptionSelector(
-                    title: "Hũ chi tiêu",
-                    options: TransactionEditorPolicy.jarOptions(summary: jarSummary, selectedJarID: jarID, selectedJarName: nil),
-                    selectionID: $jarID,
-                    emptyLabel: jarsLoading ? "Đang tải hũ..." : "Không chọn"
-                )
-                if let jarLoadError { MPStatusMessage(text: jarLoadError, tone: .danger) }
-            }
-            MPBooleanSelector(title: "Tính vào báo cáo", value: $includedInReports, trueLabel: "Có", falseLabel: "Không")
-            MPDateTimeField(title: "Ngày và giờ", date: $date, timeZone: timeZone.identifier)
-            MPTextEditor(title: "Ghi chú", text: $note)
+            TransactionEditorFields(
+                amount: $amount,
+                type: $type,
+                walletID: $walletID,
+                categoryID: $categoryID,
+                jarID: $jarID,
+                includedInReports: $includedInReports,
+                date: $date,
+                note: $note,
+                wallets: wallets,
+                categories: categories,
+                jarSummary: jarSummary,
+                jarsLoading: jarsLoading,
+                jarLoadError: jarLoadError,
+                timeZone: timeZone
+            )
             if let error { MPStatusMessage(text: error, tone: .danger) }
         } footer: {
             MPButton("Lưu đề xuất", isLoading: saving) { Task { await save() } }
@@ -1914,7 +2011,7 @@ struct EntryProposalEditor: View {
                 overIncome: false,
                 overOneHundredPercent: false,
                 jars: [JarIdentityModel(jarID: "ui-entry-jar", name: "Ăn uống")],
-                items: [JarItemModel(jarID: "ui-entry-jar", name: "Ăn uống", allocationMode: "amount", allocationAmount: nil, allocationPercent: nil, calculatedAllocation: nil, spent: 0, active: true)]
+                items: [JarItemModel(jarID: "ui-entry-jar", name: "Ăn uống", allocationMode: "none", allocationAmount: nil, allocationPercent: nil, calculatedAllocation: nil, spent: 0, active: true)]
             )
             jarsLoading = false
             return

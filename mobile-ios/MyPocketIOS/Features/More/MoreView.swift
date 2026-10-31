@@ -17,7 +17,7 @@ enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
         case .months: return "Tháng"
         case .recurring: return "Giao dịch định kỳ"
         case .travel: return "Travel Mode"
-        case .portfolio: return "Danh mục đầu tư"
+        case .portfolio: return "Tài sản tích lũy"
         case .credit: return "Sổ tín dụng"
         case .notifications: return "Thông báo"
         case .assistant: return "Finance Assistant"
@@ -30,18 +30,18 @@ enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
     var icon: String {
         switch self {
         case .wallets: return MPReferenceIcon.wallet
-        case .budgets: return "chart.pie.fill"
-        case .reports: return "chart.bar.xaxis"
-        case .categories: return "folder.fill"
-        case .jars: return "shippingbox.fill"
+        case .budgets: return MPIconCatalog.assetName(for: .savings)
+        case .reports: return MPIconCatalog.assetName(for: .report)
+        case .categories: return MPIconCatalog.assetName(for: .tag)
+        case .jars: return MPIconCatalog.assetName(for: .group)
         case .months: return "calendar"
         case .recurring: return MPReferenceIcon.recurring
-        case .travel: return "airplane"
-        case .portfolio: return "chart.line.uptrend.xyaxis"
-        case .credit: return "creditcard.fill"
-        case .notifications: return "bell.fill"
-        case .assistant: return "sparkles"
-        case .aiEntry: return "doc.text.image"
+        case .travel: return MPIconCatalog.assetName(for: .travel)
+        case .portfolio: return MPIconCatalog.assetName(for: .investment)
+        case .credit: return MPIconCatalog.assetName(for: .credit)
+        case .notifications: return MPIconCatalog.assetName(for: .bell)
+        case .assistant: return MPIconCatalog.assetName(for: .assistant)
+        case .aiEntry: return MPIconCatalog.assetName(for: .ledger)
         case .feedback: return MPReferenceIcon.feedback
         case .account: return MPReferenceIcon.account
         }
@@ -52,16 +52,6 @@ enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
 /// grouped surface per section; feature destinations remain unchanged so deep
 /// links and owner-scoped secondary routes keep their existing behavior.
 enum MoreReferencePresentation {
-    enum BankLinkStyle: Equatable {
-        case informationalDisabled
-
-        var isEnabled: Bool {
-            switch self {
-            case .informationalDisabled: false
-            }
-        }
-    }
-
     struct Section: Identifiable, Equatable {
         let title: String
         let items: [MoreDestination]
@@ -78,10 +68,8 @@ enum MoreReferencePresentation {
 
     static let surfaceStyle: MPSurfaceCardStyle = .grouped
     static let rowSpacing: CGFloat = 0
-    static let sectionSpacing: CGFloat = MPMetrics.sectionSpacing
+    static let sectionSpacing: CGFloat = 6
     static let profileBadgeTitle = "TÀI KHOẢN MYPOCKET"
-    static let bankLinkTitle = "Liên kết ngân hàng"
-    static let bankLinkStyle: BankLinkStyle = .informationalDisabled
     static let profileAccessibilityIdentifier = "more-profile-account"
     static let logoutAccessibilityIdentifier = "more-logout"
 }
@@ -92,6 +80,7 @@ struct MoreView: View {
     let masked: Bool
     let onOpenTransactions: (String?) -> Void
     let onOpenAIEntry: () -> Void
+    let onOpenAssistant: (String) -> Void
     let requestedWalletID: String?
     @Binding private var requestedDestination: MoreDestination?
     @State private var navigationPath: [MoreDestination] = []
@@ -103,13 +92,15 @@ struct MoreView: View {
         requestedDestination: Binding<MoreDestination?> = .constant(nil),
         requestedWalletID: String? = nil,
         onOpenTransactions: @escaping (String?) -> Void = { _ in },
-        onOpenAIEntry: @escaping () -> Void = {}
+        onOpenAIEntry: @escaping () -> Void = {},
+        onOpenAssistant: @escaping (String) -> Void = { _ in }
     ) {
         self.api = api
         self.auth = auth
         self.masked = masked
         self.onOpenTransactions = onOpenTransactions
         self.onOpenAIEntry = onOpenAIEntry
+        self.onOpenAssistant = onOpenAssistant
         self.requestedWalletID = requestedWalletID
         _requestedDestination = requestedDestination
     }
@@ -135,15 +126,6 @@ struct MoreView: View {
                         accessibilityIdentifier: MoreReferencePresentation.profileAccessibilityIdentifier
                     ) {
                         navigationPath = [.account]
-                    }
-                    MPSurfaceCard(style: MoreReferencePresentation.surfaceStyle) {
-                        MPMenuRow(
-                            title: MoreReferencePresentation.bankLinkTitle,
-                            subtitle: "Tính năng liên kết ngân hàng đang được phát triển.",
-                            systemName: MPReferenceIcon.bankLink,
-                            accessibilityIdentifier: "more-bank-link",
-                            isEnabled: MoreReferencePresentation.bankLinkStyle.isEnabled
-                        ) {}
                     }
                     ForEach(MoreReferencePresentation.sections) { section in
                         VStack(alignment: .leading, spacing: MPMetrics.rowSpacing) {
@@ -188,7 +170,8 @@ struct MoreView: View {
                         requestedDestination = nil
                         onOpenTransactions(walletID)
                     },
-                    onOpenAIEntry: onOpenAIEntry
+                    onOpenAIEntry: onOpenAIEntry,
+                    onOpenAssistant: onOpenAssistant
                 ) {
                     closeDestination()
                 }
@@ -241,6 +224,7 @@ struct SecondaryScreen: View {
     let onOpenJars: () -> Void
     let onOpenTransactions: (String?) -> Void
     let onOpenAIEntry: () -> Void
+    let onOpenAssistant: (String) -> Void
     let onBack: () -> Void
 
     var body: some View {
@@ -257,7 +241,7 @@ struct SecondaryScreen: View {
                     onAIEntry: onOpenAIEntry
                 )
             case .budgets: BudgetsView(api: api, onBack: onBack, masked: masked, ownerID: assistantOwnerID)
-            case .reports: ReportsView(api: api, onBack: onBack, masked: masked, ownerID: assistantOwnerID, snapshotCache: auth.financialCache)
+            case .reports: MonthlyReportsView(api: api, onBack: onBack, masked: masked, ownerID: assistantOwnerID, onChatHandoff: onOpenAssistant)
             case .categories: CategoriesView(api: api, onBack: onBack)
             case .jars: JarsView(api: api, onBack: onBack, masked: masked)
             case .months: MonthsView(api: api, onBack: onBack, onOpenJars: onOpenJars, masked: masked)

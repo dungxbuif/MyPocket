@@ -55,6 +55,18 @@ the daily income and expense totals from those same plotted points. When account
 amount masking is enabled, every exposed amount uses the shared masked value;
 the accessibility summary does not recalculate or broaden report scope.
 
+## Native insider implementation candidate — 2026-11-01
+
+`MonthlyReportsView` owns the additive aggregate-first path: exact-scope
+in-memory caching, weekly/category bars, selection drilldown, masking and
+on-demand `ReportAnalysisView`. It does not request `/transactions` while
+loading a report. When `/reports/monthly` is not deployed, the view falls back
+only to the existing owner/month aggregate endpoints and labels that state.
+The report analysis handoff pre-fills Assistant without sending a message.
+
+Tests and builds were intentionally not run for this owner-requested
+implementation pass; visual/UAT verification remains open.
+
 ## Native savings-report hierarchy — Task 5 reference redesign
 
 The savings report composes shared finance bases only. `MPFinanceSummaryCard`

@@ -25,10 +25,9 @@ final class MoreFeedbackReferenceTests: XCTestCase {
         XCTAssertEqual(visibleItems.filter { $0 == .aiEntry }.count, 1)
     }
 
-    func testAccountReferenceAnatomyKeepsProfileBadgeAndBankLinkInformational() {
+    func testAccountReferenceAnatomyKeepsProfileBadgeAndCompactRows() {
         XCTAssertEqual(MoreReferencePresentation.profileBadgeTitle, "TÀI KHOẢN MYPOCKET")
-        XCTAssertEqual(MoreReferencePresentation.bankLinkTitle, "Liên kết ngân hàng")
-        XCTAssertFalse(MoreReferencePresentation.bankLinkStyle.isEnabled)
+        XCTAssertEqual(MPMetrics.groupedRowVerticalPadding, 6)
         XCTAssertEqual(MoreReferencePresentation.logoutAccessibilityIdentifier, "more-logout")
         XCTAssertEqual(MoreReferencePresentation.profileAccessibilityIdentifier, "more-profile-account")
     }
@@ -90,11 +89,11 @@ final class MoreFeedbackReferenceTests: XCTestCase {
 
     func testReferenceIconRegistryKeepsAccountGlyphsOnNativeSymbols() {
         XCTAssertEqual(MPReferenceIcon.account, "person.crop.circle")
-        XCTAssertEqual(MPReferenceIcon.wallet, "wallet.pass.fill")
-        XCTAssertEqual(MPReferenceIcon.group, "shippingbox.fill")
-        XCTAssertEqual(MPReferenceIcon.bankLink, "link.circle.fill")
+        XCTAssertEqual(MPReferenceIcon.wallet, "wallet.pass")
+        XCTAssertEqual(MPReferenceIcon.group, "shippingbox")
+        XCTAssertEqual(MPReferenceIcon.bankLink, "link.circle")
         XCTAssertEqual(MPReferenceIcon.recurring, "repeat")
-        XCTAssertEqual(MPReferenceIcon.feedback, "bubble.left.and.bubble.right.fill")
+        XCTAssertEqual(MPReferenceIcon.feedback, "bubble.left.and.bubble.right")
     }
 
     private func proposal(type: String, occurredAt: String) -> EntryProposalModel {

@@ -30,6 +30,18 @@ The portfolio page is an account-scoped ledger for assets that are not
 wallet transactions. It uses the same mobile shell, `SurfaceCard`, `Text`,
 `BaseButton`, and form atoms as the rest of the web app.
 
+## Native accumulated-assets implementation candidate — 2026-11-01
+
+The native label is `Tài sản tích lũy`. Asset identity, unit confirmation and
+price-source metadata are additive optional fields. Cards show quantity ×
+unit-price semantics, unknown/stale source labels and masked values. History
+headlines use the quantity × unit-price total while the subtitle keeps the
+per-unit price and fee. `Sửa giao dịch` is visible and reuses the immutable
+correction preview/commit flow. Custom/system unit selection is explicit; the
+native client does not claim live market quotes when those APIs are absent.
+
+Tests and builds were intentionally not run for this implementation pass.
+
 ## Required states
 
 - Empty state explains that adding a buy creates the first position.

@@ -103,7 +103,7 @@ final class FinanceModelTests: XCTestCase {
         let row = MPTransactionRow(transaction: item, category: category, timeZone: TimeZone(identifier: "Asia/Ho_Chi_Minh")!, masked: false)
         XCTAssertEqual(row.title, "Cà phê")
         XCTAssertEqual(row.subtitle, "Highlands sáng")
-        XCTAssertEqual(row.iconName, "cup.and.saucer.fill")
+        XCTAssertEqual(row.iconName, "cup.and.saucer")
         XCTAssertEqual(row.amount, MPFormat.signedMoney(-10_000))
         XCTAssertEqual(row.amountTone, .expense)
     }
@@ -114,7 +114,7 @@ final class FinanceModelTests: XCTestCase {
         item.type = "income"
         let transfer = MPTransactionRow(transaction: item, timeZone: .gmt, masked: false)
         XCTAssertEqual(transfer.title, "Nhận chuyển ví")
-        XCTAssertEqual(transfer.iconName, "arrow.left.arrow.right")
+        XCTAssertEqual(transfer.iconName, "building.columns.fill")
         XCTAssertEqual(transfer.amountTone, .neutral)
         XCTAssertEqual(transfer.amount, MPFormat.signedMoney(10_000))
         item.transferID = nil
@@ -1185,8 +1185,8 @@ func testAdvisorHistoryRequestPolicyRejectsLateErrorAfterConversationReset() {
                 JarIdentityModel(jarID: "inactive", name: "Du lịch")
             ],
             items: [
-                JarItemModel(jarID: "active", name: "Ăn uống", allocationMode: "amount", allocationAmount: 3_000_000, allocationPercent: nil, calculatedAllocation: 3_000_000, spent: 1_000_000, active: true),
-                JarItemModel(jarID: "inactive", name: "Du lịch", allocationMode: "amount", allocationAmount: 7_000_000, allocationPercent: nil, calculatedAllocation: 7_000_000, spent: 0, active: false)
+                JarItemModel(jarID: "active", name: "Ăn uống", allocationMode: "fixed", allocationAmount: 3_000_000, allocationPercent: nil, calculatedAllocation: 3_000_000, spent: 1_000_000, active: true),
+                JarItemModel(jarID: "inactive", name: "Du lịch", allocationMode: "fixed", allocationAmount: 7_000_000, allocationPercent: nil, calculatedAllocation: 7_000_000, spent: 0, active: false)
             ]
         )
 

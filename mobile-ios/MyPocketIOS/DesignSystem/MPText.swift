@@ -3,6 +3,7 @@ import SwiftUI
 enum MPTextStyle {
     case display
     case title
+    case section
     case body
     case secondary
     case emphasis
@@ -31,6 +32,8 @@ struct MPText: View {
             return MPFont.display
         case .title:
             return MPFont.headline
+        case .section:
+            return MPFont.section
         case .body:
             return MPFont.body
         case .secondary:

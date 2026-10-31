@@ -268,7 +268,7 @@ struct MPSectionHeader: View {
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            MPText(title, style: .title)
+            MPText(title, style: .section)
             Spacer(minLength: 8)
             if let actionTitle, let action {
                 MPButton(actionTitle, style: .plain, fullWidth: false, action: action)
@@ -471,7 +471,10 @@ struct MPAssistantCard<Content: View>: View {
     let title: String
     private let content: () -> Content
 
-    static var surfaceStyle: MPSurfaceCardStyle { .elevated }
+    // Assistant finance content follows the same reference surface language
+    // as transaction previews in the Add Transaction flow. Rows remain flat
+    // inside this one card so nested cards do not create double padding.
+    static var surfaceStyle: MPSurfaceCardStyle { .reference }
 
     init(title: String, @ViewBuilder content: @escaping () -> Content) {
         self.title = title
@@ -996,8 +999,8 @@ enum TravelReferenceCopy {
 }
 
 enum PortfolioReferenceCopy {
-    static let subtitle = "Theo dõi mua bán độc lập với số dư ví"
-    static let summaryTitle = "Tổng danh mục"
+    static let subtitle = "Theo dõi tài sản, số lượng và đơn giá độc lập với số dư ví"
+    static let summaryTitle = "Tổng tài sản tích lũy"
     static let refreshAction = "Làm mới"
     static let refreshActionAccessibilityID = "portfolio-refresh"
     static let addAssetAction = "Thêm tài sản"

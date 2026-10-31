@@ -54,6 +54,34 @@ final class JarsMonthsReferenceTests: XCTestCase {
         XCTAssertEqual(MonthsPresentation.timezoneLabel("Asia/Ho_Chi_Minh"), "theo múi giờ tài khoản")
     }
 
+    func testJarsReferenceCopyMakesMonthlyFlowAndRemovalScopeExplicit() {
+        XCTAssertEqual(JarsFlowCopy.monthSelectorTitle, "Tháng đang xem")
+        XCTAssertEqual(JarsFlowCopy.summaryTitle, "Tổng quan tháng")
+        XCTAssertEqual(JarsFlowCopy.listTitle, "Hũ tháng")
+        XCTAssertEqual(JarsFlowCopy.unassignedTitle, "Chi chưa gắn hũ")
+        XCTAssertEqual(JarsFlowCopy.cumulativeTitle, "Cộng dồn")
+        XCTAssertEqual(JarsFlowCopy.removalTitle, "Gỡ hũ khỏi tháng?")
+        XCTAssertTrue(JarsFlowCopy.removalMessage.lowercased().contains("chỉ cấu hình của tháng này"))
+        XCTAssertEqual(JarsFlowCopy.removalConfirm, "Gỡ khỏi tháng")
+        XCTAssertEqual(JarsReferencePresentation.monthContext(month: "2026-10", currentMonth: "2026-10"), "Tháng 10 năm 2026 · Tháng hiện tại")
+        XCTAssertEqual(JarsReferencePresentation.monthContext(month: "2026-09", currentMonth: "2026-10"), "Tháng 09 năm 2026 · Lịch sử")
+    }
+
+    func testJarReferenceProgressIsOptionalAndClampedForOverspend() {
+        XCTAssertNil(JarsReferencePresentation.progress(spent: 100, allocation: nil))
+        XCTAssertEqual(JarsReferencePresentation.progress(spent: 250, allocation: 200), 1)
+        XCTAssertEqual(JarsReferencePresentation.progress(spent: 50, allocation: 200), 0.25)
+        XCTAssertTrue(JarsReferencePresentation.isOverspent(spent: 250, allocation: 200))
+        XCTAssertFalse(JarsReferencePresentation.isOverspent(spent: 50, allocation: 200))
+    }
+
+    func testJarAllocationDraftMatchesBackendModesAndZeroPercentContract() {
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "none", amount: nil, percent: nil))
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "fixed", amount: 1, percent: nil))
+        XCTAssertTrue(JarAllocationDraftValidator.isValid(mode: "percent", amount: nil, percent: 0))
+        XCTAssertFalse(JarAllocationDraftValidator.isValid(mode: "amount", amount: 1, percent: nil))
+    }
+
     func testPairedTransferLegsAreExcludedFromReportTrendAndWeekTotals() {
         let occurredAt = "2026-10-20T03:00:00Z"
         let transactions = [

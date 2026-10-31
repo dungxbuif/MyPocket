@@ -18,6 +18,21 @@ shared_fields:
 updated: 2026-10-26
 ---
 
+## Native UI density/chat/icons — implementation candidate, 2026-11-01
+
+Owner-requested [design](tickets/NATIVE-CHAT-COMPOSER-20261031-DETAIL_DESIGN.md)
+and [implementation plan](../superpowers/plans/2026-10-31-mypocket-ui-density-chat-icons.md):
+retain cards/colors and feedback bubble; refine typography, adaptive chat layout,
+reading position, first-class Hũ flows, and semantic icon family. Local
+implementation is authorized; production/release is not.
+The native integrator has landed the shared typography/density bases, full-screen
+Assistant route, additive typed-entry/report/asset contracts, report drilldown
+and analysis states, accumulated-asset unit/source UI, and icon catalog fallback.
+Tests/builds were intentionally not run in this owner-requested pass.
+Next: focused native verification and owner visual review.
+No deployment, physical install, model/API/schema change or feedback deletion is
+included.
+
 ## Deterministic XLSX ingestion — local candidate, 2026-10-27
 
 Tasks 1–3 and the private structured-field portion of Task 4 are implemented

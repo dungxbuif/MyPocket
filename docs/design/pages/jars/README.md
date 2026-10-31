@@ -24,6 +24,11 @@ comma→dot normalization, preserving raw invalid drafts. Generic input range is
 places. Fixed allocation remains a monetary field. No API type/schema changes.
 [Number input guide](../../../guides/numeric-input-ios.md).
 
+The current native route remains the first-class Hũ entry from Overview,
+Tài khoản and Tháng, with month scope, API-backed spend/allocation, cumulative
+history, shared transaction policy and explicit remove confirmation. No backend
+or jar semantics were changed in the UI-density integration pass.
+
 Route `/jars`; implements [TICKET-04](../../../work/tickets/TICKET-04-hu-chi-tieu.md) and [CORE-03](../../../work/tickets/CORE-03-TIME-JARS-MONTH-DETAIL_DESIGN.md). Status: implementation in progress.
 
 ## Composition

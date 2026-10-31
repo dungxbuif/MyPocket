@@ -20,6 +20,7 @@ struct MainTabView: View {
     @State private var feedbackScreenshot: Data?
     @State private var keyboardVisible = false
     @State private var assistantDraft = ""
+    @State private var footerClearance: CGFloat = 0
     @State private var requestedWalletID: String?
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -94,6 +95,11 @@ struct MainTabView: View {
                             onOpenAIEntry: {
                                 requestedAccountDestination = .aiEntry
                                 selection = "account"
+                            },
+                            onOpenAssistant: { draft in
+                                assistantDraft = draft
+                                requestedAccountDestination = .assistant
+                                selection = "account"
                             }
                         )
                     default:
@@ -115,7 +121,7 @@ struct MainTabView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .coordinateSpace(name: MPFeedbackBubbleLayout.coordinateSpace)
 
-            if !keyboardVisible {
+            if !(selection == "assistant" || (selection == "account" && requestedAccountDestination == .assistant)) && !keyboardVisible {
                 MPFeedbackDock(isVisible: !feedbackPresented && !feedbackCapturePending) {
                     // Hide the trigger for a rendered frame before capture.
                     feedbackCapturePending = true
@@ -128,6 +134,7 @@ struct MainTabView: View {
                     }
                 }
                 .frame(maxWidth: .infinity, alignment: .bottomTrailing)
+                .padding(.bottom, footerClearance)
             }
 
             if feedbackPresented {
@@ -186,6 +193,7 @@ struct MainTabView: View {
         }
         }
         .environment(\.mpFinancialValuesMasked, masked)
+        .onPreferenceChange(MPFloatingActionClearanceKey.self) { footerClearance = $0 }
         .mpObserveKeyboardVisibility($keyboardVisible)
         .onChange(of: authenticatedUserID) { _, _ in assistantDraft = "" }
         .onAppear { apply(externalRoute) }

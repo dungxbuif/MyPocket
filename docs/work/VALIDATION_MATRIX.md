@@ -5640,6 +5640,15 @@ occurred.
 | Native guards | PASS | `check-base-components.sh`, `check-base-components.test.sh`, `verify-project.sh`, and `git diff --check`. |
 | Production/device acceptance | OPEN | No production feedback was resolved and no production financial data was changed. Signed simulator interaction checks and physical owner acceptance remain separate Task 8 gates. |
 
+## Native UI density/chat/icons implementation pass — 2026-11-01
+
+| Gate | Result | Evidence |
+| --- | --- | --- |
+| Native implementation | DONE (static) | Shared bases, Assistant, Reports and accumulated-assets surfaces are in the native target and project file. |
+| Tests/build | DEFERRED | Explicit owner instruction: do not run test/build in this pass. |
+| Visual/device UAT | OPEN | Requires the focused native verification pass and owner review. |
+| Backend rollout | OPEN | Additive report/entry/unit/source endpoints are optional assumptions; no backend files changed. |
+
 ## Integrated ingestion and native candidate — 2026-10-27
 
 | Gate | Result | Evidence |

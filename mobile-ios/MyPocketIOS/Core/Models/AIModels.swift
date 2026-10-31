@@ -44,6 +44,11 @@ struct AdvisorPartModel: Decodable, Sendable {
         guard type == "entry_batch" else { return nil }
         return AdvisorEntryBatchModel(json: data)
     }
+
+    var entryBatchEnvelope: AdvisorEntryBatchEnvelopeModel? {
+        guard type == "entry_batch" else { return nil }
+        return AdvisorEntryBatchEnvelopeModel(json: data)
+    }
 }
 
 struct AdvisorEntryBatchModel: Sendable {
@@ -199,4 +204,100 @@ struct AdvisorRunModel: Codable, Sendable {
     var deadlineAt: String? = nil
     var retryAfterMs: Int? = nil
     var createdAt: String? = nil
+}
+
+/// Additive native contract for a typed assistant entry batch. Older advisor
+/// responses simply omit this payload and remain renderable as read-only chat.
+struct AdvisorEntryBatchItemModel: Codable, Identifiable, Sendable {
+    var id: String
+    var status: String
+    var draft: EntryDraftModel?
+    var proposalID: String?
+    var error: String?
+    var sourceLabel: String?
+}
+
+struct AdvisorEntryBatchEnvelopeModel: Codable, Sendable {
+    var taskID: String
+    var batchID: String
+    var version: Int64
+    var items: [AdvisorEntryBatchItemModel]
+    var summary: String?
+
+    init(taskID: String, batchID: String, version: Int64, items: [AdvisorEntryBatchItemModel], summary: String? = nil) {
+        self.taskID = taskID
+        self.batchID = batchID
+        self.version = version
+        self.items = items
+        self.summary = summary
+    }
+
+    init?(json: JSONValue?) {
+        guard case .object(let object) = json,
+              case .string(let taskID) = object["task_id"], !taskID.isEmpty,
+              case .string(let batchID) = object["batch_id"], !batchID.isEmpty,
+              case .number(let version) = object["version"], let exactVersion = Int64(exactly: version),
+              case .array(let rawItems) = object["items"] else { return nil }
+        var decodedItems: [AdvisorEntryBatchItemModel] = []
+        for rawItem in rawItems {
+            guard case .object(let item) = rawItem,
+                  case .string(let id) = item["id"],
+                  case .string(let status) = item["status"] else { return nil }
+            var draft: EntryDraftModel?
+            if case .object(let rawDraft) = item["draft"],
+               case .string(let type) = rawDraft["type"],
+               case .number(let amount) = rawDraft["amount"],
+               let exactAmount = Int64(exactly: amount),
+               case .string(let walletID) = rawDraft["wallet_id"] {
+                let categoryID = rawDraft["category_id"].flatMap { value in if case .string(let value) = value { return value }; return nil }
+                let jarID = rawDraft["jar_id"].flatMap { value in if case .string(let value) = value { return value }; return nil }
+                let occurredAt = rawDraft["occurred_at"].flatMap { value in if case .string(let value) = value { return value }; return nil } ?? ""
+                let note = rawDraft["note"].flatMap { value in if case .string(let value) = value { return value }; return nil } ?? ""
+                let included = rawDraft["included_in_reports"].flatMap { value in if case .bool(let value) = value { return value }; return nil } ?? true
+                draft = EntryDraftModel(type: type, amount: exactAmount, walletID: walletID, categoryID: categoryID, jarID: jarID, occurredAt: occurredAt, note: note, includedInReports: included)
+            }
+            let proposalID = item["proposal_id"].flatMap { value in if case .string(let value) = value { return value }; return nil }
+            let error = item["error"].flatMap { value in if case .string(let value) = value { return value }; return nil }
+            let sourceLabel = item["source_label"].flatMap { value in if case .string(let value) = value { return value }; return nil }
+            decodedItems.append(AdvisorEntryBatchItemModel(id: id, status: status, draft: draft, proposalID: proposalID, error: error, sourceLabel: sourceLabel))
+        }
+        self.init(taskID: taskID, batchID: batchID, version: exactVersion, items: decodedItems, summary: object["summary"].flatMap { value in if case .string(let value) = value { return value }; return nil })
+    }
+}
+
+enum AssistantEntryRowState: String, Codable, CaseIterable, Sendable {
+    case pending
+    case invalid
+    case saving
+    case applied
+    case rejected
+    case conflict
+
+    var label: String {
+        switch self {
+        case .pending: return "Chờ duyệt"
+        case .invalid: return "Cần bổ sung"
+        case .saving: return "Đang lưu"
+        case .applied: return "Đã ghi"
+        case .rejected: return "Đã bỏ qua"
+        case .conflict: return "Có xung đột"
+        }
+    }
+}
+
+struct AdvisorEntryInputModel: Codable, Sendable {
+    var clientRequestID: String
+    var conversationID: String
+    var text: String
+    var timezone: String?
+    var attachmentIDs: [String]?
+}
+
+struct AdvisorEntryDecisionModel: Codable, Sendable {
+    var taskID: String
+    var batchID: String
+    var batchVersion: Int64
+    var itemID: String
+    var decision: String
+    var clientRequestID: String
 }
