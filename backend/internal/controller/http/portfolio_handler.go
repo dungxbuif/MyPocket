@@ -17,8 +17,11 @@ type PortfolioHandler struct {
 }
 
 type portfolioAssetInput struct {
-	Symbol string `json:"symbol"`
-	Name   string `json:"name"`
+	Symbol    string  `json:"symbol"`
+	Name      string  `json:"name"`
+	UnitLabel *string `json:"unit_label,omitempty"`
+	ProductID *string `json:"product_id,omitempty"`
+	PriceMode string  `json:"price_mode,omitempty"`
 }
 
 type portfolioAssetUpdateInput struct {
@@ -29,6 +32,30 @@ type portfolioAssetUpdateInput struct {
 type portfolioPriceInput struct {
 	LatestPrice  *int64 `json:"latest_price" validate:"required" extensions:"x-nullable"`
 	pricePresent bool
+}
+
+type portfolioUnitInput struct {
+	ExpectedVersion int64  `json:"expected_version"`
+	UnitLabel       string `json:"unit_label"`
+}
+
+func (input *portfolioUnitInput) UnmarshalJSON(data []byte) error {
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return err
+	}
+	for key := range fields {
+		if key != "expected_version" && key != "unit_label" {
+			return errors.New("unknown portfolio unit field")
+		}
+	}
+	type plain portfolioUnitInput
+	var decoded plain
+	if err := json.Unmarshal(data, &decoded); err != nil {
+		return err
+	}
+	*input = portfolioUnitInput(decoded)
+	return nil
 }
 
 func (input *portfolioPriceInput) UnmarshalJSON(data []byte) error {
@@ -77,6 +104,7 @@ func (r *Router) RegisterPortfolioRoutes(h *PortfolioHandler) {
 	g.GET("/assets", h.ListAssets)
 	g.POST("/assets", h.CreateAsset)
 	g.PATCH("/assets/:id", h.UpdateAsset)
+	g.PATCH("/assets/:id/unit", h.ConfirmUnit)
 	g.DELETE("/assets/:id", h.DeleteAsset)
 	g.PATCH("/assets/:id/price", h.UpdatePrice)
 	g.GET("/assets/:id/trades", h.ListTrades)
@@ -163,12 +191,60 @@ func (h *PortfolioHandler) CreateAsset(c *gin.Context) {
 		transactionBadRequest(c, problemDetailInvalidJSON)
 		return
 	}
-	asset, err := h.Portfolio.CreateAsset(owner, portfoliorepo.PortfolioAssetInput{Symbol: strings.TrimSpace(input.Symbol), Name: strings.TrimSpace(input.Name)})
+	var unitLabel *string
+	if input.UnitLabel != nil {
+		value := strings.TrimSpace(*input.UnitLabel)
+		unitLabel = &value
+	}
+	var productID *string
+	if input.ProductID != nil {
+		value := strings.TrimSpace(*input.ProductID)
+		productID = &value
+	}
+	asset, err := h.Portfolio.CreateAsset(owner, portfoliorepo.PortfolioAssetInput{Symbol: strings.TrimSpace(input.Symbol), Name: strings.TrimSpace(input.Name), UnitLabel: unitLabel, MarketProductID: productID, PriceMode: strings.TrimSpace(input.PriceMode)})
 	if err != nil {
 		portfolioMapError(c, err)
 		return
 	}
 	Created(c, asset)
+}
+
+// ConfirmUnit confirms the unit label used by an existing holding. It is an
+// interpretation/version update only: quantity, prices, trades and correction
+// receipts are never converted or rewritten.
+// @Summary Confirm a portfolio asset unit
+// @Tags Portfolio
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Asset ID"
+// @Param unit body portfolioUnitInput true "Expected asset version and unit label"
+// @Success 200 {object} entity.PortfolioAsset
+// @Failure 400 {object} Problem
+// @Failure 404 {object} Problem
+// @Failure 409 {object} Problem
+// @Router /api/v1/portfolio/assets/{id}/unit [patch]
+func (h *PortfolioHandler) ConfirmUnit(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Portfolio == nil {
+		portfolioUnavailable(c)
+		return
+	}
+	var input portfolioUnitInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		transactionBadRequest(c, problemDetailInvalidJSON)
+		return
+	}
+	updated, err := h.Portfolio.ConfirmAssetUnit(owner, strings.TrimSpace(c.Param("id")), input.ExpectedVersion, input.UnitLabel)
+	if err != nil {
+		portfolioMapError(c, err)
+		return
+	}
+	OK(c, updated)
 }
 
 // UpdatePortfolioAsset godoc
@@ -500,6 +576,20 @@ func portfolioMapError(c *gin.Context, err error) {
 		Fail(c, http.StatusConflict, Problem{Code: "PORTFOLIO_CORRECTION_PENDING", Title: problemTitleBadRequest, Detail: "Yêu cầu sửa giao dịch trước đó vẫn đang xử lý; không tự gửi lại."})
 	case errors.Is(err, portfoliorepo.ErrPortfolioCorrectionInvalid), errors.Is(err, entity.ErrPortfolioRevisionInvalid), errors.Is(err, entity.ErrPortfolioRevisionConflict):
 		portfolioBadRequest(c, "Dữ liệu sửa giao dịch danh mục chưa hợp lệ.")
+	case errors.Is(err, portfoliorepo.ErrPortfolioAssetUnitConflict):
+		Fail(c, http.StatusConflict, Problem{Code: "PORTFOLIO_ASSET_UNIT_CONFLICT", Title: problemTitleBadRequest, Detail: "Không thể đổi đơn vị đã xác nhận khi tài sản đã có giao dịch."})
+	case errors.Is(err, portfoliorepo.ErrPortfolioAssetAutomaticPrice):
+		Fail(c, http.StatusConflict, Problem{Code: "PORTFOLIO_AUTOMATIC_PRICE", Title: problemTitleBadRequest, Detail: "Tài sản đang dùng giá tự động; hãy bỏ liên kết nguồn giá trước khi nhập giá thủ công."})
+	case errors.Is(err, portfoliorepo.ErrPortfolioAssetUnitInvalid):
+		portfolioBadRequest(c, "Đơn vị tài sản không hợp lệ.")
+	case errors.Is(err, portfoliorepo.ErrMarketProductNotFound):
+		Fail(c, http.StatusNotFound, Problem{Code: "MARKET_PRODUCT_NOT_FOUND", Title: problemTitleNotFound, Detail: "Không tìm thấy sản phẩm giá của hệ thống."})
+	case errors.Is(err, portfoliorepo.ErrMarketBindingHasTrades):
+		Fail(c, http.StatusConflict, Problem{Code: "PORTFOLIO_MARKET_PRODUCT_CONFLICT", Title: problemTitleBadRequest, Detail: "Không thể đổi sản phẩm giá khi tài sản đã có giao dịch."})
+	case errors.Is(err, portfoliorepo.ErrMarketBindingUnitMismatch):
+		portfolioBadRequest(c, "Đơn vị sản phẩm giá không khớp đơn vị tài sản đã xác nhận.")
+	case errors.Is(err, portfoliorepo.ErrMarketBindingInvalid), errors.Is(err, portfoliorepo.ErrMarketProductInvalid):
+		portfolioBadRequest(c, "Nguồn giá tài sản không hợp lệ.")
 	case errors.Is(err, portfoliorepo.ErrPortfolioAssetInvalid), errors.Is(err, portfoliorepo.ErrPortfolioTradeInvalid):
 		portfolioBadRequest(c, "Dữ liệu danh mục chưa hợp lệ.")
 	default:

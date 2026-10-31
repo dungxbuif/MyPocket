@@ -15,6 +15,8 @@ var (
 	ErrPortfolioAssetConflict        = errors.New("portfolio asset already exists")
 	ErrPortfolioAssetHasTrades       = errors.New("portfolio asset has trades")
 	ErrPortfolioAssetInvalid         = errors.New("portfolio asset is invalid")
+	ErrPortfolioAssetUnitConflict    = errors.New("portfolio asset unit cannot change after trades")
+	ErrPortfolioAssetAutomaticPrice  = errors.New("automatic portfolio price cannot be changed manually")
 	ErrPortfolioTradeNotFound        = errors.New("portfolio trade not found")
 	ErrPortfolioTradeInvalid         = errors.New("portfolio trade is invalid")
 	ErrPortfolioInsufficientQuantity = errors.New("portfolio position is insufficient for sell")
@@ -25,8 +27,11 @@ var (
 )
 
 type PortfolioAssetInput struct {
-	Symbol string
-	Name   string
+	Symbol          string
+	Name            string
+	UnitLabel       *string
+	MarketProductID *string
+	PriceMode       string
 }
 
 // PortfolioAssetUpdate changes descriptive metadata only. Trades remain
@@ -39,6 +44,17 @@ type PortfolioAssetUpdate struct {
 type PortfolioPriceUpdate struct {
 	LatestPrice   *int64
 	LatestPriceAt *time.Time
+}
+
+type PortfolioAssetUnitInput struct {
+	ExpectedVersion int64
+	UnitLabel       string
+}
+
+type PortfolioPriceSourceInput struct {
+	ExpectedVersion int64
+	PriceMode       string
+	MarketProductID *string
 }
 
 type PortfolioTradeInput struct {
@@ -77,6 +93,8 @@ type PortfolioRepository interface {
 	CreateAsset(ownerID string, input PortfolioAssetInput) (*entity.PortfolioAsset, error)
 	UpdateAsset(ownerID, assetID string, update PortfolioAssetUpdate) (*entity.PortfolioAsset, error)
 	DeleteAsset(ownerID, assetID string) error
+	ConfirmAssetUnit(ownerID, assetID string, expectedVersion int64, unitLabel string) (*entity.PortfolioAsset, error)
+	UpdateAssetPriceSource(ownerID, assetID string, input PortfolioPriceSourceInput) (*entity.PortfolioAsset, error)
 	UpdateAssetPrice(ownerID, assetID string, update PortfolioPriceUpdate) (*entity.PortfolioAsset, error)
 	ListTrades(ownerID, assetID string) ([]entity.PortfolioTrade, error)
 	CreateTrade(ownerID, assetID string, input PortfolioTradeInput) (*entity.PortfolioTrade, error)

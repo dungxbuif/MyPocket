@@ -11,30 +11,43 @@ import (
 )
 
 const (
-	QuantityScale      int64 = 100000000
-	PortfolioTradeBuy        = "buy"
-	PortfolioTradeSell       = "sell"
+	QuantityScale               int64 = 100000000
+	PortfolioTradeBuy                 = "buy"
+	PortfolioTradeSell                = "sell"
+	PortfolioPriceModeManual          = "manual"
+	PortfolioPriceModeAuto            = "automatic"
+	PortfolioQuoteStatusFresh         = "fresh"
+	PortfolioQuoteStatusStale         = "stale"
+	PortfolioQuoteStatusUnknown       = "unknown"
 )
+
+const PortfolioQuoteFreshness = time.Hour
 
 var (
 	ErrPortfolioQuantityInvalid      = errors.New("portfolio quantity is invalid")
 	ErrPortfolioTradeInvalid         = errors.New("portfolio trade is invalid")
 	ErrPortfolioInsufficientQuantity = errors.New("portfolio position is insufficient for sell")
 	ErrPortfolioOverflow             = errors.New("portfolio calculation overflow")
+	ErrPortfolioAssetUnitInvalid     = errors.New("portfolio asset unit is invalid")
 )
 
 // PortfolioAsset is an owner-scoped investment instrument. Prices are VND
 // snapshots and are deliberately optional: an unknown price is not zero.
 type PortfolioAsset struct {
-	ID            string     `json:"id" gorm:"primaryKey"`
-	OwnerID       string     `json:"owner_id" gorm:"index;not null"`
-	Symbol        string     `json:"symbol" gorm:"not null"`
-	Name          string     `json:"name" gorm:"not null"`
-	LatestPrice   *int64     `json:"latest_price,omitempty"`
-	LatestPriceAt *time.Time `json:"latest_price_at,omitempty"`
-	CreatedAt     time.Time  `json:"created_at"`
-	UpdatedAt     time.Time  `json:"updated_at"`
-	Version       int64      `json:"version" gorm:"not null;default:1"`
+	ID                string     `json:"id" gorm:"primaryKey"`
+	OwnerID           string     `json:"owner_id" gorm:"index;not null"`
+	Symbol            string     `json:"symbol" gorm:"not null"`
+	Name              string     `json:"name" gorm:"not null"`
+	UnitLabel         *string    `json:"unit_label,omitempty"`
+	UnitConfirmed     bool       `json:"unit_confirmed" gorm:"not null;default:false"`
+	PriceMode         string     `json:"price_mode" gorm:"not null;default:manual"`
+	MarketProductID   *string    `json:"market_product_id,omitempty" gorm:"column:market_product_id;index"`
+	LatestPriceSource *string    `json:"latest_price_source,omitempty" gorm:"column:latest_price_source"`
+	LatestPrice       *int64     `json:"latest_price,omitempty"`
+	LatestPriceAt     *time.Time `json:"latest_price_at,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
+	Version           int64      `json:"version" gorm:"not null;default:1"`
 }
 
 // PortfolioTrade is immutable history. QuantityScaled stores quantity in
@@ -57,6 +70,11 @@ type PortfolioPosition struct {
 	AssetID        string     `json:"asset_id"`
 	Symbol         string     `json:"symbol,omitempty"`
 	Name           string     `json:"name,omitempty"`
+	UnitLabel      *string    `json:"unit_label,omitempty"`
+	PriceMode      string     `json:"price_mode,omitempty"`
+	PriceSource    *string    `json:"price_source,omitempty"`
+	PriceAsOf      *time.Time `json:"price_as_of,omitempty"`
+	PriceStatus    string     `json:"price_status,omitempty"`
 	Quantity       string     `json:"quantity"`
 	QuantityScaled int64      `json:"-"`
 	CostBasis      int64      `json:"cost_basis"`
@@ -75,6 +93,9 @@ type PortfolioSummary struct {
 	TotalCostBasis     int64               `json:"total_cost_basis"`
 	TotalMarketValue   *int64              `json:"total_market_value,omitempty"`
 	TotalUnrealizedPnL *int64              `json:"total_unrealized_pnl,omitempty"`
+	KnownMarketValue   *int64              `json:"known_market_value,omitempty"`
+	UnknownAssetCount  int                 `json:"unknown_asset_count"`
+	StaleAssetCount    int                 `json:"stale_asset_count"`
 }
 
 func ParsePortfolioQuantity(raw string) (int64, error) {

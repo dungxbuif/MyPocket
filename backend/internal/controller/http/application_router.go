@@ -29,6 +29,7 @@ type ApplicationHandlers struct {
 	Credit        *CreditHandler
 	Travel        *TravelHandler
 	Portfolio     *PortfolioHandler
+	AssetMarket   *AssetMarketHandler
 	Insider       *InsiderHandler
 	AIEntry       *AIEntryHandler
 	Advisor       *AdvisorHandler
@@ -64,6 +65,7 @@ func NewApplicationRouter(handlers ApplicationHandlers, options ApplicationRoute
 	r.RegisterCreditRoutes(applicationHandler(handlers.Credit))
 	r.RegisterTravelRoutes(applicationHandler(handlers.Travel))
 	r.RegisterPortfolioRoutes(applicationHandler(handlers.Portfolio))
+	r.RegisterAssetMarketRoutes(applicationHandler(handlers.AssetMarket))
 	r.RegisterInsiderRoutes(applicationHandler(handlers.Insider))
 	r.RegisterAIEntryRoutes(applicationHandler(handlers.AIEntry))
 	r.RegisterAdvisorRoutes(applicationHandler(handlers.Advisor))

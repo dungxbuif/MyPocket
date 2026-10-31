@@ -38,7 +38,45 @@ func (r *PortfolioPostgresRepository) CreateAsset(ownerID string, input portfoli
 	if symbol == "" || name == "" || len(symbol) > 32 || len(name) > 160 {
 		return nil, portfoliorepo.ErrPortfolioAssetInvalid
 	}
-	row := &entity.PortfolioAsset{ID: uuid.NewString(), OwnerID: ownerID, Symbol: symbol, Name: name}
+	priceMode := input.PriceMode
+	if priceMode == "" {
+		priceMode = entity.PortfolioPriceModeManual
+		if input.MarketProductID != nil {
+			priceMode = entity.PortfolioPriceModeAuto
+		}
+	}
+	if priceMode != entity.PortfolioPriceModeManual && priceMode != entity.PortfolioPriceModeAuto {
+		return nil, portfoliorepo.ErrPortfolioAssetInvalid
+	}
+	if priceMode == entity.PortfolioPriceModeAuto && input.MarketProductID == nil {
+		return nil, portfoliorepo.ErrMarketBindingInvalid
+	}
+	row := &entity.PortfolioAsset{ID: uuid.NewString(), OwnerID: ownerID, Symbol: symbol, Name: name, PriceMode: priceMode}
+	if input.UnitLabel != nil {
+		unit := strings.TrimSpace(*input.UnitLabel)
+		if unit == "" || len(unit) > 64 {
+			return nil, portfoliorepo.ErrPortfolioAssetUnitInvalid
+		}
+		row.UnitLabel = &unit
+		row.UnitConfirmed = true
+	}
+	if input.MarketProductID != nil {
+		productID := strings.TrimSpace(*input.MarketProductID)
+		if productID == "" || priceMode != entity.PortfolioPriceModeAuto || row.UnitLabel == nil || !row.UnitConfirmed {
+			return nil, portfoliorepo.ErrMarketBindingInvalid
+		}
+		var product entity.MarketProduct
+		if err := r.db.Where("id = ?", productID).First(&product).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return nil, portfoliorepo.ErrMarketProductNotFound
+			}
+			return nil, err
+		}
+		if err := validateMarketProductForAsset(row, product); err != nil {
+			return nil, err
+		}
+		row.MarketProductID = &productID
+	}
 	if err := r.db.Create(row).Error; err != nil {
 		if portfolioUniqueViolation(err) {
 			return nil, portfoliorepo.ErrPortfolioAssetConflict
@@ -46,6 +84,52 @@ func (r *PortfolioPostgresRepository) CreateAsset(ownerID string, input portfoli
 		return nil, err
 	}
 	return row, nil
+}
+
+func (r *PortfolioPostgresRepository) ConfirmAssetUnit(ownerID, assetID string, expectedVersion int64, unitLabel string) (*entity.PortfolioAsset, error) {
+	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(assetID) == "" || expectedVersion <= 0 {
+		return nil, portfoliorepo.ErrPortfolioAssetInvalid
+	}
+	unitLabel = strings.TrimSpace(unitLabel)
+	if unitLabel == "" || len(unitLabel) > 64 {
+		return nil, portfoliorepo.ErrPortfolioAssetUnitInvalid
+	}
+	var row entity.PortfolioAsset
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("owner_id = ? AND id = ?", ownerID, assetID).First(&row).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return portfoliorepo.ErrPortfolioAssetNotFound
+			}
+			return err
+		}
+		if row.Version != expectedVersion {
+			return portfoliorepo.ErrPortfolioAssetConflictVersion
+		}
+		if row.UnitConfirmed && (row.UnitLabel == nil || strings.TrimSpace(*row.UnitLabel) != unitLabel) {
+			var tradeCount int64
+			if err := tx.Model(&entity.PortfolioTrade{}).Where("owner_id = ? AND asset_id = ?", ownerID, assetID).Count(&tradeCount).Error; err != nil {
+				return err
+			}
+			if tradeCount > 0 {
+				return portfoliorepo.ErrPortfolioAssetUnitConflict
+			}
+		}
+		if row.UnitConfirmed && row.UnitLabel != nil && strings.TrimSpace(*row.UnitLabel) == unitLabel {
+			return nil
+		}
+		row.UnitLabel = &unitLabel
+		row.UnitConfirmed = true
+		row.Version++
+		return tx.Model(&row).Updates(map[string]any{
+			"unit_label":     row.UnitLabel,
+			"unit_confirmed": true,
+			"version":        row.Version,
+		}).Error
+	})
+	if err != nil {
+		return nil, err
+	}
+	return &row, nil
 }
 
 func (r *PortfolioPostgresRepository) UpdateAsset(ownerID, assetID string, update portfoliorepo.PortfolioAssetUpdate) (*entity.PortfolioAsset, error) {
@@ -129,12 +213,16 @@ func (r *PortfolioPostgresRepository) UpdateAssetPrice(ownerID, assetID string, 
 		}
 		return nil, err
 	}
+	if row.PriceMode == entity.PortfolioPriceModeAuto {
+		return nil, portfoliorepo.ErrPortfolioAssetAutomaticPrice
+	}
 	row.LatestPrice = update.LatestPrice
 	row.LatestPriceAt = update.LatestPriceAt
+	row.LatestPriceSource = nil
 	if update.LatestPrice == nil {
 		row.LatestPriceAt = nil
 	}
-	if err := r.db.Model(&row).Updates(map[string]any{"latest_price": row.LatestPrice, "latest_price_at": row.LatestPriceAt}).Error; err != nil {
+	if err := r.db.Model(&row).Updates(map[string]any{"latest_price": row.LatestPrice, "latest_price_at": row.LatestPriceAt, "latest_price_source": nil}).Error; err != nil {
 		return nil, err
 	}
 	return &row, nil
@@ -208,16 +296,70 @@ func (r *PortfolioPostgresRepository) Summary(ownerID string) (*entity.Portfolio
 	for _, trade := range trades {
 		byAsset[trade.AssetID] = append(byAsset[trade.AssetID], trade)
 	}
+	products := make(map[string]entity.MarketProduct)
+	quotes := make(map[string]entity.MarketQuote)
+	productIDs := make([]string, 0)
+	for _, asset := range assets {
+		if asset.MarketProductID != nil && strings.TrimSpace(*asset.MarketProductID) != "" {
+			productIDs = append(productIDs, strings.TrimSpace(*asset.MarketProductID))
+		}
+	}
+	if len(productIDs) > 0 {
+		var marketProducts []entity.MarketProduct
+		if err := r.db.Where("id IN ?", productIDs).Find(&marketProducts).Error; err != nil {
+			return nil, err
+		}
+		for _, product := range marketProducts {
+			products[product.ID] = product
+		}
+		var marketQuotes []entity.MarketQuote
+		if err := r.db.Where("product_id IN ?", productIDs).Find(&marketQuotes).Error; err != nil {
+			return nil, err
+		}
+		for _, quote := range marketQuotes {
+			quotes[quote.ProductID] = quote
+		}
+	}
 	result := &entity.PortfolioSummary{Assets: assets, Positions: make([]entity.PortfolioPosition, 0, len(assets)), Trades: []entity.PortfolioTrade{}}
-	var totalMarket int64
-	pricedCount := 0
+	var knownMarket int64
+	knownCount := 0
+	now := time.Now().UTC()
 	for _, asset := range assets {
 		position, err := entity.ComputePortfolioPosition(byAsset[asset.ID])
 		if err != nil {
 			return nil, err
 		}
 		position.AssetID, position.Symbol, position.Name = asset.ID, asset.Symbol, asset.Name
-		position, err = entity.PortfolioMarketValue(position, asset.LatestPrice)
+		position.UnitLabel, position.PriceMode = asset.UnitLabel, asset.PriceMode
+		if position.PriceMode == "" {
+			position.PriceMode = entity.PortfolioPriceModeManual
+		}
+		price := asset.LatestPrice
+		priceAsOf := asset.LatestPriceAt
+		priceSource := asset.LatestPriceSource
+		priceStatus := entity.PortfolioQuoteStatusUnknown
+		if position.PriceMode == entity.PortfolioPriceModeAuto {
+			price = nil
+			if asset.MarketProductID != nil {
+				if product, ok := products[*asset.MarketProductID]; ok {
+					source := product.ProviderKey + ":" + product.ExternalProductID
+					priceSource = &source
+				}
+				if quote, ok := quotes[*asset.MarketProductID]; ok && quote.Price > 0 && !quote.ObservedAt.After(now.Add(5*time.Minute)) {
+					price = &quote.Price
+					observedAt := quote.ObservedAt
+					priceAsOf = &observedAt
+					priceStatus = entity.PortfolioQuoteStatusFresh
+					if now.Sub(quote.ObservedAt) > entity.PortfolioQuoteFreshness {
+						priceStatus = entity.PortfolioQuoteStatusStale
+					}
+				}
+			}
+		} else if price != nil {
+			priceStatus = entity.PortfolioQuoteStatusFresh
+		}
+		position.PriceSource, position.PriceAsOf, position.PriceStatus = priceSource, priceAsOf, priceStatus
+		position, err = entity.PortfolioMarketValue(position, price)
 		if err != nil {
 			return nil, err
 		}
@@ -226,17 +368,26 @@ func (r *PortfolioPostgresRepository) Summary(ownerID string) (*entity.Portfolio
 			return nil, entity.ErrPortfolioOverflow
 		}
 		result.TotalCostBasis += position.CostBasis
+		if position.QuantityScaled > 0 && position.MarketValue == nil {
+			result.UnknownAssetCount++
+		}
+		if position.QuantityScaled > 0 && position.PriceStatus == entity.PortfolioQuoteStatusStale {
+			result.StaleAssetCount++
+		}
 		if position.MarketValue != nil {
-			pricedCount++
-			if *position.MarketValue > 0 && totalMarket > math.MaxInt64-*position.MarketValue {
+			knownCount++
+			if *position.MarketValue > 0 && knownMarket > math.MaxInt64-*position.MarketValue {
 				return nil, entity.ErrPortfolioOverflow
 			}
-			totalMarket += *position.MarketValue
+			knownMarket += *position.MarketValue
 		}
 	}
-	if pricedCount == len(assets) && len(assets) > 0 {
-		result.TotalMarketValue = &totalMarket
-		totalUnrealized := totalMarket - result.TotalCostBasis
+	if knownCount > 0 {
+		result.KnownMarketValue = &knownMarket
+	}
+	if result.UnknownAssetCount == 0 && len(assets) > 0 {
+		result.TotalMarketValue = &knownMarket
+		totalUnrealized := knownMarket - result.TotalCostBasis
 		result.TotalUnrealizedPnL = &totalUnrealized
 	}
 	return result, nil

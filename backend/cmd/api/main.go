@@ -16,6 +16,7 @@ import (
 	"github.com/mypocket/backend/internal/infrastructure/auth"
 	"github.com/mypocket/backend/internal/infrastructure/cache"
 	"github.com/mypocket/backend/internal/infrastructure/db"
+	"github.com/mypocket/backend/internal/infrastructure/marketdata"
 	repo "github.com/mypocket/backend/internal/infrastructure/repository"
 	"github.com/mypocket/backend/internal/infrastructure/storage"
 	transactionrepo "github.com/mypocket/backend/internal/repository"
@@ -147,6 +148,9 @@ func main() {
 	handlers.Travel = &httpapi.TravelHandler{Events: travelRepository}
 	portfolioRepository := repo.NewPortfolioPostgresRepository(database)
 	handlers.Portfolio = &httpapi.PortfolioHandler{Portfolio: portfolioRepository}
+	marketRepository := repo.NewAssetMarketPostgresRepository(database)
+	marketProviders := marketdata.DefaultGoldProviders()
+	handlers.AssetMarket = &httpapi.AssetMarketHandler{Market: marketRepository, Portfolio: portfolioRepository, ConfiguredProviders: marketdata.ConfiguredProviderKeys(marketProviders)}
 	insiderRepository := repo.NewInsiderPostgresRepository(database)
 	handlers.Insider = &httpapi.InsiderHandler{Reader: insiderRepository, Users: userRepo}
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
