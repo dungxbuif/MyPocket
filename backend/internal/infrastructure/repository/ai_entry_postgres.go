@@ -40,6 +40,14 @@ func (r *AIEntryPostgresRepository) CreateAttachments(ctx context.Context, attac
 	}
 	return r.db.WithContext(ctx).Create(&attachments).Error
 }
+
+func (r *AIEntryPostgresRepository) ListAttachments(ctx context.Context, owner, process string) ([]entity.AIEntryAttachment, error) {
+	var attachments []entity.AIEntryAttachment
+	err := r.db.WithContext(ctx).
+		Where("owner_id = ? AND session_id = ?", owner, process).
+		Order("input_order ASC, created_at ASC, id ASC").Find(&attachments).Error
+	return attachments, err
+}
 func (r *AIEntryPostgresRepository) UpdateAttachmentOCR(ctx context.Context, owner, process string, texts []string, completed bool) error {
 	var attachments []entity.AIEntryAttachment
 	if err := r.db.WithContext(ctx).Where("owner_id = ? AND session_id = ?", owner, process).Order("id").Find(&attachments).Error; err != nil {
@@ -154,6 +162,21 @@ func (r *AIEntryPostgresRepository) BeginMessage(ctx context.Context, owner, id,
 			if prior.Hash != hash {
 				return port.ErrAIConflict
 			}
+			// A durable advisor task may outlive the API process that started
+			// extraction. Reclaim only an expired in-flight session; a completed
+			// or currently running request remains an idempotent replay/busy result.
+			if s.ProcessingUntil == nil || time.Now().Before(*s.ProcessingUntil) {
+				return nil
+			}
+			token = uuid.NewString()
+			until := time.Now().Add(4 * time.Minute)
+			if e = tx.Model(&prior).Updates(map[string]any{"token": token, "created_at": time.Now().UTC()}).Error; e != nil {
+				return e
+			}
+			if e = tx.Model(&s).Updates(map[string]any{"request_token": token, "processing_until": until, "error": "", "error_code": ""}).Error; e != nil {
+				return e
+			}
+			started = true
 			return nil
 		}
 		if !errors.Is(e, gorm.ErrRecordNotFound) {
@@ -252,8 +275,8 @@ func (r *AIEntryPostgresRepository) DecideProposal(ctx context.Context, owner, i
 		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ?", id, owner).First(&p).Error; err != nil {
 			return err
 		}
-		if (approve && p.Status == entity.AIProposalApproved) || (!approve && p.Status == entity.AIProposalRejected) {
-			if approve && p.Status == entity.AIProposalApproved && p.TransactionID != nil {
+		if (approve && (p.Status == entity.AIProposalApproved || p.Status == entity.AIProposalApplied)) || (!approve && p.Status == entity.AIProposalRejected) {
+			if approve && (p.Status == entity.AIProposalApproved || p.Status == entity.AIProposalApplied) && p.TransactionID != nil {
 				return tx.Model(&entity.AIEntryAttachmentLink{}).Joins("JOIN transaction_attachments ON transaction_attachments.id = transaction_attachment_links.attachment_id").Where("transaction_attachment_links.transaction_id = ? AND transaction_attachments.owner_id = ?", *p.TransactionID, owner).Order("transaction_attachment_links.attachment_id").Pluck("transaction_attachment_links.attachment_id", &p.AttachmentIDs).Error
 			}
 			return nil
@@ -307,7 +330,7 @@ func (r *AIEntryPostgresRepository) DecideProposal(ctx context.Context, owner, i
 				}
 			}
 			p.TransactionID = &row.ID
-			p.Status = entity.AIProposalApproved
+			p.Status = entity.AIProposalApplied
 			var attachments []entity.AIEntryAttachment
 			if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("session_id = ? AND owner_id = ?", p.SessionID, owner).Find(&attachments).Error; err != nil {
 				return err

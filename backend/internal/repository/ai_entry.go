@@ -8,9 +8,12 @@ import (
 )
 
 var (
-	ErrAIInvalid  = errors.New("dữ liệu đề xuất chưa hợp lệ")
-	ErrAIConflict = errors.New("kết quả hoặc đề xuất đã thay đổi; hãy tải lại")
-	ErrAIBusy     = errors.New("yêu cầu đang xử lý, vui lòng chờ")
+	ErrAdvisorEntryConflict  = errors.New("advisor entry task conflict")
+	ErrAdvisorEntryLeaseLost = errors.New("advisor entry task lease lost")
+	ErrAdvisorEntryInvalid   = errors.New("advisor entry task is invalid")
+	ErrAIInvalid             = errors.New("dữ liệu đề xuất chưa hợp lệ")
+	ErrAIConflict            = errors.New("kết quả hoặc đề xuất đã thay đổi; hãy tải lại")
+	ErrAIBusy                = errors.New("yêu cầu đang xử lý, vui lòng chờ")
 )
 
 type AIEntryRepository interface {
@@ -31,4 +34,10 @@ type AIEntryRepository interface {
 type AIEntryAttachmentCleanupRepository interface {
 	ClaimExpiredAttachments(ctx context.Context, before, staleClaim time.Time, limit int) ([]entity.AIEntryAttachment, error)
 	SetAttachmentDeleteStatus(ctx context.Context, id, status string) error
+}
+
+// AIEntryStoredInputRepository exposes only private attachment metadata to the
+// durable worker. Object bytes are still loaded through AttachmentReader.
+type AIEntryStoredInputRepository interface {
+	ListAttachments(context.Context, string, string) ([]entity.AIEntryAttachment, error)
 }

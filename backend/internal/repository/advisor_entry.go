@@ -25,11 +25,12 @@ type AdvisorEntryTaskRepository interface {
 	GetTask(context.Context, string, string) (*entity.AdvisorEntryTask, error)
 	GetTaskByRequest(context.Context, string, string, int64, string) (*entity.AdvisorEntryTask, error)
 	ClaimTask(context.Context, string, string, string) (AdvisorEntryTaskLease, error)
+	ClaimNextTask(context.Context, string) (AdvisorEntryTaskLease, error)
 	HeartbeatTask(context.Context, AdvisorEntryTaskLease) error
 	CompleteTask(context.Context, AdvisorEntryTaskLease, entity.AdvisorEntryBatchPart) error
 	FailTask(context.Context, AdvisorEntryTaskLease, string) error
 	CancelTask(context.Context, string, string) error
-	AppendEvent(context.Context, string, string, string, any) (*entity.AdvisorEntryTaskEvent, error)
+	AppendEvent(context.Context, AdvisorEntryTaskLease, string, any) (*entity.AdvisorEntryTaskEvent, error)
 	ListEvents(context.Context, string, string, int64, int) ([]entity.AdvisorEntryTaskEvent, error)
-	ReapExpiredTasks(context.Context, int) (int, error)
+	ReapExpiredTasks(context.Context, string, int) (int, error)
 }

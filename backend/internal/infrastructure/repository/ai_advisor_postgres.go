@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"time"
@@ -453,6 +454,236 @@ func (r *AdvisorPostgresRepository) CreateAssistantMessage(ctx context.Context, 
 		return nil, err
 	}
 	return message, nil
+}
+
+func (r *AdvisorPostgresRepository) ReplaceAction(ctx context.Context, ownerID, conversationID string, generation int64, actionID string, revision int64, patch map[string]any) (map[string]any, error) {
+	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(conversationID) == "" || strings.TrimSpace(actionID) == "" || generation <= 0 || revision <= 0 || len(patch) == 0 {
+		return nil, contract.ErrAdvisorEntryInvalid
+	}
+	var replacement map[string]any
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var conversation entity.AdvisorConversation
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ?", conversationID, ownerID).First(&conversation).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return contract.ErrNotFound
+			}
+			return err
+		}
+		if conversation.Generation != generation {
+			return contract.ErrAdvisorEntryConflict
+		}
+		var messages []entity.AdvisorMessage
+		if err := tx.Where("conversation_id = ? AND generation = ? AND role = ?", conversationID, generation, entity.AdvisorRoleAssistant).Order("seq ASC").Find(&messages).Error; err != nil {
+			return err
+		}
+		for messageIndex := range messages {
+			message := &messages[messageIndex]
+			for partIndex := range message.Parts {
+				envelope, view, ok := advisorProposalView(message.Parts[partIndex])
+				if !ok || stringValue(view["action_id"]) != actionID {
+					continue
+				}
+				currentRevision := numberValue(view["revision"])
+				if currentRevision <= 0 {
+					currentRevision = 1
+				}
+				if currentRevision != revision || actionLifecycleTerminal(stringValue(view["status"])) {
+					return contract.ErrAdvisorEntryConflict
+				}
+				if err := validateAdvisorActionPatch(stringValue(view["action"]), patch); err != nil {
+					return err
+				}
+				newActionID := uuid.NewString()
+				oldView := cloneMap(view)
+				oldView["status"] = entity.AIProposalSuperseded
+				oldView["superseded_by"] = newActionID
+				newView := cloneMap(view)
+				newView["action_id"] = newActionID
+				newView["revision"] = currentRevision + 1
+				newView["status"] = entity.AIProposalPending
+				delete(newView, "receipt")
+				delete(newView, "resource_receipt")
+				for key, value := range patch {
+					newView[key] = value
+				}
+				oldEnvelope := cloneMap(envelope)
+				oldEnvelope["view"] = oldView
+				newEnvelope := cloneMap(envelope)
+				newEnvelope["view"] = newView
+				newEnvelope["status"] = "proposed"
+				message.Parts[partIndex].Data = oldEnvelope
+				message.Parts = append(message.Parts, entity.AdvisorPart{Type: message.Parts[partIndex].Type, Data: newEnvelope})
+				if err := message.Validate(); err != nil {
+					return contract.ErrAdvisorEntryInvalid
+				}
+				if err := tx.Model(&entity.AdvisorMessage{}).Where("id = ? AND conversation_id = ? AND generation = ?", message.ID, conversationID, generation).Update("parts", message.Parts).Error; err != nil {
+					return err
+				}
+				replacement = newView
+				return nil
+			}
+		}
+		return contract.ErrNotFound
+	})
+	return replacement, err
+}
+
+func (r *AdvisorPostgresRepository) MarkAction(ctx context.Context, ownerID, conversationID string, generation int64, actionID, status string, receipt map[string]any) error {
+	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(conversationID) == "" || strings.TrimSpace(actionID) == "" || generation <= 0 {
+		return contract.ErrAdvisorEntryInvalid
+	}
+	if status != entity.AIProposalApplying && status != entity.AIProposalApplied && status != entity.AIProposalRejected && status != entity.AIProposalConflict {
+		return contract.ErrAdvisorEntryInvalid
+	}
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var conversation entity.AdvisorConversation
+		if err := tx.Clauses(clause.Locking{Strength: "UPDATE"}).Where("id = ? AND owner_id = ?", conversationID, ownerID).First(&conversation).Error; err != nil {
+			if errors.Is(err, gorm.ErrRecordNotFound) {
+				return contract.ErrNotFound
+			}
+			return err
+		}
+		if conversation.Generation != generation {
+			return contract.ErrAdvisorEntryConflict
+		}
+		var messages []entity.AdvisorMessage
+		if err := tx.Where("conversation_id = ? AND generation = ? AND role = ?", conversationID, generation, entity.AdvisorRoleAssistant).Order("seq ASC").Find(&messages).Error; err != nil {
+			return err
+		}
+		for messageIndex := range messages {
+			message := &messages[messageIndex]
+			for partIndex := range message.Parts {
+				envelope, view, ok := advisorProposalView(message.Parts[partIndex])
+				if !ok || stringValue(view["action_id"]) != actionID {
+					continue
+				}
+				current := stringValue(view["status"])
+				if current == status || current == entity.AIProposalApplied && status == entity.AIProposalApplying {
+					return nil
+				}
+				if current == entity.AIProposalApplied || current == entity.AIProposalRejected || current == entity.AIProposalSuperseded {
+					return contract.ErrAdvisorEntryConflict
+				}
+				view["status"] = status
+				if receipt != nil {
+					view["receipt"] = receipt
+					view["resource_receipt"] = receipt
+				}
+				message.Parts[partIndex].Data = envelope
+				if err := message.Validate(); err != nil {
+					return contract.ErrAdvisorEntryInvalid
+				}
+				return tx.Model(&entity.AdvisorMessage{}).Where("id = ? AND conversation_id = ? AND generation = ?", message.ID, conversationID, generation).Update("parts", message.Parts).Error
+			}
+		}
+		return contract.ErrNotFound
+	})
+}
+
+func advisorProposalView(part entity.AdvisorPart) (map[string]any, map[string]any, bool) {
+	switch part.Type {
+	case "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation":
+	default:
+		return nil, nil, false
+	}
+	encoded, err := json.Marshal(part.Data)
+	if err != nil {
+		return nil, nil, false
+	}
+	var envelope map[string]any
+	if json.Unmarshal(encoded, &envelope) != nil {
+		return nil, nil, false
+	}
+	view, ok := envelope["view"].(map[string]any)
+	return envelope, view, ok
+}
+
+func cloneMap(value map[string]any) map[string]any {
+	clone := make(map[string]any, len(value))
+	for key, item := range value {
+		clone[key] = item
+	}
+	return clone
+}
+
+func actionLifecycleTerminal(status string) bool {
+	return status == entity.AIProposalApplied || status == entity.AIProposalRejected || status == entity.AIProposalSuperseded || status == entity.AIProposalConflict
+}
+
+func validateAdvisorActionPatch(actionID string, patch map[string]any) error {
+	allowed := map[string]map[string]bool{
+		"create_wallet":            {"name": true, "type": true, "opening_balance": true, "is_in_total": true, "description": true, "target_amount": true, "target_date": true, "credit_limit": true, "last_statement_balance": true, "statement_day": true, "payment_due_day": true},
+		"create_jar":               {"month": true, "name": true, "allocation_mode": true, "allocation_amount": true, "allocation_percent": true},
+		"update_jar":               {"month": true, "name": true, "allocation_mode": true, "allocation_amount": true, "allocation_percent": true},
+		"create_budget":            {"name": true, "limit_amount": true, "wallet_id": true, "category_id": true, "start_date": true, "end_date": true},
+		"update_budget":            {"name": true, "limit_amount": true, "wallet_id": true, "category_id": true, "start_date": true, "end_date": true},
+		"create_transaction":       {"wallet_id": true, "category_id": true, "type": true, "amount": true, "occurred_at": true, "note": true, "included_in_reports": true},
+		"update_transaction":       {"wallet_id": true, "category_id": true, "type": true, "amount": true, "occurred_at": true, "note": true, "included_in_reports": true},
+		"transfer_wallet":          {"source_wallet_id": true, "destination_wallet_id": true, "amount": true, "occurred_at": true, "note": true},
+		"create_category":          {"name": true, "kind": true, "parent_id": true, "wallet_ids": true, "icon_key": true},
+		"update_category":          {"name": true, "kind": true, "parent_id": true, "wallet_ids": true, "icon_key": true},
+		"recategorize_transaction": {"category_id": true},
+	}
+	fields, knownAction := allowed[actionID]
+	if !knownAction {
+		return contract.ErrAdvisorEntryInvalid
+	}
+	for key, value := range patch {
+		if strings.TrimSpace(key) == "" || !fields[key] {
+			return contract.ErrAdvisorEntryInvalid
+		}
+		if value == nil {
+			continue
+		}
+		switch key {
+		case "amount", "opening_balance", "limit_amount", "target_amount", "allocation_amount":
+			if numberValue(value) < 0 || numberValue(value) > 9007199254740991 {
+				return contract.ErrAdvisorEntryInvalid
+			}
+		case "allocation_percent":
+			if numberValue(value) < 0 || numberValue(value) > 100 {
+				return contract.ErrAdvisorEntryInvalid
+			}
+		case "is_in_total", "included_in_reports":
+			if _, ok := value.(bool); !ok {
+				return contract.ErrAdvisorEntryInvalid
+			}
+		case "wallet_ids":
+			items, ok := value.([]any)
+			if !ok || len(items) > 50 {
+				return contract.ErrAdvisorEntryInvalid
+			}
+			for _, item := range items {
+				if _, ok := item.(string); !ok {
+					return contract.ErrAdvisorEntryInvalid
+				}
+			}
+		default:
+			if _, ok := value.(string); !ok {
+				return contract.ErrAdvisorEntryInvalid
+			}
+			if len(value.(string)) > 8192 {
+				return contract.ErrAdvisorEntryInvalid
+			}
+		}
+	}
+	return nil
+}
+
+func numberValue(value any) int64 {
+	switch number := value.(type) {
+	case int:
+		return int64(number)
+	case int64:
+		return number
+	case float64:
+		return int64(number)
+	case json.Number:
+		parsed, _ := number.Int64()
+		return parsed
+	default:
+		return -1
+	}
 }
 
 // ExpireIdleBatch purges at most limit owner conversations whose server-side

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -24,6 +25,7 @@ const advisorRoute = "/api/v1/ai/advisor"
 
 type AdvisorHandler struct {
 	Service      *usecase.AdvisorService
+	Entry        *usecase.AdvisorEntryService
 	Users        repository.UserRepository
 	Finance      *usecase.FinanceQueryService
 	Wallets      repository.WalletRepository
@@ -56,6 +58,13 @@ type advisorConfirmActionInput struct {
 	Generation     int64  `json:"generation"`
 }
 
+type advisorReplaceActionInput struct {
+	ConversationID string         `json:"conversation_id"`
+	Generation     int64          `json:"generation"`
+	Revision       int64          `json:"revision"`
+	Patch          map[string]any `json:"patch"`
+}
+
 func (r *Router) RegisterAdvisorRoutes(h *AdvisorHandler) {
 	g := r.Engine.Group(advisorRoute)
 	g.Use(r.AuthMiddleware.RequireAdvisorAuth)
@@ -66,6 +75,10 @@ func (r *Router) RegisterAdvisorRoutes(h *AdvisorHandler) {
 	g.POST("/messages", h.MessagesPost)
 	g.POST("/messages/async", h.MessagesPostAsync)
 	g.POST("/actions/:action_id/confirm", h.ConfirmAction)
+	g.PATCH("/actions/:action_id/replace", h.ReplaceAction)
+	g.POST("/entries", h.EntryPost)
+	g.GET("/entries/:id", h.EntryGet)
+	g.POST("/entries/:id/cancel", h.EntryCancel)
 	g.GET("/runs/:id", h.Run)
 	g.GET("/runs/:id/events", h.RunEvents)
 	g.POST("/runs/:id/cancel", h.Cancel)
@@ -141,6 +154,31 @@ func (h *AdvisorHandler) ConfirmAction(c *gin.Context) {
 	if !found {
 		Fail(c, http.StatusNotFound, Problem{Code: "advisor_action_not_found", Title: problemTitleNotFound, Detail: "Không tìm thấy đề xuất trợ lý."})
 		return
+	}
+	if status := stringValue(view["status"]); status == entity.AIProposalApplied {
+		OK(c, map[string]any{"status": status, "receipt": view["receipt"], "resource_receipt": view["resource_receipt"]})
+		return
+	} else if status == entity.AIProposalRejected {
+		OK(c, map[string]any{"status": status, "receipt": view["receipt"]})
+		return
+	} else if status == entity.AIProposalSuperseded || status == entity.AIProposalApplying {
+		Fail(c, http.StatusConflict, Problem{Code: "advisor_action_conflict", Title: problemTitleBadRequest, Detail: "Đề xuất trợ lý đã được thay đổi hoặc đang được xử lý."})
+		return
+	}
+	var actionStore repository.AdvisorActionRepository
+	if candidate, ok := h.Service.Store.(repository.AdvisorActionRepository); ok {
+		actionStore = candidate
+		if err := actionStore.MarkAction(c.Request.Context(), owner, input.ConversationID, input.Generation, actionID, entity.AIProposalApplying, nil); err != nil {
+			advisorFailure(c, err)
+			return
+		}
+		defer func() {
+			status := entity.AIProposalRejected
+			if c.Writer.Status() >= http.StatusOK && c.Writer.Status() < http.StatusMultipleChoices {
+				status = entity.AIProposalApplied
+			}
+			_ = actionStore.MarkAction(context.WithoutCancel(c.Request.Context()), owner, input.ConversationID, input.Generation, actionID, status, advisorActionReceipt(view, actionID))
+		}()
 	}
 	// Versioned edits must carry the snapshot version captured when the card was
 	// prepared. Without it, dispatching through a legacy handler would silently
@@ -302,6 +340,133 @@ func (h *AdvisorHandler) ConfirmAction(c *gin.Context) {
 	}
 }
 
+// ReplaceAction replaces only the editable fields of one persisted proposal.
+// The old action remains in history as superseded; the returned action ID is
+// the only identity that can later be confirmed.
+func (h *AdvisorHandler) ReplaceAction(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Service == nil || h.Service.Store == nil {
+		advisorFailure(c, errors.New("advisor action unavailable"))
+		return
+	}
+	store, ok := h.Service.Store.(repository.AdvisorActionRepository)
+	if !ok {
+		Fail(c, http.StatusNotImplemented, Problem{Code: "advisor_action_replace_unavailable", Title: "Finance Assistant action replacement unavailable", Detail: "chưa bật thay đổi đề xuất trợ lý"})
+		return
+	}
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, 16*1024)
+	var input advisorReplaceActionInput
+	decoder := json.NewDecoder(c.Request.Body)
+	decoder.DisallowUnknownFields()
+	if decoder.Decode(&input) != nil || strings.TrimSpace(input.ConversationID) == "" || len(input.ConversationID) > 128 || input.Generation <= 0 || input.Revision <= 0 || len(input.Patch) == 0 {
+		advisorBadRequest(c)
+		return
+	}
+	view, err := store.ReplaceAction(c.Request.Context(), owner, input.ConversationID, input.Generation, c.Param("action_id"), input.Revision, input.Patch)
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	OK(c, view)
+}
+
+func (h *AdvisorHandler) EntryPost(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Entry == nil {
+		advisorFailure(c, errors.New("advisor entry unavailable"))
+		return
+	}
+	principal := advisorPrincipal(c, owner)
+	c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, aiMaxBody)
+	if err := c.Request.ParseMultipartForm(6 * 1024 * 1024); err != nil {
+		advisorFailure(c, repository.ErrAdvisorEntryInvalid)
+		return
+	}
+	if c.Request.MultipartForm != nil {
+		defer c.Request.MultipartForm.RemoveAll()
+	}
+	timezone := strings.TrimSpace(c.PostForm("timezone"))
+	if timezone == "" {
+		timezone = principal.Timezone
+	}
+	if timezone == "" {
+		timezone = "Asia/Ho_Chi_Minh"
+	}
+	files, err := parseAIEntryFiles(c.Request.MultipartForm.File["files"], timezone)
+	if err != nil {
+		advisorFailure(c, repository.ErrAdvisorEntryInvalid)
+		return
+	}
+	generation, err := strconv.ParseInt(strings.TrimSpace(c.PostForm("generation")), 10, 64)
+	if err != nil {
+		advisorBadRequest(c)
+		return
+	}
+	task, err := h.Entry.Accept(c.Request.Context(), principal, usecase.AdvisorEntryInput{
+		ClientRequestID: strings.TrimSpace(c.PostForm("client_request_id")), ConversationID: strings.TrimSpace(c.PostForm("conversation_id")),
+		Generation: generation, Text: c.PostForm("text"), Timezone: timezone, Files: files,
+	})
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	c.JSON(http.StatusAccepted, Response{Data: task, Meta: nil})
+}
+
+func (h *AdvisorHandler) EntryGet(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Entry == nil {
+		advisorFailure(c, errors.New("advisor entry unavailable"))
+		return
+	}
+	view, err := h.Entry.Get(c.Request.Context(), owner, c.Param("id"))
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	OK(c, view)
+}
+
+func (h *AdvisorHandler) EntryCancel(c *gin.Context) {
+	owner, ok := walletOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Entry == nil {
+		advisorFailure(c, errors.New("advisor entry unavailable"))
+		return
+	}
+	if err := h.Entry.Cancel(c.Request.Context(), owner, c.Param("id")); err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	NoContent(c)
+}
+
+func advisorActionReceipt(view map[string]any, actionID string) map[string]any {
+	receipt := map[string]any{"action_id": actionID}
+	for _, key := range []string{"transaction_id", "wallet_id", "jar_id", "budget_id", "category_id"} {
+		if value := stringValue(view[key]); value != "" {
+			receipt["resource_id"] = value
+			break
+		}
+	}
+	return receipt
+}
+
 func requiresAdvisorExpectedVersion(action string) bool {
 	switch action {
 	case "update_transaction", "delete_transaction", "recategorize_transaction", "update_category":
@@ -444,6 +609,12 @@ func (h *AdvisorHandler) Capabilities(c *gin.Context) {
 		"grounding_version":     1,
 		"tools":                 []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget", "propose_create_transaction", "propose_update_transaction", "propose_delete_transaction", "propose_transfer_wallet", "propose_create_category", "propose_update_category", "propose_recategorize_transaction"},
 		"actions":               []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction"},
+		"entry_integration":     h != nil && h.Entry != nil,
+		"supported_part_kinds":  []string{"text", "metric_group", "transaction_list", "transaction_detail", "period_comparison", "wallet_balances", "budget_status", "goal_progress", "jar_progress", "product_help", "entry_batch", "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation"},
+		"action_kinds":          []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction"},
+		"attachment_formats":    []string{"image/jpeg", "image/png", "application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
+		"attachment_max_count":  20,
+		"attachment_max_bytes":  5 * 1024 * 1024,
 	})
 }
 
@@ -541,6 +712,13 @@ func (h *AdvisorHandler) Messages(c *gin.Context) {
 	if err != nil {
 		advisorFailure(c, err)
 		return
+	}
+	if h.Entry != nil {
+		rows, err = h.Entry.HydrateAdvisorMessages(c.Request.Context(), owner, rows)
+		if err != nil {
+			advisorFailure(c, err)
+			return
+		}
 	}
 	var meta any
 	if metadataStore, ok := h.Service.Store.(repository.AdvisorHistoryMetadataRepository); ok {
@@ -846,6 +1024,14 @@ func advisorFailure(c *gin.Context, err error) {
 		status, code = http.StatusGone, "advisor_history_expired"
 	} else if errors.Is(err, repository.ErrNotFound) {
 		status, code = http.StatusNotFound, "advisor_not_found"
+	} else if errors.Is(err, repository.ErrAdvisorEntryInvalid) {
+		status, code = http.StatusBadRequest, "advisor_entry_invalid"
+	} else if errors.Is(err, repository.ErrAdvisorEntryConflict) || errors.Is(err, repository.ErrAdvisorEntryLeaseLost) {
+		status, code = http.StatusConflict, "advisor_entry_conflict"
+	} else if errors.Is(err, repository.ErrAIInvalid) {
+		status, code = http.StatusBadRequest, "advisor_invalid"
+	} else if errors.Is(err, repository.ErrAIConflict) {
+		status, code = http.StatusConflict, "advisor_conflict"
 	} else if errors.Is(err, usecase.ErrAdvisorToolInvalid) {
 		status, code = http.StatusBadRequest, "advisor_invalid"
 	}

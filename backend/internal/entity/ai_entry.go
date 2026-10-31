@@ -3,9 +3,14 @@ package entity
 import "time"
 
 const (
-	AIProposalPending  = "pending"
-	AIProposalApproved = "approved"
-	AIProposalRejected = "rejected"
+	AIProposalPending    = "pending"
+	AIProposalApplying   = "applying"
+	AIProposalApplied    = "applied"
+	AIProposalApproved   = "approved" // Legacy read compatibility.
+	AIProposalRejected   = "rejected"
+	AIProposalExpired    = "expired"
+	AIProposalConflict   = "conflict"
+	AIProposalSuperseded = "superseded"
 )
 
 type AIEntryDraft struct {
@@ -51,6 +56,7 @@ type AIEntryAttachment struct {
 	Filename    string    `json:"filename"`
 	MIMEType    string    `json:"mime_type"`
 	SizeBytes   int64     `json:"size_bytes"`
+	InputOrder  int       `json:"-"`
 	SHA256      string    `json:"-"`
 	OCRStatus   string    `json:"-"`
 	OCRText     string    `json:"-"`

@@ -89,3 +89,12 @@ type AdvisorHistoryMetadataRepository interface {
 type AdvisorLifecycleRepository interface {
 	ResetConversation(context.Context, string, string, string) (*entity.AdvisorResetResult, error)
 }
+
+// AdvisorActionRepository stores the authoritative replacement and lifecycle
+// state of persisted proposal cards. It is optional so legacy adapters can
+// keep serving read-only advisor history while the PostgreSQL adapter enables
+// action replacement/receipts.
+type AdvisorActionRepository interface {
+	ReplaceAction(context.Context, string, string, int64, string, int64, map[string]any) (map[string]any, error)
+	MarkAction(context.Context, string, string, int64, string, string, map[string]any) error
+}

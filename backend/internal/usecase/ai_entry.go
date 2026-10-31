@@ -56,6 +56,10 @@ type AttachmentStorage interface {
 	Delete(context.Context, string) error
 	SignedGet(context.Context, string) (string, error)
 }
+
+type AttachmentReader interface {
+	Read(context.Context, string, int64) ([]byte, error)
+}
 type AIEntryMessageInput struct {
 	RequestID string           `json:"request_id"`
 	Text      string           `json:"text"`
@@ -63,7 +67,61 @@ type AIEntryMessageInput struct {
 	Images    []entity.AIImage `json:"images,omitempty"`
 }
 
+// StoreAcceptedAttachments persists private objects before a durable advisor
+// task is returned to the client. Processing is intentionally separate: the
+// worker later reads these objects and calls ProcessStored.
+func (s *AIEntryService) StoreAcceptedAttachments(ctx context.Context, owner, sessionID string, files []entity.AIImage) ([]entity.AIEntryAttachment, error) {
+	if len(files) == 0 {
+		return []entity.AIEntryAttachment{}, nil
+	}
+	if s == nil || s.Storage == nil || s.Entries == nil {
+		return nil, ErrAIStorage
+	}
+	prepared, attachments, err := s.storeForOCR(ctx, owner, sessionID, files)
+	_ = prepared
+	if err != nil {
+		return nil, ErrAIStorage
+	}
+	if err := s.Entries.CreateAttachments(ctx, attachments); err != nil {
+		for _, attachment := range attachments {
+			_ = s.Storage.Delete(context.WithoutCancel(ctx), attachment.ObjectKey)
+		}
+		return nil, ErrAIStorage
+	}
+	return attachments, nil
+}
+
 func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryMessageInput) (*entity.AIEntrySession, error) {
+	return s.send(ctx, owner, id, in, nil)
+}
+
+// ProcessStored executes the same extraction/normalization/persistence path as
+// the legacy endpoint after a durable task has already stored its attachments.
+// It never calls storeForOCR, so a worker restart cannot create duplicate
+// private objects for the same accepted task.
+func (s *AIEntryService) ProcessStored(ctx context.Context, owner, sessionID string, in AIEntryMessageInput) (*entity.AIEntrySession, error) {
+	attachmentsRepo, ok := s.Entries.(port.AIEntryStoredInputRepository)
+	if !ok {
+		return nil, ErrAIStorage
+	}
+	attachments, err := attachmentsRepo.ListAttachments(ctx, owner, sessionID)
+	if err != nil {
+		return nil, err
+	}
+	images, err := s.loadStoredImages(ctx, attachments)
+	if err != nil {
+		return nil, err
+	}
+	in.Images = images
+	// The accepted task stores the timezone that was part of the idempotent
+	// payload. Do not silently replace it with a later profile edit while a
+	// restarted worker is processing the task.
+	workerService := *s
+	workerService.Users = nil
+	return workerService.send(ctx, owner, sessionID, in, attachments)
+}
+
+func (s *AIEntryService) send(ctx context.Context, owner, id string, in AIEntryMessageInput, storedAttachments []entity.AIEntryAttachment) (*entity.AIEntrySession, error) {
 	slog.Info("AI entry processing started", "process_id", id, "text_bytes", len(in.Text), "image_count", len(in.Images))
 	in.Text = strings.TrimSpace(in.Text)
 	if err := s.resolveTimezone(ctx, owner, &in); err != nil {
@@ -75,6 +133,18 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 	structuredRows, err := parseAIEntryWorkbooks(in.Images, in.Timezone)
 	if err != nil {
 		return nil, fmt.Errorf("%w: tệp XLSX không hợp lệ", port.ErrAIInvalid)
+	}
+	if storedAttachments != nil {
+		// Workbooks are parsed locally into structured rows and are not sent to
+		// the OCR/model image lane. This mirrors the legacy upload path after a
+		// restart without creating a second private-object upload.
+		ocrImages := make([]entity.AIImage, 0, len(in.Images))
+		for _, image := range in.Images {
+			if image.MIMEType != xlsxMIMEType {
+				ocrImages = append(ocrImages, image)
+			}
+		}
+		in.Images = ocrImages
 	}
 	accountNow := time.Now()
 	if location, locationErr := time.LoadLocation(in.Timezone); locationErr == nil {
@@ -112,32 +182,36 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 	}
 	var ocrAttachments []entity.AIEntryAttachment
 	if len(in.Images) > 0 {
-		if s.Storage == nil {
-			slog.Warn("AI entry storage unavailable", "process_id", id, "stage", "storage", "code", "storage_not_configured")
-			s.fail(owner, id, token, "")
-			return nil, ErrAIUnavailable
-		}
-		// Object storage is a separate network hop from OCR/model execution.
-		// Bound it explicitly so a stalled S3-compatible endpoint cannot consume
-		// the entire AI request budget before the provider is even called.
-		storageCtx, storageCancel := context.WithTimeout(ctx, aiAttachmentStorageTimeout)
-		prepared, attachments, err := s.storeForOCR(storageCtx, owner, id, in.Images)
-		storageCancel()
-		if err != nil {
-			slog.Warn("AI entry storage failed", "process_id", id, "stage", "storage", "code", "attachment_put_failed", "file_count", len(in.Images))
-			s.failWith(owner, id, token, ErrAIStorage.Error(), "storage_error", "")
-			return nil, ErrAIStorage
-		}
-		if err := s.Entries.CreateAttachments(ctx, attachments); err != nil {
-			slog.Warn("AI entry attachment metadata failed", "process_id", id, "stage", "storage", "code", "attachment_metadata_failed", "file_count", len(attachments))
-			for _, attachment := range attachments {
-				_ = s.Storage.Delete(context.WithoutCancel(ctx), attachment.ObjectKey)
+		if storedAttachments != nil {
+			ocrAttachments = append([]entity.AIEntryAttachment(nil), storedAttachments...)
+		} else {
+			if s.Storage == nil {
+				slog.Warn("AI entry storage unavailable", "process_id", id, "stage", "storage", "code", "storage_not_configured")
+				s.fail(owner, id, token, "")
+				return nil, ErrAIUnavailable
 			}
-			s.failWith(owner, id, token, ErrAIStorage.Error(), "storage_error", "")
-			return nil, ErrAIStorage
+			// Object storage is a separate network hop from OCR/model execution.
+			// Bound it explicitly so a stalled S3-compatible endpoint cannot consume
+			// the entire AI request budget before the provider is even called.
+			storageCtx, storageCancel := context.WithTimeout(ctx, aiAttachmentStorageTimeout)
+			prepared, attachments, err := s.storeForOCR(storageCtx, owner, id, in.Images)
+			storageCancel()
+			if err != nil {
+				slog.Warn("AI entry storage failed", "process_id", id, "stage", "storage", "code", "attachment_put_failed", "file_count", len(in.Images))
+				s.failWith(owner, id, token, ErrAIStorage.Error(), "storage_error", "")
+				return nil, ErrAIStorage
+			}
+			if err := s.Entries.CreateAttachments(ctx, attachments); err != nil {
+				slog.Warn("AI entry attachment metadata failed", "process_id", id, "stage", "storage", "code", "attachment_metadata_failed", "file_count", len(attachments))
+				for _, attachment := range attachments {
+					_ = s.Storage.Delete(context.WithoutCancel(ctx), attachment.ObjectKey)
+				}
+				s.failWith(owner, id, token, ErrAIStorage.Error(), "storage_error", "")
+				return nil, ErrAIStorage
+			}
+			in.Images = prepared
+			ocrAttachments = attachments
 		}
-		in.Images = prepared
-		ocrAttachments = attachments
 	}
 	providerCtx, cancel := context.WithTimeout(ctx, aiProviderTimeout)
 	defer cancel()
@@ -244,6 +318,114 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 	}
 	process.Reply = out.Reply
 	return process, nil
+}
+
+func (s *AIEntryService) loadStoredImages(ctx context.Context, attachments []entity.AIEntryAttachment) ([]entity.AIImage, error) {
+	reader, ok := s.Storage.(AttachmentReader)
+	if !ok || reader == nil {
+		return nil, ErrAIStorage
+	}
+	images := make([]entity.AIImage, 0, len(attachments))
+	for _, attachment := range attachments {
+		if attachment.OCRStatus == "deleted" || attachment.OCRStatus == "deleting" || strings.TrimSpace(attachment.ObjectKey) == "" {
+			return nil, ErrAIStorage
+		}
+		data, err := reader.Read(ctx, attachment.ObjectKey, 5*1024*1024)
+		if err != nil {
+			return nil, ErrAIStorage
+		}
+		images = append(images, entity.AIImage{Name: attachment.Filename, MIMEType: attachment.MIMEType, Base64: base64.StdEncoding.EncodeToString(data), AttachmentID: attachment.ID})
+	}
+	return images, nil
+}
+
+// Batch returns the authoritative proposal snapshot for an accepted entry
+// task. The task/event row only carries a stable reference; clients must not
+// treat its item IDs as the draft source of truth.
+func (s *AIEntryService) Batch(ctx context.Context, ownerID, batchID string, version int64) (*entity.AdvisorEntryBatchView, error) {
+	if s == nil || s.Entries == nil || strings.TrimSpace(ownerID) == "" || strings.TrimSpace(batchID) == "" || version <= 0 {
+		return nil, port.ErrAIInvalid
+	}
+	session, err := s.Entries.Session(ctx, ownerID, batchID)
+	if err != nil {
+		return nil, err
+	}
+	if version != 1 {
+		return nil, port.ErrAIConflict
+	}
+	items := make([]entity.AdvisorEntryBatchItem, 0, len(session.Proposals))
+	for _, proposal := range session.Proposals {
+		status := proposal.Status
+		if status == entity.AIProposalApproved {
+			status = entity.AIProposalApplied
+		}
+		item := entity.AdvisorEntryBatchItem{
+			ID: proposal.ID, Version: proposal.Version, Status: status,
+			Draft: proposal.Draft, Questions: append([]string(nil), proposal.Questions...),
+			SupportedEditFields: []string{"type", "amount", "wallet_id", "category_id", "jar_id", "occurred_at", "note", "included_in_reports"},
+		}
+		if status == entity.AIProposalRejected || status == entity.AIProposalConflict || status == entity.AIProposalExpired {
+			item.Error = status
+		}
+		if proposal.TransactionID != nil {
+			item.ResourceID = *proposal.TransactionID
+			item.ResourceReceipt = map[string]any{"resource_id": *proposal.TransactionID}
+		}
+		items = append(items, item)
+	}
+	return &entity.AdvisorEntryBatchView{BatchID: batchID, Version: version, SessionID: session.ID, Items: items}, nil
+}
+
+// HydrateAdvisorMessages replaces only entry_batch reference parts in the
+// response copy. Persisted advisor history remains reference-only and can be
+// replayed safely while proposal drafts/statuses stay authoritative in the
+// AI-entry tables.
+func (s *AIEntryService) HydrateAdvisorMessages(ctx context.Context, ownerID string, messages []entity.AdvisorMessage) ([]entity.AdvisorMessage, error) {
+	result := append([]entity.AdvisorMessage(nil), messages...)
+	for messageIndex := range result {
+		result[messageIndex].Parts = append([]entity.AdvisorPart(nil), result[messageIndex].Parts...)
+		for partIndex := range result[messageIndex].Parts {
+			part := &result[messageIndex].Parts[partIndex]
+			if part.Type != "entry_batch" {
+				continue
+			}
+			envelope, ok := part.Data.(map[string]any)
+			if !ok {
+				encoded, marshalErr := json.Marshal(part.Data)
+				if marshalErr != nil || json.Unmarshal(encoded, &envelope) != nil {
+					return nil, port.ErrAIConflict
+				}
+			}
+			batchID, _ := envelope["batch_id"].(string)
+			version := int64Value(envelope["version"])
+			if batchID == "" || version <= 0 {
+				return nil, port.ErrAIConflict
+			}
+			batch, err := s.Batch(ctx, ownerID, batchID, version)
+			if err != nil {
+				return nil, err
+			}
+			envelope["batch"] = batch
+			part.Data = envelope
+		}
+	}
+	return result, nil
+}
+
+func int64Value(value any) int64 {
+	switch number := value.(type) {
+	case int64:
+		return number
+	case int:
+		return int64(number)
+	case float64:
+		return int64(number)
+	case json.Number:
+		parsed, _ := number.Int64()
+		return parsed
+	default:
+		return 0
+	}
 }
 
 func defaultAIEntryCategory(d entity.AIEntryDraft, wallet entity.Wallet, categories []entity.Category) *entity.Category {
@@ -452,7 +634,7 @@ func (s *AIEntryService) storeForOCR(ctx context.Context, owner, process string,
 		if file.MIMEType == xlsxMIMEType {
 			ocrStatus = "completed"
 		}
-		attachments = append(attachments, entity.AIEntryAttachment{ID: id, OwnerID: owner, ProcessID: process, ObjectKey: key, Filename: filepath.Base(file.Name), MIMEType: file.MIMEType, SizeBytes: int64(len(data)), SHA256: hex.EncodeToString(digest[:]), OCRStatus: ocrStatus, DeleteAfter: time.Now().Add(24 * time.Hour)})
+		attachments = append(attachments, entity.AIEntryAttachment{ID: id, OwnerID: owner, ProcessID: process, ObjectKey: key, Filename: filepath.Base(file.Name), MIMEType: file.MIMEType, SizeBytes: int64(len(data)), InputOrder: index, SHA256: hex.EncodeToString(digest[:]), OCRStatus: ocrStatus, DeleteAfter: time.Now().Add(24 * time.Hour)})
 		// The original remains in MyPocket's private storage for evidence/download.
 		// OCR Platform cannot dereference a signed URL from MyPocket's bucket as an
 		// app-owned s3:// source, so pass the already validated bytes to the OCR

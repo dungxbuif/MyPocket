@@ -37,6 +37,15 @@ func BuildAdvisorPartsForRun(answer AdvisorAnswer, conversationID string, genera
 				view["conversation_id"] = conversationID
 				view["generation"] = generation
 				view["run_id"] = runID
+				if _, exists := view["status"]; !exists {
+					view["status"] = entity.AIProposalPending
+				}
+				if _, exists := view["revision"]; !exists {
+					view["revision"] = int64(1)
+				}
+				if _, exists := view["supported_edit_fields"]; !exists {
+					view["supported_edit_fields"] = advisorSupportedEditFields(stringValue(view["action"]))
+				}
 			}
 		}
 		parts = append(parts, entity.AdvisorPart{Type: partType, Data: map[string]any{
@@ -50,6 +59,32 @@ func BuildAdvisorPartsForRun(answer AdvisorAnswer, conversationID string, genera
 		return []entity.AdvisorPart{{Type: "text", Text: "Chưa có dữ liệu để hiển thị."}}
 	}
 	return parts
+}
+
+func advisorSupportedEditFields(action string) []string {
+	switch action {
+	case "create_wallet":
+		return []string{"name", "type", "opening_balance", "is_in_total", "description", "target_amount", "target_date", "credit_limit", "last_statement_balance", "statement_day", "payment_due_day"}
+	case "create_jar", "update_jar":
+		return []string{"month", "name", "allocation_mode", "allocation_amount", "allocation_percent"}
+	case "create_budget", "update_budget":
+		return []string{"name", "limit_amount", "wallet_id", "category_id", "start_date", "end_date"}
+	case "create_transaction", "update_transaction":
+		return []string{"wallet_id", "category_id", "type", "amount", "occurred_at", "note", "included_in_reports"}
+	case "transfer_wallet":
+		return []string{"source_wallet_id", "destination_wallet_id", "amount", "occurred_at", "note"}
+	case "create_category", "update_category":
+		return []string{"name", "kind", "parent_id", "wallet_ids", "icon_key"}
+	case "recategorize_transaction":
+		return []string{"category_id"}
+	default:
+		return []string{}
+	}
+}
+
+func stringValue(value any) string {
+	text, _ := value.(string)
+	return text
 }
 
 func advisorPartType(viewKind string) (string, bool) {

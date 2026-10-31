@@ -152,6 +152,38 @@ func (s *S3) SignedGet(ctx context.Context, key string) (string, error) {
 	return result.URL, nil
 }
 
+// Read fetches a private object for the trusted worker. It is deliberately
+// bounded so a corrupted metadata row cannot turn a worker into an unbounded
+// memory reader. The method is not exposed through the public download route.
+func (s *S3) Read(ctx context.Context, key string, maxBytes int64) ([]byte, error) {
+	if key == "" || maxBytes <= 0 {
+		return nil, errors.New("invalid attachment read")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.objectURL(key).String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.sign(req, hex.EncodeToString(hash(nil)), time.Now()); err != nil {
+		return nil, err
+	}
+	resp, err := s.http.Do(req)
+	if err != nil {
+		return nil, errors.New("S3 read failed")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("S3 read returned HTTP %d", resp.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, maxBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(data)) > maxBytes {
+		return nil, errors.New("attachment exceeds read limit")
+	}
+	return data, nil
+}
+
 func (s *S3) objectURL(key string) *url.URL {
 	u := *s.endpoint
 	if s.cfg.ForcePathStyle {

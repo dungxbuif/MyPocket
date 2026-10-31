@@ -37,6 +37,12 @@ type AdvisorEntryTask struct {
 	BatchID         string     `json:"batch_id,omitempty"`
 	BatchVersion    int64      `json:"batch_version,omitempty"`
 	ErrorCode       string     `json:"error_code,omitempty"`
+	InputText       string     `json:"-"`
+	Timezone        string     `json:"-"`
+	LeaseToken      string     `json:"-"`
+	LeaseUntil      *time.Time `json:"-"`
+	DeadlineAt      time.Time  `json:"-"`
+	LastEventSeq    int64      `json:"-"`
 	CreatedAt       time.Time  `json:"created_at"`
 	UpdatedAt       time.Time  `json:"updated_at"`
 	CompletedAt     *time.Time `json:"completed_at,omitempty"`
@@ -91,4 +97,41 @@ type AdvisorEntryTaskEvent struct {
 	Type      string    `json:"type"`
 	Payload   any       `json:"payload"`
 	CreatedAt time.Time `json:"created_at"`
+}
+
+type AdvisorEntryAttachmentBinding struct {
+	TaskID       string    `json:"-" gorm:"primaryKey"`
+	OwnerID      string    `json:"-"`
+	AttachmentID string    `json:"attachment_id" gorm:"primaryKey"`
+	CreatedAt    time.Time `json:"created_at"`
+}
+
+func (AdvisorEntryAttachmentBinding) TableName() string { return "advisor_entry_attachment_bindings" }
+
+// AdvisorEntryTaskView is the recovery response. Private object keys, payload
+// hashes and lease tokens intentionally never cross this boundary.
+type AdvisorEntryTaskView struct {
+	Task        AdvisorEntryTask        `json:"task"`
+	Attachments []AIEntryAttachment     `json:"attachments"`
+	Batch       *AdvisorEntryBatchView  `json:"batch,omitempty"`
+	Events      []AdvisorEntryTaskEvent `json:"events,omitempty"`
+}
+
+type AdvisorEntryBatchView struct {
+	BatchID   string                  `json:"batch_id"`
+	Version   int64                   `json:"version"`
+	SessionID string                  `json:"session_id"`
+	Items     []AdvisorEntryBatchItem `json:"items"`
+}
+
+type AdvisorEntryBatchItem struct {
+	ID                  string         `json:"id"`
+	Version             int            `json:"version"`
+	Status              string         `json:"status"`
+	Draft               AIEntryDraft   `json:"draft"`
+	Questions           []string       `json:"questions"`
+	Error               string         `json:"error,omitempty"`
+	ResourceID          string         `json:"resource_id,omitempty"`
+	ResourceReceipt     map[string]any `json:"resource_receipt,omitempty"`
+	SupportedEditFields []string       `json:"supported_edit_fields"`
 }
