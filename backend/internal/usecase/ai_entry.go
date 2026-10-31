@@ -393,6 +393,15 @@ func (s *AIEntryService) HydrateAdvisorMessages(ctx context.Context, ownerID str
 				continue
 			}
 			envelope, ok := part.Data.(map[string]any)
+			if ok {
+				// Do not mutate the caller's persisted-history value while adding the
+				// authoritative proposal snapshot to the response copy.
+				copied := make(map[string]any, len(envelope)+1)
+				for key, value := range envelope {
+					copied[key] = value
+				}
+				envelope = copied
+			}
 			if !ok {
 				encoded, marshalErr := json.Marshal(part.Data)
 				if marshalErr != nil || json.Unmarshal(encoded, &envelope) != nil {

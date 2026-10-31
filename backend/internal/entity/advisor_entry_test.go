@@ -3,6 +3,7 @@ package entity
 import (
 	"encoding/json"
 	"testing"
+	"time"
 )
 
 func validAdvisorEntryTask() AdvisorEntryTask {
@@ -86,5 +87,29 @@ func TestAdvisorEntryBatchPartExposesReferencesWithoutDraft(t *testing.T) {
 	}
 	if _, ok := object["draft"]; ok {
 		t.Fatal("entry batch exposed authoritative draft")
+	}
+}
+
+func TestAdvisorEntryTaskJSONKeepsWorkerStatePrivate(t *testing.T) {
+	leaseUntil := time.Date(2026, 11, 1, 1, 2, 3, 0, time.UTC)
+	task := validAdvisorEntryTask()
+	task.InputText = "private receipt text"
+	task.Timezone = "Asia/Ho_Chi_Minh"
+	task.LeaseToken = "secret-lease-token"
+	task.LeaseUntil = &leaseUntil
+	task.DeadlineAt = leaseUntil.Add(time.Hour)
+
+	encoded, err := json.Marshal(task)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var object map[string]any
+	if err := json.Unmarshal(encoded, &object); err != nil {
+		t.Fatal(err)
+	}
+	for _, key := range []string{"input_text", "timezone", "lease_token", "lease_until", "deadline_at", "payload_hash"} {
+		if _, ok := object[key]; ok {
+			t.Fatalf("worker/private field %q leaked into task response: %s", key, encoded)
+		}
 	}
 }
