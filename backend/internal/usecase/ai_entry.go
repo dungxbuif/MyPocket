@@ -100,6 +100,9 @@ func (s *AIEntryService) Send(ctx context.Context, owner, id string, in AIEntryM
 // It never calls storeForOCR, so a worker restart cannot create duplicate
 // private objects for the same accepted task.
 func (s *AIEntryService) ProcessStored(ctx context.Context, owner, sessionID string, in AIEntryMessageInput) (*entity.AIEntrySession, error) {
+	if s == nil || s.Entries == nil {
+		return nil, ErrAIStorage
+	}
 	attachmentsRepo, ok := s.Entries.(port.AIEntryStoredInputRepository)
 	if !ok {
 		return nil, ErrAIStorage
