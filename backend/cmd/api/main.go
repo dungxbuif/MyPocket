@@ -162,7 +162,8 @@ func main() {
 	// storage is intentionally optional; a typed-nil interface would compare
 	// non-nil and panic when feedback/AI attachment code calls Key or Put.
 	aiAttachmentStorage, feedbackStorage := optionalAttachmentStores(attachmentStorage)
-	handlers.AIEntry = &httpapi.AIEntryHandler{Service: &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: aiAttachmentStorage, Users: userRepo}}
+	aiEntryService := &usecase.AIEntryService{Entries: repo.NewAIEntryPostgresRepository(database), Wallets: walletRepository, Categories: categoryRepository, Extractor: aiClient, Storage: aiAttachmentStorage, Users: userRepo}
+	handlers.AIEntry = &httpapi.AIEntryHandler{Service: aiEntryService}
 	financeReader := repo.NewFinanceQueryPostgresRepository(database)
 	financeQueryService := usecase.NewFinanceQueryService(financeReader)
 	advisorProvider := ai.NewAdvisorClient(ai.AdvisorClientConfig{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, StoreUsage: cfg.AIStoreUsage})
@@ -187,8 +188,10 @@ func main() {
 		}
 	})
 	advisorService := usecase.NewAdvisorServiceWithRuntime(advisorStore, advisorOrchestrator, cfg.AIAdvisorRunLeasesEnabled)
+	advisorEntryTasks := repo.NewAdvisorEntryPostgresRepository(database)
 	handlers.Advisor = &httpapi.AdvisorHandler{
 		Service:      advisorService,
+		Entry:        &usecase.AdvisorEntryService{Tasks: advisorEntryTasks, Entries: aiEntryService},
 		Users:        userRepo,
 		Finance:      financeQueryService,
 		Wallets:      walletRepository,

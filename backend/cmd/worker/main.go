@@ -10,6 +10,7 @@ import (
 
 	"github.com/mypocket/backend/internal/config"
 	"github.com/mypocket/backend/internal/entity"
+	"github.com/mypocket/backend/internal/infrastructure/ai"
 	"github.com/mypocket/backend/internal/infrastructure/cache"
 	"github.com/mypocket/backend/internal/infrastructure/db"
 	repo "github.com/mypocket/backend/internal/infrastructure/repository"
@@ -46,6 +47,8 @@ func main() {
 		}
 	}()
 	advisorRepository := repo.NewAdvisorPostgresRepository(database)
+	entryTaskRepository := repo.NewAdvisorEntryPostgresRepository(database)
+	entryRepository := repo.NewAIEntryPostgresRepository(database)
 	advisorExpiry, _ := advisorRepository.(repository.AdvisorExpiryRepository)
 	advisorRuntime, _ := advisorRepository.(repository.AdvisorRuntimeRepository)
 	reaperCtx, stopReaper := context.WithCancel(context.Background())
@@ -58,6 +61,7 @@ func main() {
 	}
 	defer stopAdvisorReaper()
 	attachmentCleanup := attachmentCleanupRunner(nil)
+	var advisorEntryPass advisorEntryPassRunner
 	if privateStorage, storageErr := storage.NewS3(storage.S3Config{
 		Endpoint: cfg.S3Endpoint, Region: cfg.S3Region, Bucket: cfg.S3Bucket,
 		Prefix: cfg.S3Prefix, Environment: cfg.AppEnv, AccessKeyID: cfg.S3AccessKeyID,
@@ -65,9 +69,14 @@ func main() {
 	}); storageErr != nil {
 		log.Printf("attachment cleanup unavailable; configure private storage to enable scheduled cleanup: %v", storageErr)
 	} else {
-		attachmentCleanup = &usecase.AIEntryAttachmentCleanup{
-			Entries: repo.NewAIEntryPostgresRepository(database), Storage: privateStorage,
+		attachmentCleanup = &usecase.AIEntryAttachmentCleanup{Entries: entryRepository, Storage: privateStorage}
+		entryExtractor := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
+		entryService := &usecase.AIEntryService{
+			Entries: entryRepository, Wallets: repo.NewWalletPostgresRepository(database),
+			Categories: repo.NewCategoryPostgresRepository(database), Extractor: entryExtractor,
+			Storage: privateStorage, Users: repo.NewUserPostgresRepository(database),
 		}
+		advisorEntryPass = &advisorEntryWorker{Tasks: entryTaskRepository, Service: &usecase.AdvisorEntryService{Tasks: entryTaskRepository, Entries: entryService}}
 	}
 	for {
 		if err := runRecurringPass(database, runner, time.Now().UTC()); err != nil {
@@ -83,6 +92,12 @@ func main() {
 			if _, err := runAdvisorExpiryPass(context.Background(), advisorExpiry, time.Now().UTC()); err != nil {
 				log.Printf("advisor expiry worker pass failed: %v", err)
 			}
+		}
+		if processed, err := runAdvisorEntryPass(context.Background(), advisorEntryPass, 100); err != nil {
+			log.Printf("advisor entry worker pass failed after %d task(s): %v", processed, err)
+		}
+		if _, err := entryTaskRepository.ReapExpiredTasks(context.Background(), "", 100); err != nil {
+			log.Printf("advisor entry task reaper failed: %v", err)
 		}
 		if attachmentCleanup != nil {
 			deleted, cleanupErr := runAttachmentCleanupPass(context.Background(), attachmentCleanup)
