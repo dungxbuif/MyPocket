@@ -72,3 +72,23 @@ Verification after the durable repair: authenticated Redis `PING` from both
 overlay namespaces, MyPocket `/api/v1/health`, OCR `/readyz`, one authenticated
 image-processing smoke request, then removal of the emergency API and TCP
 forwarder only after the native Swarm tasks are healthy.
+
+## Recovery result, 2026-10-31
+
+After the PVE/VM100 network link was restored, SSH confirmed the worker was
+online. The Pi5 data containers were recovered with their existing Compose
+definitions and bind-mounted data: PostgreSQL reached `healthy`, PgBouncer was
+running, and Redis was recreated by its existing Compose project without
+changing its data directory. The existing Redis container was then attached to
+`mypocket-redis-net` and `macocr-redis-net` with the `redis-prod` alias.
+
+The native Swarm tasks recovered without changing application images:
+NetBird server, MyPocket API/worker, and macOCR proxy are running. Verified
+routes returned NetBird OIDC `200`, MyPocket health `200`, OCR health/ready
+`200`, and KubeKosh `200`; the full edge scan showed no remaining gateway 502s
+except the separate LLM tunnel timeout. Expected `401`, `403`, and `404`
+responses on protected or path-specific probes were not classified as outages.
+
+The emergency MyPocket API and Redis forwarder are stopped and no longer serve
+traffic. They remain as stopped diagnostic containers for now; no financial
+database reset, drop, truncate, or migration was performed.
