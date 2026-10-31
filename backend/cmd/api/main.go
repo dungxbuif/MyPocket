@@ -153,6 +153,10 @@ func main() {
 	handlers.AssetMarket = &httpapi.AssetMarketHandler{Market: marketRepository, Portfolio: portfolioRepository, ConfiguredProviders: marketdata.ConfiguredProviderKeys(marketProviders)}
 	insiderRepository := repo.NewInsiderPostgresRepository(database)
 	handlers.Insider = &httpapi.InsiderHandler{Reader: insiderRepository, Users: userRepo}
+	monthlyReportReader := repo.NewMonthlyReportPostgresRepository(database)
+	reportSnapshots := repo.NewReportSnapshotPostgresRepository(database)
+	handlers.MonthlyReport = &httpapi.MonthlyReportHandler{Service: usecase.NewMonthlyReportService(monthlyReportReader, reportSnapshots)}
+	reportAnalysisRepository := repo.NewReportAnalysisPostgresRepository(database)
 	aiClient := ai.NewClient(ai.Config{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, OCRURL: cfg.OCRAPIURL, OCRKey: cfg.OCRAPIKey, StoreUsage: cfg.AIStoreUsage})
 	attachmentStorage, err := newAttachmentStorage(cfg)
 	if err != nil {
@@ -167,6 +171,8 @@ func main() {
 	financeReader := repo.NewFinanceQueryPostgresRepository(database)
 	financeQueryService := usecase.NewFinanceQueryService(financeReader)
 	advisorProvider := ai.NewAdvisorClient(ai.AdvisorClientConfig{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, StoreUsage: cfg.AIStoreUsage})
+	reportAnalysisProvider := ai.NewReportAnalysisProvider(advisorProvider)
+	handlers.ReportAnalysis = &httpapi.ReportAnalysisHandler{Service: usecase.NewReportAnalysisService(reportAnalysisRepository, reportSnapshots, reportAnalysisProvider)}
 	advisorStore := repo.NewAdvisorPostgresRepository(database)
 	advisorOrchestrator := usecase.NewAdvisorOrchestrator(advisorProvider, usecase.NewAdvisorToolRegistry(financeQueryService))
 	advisorOrchestrator.GroundingEnabled = cfg.AIAdvisorGroundingEnabled

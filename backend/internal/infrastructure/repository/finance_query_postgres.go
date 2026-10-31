@@ -839,7 +839,7 @@ func (r *FinanceQueryPostgresRepository) scopedTransactions(ctx context.Context,
 		Where("transactions.owner_id = ?", ownerID).
 		Where("transactions.occurred_at >= ? AND transactions.occurred_at < ?", filter.Dates.StartAt, filter.Dates.EndExclusive)
 	if filter.ReportScope == entity.FinanceReportIncluded {
-		query = query.Where("transactions.included_in_reports = true")
+		query = applyCanonicalReportEligibility(query, "transactions")
 	} else if filter.ReportScope == entity.FinanceReportExcluded {
 		query = query.Where("transactions.included_in_reports = false")
 	}
@@ -857,13 +857,6 @@ func (r *FinanceQueryPostgresRepository) scopedTransactions(ctx context.Context,
 	}
 	if filter.NoteContains != "" {
 		query = query.Where("strpos(lower(coalesce(transactions.note, '')), lower(?)) > 0", filter.NoteContains)
-	}
-	if filter.ReportScope == entity.FinanceReportIncluded {
-		// Internal transfers are not report activity, even if legacy rows were
-		// accidentally flagged as included. System transfer categories are also
-		// excluded by key to cover older data without a transfer_id.
-		query = query.Where("transactions.transfer_id IS NULL")
-		query = query.Where("NOT EXISTS (SELECT 1 FROM categories transfer_categories WHERE transfer_categories.id = transactions.category_id AND transfer_categories.system_key IN (?, ?))", "income_transfer_in", "expense_transfer_out")
 	}
 	if len(filter.CategoryIDs) > 0 {
 		ids, err := r.expandCategoryIDs(tx, ownerID, filter.CategoryIDs, filter.IncludeChildren)

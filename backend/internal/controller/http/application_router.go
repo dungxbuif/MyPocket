@@ -31,6 +31,8 @@ type ApplicationHandlers struct {
 	Portfolio     *PortfolioHandler
 	AssetMarket   *AssetMarketHandler
 	Insider       *InsiderHandler
+	MonthlyReport *MonthlyReportHandler
+	ReportAnalysis *ReportAnalysisHandler
 	AIEntry       *AIEntryHandler
 	Advisor       *AdvisorHandler
 	Feedback      *FeedbackHandler
@@ -67,6 +69,8 @@ func NewApplicationRouter(handlers ApplicationHandlers, options ApplicationRoute
 	r.RegisterPortfolioRoutes(applicationHandler(handlers.Portfolio))
 	r.RegisterAssetMarketRoutes(applicationHandler(handlers.AssetMarket))
 	r.RegisterInsiderRoutes(applicationHandler(handlers.Insider))
+	r.RegisterMonthlyReportRoutes(applicationHandler(handlers.MonthlyReport))
+	r.RegisterReportAnalysisRoutes(applicationHandler(handlers.ReportAnalysis))
 	r.RegisterAIEntryRoutes(applicationHandler(handlers.AIEntry))
 	r.RegisterAdvisorRoutes(applicationHandler(handlers.Advisor))
 	r.RegisterFeedbackRoutes(mcpFeedbackHandler(applicationHandler(handlers.Feedback)), applicationHandler(handlers.Changelog), applicationHandler(handlers.FeedbackAgent))

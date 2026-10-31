@@ -141,6 +141,10 @@ var mcpExcludedRouteInventory = map[string]string{
 	"POST /api/v1/mcp":                            "SDK protocol entry point; never a recursive tool",
 	"DELETE /api/v1/mcp":                          "SDK protocol entry point; never a recursive tool",
 	"GET /api/v1/docs/*any":                       "public OpenAPI documentation",
+	"GET /api/v1/reports/monthly":                 "deterministic report read model; not exposed through MCP",
+	"POST /api/v1/reports/analyses":               "on-demand provider job; not exposed through MCP",
+	"GET /api/v1/reports/analyses/{id}":           "on-demand provider job; not exposed through MCP",
+	"POST /api/v1/reports/analyses/{id}/cancel":   "on-demand provider job; not exposed through MCP",
 	"GET /docs":                                   "public documentation redirect",
 	"GET /docs/":                                  "public documentation redirect",
 }

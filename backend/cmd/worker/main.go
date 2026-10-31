@@ -49,6 +49,10 @@ func main() {
 	advisorRepository := repo.NewAdvisorPostgresRepository(database)
 	entryTaskRepository := repo.NewAdvisorEntryPostgresRepository(database)
 	entryRepository := repo.NewAIEntryPostgresRepository(database)
+	reportAnalysisRepository := repo.NewReportAnalysisPostgresRepository(database)
+	reportSnapshotRepository := repo.NewReportSnapshotPostgresRepository(database)
+	reportAnalysisProvider := ai.NewReportAnalysisProvider(ai.NewAdvisorClient(ai.AdvisorClientConfig{BaseURL: cfg.AIBaseURL, APIKey: cfg.AIAPIKey, Model: cfg.AIModel, StoreUsage: cfg.AIStoreUsage}))
+	reportAnalysisWorker := usecase.NewReportAnalysisWorker(reportAnalysisRepository, reportSnapshotRepository, reportAnalysisProvider)
 	advisorExpiry, _ := advisorRepository.(repository.AdvisorExpiryRepository)
 	advisorRuntime, _ := advisorRepository.(repository.AdvisorRuntimeRepository)
 	reaperCtx, stopReaper := context.WithCancel(context.Background())
@@ -98,6 +102,12 @@ func main() {
 		}
 		if _, err := entryTaskRepository.ReapExpiredTasks(context.Background(), "", 100); err != nil {
 			log.Printf("advisor entry task reaper failed: %v", err)
+		}
+		if _, err := runReportAnalysisPass(context.Background(), reportAnalysisWorker); err != nil {
+			log.Printf("report analysis worker pass failed: %v", err)
+		}
+		if _, err := runReportRetentionPass(context.Background(), reportAnalysisRepository, reportSnapshotRepository, time.Now().UTC()); err != nil {
+			log.Printf("report retention worker pass failed: %v", err)
 		}
 		if attachmentCleanup != nil {
 			deleted, cleanupErr := runAttachmentCleanupPass(context.Background(), attachmentCleanup)
