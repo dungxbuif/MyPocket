@@ -103,8 +103,11 @@ focus requests. Typed entry batches are read-only until explicit per-row or
 valid-batch decisions, and ordinary proposal editing reuses the shared
 transaction fields and jar policy.
 
-Tests and builds were intentionally not run for this owner-requested native
-implementation pass.
+Local acceptance coverage now includes run-observer lifecycle/relaunch recovery,
+chat submit/cancel state policy, unknown-part read-only behavior, typed entry
+batch preview/action state, and canonical transaction-row parity. The focused
+native XCTest run passed on the iPhone 16 Simulator; provider, physical-device,
+and production evidence remain intentionally unclaimed.
 
 ## Contract
 

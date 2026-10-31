@@ -13,8 +13,16 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: 2026-10-27
+updated: 2026-11-01
 ---
+
+## Unified native Assistant local acceptance — 2026-11-01
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| TDD-focused native XCTest | `xcodebuild test` on iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`, selecting `AdvisorRunObserverTests`, Assistant batch/read-only/lifecycle/composer/scroll tests, canonical transaction-row parity, and the AI-entry attachment policy | PASS: 12 focused tests, 0 failures |
+| Assistant batch state/row implementation | `AssistantEntryBatchPolicy`, `AssistantEntryBatchPresentation`, `AssistantActionCard` | PASS: server states map to review/saving/applied/rejected/conflict; batch preview uses shared `MPTransactionRow` signs and hierarchy; saving hides duplicate actions |
+| Provider/device/production evidence | Not run or claimed in this local-only pass | OPEN; owner/provider/physical-device acceptance remains separate |
 
 ## MyPocket 1.3.0 physical release candidate — 2026-10-27
 

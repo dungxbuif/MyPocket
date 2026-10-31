@@ -16,7 +16,7 @@ struct AssistantActionCard: View {
                     MPStatusBadge(text: state.label, tone: state == .applied ? .success : state == .invalid || state == .conflict ? .danger : .muted)
                 }
                 MPText(summary, style: .secondary)
-                if state != .applied && state != .rejected {
+                if state != .applied && state != .rejected && state != .saving {
                     HStack(spacing: MPMetrics.sectionSpacing) {
                         MPButton("Ghi giao dịch", style: .secondary, fullWidth: false, action: onPrimary)
                         MPButton("Bỏ qua", style: .plain, fullWidth: false, action: onSecondary)
