@@ -7,25 +7,18 @@ final class MonthlyReportsViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var error: String?
     @Published private(set) var usedFallback = false
-    @Published private(set) var insider: InsiderSummaryModel?
-
     private var cache: [ReportScope: MonthlyReportModel] = [:]
 
     func load(api: FinanceAPI, month: String, walletID: String? = nil, ownerID: String? = nil, granularity: String = "day") async {
         let scope = ReportScope(ownerID: ownerID, month: month, walletID: walletID, granularity: granularity)
         guard !isLoading else { return }
-        if let cached = cache[scope] {
-            report = cached
-            usedFallback = false
-            error = nil
-            return
-        }
+        // A cached snapshot is only presentation while the revision-aware
+        // server read refreshes it; never early-return stale financial data.
+        if let cached = cache[scope] { report = cached }
         isLoading = true
         error = nil
         usedFallback = false
-        insider = nil
         defer { isLoading = false }
-        async let insiderResult: InsiderSummaryModel? = try? api.insider(month: month, ownerID: ownerID)
         do {
             let loaded = try await api.monthlyReport(month: month, walletID: walletID, granularity: granularity, ownerID: ownerID)
             guard loaded.month == month else { throw APIError.decoding("Report scope mismatch") }
@@ -42,7 +35,6 @@ final class MonthlyReportsViewModel: ObservableObject {
                 self.error = "Không thể tải báo cáo cho tháng này."
             }
         }
-        insider = await insiderResult
     }
 
     func clear() {

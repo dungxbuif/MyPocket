@@ -192,20 +192,44 @@ func (h *PortfolioHandler) CreateAsset(c *gin.Context) {
 		return
 	}
 	var unitLabel *string
-	if input.UnitLabel == nil || !entity.IsPortfolioGoldUnit(*input.UnitLabel) {
-		portfolioBadRequest(c, "Hãy chọn một đơn vị vàng hợp lệ từ danh mục.")
-		return
+	if input.UnitLabel != nil {
+		value := strings.TrimSpace(*input.UnitLabel)
+		if !entity.IsPortfolioGoldUnit(value) {
+			portfolioBadRequest(c, "Hãy chọn một đơn vị vàng hợp lệ từ danh mục.")
+			return
+		}
+		unitLabel = &value
 	}
-	value := strings.TrimSpace(*input.UnitLabel)
-	unitLabel = &value
 	var productID *string
 	if input.ProductID != nil {
 		value := strings.TrimSpace(*input.ProductID)
 		productID = &value
 	}
-	asset, err := h.Portfolio.CreateAsset(owner, portfoliorepo.PortfolioAssetInput{Symbol: strings.TrimSpace(input.Symbol), Name: strings.TrimSpace(input.Name), UnitLabel: unitLabel, MarketProductID: productID, PriceMode: strings.TrimSpace(input.PriceMode)})
+	request := portfoliorepo.PortfolioAssetInput{Symbol: strings.TrimSpace(input.Symbol), Name: strings.TrimSpace(input.Name), UnitLabel: unitLabel, MarketProductID: productID, PriceMode: strings.TrimSpace(input.PriceMode)}
+	key, keyOK := optionalPortfolioIdempotencyKey(c)
+	if !keyOK {
+		return
+	}
+	var asset *entity.PortfolioAsset
+	var replayed bool
+	var err error
+	if key != "" {
+		store, ok := h.Portfolio.(portfoliorepo.PortfolioIdempotentRepository)
+		if !ok {
+			portfolioUnavailable(c)
+			return
+		}
+		asset, replayed, err = store.CreateAssetIdempotent(owner, request, key, portfoliorepo.PortfolioMutationHash(request))
+	} else {
+		asset, err = h.Portfolio.CreateAsset(owner, request)
+	}
 	if err != nil {
 		portfolioMapError(c, err)
+		return
+	}
+	if replayed {
+		c.Header("Idempotent-Replayed", "true")
+		OK(c, asset)
 		return
 	}
 	Created(c, asset)
@@ -440,12 +464,60 @@ func (h *PortfolioHandler) CreateTrade(c *gin.Context) {
 	if input.Fee != nil {
 		fee = *input.Fee
 	}
-	trade, err := h.Portfolio.CreateTrade(owner, strings.TrimSpace(c.Param("id")), portfoliorepo.PortfolioTradeInput{Side: strings.TrimSpace(input.Side), QuantityScaled: quantity, UnitPrice: *input.UnitPrice, Fee: fee, OccurredAt: occurredAt, Note: normalizeOptional(input.Note)})
+	assetID := strings.TrimSpace(c.Param("id"))
+	request := portfoliorepo.PortfolioTradeInput{Side: strings.TrimSpace(input.Side), QuantityScaled: quantity, UnitPrice: *input.UnitPrice, Fee: fee, OccurredAt: occurredAt, Note: normalizeOptional(input.Note)}
+	key, keyOK := optionalPortfolioIdempotencyKey(c)
+	if !keyOK {
+		return
+	}
+	var trade *entity.PortfolioTrade
+	var replayed bool
+	if key != "" {
+		store, ok := h.Portfolio.(portfoliorepo.PortfolioIdempotentRepository)
+		if !ok {
+			portfolioUnavailable(c)
+			return
+		}
+		trade, replayed, err = store.CreateTradeIdempotent(owner, assetID, request, key, portfoliorepo.PortfolioMutationHash(struct {
+			AssetID string
+			Input   portfoliorepo.PortfolioTradeInput
+		}{assetID, request}))
+	} else {
+		trade, err = h.Portfolio.CreateTrade(owner, assetID, request)
+	}
 	if err != nil {
 		portfolioMapError(c, err)
 		return
 	}
+	if replayed {
+		c.Header("Idempotent-Replayed", "true")
+		OK(c, trade)
+		return
+	}
 	Created(c, trade)
+}
+
+func optionalPortfolioIdempotencyKey(c *gin.Context) (string, bool) {
+	values := c.Request.Header.Values("Idempotency-Key")
+	if len(values) == 0 {
+		return "", true
+	}
+	if len(values) != 1 {
+		portfolioBadRequest(c, "Idempotency-Key không hợp lệ.")
+		return "", false
+	}
+	key := strings.TrimSpace(values[0])
+	if key == "" || len(key) > 128 {
+		portfolioBadRequest(c, "Idempotency-Key không hợp lệ.")
+		return "", false
+	}
+	for _, value := range key {
+		if value < 32 || value > 126 {
+			portfolioBadRequest(c, "Idempotency-Key không hợp lệ.")
+			return "", false
+		}
+	}
+	return key, true
 }
 
 // PreviewPortfolioTradeCorrection validates a revision and returns the

@@ -113,7 +113,7 @@ func TestRunPushDeliveryPassHandoffsAndSendsSuccess(t *testing.T) {
 	if err != nil || count != 1 {
 		t.Fatalf("push pass count=%d err=%v", count, err)
 	}
-	if deliveryRepo.enqueueLimit != 100 || deliveryRepo.claimLimit != 100 || deliveryRepo.claimLease != 2*time.Minute || deliveryRepo.claimEnv != "production" {
+	if deliveryRepo.enqueueLimit != 100 || deliveryRepo.claimLimit != pushDeliveryBatchSize || deliveryRepo.claimLease != pushDeliveryLease || deliveryRepo.claimEnv != "production" {
 		t.Fatalf("unexpected queue contract: %+v", deliveryRepo)
 	}
 	if len(transport.requests) != 1 || transport.requests[0].DeviceToken != "device-token" || string(transport.requests[0].Payload) != `{"aps":{}}` {

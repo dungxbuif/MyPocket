@@ -873,7 +873,8 @@ final class APIClientTests: XCTestCase {
                 fee: 1_000,
                 occurredAt: "2026-10-07T05:00:00Z",
                 note: "DCA"
-            )
+            ),
+            idempotencyKey: "portfolio-trade-stable-key"
         )
 
         XCTAssertEqual(trade.id, "trade-1")
@@ -881,7 +882,7 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(request.httpMethod, "POST")
         XCTAssertEqual(request.url?.path, "/api/v1/portfolio/assets/asset-1/trades")
         XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer access")
-        XCTAssertFalse(request.value(forHTTPHeaderField: "Idempotency-Key")?.isEmpty ?? true)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Idempotency-Key"), "portfolio-trade-stable-key")
         let json = try XCTUnwrap(JSONSerialization.jsonObject(with: try XCTUnwrap(request.httpBody)) as? [String: Any])
         XCTAssertEqual(json["side"] as? String, "buy")
         XCTAssertEqual(json["quantity"] as? String, "1.25000000")

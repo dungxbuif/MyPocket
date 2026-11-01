@@ -188,20 +188,28 @@ struct MPDocumentPicker: View {
     let onPhotoImport: (([MPPickedImage]) -> Void)?
     let onImport: ([URL]) -> Void
     @State private var isLoading = false
+    var compact = false
 
-    init(title: String, count: Int, maxCount: Int, isPresented: Binding<Bool>,
+    init(title: String, count: Int, maxCount: Int, isPresented: Binding<Bool>, compact: Bool = false,
          onPhotoImport: (([MPPickedImage]) -> Void)? = nil,
          onImport: @escaping ([URL]) -> Void) {
         self.title = title; self.count = count; self.maxCount = maxCount
         self._isPresented = isPresented
+        self.compact = compact
         self.onPhotoImport = onPhotoImport; self.onImport = onImport
     }
 
     var body: some View {
         if let onPhotoImport {
-            MPButton(title, style: .secondary) { isPresented = true }
+            MPButton(style: compact ? .plain : .secondary, fullWidth: !compact) { isPresented = true } label: {
+                HStack(spacing: 6) {
+                    MPIconImage(systemName: "paperclip")
+                    Text(compact ? "Đính kèm" : title)
+                    if compact && count > 0 { Text("\(count)").font(MPFont.labelSmall) }
+                }
+            }
                 .disabled(count >= maxCount || isLoading)
-                .accessibilityHint("JPEG, PNG hoặc PDF; tối đa 5 MiB mỗi tệp")
+                .accessibilityHint("JPEG, PNG, PDF hoặc XLSX; tối đa 5 MiB mỗi tệp")
                 .mpFormBottomSheet(isPresented: $isPresented, title: "Đính kèm chứng từ",
                     accessibilityIdentifier: "attachment-source-picker",
                     isDismissDisabled: isLoading, onClose: { if !isLoading { isPresented = false } }) {
@@ -219,12 +227,12 @@ struct MPDocumentPicker: View {
             .disabled(count >= maxCount)
             .fileImporter(
                 isPresented: $isPresented,
-                allowedContentTypes: [.image, .pdf],
+                allowedContentTypes: [.image, .pdf, .spreadsheet],
                 allowsMultipleSelection: true
             ) { result in
                 if case .success(let urls) = result { onImport(Array(urls.prefix(maxCount - count))) }
             }
-            .accessibilityHint("JPEG, PNG hoặc PDF; tối đa 5 MiB mỗi tệp")
+            .accessibilityHint("JPEG, PNG, PDF hoặc XLSX; tối đa 5 MiB mỗi tệp")
     }
 }
 
@@ -248,7 +256,7 @@ private struct MPAttachmentSourceChooser: View {
             MPSegmentedControl(options: [(id: "photos", title: "Ảnh"), (id: "files", title: "Tệp")], selection: $source)
             MPText("Còn \(remaining) tệp", style: .secondary)
                 .accessibilityIdentifier("attachment-remaining-capacity")
-            MPText("JPEG, PNG hoặc PDF; tối đa 5 MiB mỗi tệp.", style: .secondary)
+            MPText("JPEG, PNG, PDF hoặc XLSX; tối đa 5 MiB mỗi tệp.", style: .secondary)
             if source == "photos" {
                 MPButton("Chọn ảnh", style: .secondary, isLoading: isLoading) { photosPresented = true }
                     .accessibilityIdentifier("attachment-open-photos")
@@ -258,7 +266,7 @@ private struct MPAttachmentSourceChooser: View {
             } else {
                 MPButton("Chọn tệp", style: .secondary) { filesPresented = true }
                     .accessibilityIdentifier("attachment-open-files")
-                    .fileImporter(isPresented: $filesPresented, allowedContentTypes: [.image, .pdf], allowsMultipleSelection: true, onCompletion: importResult)
+                    .fileImporter(isPresented: $filesPresented, allowedContentTypes: [.image, .pdf, .spreadsheet], allowsMultipleSelection: true, onCompletion: importResult)
             }
             ForEach(Array(errors.enumerated()), id: \.offset) { _, error in
                 MPStatusMessage(text: error, tone: .danger)

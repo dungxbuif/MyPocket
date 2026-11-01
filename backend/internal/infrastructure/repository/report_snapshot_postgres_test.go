@@ -113,3 +113,22 @@ func TestReportSnapshotPostgresRetentionSkipsSnapshotsWithLiveAnalysis(t *testin
 		t.Fatal("live analysis must be preserved with its snapshot")
 	}
 }
+
+func TestReportSnapshotPostgresRetentionKeepsFreshnessExpiredSnapshotForNinetyDays(t *testing.T) {
+	db := openReportsPostgresTestDB(t)
+	now := time.Date(2026, 11, 1, 2, 0, 0, 0, time.UTC)
+	ownerID := insertReportsTestUser(t, db, "UTC")
+	id := uuid.NewString()
+	createdAt := now.Add(-24 * time.Hour)
+	if err := db.Exec(`INSERT INTO report_snapshots(id, owner_id, month, wallet_id, granularity, timezone, as_of_day, data_revision, rule_version, as_of, expires_at, created_at, payload)
+VALUES (?, ?, '2026-11', '', 'day', 'UTC', '2026-10-31', 1, ?, ?, ?, ?, ?::jsonb)`, id, ownerID, entity.MonthlyReportRuleVersion, createdAt, now.Add(-time.Minute), createdAt, `{"scope":{"month":"2026-11","granularity":"day"},"totals":{"transaction_count":0}}`).Error; err != nil {
+		t.Fatal(err)
+	}
+	deleted, err := NewReportSnapshotPostgresRepository(db).DeleteExpired(t.Context(), now, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deleted != 0 {
+		t.Fatalf("deleted=%d, want freshness-expired snapshot retained", deleted)
+	}
+}

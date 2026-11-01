@@ -564,10 +564,10 @@ enum MPShellNavigation {
     }
 
     static let primaryItems: [(id: String, title: String, systemName: String)] = [
-        ("overview", "Tổng quan", "house.fill"),
-        ("transactions", "Giao dịch", "list.bullet.rectangle"),
-        ("assistant", "Trợ lý", "message.fill"),
-        ("account", "Tài khoản", "ellipsis.circle.fill")
+        ("overview", "Tổng quan", MPIconCatalog.assetName(for: .home)),
+        ("transactions", "Giao dịch", MPIconCatalog.assetName(for: .ledger)),
+        ("reports", "Báo cáo", MPIconCatalog.assetName(for: .report)),
+        ("account", "Tài khoản", MPIconCatalog.assetName(for: .account))
     ]
 
     static let addActionAccessibilityID = "add-transaction-button"
@@ -578,7 +578,6 @@ enum MPShellNavigation {
     static let selectedTabCornerRadius: CGFloat = 10
     static let addButtonDiameter: CGFloat = 56
     static let feedbackBubbleDiameter: CGFloat = 52
-    static let feedbackDockHeight: CGFloat = feedbackBubbleDiameter + 8
 }
 
 struct MPBalanceHeader: View {
@@ -626,8 +625,8 @@ struct MPBalanceHeader: View {
             }
             Spacer()
             HStack(spacing: 0) {
-                MPIconButton(systemName: "magnifyingglass", label: "Tìm kiếm", action: onSearch)
-                MPIconButton(systemName: "bell", label: "Thông báo", action: onNotifications)
+                MPIconButton(systemName: MPIconCatalog.assetName(for: .search), label: "Tìm kiếm", action: onSearch)
+                MPIconButton(systemName: MPIconCatalog.assetName(for: .bell), label: "Thông báo", action: onNotifications)
             }
         }
         .padding(.horizontal, MPMetrics.pagePadding)
@@ -693,7 +692,7 @@ struct MPBottomNavigation: View {
                         selection = item.id
                     } label: {
                         VStack(spacing: 4) {
-                            Image(systemName: item.systemName)
+                            MPIconImage(systemName: item.systemName)
                             Text(item.title).font(MPFont.labelSmall)
                         }
                         .frame(maxWidth: .infinity, minHeight: MPMetrics.hitTarget)
@@ -837,7 +836,7 @@ struct MPBottomAddButton: View {
             }
             action()
         } label: {
-            Image(systemName: "plus")
+            MPIconImage(systemName: MPIconCatalog.assetName(for: .add))
                 .font(MPFont.headline)
                 .frame(
                     width: MPShellNavigation.addButtonDiameter,
@@ -977,32 +976,11 @@ struct MPOverflowMenu: View {
     }
 }
 
-struct MPFeedbackDock: View {
-    let isVisible: Bool
-    let action: () -> Void
-
-    var body: some View {
-        GeometryReader { geometry in
-            if isVisible, let frame = MPFeedbackBubbleLayout.frame(
-                in: CGRect(origin: .zero, size: geometry.size),
-                clearance: 0,
-                obstacles: []
-            ) {
-                MPFeedbackBubble(action: action)
-                    .position(x: frame.midX, y: frame.midY)
-            }
-        }
-        .frame(height: MPShellNavigation.feedbackDockHeight)
-        .accessibilityElement(children: .contain)
-        .accessibilityIdentifier("feedback-dock")
-    }
-}
-
 struct MPFeedbackBubble: View {
     let action: () -> Void
 
     var body: some View {
-        MPIconButton(systemName: "bubble.left.and.bubble.right.fill", label: "Gửi phản hồi", avoidsFeedback: false, action: action)
+        MPIconButton(systemName: MPIconCatalog.assetName(for: .feedback), label: "Gửi phản hồi", avoidsFeedback: false, action: action)
             .accessibilityIdentifier("floating-feedback-bubble")
             .frame(
                 width: MPShellNavigation.feedbackBubbleDiameter,

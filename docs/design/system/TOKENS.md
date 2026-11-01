@@ -85,13 +85,15 @@ minimum and grow for content; profile is one tappable identity row, no duplicate
 manage-account row. Typography remains unchanged; do not achieve density by
 clipping accessibility text. Account root retains center Add; Account child
 destinations and Assistant hide it.
-The shell reserves a 60pt Feedback dock above its 56pt navbar. The 52pt bubble
-stays at the dock's trailing edge, separated from route content.
+The shell never reserves layout space for Feedback. The 52pt bubble is a
+trailing overlay inside the route viewport, 8pt above the visible navbar;
+there is no dock, spacer, inset or content-height subtraction.
 The selected primary tab uses the shared `surfacePill` style (`MPColor.row`,
 22pt radius); shell geometry is centralized in `MPShellNavigation` so the add
 button and feedback bubble cannot drift from the reference layout. The web
 target keeps the OFL-licensed Manrope font, while native iOS uses the system SF
-Pro metrics through `MPFont`; feature
+Pro metrics through `MPFont`. Shared prose uses medium weight without changing
+the approved text sizes; feature
 screens do not choose fonts directly.
 
 Text dùng Text/Heading với size/weight/tone. Số tiền dùng numeric; scale text 10/11/12/14/16/18/20/24/30/36px. Kích thước 10–11px chỉ cho metadata phụ; không dùng cho input/hành động.

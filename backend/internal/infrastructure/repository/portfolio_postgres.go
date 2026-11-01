@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"encoding/json"
 	"errors"
 	"math"
 	"strings"
@@ -14,6 +15,74 @@ import (
 )
 
 type PortfolioPostgresRepository struct{ db *gorm.DB }
+
+func (r *PortfolioPostgresRepository) CreateAssetIdempotent(ownerID string, input portfoliorepo.PortfolioAssetInput, key, requestHash string) (*entity.PortfolioAsset, bool, error) {
+	if r == nil || r.db == nil || !validPortfolioCorrectionKey(key) || strings.TrimSpace(requestHash) == "" {
+		return nil, false, portfoliorepo.ErrPortfolioAssetInvalid
+	}
+	var asset entity.PortfolioAsset
+	replayed := false
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		mutation, created, err := reservePortfolioMutation(tx, ownerID, "portfolio.asset_create", key, requestHash)
+		if err != nil {
+			return err
+		}
+		if !created {
+			if mutation.Status != "completed" {
+				return portfoliorepo.ErrPortfolioCorrectionPending
+			}
+			if err := json.Unmarshal([]byte(mutation.ResponseJSON), &asset); err != nil {
+				return err
+			}
+			replayed = true
+			return nil
+		}
+		value, err := (&PortfolioPostgresRepository{db: tx}).CreateAsset(ownerID, input)
+		if err != nil {
+			return err
+		}
+		asset = *value
+		return completePortfolioMutation(tx, mutation.ID, asset)
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return &asset, replayed, nil
+}
+
+func (r *PortfolioPostgresRepository) CreateTradeIdempotent(ownerID, assetID string, input portfoliorepo.PortfolioTradeInput, key, requestHash string) (*entity.PortfolioTrade, bool, error) {
+	if r == nil || r.db == nil || !validPortfolioCorrectionKey(key) || strings.TrimSpace(requestHash) == "" {
+		return nil, false, portfoliorepo.ErrPortfolioTradeInvalid
+	}
+	var trade entity.PortfolioTrade
+	replayed := false
+	err := r.db.Transaction(func(tx *gorm.DB) error {
+		mutation, created, err := reservePortfolioMutation(tx, ownerID, "portfolio.trade_create", key, requestHash)
+		if err != nil {
+			return err
+		}
+		if !created {
+			if mutation.Status != "completed" {
+				return portfoliorepo.ErrPortfolioCorrectionPending
+			}
+			if err := json.Unmarshal([]byte(mutation.ResponseJSON), &trade); err != nil {
+				return err
+			}
+			replayed = true
+			return nil
+		}
+		value, err := (&PortfolioPostgresRepository{db: tx}).CreateTrade(ownerID, assetID, input)
+		if err != nil {
+			return err
+		}
+		trade = *value
+		return completePortfolioMutation(tx, mutation.ID, trade)
+	})
+	if err != nil {
+		return nil, false, err
+	}
+	return &trade, replayed, nil
+}
 
 func NewPortfolioPostgresRepository(db *gorm.DB) portfoliorepo.PortfolioRepository {
 	return &PortfolioPostgresRepository{db: db}

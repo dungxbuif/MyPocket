@@ -56,6 +56,10 @@ struct AppRootView: View {
         .task(id: FinancialQueueLifecycle(ownerID: authenticatedOwnerID, foreground: scenePhase == .active)) {
             try? await auth.financialQueue?.updateLifecycle(ownerID: authenticatedOwnerID, isForeground: scenePhase == .active)
         }
+        .task(id: authenticatedOwnerID) {
+            guard authenticatedOwnerID != nil else { return }
+            await PushNotificationCoordinator.shared.activate(api: auth.financeAPI)
+        }
     }
 
     private var authenticatedOwnerID: String? {

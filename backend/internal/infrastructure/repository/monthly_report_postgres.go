@@ -50,6 +50,37 @@ func (r *MonthlyReportPostgresRepository) ReadMonthly(ctx context.Context, owner
 	return result, err
 }
 
+func (r *MonthlyReportPostgresRepository) ReadMonthlyTransactions(ctx context.Context, ownerID string, scope entity.MonthlyReportScope, categoryID, kind string, limit, offset int, now time.Time) (entity.SavingsTransactionPage, error) {
+	if limit < 1 || limit > 100 || offset < 0 || (kind != "" && kind != "all" && kind != entity.TransactionTypeIncome && kind != entity.TransactionTypeExpense) {
+		return entity.SavingsTransactionPage{}, entity.ErrMonthlyReportScopeInvalid
+	}
+	queryScope, err := r.resolveScope(ctx, r.db, ownerID, scope, now)
+	if err != nil {
+		return entity.SavingsTransactionPage{}, err
+	}
+	query := r.db.WithContext(ctx).Model(&entity.Transaction{}).
+		Where("owner_id = ? AND occurred_at >= ? AND occurred_at < ?", ownerID, queryScope.Current.From, queryScope.Current.EndExclusive)
+	query = applyCanonicalReportEligibility(query, "transactions")
+	if queryScope.Scope.WalletID != "" {
+		query = query.Where("wallet_id = ?", queryScope.Scope.WalletID)
+	}
+	if strings.TrimSpace(categoryID) != "" {
+		query = query.Where("category_id = ?", strings.TrimSpace(categoryID))
+	}
+	if kind == entity.TransactionTypeIncome || kind == entity.TransactionTypeExpense {
+		query = query.Where("type = ?", kind)
+	}
+	var total int64
+	if err := query.Count(&total).Error; err != nil {
+		return entity.SavingsTransactionPage{}, err
+	}
+	items := make([]entity.Transaction, 0, limit)
+	if err := query.Order("occurred_at DESC, id DESC").Limit(limit).Offset(offset).Find(&items).Error; err != nil {
+		return entity.SavingsTransactionPage{}, err
+	}
+	return entity.SavingsTransactionPage{Items: items, Total: int(total), Limit: limit, Offset: offset, Month: queryScope.Scope.Month, Timezone: queryScope.Location.String(), AsOf: now.UTC()}, nil
+}
+
 func (r *MonthlyReportPostgresRepository) readMonthlyInTx(ctx context.Context, tx *gorm.DB, ownerID string, scope entity.MonthlyReportScope, now time.Time, revision int64) (entity.MonthlyReport, error) {
 	queryScope, err := r.resolveScope(ctx, tx, ownerID, scope, now)
 	if err != nil {

@@ -175,12 +175,25 @@ func TestAIEntryPersistsReviewAndApprovesExactlyOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	expired := entity.AIEntryAttachment{ID: uuid.NewString(), OwnerID: owner, ProcessID: cleanupProcess, ObjectKey: "mypocket/test/expired.pdf", Filename: "expired.pdf", MIMEType: "application/pdf", SizeBytes: 64, SHA256: "expired-hash", OCRStatus: "failed", DeleteAfter: time.Now().Add(-time.Hour)}
-	if err = r.CreateAttachments(ctx, []entity.AIEntryAttachment{expired}); err != nil {
+	bound := entity.AIEntryAttachment{ID: uuid.NewString(), OwnerID: owner, ProcessID: cleanupProcess, ObjectKey: "mypocket/test/bound.pdf", Filename: "bound.pdf", MIMEType: "application/pdf", SizeBytes: 64, SHA256: "bound-hash", OCRStatus: "completed", DeleteAfter: time.Now().Add(-time.Hour)}
+	if err = r.CreateAttachments(ctx, []entity.AIEntryAttachment{expired, bound}); err != nil {
+		t.Fatal(err)
+	}
+	conversation := entity.AdvisorConversation{ID: uuid.NewString(), OwnerID: owner, Generation: 1, NextMessageSeq: 1, Summary: map[string]any{}}
+	if err = db.Create(&conversation).Error; err != nil {
+		t.Fatal(err)
+	}
+	now := time.Now().UTC()
+	task := entity.AdvisorEntryTask{ID: uuid.NewString(), OwnerID: owner, ConversationID: conversation.ID, Generation: 1, ClientRequestID: uuid.NewString(), PayloadHash: "sha256:bound", SessionID: cleanupProcess, Status: entity.AdvisorEntryTaskReviewReady, Stage: "review_ready", DeadlineAt: now.Add(time.Hour), CreatedAt: now, UpdatedAt: now}
+	if err = db.Create(&task).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err = db.Exec("INSERT INTO advisor_entry_attachment_bindings (task_id, owner_id, attachment_id) VALUES (?, ?, ?)", task.ID, owner, bound.ID).Error; err != nil {
 		t.Fatal(err)
 	}
 	claimed, err := r.ClaimExpiredAttachments(ctx, time.Now(), time.Now().Add(-10*time.Minute), 10)
 	if err != nil || len(claimed) != 1 || claimed[0].ID != expired.ID {
-		t.Fatalf("cleanup must claim only expired unlinked evidence: %+v %v", claimed, err)
+		t.Fatalf("cleanup must claim only expired evidence without transaction or advisor bindings: %+v %v", claimed, err)
 	}
 	if err = r.SetAttachmentDeleteStatus(ctx, expired.ID, "delete_failed"); err != nil {
 		t.Fatal(err)

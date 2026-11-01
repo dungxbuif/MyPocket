@@ -1425,8 +1425,16 @@ final class LaunchTests: XCTestCase {
 
     private func openMore(_ app: XCUIApplication) {
         let accountTab = app.buttons["bottom-tab-account"]
-        XCTAssertTrue(accountTab.waitForExistence(timeout: 10))
-        accountTab.tap()
+        if accountTab.waitForExistence(timeout: 2) {
+            accountTab.tap()
+        } else {
+            let menu = app.buttons["bottom-navigation-menu"]
+            XCTAssertTrue(menu.waitForExistence(timeout: 10))
+            menu.tap()
+            let accountOption = app.buttons["Tài khoản"]
+            XCTAssertTrue(accountOption.waitForExistence(timeout: 5))
+            accountOption.tap()
+        }
         XCTAssertTrue(app.staticTexts["screen-title-Thêm"].waitForExistence(timeout: 10))
     }
 
@@ -1438,6 +1446,16 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(walletsEntry.isHittable)
         walletsEntry.tap()
         XCTAssertTrue(app.staticTexts["screen-title-Chọn Ví"].waitForExistence(timeout: 10))
+    }
+
+    private func openAssistant(_ app: XCUIApplication) {
+        openMore(app)
+        let assistant = moreEntry("more-destination-assistant", in: app)
+        XCTAssertTrue(assistant.waitForExistence(timeout: 10))
+        reveal(assistant, in: app)
+        XCTAssertTrue(assistant.isHittable)
+        assistant.tap()
+        XCTAssertTrue(app.staticTexts["Trợ lý tài chính"].firstMatch.waitForExistence(timeout: 10))
     }
 
     private func dismissKeyboard(_ app: XCUIApplication) {
@@ -1628,7 +1646,6 @@ final class LaunchTests: XCTestCase {
         let navigation = app.descendants(matching: .any)["bottom-navigation"]
         let overview = app.buttons["bottom-tab-overview"]
         let feedback = app.buttons["floating-feedback-bubble"]
-        let dock = app.descendants(matching: .any)["feedback-dock"]
         let viewport = app.descendants(matching: .any)["shell-content-viewport"]
         let add = app.buttons["add-transaction-button"]
 
@@ -1637,9 +1654,9 @@ final class LaunchTests: XCTestCase {
         XCTAssertGreaterThanOrEqual(navigation.frame.minX, window.frame.minX + 12)
         XCTAssertLessThanOrEqual(navigation.frame.maxX, window.frame.maxX - 12)
         XCTAssertTrue(feedback.waitForExistence(timeout: 5))
-        XCTAssertTrue(dock.frame.contains(feedback.frame), "Feedback must stay inside its transparent overlay host.")
-        XCTAssertFalse(viewport.frame.intersects(feedback.frame), "Feedback belongs in the dedicated dock below route content.")
-        XCTAssertGreaterThanOrEqual(feedback.frame.minY, viewport.frame.maxY)
+        XCTAssertFalse(app.descendants(matching: .any)["feedback-dock"].exists, "Feedback must not create a layout container.")
+        XCTAssertTrue(viewport.frame.intersects(feedback.frame), "Feedback must float over route content without reserving a lane.")
+        XCTAssertLessThanOrEqual(feedback.frame.maxY, viewport.frame.maxY)
         XCTAssertLessThanOrEqual(feedback.frame.maxY, navigation.frame.minY + 12)
         XCTAssertGreaterThanOrEqual(add.frame.width, 44)
         XCTAssertGreaterThanOrEqual(add.frame.height, 44)
@@ -1668,7 +1685,7 @@ final class LaunchTests: XCTestCase {
 
         XCTAssertTrue(feedback.waitForExistence(timeout: 5))
         XCTAssertEqual(feedback.frame, feedbackFrame, "Feedback must return to the same dock position after editor keyboard use.")
-        XCTAssertTrue(app.buttons["bottom-tab-assistant"].isHittable)
+        XCTAssertTrue(app.buttons["bottom-tab-reports"].isHittable)
         XCTAssertTrue(app.buttons["bottom-tab-account"].isHittable)
     }
 
@@ -2052,8 +2069,8 @@ final class LaunchTests: XCTestCase {
             if ["categories", "jars", "months", "portfolio", "notifications"].contains(destination.id) {
                 let viewport = app.descendants(matching: .any)["shell-content-viewport"]
                 XCTAssertTrue(
-                    viewport.waitForExistence(timeout: 2) && !viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
-                    "Scrollable secondary screen must reserve space below the floating Feedback bubble: \(title)"
+                    viewport.waitForExistence(timeout: 2) && viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
+                    "Scrollable secondary screen must keep its full viewport behind the floating Feedback overlay: \(title)"
                 )
             }
             attachScreenshot(app, named: "secondary-route-\(destination.id)")
@@ -2118,28 +2135,27 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(app.buttons["more-destination-notifications"].exists, "Overview bell owns inbox entry")
     }
 
-    func testAssistantTabIsSolePrimaryEntryAndRetainsUnsentDraftAcrossTabs() {
+    func testAssistantIsStandaloneAndRetainsUnsentDraftAfterClose() {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]
         app.launch()
         openMore(app)
         for _ in 0..<4 { app.scrollViews.firstMatch.swipeUp() }
-        XCTAssertFalse(app.buttons["more-destination-assistant"].exists, "Advisor tab must not compete with a duplicate More route.")
+        XCTAssertTrue(app.buttons["more-destination-assistant"].exists, "Account provides the explicit entry into standalone Assistant.")
         XCTAssertTrue(app.buttons["more-destination-aiEntry"].exists, "Transaction extraction stays a separate workflow.")
-        let tab = app.buttons["bottom-tab-assistant"]
-        XCTAssertTrue(tab.isHittable)
-        tab.tap()
+        let assistantEntry = app.buttons["more-destination-assistant"]
+        reveal(assistantEntry, in: app)
+        assistantEntry.tap()
         let input = app.textFields["assistant-composer-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         input.tap()
         input.typeText("Chi tieu thang nay")
-        XCTAssertFalse(tab.exists)
+        XCTAssertFalse(app.buttons["bottom-navigation"].exists)
         app.buttons["assistant-dismiss-keyboard"].tap()
         let close = app.buttons["assistant-close"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
-        XCTAssertTrue(tab.waitForExistence(timeout: 5))
-        tab.tap()
+        openAssistant(app)
         XCTAssertTrue(input.waitForExistence(timeout: 5))
         XCTAssertEqual(input.value as? String, "Chi tieu thang nay", "Switching tabs must preserve the unsent financial question.")
         attachScreenshot(app, named: "assistant-primary-tab-retained-draft")
@@ -2177,8 +2193,8 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(app.buttons["Back"].exists, "Secondary routes must not show the native back button above the Stitch header.")
         let viewport = app.descendants(matching: .any)["shell-content-viewport"]
         XCTAssertTrue(
-            viewport.waitForExistence(timeout: 2) && !viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
-            "Categories must reserve a clear viewport outside the floating Feedback dock."
+            viewport.waitForExistence(timeout: 2) && viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
+            "Categories must retain the full viewport behind the floating Feedback overlay."
         )
         attachScreenshot(app, named: "categories-shell-clearance")
     }
@@ -2194,8 +2210,8 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(app.buttons["Back"].exists, "Secondary routes must not show the native back button above the Stitch header.")
         let viewport = app.descendants(matching: .any)["shell-content-viewport"]
         XCTAssertTrue(
-            viewport.waitForExistence(timeout: 2) && !viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
-            "Notifications must reserve a clear viewport outside the floating Feedback dock."
+            viewport.waitForExistence(timeout: 2) && viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
+            "Notifications must retain the full viewport behind the floating Feedback overlay."
         )
         attachScreenshot(app, named: "notifications-shell-clearance")
     }
@@ -2254,8 +2270,8 @@ final class LaunchTests: XCTestCase {
             XCTAssertFalse(app.buttons["Back"].exists, "Secondary routes must not show the native back button: \(route.id)")
             let viewport = app.descendants(matching: .any)["shell-content-viewport"]
             XCTAssertTrue(
-                viewport.waitForExistence(timeout: 2) && !viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
-                "Scrollable secondary route must use the bounded shell viewport: \(route.id)"
+                viewport.waitForExistence(timeout: 2) && viewport.frame.intersects(app.buttons["floating-feedback-bubble"].frame),
+                "Scrollable secondary route must keep its full viewport behind the floating Feedback overlay: \(route.id)"
             )
             let back = app.buttons["screen-back"].firstMatch
             XCTAssertTrue(back.waitForExistence(timeout: 5), "Missing custom back action: \(route.id)")
@@ -2348,7 +2364,7 @@ final class LaunchTests: XCTestCase {
         // persisted override or a new production fixture hook.
         app.launchArguments = ["-UITestAuthenticatedAPI", "-mypocket.privacy.masked", "NO", "-mypocket.advisor.conversation.\(ownerID)", conversationID]
         app.launch()
-        app.buttons["bottom-tab-assistant"].tap()
+        openAssistant(app)
         let latest = app.staticTexts["Native History Fixture 51"]
         XCTAssertTrue(latest.waitForExistence(timeout: 15))
         let conversation = app.scrollViews["assistant-conversation"]
@@ -2380,7 +2396,7 @@ final class LaunchTests: XCTestCase {
 
         app.terminate()
         app.launch()
-        app.buttons["bottom-tab-assistant"].tap()
+        openAssistant(app)
         XCTAssertTrue(latest.waitForExistence(timeout: 15), "Persisted history must reload after restart")
         XCTAssertEqual(app.staticTexts.matching(identifier: "Native History Fixture 51").count, 1)
         let latestAfter = try await LocalAPIFixture.advisorHistory(conversationID: conversationID)
@@ -2397,10 +2413,7 @@ final class LaunchTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticatedAPI"]
         app.launch()
-        let assistantEntry = app.buttons["bottom-tab-assistant"]
-        XCTAssertTrue(assistantEntry.waitForExistence(timeout: 10))
-        assistantEntry.tap()
-        XCTAssertTrue(app.staticTexts["Finance Assistant"].firstMatch.waitForExistence(timeout: 10))
+        openAssistant(app)
         let disabledMessage = app.staticTexts["Finance Assistant chưa được bật."]
         let firstQuestionPrompt = app.staticTexts["Mình có thể giúp gì cho bạn?"]
         XCTAssertTrue(
@@ -2451,8 +2464,7 @@ final class LaunchTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]
         app.launch()
-        app.buttons["bottom-tab-assistant"].tap()
-        XCTAssertTrue(app.staticTexts["Finance Assistant"].firstMatch.waitForExistence(timeout: 10))
+        openAssistant(app)
         XCTAssertFalse(app.buttons["bottom-navigation"].exists, "Assistant is a standalone screen without the shell navigation.")
         XCTAssertTrue(app.buttons["assistant-close"].waitForExistence(timeout: 5))
         XCTAssertFalse(
@@ -2484,20 +2496,13 @@ final class LaunchTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]
         app.launch()
-        app.buttons["bottom-tab-assistant"].tap()
+        openAssistant(app)
         let input = app.textFields["assistant-composer-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         app.terminate()
         app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         app.launch()
-        if app.buttons["bottom-tab-assistant"].exists {
-            app.buttons["bottom-tab-assistant"].tap()
-        } else {
-            let navigation = app.buttons["bottom-navigation-menu"]
-            XCTAssertTrue(navigation.waitForExistence(timeout: 10))
-            navigation.tap()
-            app.buttons["Trợ lý"].firstMatch.tap()
-        }
+        openAssistant(app)
         let accessibilityInput = app.textFields["assistant-composer-input"]
         XCTAssertTrue(accessibilityInput.waitForExistence(timeout: 10))
         XCTAssertFalse(app.buttons["bottom-navigation-menu"].exists)
@@ -2548,25 +2553,42 @@ final class LaunchTests: XCTestCase {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]
         app.launch()
-        let assistantEntry = app.buttons["bottom-tab-assistant"]
-        XCTAssertTrue(assistantEntry.waitForExistence(timeout: 10))
-        assistantEntry.tap()
-        XCTAssertTrue(app.staticTexts["Finance Assistant"].firstMatch.waitForExistence(timeout: 10))
+        openAssistant(app)
         XCTAssertTrue(
             app.buttons["assistant-suggestion-0"].waitForExistence(timeout: 10),
             "The assistant should offer a deterministic first question while history is empty."
         )
+        attachScreenshot(app, named: "assistant-empty-conversation")
         app.buttons["assistant-suggestion-0"].tap()
         let composer = app.textFields["assistant-composer-input"]
         XCTAssertTrue(composer.exists)
         XCTAssertEqual(composer.value as? String, "Tháng này tôi tiêu thế nào?")
     }
 
+    func testVisualAuditPrimaryTabs() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-overview"].waitForExistence(timeout: 10))
+        attachScreenshot(app, named: "visual-audit-overview")
+
+        for (identifier, name) in [
+            ("bottom-tab-transactions", "transactions"),
+            ("bottom-tab-reports", "reports"),
+            ("bottom-tab-account", "account")
+        ] {
+            let tab = app.buttons[identifier]
+            XCTAssertTrue(tab.waitForExistence(timeout: 5))
+            tab.tap()
+            attachScreenshot(app, named: "visual-audit-\(name)")
+        }
+    }
+
     func testAssistantFeedbackBubbleDoesNotCoverComposerAndDraftSurvivesDisabledSend() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]
         app.launch()
-        app.buttons["bottom-tab-assistant"].tap()
+        openAssistant(app)
         let input = app.textFields["assistant-composer-input"]
         XCTAssertTrue(input.waitForExistence(timeout: 10))
         let send = app.buttons["assistant-composer-action"]
@@ -2847,7 +2869,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(feedback.waitForExistence(timeout: 5))
         let viewport = app.descendants(matching: .any)["shell-content-viewport"]
         XCTAssertTrue(viewport.exists, "Authenticated route content must have a bounded shell viewport.")
-        XCTAssertFalse(viewport.frame.intersects(feedback.frame), "Feedback belongs below the route viewport.")
+        XCTAssertTrue(viewport.frame.intersects(feedback.frame), "Feedback must float inside the route viewport without reserving space.")
         let visibleMoreRows = app.buttons.matching(
             NSPredicate(format: "identifier BEGINSWITH %@", "more-destination-")
         ).allElementsBoundByIndex.filter { $0.exists && viewport.frame.intersects($0.frame) }
@@ -2993,7 +3015,7 @@ final class LaunchTests: XCTestCase {
         )
     }
 
-    func testFeedbackDockReservesClearanceOutsideTheScrollViewport() throws {
+    func testFeedbackBubbleOverlaysWithoutReservingScrollViewportSpace() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]
         app.launch()
@@ -3003,14 +3025,11 @@ final class LaunchTests: XCTestCase {
         let bubble = app.buttons["floating-feedback-bubble"]
         XCTAssertTrue(viewport.waitForExistence(timeout: 5))
         XCTAssertTrue(bubble.exists)
-        let dock = app.descendants(matching: .any)["feedback-dock"]
-        XCTAssertTrue(dock.exists)
-        XCTAssertLessThanOrEqual(viewport.frame.maxY, dock.frame.minY + 1)
-        XCTAssertLessThanOrEqual(dock.frame.maxY, tab.frame.minY + 12)
+        XCTAssertFalse(app.descendants(matching: .any)["feedback-dock"].exists)
         XCTAssertLessThanOrEqual(viewport.frame.maxY, tab.frame.minY + 1, "Content bounds must not extend behind the navbar")
-        XCTAssertFalse(viewport.frame.intersects(bubble.frame), "Feedback must stay outside route content.")
-        XCTAssertTrue(dock.frame.contains(bubble.frame))
-        attachScreenshot(app, named: "compact-more-feedback-dock")
+        XCTAssertTrue(viewport.frame.intersects(bubble.frame), "Feedback must overlay route content without shortening it.")
+        XCTAssertLessThanOrEqual(bubble.frame.maxY, viewport.frame.maxY)
+        attachScreenshot(app, named: "compact-more-feedback-overlay")
     }
 
     func testAPIBackedAccountAPIKeyCreateAndRevoke() async throws {
@@ -3321,10 +3340,8 @@ final class LaunchTests: XCTestCase {
         let feedback = app.buttons["floating-feedback-bubble"]
         XCTAssertTrue(feedback.exists)
         let viewport = app.descendants(matching: .any)["shell-content-viewport"]
-        let dock = app.otherElements["feedback-dock"]
-        XCTAssertTrue(dock.exists)
-        XCTAssertFalse(viewport.frame.intersects(feedback.frame))
-        XCTAssertTrue(dock.frame.contains(feedback.frame))
+        XCTAssertFalse(app.otherElements["feedback-dock"].exists)
+        XCTAssertTrue(viewport.frame.intersects(feedback.frame))
         XCTAssertEqual(feedback.frame, feedbackBeforeScroll, "Feedback must stay fixed while cards scroll.")
         XCTAssertFalse(
             feedback.frame.intersects(secondApproval.frame),
@@ -3580,7 +3597,10 @@ final class LaunchTests: XCTestCase {
         name.tap()
         name.typeText("Draft")
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["floating-feedback-bubble"].exists, "Auxiliary bubble must not intercept input/clear targets while typing.")
+        XCTAssertTrue(
+            app.buttons["floating-feedback-bubble"].waitForNonExistence(timeout: 2),
+            "Auxiliary bubble must not intercept input/clear targets while typing."
+        )
         app.buttons["clear-field-Tên"].tap()
         name.tap(); name.typeText("Retained draft")
         XCTAssertFalse(app.staticTexts["screen-title-Phản hồi"].exists)

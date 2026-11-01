@@ -22,6 +22,27 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## Non-negotiable native shell invariants — owner correction, 2026-11-01
+
+- Feedback is one 52pt floating overlay above the route viewport. It never owns
+  a row, dock, spacer, safe-area inset, or reserved content height.
+- `MainTabView` subtracts only visible bottom-navigation height. Assistant hides
+  both navigation and Feedback.
+- Native font sizes remain unchanged; shared regular prose roles use medium
+  weight for slightly stronger device rendering. Screens must not override
+  these decisions locally.
+
+## Native navigation UX — owner correction and plan, 2026-11-01
+
+Owner confirms Assistant is a separate screen with primary navigation and the
+feedback bubble hidden. The audit finding demanding a visible Assistant bubble
+is withdrawn; older composer documents do not override this direction.
+The [navigation design](work/tickets/NATIVE-NAVIGATION-UX-20261101-DETAIL_DESIGN.md)
+and [plan](superpowers/plans/2026-11-01-native-navigation-ux.md) propose preserved
+per-tab stacks, origin-aware Assistant dismissal, contextual detail routes and
+shared editor presentations. Four revised tabs are a proposal awaiting review.
+Planning only; no runtime changes or new verification claims.
+
 ## Release 1.3.0 build 7 — released, 2026-11-01
 
 The unified native Assistant, report/insider surfaces, accumulated-asset units
@@ -162,13 +183,13 @@ ledger assertion. Only the regression test and docs changed; no production
 data, status or deployment changed. [Work note](work/bugs/FEEDBACK-8eeb848f-native-transaction-row.md)
 keeps affected physical-build owner acceptance open.
 
-## Native Feedback dock follow-up 5ff74529 — 2026-10-26
+## Native Feedback dock follow-up 5ff74529 — superseded 2026-11-01
 
-The shell now reserves a 60pt Feedback dock below its clipped route viewport.
+This historical implementation reserved a 60pt Feedback dock below its clipped route viewport.
 The AI review overlap was reproduced RED, then passed on iPhone 16 and SE;
 focused route, capture and Account Add checks also pass. The bubble does not
 jump as the review cards scroll. [Bounded work note](work/bugs/FEEDBACK-5ff74529-native-feedback-position.md)
-remains `in_review` for deployed/physical-device and owner acceptance. No
+is superseded by the owner invariant above: no dock or reserved height. No
 production feedback status, deployment or financial data changed.
 
 ## Native notification feedback aa6ca3cf — 2026-10-26

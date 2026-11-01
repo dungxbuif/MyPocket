@@ -64,13 +64,13 @@ active transitions or presented modals. No financial write is triggered by pop.
 The typed `init(isBusy:header:fields:footer:)` allows AI-entry's existing custom
 header/Save-all without AnyView or a separate editor hierarchy. Header min52pt
 preserves44pt controls with breathing room and grows with content. The shell
-uses a stable lower-right Feedback dock below the clipped route viewport and
-above navigation. It does not move between rows or sides based on obstacle
-reports. The old obstacle/clearance preference plumbing remains source-compatible
-for screen consumers but no longer repositions the shared bubble. The shell
-observes keyboard visibility with `mpObserveKeyboardVisibility`; Feedback hides
-while typing and the dock space is reclaimed until dismissal. Capture and
-Feedback presentation hide the trigger while retaining the dock's geometry.
+uses one stable lower-right Feedback overlay inside the clipped route viewport,
+above navigation. It does not create a dock, row, spacer or reserved height and
+does not move between rows or sides based on obstacle reports. The old
+obstacle/clearance preference plumbing remains source-compatible for screen
+consumers but no longer repositions the shared bubble. The shell observes
+keyboard visibility with `mpObserveKeyboardVisibility`; Feedback hides while
+typing without relayout. Capture and Feedback presentation hide only the trigger.
 
 `MPOptionalDateField(title:value:timeZone:accessibilityIdentifier:)` binds an
 optional calendar date as an empty/`YYYY-MM-DD` string. Enabling defaults to
@@ -131,7 +131,7 @@ compile/signature/install checks still required. No backend/API changes.
 | MPCheckboxRow / MPWalletApplicabilityCard (SwiftUI) | title, selected value, stable ID/action / owner wallet list + selected wallet ID binding | Shared 44pt accessible checkbox rows and visible category-to-wallet applicability card; empty set means all wallets and full-set normalization returns to empty |
 | MPCategoryTree / MPCategoryTreeItem (SwiftUI) | stable category nodes with depth, hierarchy-context and branch flags; select callback | Owns shared root/child rows, branch connector, icon/title/subtitle/chevron geometry and lazy rendering; editable rows navigate as one target, hierarchy context stays disabled, and delete remains in the category editor; `CategoryListPresentation` supplies filtered nodes while feature screens own navigation and API calls |
 | MPCategoryPicker / MPCategoryTree (SwiftUI) | category candidates, kind, optional eligible-ID set, selected ID, optional clear action | One tree owns management and selection row geometry, localized hierarchy-preserving search, selectable-row check, disabled parent context, one shared surface per root and stable IDs; root/child glyphs 40/32pt, connectors terminate before the icon; host owns sheet lifecycle and payload |
-| MPFeedbackDock / MPFeedbackBubble / MPBottomNavigationInset (SwiftUI) | dock visibility and action; inset has no consumer props | `MPFeedbackDock` owns a stable 60pt shell row between clipped route content and the 56pt navbar. Its 52pt trailing bubble keeps an 8pt lower margin and does not jump around obstacles or cover route controls. Capture and Feedback presentation hide the trigger without resizing the dock; keyboard entry hides it and reclaims dock space. `MPBottomNavigationInset` remains only for independent editors/modals, not shell routes. |
+| MPFeedbackBubble / MPBottomNavigationInset (SwiftUI) | bubble action; inset has no consumer props | `MPFeedbackBubble` is a 52pt shell overlay inside the route viewport, 8pt above visible navigation. It must never be placed in a layout row or reserve height, spacer, inset or dock. Capture, Feedback presentation, keyboard entry and Assistant may hide it without relayout. `MPBottomNavigationInset` remains only for independent editors/modals, not shell routes. |
 | MPSurfaceCard / MPGroupedRow / MPInsetDivider / MPMetric / MPMetricCard (SwiftUI) | standard/elevated/reference/grouped surface style; semantic grouped row and inset separator; semantic metric title/value/detail/masked | Existing card styles retain 12pt horizontal/8pt vertical padding. The new flat grouped style uses the adaptive grouped surface, 24pt group radius and no outer content inset so rows own 16pt horizontal/10pt vertical spacing and a 44pt minimum while expanding for Dynamic Type. `MPInsetDivider` aligns the semantic separator 56pt from the leading group edge by default. Existing styles and token names remain source-compatible; screens consume these bases rather than raw colors, padding or separators. Metrics keep one shared presentation. |
 | MPTransactionRow / MPTransactionPresentation (SwiftUI) | persisted transaction/category or validated structured fields, timezone, masked | Canonical semantic mapping for category/icon, note-or-local-date, signed/masked amount and neutral transfer/adjustment; used by Overview, ledger, wallet/credit history and Assistant. Default glyph 32pt, 6pt vertical padding, min44pt content height; amounts stack for accessibility text sizes. |
 | MPImageAttachmentPicker / MPAttachmentThumb (SwiftUI) | optional bound image bytes | Shared choose/remove/replace image, loading/error states and thumbnail; source limit25MiB, bounded decoding, conversion to PNG ≤1MiB for existing feedback multipart contract. Both feedback entry points reuse this base. |

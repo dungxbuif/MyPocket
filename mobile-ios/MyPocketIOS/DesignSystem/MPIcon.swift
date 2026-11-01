@@ -5,12 +5,18 @@ import SwiftUI
 /// roles use the bundled Phosphor asset names.
 struct MPIconImage: View {
     let systemName: String
+    var size: CGFloat = 22
 
     var body: some View {
         if MPIconCatalog.isBundledAssetName(systemName) {
             Image(systemName)
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
+                .frame(width: size, height: size)
         } else {
             Image(systemName: systemName)
+                .frame(width: size, height: size)
         }
     }
 }
@@ -58,16 +64,20 @@ struct MPIcon: View {
     var body: some View {
         iconImage
             .foregroundStyle(color)
-            .frame(width: size, height: size)
+            .frame(width: size ?? 22, height: size ?? 22)
             .contentShape(Rectangle())
             .modifier(MPIconAccessibility(label: label))
     }
 
-    private var iconImage: Image {
+    @ViewBuilder private var iconImage: some View {
         if MPIconCatalog.isBundledAssetName(systemName) {
-            return Image(systemName)
+            Image(systemName)
+                .resizable()
+                .renderingMode(.template)
+                .scaledToFit()
+        } else {
+            Image(systemName: systemName)
         }
-        return Image(systemName: systemName)
     }
 }
 

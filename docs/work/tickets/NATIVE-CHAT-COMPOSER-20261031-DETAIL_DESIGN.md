@@ -8,6 +8,11 @@ approval: planning_requested_implementation_not_resumed
 
 # MyPocket: chữ gọn, chat dễ dùng, icon nhẹ hơn
 
+> Owner correction 2026-11-01: Assistant là màn riêng, ẩn navigation chính và
+> bubble. Phần 3 bên dưới là quyết định lịch sử đã bị thay thế đối với Assistant;
+> không dùng nó để yêu cầu khôi phục bubble. Các màn thường vẫn giữ feedback.
+> Xem [navigation design](NATIVE-NAVIGATION-UX-20261101-DETAIL_DESIGN.md).
+
 ## Yêu cầu đã xác nhận
 
 - Giữ phong cách card, màu sắc và tổng thể bản đang cài trên máy ảo.

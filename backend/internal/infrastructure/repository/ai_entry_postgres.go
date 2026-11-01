@@ -86,7 +86,7 @@ func (r *AIEntryPostgresRepository) ClaimExpiredAttachments(ctx context.Context,
 	var claimed []entity.AIEntryAttachment
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var rows []entity.AIEntryAttachment
-		query := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "transaction_attachments"}, Options: "SKIP LOCKED"}).Where("NOT EXISTS (SELECT 1 FROM transaction_attachment_links WHERE transaction_attachment_links.attachment_id = transaction_attachments.id) AND transaction_attachments.delete_after <= ? AND (transaction_attachments.ocr_status IN ? OR (transaction_attachments.ocr_status = 'deleting' AND transaction_attachments.updated_at <= ?))", before, []string{"pending", "completed", "failed", "delete_failed"}, staleClaim).Order("transaction_attachments.delete_after").Limit(limit)
+		query := tx.Clauses(clause.Locking{Strength: "UPDATE", Table: clause.Table{Name: "transaction_attachments"}, Options: "SKIP LOCKED"}).Where("NOT EXISTS (SELECT 1 FROM transaction_attachment_links WHERE transaction_attachment_links.attachment_id = transaction_attachments.id) AND NOT EXISTS (SELECT 1 FROM advisor_entry_attachment_bindings WHERE advisor_entry_attachment_bindings.attachment_id = transaction_attachments.id) AND transaction_attachments.delete_after <= ? AND (transaction_attachments.ocr_status IN ? OR (transaction_attachments.ocr_status = 'deleting' AND transaction_attachments.updated_at <= ?))", before, []string{"pending", "completed", "failed", "delete_failed"}, staleClaim).Order("transaction_attachments.delete_after").Limit(limit)
 		if err := query.Find(&rows).Error; err != nil {
 			return err
 		}

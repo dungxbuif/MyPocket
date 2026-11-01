@@ -24,11 +24,11 @@ private struct AssistantMessageFramesPreferenceKey: PreferenceKey {
 }
 
 enum AssistantComposerPolicy {
-    static func canSend(enabled: Bool, text: String, activeRunID: String?, isLocallySending: Bool = false) -> Bool {
+    static func canSend(enabled: Bool, text: String, attachmentCount: Int = 0, activeRunID: String?, isLocallySending: Bool = false) -> Bool {
         enabled
             && activeRunID == nil
             && !isLocallySending
-            && !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && (!text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || attachmentCount > 0)
     }
 }
 
@@ -317,6 +317,9 @@ struct AssistantView: View {
     @State private var loadingOlder = false
     @State private var hasOlder = false
     @State private var activeRunID: String?
+    @State private var activeEntryTaskID: String?
+    @State private var files: [MultipartFile] = []
+    @State private var showFilePicker = false
     @State private var error: String?
     @State private var walletActionMessage: String?
     @State private var overviewPresented = false
@@ -336,6 +339,7 @@ struct AssistantView: View {
     @State private var scrollDistanceFromBottom: CGFloat = 0
     @State private var visibleMessageAnchor: AssistantScrollAnchor?
     @StateObject private var runObserver: AdvisorRunObserver
+    @StateObject private var entryObserver: AdvisorEntryObserver
 
     private let suggestions = [
         "Tháng này tôi tiêu thế nào?",
@@ -351,6 +355,9 @@ struct AssistantView: View {
         self.draft = draft
         _runObserver = StateObject(wrappedValue: AdvisorRunObserver(fetchRun: { runID in
             try await api.advisorRun(id: runID)
+        }))
+        _entryObserver = StateObject(wrappedValue: AdvisorEntryObserver(fetchTask: { taskID in
+            try await api.advisorEntryTask(id: taskID)
         }))
         let key = Self.conversationKey(ownerID: ownerID)
         _conversationID = State(initialValue: UserDefaults.standard.string(forKey: key) ?? "")
@@ -393,7 +400,21 @@ struct AssistantView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            MPScreenHeader(title: "Finance Assistant", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
+            HStack(spacing: 10) {
+                MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack)
+                ZStack(alignment: .bottomTrailing) {
+                    MPIcon(iconID: .assistant, color: MPColor.action, size: 22)
+                        .frame(width: 40, height: 40)
+                        .background(MPColor.successSoft, in: Circle())
+                    Circle().fill(MPColor.action).frame(width: 10, height: 10)
+                        .overlay(Circle().stroke(MPColor.canvas, lineWidth: 2))
+                }
+                VStack(alignment: .leading, spacing: 1) {
+                    MPText("Trợ lý tài chính", style: .emphasis)
+                    MPText(activeRunID == nil && activeEntryTaskID == nil ? "Sẵn sàng hỗ trợ" : "Đang phân tích…", style: .secondary)
+                        .font(MPFont.labelSmall)
+                }
+                Spacer(minLength: 4)
                 HStack(spacing: 8) {
                     if overview != nil {
                         MPIconButton(systemName: MPIconCatalog.assetName(for: .report), label: "Tổng quan tài chính") { overviewPresented = true }
@@ -414,10 +435,13 @@ struct AssistantView: View {
                 }
                 MPIconButton(systemName: "xmark", label: "Đóng trợ lý", action: onBack)
                     .accessibilityIdentifier("assistant-close")
-            })
-                .padding(.horizontal, MPMetrics.pagePadding)
+            }
+            .frame(minHeight: 56)
+            .padding(.horizontal, MPMetrics.pagePadding)
+            .background(MPColor.canvas.opacity(0.96))
             VStack(spacing: 0) {
                 MPChatSurface {
+                    VStack(spacing: 0) {
                     ScrollViewReader { proxy in
                     ScrollView {
                         // Assistant history is paged by the API. A regular stack
@@ -578,28 +602,58 @@ struct AssistantView: View {
                             proxy.scrollTo("assistant-restore-anchor", anchor: .top)
                         }
                     }
-                }
-                    HStack(alignment: .bottom, spacing: MPMetrics.sectionSpacing) {
+                    }
+                    VStack(alignment: .leading, spacing: 8) {
+                        if capabilities?.entryIntegration == true {
+                            if !files.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 8) {
+                                        ForEach(Array(files.enumerated()), id: \.offset) { index, file in
+                                            MPAttachmentThumb(name: file.fileName, data: file.data) {
+                                                files.remove(at: index)
+                                            }
+                                            .frame(width: 220)
+                                        }
+                                    }
+                                }
+                                .accessibilityIdentifier("assistant-attachment-pills")
+                            }
+                            MPDocumentPicker(
+                                title: files.isEmpty ? "Đính kèm chứng từ" : "Thêm chứng từ",
+                                count: files.count,
+                                maxCount: capabilities?.attachmentMaxCount ?? 20,
+                                isPresented: $showFilePicker,
+                                compact: true,
+                                onPhotoImport: importAssistantPhotos,
+                                onImport: importAssistantFiles
+                            )
+                            .disabled(sending || activeRunID != nil || activeEntryTaskID != nil || advisorSubmitUncertain)
+                            .accessibilityIdentifier("assistant-attachment-picker")
+                        }
                         MPChatComposer(
                             text: inputBinding,
-                            isBusy: sending || activeRunID != nil,
+                            isBusy: sending || activeRunID != nil || activeEntryTaskID != nil,
                             isEnabled: capabilities?.enabled == true && !advisorSubmitUncertain,
                             onSend: { Task { await send() } },
-                            onCancel: activeRunID.map { runID in { Task { await cancel(runID: runID) }; return () } },
+                            onCancel: cancelCurrentWork,
                             mode: composerMode,
                             isKeyboardVisible: keyboardVisible,
                             focusRequest: composerFocusRequest,
-                            dismissKeyboardRequest: dismissKeyboardRequest
+                            dismissKeyboardRequest: dismissKeyboardRequest,
+                            embedded: true,
+                            allowsEmptySend: !files.isEmpty
                         )
                         .frame(maxWidth: .infinity)
                         .disabled(advisorSubmitUncertain)
                     }
                     .padding(.horizontal, 4)
                     .padding(.vertical, 12)
+                    .background(MPColor.surface)
                     .overlay(alignment: .top) {
                         Rectangle()
                             .fill(MPColor.line)
                             .frame(height: MPMetrics.inputBorderWidth)
+                    }
                     }
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -858,6 +912,7 @@ struct AssistantView: View {
               AssistantComposerPolicy.canSend(
                   enabled: capabilities?.enabled == true,
                   text: text,
+                  attachmentCount: files.count,
                   activeRunID: activeRunID,
                   isLocallySending: sending
               ) else { return }
@@ -866,6 +921,34 @@ struct AssistantView: View {
         advisorSubmitRequestID = clientRequestID
         chatState = .sending(requestID: clientRequestID)
         do {
+            if !files.isEmpty {
+                let generation = historyMeta?.generation ?? 0
+                let boundConversationID = generation > 0 ? (historyMeta?.conversationID ?? conversationID) : ""
+                let result = try await api.beginAdvisorEntry(
+                    AdvisorEntryInputModel(
+                        clientRequestID: clientRequestID,
+                        conversationID: boundConversationID,
+                        generation: generation,
+                        text: text,
+                        timezone: TimeZone.current.identifier
+                    ),
+                    files: files
+                )
+                advisorSubmitRequestID = nil
+                advisorSubmitUncertain = false
+                conversationID = result.conversationID
+                UserDefaults.standard.set(result.conversationID, forKey: Self.conversationKey(ownerID: ownerID))
+                activeEntryTaskID = result.id
+                chatState = .processing(runID: result.id)
+                input = ""
+                files = []
+                await entryObserver.observe(taskID: result.id)
+                if case .failed(let message) = entryObserver.state { self.error = message }
+                await reloadHistory()
+                activeEntryTaskID = nil
+                chatState = .idle
+                return
+            }
             let result = try await api.beginAdvisorMessage(AdvisorMessageInputModel(clientRequestID: clientRequestID, text: text))
             advisorSubmitRequestID = nil
             advisorSubmitUncertain = false
@@ -918,6 +1001,71 @@ struct AssistantView: View {
                 chatState = .failed(message: "Không thể xử lý yêu cầu trợ lý tài chính.")
                 self.error = "Không thể xử lý yêu cầu trợ lý tài chính."
             }
+        }
+    }
+
+    private var cancelCurrentWork: (() -> Void)? {
+        if let taskID = activeEntryTaskID {
+            return { Task { await cancelEntry(taskID: taskID) } }
+        }
+        if let runID = activeRunID {
+            return { Task { await cancel(runID: runID) } }
+        }
+        return nil
+    }
+
+    private func cancelEntry(taskID: String) async {
+        do {
+            try await api.cancelAdvisorEntry(id: taskID)
+            entryObserver.reset()
+            activeEntryTaskID = nil
+            chatState = .cancelled
+            await reloadHistory()
+        } catch let apiError as APIError {
+            error = apiError.userMessage
+        } catch {
+            self.error = "Không thể huỷ xử lý chứng từ."
+        }
+    }
+
+    private func importAssistantFiles(_ urls: [URL]) {
+        let maxCount = capabilities?.attachmentMaxCount ?? 20
+        let maxBytes = Int(capabilities?.attachmentMaxBytes ?? Int64(5 * 1024 * 1024))
+        for url in urls {
+            guard files.count < maxCount else { break }
+            let accessed = url.startAccessingSecurityScopedResource()
+            defer { if accessed { url.stopAccessingSecurityScopedResource() } }
+            guard let data = try? Data(contentsOf: url), data.count <= maxBytes else {
+                error = "Mỗi tệp phải nhỏ hơn 5 MiB."
+                continue
+            }
+            let mime: String
+            switch url.pathExtension.lowercased() {
+            case "jpg", "jpeg": mime = "image/jpeg"
+            case "png": mime = "image/png"
+            case "pdf": mime = "application/pdf"
+            case "xlsx": mime = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            default:
+                error = "Chỉ hỗ trợ JPEG, PNG, PDF hoặc XLSX."
+                continue
+            }
+            guard !files.contains(where: { $0.fileName == url.lastPathComponent && $0.data == data }) else {
+                error = "Tệp này đã được đính kèm."
+                continue
+            }
+            files.append(MultipartFile(fieldName: "files", fileName: url.lastPathComponent, mimeType: mime, data: data))
+        }
+    }
+
+    private func importAssistantPhotos(_ images: [MPPickedImage]) {
+        let maxCount = capabilities?.attachmentMaxCount ?? 20
+        for image in images {
+            guard files.count < maxCount else { break }
+            guard !files.contains(where: { $0.data == image.data }) else {
+                error = "Ảnh này đã được đính kèm."
+                continue
+            }
+            files.append(MultipartFile(fieldName: "files", fileName: image.name, mimeType: image.mimeType, data: image.data))
         }
     }
 

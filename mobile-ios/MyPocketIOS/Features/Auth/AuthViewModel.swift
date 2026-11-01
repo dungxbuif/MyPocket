@@ -202,6 +202,7 @@ final class AuthViewModel: ObservableObject {
 
     private func endCurrentSession() async throws {
         if let session = store.load() {
+            await PushNotificationCoordinator.shared.revoke(api: financeAPI)
             do { try await financeAPI.logout(refreshToken: session.refreshToken) }
             catch APIError.unauthorized { /* Session has already been revoked. */ }
         }

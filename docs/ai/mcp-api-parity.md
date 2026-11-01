@@ -72,6 +72,7 @@ are route classifications, not permission scopes:
     "DELETE /api/v1/mcp",
     "GET /api/v1/docs/*any",
     "GET /api/v1/reports/monthly",
+    "GET /api/v1/reports/monthly/transactions",
     "POST /api/v1/reports/analyses",
     "GET /api/v1/reports/analyses/{id}",
     "POST /api/v1/reports/analyses/{id}/cancel",

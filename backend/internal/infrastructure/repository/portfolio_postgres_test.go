@@ -97,6 +97,47 @@ func TestPortfolioDeleteCannotCascadeConcurrentTrade(t *testing.T) {
 	}
 }
 
+func TestPortfolioCreateAssetAndTradeAreDurablyIdempotent(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("requires migrated local TEST_DATABASE_URL")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner := uuid.NewString()
+	if err := db.Create(&entity.User{ID: owner, Email: owner + "@portfolio.test", GoogleSubject: owner, Timezone: "UTC"}).Error; err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = db.Where("id = ?", owner).Delete(&entity.User{}).Error })
+	repo := NewPortfolioPostgresRepository(db)
+	idempotent := repo.(contract.PortfolioIdempotentRepository)
+	assetInput := contract.PortfolioAssetInput{Symbol: "IDEM", Name: "Idempotent asset"}
+	assetHash := contract.PortfolioMutationHash(assetInput)
+	firstAsset, replayed, err := idempotent.CreateAssetIdempotent(owner, assetInput, "asset-key", assetHash)
+	if err != nil || replayed {
+		t.Fatalf("first asset replayed=%v err=%v", replayed, err)
+	}
+	secondAsset, replayed, err := idempotent.CreateAssetIdempotent(owner, assetInput, "asset-key", assetHash)
+	if err != nil || !replayed || secondAsset.ID != firstAsset.ID {
+		t.Fatalf("asset replay=%+v replayed=%v err=%v", secondAsset, replayed, err)
+	}
+	tradeInput := contract.PortfolioTradeInput{Side: entity.PortfolioTradeBuy, QuantityScaled: entity.QuantityScale, UnitPrice: 100, OccurredAt: time.Now().UTC().Truncate(time.Second)}
+	tradeHash := contract.PortfolioMutationHash(struct {
+		AssetID string
+		Input   contract.PortfolioTradeInput
+	}{firstAsset.ID, tradeInput})
+	firstTrade, replayed, err := idempotent.CreateTradeIdempotent(owner, firstAsset.ID, tradeInput, "trade-key", tradeHash)
+	if err != nil || replayed {
+		t.Fatalf("first trade replayed=%v err=%v", replayed, err)
+	}
+	secondTrade, replayed, err := idempotent.CreateTradeIdempotent(owner, firstAsset.ID, tradeInput, "trade-key", tradeHash)
+	if err != nil || !replayed || secondTrade.ID != firstTrade.ID {
+		t.Fatalf("trade replay=%+v replayed=%v err=%v", secondTrade, replayed, err)
+	}
+}
+
 func TestPortfolioUpdateAssetMetadataDoesNotRewriteTrades(t *testing.T) {
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {

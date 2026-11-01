@@ -9,7 +9,10 @@ import (
 	"github.com/mypocket/backend/internal/repository"
 )
 
-const pushDeliveryLease = 2 * time.Minute
+const (
+	pushDeliveryLease     = 2 * time.Minute
+	pushDeliveryBatchSize = 4 // 4 × 15s provider timeout stays well inside the lease.
+)
 
 // runPushDeliveryPass first hands off inbox notifications to the durable
 // queue, then drains only the configured APNs environment. All provider state
@@ -21,7 +24,7 @@ func runPushDeliveryPass(ctx context.Context, deliveries repository.PushDelivery
 	if _, err := deliveries.EnqueueNotificationDeliveries(ctx, now, 100); err != nil {
 		return 0, err
 	}
-	jobs, err := deliveries.ClaimPushDeliveries(ctx, now, 100, pushDeliveryLease, environment)
+	jobs, err := deliveries.ClaimPushDeliveries(ctx, now, pushDeliveryBatchSize, pushDeliveryLease, environment)
 	if err != nil {
 		return 0, err
 	}

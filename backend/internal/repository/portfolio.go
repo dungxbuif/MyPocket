@@ -89,6 +89,17 @@ func PortfolioCorrectionHash(input PortfolioTradeCorrectionInput) string {
 	return hex.EncodeToString(sum[:])
 }
 
+func PortfolioMutationHash(input any) string {
+	data, _ := json.Marshal(input)
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
+
+type PortfolioIdempotentRepository interface {
+	CreateAssetIdempotent(ownerID string, input PortfolioAssetInput, idempotencyKey, requestHash string) (*entity.PortfolioAsset, bool, error)
+	CreateTradeIdempotent(ownerID, assetID string, input PortfolioTradeInput, idempotencyKey, requestHash string) (*entity.PortfolioTrade, bool, error)
+}
+
 type PortfolioRepository interface {
 	ListAssets(ownerID string) ([]entity.PortfolioAsset, error)
 	CreateAsset(ownerID string, input PortfolioAssetInput) (*entity.PortfolioAsset, error)

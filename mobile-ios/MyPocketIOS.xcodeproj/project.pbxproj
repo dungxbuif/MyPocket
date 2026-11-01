@@ -823,6 +823,7 @@
 		643C37633FBB5348264666CD /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = production;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MyPocketIOS/MyPocketIOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
@@ -925,6 +926,7 @@
 		B0872D1A9118BB7164DCC726 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				APS_ENVIRONMENT = development;
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_ENTITLEMENTS = MyPocketIOS/MyPocketIOS.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";

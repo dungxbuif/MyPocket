@@ -20,8 +20,10 @@ struct MainTabView: View {
     @State private var feedbackScreenshot: Data?
     @State private var keyboardVisible = false
     @State private var assistantDraft = ""
+    @State private var assistantPresented = false
     @State private var footerClearance: CGFloat = 0
     @State private var requestedWalletID: String?
+    @State private var overviewPath: [MoreDestination] = []
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     init(auth: AuthViewModel, externalRoute: AppRoute? = nil) {
@@ -31,31 +33,59 @@ struct MainTabView: View {
 
     var body: some View {
         GeometryReader { geometry in
-        let navigationVisible = selection != "assistant" && !keyboardVisible
-        let dockVisible = selection != "assistant" && !keyboardVisible && !feedbackPresented && !feedbackCapturePending
+        // A full-screen Assistant is a separate experience, not another shell
+        // route. Remove shell controls from both rendering and accessibility
+        // while it is presented so VoiceOver and UI automation cannot reach
+        // navigation or Feedback through the cover.
+        let navigationVisible = !keyboardVisible && !assistantPresented
+        let feedbackVisible = !keyboardVisible && !assistantPresented && !feedbackPresented && !feedbackCapturePending
         let navigationHeight = navigationVisible ? MPMetrics.bottomNavigationHeight : 0
-        let dockHeight = dockVisible ? MPShellNavigation.feedbackDockHeight : 0
         let contentHeight = MPShellContentLayout.routeHeight(
             containerHeight: geometry.size.height,
-            navigationHeight: navigationHeight + dockHeight
+            navigationHeight: navigationHeight
         )
-        ZStack(alignment: .bottom) {
+        ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
             VStack(spacing: 0) {
                 Group {
                     switch selection {
                     case "overview":
+                        NavigationStack(path: $overviewPath) {
                         OverviewView(
                             api: auth.financeAPI,
                             ownerID: authenticatedUserID,
                             snapshotCache: auth.financialCache,
                             masked: $masked,
                             onOpenTransactions: { selection = "transactions" },
-                            onOpenWallets: { requestedAccountDestination = .wallets; selection = "account" },
-                            onOpenMonth: { requestedAccountDestination = .months; selection = "account" },
-                            onOpenJars: { requestedAccountDestination = .jars; selection = "account" },
-                            onOpenNotifications: { requestedAccountDestination = .notifications; selection = "account" }
+                            onOpenWallets: { overviewPath.append(.wallets) },
+                            onOpenMonth: { overviewPath.append(.months) },
+                            onOpenJars: { overviewPath.append(.jars) },
+                            onOpenNotifications: { overviewPath.append(.notifications) }
                         )
+                        .navigationDestination(for: MoreDestination.self) { destination in
+                            SecondaryScreen(
+                                destination: destination,
+                                api: auth.financeAPI,
+                                auth: auth,
+                                masked: masked,
+                                initialWalletID: requestedWalletID,
+                                onOpenJars: { overviewPath = [.jars] },
+                                onOpenTransactions: { walletID in
+                                    overviewPath.removeAll()
+                                    scopedWalletID = walletID
+                                    selection = "transactions"
+                                },
+                                onOpenAIEntry: {
+                                    overviewPath.removeAll()
+                                    requestedAccountDestination = .aiEntry
+                                    selection = "account"
+                                },
+                                onOpenAssistant: presentAssistant,
+                                onBack: { if !overviewPath.isEmpty { overviewPath.removeLast() } }
+                            )
+                        }
+                        .toolbar(.hidden, for: .navigationBar)
+                        }
                     case "transactions":
                         TransactionsView(
                             api: auth.financeAPI,
@@ -81,8 +111,15 @@ struct MainTabView: View {
                             }
                         )
                         .id(scopedWalletID ?? "all-wallets")
-                    case "assistant":
-                        AssistantView(api: auth.financeAPI, onBack: { selection = "overview" }, ownerID: assistantOwnerID, masked: masked, draft: $assistantDraft)
+                    case "reports":
+                        MonthlyReportsView(
+                            api: auth.financeAPI,
+                            onBack: {},
+                            masked: masked,
+                            ownerID: authenticatedUserID,
+                            showsBack: false,
+                            onChatHandoff: presentAssistant
+                        )
                     case "account":
                         MoreView(
                             api: auth.financeAPI,
@@ -98,11 +135,7 @@ struct MainTabView: View {
                                 requestedAccountDestination = .aiEntry
                                 selection = "account"
                             },
-                            onOpenAssistant: { draft in
-                                assistantDraft = draft
-                                requestedAccountDestination = .assistant
-                                selection = "account"
-                            }
+                            onOpenAssistant: presentAssistant
                         )
                     default:
                         OverviewView(
@@ -117,24 +150,11 @@ struct MainTabView: View {
                 }
                 .frame(width: geometry.size.width, height: contentHeight, alignment: .top)
                 .clipped()
+                .accessibilityHidden(assistantPresented)
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier("shell-content-viewport")
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            if dockVisible {
-                MPFeedbackDock(isVisible: !feedbackPresented && !feedbackCapturePending) {
-                    // Hide the trigger for a rendered frame before capture.
-                    feedbackCapturePending = true
-                    Task { @MainActor in
-                        try? await Task.sleep(for: .milliseconds(100))
-                        guard feedbackCapturePending else { return }
-                        feedbackScreenshot = ScreenSnapshot.capture()
-                        feedbackCapturePending = false
-                        feedbackPresented = true
-                    }
-                }
-                .frame(height: dockHeight)
-            }
             if navigationVisible {
                 ZStack(alignment: .bottom) {
                     MPBottomNavigation(
@@ -181,6 +201,25 @@ struct MainTabView: View {
             .frame(height: MPMetrics.bottomNavigationHeight)
             }
             }
+            if feedbackVisible {
+                MPFeedbackBubble {
+                    // Hide the trigger for one rendered frame before capture.
+                    feedbackCapturePending = true
+                    Task { @MainActor in
+                        try? await Task.sleep(for: .milliseconds(100))
+                        guard feedbackCapturePending else { return }
+                        feedbackScreenshot = ScreenSnapshot.capture()
+                        feedbackCapturePending = false
+                        feedbackPresented = true
+                    }
+                }
+                .padding(.trailing, MPMetrics.pagePadding)
+                // Remain a true overlay while clearing any pinned editor
+                // footer. This moves the bubble; it never reserves route
+                // height or inserts a dock/spacer into the shell.
+                .padding(.bottom, navigationHeight + footerClearance + 8)
+                .zIndex(4)
+            }
         }
         if feedbackPresented {
             FeedbackOverlay(api: auth.financeAPI, screenshot: feedbackScreenshot) { feedbackPresented = false }
@@ -193,6 +232,15 @@ struct MainTabView: View {
         .onPreferenceChange(MPFloatingActionClearanceKey.self) { footerClearance = $0 }
         .mpObserveKeyboardVisibility($keyboardVisible)
         .onChange(of: authenticatedUserID) { _, _ in assistantDraft = "" }
+        .fullScreenCover(isPresented: $assistantPresented) {
+            AssistantView(
+                api: auth.financeAPI,
+                onBack: { assistantPresented = false },
+                ownerID: assistantOwnerID,
+                masked: masked,
+                draft: $assistantDraft
+            )
+        }
         .onAppear { apply(externalRoute) }
         .onChange(of: externalRoute) { _, route in apply(route) }
         .animation(.easeInOut(duration: 0.2), value: feedbackPresented)
@@ -208,12 +256,18 @@ struct MainTabView: View {
         return nil
     }
 
+    private func presentAssistant(_ draft: String) {
+        if !draft.isEmpty { assistantDraft = draft }
+        assistantPresented = true
+    }
+
     private func apply(_ route: AppRoute?) {
         guard let route else { return }
         switch route {
         case .overview:
             requestedWalletID = nil
             requestedAccountDestination = nil
+            overviewPath.removeAll()
             selection = "overview"
         case .transactions(let walletID):
             requestedWalletID = nil
@@ -259,8 +313,8 @@ struct MainTabView: View {
             selection = "account"
         case .reports:
             requestedWalletID = nil
-            requestedAccountDestination = .reports
-            selection = "account"
+            requestedAccountDestination = nil
+            selection = "reports"
         case .portfolio:
             requestedWalletID = nil
             requestedAccountDestination = .portfolio
@@ -276,7 +330,7 @@ struct MainTabView: View {
         case .assistant:
             requestedWalletID = nil
             requestedAccountDestination = nil
-            selection = "assistant"
+            assistantPresented = true
         case .aiEntry:
             requestedWalletID = nil
             requestedAccountDestination = .aiEntry

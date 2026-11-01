@@ -80,8 +80,8 @@ enum MPChatComposerMetrics {
     }
 
     static func minimumHeight(mode: MPChatComposerMode, keyboardVisible: Bool, accessibilitySize: Bool) -> CGFloat {
-        if keyboardVisible { return accessibilitySize ? 76 : 84 }
-        return mode == .welcome ? 104 : 92
+        if keyboardVisible { return accessibilitySize ? 72 : 64 }
+        return mode == .welcome ? 72 : 64
     }
 }
 
@@ -97,6 +97,8 @@ struct MPChatComposer: View {
     var isKeyboardVisible = false
     var focusRequest = 0
     var dismissKeyboardRequest = 0
+    var embedded = false
+    var allowsEmptySend = false
     @FocusState private var focused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -105,7 +107,7 @@ struct MPChatComposer: View {
     }
 
     private var sendDisabled: Bool {
-        onCancel == nil && (!isEnabled || isBusy || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        onCancel == nil && (!isEnabled || isBusy || (!allowsEmptySend && text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty))
     }
 
     var body: some View {
@@ -134,7 +136,7 @@ struct MPChatComposer: View {
                     if let onCancel { onCancel() }
                     else { onSend() }
                 } label: {
-                    Image(systemName: onCancel == nil ? "arrow.up" : "stop.fill")
+                    MPIconImage(systemName: onCancel == nil ? MPIconCatalog.assetName(for: .send) : "stop.fill")
                         .font(MPFont.bodyEmphasis)
                         .frame(width: MPMetrics.hitTarget, height: MPMetrics.hitTarget)
                         .foregroundStyle(.white)
@@ -148,10 +150,12 @@ struct MPChatComposer: View {
             }
         }
         .padding(12)
-        .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.groupedSurfaceCornerRadius, style: .continuous))
+        .background(embedded ? Color.clear : MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.groupedSurfaceCornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: MPMetrics.groupedSurfaceCornerRadius, style: .continuous)
-                .stroke(focused ? MPColor.action : MPColor.line, lineWidth: MPMetrics.inputBorderWidth)
+            if !embedded {
+                RoundedRectangle(cornerRadius: MPMetrics.groupedSurfaceCornerRadius, style: .continuous)
+                    .stroke(focused ? MPColor.action : MPColor.line, lineWidth: MPMetrics.inputBorderWidth)
+            }
         }
         // Keep a full-size accessibility anchor for the shared composer card.
         // A 1x1 overlay makes UI tests (and assistive navigation) treat the

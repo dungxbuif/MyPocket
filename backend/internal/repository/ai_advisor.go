@@ -83,6 +83,13 @@ type AdvisorHistoryMetadataRepository interface {
 	AdvisorHistoryMeta(context.Context, string, string) (entity.AdvisorHistoryMeta, error)
 }
 
+// AdvisorConversationRepository creates or reads the owner's current
+// conversation without creating a placeholder message. Multipart Assistant
+// entry uses it when the first user action in a conversation is an attachment.
+type AdvisorConversationRepository interface {
+	EnsureAdvisorConversation(context.Context, string) (entity.AdvisorHistoryMeta, error)
+}
+
 // AdvisorLifecycleRepository contains explicit reset operations separately
 // from the core advisor contract so deterministic provider/unit adapters do not
 // need to implement database lifecycle storage.

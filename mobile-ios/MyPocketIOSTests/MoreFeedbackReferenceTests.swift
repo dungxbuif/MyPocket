@@ -17,10 +17,10 @@ final class MoreFeedbackReferenceTests: XCTestCase {
         XCTAssertEqual(MoreReferencePresentation.rowSpacing, 0)
     }
 
-    func testMoreReferenceSectionsKeepSinglePrimaryAssistantAndNotificationEntries() {
+    func testMoreReferenceSectionsKeepSingleAssistantAIEntryAndNoDuplicateNotifications() {
         let visibleItems = MoreReferencePresentation.sections.flatMap(\.items)
 
-        XCTAssertFalse(visibleItems.contains(.assistant))
+        XCTAssertEqual(visibleItems.filter { $0 == .assistant }.count, 1)
         XCTAssertFalse(visibleItems.contains(.notifications))
         XCTAssertEqual(visibleItems.filter { $0 == .aiEntry }.count, 1)
     }

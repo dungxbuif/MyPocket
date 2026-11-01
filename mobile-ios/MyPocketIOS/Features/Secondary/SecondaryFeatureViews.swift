@@ -2063,6 +2063,10 @@ struct PortfolioView: View {
     @State private var correctionSaving = false
     @State private var correctionError: String?
     @State private var correctionIdempotencyKey: String?
+    @State private var assetCreateKey: String?
+    @State private var assetCreateFingerprint: String?
+    @State private var tradeCreateKey: String?
+    @State private var tradeCreateFingerprint: String?
     @State private var saving = false
     @State private var accountTimezone = TimeZone.current.identifier
 
@@ -2619,12 +2623,16 @@ struct PortfolioView: View {
         defer { saving = false }
         do {
             guard !assetUnitCode.isEmpty else { error = "Chọn loại tài sản và đơn vị."; return }
-            let created = try await api.createPortfolioAsset(symbol: draft.symbol, name: draft.name, unitLabel: assetUnitCode)
+            let fingerprint = [draft.symbol, draft.name, assetUnitCode].joined(separator: "|")
+            if assetCreateFingerprint != fingerprint { assetCreateKey = UUID().uuidString; assetCreateFingerprint = fingerprint }
+            let created = try await api.createPortfolioAsset(symbol: draft.symbol, name: draft.name, unitLabel: assetUnitCode, idempotencyKey: assetCreateKey ?? UUID().uuidString)
             if tradeAssetID.isEmpty { tradeAssetID = created.id }
             symbol = ""
             assetName = ""
             assetUnitCode = ""
             assetEditorPresented = false
+            assetCreateKey = nil
+            assetCreateFingerprint = nil
             await load()
         }
         catch { self.error = "Không thể tạo tài sản." }
@@ -2691,11 +2699,16 @@ struct PortfolioView: View {
         saving = true; error = nil
         defer { saving = false }
         do {
-            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: normalizedQuantity, unitPrice: parsedPrice, fee: parsedFee, occurredAt: Self.accountLocalNoonTimestamp(tradeDate, timezone: accountTimezone), note: nil))
+            let occurredAt = Self.accountLocalNoonTimestamp(tradeDate, timezone: accountTimezone)
+            let fingerprint = [asset.id, tradeSide, normalizedQuantity, String(parsedPrice), String(parsedFee), occurredAt].joined(separator: "|")
+            if tradeCreateFingerprint != fingerprint { tradeCreateKey = UUID().uuidString; tradeCreateFingerprint = fingerprint }
+            _ = try await api.createPortfolioTrade(assetID: asset.id, input: PortfolioTradeInputModel(side: tradeSide, quantity: normalizedQuantity, unitPrice: parsedPrice, fee: parsedFee, occurredAt: occurredAt, note: nil), idempotencyKey: tradeCreateKey ?? UUID().uuidString)
             tradeQuantity = ""
             tradePrice = ""
             tradeFee = ""
             tradeEditorPresented = false
+            tradeCreateKey = nil
+            tradeCreateFingerprint = nil
             await load()
         } catch { self.error = "Không thể ghi nhận giao dịch danh mục." }
     }

@@ -122,14 +122,15 @@ enum MPFont {
     static let headline = semantic(.headline, weight: .semibold)
     static let section = semantic(.subheadline, weight: .semibold)
     static let subheadline = semantic(.subheadline, weight: .semibold)
-    static let body = semantic(.subheadline, weight: .regular)
-    // Chat drafts are prose: use regular weight while retaining native scaling.
-    static let chatBody = semantic(.subheadline, weight: .regular)
-    static let chatCaption = Font.system(.footnote, design: .default).weight(.regular)
+    // Owner preference: keep the compact type scale, but give prose one
+    // additional weight step for clearer rendering on device.
+    static let body = semantic(.subheadline, weight: .medium)
+    static let chatBody = semantic(.subheadline, weight: .medium)
+    static let chatCaption = Font.system(.footnote, design: .default).weight(.medium)
     static let bodyEmphasis = semantic(.subheadline, weight: .medium)
-    static let bodySmall = semantic(.footnote, weight: .regular)
+    static let bodySmall = semantic(.footnote, weight: .medium)
     static let label = semantic(.caption, weight: .semibold)
-    static let labelSmall = semantic(.caption, weight: .regular)
+    static let labelSmall = semantic(.caption, weight: .medium)
     /// Compact money rows use a distinct role so transaction and report
     /// amounts do not inherit prose sizing or introduce local font choices.
     static let amount = semantic(.callout, weight: .medium).monospacedDigit()
@@ -137,7 +138,7 @@ enum MPFont {
 
     /// UIKit-backed fields use the same system family as SwiftUI and preserve
     /// the device's native text metrics.
-    static let uiBody: UIFont = UIFont.systemFont(ofSize: 16)
+    static let uiBody: UIFont = UIFont.systemFont(ofSize: 16, weight: .medium)
 
     private static func semantic(_ style: Font.TextStyle, weight: Font.Weight = .regular) -> Font {
         // Use native semantic styles so Dynamic Type remains automatic. The

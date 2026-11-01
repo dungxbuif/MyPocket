@@ -26,10 +26,10 @@ final class AdvisorEntryObserver: ObservableObject {
         token = currentToken
         state = .processing(runID: id)
         lastError = nil
-        for delay in [Duration.seconds(0), .seconds(1), .seconds(2), .seconds(3), .seconds(5)] {
+        for attempt in 0..<105 {
             guard token == currentToken else { return }
             do {
-                if delay > .zero { try await Task.sleep(for: delay) }
+                if attempt > 0 { try await Task.sleep(for: .seconds(2)) }
                 let result = try await fetchTask(id)
                 guard token == currentToken else { return }
                 task = result
@@ -48,6 +48,7 @@ final class AdvisorEntryObserver: ObservableObject {
                 return
             }
         }
+        lastError = "Yêu cầu vẫn đang xử lý. Bạn có thể mở lại Trợ lý để tiếp tục theo dõi."
     }
 
     func reset() {

@@ -187,11 +187,13 @@ struct SavingsReportsView: View {
 enum ReportTransactionScope: Equatable, Sendable {
     case savings(month: String, walletID: String?, section: String)
     case budget(id: String)
+    case monthly(month: String, walletID: String?, categoryID: String?, title: String)
 
     var title: String {
         switch self {
         case .savings(_, _, let section): section == "goals" ? "Giao dịch ví mục tiêu" : "Thu / chi toàn tài khoản"
         case .budget: "Giao dịch ngân sách"
+        case .monthly(_, _, _, let title): title
         }
     }
 }
@@ -216,6 +218,7 @@ struct ReportTransactionsView: View {
         case .savings:
             [("all", "Tất cả"), ("income", "Thu"), ("expense", "Chi")].map { MPSelectionOption(id: $0.0, label: $0.1) }
         case .budget: []
+        case .monthly: [("all", "Tất cả"), ("income", "Thu"), ("expense", "Chi")].map { MPSelectionOption(id: $0.0, label: $0.1) }
         }
     }
 
@@ -270,6 +273,8 @@ struct ReportTransactionsView: View {
             case .savings(let month, let walletID, let section):
                 result = try await api.savingsTransactions(month: month, walletID: walletID, section: section, kind: requestedKind, offset: offset, ownerID: ownerID)
             case .budget(let id): result = try await api.budgetTransactions(id: id, offset: offset, ownerID: ownerID)
+            case .monthly(let month, let walletID, let categoryID, _):
+                result = try await api.monthlyReportTransactions(month: month, walletID: walletID, categoryID: categoryID, kind: requestedKind, offset: offset, ownerID: ownerID)
             }
             try Task.checkCancellation()
             guard kind == requestedKind else { return }

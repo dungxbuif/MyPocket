@@ -116,7 +116,8 @@ func (r *ReportSnapshotPostgresRepository) DeleteExpired(ctx context.Context, no
 	}
 	var ids []string
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		query := tx.WithContext(ctx).Table("report_snapshots AS s").Select("s.id").Where("s.expires_at <= ?", now.UTC()).Where("NOT EXISTS (SELECT 1 FROM report_analyses a WHERE a.snapshot_id = s.id AND a.status IN (?, ?))", entity.ReportAnalysisStatusQueued, entity.ReportAnalysisStatusRunning).Order("s.expires_at ASC").Limit(limit).Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Scan(&ids)
+		retentionCutoff := now.UTC().Add(-entity.ReportSnapshotRetention)
+		query := tx.WithContext(ctx).Table("report_snapshots AS s").Select("s.id").Where("s.created_at <= ?", retentionCutoff).Where("NOT EXISTS (SELECT 1 FROM report_analyses a WHERE a.snapshot_id = s.id AND a.status IN (?, ?))", entity.ReportAnalysisStatusQueued, entity.ReportAnalysisStatusRunning).Order("s.created_at ASC").Limit(limit).Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Scan(&ids)
 		if query.Error != nil {
 			return query.Error
 		}

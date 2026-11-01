@@ -149,6 +149,13 @@ final class FinanceAPI: @unchecked Sendable {
         return try await client.send(APIRequest(path: "/reports/monthly?\(components.percentEncodedQuery ?? "")", expectedOwnerID: ownerID))
     }
 
+    func monthlyReportTransactions(month: String, walletID: String? = nil, categoryID: String? = nil, kind: String = "all", offset: Int, ownerID: String?) async throws -> ReportTransactionPageModel {
+        var items = [URLQueryItem(name: "month", value: month), URLQueryItem(name: "kind", value: kind), URLQueryItem(name: "limit", value: "50"), URLQueryItem(name: "offset", value: String(offset))]
+        if let walletID { items.append(URLQueryItem(name: "wallet_id", value: walletID)) }
+        if let categoryID { items.append(URLQueryItem(name: "category_id", value: categoryID)) }
+        return try await client.send(APIRequest(path: reportPath("/reports/monthly/transactions", query: items), expectedOwnerID: ownerID))
+    }
+
     func requestReportAnalysis(_ input: ReportAnalysisRequestModel) async throws -> ReportAnalysisModel {
         try await client.send(APIRequest(path: "/reports/analyses", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
     }
@@ -388,8 +395,8 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/portfolio/summary"))
     }
 
-    func createPortfolioAsset(symbol: String, name: String, unitLabel: String) async throws -> PortfolioAssetModel {
-        try await client.send(APIRequest(path: "/portfolio/assets", method: .post, body: try body(["symbol": symbol, "name": name, "unit_label": unitLabel]), idempotencyKey: UUID().uuidString))
+    func createPortfolioAsset(symbol: String, name: String, unitLabel: String, idempotencyKey: String) async throws -> PortfolioAssetModel {
+        try await client.send(APIRequest(path: "/portfolio/assets", method: .post, body: try body(["symbol": symbol, "name": name, "unit_label": unitLabel]), idempotencyKey: idempotencyKey))
     }
 
     func updatePortfolioAsset(assetID: String, symbol: String, name: String) async throws -> PortfolioAssetModel {
@@ -418,8 +425,8 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/price-source", method: .patch, body: try body(source)))
     }
 
-    func createPortfolioTrade(assetID: String, input: PortfolioTradeInputModel) async throws -> PortfolioTradeModel {
-        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/trades", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    func createPortfolioTrade(assetID: String, input: PortfolioTradeInputModel, idempotencyKey: String) async throws -> PortfolioTradeModel {
+        try await client.send(APIRequest(path: "/portfolio/assets/\(assetID)/trades", method: .post, body: try body(input), idempotencyKey: idempotencyKey))
     }
 
     func portfolioTrades(assetID: String) async throws -> [PortfolioTradeModel] {
@@ -582,6 +589,11 @@ final class FinanceAPI: @unchecked Sendable {
             files: files,
             idempotencyKey: input.clientRequestID
         )
+    }
+
+    func cancelAdvisorEntry(id: String) async throws {
+        let escapedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        let _: EmptyResponse = try await client.send(APIRequest(path: "/ai/advisor/entries/\(escapedID)/cancel", method: .post, idempotencyKey: UUID().uuidString))
     }
 
     func decideAdvisorEntry(_ input: AdvisorEntryDecisionModel) async throws -> AdvisorEntryTaskModel {

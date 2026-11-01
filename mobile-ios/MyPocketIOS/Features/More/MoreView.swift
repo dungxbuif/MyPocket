@@ -20,7 +20,7 @@ enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
         case .portfolio: return "Tài sản tích lũy"
         case .credit: return "Sổ tín dụng"
         case .notifications: return "Thông báo"
-        case .assistant: return "Finance Assistant"
+        case .assistant: return "Trợ lý tài chính"
         case .aiEntry: return "Nhập giao dịch bằng AI"
         case .feedback: return "Phản hồi & changelog"
         case .account: return "Tài khoản"
@@ -63,7 +63,7 @@ enum MoreReferencePresentation {
         Section(title: "Ví của tôi", items: [.wallets, .credit, .portfolio]),
         Section(title: "Kế hoạch", items: [.budgets, .jars, .months]),
         Section(title: "Giao dịch", items: [.categories, .recurring, .travel, .reports]),
-        Section(title: "Trợ lý", items: [.aiEntry])
+        Section(title: "Trợ lý", items: [.assistant, .aiEntry])
     ]
 
     static let surfaceStyle: MPSurfaceCardStyle = .grouped
@@ -140,7 +140,11 @@ struct MoreView: View {
                                                 systemName: item.icon,
                                                 accessibilityIdentifier: "more-destination-\(item.id)"
                                             ) {
-                                                navigationPath = [item]
+                                                if item == .assistant {
+                                                    onOpenAssistant("")
+                                                } else {
+                                                    navigationPath = [item]
+                                                }
                                             }
                                         }
                                     }

@@ -18,6 +18,16 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## Native navigation UX — draft plan, 2026-11-01
+
+Owner correction: Assistant is separate and hides primary navigation and the
+feedback bubble; the opposite audit finding is invalid. Preserve base styling.
+[Design](tickets/NATIVE-NAVIGATION-UX-20261101-DETAIL_DESIGN.md) and
+[plan](../superpowers/plans/2026-11-01-native-navigation-ux.md) cover per-tab stacks,
+origin-aware return, contextual detail navigation and shared editors/pickers.
+Tab reorganization is proposed, not yet approved/implemented. Next: review this
+navigation proposal; independent backend/Assistant-contract audit findings remain.
+
 ## Native UI density/chat/icons — released 1.3.0 build 7, 2026-11-01
 
 Owner-requested [design](tickets/NATIVE-CHAT-COMPOSER-20261031-DETAIL_DESIGN.md)

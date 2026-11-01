@@ -391,7 +391,7 @@ func (h *AdvisorHandler) EntryPost(c *gin.Context) {
 		transactionUnauthorized(c)
 		return
 	}
-	if h == nil || h.Entry == nil {
+	if h == nil || h.Entry == nil || h.Service == nil || h.Service.Store == nil {
 		advisorFailure(c, errors.New("advisor entry unavailable"))
 		return
 	}
@@ -416,13 +416,35 @@ func (h *AdvisorHandler) EntryPost(c *gin.Context) {
 		advisorFailure(c, repository.ErrAdvisorEntryInvalid)
 		return
 	}
-	generation, err := strconv.ParseInt(strings.TrimSpace(c.PostForm("generation")), 10, 64)
-	if err != nil {
+	conversationID := strings.TrimSpace(c.PostForm("conversation_id"))
+	generationText := strings.TrimSpace(c.PostForm("generation"))
+	var generation int64
+	if generationText != "" {
+		generation, err = strconv.ParseInt(generationText, 10, 64)
+		if err != nil {
+			advisorBadRequest(c)
+			return
+		}
+	}
+	if conversationID == "" && generation == 0 {
+		store, ok := h.Service.Store.(repository.AdvisorConversationRepository)
+		if !ok {
+			advisorFailure(c, repository.ErrAdvisorEntryInvalid)
+			return
+		}
+		meta, ensureErr := store.EnsureAdvisorConversation(c.Request.Context(), principal.OwnerID)
+		if ensureErr != nil {
+			advisorFailure(c, ensureErr)
+			return
+		}
+		conversationID = meta.ConversationID
+		generation = meta.Generation
+	} else if conversationID == "" || generation <= 0 {
 		advisorBadRequest(c)
 		return
 	}
 	task, err := h.Entry.Accept(c.Request.Context(), principal, usecase.AdvisorEntryInput{
-		ClientRequestID: strings.TrimSpace(c.PostForm("client_request_id")), ConversationID: strings.TrimSpace(c.PostForm("conversation_id")),
+		ClientRequestID: strings.TrimSpace(c.PostForm("client_request_id")), ConversationID: conversationID,
 		Generation: generation, Text: c.PostForm("text"), Timezone: timezone, Files: files,
 	})
 	if err != nil {

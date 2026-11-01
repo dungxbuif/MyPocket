@@ -5,25 +5,34 @@ struct MonthlyReportsView: View {
     let onBack: () -> Void
     let masked: Bool
     let ownerID: String?
+    let showsBack: Bool
     @StateObject private var model = MonthlyReportsViewModel()
     @State private var month = MPFormat.currentMonth
     @State private var selectedPoint: ReportPoint?
     @State private var selectedCategory: ReportCategoryTotal?
+    @State private var drilldown: ReportTransactionScope?
     @State private var accountTimezone = TimeZone.current.identifier
     let onChatHandoff: (String) -> Void
 
-    init(api: FinanceAPI, onBack: @escaping () -> Void, masked: Bool, ownerID: String?, onChatHandoff: @escaping (String) -> Void = { _ in }) {
+    init(api: FinanceAPI, onBack: @escaping () -> Void, masked: Bool, ownerID: String?, showsBack: Bool = true, onChatHandoff: @escaping (String) -> Void = { _ in }) {
         self.api = api
         self.onBack = onBack
         self.masked = masked
         self.ownerID = ownerID
+        self.showsBack = showsBack
         self.onChatHandoff = onChatHandoff
     }
 
     var body: some View {
+        Group {
+        if let drilldown {
+            ReportTransactionsView(api: api, ownerID: ownerID, masked: masked, scope: drilldown, onBack: { self.drilldown = nil })
+        } else {
         ScrollView {
             VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
-                MPScreenHeader(title: "Báo cáo", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: {
+                MPScreenHeader(title: "Báo cáo", leading: {
+                    if showsBack { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }
+                }, trailing: {
                     MPIconButton(systemName: MPIconCatalog.assetName(for: .report), label: "Tải lại") { Task { await load() } }
                 })
                 MPText("Tổng hợp theo tháng, không mở sổ giao dịch mặc định.", style: .secondary)
@@ -53,9 +62,6 @@ struct MonthlyReportsView: View {
                             MPMetricItem(title: "Giao dịch", value: "\(report.transactionCount)", masked: false)
                         ], masked: false)
                     }
-                    if let insider = model.insider {
-                        MPReportsInsiderCard(value: insider, masked: masked)
-                    }
                     if !report.daily.isEmpty {
                         MPSurfaceCard(style: .grouped) {
                             MPTrendChart(
@@ -82,6 +88,9 @@ struct MonthlyReportsView: View {
                     if let selectedCategory {
                         let value = masked ? MPFormat.maskedValue : MPFormat.money(selectedCategory.amount)
                         MPStatusMessage(text: selectedCategory.name + " · " + String(selectedCategory.count) + " giao dịch · " + value, tone: .info)
+                        MPButton("Xem giao dịch \(selectedCategory.name)", style: .secondary) {
+                            drilldown = .monthly(month: report.month, walletID: nil, categoryID: selectedCategory.categoryID, title: selectedCategory.name)
+                        }
                     }
                     if let insight = report.insight, !insight.isEmpty {
                         MPSurfaceCard(style: .grouped) {
@@ -103,6 +112,8 @@ struct MonthlyReportsView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
+        }
+        }
     }
 
     private func load() async {

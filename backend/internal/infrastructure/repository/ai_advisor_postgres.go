@@ -346,6 +346,26 @@ func (r *AdvisorPostgresRepository) AdvisorHistoryMeta(ctx context.Context, owne
 	return meta, nil
 }
 
+func (r *AdvisorPostgresRepository) EnsureAdvisorConversation(ctx context.Context, ownerID string) (entity.AdvisorHistoryMeta, error) {
+	if r == nil || r.db == nil || strings.TrimSpace(ownerID) == "" {
+		return entity.AdvisorHistoryMeta{}, contract.ErrNotFound
+	}
+	var conversation *entity.AdvisorConversation
+	serverTime := time.Now().UTC()
+	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		var err error
+		conversation, err = r.lockConversation(tx, ownerID)
+		if err != nil {
+			return err
+		}
+		return r.expireIdleConversation(tx, conversation, serverTime)
+	})
+	if err != nil {
+		return entity.AdvisorHistoryMeta{}, err
+	}
+	return conversation.HistoryMeta(serverTime), nil
+}
+
 func (r *AdvisorPostgresRepository) AppendEvent(ctx context.Context, ownerID, runID, eventType string, payload any) (*entity.AdvisorEvent, error) {
 	var event entity.AdvisorEvent
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {

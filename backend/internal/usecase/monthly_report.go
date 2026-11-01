@@ -51,3 +51,18 @@ func (s *MonthlyReportService) Snapshot(ctx context.Context, principal Principal
 	}
 	return s.Snapshots.GetOwned(ctx, principal.OwnerID, snapshotID, now)
 }
+
+func (s *MonthlyReportService) Transactions(ctx context.Context, principal Principal, scope entity.MonthlyReportScope, categoryID, kind string, limit, offset int) (entity.SavingsTransactionPage, error) {
+	if s == nil {
+		return entity.SavingsTransactionPage{}, repository.ErrNotFound
+	}
+	reader, ok := s.Reader.(repository.MonthlyReportTransactionReader)
+	if !ok {
+		return entity.SavingsTransactionPage{}, repository.ErrNotFound
+	}
+	now := time.Now().UTC()
+	if s.Now != nil {
+		now = s.Now().UTC()
+	}
+	return reader.ReadMonthlyTransactions(ctx, principal.OwnerID, scope, categoryID, kind, limit, offset, now)
+}

@@ -445,14 +445,14 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertGreaterThan(accessible.height, compact.height)
     }
 
-    func testPrimaryNavigationMatchesWebShellAndExposesGlobalAddAction() {
+    func testPrimaryNavigationMatchesNativeShellAndExposesGlobalAddAction() {
         XCTAssertEqual(
             MPShellNavigation.primaryItems.map(\.id),
-            ["overview", "transactions", "assistant", "account"]
+            ["overview", "transactions", "reports", "account"]
         )
         XCTAssertEqual(
             MPShellNavigation.primaryItems.map(\.title),
-            ["Tổng quan", "Giao dịch", "Trợ lý", "Tài khoản"]
+            ["Tổng quan", "Giao dịch", "Báo cáo", "Tài khoản"]
         )
         XCTAssertEqual(MPShellNavigation.addActionAccessibilityID, "add-transaction-button")
     }
@@ -982,6 +982,7 @@ final class DesignSystemTests: XCTestCase {
 
     func testAssistantComposerRequiresEnabledCapabilityAndNonEmptyText() {
         XCTAssertTrue(AssistantComposerPolicy.canSend(enabled: true, text: "  tháng này  ", activeRunID: nil))
+        XCTAssertTrue(AssistantComposerPolicy.canSend(enabled: true, text: "", attachmentCount: 1, activeRunID: nil))
         XCTAssertFalse(AssistantComposerPolicy.canSend(enabled: false, text: "tháng này", activeRunID: nil))
         XCTAssertFalse(AssistantComposerPolicy.canSend(enabled: true, text: "   ", activeRunID: nil))
         XCTAssertFalse(AssistantComposerPolicy.canSend(enabled: true, text: "tháng này", activeRunID: "run-1"))
@@ -1305,12 +1306,21 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
         XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .welcome, accessibilitySize: false), 3...5)
         XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .conversation, accessibilitySize: false), 2...5)
         XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .conversation, accessibilitySize: true), 2...3)
-        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .welcome, keyboardVisible: false, accessibilitySize: false), 104)
-        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .conversation, keyboardVisible: false, accessibilitySize: false), 92)
+        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .welcome, keyboardVisible: false, accessibilitySize: false), 72)
+        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .conversation, keyboardVisible: false, accessibilitySize: false), 64)
         XCTAssertGreaterThan(
             MPChatComposerMetrics.minimumHeight(mode: .conversation, keyboardVisible: true, accessibilitySize: false),
             44
         )
+    }
+
+    func testBaseProseUsesSlightlyHeavierNativeWeight() throws {
+        let traits = try XCTUnwrap(
+            MPFont.uiBody.fontDescriptor.object(forKey: .traits)
+                as? [UIFontDescriptor.TraitKey: Any]
+        )
+        let weight = try XCTUnwrap((traits[.weight] as? NSNumber)?.doubleValue)
+        XCTAssertEqual(weight, Double(UIFont.Weight.medium.rawValue), accuracy: 0.001)
     }
 
     func testAssistantScrollPolicyOnlyFollowsWhenNearTheBottom() {

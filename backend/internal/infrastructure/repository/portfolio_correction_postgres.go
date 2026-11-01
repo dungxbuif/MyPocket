@@ -31,7 +31,7 @@ func (r *PortfolioPostgresRepository) CorrectTrade(ownerID, assetID string, inpu
 	var result portfoliorepo.PortfolioTradeCorrectionResult
 	replayed := false
 	err := r.db.Transaction(func(tx *gorm.DB) error {
-		mutation, created, err := reservePortfolioMutation(tx, ownerID, idempotencyKey, requestHash)
+		mutation, created, err := reservePortfolioMutation(tx, ownerID, "portfolio.trade_correction", idempotencyKey, requestHash)
 		if err != nil {
 			return err
 		}
@@ -165,8 +165,8 @@ func nextPortfolioRevision(revisions []entity.PortfolioTradeRevision, sourceID s
 	return max + 1
 }
 
-func reservePortfolioMutation(tx *gorm.DB, owner, key, requestHash string) (entity.TransactionMutation, bool, error) {
-	mutation := entity.TransactionMutation{ID: uuid.NewString(), OwnerID: owner, Operation: "portfolio.trade_correction", IdempotencyKey: key, RequestHash: requestHash, Status: "pending", ResponseJSON: "{}"}
+func reservePortfolioMutation(tx *gorm.DB, owner, operation, key, requestHash string) (entity.TransactionMutation, bool, error) {
+	mutation := entity.TransactionMutation{ID: uuid.NewString(), OwnerID: owner, Operation: operation, IdempotencyKey: key, RequestHash: requestHash, Status: "pending", ResponseJSON: "{}"}
 	result := tx.Exec(`INSERT INTO transaction_mutations (id,owner_id,operation,idempotency_key,request_hash,status,response_json) VALUES (?,?,?,?,?,?,'{}'::jsonb) ON CONFLICT (owner_id,operation,idempotency_key) DO NOTHING`, mutation.ID, owner, mutation.Operation, key, requestHash, mutation.Status)
 	if result.Error != nil {
 		return entity.TransactionMutation{}, false, result.Error
