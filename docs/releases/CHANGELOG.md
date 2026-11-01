@@ -23,7 +23,8 @@ shared_fields: [status]
   reports/insider drilldown, accumulated-asset units and price-source UI, and
   the bundled Phosphor icon catalog fallback from the reviewed native candidate.
 - Native metadata advances to build 7; production API/worker rollout and
-  simulator installation are recorded in the versioned release note.
+  simulator plus paired iPhone installation/launch are recorded in the
+  versioned release note.
 
 [Release note](REL-1.3.0-20261101.md).
 

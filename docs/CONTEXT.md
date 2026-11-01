@@ -27,9 +27,10 @@ updated: 2026-11-01
 The unified native Assistant, report/insider surfaces, accumulated-asset units
 and source UI, shared typography/density bases, Phosphor icon catalog fallback,
 privacy-safe AI attachment diagnostics, and APNs transport are frozen as the
-`1.3.0 (7)` release. The native Release simulator artifact passed
-metadata preflight and was installed/launched on `MyPocket-iPhone-16`. Signed
-native units pass 442/442 and the backend suite passes; the aggregate UI scheme
+`1.3.0 (7)` release. The native Release simulator artifact and a signed
+physical-device Release artifact passed metadata/code-sign preflight; both were
+installed/launched on `MyPocket-iPhone-16` and the paired iPhone 15 Plus.
+Signed native units pass 442/442 and the backend suite passes; the aggregate UI scheme
 run was interrupted after the simulator runner made no completion progress for
 more than eleven minutes, so it is not claimed as a full UI-suite pass. APNs
 remains disabled by default pending Apple credentials/entitlements and signed

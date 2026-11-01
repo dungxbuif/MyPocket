@@ -30,10 +30,13 @@ no panic, fatal, missing-schema or migration-dirty pattern. No feedback rows or
 financial data were deleted or reset.
 
 The native `1.3.0 (7)` Release simulator artifact was installed and launched
-on `MyPocket-iPhone-16` (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`). This does not
-claim physical-device acceptance, APNs delivery, Dynamic Type or owner visual
-UAT. APNs remains disabled by default until Apple credentials, entitlements and
-a signed-device delivery check are available.
+on `MyPocket-iPhone-16` (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`). A signed
+Personal Team device artifact also passed strict deep code-sign verification,
+installed and launched on iPhone 15 Plus
+(`00008120-001C28C02131A01E`). This records installation/launch, not complete
+owner visual acceptance, Dynamic Type or APNs delivery. APNs remains disabled
+by default until Apple credentials, entitlements and a signed-device delivery
+check are available.
 
 ## API-only production mode — 2026-10-13
 

@@ -64,13 +64,18 @@ physical-device install is claimed here.
 - Native install/launch: `MyPocket-iPhone-16`
   (`EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`), `xcrun simctl launch` returned PID
   `89323`
+- Physical install/launch: signed Release artifact
+  `/tmp/mypocket-release-1.3.0-build7-device-20261101/Build/Products/Release-iphoneos/MyPocketIOS.app`
+  passed artifact preflight and strict deep code-sign verification, installed
+  successfully, and launched with `devicectl` on iPhone 15 Plus
+  `00008120-001C28C02131A01E`
 
 ## Known gates
 
 - APNs live delivery is not enabled or claimed; `APNS_ENABLED=false` remains
   the safe default.
-- Physical-device, owner visual acceptance, Dynamic Type and provider freshness
-  remain separate UAT gates.
+- Owner visual acceptance, Dynamic Type and provider freshness remain separate
+  UAT gates; physical installation and launch are complete.
 - The aggregate native UI scheme run was interrupted after the simulator UI
   runner produced no completion result for more than eleven minutes. Signed
   native unit coverage is complete at 442/442; this is a remaining UI-runner

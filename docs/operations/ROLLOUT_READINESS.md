@@ -25,7 +25,8 @@ with SHA-256
 Production readback is `version: 52 dirty: false`; both services are `1/1`,
 health is HTTP 200 and strict route parity is `96/96`. The native `1.3.0 (7)`
 simulator artifact is installed/launched. APNs remains disabled by default;
-live Apple/device delivery and owner physical UAT remain open.
+the app's physical installation/launch is complete, while live Apple/device
+delivery and owner visual UAT remain open.
 
 This runbook is for the current native/API candidate. The repository preflight
 commands remain read-only. The 2026-11-01 rollout evidence is recorded first;
