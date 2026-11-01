@@ -54,6 +54,9 @@ func (r *ReportSnapshotPostgresRepository) ReadOrCreate(ctx context.Context, own
 			return err
 		}
 		asOfDay := now.In(queryScope.Location).Format("2006-01-02")
+		if !queryScope.IsCurrentMonth {
+			asOfDay = queryScope.MonthNext.In(queryScope.Location).AddDate(0, 0, -1).Format("2006-01-02")
+		}
 		var row reportSnapshotRow
 		query := tx.WithContext(ctx).Table("report_snapshots").Where("owner_id = ? AND month = ? AND wallet_id = ? AND granularity = ? AND timezone = ? AND as_of_day = ? AND data_revision = ? AND rule_version = ? AND expires_at > ?", ownerID, queryScope.Scope.Month, queryScope.Scope.WalletID, queryScope.Scope.Granularity, queryScope.Location.String(), asOfDay, revision, entity.MonthlyReportRuleVersion, now.UTC()).Order("created_at DESC").First(&row)
 		if query.Error == nil {
@@ -92,6 +95,17 @@ func (r *ReportSnapshotPostgresRepository) ReadOrCreate(ctx context.Context, own
 }
 
 func (r *ReportSnapshotPostgresRepository) GetOwned(ctx context.Context, ownerID, snapshotID string, now time.Time) (*entity.ReportSnapshot, error) {
+	snapshot, err := r.GetRetainedOwned(ctx, ownerID, snapshotID, now)
+	if err != nil {
+		return nil, err
+	}
+	if !snapshot.ExpiresAt.After(now.UTC()) {
+		return nil, contract.ErrSnapshotExpired
+	}
+	return snapshot, nil
+}
+
+func (r *ReportSnapshotPostgresRepository) GetRetainedOwned(ctx context.Context, ownerID, snapshotID string, now time.Time) (*entity.ReportSnapshot, error) {
 	var row reportSnapshotRow
 	err := r.db.WithContext(ctx).Table("report_snapshots").Where("id = ? AND owner_id = ?", snapshotID, ownerID).First(&row).Error
 	if errors.Is(err, gorm.ErrRecordNotFound) {
@@ -100,7 +114,7 @@ func (r *ReportSnapshotPostgresRepository) GetOwned(ctx context.Context, ownerID
 	if err != nil {
 		return nil, err
 	}
-	if !row.ExpiresAt.After(now.UTC()) {
+	if !row.CreatedAt.Add(entity.ReportSnapshotRetention).After(now.UTC()) {
 		return nil, contract.ErrSnapshotExpired
 	}
 	return decodeReportSnapshot(row)
@@ -117,7 +131,7 @@ func (r *ReportSnapshotPostgresRepository) DeleteExpired(ctx context.Context, no
 	var ids []string
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		retentionCutoff := now.UTC().Add(-entity.ReportSnapshotRetention)
-		query := tx.WithContext(ctx).Table("report_snapshots AS s").Select("s.id").Where("s.created_at <= ?", retentionCutoff).Where("NOT EXISTS (SELECT 1 FROM report_analyses a WHERE a.snapshot_id = s.id AND a.status IN (?, ?))", entity.ReportAnalysisStatusQueued, entity.ReportAnalysisStatusRunning).Order("s.created_at ASC").Limit(limit).Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Scan(&ids)
+		query := tx.WithContext(ctx).Table("report_snapshots AS s").Select("s.id").Where("s.created_at <= ?", retentionCutoff).Where("NOT EXISTS (SELECT 1 FROM report_analyses a WHERE a.snapshot_id = s.id AND (a.status IN (?, ?) OR a.created_at > ?))", entity.ReportAnalysisStatusQueued, entity.ReportAnalysisStatusRunning, retentionCutoff).Order("s.created_at ASC").Limit(limit).Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).Scan(&ids)
 		if query.Error != nil {
 			return query.Error
 		}

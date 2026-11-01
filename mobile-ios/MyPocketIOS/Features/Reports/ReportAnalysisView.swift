@@ -6,120 +6,127 @@ struct ReportAnalysisView: View {
     let ownerID: String?
     let masked: Bool
     let onChatHandoff: (String) -> Void
-    @State private var state: ReportAnalysisState = .idle
+    @State private var completed: ReportAnalysisModel?
+    @State private var active: ReportAnalysisModel?
+    @State private var freshness = "none"
+    @State private var loadingLatest = false
+    @State private var actionError: String?
+    private let cache = try? ReportAnalysisCache.makeDefault()
+
+    private var cacheScope: String { report.month + "|" + (report.walletID ?? "all") + "|" + (report.timezone ?? "unknown") }
 
     var body: some View {
         MPSurfaceCard(style: .grouped) {
             VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
                 HStack {
-                    MPText("Phân tích sâu", style: .emphasis)
-                    Spacer(minLength: MPMetrics.rowSpacing)
+                    MPText("Phân tích AI", style: .emphasis)
+                    Spacer(minLength: 8)
                     MPStatusBadge(text: statusLabel, tone: statusTone)
                 }
-                switch state {
-                case .completed(_, let revision, let article):
-                    if let revision, let reportRevision = report.dataRevision, revision != reportRevision {
-                        MPStatusMessage(text: "Bài phân tích thuộc phiên bản cũ; số liệu mới vẫn là nguồn chính.", tone: .info)
-                    }
-                    MPText(masked ? AssistantPrivacyPolicy.maskedText : article, style: .body)
-                case .failed(let message):
-                    MPStatusMessage(text: message, tone: .danger)
-                case .expired:
-                    MPStatusMessage(text: "Bài phân tích đã hết hạn. Hãy yêu cầu lại.", tone: .info)
-                case .queued, .running:
-                    MPLoadingView(label: "Đang tạo phân tích…")
-                case .cancelled:
-                    MPText("Đã hủy phân tích.", style: .secondary)
-                case .idle:
-                    MPText("Phân tích được tạo theo yêu cầu, không tự động chạy khi mở báo cáo.", style: .secondary)
+
+                if let completed {
+                    if freshness == "stale" { MPStatusMessage(text: "Có dữ liệu mới. Bài cũ vẫn được giữ để bạn đọc và đối chiếu.", tone: .info) }
+                    MPReportAnalysisArticle(analysis: completed, masked: masked)
+                } else if loadingLatest {
+                    MPLoadingView(label: "Đang tìm bản phân tích đã lưu…")
+                } else {
+                    MPText("AI giải thích các số liệu đã được tổng hợp. Bài được tạo theo yêu cầu và lưu để lần sau mở lại.", style: .secondary)
                 }
-                HStack(spacing: MPMetrics.sectionSpacing) {
-                    if isWorking {
-                        MPButton("Hủy", style: .plain, fullWidth: false) { Task { await cancel() } }
-                    } else {
-                        MPButton(actionTitle, style: .secondary, fullWidth: false) { Task { await start() } }
+
+                if let active {
+                    MPStatusMessage(text: active.status == "queued" ? "Phân tích đang chờ xử lý. Bạn có thể rời màn hình và quay lại sau." : "Đang cập nhật phân tích. Bài cũ vẫn đọc được trong lúc chờ.", tone: .info)
+                }
+                if let actionError { MPStatusMessage(text: actionError, tone: .danger) }
+
+                HStack(spacing: 10) {
+                    if let active {
+                        MPButton("Hủy", style: .plain, fullWidth: false) { Task { await cancel(active.id) } }
+                    } else if completed == nil || freshness == "stale" {
+                        MPButton(completed == nil ? "Phân tích sâu" : "Cập nhật phân tích", style: .secondary, fullWidth: false) { Task { await start() } }
                     }
-                    MPButton("Hỏi trợ lý", style: .plain, fullWidth: false) {
-                        onChatHandoff("Hãy phân tích báo cáo tháng \(report.month) dựa trên các số liệu đang hiển thị.")
+                    if completed != nil {
+                        MPButton("Hỏi tiếp", style: .plain, fullWidth: false) {
+                            onChatHandoff("Tôi muốn hỏi tiếp về bài phân tích báo cáo tháng \(report.month).")
+                        }
                     }
                 }
             }
         }
         .accessibilityIdentifier("report-analysis")
-    }
-
-    private var isWorking: Bool {
-        switch state { case .queued, .running: return true; default: return false }
-    }
-
-    private var actionTitle: String {
-        switch state { case .completed, .failed, .expired: return "Tạo lại phân tích"; default: return "Phân tích sâu" }
+        .task(id: report.snapshotID) { await restore() }
     }
 
     private var statusLabel: String {
-        switch state {
-        case .idle: return "Theo yêu cầu"
-        case .queued: return "Đang xếp hàng"
-        case .running: return "Đang chạy"
-        case .completed: return "Sẵn sàng"
-        case .failed: return "Lỗi"
-        case .cancelled: return "Đã hủy"
-        case .expired: return "Hết hạn"
-        }
+        if active != nil { return active?.status == "queued" ? "Đang xếp hàng" : "Đang cập nhật" }
+        if completed != nil { return freshness == "stale" ? "Có dữ liệu mới" : "Bản đã lưu" }
+        return "Theo yêu cầu"
     }
 
     private var statusTone: MPStatusBadge.Tone {
-        switch state {
-        case .completed: return .success
-        case .failed: return .danger
-        case .queued, .running: return .muted
-        default: return .muted
+        if actionError != nil { return .danger }
+        return completed != nil && freshness == "current" ? .success : .muted
+    }
+
+    private func restore() async {
+        guard let snapshotID = report.snapshotID, !snapshotID.isEmpty else { return }
+        loadingLatest = completed == nil
+        actionError = nil
+        defer { loadingLatest = false }
+        if completed == nil, let ownerID, let cache, let cached = try? await cache.load(ownerID: ownerID, scopeKey: cacheScope) {
+            completed = cached.0; freshness = cached.1
         }
+        do {
+            let latest = try await api.latestReportAnalysis(snapshotID: snapshotID)
+            try Task.checkCancellation()
+            completed = latest.completed
+            active = latest.active
+            freshness = latest.freshness
+            if let completed, let ownerID, let cache { try? await cache.save(ownerID: ownerID, scopeKey: cacheScope, freshness: freshness, analysis: completed) }
+            if let active { await follow(active.id) }
+        } catch is CancellationError { }
+        catch { actionError = "Chưa kiểm tra được bản phân tích đã lưu. Báo cáo vẫn dùng được bình thường." }
     }
 
     private func start() async {
-        guard !isWorking else { return }
+        guard active == nil, let snapshotID = report.snapshotID, !snapshotID.isEmpty else { return }
+        actionError = nil
         let requestID = UUID().uuidString
-        state = .queued(requestID: requestID)
         do {
-            guard let snapshotID = report.snapshotID, !snapshotID.isEmpty else {
-                state = .failed(message: "Báo cáo hiện tại chưa có bản chụp để phân tích.")
-                return
-            }
             let accepted = try await api.requestReportAnalysis(ReportAnalysisRequestModel(snapshotID: snapshotID, clientRequestID: requestID))
-            let analysisID = accepted.id.isEmpty ? requestID : accepted.id
-            state = .running(requestID: analysisID)
-            for _ in 0..<30 {
-                try await Task.sleep(for: .seconds(1))
+            active = accepted
+            if accepted.status == "completed" {
+                completed = accepted; active = nil; freshness = "current"
+            } else {
+                await follow(accepted.id)
+            }
+        } catch { actionError = "Chưa thể bắt đầu phân tích. Bài đã lưu, nếu có, vẫn được giữ nguyên." }
+    }
+
+    private func follow(_ analysisID: String) async {
+        guard !analysisID.isEmpty else { return }
+        var delay: UInt64 = 1_000_000_000
+        while !Task.isCancelled {
+            do {
+                try await Task.sleep(nanoseconds: delay)
                 let result = try await api.reportAnalysis(requestID: analysisID)
                 switch result.status.lowercased() {
                 case "completed":
-                    state = .completed(requestID: analysisID, revision: result.revision, article: result.renderedArticle.isEmpty ? "Chưa có bài phân tích." : result.renderedArticle)
+                    completed = result; active = nil; freshness = "current"; actionError = nil
+                    if let ownerID, let cache { try? await cache.save(ownerID: ownerID, scopeKey: cacheScope, freshness: freshness, analysis: result) }
                     return
-                case "expired": state = .expired; return
-                case "cancelled": state = .cancelled; return
-                case "failed": state = .failed(message: "Máy chủ chưa tạo được phân tích."); return
-                default: state = .running(requestID: analysisID)
+                case "failed":
+                    active = nil; actionError = "Máy chủ chưa tạo được bản phân tích mới. Bài cũ vẫn được giữ."; return
+                case "cancelled": active = nil; return
+                default: active = result
                 }
-            }
-            state = .failed(message: "Phân tích đang mất nhiều thời gian hơn dự kiến. Bạn có thể tải lại sau.")
-        } catch {
-            state = .failed(message: "Chưa thể tạo phân tích sâu trên máy chủ hiện tại.")
+                delay = min(delay * 2, 5_000_000_000)
+            } catch is CancellationError { return }
+            catch { actionError = "Mất kết nối khi theo dõi. Bạn có thể rời màn hình và quay lại sau."; return }
         }
     }
 
-    private func cancel() async {
-        let requestID: String?
-        switch state {
-        case .queued(let id), .running(let id): requestID = id
-        default: requestID = nil
-        }
-        guard let requestID else { return }
-        do {
-            try await api.cancelReportAnalysis(requestID: requestID)
-            state = .cancelled
-        } catch {
-            state = .failed(message: "Không thể hủy phân tích đang chạy.")
-        }
+    private func cancel(_ analysisID: String) async {
+        do { try await api.cancelReportAnalysis(requestID: analysisID); active = nil }
+        catch { actionError = "Không thể hủy phân tích đang chạy." }
     }
 }

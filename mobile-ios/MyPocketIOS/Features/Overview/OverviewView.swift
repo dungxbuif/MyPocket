@@ -39,6 +39,7 @@ final class OverviewViewModel: ObservableObject {
     @Published private(set) var categories: [CategoryModel] = []
     @Published private(set) var monthSummary: MonthSummaryModel?
     @Published private(set) var insider: InsiderSummaryModel?
+    @Published private(set) var reportInsights: [ReportInsightModel] = []
     @Published private(set) var isLoading = false
     @Published private(set) var monthLoading = false
     @Published private(set) var errorMessage: String?
@@ -145,9 +146,11 @@ final class OverviewViewModel: ObservableObject {
 
     func loadInsider() async {
         do {
-            insider = try await api.insider(month: currentMonth)
-        } catch {
+            let report = try await api.monthlyReport(month: currentMonth, granularity: "day", ownerID: ownerID)
+            reportInsights = Array(report.insights.prefix(3))
             insider = nil
+        } catch {
+            reportInsights = []
         }
     }
 
@@ -237,7 +240,10 @@ struct OverviewView: View {
                             MPStatusMessage(text: "Bản lưu \(cachedAt.formatted(date: .abbreviated, time: .shortened)) · Chưa cập nhật từ máy chủ.", tone: .info)
                         }
                         walletsCard
-                        if let insider = model.insider {
+                        if !model.reportInsights.isEmpty {
+                            MPReportInsiderCard(insights: model.reportInsights, masked: masked, onOpen: onOpenMonth)
+                                .accessibilityIdentifier("overview-section-insider")
+                        } else if let insider = model.insider {
                             MPMoneyInsiderCard(value: insider, masked: masked, onOpen: onOpenMonth)
                                 .accessibilityIdentifier("overview-section-insider")
                         }

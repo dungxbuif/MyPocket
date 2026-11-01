@@ -2151,7 +2151,8 @@ final class LaunchTests: XCTestCase {
         input.tap()
         input.typeText("Chi tieu thang nay")
         XCTAssertFalse(app.buttons["bottom-navigation"].exists)
-        app.buttons["assistant-dismiss-keyboard"].tap()
+        app.buttons["Tùy chọn hội thoại"].tap()
+        app.buttons["Đóng bàn phím"].tap()
         let close = app.buttons["assistant-close"]
         XCTAssertTrue(close.waitForExistence(timeout: 5))
         close.tap()
@@ -2415,13 +2416,13 @@ final class LaunchTests: XCTestCase {
         app.launch()
         openAssistant(app)
         let disabledMessage = app.staticTexts["Finance Assistant chưa được bật."]
-        let firstQuestionPrompt = app.staticTexts["Mình có thể giúp gì cho bạn?"]
+        let firstQuestionPrompt = app.staticTexts["Chào bạn"]
         XCTAssertTrue(
             disabledMessage.waitForExistence(timeout: 10) || firstQuestionPrompt.waitForExistence(timeout: 10),
             "Assistant should render either its disabled state or the ready conversation empty state."
         )
         XCTAssertFalse(app.staticTexts["Không thể tải tổng quan trợ lý tài chính."].exists)
-        let overview = app.buttons["assistant-header-overview"]
+        let overview = app.buttons["assistant-pinned-overview"]
         XCTAssertTrue(overview.waitForExistence(timeout: 10))
         let conversation = app.scrollViews["assistant-conversation"]
         XCTAssertTrue(conversation.exists)
@@ -2430,7 +2431,7 @@ final class LaunchTests: XCTestCase {
         app.buttons["Đóng"].firstMatch.tap()
         XCTAssertTrue(overview.waitForExistence(timeout: 5))
         let screenshot = XCTAttachment(screenshot: app.screenshot())
-        screenshot.name = "assistant-api-pinned-overview"
+        screenshot.name = "assistant-api-inline-overview"
         screenshot.lifetime = .keepAlways
         add(screenshot)
 #endif
@@ -2479,7 +2480,11 @@ final class LaunchTests: XCTestCase {
         XCTAssertTrue(chatFrame.waitForExistence(timeout: 5))
         XCTAssertTrue(chatFrame.frame.contains(composer.frame), "The composer must belong to the shared assistant chat frame. chat=\(chatFrame.frame) composer=\(composer.frame)")
         XCTAssertGreaterThan(composer.frame.width, app.windows.firstMatch.frame.width - 48, "Assistant composer should use the full available width.")
-        XCTAssertGreaterThan(composer.frame.height, 76, "Welcome mode must leave room for a short first question without becoming a full note editor.")
+        XCTAssertLessThanOrEqual(composer.frame.height, 72, "Empty composer starts in one compact row and grows with the draft.")
+        let header = app.descendants(matching: .any)["assistant-header"].firstMatch
+        XCTAssertTrue(header.exists)
+        XCTAssertLessThanOrEqual(header.frame.height, 64, "Overflow actions must not squeeze the title into stacked letters.")
+        XCTAssertTrue(app.buttons["Tùy chọn hội thoại"].exists)
         input.tap()
         XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
         let send = app.buttons.matching(NSPredicate(format: "label == %@", "Gửi")).firstMatch
@@ -2521,7 +2526,8 @@ final class LaunchTests: XCTestCase {
         XCTAssertLessThanOrEqual(composer.frame.maxY, app.keyboards.firstMatch.frame.minY + 1, "Keyboard must not obscure large-text composer")
         XCTAssertGreaterThanOrEqual(conversation.frame.height, 44, "Large drafts must not consume the entire conversation viewport")
         attachScreenshot(app, named: "assistant-largest-text-multiline-keyboard")
-        app.buttons["assistant-dismiss-keyboard"].tap()
+        app.buttons["Tùy chọn hội thoại"].tap()
+        app.buttons["Đóng bàn phím"].tap()
         XCTAssertTrue(app.buttons["assistant-close"].waitForExistence(timeout: 5))
         XCTAssertTrue((accessibilityInput.value as? String)?.contains("Dong cuoi can giu") == true)
         attachScreenshot(app, named: "assistant-largest-text-navigation-restored")

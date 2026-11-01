@@ -1,5 +1,20 @@
 # Reports and Money Insider page contract
 
+## New native local candidate — 2026-11-01
+
+The owner requests a visual redesign and saved AI analysis restoration.
+[Requirements and technical design](../../../work/tickets/REPORTS-INSIDER-VISUAL-20261101-DETAIL_DESIGN.md)
+and [execution plan](../../../superpowers/plans/2026-11-01-reports-insider-visual-and-saved-analysis.md)
+define cumulative/weekly trends, category allocation, comparable-period drivers,
+shared Insider facts and resumable saved analysis. The local iOS/backend candidate
+now implements this contract; production rollout and the provider-backed analysis
+UAT gate remain open.
+For that candidate, the new design supersedes the older native web-parity,
+top-transaction-list and comparison-donut layout directions below. Historical
+verification statements below describe their original changes only.
+
+## Existing behavior and historical implementation notes
+
 Reports render facts from the owner-scoped ledger. Money Insider is a
 deterministic report card, not a model-generated financial conclusion.
 
@@ -64,8 +79,11 @@ loading a report. When `/reports/monthly` is not deployed, the view falls back
 only to the existing owner/month aggregate endpoints and labels that state.
 The report analysis handoff pre-fills Assistant without sending a message.
 
-Tests and builds were intentionally not run for this owner-requested
-implementation pass; visual/UAT verification remains open.
+Automated tests were intentionally skipped for this owner-requested implementation
+pass. Backend and simulator builds pass; manual rich-data UAT confirms summary,
+30-day comparison, cumulative trend, category allocation, contributors, Insider
+and snapshot-bound category drill-down. AI provider creation/reopen and physical
+device acceptance remain open.
 
 ## Native savings-report hierarchy — Task 5 reference redesign
 

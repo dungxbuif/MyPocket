@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	MonthlyReportRuleVersion = "monthly-report-v1"
-	ReportInsightRuleVersion = "report-insight-v1"
+	MonthlyReportRuleVersion = "monthly-report-v2"
+	ReportInsightRuleVersion = "report-insight-v2"
 	ReportSnapshotRetention  = 90 * 24 * time.Hour
 	ReportAnalysisCooldown   = 60 * time.Second
 )
@@ -18,6 +18,7 @@ var (
 	ErrMonthlyReportScopeInvalid = errors.New("monthly report scope is invalid")
 	ErrMonthlyReportFuture       = errors.New("monthly report cannot target a future month")
 	ErrMonthlyReportOverflow     = errors.New("monthly report money overflow")
+	ErrReportSnapshotStale       = errors.New("monthly report snapshot is stale")
 )
 
 type MonthlyReportScope struct {
@@ -79,22 +80,28 @@ type ReportSeriesPoint struct {
 }
 
 type ReportCategoryBreakdown struct {
-	CategoryID       *string `json:"category_id,omitempty"`
-	Name             string  `json:"name"`
-	Amount           int64   `json:"amount"`
-	TransactionCount int64   `json:"transaction_count"`
+	CategoryID       *string         `json:"category_id,omitempty"`
+	Name             string          `json:"name"`
+	Amount           int64           `json:"amount"`
+	TransactionCount int64           `json:"transaction_count"`
+	ShareBPS         int64           `json:"share_bps"`
+	Bucket           string          `json:"bucket"`
+	TargetID         string          `json:"target_id"`
+	Drilldown        ReportDrilldown `json:"drilldown"`
 }
 
 type ReportContributor struct {
-	CategoryID     *string `json:"category_id,omitempty"`
-	Name           string  `json:"name"`
-	CurrentAmount  int64   `json:"current_amount"`
-	PreviousAmount int64   `json:"previous_amount"`
-	Delta          int64   `json:"delta"`
-	CurrentCount   int64   `json:"current_count"`
-	PreviousCount  int64   `json:"previous_count"`
-	ChangeBPS      *int64  `json:"change_bps,omitempty"`
-	FactRef        string  `json:"fact_ref"`
+	CategoryID     *string         `json:"category_id,omitempty"`
+	Name           string          `json:"name"`
+	CurrentAmount  int64           `json:"current_amount"`
+	PreviousAmount int64           `json:"previous_amount"`
+	Delta          int64           `json:"delta"`
+	CurrentCount   int64           `json:"current_count"`
+	PreviousCount  int64           `json:"previous_count"`
+	ChangeBPS      *int64          `json:"change_bps,omitempty"`
+	FactRef        string          `json:"fact_ref"`
+	TargetID       string          `json:"target_id"`
+	Drilldown      ReportDrilldown `json:"drilldown"`
 }
 
 type ReportBudgetPreview struct {
@@ -122,11 +129,13 @@ type ReportJarPreview struct {
 }
 
 type ReportDrilldown struct {
-	From         time.Time `json:"from"`
-	EndExclusive time.Time `json:"end_exclusive"`
-	WalletID     string    `json:"wallet_id,omitempty"`
-	CategoryIDs  []string  `json:"category_ids,omitempty"`
-	Type         string    `json:"type,omitempty"`
+	TargetID       string    `json:"target_id,omitempty"`
+	From           time.Time `json:"from"`
+	EndExclusive   time.Time `json:"end_exclusive"`
+	WalletID       string    `json:"wallet_id,omitempty"`
+	CategoryIDs    []string  `json:"category_ids,omitempty"`
+	CategoryBucket string    `json:"category_bucket,omitempty"`
+	Type           string    `json:"type,omitempty"`
 }
 
 type ReportInsight struct {
@@ -142,6 +151,7 @@ type ReportInsight struct {
 	AsOf         time.Time          `json:"as_of"`
 	Drilldown    ReportDrilldown    `json:"drilldown"`
 	Priority     int                `json:"-"`
+	Impact       int64              `json:"-"`
 }
 
 type MonthlyReport struct {
@@ -157,6 +167,7 @@ type MonthlyReport struct {
 	Totals          ReportTotals              `json:"totals"`
 	Comparison      ReportComparison          `json:"comparison"`
 	Series          []ReportSeriesPoint       `json:"series"`
+	PreviousSeries  []ReportSeriesPoint       `json:"previous_series"`
 	Categories      []ReportCategoryBreakdown `json:"categories"`
 	Contributors    []ReportContributor       `json:"contributors"`
 	Budgets         []ReportBudgetPreview     `json:"budgets"`

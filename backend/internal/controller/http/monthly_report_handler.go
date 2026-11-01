@@ -66,6 +66,8 @@ func monthlyReportMapError(c *gin.Context, err error) {
 		Fail(c, http.StatusNotFound, Problem{Code: "REPORT_NOT_FOUND", Title: problemTitleNotFound, Detail: "Không tìm thấy phạm vi báo cáo."})
 	case errors.Is(err, entity.ErrMonthlyReportOverflow):
 		Fail(c, http.StatusUnprocessableEntity, Problem{Code: "REPORT_OVERFLOW", Title: problemTitleBadRequest, Detail: "Số liệu báo cáo vượt giới hạn an toàn."})
+	case errors.Is(err, entity.ErrReportSnapshotStale):
+		Fail(c, http.StatusConflict, Problem{Code: "REPORT_SNAPSHOT_STALE", Title: problemTitleBadRequest, Detail: "Dữ liệu báo cáo đã thay đổi. Hãy tải lại báo cáo trước khi mở chi tiết."})
 	default:
 		Fail(c, http.StatusInternalServerError, Problem{Code: "REPORT_FAILED", Title: problemTitleInternalServer, Detail: "Không thể tải báo cáo."})
 	}
@@ -99,11 +101,22 @@ func (h *MonthlyReportHandler) ListTransactions(c *gin.Context) {
 	}
 	scope := entity.MonthlyReportScope{Month: strings.TrimSpace(c.Query("month")), WalletID: strings.TrimSpace(c.Query("wallet_id")), Granularity: "day"}
 	categoryID, kind := strings.TrimSpace(c.Query("category_id")), strings.TrimSpace(c.Query("kind"))
+	snapshotID, targetID := strings.TrimSpace(c.Query("snapshot_id")), strings.TrimSpace(c.Query("target_id"))
 	if h == nil || h.Service == nil || len(categoryID) > 128 || len(kind) > 16 {
 		monthlyReportMapError(c, entity.ErrMonthlyReportScopeInvalid)
 		return
 	}
-	page, err := h.Service.Transactions(c.Request.Context(), principal, scope, categoryID, kind, limit, offset)
+	var page entity.SavingsTransactionPage
+	var err error
+	if snapshotID != "" || targetID != "" {
+		if snapshotID == "" || targetID == "" || len(snapshotID) > 128 || len(targetID) > 160 {
+			monthlyReportMapError(c, entity.ErrMonthlyReportScopeInvalid)
+			return
+		}
+		page, err = h.Service.TransactionsTarget(c.Request.Context(), principal, snapshotID, targetID, limit, offset)
+	} else {
+		page, err = h.Service.Transactions(c.Request.Context(), principal, scope, categoryID, kind, limit, offset)
+	}
 	if err != nil {
 		monthlyReportMapError(c, err)
 		return

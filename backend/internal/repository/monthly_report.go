@@ -15,4 +15,5 @@ type MonthlyReportReader interface {
 // source compatible while native clients request bounded drill-down pages.
 type MonthlyReportTransactionReader interface {
 	ReadMonthlyTransactions(context.Context, string, entity.MonthlyReportScope, string, string, int, int, time.Time) (entity.SavingsTransactionPage, error)
+	ReadMonthlyTransactionsByDrilldown(context.Context, string, entity.MonthlyReportScope, entity.ReportDrilldown, int, int, time.Time) (entity.SavingsTransactionPage, error)
 }

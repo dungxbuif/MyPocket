@@ -168,23 +168,44 @@ struct MPFinanceSummaryCard<Chart: View, Content: View>: View {
     }
 }
 
-/// User prose has a trailing bubble; assistant prose and structured finance
-/// cards remain flat so a response never adds a second card around each card.
+/// Role alignment is separate from prose surfaces so structured cards keep
+/// their own anatomy and confirmation controls without nested bubbles.
 struct MPChatMessage<Content: View>: View {
     let isUser: Bool
     @ViewBuilder var content: () -> Content
 
     var body: some View {
-        HStack(alignment: .top, spacing: 0) {
+        HStack(alignment: .top, spacing: 8) {
             if isUser { Spacer(minLength: 32) }
+            if !isUser { MPChatAvatar() }
             VStack(alignment: .leading, spacing: 8, content: content)
-                .padding(isUser ? 12 : 0)
-                .background(isUser ? MPColor.successSoft : .clear, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
-                .frame(maxWidth: .infinity, alignment: .leading)
-            if !isUser { Spacer(minLength: 0) }
+                .frame(maxWidth: .infinity, alignment: isUser ? .trailing : .leading)
+            if isUser { MPChatAvatar(isUser: true) }
+            if !isUser { Spacer(minLength: 8) }
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel(isUser ? "Bạn" : "Trợ lý")
+    }
+}
+
+struct MPChatTextBubble: View {
+    let text: String
+    let isUser: Bool
+    var masked = false
+
+    var body: some View {
+        Group {
+            if isUser {
+                Text(text).font(MPFont.chatBody).foregroundStyle(Color.white)
+            } else if masked {
+                MPText(text, style: .secondary)
+            } else {
+                MPMarkdown(content: text)
+            }
+        }
+        .padding(12)
+        .background(isUser ? MPColor.action : MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.cornerRadius))
+        .accessibilityIdentifier(isUser ? "assistant-user-bubble" : "assistant-reply-bubble")
     }
 }
 
@@ -192,16 +213,20 @@ struct MPChatOverview: View {
     let income: String
     let expense: String
     let onDetails: () -> Void
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         Button(action: onDetails) {
-            HStack(spacing: 12) {
+            let layout = dynamicTypeSize.isAccessibilitySize
+                ? AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+                : AnyLayout(HStackLayout(spacing: 12))
+            layout {
                 VStack(alignment: .leading, spacing: 2) {
                     MPText("Thu nhập", style: .secondary)
                     MPText(income, style: .emphasis)
                 }
-                Spacer(minLength: 0)
-                VStack(alignment: .trailing, spacing: 2) {
+                if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 0) }
+                VStack(alignment: dynamicTypeSize.isAccessibilitySize ? .leading : .trailing, spacing: 2) {
                     MPText("Chi tiêu", style: .secondary)
                     MPText(expense, style: .emphasis)
                 }
@@ -488,6 +513,46 @@ struct MPAssistantCard<Content: View>: View {
                 content()
             }
         }
+    }
+}
+
+/// Shared anatomy for confirmation cards embedded in Assistant chat. The
+/// compact semantic icon and aligned key/value rows mirror transaction
+/// previews without nesting a second card inside the conversation surface.
+struct MPAssistantProposalHeader: View {
+    let title: String
+    let subtitle: String
+    let iconID: MPIconID
+
+    var body: some View {
+        HStack(spacing: 10) {
+            MPIcon(iconID: iconID, color: MPColor.action, size: 20)
+                .frame(width: 36, height: 36)
+                .background(MPColor.successSoft, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(MPFont.bodyEmphasis).foregroundStyle(MPColor.ink)
+                Text(subtitle).font(MPFont.bodySmall).foregroundStyle(MPColor.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+    }
+}
+
+struct MPAssistantDetailRow: View {
+    let label: String
+    let value: String
+    var emphasized = false
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 12) {
+            Text(label).font(MPFont.bodySmall).foregroundStyle(MPColor.secondary)
+            Spacer(minLength: 8)
+            Text(value)
+                .font(emphasized ? MPFont.amount : MPFont.bodySmall)
+                .foregroundStyle(MPColor.ink)
+                .multilineTextAlignment(.trailing)
+        }
+        .padding(.vertical, 2)
     }
 }
 

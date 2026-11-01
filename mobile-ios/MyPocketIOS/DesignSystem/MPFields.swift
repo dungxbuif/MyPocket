@@ -70,18 +70,15 @@ enum MPChatComposerMode: Equatable {
 }
 
 /// Shared geometry rules for the assistant composer. The editor remains
-/// content-driven, but a conversation draft needs a useful reading area even
-/// before the first line has been typed. Keeping these values here prevents
-/// individual screens from inventing their own chat heights.
+/// content-driven: one line at rest, then bounded growth and internal scrolling.
+/// The send and optional attachment controls share that first row.
 enum MPChatComposerMetrics {
     static func lineLimit(mode: MPChatComposerMode, accessibilitySize: Bool) -> ClosedRange<Int> {
-        if accessibilitySize { return 2...3 }
-        return mode == .welcome ? 3...5 : 2...5
+        accessibilitySize ? 1...3 : 1...4
     }
 
     static func minimumHeight(mode: MPChatComposerMode, keyboardVisible: Bool, accessibilitySize: Bool) -> CGFloat {
-        if keyboardVisible { return accessibilitySize ? 72 : 64 }
-        return mode == .welcome ? 72 : 64
+        MPMetrics.hitTarget
     }
 }
 
@@ -99,6 +96,7 @@ struct MPChatComposer: View {
     var dismissKeyboardRequest = 0
     var embedded = false
     var allowsEmptySend = false
+    var attachmentControl: AnyView? = nil
     @FocusState private var focused: Bool
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
@@ -111,8 +109,9 @@ struct MPChatComposer: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            TextField("Bạn muốn hỏi điều gì về tiền của mình?", text: $text, axis: .vertical)
+        HStack(alignment: .bottom, spacing: 4) {
+            if let attachmentControl { attachmentControl }
+            TextField("Hỏi AI về tiền của bạn…", text: $text, axis: .vertical)
                 .lineLimit(visibleLineCount)
                 .font(MPFont.chatBody)
                 .foregroundStyle(MPColor.ink)
@@ -126,12 +125,10 @@ struct MPChatComposer: View {
                         keyboardVisible: isKeyboardVisible,
                         accessibilitySize: dynamicTypeSize.isAccessibilitySize
                     ),
-                    alignment: .top
+                    alignment: .center
                 )
                 .accessibilityLabel("Tin nhắn cho trợ lý")
                 .accessibilityIdentifier("assistant-composer-input")
-            HStack(alignment: .center, spacing: 12) {
-                Spacer(minLength: 0)
                 Button {
                     if let onCancel { onCancel() }
                     else { onSend() }
@@ -147,9 +144,8 @@ struct MPChatComposer: View {
                 .opacity(sendDisabled ? 0.5 : 1)
                 .accessibilityLabel(onCancel == nil ? "Gửi" : "Dừng xử lý")
                 .accessibilityIdentifier("assistant-composer-action")
-            }
         }
-        .padding(12)
+        .padding(6)
         .background(embedded ? Color.clear : MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.groupedSurfaceCornerRadius, style: .continuous))
         .overlay {
             if !embedded {

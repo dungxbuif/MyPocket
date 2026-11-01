@@ -37,8 +37,11 @@ type Config struct {
 }
 
 const (
-	maxTextBytes              = 32 * 1024
-	maxSourceBytes            = 64 * 1024
+	maxTextBytes   = 32 * 1024
+	maxSourceBytes = 64 * 1024
+	// Match the usecase's aggregate evidence envelope; each model request
+	// still receives at most maxSourceBytes, split only between documents.
+	maxOCRSourceBytes         = 200000
 	maxPromptBytes            = 128 * 1024
 	maxResponseBytes          = 256 * 1024
 	maxWalletDescriptionBytes = 2048
@@ -295,14 +298,21 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 	attachmentTexts, ocrErr := c.extractOCRTexts(ctx, source, input.Images)
 	for index, extracted := range attachmentTexts {
 		source = appendOCRDocument(source, index+1, input.Images[index].Name, extracted)
-		if len(source) > maxSourceBytes {
-			return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrErr == nil && len(attachmentTexts) == len(input.Images)}, errors.New("OCR source text exceeds limit")
+		if len(source) > maxOCRSourceBytes {
+			return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrErr == nil && len(attachmentTexts) == len(input.Images)}, wrapProviderError("model", "model_source_limit", errors.New("OCR source text exceeds aggregate limit"))
 		}
 	}
 	if ocrErr != nil {
 		return Output{SourceText: source, AttachmentTexts: attachmentTexts}, ocrErr
 	}
 	ocrComplete := len(attachmentTexts) == len(input.Images)
+	if len(source) > maxSourceBytes {
+		return c.extractOCRDocumentBatches(ctx, input, source, attachmentTexts)
+	}
+	return c.extractModel(ctx, input, source, attachmentTexts, ocrComplete)
+}
+
+func (c *Client) extractModel(ctx context.Context, input Input, source string, attachmentTexts []string, ocrComplete bool) (Output, error) {
 	messages, err := buildMessages(input, source)
 	if err != nil {
 		return Output{SourceText: source, AttachmentTexts: attachmentTexts, OCRComplete: ocrComplete}, err
@@ -406,6 +416,56 @@ func (c *Client) Extract(ctx context.Context, input Input) (Output, error) {
 		"total_tokens", modelUsageInt(modelUsage, "total_tokens"),
 	)
 	return out, err
+}
+
+// Keep complete documents together: arbitrary byte/line splits can sever a
+// financial row from its date, currency or column header. Preflight every
+// chunk before spending model calls; a failure never returns a draft prefix.
+func (c *Client) extractOCRDocumentBatches(ctx context.Context, input Input, source string, texts []string) (Output, error) {
+	evidence := Output{SourceText: source, AttachmentTexts: texts, OCRComplete: true}
+	chunks := []string{}
+	chunk := input.Text
+	for i, text := range texts {
+		candidate := appendOCRDocument(chunk, i+1, input.Images[i].Name, text)
+		if len(candidate) > maxSourceBytes {
+			if chunk != "" {
+				chunks = append(chunks, chunk)
+			}
+			// User text may itself contain financial records. Include it as
+			// source evidence once; buildMessages carries instructions to all chunks.
+			candidate = appendOCRDocument("", i+1, input.Images[i].Name, text)
+			if len(candidate) > maxSourceBytes {
+				return evidence, wrapProviderError("model", "model_source_limit", errors.New("OCR document exceeds model source limit"))
+			}
+		}
+		chunk = candidate
+	}
+	chunks = append(chunks, chunk)
+	for _, chunk := range chunks {
+		if _, err := buildMessages(input, chunk); err != nil {
+			return evidence, wrapProviderError("model", "model_input_limit", err)
+		}
+	}
+	aggregate := evidence
+	aggregate.Drafts = []Draft{}
+	if c.config.StoreUsage {
+		aggregate.ModelUsage = map[string]any{"provider": "openai_compatible", "model": c.config.Model}
+	}
+	for _, chunk := range chunks {
+		out, err := c.extractModel(ctx, input, chunk, nil, true)
+		if err != nil {
+			return evidence, err
+		}
+		aggregate.Drafts = append(aggregate.Drafts, out.Drafts...)
+		if c.config.StoreUsage {
+			aggregate.ModelUsage["batch_count"] = modelUsageInt(aggregate.ModelUsage, "batch_count") + 1
+			for _, key := range []string{"latency_ms", "prompt_tokens", "completion_tokens", "total_tokens"} {
+				aggregate.ModelUsage[key] = modelUsageInt(aggregate.ModelUsage, key) + modelUsageInt(out.ModelUsage, key)
+			}
+		}
+	}
+	// The usecase renders the final reply from all normalized proposals.
+	return aggregate, nil
 }
 
 func validateStructuredRows(rows []entity.AIStructuredRow) error {
@@ -517,9 +577,9 @@ func (c *Client) extractOCRTexts(ctx context.Context, source string, images []Im
 				candidate = appendOCRDocument(candidate, prior+1, images[prior].Name, priorText)
 			}
 			texts[index], completed[index] = text, true
-			if candidate != "" && len(candidate) > maxSourceBytes {
+			if candidate != "" && len(candidate) > maxOCRSourceBytes {
 				if firstErr == nil || index < firstErrIndex {
-					firstErr, firstErrIndex = errors.New("OCR source text exceeds limit"), index
+					firstErr, firstErrIndex = wrapProviderError("model", "model_source_limit", errors.New("OCR source text exceeds aggregate limit")), index
 					cancel()
 				}
 				mu.Unlock()

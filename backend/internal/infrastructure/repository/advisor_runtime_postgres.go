@@ -137,9 +137,6 @@ func (r *AdvisorPostgresRepository) CompleteRun(ctx context.Context, lease entit
 		return entity.AdvisorCompletionResult{}, contract.ErrAdvisorLeaseLost
 	}
 	message := &entity.AdvisorMessage{ID: uuid.NewString(), Role: entity.AdvisorRoleAssistant, PartsVersion: 1, Parts: completion.Parts}
-	if err := message.Validate(); err != nil {
-		return entity.AdvisorCompletionResult{}, err
-	}
 	if err := entity.ValidateAdvisorContextState(completion.ContextState); err != nil {
 		return entity.AdvisorCompletionResult{}, err
 	}
@@ -189,6 +186,12 @@ func (r *AdvisorPostgresRepository) CompleteRun(ctx context.Context, lease entit
 		message.Generation = run.Generation
 		message.RunID = run.ID
 		message.Seq = conversation.NextMessageSeq
+		if err := prepareAdvisorProposalReplacement(tx, conversation.ID, run.Generation, message.Parts); err != nil {
+			return err
+		}
+		if err := message.Validate(); err != nil {
+			return err
+		}
 		if err := tx.Create(message).Error; err != nil {
 			return err
 		}

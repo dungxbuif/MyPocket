@@ -7,40 +7,55 @@ final class MonthlyReportsViewModel: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var error: String?
     @Published private(set) var usedFallback = false
+    @Published private(set) var wallets: [WalletModel] = []
     private var cache: [ReportScope: MonthlyReportModel] = [:]
+    private var requestGeneration = 0
 
     func load(api: FinanceAPI, month: String, walletID: String? = nil, ownerID: String? = nil, granularity: String = "day") async {
         let scope = ReportScope(ownerID: ownerID, month: month, walletID: walletID, granularity: granularity)
-        guard !isLoading else { return }
+        requestGeneration += 1
+        let generation = requestGeneration
         // A cached snapshot is only presentation while the revision-aware
         // server read refreshes it; never early-return stale financial data.
         if let cached = cache[scope] { report = cached }
         isLoading = true
         error = nil
         usedFallback = false
-        defer { isLoading = false }
+        defer { if generation == requestGeneration { isLoading = false } }
         do {
             let loaded = try await api.monthlyReport(month: month, walletID: walletID, granularity: granularity, ownerID: ownerID)
-            guard loaded.month == month else { throw APIError.decoding("Report scope mismatch") }
+            try Task.checkCancellation()
+            guard generation == requestGeneration, loaded.month == month else { return }
             cache[scope] = loaded
             report = loaded
         } catch {
-            do {
+            guard generation == requestGeneration else { return }
+            if walletID == nil { do {
                 let fallback = try await loadAggregateFallback(api: api, month: month, ownerID: ownerID)
+                guard generation == requestGeneration else { return }
                 cache[scope] = fallback
                 report = fallback
                 usedFallback = true
             } catch {
-                report = nil
+                if cache[scope] == nil { report = nil }
                 self.error = "Không thể tải báo cáo cho tháng này."
+            } } else {
+                if cache[scope] == nil { report = nil }
+                self.error = "Không thể tải báo cáo cho ví này."
             }
         }
+    }
+
+    func loadWallets(api: FinanceAPI, ownerID: String?) async {
+        guard wallets.isEmpty else { return }
+        wallets = (try? await api.wallets(ownerID: ownerID)) ?? []
     }
 
     func clear() {
         report = nil
         error = nil
         usedFallback = false
+        requestGeneration += 1
     }
 
     private func loadAggregateFallback(api: FinanceAPI, month: String, ownerID: String?) async throws -> MonthlyReportModel {

@@ -21,13 +21,31 @@ var advisorFinalTemplates = map[string]struct{}{
 }
 
 var advisorClarifications = map[string]string{
-	"":            "Bạn muốn trợ lý hỗ trợ việc gì?",
-	"intent":      "Bạn muốn trợ lý hỗ trợ việc gì?",
-	"wallet":      "Bạn muốn chọn ví nào?",
-	"category":    "Bạn muốn chọn danh mục nào?",
-	"period":      "Bạn muốn xem khoảng thời gian nào?",
-	"transaction": "Bạn muốn chọn giao dịch nào?",
-	"amount":      "Bạn muốn dùng số tiền bao nhiêu?",
+	"":              "Bạn muốn trợ lý hỗ trợ việc gì?",
+	"intent":        "Bạn muốn trợ lý hỗ trợ việc gì?",
+	"wallet":        "Bạn muốn chọn ví nào?",
+	"category":      "Bạn muốn chọn danh mục nào?",
+	"period":        "Bạn muốn xem khoảng thời gian nào?",
+	"transaction":   "Bạn muốn chọn giao dịch nào?",
+	"amount":        "Bạn muốn dùng số tiền bao nhiêu?",
+	"jar_month":     "Bạn muốn phân bổ cho hũ trong tháng nào? Hũ là kế hoạch theo tháng, không tự động chuyển tiền.",
+	"proposal_edit": "Trợ lý chưa thể sửa thẻ đề xuất qua tin nhắn. Bạn đừng xác nhận thẻ cũ nếu số tiền chưa đúng.",
+}
+
+const advisorProposalReply = "Đã chuẩn bị đề xuất. Bạn kiểm tra và xác nhận trên thẻ để lưu."
+
+// Only replace prose when the entire result is prepared actions. Mixed
+// read/action requests retain their answer; card data and warnings are untouched.
+func advisorProposalOnly(results []entity.FinanceResult) bool {
+	if len(results) == 0 {
+		return false
+	}
+	for _, result := range results {
+		if result.Status != "proposed" || !isAdvisorProposalView(result.ViewKind) {
+			return false
+		}
+	}
+	return true
 }
 
 type AdvisorEvidenceIndex struct {
@@ -180,7 +198,7 @@ func RenderAdvisorFinal(answer entity.AdvisorFinalAnswer, index *AdvisorEvidence
 		return "Bạn có thể xem số liệu tại Tổng quan, tìm giao dịch tại Giao dịch, hoặc mở Tài khoản để quản lý ví, danh mục, ngân sách và hũ chi tiêu. Trợ lý có thể chuẩn bị đề xuất; bạn kiểm tra và xác nhận trên thẻ trước khi lưu.", nil
 	}
 	if answer.TemplateID == "proposal" {
-		return "Đã chuẩn bị đề xuất. Bạn kiểm tra và xác nhận trên thẻ để lưu.", nil
+		return advisorProposalReply, nil
 	}
 	parts := make([]string, 0, len(answer.Claims))
 	for _, claim := range answer.Claims {

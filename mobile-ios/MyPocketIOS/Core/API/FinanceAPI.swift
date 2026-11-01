@@ -156,6 +156,11 @@ final class FinanceAPI: @unchecked Sendable {
         return try await client.send(APIRequest(path: reportPath("/reports/monthly/transactions", query: items), expectedOwnerID: ownerID))
     }
 
+    func monthlyReportTransactions(snapshotID: String, targetID: String, offset: Int, ownerID: String?) async throws -> ReportTransactionPageModel {
+        let items = [URLQueryItem(name: "snapshot_id", value: snapshotID), URLQueryItem(name: "target_id", value: targetID), URLQueryItem(name: "limit", value: "50"), URLQueryItem(name: "offset", value: String(offset))]
+        return try await client.send(APIRequest(path: reportPath("/reports/monthly/transactions", query: items), expectedOwnerID: ownerID))
+    }
+
     func requestReportAnalysis(_ input: ReportAnalysisRequestModel) async throws -> ReportAnalysisModel {
         try await client.send(APIRequest(path: "/reports/analyses", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
     }
@@ -163,6 +168,11 @@ final class FinanceAPI: @unchecked Sendable {
     func reportAnalysis(requestID: String) async throws -> ReportAnalysisModel {
         let escaped = requestID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? requestID
         return try await client.send(APIRequest(path: "/reports/analyses/\(escaped)"))
+    }
+
+    func latestReportAnalysis(snapshotID: String) async throws -> ReportAnalysisLatestModel {
+        let path = reportPath("/reports/analyses/latest", query: [URLQueryItem(name: "snapshot_id", value: snapshotID)])
+        return try await client.send(APIRequest(path: path))
     }
 
     func cancelReportAnalysis(requestID: String) async throws {

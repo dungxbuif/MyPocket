@@ -24,8 +24,32 @@ func (r *Router) RegisterReportAnalysisRoutes(h *ReportAnalysisHandler) {
 	g := r.Engine.Group("/api/v1/reports")
 	g.Use(r.AuthMiddleware.RequireAdvisorAuth)
 	g.POST("/analyses", h.Begin)
+	g.GET("/analyses/latest", h.Latest)
 	g.GET("/analyses/:id", h.Get)
 	g.POST("/analyses/:id/cancel", h.Cancel)
+}
+
+func (h *ReportAnalysisHandler) Latest(c *gin.Context) {
+	owner, ok := transactionOwner(c)
+	if !ok {
+		transactionUnauthorized(c)
+		return
+	}
+	if h == nil || h.Service == nil {
+		reportAnalysisUnavailable(c)
+		return
+	}
+	snapshotID := strings.TrimSpace(c.Query("snapshot_id"))
+	if snapshotID == "" || len(snapshotID) > 128 {
+		Fail(c, http.StatusBadRequest, Problem{Code: "REPORT_ANALYSIS_BAD_REQUEST", Title: problemTitleBadRequest, Detail: "Bản chụp báo cáo không hợp lệ."})
+		return
+	}
+	latest, err := h.Service.Latest(c.Request.Context(), advisorPrincipal(c, owner), snapshotID)
+	if err != nil {
+		reportAnalysisMapError(c, err)
+		return
+	}
+	OK(c, latest)
 }
 
 func (h *ReportAnalysisHandler) Begin(c *gin.Context) {

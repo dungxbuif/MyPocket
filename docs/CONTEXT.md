@@ -22,6 +22,32 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## Reports / Insider visual and saved-analysis local candidate — 2026-11-01
+
+Owner requests detailed requirements and technical design for clearer charts,
+more useful Insider, and automatically restored saved AI analysis.
+[Detail design](work/tickets/REPORTS-INSIDER-VISUAL-20261101-DETAIL_DESIGN.md)
+and [implementation plan](superpowers/plans/2026-11-01-reports-insider-visual-and-saved-analysis.md)
+are now implemented as a local candidate: native shared Swift Charts bases,
+comparable-window aggregates, snapshot-bound drill-down, deterministic Insider,
+scope-based latest-analysis restoration, protected owner/scope cache, and separate
+freshness/retention. Backend `go build ./...` and the Debug simulator build pass.
+Manual rich-data UAT confirms October totals, 30-day comparison, cumulative chart,
+category allocation, contributors, Insider and the 13-row category drill-down.
+Automated tests remain intentionally skipped by owner direction; provider-backed
+analysis generation, offline restoration and physical-device acceptance remain open.
+
+## Assistant local correction — 2026-11-01
+
+Owner-approved reference UI is installed on the rich-data simulator. Create-jar
+confirmation's SQLSTATE 42804 root cause is fixed with serializer-aware JSONB
+updates in both action confirmation and revision. Two real PostgreSQL regression
+tests pass; a real local DeepSeek-backed conversation produced a jar proposal and
+confirmation returned HTTP 201, persisted the jar, and reloaded as “Đã tạo hũ”.
+Native DesignSystem passes 116/116. Assistant cards no longer expose the account's
+IANA timezone or product-help source IDs, and jar months render as MM/YYYY.
+Backend/API remains local; no release, merge, push or production change occurred.
+
 ## Non-negotiable native shell invariants — owner correction, 2026-11-01
 
 - Feedback is one 52pt floating overlay above the route viewport. It never owns

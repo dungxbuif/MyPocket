@@ -7,6 +7,59 @@ updated: 2026-09-22
 
 # Finance Assistant `/assistant`
 
+## Approved native reference correction — 2026-11-01
+
+This section supersedes the historical pinned-overview, continuous-panel,
+multi-row composer and visible Feedback descriptions below. Owner explicitly
+approved matching the supplied ZIP layout while preserving shared native colors,
+font sizes and medium prose weight. Scope: native UI, focused native tests and
+this spec only; integration documentation belongs to the coordinator.
+Reference inspected: `/tmp/mypocket-assistant-reference.YDtl3S/screen.png`,
+`code.html`, `DESIGN.md`. The screenshot is visual input, not financial data.
+
+| Reference region/action/state | Native base mapping and behavior |
+| --- | --- |
+| Slim back/avatar/title/menu/profile header | `MPChatHeader`, `MPChatAvatar`, `MPIconButton`, `MPOverflowMenu`; title has a single-line normal-size layout, accessible sizes get a separate title row. Reload, overview, keyboard dismissal and confirmed new chat remain in the menu. Profile glyph is decorative identity, not an invented destination. |
+| Greeting and financial overview | `MPChatGreeting`, `MPChatOverview`; inline in the scrolling transcript, real income/expense and existing source/details sheet. Missing values remain unavailable; privacy masking applies. No invented name, score, rank or savings claim. |
+| Suggested questions | Horizontal `MPButton` row, fills and focuses draft without submitting; hidden when a nonempty draft would be overwritten. |
+| Left assistant / right user prose | `MPChatMessage`, `MPChatTextBubble`, `MPChatAvatar`, `MPMarkdown`; separate semantic surfaces and opposite alignment. Shared colors and `MPFont` roles, no export CSS/font sizes. |
+| Budget/action cards and financial breakdowns | Existing `AssistantStructuredCard`, `MPAssistantCard`, `MPMetric`, `MPProgressBar`, `MPTransactionRow`; cards remain transcript siblings of prose, without a second prose bubble. Existing typed validators, source/privacy rendering and explicit confirmation remain authoritative. |
+| Smart recommendations and offers | Render only server-supplied supported cards; no static subscription/cashback offers, fabricated charts or inferred financial health. |
+| Attachments and compact bottom input | `MPChatComposer` with inline `MPDocumentPicker` icon-only variant; one line initially, grows to four (three at accessibility sizes), selected files above only when present. Existing photo/file sheet, bounds, remove, send/stop and uncertain-request locking remain. No unsupported microphone action. |
+| Full-screen route | Canvas transcript, pinned composer, existing shell hides both bottom navigation and Feedback; back remains origin-aware. |
+| History/loading/errors/retry | Existing paged history and scroll-anchor policy, `MPLoadingView`, `MPStatusMessage`, `MPButton`; no persistence or request lifecycle change. |
+
+Root cause: each independent header action consumed title width; composer base
+reserved multiple lines plus a separate action row; `MPChatSurface` forced the
+whole transcript into one white panel. Fix the shared anatomy instead of reducing
+font size or clipping content. Shared base extension contract: header takes status,
+back and menu actions; greeting takes formatted real totals and details callback;
+text bubble takes prose/role/privacy; composer accepts an optional attachment
+control. All interactive targets remain at least 44pt. Dynamic Type grows content;
+focus/dismiss and draft ownership remain unchanged. No API/data/security/runtime
+changes or new dependencies.
+
+Verification pending: coordinator will run the combined native build/tests and
+compare the rendered screen with the reference at compact phone widths, large
+text, light/dark, keyboard and populated history states. This worker must not run
+`xcodebuild`, tests, or touch the simulator. Focused regression coverage will check
+header/composer measured geometry and existing lifecycle tests remain applicable.
+Visual fidelity, provider-backed cards and physical-device acceptance are **not
+verified** by this implementation. Links: [native phase](../../../work/phases/PHASE-002-native-ios-swiftui.md),
+[base contract](../../system/BASE_COMPONENTS.md),
+[validation](../../../work/VALIDATION_MATRIX.md).
+
+Local handoff evidence: `rtk git diff --check` passed. The read-only
+`rtk proxy bash mobile-ios/scripts/check-base-components.sh` failed on the
+pre-existing `MainTabView.swift:235` raw `.fullScreenCover`; that file was not
+changed in this slice. No build, XCTest or simulator command was run. Added
+hosted geometry checks for 320/375/430pt headers, accessibility title expansion,
+and compact attachment/input growth in `DesignSystemTests`; updated focused
+`LaunchTests` for inline overview and menu-based keyboard dismissal. These are
+authored checks, not passing runtime evidence. Existing shell policy already
+hides navigation and Feedback for Assistant and was left intact. No unsupported
+health score, promotional offer, microphone or fabricated timestamp was added.
+
 ## Native iOS conversation — 2026-10-14
 
 2026-10-15 persisted history local E2E: backend latest50 + exclusive older cursor,

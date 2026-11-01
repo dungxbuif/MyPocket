@@ -16,6 +16,18 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## Reports / Insider visual and saved-analysis local candidate — 2026-11-01
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Backend compile | `rtk go build ./...` in `backend/` after aggregate, snapshot-target, latest-analysis, fingerprint and lease changes | PASS; compile only, automated tests intentionally skipped by owner direction |
+| Native compile/install | Debug simulator build with explicit `MP_API_BASE_URL=http://127.0.0.1:8081/api/v1`; Info.plist readback; install/launch on `MyPocket-iPhone-16` | PASS; artifact embeds 8081 local endpoint and launches |
+| Wire decode | Current `/reports/monthly` payload decoded with the production `JSONDecoder.mypocket` key strategy | PASS: month 2026-11, one daily point and one category |
+| Rich-data report | Manual October 2026 route on simulator | PASS: 66.6M income, 10.84M expense, 31 transactions, 30-day current/previous cumulative chart, five category shares and three contributors visible |
+| Snapshot drill-down | Tap category `Ăn uống` from report | PASS: opens 13/13 matching transactions through snapshot ID + target ID |
+| Saved AI provider/offline/retention | Real provider creation, reopen, stale refresh, offline cache and expiry | OPEN; no provider call made and no automated test claim |
+| Device/release/production | Physical device and deployed schema/API/worker | OPEN; local candidate only |
+
 ## MyPocket 1.3.0 build 7 release gate — 2026-11-01
 
 | Gate | Evidence | Result |
@@ -38,6 +50,9 @@ updated: 2026-11-01
 | --- | --- | --- |
 | TDD-focused native XCTest | `xcodebuild test` on iPhone 16 Simulator `EC80B092-CEF1-4A8E-A5A3-7420298EFD4D`, selecting `AdvisorRunObserverTests`, Assistant batch/read-only/lifecycle/composer/scroll tests, canonical transaction-row parity, and the AI-entry attachment policy | PASS: 12 focused tests, 0 failures |
 | Assistant batch state/row implementation | `AssistantEntryBatchPolicy`, `AssistantEntryBatchPresentation`, `AssistantActionCard` | PASS: server states map to review/saving/applied/rejected/conflict; batch preview uses shared `MPTransactionRow` signs and hierarchy; saving hides duplicate actions |
+| Proposal JSONB lifecycle | `TEST_DATABASE_URL=<loopback rich fixture> go test ./internal/infrastructure/repository -run '^TestAdvisorPostgres(MarkAction|ReplaceAction)SerializesParts$' -count=1 -v` | PASS: 2/2 real PostgreSQL regressions; applying/applied receipts and action replacement serialize to JSONB without SQLSTATE 42804 |
+| Live create-jar confirmation | Local DeepSeek-backed Assistant → `propose_create_jar` → canonical confirm endpoint | PASS: HTTP 201, jar `Kiểm tra` persisted for 11/2026 at 1,000,000 VND; reload renders applied state without another confirmation action |
+| Reference UI/source copy | `xcodebuild ... -only-testing:MyPocketIOSTests/DesignSystemTests test`; install and visual check on rich-data iPhone 16 Simulator | PASS: 116/116, zero warnings; compact header/composer, terminal action state, friendly month, no IANA timezone/source ID; owner visual acceptance remains open |
 | Provider/device/production evidence | Not run or claimed in this local-only pass | OPEN; owner/provider/physical-device acceptance remains separate |
 
 ## AI attachment diagnostics and APNs transport — 2026-11-01

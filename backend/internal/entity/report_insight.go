@@ -3,6 +3,8 @@ package entity
 import (
 	"fmt"
 	"sort"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -24,7 +26,8 @@ func BuildReportInsights(report MonthlyReport) []ReportInsight {
 			Title: "Ngân sách đã vượt giới hạn", Body: fmt.Sprintf("%s đã vượt ngân sách ghi nhận trong kỳ.", budget.Name),
 			FactRefs: []string{budget.FactRef}, Scope: report.Scope, From: report.CurrentRange.From,
 			EndExclusive: report.CurrentRange.EndExclusive, AsOf: report.AsOf, Priority: 0,
-			Drilldown: ReportDrilldown{From: report.CurrentRange.From, EndExclusive: report.CurrentRange.EndExclusive, WalletID: report.Scope.WalletID, CategoryIDs: stringSlice(budget.CategoryID), Type: TransactionTypeExpense},
+			Drilldown: ReportDrilldown{TargetID: "budget:" + budget.ID, From: report.CurrentRange.From, EndExclusive: report.CurrentRange.EndExclusive, WalletID: report.Scope.WalletID, CategoryIDs: stringSlice(budget.CategoryID), CategoryBucket: "root", Type: TransactionTypeExpense},
+			Impact:    budget.Spent - budget.LimitAmount,
 		})
 		seen[budget.CategoryIDValue()] = struct{}{}
 	}
@@ -53,10 +56,10 @@ func BuildReportInsights(report MonthlyReport) []ReportInsight {
 		}
 		items = append(items, ReportInsight{
 			ID: id, RuleVersion: ReportInsightRuleVersion, Kind: ReportInsightKindCategory,
-			Title: "Danh mục thay đổi đáng chú ý", Body: fmt.Sprintf("%s %s so với kỳ so sánh.", contributor.Name, direction),
+			Title: contributor.Name + " " + direction, Body: fmt.Sprintf("%s %s %s so với cùng %d ngày của kỳ trước.", contributor.Name, direction, formatReportVND(abs(contributor.Delta)), report.Comparison.CommonDays),
 			FactRefs: []string{contributor.FactRef}, Scope: report.Scope, From: report.ComparisonRange.From,
 			EndExclusive: report.CurrentRange.EndExclusive, AsOf: report.AsOf, Priority: 1,
-			Drilldown: ReportDrilldown{From: report.CurrentRange.From, EndExclusive: report.CurrentRange.EndExclusive, WalletID: report.Scope.WalletID, CategoryIDs: stringSlice(contributor.CategoryID), Type: TransactionTypeExpense},
+			Drilldown: contributor.Drilldown, Impact: abs(contributor.Delta),
 		})
 	}
 	if len(items) == 0 && report.Totals.TransactionCount == 0 {
@@ -72,12 +75,26 @@ func BuildReportInsights(report MonthlyReport) []ReportInsight {
 		if items[i].Priority != items[j].Priority {
 			return items[i].Priority < items[j].Priority
 		}
+		if items[i].Impact != items[j].Impact {
+			return items[i].Impact > items[j].Impact
+		}
 		return items[i].ID < items[j].ID
 	})
 	if len(items) > 3 {
 		items = items[:3]
 	}
 	return items
+}
+
+func formatReportVND(value int64) string {
+	digits := strconv.FormatInt(value, 10)
+	groups := make([]string, 0, (len(digits)+2)/3)
+	for len(digits) > 3 {
+		groups = append([]string{digits[len(digits)-3:]}, groups...)
+		digits = digits[:len(digits)-3]
+	}
+	groups = append([]string{digits}, groups...)
+	return strings.Join(groups, ".") + " đ"
 }
 
 func (c ReportContributor) CategoryIDValue() string {

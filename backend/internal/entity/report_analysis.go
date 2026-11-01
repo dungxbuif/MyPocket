@@ -13,8 +13,8 @@ const (
 	ReportAnalysisStatusCompleted = "completed"
 	ReportAnalysisStatusFailed    = "failed"
 	ReportAnalysisStatusCancelled = "cancelled"
-	ReportAnalysisRuleVersion     = "report-analysis-v1"
-	ReportAnalysisPromptVersion   = "report-analysis-prompt-v1"
+	ReportAnalysisRuleVersion     = "report-analysis-v2"
+	ReportAnalysisPromptVersion   = "report-analysis-prompt-v2"
 	ReportAnalysisLease           = 2 * time.Minute
 	ReportAnalysisDeadline        = 5 * time.Minute
 )
@@ -64,6 +64,7 @@ type ReportAnalysis struct {
 	JobKey                 string          `json:"-"`
 	ClientRequestID        string          `json:"-"`
 	PayloadHash            string          `json:"-"`
+	AnalysisFingerprint    string          `json:"analysis_fingerprint"`
 	Revision               int64           `json:"revision"`
 	RuleVersion            string          `json:"rule_version"`
 	PromptVersion          string          `json:"prompt_version"`
@@ -80,6 +81,7 @@ type ReportAnalysis struct {
 	UpdatedAt              time.Time       `json:"updated_at"`
 	StartedAt              *time.Time      `json:"started_at,omitempty"`
 	FinishedAt             *time.Time      `json:"finished_at,omitempty"`
+	RetainedUntil          time.Time       `json:"retained_until" gorm:"-"`
 	LeaseUntil             *time.Time      `json:"-"`
 	LeaseToken             string          `json:"-"`
 	DeadlineAt             *time.Time      `json:"-"`
@@ -94,12 +96,12 @@ func (ReportAnalysis) TableName() string { return "report_analyses" }
 func BuildReportFactBundle(snapshot ReportSnapshot) (ReportFactBundle, error) {
 	report := snapshot.Report
 	facts := make([]ReportFact, 0, 30)
-	appendFact := func(fact ReportFact) error {
+	appendFact := func(fact ReportFact) bool {
 		if len(facts) >= 30 {
-			return ErrReportAnalysisFactsInvalid
+			return false
 		}
 		facts = append(facts, fact)
-		return nil
+		return true
 	}
 	for _, item := range []struct {
 		id    string
@@ -110,29 +112,25 @@ func BuildReportFactBundle(snapshot ReportSnapshot) (ReportFactBundle, error) {
 		{"comparison.income_delta", report.Comparison.IncomeDelta}, {"comparison.expense_delta", report.Comparison.ExpenseDelta},
 		{"comparison.net_delta", report.Comparison.NetDelta},
 	} {
-		if err := appendFact(ReportFact{ID: item.id, Kind: "money_or_count", Value: item.value, SourceRef: item.id}); err != nil {
-			return ReportFactBundle{}, err
-		}
+		appendFact(ReportFact{ID: item.id, Kind: "money_or_count", Value: item.value, SourceRef: item.id})
 	}
 	for _, contributor := range report.Contributors {
-		if err := appendFact(ReportFact{ID: contributor.FactRef + ".current", Kind: "money", Value: contributor.CurrentAmount, SourceRef: contributor.FactRef}); err != nil {
-			return ReportFactBundle{}, err
+		if len(facts)+2 > 30 {
+			break
 		}
-		if err := appendFact(ReportFact{ID: contributor.FactRef + ".delta", Kind: "money", Value: contributor.Delta, SourceRef: contributor.FactRef}); err != nil {
-			return ReportFactBundle{}, err
-		}
+		appendFact(ReportFact{ID: contributor.FactRef + ".current", Kind: "money", Value: contributor.CurrentAmount, SourceRef: contributor.FactRef})
+		appendFact(ReportFact{ID: contributor.FactRef + ".delta", Kind: "money", Value: contributor.Delta, SourceRef: contributor.FactRef})
 	}
 	for _, budget := range report.Budgets {
-		if err := appendFact(ReportFact{ID: budget.FactRef + ".spent", Kind: "money", Value: budget.Spent, SourceRef: budget.FactRef}); err != nil {
-			return ReportFactBundle{}, err
+		if len(facts)+2 > 30 {
+			break
 		}
-		if err := appendFact(ReportFact{ID: budget.FactRef + ".remaining", Kind: "money", Value: budget.Remaining, SourceRef: budget.FactRef}); err != nil {
-			return ReportFactBundle{}, err
-		}
+		appendFact(ReportFact{ID: budget.FactRef + ".spent", Kind: "money", Value: budget.Spent, SourceRef: budget.FactRef})
+		appendFact(ReportFact{ID: budget.FactRef + ".remaining", Kind: "money", Value: budget.Remaining, SourceRef: budget.FactRef})
 	}
 	for _, jar := range report.Jars {
-		if err := appendFact(ReportFact{ID: jar.FactRef + ".spent", Kind: "money", Value: jar.Spent, SourceRef: jar.FactRef}); err != nil {
-			return ReportFactBundle{}, err
+		if !appendFact(ReportFact{ID: jar.FactRef + ".spent", Kind: "money", Value: jar.Spent, SourceRef: jar.FactRef}) {
+			break
 		}
 	}
 	return ReportFactBundle{SnapshotID: snapshot.ID, Revision: snapshot.DataRevision, Scope: report.Scope, AsOf: report.AsOf, Facts: facts}, nil

@@ -18,6 +18,32 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## Reports / Insider visual reporting and saved AI — local candidate, 2026-11-01
+
+[Detail design](tickets/REPORTS-INSIDER-VISUAL-20261101-DETAIL_DESIGN.md) and
+[implementation plan](../superpowers/plans/2026-11-01-reports-insider-visual-and-saved-analysis.md)
+cover the owner's chart/readability and saved-analysis request. The local candidate
+implements aggregate/comparison DTOs, stable report targets, a retained latest
+analysis read, fingerprint reuse, worker lease renewal, protected native cache and
+shared Swift Charts/Insider/article bases. Rich-data simulator UAT confirms the
+October report and category drill-down; backend and simulator builds pass.
+Open gates: provider-backed analysis creation/reopen, offline/retention expiry,
+physical device and production rollout. Automated tests were skipped by explicit
+owner direction, so this is not a release or full verification claim.
+
+## Assistant reference UI and action reliability — local candidate, 2026-11-01
+
+The owner-approved [detail design](tickets/ASSISTANT-FIDELITY-AI-20261101-DETAIL_DESIGN.md)
+is implemented locally. A real create-jar confirmation reproduced HTTP 500 /
+PostgreSQL `42804`: GORM's single-column slice update bypassed the message
+`serializer:json` contract. Both action revision and confirmation now use typed,
+serializer-aware JSONB updates. Real PostgreSQL regressions pass 2/2 and a live
+local provider conversation created the requested jar with HTTP 201. Native cards
+now persist terminal action state across reload, hide implementation timezone and
+source IDs, format jar month as `MM/YYYY`, and pass 116/116 DesignSystem tests.
+Simulator installation and rendered applied-state proof pass; broader Assistant
+and PDF integration remain in this candidate and are not released.
+
 ## Native navigation UX — draft plan, 2026-11-01
 
 Owner correction: Assistant is separate and hides primary navigation and the

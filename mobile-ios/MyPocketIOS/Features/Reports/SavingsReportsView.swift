@@ -188,12 +188,14 @@ enum ReportTransactionScope: Equatable, Sendable {
     case savings(month: String, walletID: String?, section: String)
     case budget(id: String)
     case monthly(month: String, walletID: String?, categoryID: String?, title: String)
+    case monthlyTarget(snapshotID: String, targetID: String, title: String)
 
     var title: String {
         switch self {
         case .savings(_, _, let section): section == "goals" ? "Giao dịch ví mục tiêu" : "Thu / chi toàn tài khoản"
         case .budget: "Giao dịch ngân sách"
         case .monthly(_, _, _, let title): title
+        case .monthlyTarget(_, _, let title): title
         }
     }
 }
@@ -219,6 +221,7 @@ struct ReportTransactionsView: View {
             [("all", "Tất cả"), ("income", "Thu"), ("expense", "Chi")].map { MPSelectionOption(id: $0.0, label: $0.1) }
         case .budget: []
         case .monthly: [("all", "Tất cả"), ("income", "Thu"), ("expense", "Chi")].map { MPSelectionOption(id: $0.0, label: $0.1) }
+        case .monthlyTarget: []
         }
     }
 
@@ -275,6 +278,8 @@ struct ReportTransactionsView: View {
             case .budget(let id): result = try await api.budgetTransactions(id: id, offset: offset, ownerID: ownerID)
             case .monthly(let month, let walletID, let categoryID, _):
                 result = try await api.monthlyReportTransactions(month: month, walletID: walletID, categoryID: categoryID, kind: requestedKind, offset: offset, ownerID: ownerID)
+            case .monthlyTarget(let snapshotID, let targetID, _):
+                result = try await api.monthlyReportTransactions(snapshotID: snapshotID, targetID: targetID, offset: offset, ownerID: ownerID)
             }
             try Task.checkCancellation()
             guard kind == requestedKind else { return }

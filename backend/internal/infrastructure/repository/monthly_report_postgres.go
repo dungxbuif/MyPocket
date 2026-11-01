@@ -51,6 +51,16 @@ func (r *MonthlyReportPostgresRepository) ReadMonthly(ctx context.Context, owner
 }
 
 func (r *MonthlyReportPostgresRepository) ReadMonthlyTransactions(ctx context.Context, ownerID string, scope entity.MonthlyReportScope, categoryID, kind string, limit, offset int, now time.Time) (entity.SavingsTransactionPage, error) {
+	drilldown := entity.ReportDrilldown{Type: kind}
+	if strings.TrimSpace(categoryID) != "" {
+		drilldown.CategoryBucket = "legacy_exact"
+		drilldown.CategoryIDs = []string{strings.TrimSpace(categoryID)}
+	}
+	return r.ReadMonthlyTransactionsByDrilldown(ctx, ownerID, scope, drilldown, limit, offset, now)
+}
+
+func (r *MonthlyReportPostgresRepository) ReadMonthlyTransactionsByDrilldown(ctx context.Context, ownerID string, scope entity.MonthlyReportScope, drilldown entity.ReportDrilldown, limit, offset int, now time.Time) (entity.SavingsTransactionPage, error) {
+	kind := strings.TrimSpace(drilldown.Type)
 	if limit < 1 || limit > 100 || offset < 0 || (kind != "" && kind != "all" && kind != entity.TransactionTypeIncome && kind != entity.TransactionTypeExpense) {
 		return entity.SavingsTransactionPage{}, entity.ErrMonthlyReportScopeInvalid
 	}
@@ -64,8 +74,22 @@ func (r *MonthlyReportPostgresRepository) ReadMonthlyTransactions(ctx context.Co
 	if queryScope.Scope.WalletID != "" {
 		query = query.Where("wallet_id = ?", queryScope.Scope.WalletID)
 	}
-	if strings.TrimSpace(categoryID) != "" {
-		query = query.Where("category_id = ?", strings.TrimSpace(categoryID))
+	switch drilldown.CategoryBucket {
+	case "":
+	case "legacy_exact":
+		if len(drilldown.CategoryIDs) != 1 {
+			return entity.SavingsTransactionPage{}, entity.ErrMonthlyReportScopeInvalid
+		}
+		query = query.Where("category_id = ?", drilldown.CategoryIDs[0])
+	case "uncategorized":
+		query = query.Where("category_id IS NULL")
+	case "root", "other":
+		if len(drilldown.CategoryIDs) == 0 {
+			return entity.SavingsTransactionPage{}, entity.ErrMonthlyReportScopeInvalid
+		}
+		query = query.Where("category_id IN ?", drilldown.CategoryIDs)
+	default:
+		return entity.SavingsTransactionPage{}, entity.ErrMonthlyReportScopeInvalid
 	}
 	if kind == entity.TransactionTypeIncome || kind == entity.TransactionTypeExpense {
 		query = query.Where("type = ?", kind)
@@ -94,7 +118,8 @@ func (r *MonthlyReportPostgresRepository) readMonthlyInTx(ctx context.Context, t
 	if err != nil {
 		return entity.MonthlyReport{}, err
 	}
-	comparisonPrevious, err := r.aggregateTotals(ctx, tx, ownerID, queryScope.Scope.WalletID, queryScope.PreviousStart, queryScope.PreviousStart.Add(queryScope.Comparison.EndExclusive.Sub(queryScope.Comparison.From)))
+	comparisonPreviousEnd := localDateAdd(queryScope.PreviousStart.In(queryScope.Location), queryScope.CommonDays).UTC()
+	comparisonPrevious, err := r.aggregateTotals(ctx, tx, ownerID, queryScope.Scope.WalletID, queryScope.PreviousStart, comparisonPreviousEnd)
 	if err != nil {
 		return entity.MonthlyReport{}, err
 	}
@@ -103,6 +128,14 @@ func (r *MonthlyReportPostgresRepository) readMonthlyInTx(ctx context.Context, t
 		return entity.MonthlyReport{}, err
 	}
 	series, err := r.series(ctx, tx, ownerID, queryScope)
+	if err != nil {
+		return entity.MonthlyReport{}, err
+	}
+	previousRange := entity.ReportRange{From: queryScope.PreviousStart, EndExclusive: queryScope.PreviousStart, Days: queryScope.CommonDays, IsPartial: queryScope.IsCurrentMonth}
+	if queryScope.CommonDays > 0 {
+		previousRange.EndExclusive = localDateAdd(queryScope.PreviousStart.In(queryScope.Location), queryScope.CommonDays).UTC()
+	}
+	previousSeries, err := r.seriesForRange(ctx, tx, ownerID, queryScope, previousRange)
 	if err != nil {
 		return entity.MonthlyReport{}, err
 	}
@@ -132,7 +165,7 @@ func (r *MonthlyReportPostgresRepository) readMonthlyInTx(ctx context.Context, t
 		Scope: queryScope.Scope, Timezone: queryScope.Location.String(), Currency: queryScope.WalletCurrency,
 		AsOf: now.UTC(), DataRevision: revision, RuleVersion: entity.MonthlyReportRuleVersion,
 		CurrentRange: queryScope.Current, ComparisonRange: queryScope.Comparison,
-		Totals: current, Comparison: comparison, Series: series, Categories: categories,
+		Totals: current, Comparison: comparison, Series: series, PreviousSeries: previousSeries, Categories: categories,
 		Contributors: contributors, Budgets: budgets, Jars: jars, QualityFlags: quality,
 		Drilldown: entity.ReportDrilldown{From: queryScope.Current.From, EndExclusive: queryScope.Current.EndExclusive, WalletID: queryScope.Scope.WalletID},
 	}
@@ -282,15 +315,19 @@ type dailyReportRow struct {
 }
 
 func (r *MonthlyReportPostgresRepository) series(ctx context.Context, tx *gorm.DB, ownerID string, scope reportQueryScope) ([]entity.ReportSeriesPoint, error) {
-	if scope.Current.EndExclusive.Before(scope.Current.From) || scope.Current.EndExclusive.Equal(scope.Current.From) {
+	return r.seriesForRange(ctx, tx, ownerID, scope, scope.Current)
+}
+
+func (r *MonthlyReportPostgresRepository) seriesForRange(ctx context.Context, tx *gorm.DB, ownerID string, scope reportQueryScope, reportRange entity.ReportRange) ([]entity.ReportSeriesPoint, error) {
+	if reportRange.EndExclusive.Before(reportRange.From) || reportRange.EndExclusive.Equal(reportRange.From) {
 		return []entity.ReportSeriesPoint{}, nil
 	}
-	query := tx.WithContext(ctx).Table("transactions AS t").Where("t.owner_id = ? AND t.occurred_at >= ? AND t.occurred_at < ?", ownerID, scope.Current.From, scope.Current.EndExclusive)
+	query := tx.WithContext(ctx).Table("transactions AS t").Where("t.owner_id = ? AND t.occurred_at >= ? AND t.occurred_at < ?", ownerID, reportRange.From, reportRange.EndExclusive)
 	query = applyCanonicalReportEligibility(query, "t")
 	if scope.Scope.WalletID != "" {
 		query = query.Where("t.wallet_id = ?", scope.Scope.WalletID)
 	}
-	rows := make([]dailyReportRow, 0, scope.Current.Days)
+	rows := make([]dailyReportRow, 0, reportRange.Days)
 	err := query.Select("to_char(t.occurred_at AT TIME ZONE ?, 'YYYY-MM-DD') AS day, COALESCE(SUM(CASE WHEN t.type = 'income' THEN t.amount ELSE 0 END)::text, '0') AS income, COALESCE(SUM(CASE WHEN t.type = 'expense' THEN t.amount ELSE 0 END)::text, '0') AS expense, COUNT(*) AS count", scope.Location.String()).Group("day").Order("day ASC").Scan(&rows).Error
 	if err != nil {
 		return nil, err
@@ -299,9 +336,9 @@ func (r *MonthlyReportPostgresRepository) series(ctx context.Context, tx *gorm.D
 	for _, row := range rows {
 		daily[row.Day] = row
 	}
-	points := make([]entity.ReportSeriesPoint, 0, scope.Current.Days)
-	startLocal := scope.Current.From.In(scope.Location)
-	for index := 0; index < scope.Current.Days; {
+	points := make([]entity.ReportSeriesPoint, 0, reportRange.Days)
+	startLocal := reportRange.From.In(scope.Location)
+	for index := 0; index < reportRange.Days; {
 		bucketStart := time.Date(startLocal.Year(), startLocal.Month(), startLocal.Day()+index, 0, 0, 0, 0, scope.Location)
 		bucketEnd := bucketStart.AddDate(0, 0, 1)
 		label := bucketStart.Format("2006-01-02")
@@ -311,11 +348,11 @@ func (r *MonthlyReportPostgresRepository) series(ctx context.Context, tx *gorm.D
 			bucketEnd = monday.AddDate(0, 0, 7)
 			label = monday.Format("2006-01-02")
 		}
-		if bucketStart.Before(scope.Current.From.In(scope.Location)) {
-			bucketStart = scope.Current.From.In(scope.Location)
+		if bucketStart.Before(reportRange.From.In(scope.Location)) {
+			bucketStart = reportRange.From.In(scope.Location)
 		}
-		if bucketEnd.After(scope.Current.EndExclusive.In(scope.Location)) {
-			bucketEnd = scope.Current.EndExclusive.In(scope.Location)
+		if bucketEnd.After(reportRange.EndExclusive.In(scope.Location)) {
+			bucketEnd = reportRange.EndExclusive.In(scope.Location)
 		}
 		income, expense, count := int64(0), int64(0), int64(0)
 		for day := bucketStart; day.Before(bucketEnd); day = day.AddDate(0, 0, 1) {
@@ -360,11 +397,16 @@ type categoryReportRow struct {
 }
 
 func (r *MonthlyReportPostgresRepository) categoriesAndContributors(ctx context.Context, tx *gorm.DB, ownerID string, scope reportQueryScope) ([]entity.ReportCategoryBreakdown, []entity.ReportContributor, error) {
-	current, err := r.categoryAggregates(ctx, tx, ownerID, scope.Scope.WalletID, scope.Current.From, scope.Current.EndExclusive)
+	fullCurrent, err := r.categoryAggregates(ctx, tx, ownerID, scope.Scope.WalletID, scope.Current.From, scope.Current.EndExclusive)
 	if err != nil {
 		return nil, nil, err
 	}
-	previous, err := r.categoryAggregates(ctx, tx, ownerID, scope.Scope.WalletID, scope.PreviousStart, scope.PreviousStart.Add(scope.Comparison.EndExclusive.Sub(scope.Comparison.From)))
+	comparableCurrent, err := r.categoryAggregates(ctx, tx, ownerID, scope.Scope.WalletID, scope.Comparison.From, scope.Comparison.EndExclusive)
+	if err != nil {
+		return nil, nil, err
+	}
+	previousEnd := localDateAdd(scope.PreviousStart.In(scope.Location), scope.CommonDays).UTC()
+	previous, err := r.categoryAggregates(ctx, tx, ownerID, scope.Scope.WalletID, scope.PreviousStart, previousEnd)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -380,44 +422,49 @@ func (r *MonthlyReportPostgresRepository) categoriesAndContributors(ctx context.
 		id, name                                       string
 		current, previous, currentCount, previousCount int64
 	}
-	rolledRows := map[string]*rolled{}
-	roll := func(row categoryReportRow, target map[string]*rolled, currentSide bool) error {
-		id := ""
-		if row.CategoryID.Valid {
-			id = row.CategoryID.String
+	roll := func(rows []categoryReportRow, target map[string]*rolled, currentSide bool) error {
+		for _, row := range rows {
+			id := ""
+			if row.CategoryID.Valid {
+				id = row.CategoryID.String
+			}
+			rootID, name := reportCategoryRoot(id, byID)
+			key := rootID + "|" + name
+			item := target[key]
+			if item == nil {
+				item = &rolled{id: rootID, name: name}
+				target[key] = item
+			}
+			amount, err := parseReportMoney(row.Amount.String)
+			if err != nil {
+				return err
+			}
+			if currentSide {
+				item.current, err = entity.CheckedMoneyAdd(item.current, amount)
+				item.currentCount += row.Count
+			} else {
+				item.previous, err = entity.CheckedMoneyAdd(item.previous, amount)
+				item.previousCount += row.Count
+			}
+			if err != nil {
+				return err
+			}
 		}
-		rootID, name := reportCategoryRoot(id, byID)
-		key := rootID + "|" + name
-		item := target[key]
-		if item == nil {
-			item = &rolled{id: rootID, name: name}
-			target[key] = item
-		}
-		amount, err := parseReportMoney(row.Amount.String)
-		if err != nil {
-			return err
-		}
-		if currentSide {
-			item.current, err = entity.CheckedMoneyAdd(item.current, amount)
-			item.currentCount += row.Count
-		} else {
-			item.previous, err = entity.CheckedMoneyAdd(item.previous, amount)
-			item.previousCount += row.Count
-		}
-		return err
+		return nil
 	}
-	for _, row := range current {
-		if err := roll(row, rolledRows, true); err != nil {
-			return nil, nil, err
-		}
+	fullRows := map[string]*rolled{}
+	if err := roll(fullCurrent, fullRows, true); err != nil {
+		return nil, nil, err
 	}
-	for _, row := range previous {
-		if err := roll(row, rolledRows, false); err != nil {
-			return nil, nil, err
-		}
+	comparisonRows := map[string]*rolled{}
+	if err := roll(comparableCurrent, comparisonRows, true); err != nil {
+		return nil, nil, err
 	}
-	items := make([]rolled, 0, len(rolledRows))
-	for _, item := range rolledRows {
+	if err := roll(previous, comparisonRows, false); err != nil {
+		return nil, nil, err
+	}
+	items := make([]rolled, 0, len(fullRows))
+	for _, item := range fullRows {
 		items = append(items, *item)
 	}
 	sort.SliceStable(items, func(i, j int) bool {
@@ -426,26 +473,70 @@ func (r *MonthlyReportPostgresRepository) categoriesAndContributors(ctx context.
 		}
 		return items[i].id < items[j].id
 	})
-	breakdown := make([]entity.ReportCategoryBreakdown, 0, minInt(6, len(items)))
-	for index, item := range items {
+	drilldownFor := func(targetID, bucket string, rootIDs []string) entity.ReportDrilldown {
+		categoryIDs := make([]string, 0, len(byID))
+		if bucket == "root" || bucket == "other" {
+			roots := make(map[string]struct{}, len(rootIDs))
+			for _, id := range rootIDs {
+				roots[id] = struct{}{}
+			}
+			for id := range byID {
+				rootID, _ := reportCategoryRoot(id, byID)
+				if _, ok := roots[rootID]; ok {
+					categoryIDs = append(categoryIDs, id)
+				}
+			}
+			sort.Strings(categoryIDs)
+		}
+		return entity.ReportDrilldown{TargetID: targetID, From: scope.Current.From, EndExclusive: scope.Current.EndExclusive, WalletID: scope.Scope.WalletID, CategoryIDs: categoryIDs, CategoryBucket: bucket, Type: entity.TransactionTypeExpense}
+	}
+	totalCategoryAmount := int64(0)
+	for _, item := range items {
+		totalCategoryAmount, err = entity.CheckedMoneyAdd(totalCategoryAmount, item.current)
+		if err != nil {
+			return nil, nil, err
+		}
+	}
+	categorized := make([]rolled, 0, len(items))
+	var uncategorized *rolled
+	for index := range items {
+		if items[index].id == "" {
+			copy := items[index]
+			uncategorized = &copy
+		} else {
+			categorized = append(categorized, items[index])
+		}
+	}
+	breakdown := make([]entity.ReportCategoryBreakdown, 0, minInt(7, len(items)+1))
+	for index, item := range categorized {
 		if index >= 5 {
 			break
 		}
-		breakdown = append(breakdown, entity.ReportCategoryBreakdown{CategoryID: categoryPointer(item.id), Name: item.name, Amount: item.current, TransactionCount: item.currentCount})
+		targetID := "category:" + item.id
+		breakdown = append(breakdown, entity.ReportCategoryBreakdown{CategoryID: categoryPointer(item.id), Name: item.name, Amount: item.current, TransactionCount: item.currentCount, ShareBPS: reportShareBPS(item.current, totalCategoryAmount), Bucket: "root", TargetID: targetID, Drilldown: drilldownFor(targetID, "root", []string{item.id})})
 	}
-	if len(items) > 5 {
+	if uncategorized != nil {
+		breakdown = append(breakdown, entity.ReportCategoryBreakdown{Name: uncategorized.name, Amount: uncategorized.current, TransactionCount: uncategorized.currentCount, ShareBPS: reportShareBPS(uncategorized.current, totalCategoryAmount), Bucket: "uncategorized", TargetID: "category:uncategorized", Drilldown: drilldownFor("category:uncategorized", "uncategorized", nil)})
+	}
+	if len(categorized) > 5 {
 		otherAmount, otherCount := int64(0), int64(0)
-		for _, item := range items[5:] {
+		otherRoots := make([]string, 0, len(categorized)-5)
+		for _, item := range categorized[5:] {
 			otherAmount, err = entity.CheckedMoneyAdd(otherAmount, item.current)
 			if err != nil {
 				return nil, nil, err
 			}
 			otherCount += item.currentCount
+			otherRoots = append(otherRoots, item.id)
 		}
-		breakdown = append(breakdown, entity.ReportCategoryBreakdown{Name: "Khác", Amount: otherAmount, TransactionCount: otherCount})
+		breakdown = append(breakdown, entity.ReportCategoryBreakdown{Name: "Khác", Amount: otherAmount, TransactionCount: otherCount, ShareBPS: reportShareBPS(otherAmount, totalCategoryAmount), Bucket: "other", TargetID: "category:other", Drilldown: drilldownFor("category:other", "other", otherRoots)})
 	}
-	contributors := make([]entity.ReportContributor, 0, len(items))
-	for _, item := range items {
+	comparisonItems := make([]rolled, 0, len(comparisonRows))
+	for _, item := range comparisonRows {
+		comparisonItems = append(comparisonItems, *item)
+	}
+	contributors := make([]entity.ReportContributor, 0, len(comparisonItems))
+	for _, item := range comparisonItems {
 		delta, err := entity.CheckedMoneyDifference(item.current, item.previous)
 		if err != nil {
 			return nil, nil, err
@@ -454,7 +545,12 @@ func (r *MonthlyReportPostgresRepository) categoriesAndContributors(ctx context.
 		if err != nil {
 			return nil, nil, err
 		}
-		contributors = append(contributors, entity.ReportContributor{CategoryID: categoryPointer(item.id), Name: item.name, CurrentAmount: item.current, PreviousAmount: item.previous, Delta: delta, CurrentCount: item.currentCount, PreviousCount: item.previousCount, ChangeBPS: change, FactRef: "category:" + item.id})
+		bucket, targetID := "root", "category:"+item.id
+		rootIDs := []string{item.id}
+		if item.id == "" {
+			bucket, targetID, rootIDs = "uncategorized", "category:uncategorized", nil
+		}
+		contributors = append(contributors, entity.ReportContributor{CategoryID: categoryPointer(item.id), Name: item.name, CurrentAmount: item.current, PreviousAmount: item.previous, Delta: delta, CurrentCount: item.currentCount, PreviousCount: item.previousCount, ChangeBPS: change, FactRef: "category:" + item.id, TargetID: targetID, Drilldown: drilldownFor(targetID, bucket, rootIDs)})
 	}
 	sort.SliceStable(contributors, func(i, j int) bool {
 		left, right := absReport(contributors[i].Delta), absReport(contributors[j].Delta)
@@ -467,6 +563,14 @@ func (r *MonthlyReportPostgresRepository) categoriesAndContributors(ctx context.
 		contributors = contributors[:10]
 	}
 	return breakdown, contributors, nil
+}
+
+func reportShareBPS(amount, total int64) int64 {
+	if amount <= 0 || total <= 0 {
+		return 0
+	}
+	numerator := new(big.Int).Mul(big.NewInt(amount), big.NewInt(10000))
+	return numerator.Quo(numerator, big.NewInt(total)).Int64()
 }
 
 func (r *MonthlyReportPostgresRepository) categoryAggregates(ctx context.Context, tx *gorm.DB, ownerID, walletID string, from, end time.Time) ([]categoryReportRow, error) {

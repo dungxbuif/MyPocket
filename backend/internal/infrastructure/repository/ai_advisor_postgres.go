@@ -431,9 +431,6 @@ func (r *AdvisorPostgresRepository) ListEvents(ctx context.Context, ownerID, run
 
 func (r *AdvisorPostgresRepository) CreateAssistantMessage(ctx context.Context, ownerID, runID string, generation int64, parts []entity.AdvisorPart) (*entity.AdvisorMessage, error) {
 	message := &entity.AdvisorMessage{ID: uuid.NewString(), Role: entity.AdvisorRoleAssistant, PartsVersion: 1, Parts: parts}
-	if err := message.Validate(); err != nil {
-		return nil, err
-	}
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
 		var run entity.AdvisorRun
 		if err := tx.Where("id = ? AND owner_id = ?", runID, ownerID).First(&run).Error; err != nil {
@@ -470,6 +467,12 @@ func (r *AdvisorPostgresRepository) CreateAssistantMessage(ctx context.Context, 
 		message.Generation = generation
 		message.RunID = runID
 		message.Seq = conversation.NextMessageSeq
+		if err := prepareAdvisorProposalReplacement(tx, conversation.ID, generation, message.Parts); err != nil {
+			return err
+		}
+		if err := message.Validate(); err != nil {
+			return err
+		}
 		if err := tx.Create(message).Error; err != nil {
 			return err
 		}
@@ -479,6 +482,81 @@ func (r *AdvisorPostgresRepository) CreateAssistantMessage(ctx context.Context, 
 		return nil, err
 	}
 	return message, nil
+}
+
+// prepareAdvisorProposalReplacement resolves a model-produced patch against
+// the persisted pending card while both messages share the conversation lock.
+// The new assistant card and the old superseded state therefore commit as one
+// transaction; a provider response can never partially mutate financial data.
+func prepareAdvisorProposalReplacement(tx *gorm.DB, conversationID string, generation int64, parts []entity.AdvisorPart) error {
+	for partIndex := range parts {
+		newEnvelope, revisionView, ok := advisorProposalView(parts[partIndex])
+		if !ok {
+			continue
+		}
+		replacesID := stringValue(revisionView["replaces_action_id"])
+		if replacesID == "" {
+			continue
+		}
+		replacesRevision := numberValue(revisionView["replaces_revision"])
+		patch, ok := revisionView["patch"].(map[string]any)
+		if !ok || replacesRevision <= 0 || len(patch) == 0 {
+			return contract.ErrAdvisorEntryInvalid
+		}
+		var messages []entity.AdvisorMessage
+		if err := tx.Where("conversation_id = ? AND generation = ? AND role = ?", conversationID, generation, entity.AdvisorRoleAssistant).Order("seq DESC").Find(&messages).Error; err != nil {
+			return err
+		}
+		found := false
+		for messageIndex := range messages {
+			message := &messages[messageIndex]
+			for oldPartIndex := range message.Parts {
+				oldEnvelope, oldView, candidate := advisorProposalView(message.Parts[oldPartIndex])
+				if !candidate || stringValue(oldView["action_id"]) != replacesID {
+					continue
+				}
+				if stringValue(oldView["status"]) != entity.AIProposalPending || numberValue(oldView["revision"]) != replacesRevision || stringValue(oldView["action"]) != stringValue(revisionView["action"]) {
+					return contract.ErrAdvisorEntryConflict
+				}
+				if err := validateAdvisorActionPatch(stringValue(oldView["action"]), patch); err != nil {
+					return err
+				}
+				newView := cloneMap(oldView)
+				for key, value := range patch {
+					newView[key] = value
+				}
+				newView["action_id"] = revisionView["action_id"]
+				newView["revision"] = replacesRevision + 1
+				newView["status"] = entity.AIProposalPending
+				for _, key := range []string{"receipt", "resource_receipt", "superseded_by", "replaces_action_id", "replaces_revision", "patch"} {
+					delete(newView, key)
+				}
+				for _, key := range []string{"conversation_id", "generation", "run_id", "supported_edit_fields"} {
+					if value, exists := revisionView[key]; exists {
+						newView[key] = value
+					}
+				}
+				oldView["status"] = entity.AIProposalSuperseded
+				oldView["superseded_by"] = newView["action_id"]
+				oldEnvelope["view"] = oldView
+				message.Parts[oldPartIndex].Data = oldEnvelope
+				if err := tx.Model(&entity.AdvisorMessage{}).Where("id = ? AND conversation_id = ? AND generation = ?", message.ID, conversationID, generation).Select("Parts").Updates(&entity.AdvisorMessage{Parts: message.Parts}).Error; err != nil {
+					return err
+				}
+				newEnvelope["view"] = newView
+				parts[partIndex].Data = newEnvelope
+				found = true
+				break
+			}
+			if found {
+				break
+			}
+		}
+		if !found {
+			return contract.ErrNotFound
+		}
+	}
+	return nil
 }
 
 func (r *AdvisorPostgresRepository) ReplaceAction(ctx context.Context, ownerID, conversationID string, generation int64, actionID string, revision int64, patch map[string]any) (map[string]any, error) {
@@ -541,7 +619,9 @@ func (r *AdvisorPostgresRepository) ReplaceAction(ctx context.Context, ownerID, 
 				if err := message.Validate(); err != nil {
 					return contract.ErrAdvisorEntryInvalid
 				}
-				if err := tx.Model(&entity.AdvisorMessage{}).Where("id = ? AND conversation_id = ? AND generation = ?", message.ID, conversationID, generation).Update("parts", message.Parts).Error; err != nil {
+				// Use the typed model field so GORM applies serializer:json;
+				// a single-column slice update is bound as a SQL record.
+				if err := tx.Model(&entity.AdvisorMessage{}).Where("id = ? AND conversation_id = ? AND generation = ?", message.ID, conversationID, generation).Select("Parts").Updates(&entity.AdvisorMessage{Parts: message.Parts}).Error; err != nil {
 					return err
 				}
 				replacement = newView
@@ -598,7 +678,8 @@ func (r *AdvisorPostgresRepository) MarkAction(ctx context.Context, ownerID, con
 				if err := message.Validate(); err != nil {
 					return contract.ErrAdvisorEntryInvalid
 				}
-				return tx.Model(&entity.AdvisorMessage{}).Where("id = ? AND conversation_id = ? AND generation = ?", message.ID, conversationID, generation).Update("parts", message.Parts).Error
+				// Preserve the model serializer while restricting this update to parts.
+				return tx.Model(&entity.AdvisorMessage{}).Where("id = ? AND conversation_id = ? AND generation = ?", message.ID, conversationID, generation).Select("Parts").Updates(&entity.AdvisorMessage{Parts: message.Parts}).Error
 			}
 		}
 		return contract.ErrNotFound

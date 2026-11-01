@@ -27,6 +27,7 @@ type reportAnalysisRow struct {
 	JobKey                 string
 	ClientRequestID        string
 	PayloadHash            string
+	AnalysisFingerprint    string
 	Revision               int64
 	RuleVersion            string
 	PromptVersion          string
@@ -52,22 +53,35 @@ func (r *ReportAnalysisPostgresRepository) CreateOrGet(ctx context.Context, anal
 	var result *entity.ReportAnalysis
 	replay := false
 	err := r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Exec("SELECT pg_advisory_xact_lock(hashtextextended(?, 0))", analysis.OwnerID).Error; err != nil {
+			return err
+		}
 		var existing reportAnalysisRow
-		if err := tx.WithContext(ctx).Table("report_analyses").Where("owner_id = ? AND job_key = ?", analysis.OwnerID, analysis.JobKey).First(&existing).Error; err == nil {
+		retentionCutoff := analysis.CreatedAt.UTC().Add(-entity.ReportSnapshotRetention)
+		if err := tx.WithContext(ctx).Table("report_analyses").Where("owner_id = ? AND client_request_id = ?", analysis.OwnerID, analysis.ClientRequestID).First(&existing).Error; err == nil {
+			if existing.Status == entity.ReportAnalysisStatusCompleted && !existing.CreatedAt.After(retentionCutoff) {
+				if deleteErr := tx.WithContext(ctx).Table("report_analyses").Where("id = ?", existing.ID).Delete(&entity.ReportAnalysis{}).Error; deleteErr != nil {
+					return deleteErr
+				}
+			} else {
+				if existing.PayloadHash != analysis.PayloadHash {
+					return contract.ErrAnalysisRequestConflict
+				}
+				decoded, decodeErr := decodeReportAnalysis(existing)
+				result, replay = decoded, true
+				return decodeErr
+			}
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+		if err := tx.WithContext(ctx).Table("report_analyses").Where("owner_id = ? AND analysis_fingerprint = ? AND (status IN (?, ?) OR (status = ? AND created_at > ?))", analysis.OwnerID, analysis.AnalysisFingerprint, entity.ReportAnalysisStatusQueued, entity.ReportAnalysisStatusRunning, entity.ReportAnalysisStatusCompleted, retentionCutoff).Order("created_at DESC").First(&existing).Error; err == nil {
 			decoded, decodeErr := decodeReportAnalysis(existing)
 			result, replay = decoded, true
 			return decodeErr
 		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 			return err
 		}
-		if err := tx.WithContext(ctx).Table("report_analyses").Where("owner_id = ? AND client_request_id = ?", analysis.OwnerID, analysis.ClientRequestID).First(&existing).Error; err == nil {
-			if existing.PayloadHash != analysis.PayloadHash {
-				return contract.ErrAnalysisRequestConflict
-			}
-			decoded, decodeErr := decodeReportAnalysis(existing)
-			result, replay = decoded, true
-			return decodeErr
-		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := tx.WithContext(ctx).Table("report_analyses").Where("owner_id = ? AND analysis_fingerprint = ? AND status = ? AND created_at <= ?", analysis.OwnerID, analysis.AnalysisFingerprint, entity.ReportAnalysisStatusCompleted, retentionCutoff).Delete(&entity.ReportAnalysis{}).Error; err != nil {
 			return err
 		}
 		var active int64
@@ -85,7 +99,7 @@ func (r *ReportAnalysisPostgresRepository) CreateOrGet(ctx context.Context, anal
 		}
 		if err := insertReportAnalysis(tx, analysis); err != nil {
 			var retry reportAnalysisRow
-			if queryErr := tx.WithContext(ctx).Table("report_analyses").Where("owner_id = ? AND job_key = ?", analysis.OwnerID, analysis.JobKey).First(&retry).Error; queryErr == nil {
+			if queryErr := tx.WithContext(ctx).Table("report_analyses").Where("owner_id = ? AND analysis_fingerprint = ? AND status IN (?, ?, ?)", analysis.OwnerID, analysis.AnalysisFingerprint, entity.ReportAnalysisStatusQueued, entity.ReportAnalysisStatusRunning, entity.ReportAnalysisStatusCompleted).First(&retry).Error; queryErr == nil {
 				decoded, decodeErr := decodeReportAnalysis(retry)
 				result, replay = decoded, true
 				return decodeErr
@@ -96,6 +110,29 @@ func (r *ReportAnalysisPostgresRepository) CreateOrGet(ctx context.Context, anal
 		return nil
 	})
 	return result, replay, err
+}
+
+func (r *ReportAnalysisPostgresRepository) LatestForScope(ctx context.Context, ownerID string, scope entity.MonthlyReportScope, timezone string, now time.Time) (*entity.ReportAnalysis, *entity.ReportAnalysis, error) {
+	read := func(statuses []string) (*entity.ReportAnalysis, error) {
+		var row reportAnalysisRow
+		query := r.db.WithContext(ctx).Table("report_analyses AS a").Select("a.*").Joins("JOIN report_snapshots s ON s.id = a.snapshot_id").Where("a.owner_id = ? AND s.month = ? AND s.wallet_id = ? AND s.timezone = ? AND a.created_at > ? AND a.status IN ?", ownerID, scope.Month, scope.WalletID, timezone, now.UTC().Add(-entity.ReportSnapshotRetention), statuses).Order("a.created_at DESC, a.id DESC").First(&row)
+		if errors.Is(query.Error, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		if query.Error != nil {
+			return nil, query.Error
+		}
+		return decodeReportAnalysis(row)
+	}
+	completed, err := read([]string{entity.ReportAnalysisStatusCompleted})
+	if err != nil {
+		return nil, nil, err
+	}
+	active, err := read([]string{entity.ReportAnalysisStatusQueued, entity.ReportAnalysisStatusRunning})
+	if err != nil {
+		return nil, nil, err
+	}
+	return completed, active, nil
 }
 
 func (r *ReportAnalysisPostgresRepository) GetOwned(ctx context.Context, ownerID, analysisID string) (*entity.ReportAnalysis, error) {
@@ -141,6 +178,17 @@ func (r *ReportAnalysisPostgresRepository) ClaimNext(ctx context.Context, now ti
 		return err
 	})
 	return result, err
+}
+
+func (r *ReportAnalysisPostgresRepository) RenewLease(ctx context.Context, analysisID, leaseToken string, now time.Time, lease time.Duration) error {
+	result := r.db.WithContext(ctx).Table("report_analyses").Where("id = ? AND status = ? AND lease_token = ? AND (deadline_at IS NULL OR deadline_at > ?)", analysisID, entity.ReportAnalysisStatusRunning, leaseToken, now.UTC()).Updates(map[string]any{"lease_until": now.UTC().Add(lease), "updated_at": now.UTC()})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected != 1 {
+		return contract.ErrAnalysisLeaseLost
+	}
+	return nil
 }
 
 func (r *ReportAnalysisPostgresRepository) RecoverStale(ctx context.Context, now time.Time, limit int) error {
@@ -204,7 +252,7 @@ func insertReportAnalysis(tx *gorm.DB, analysis *entity.ReportAnalysis) error {
 	if err != nil {
 		return err
 	}
-	return tx.WithContext(context.Background()).Exec(`INSERT INTO report_analyses(id, owner_id, snapshot_id, job_key, client_request_id, payload_hash, revision, rule_version, prompt_version, provider_profile_version, status, error_code, provider_called, summary, observations, suggestions, fact_refs, usage, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, analysis.ID, analysis.OwnerID, analysis.SnapshotID, analysis.JobKey, analysis.ClientRequestID, analysis.PayloadHash, analysis.Revision, analysis.RuleVersion, analysis.PromptVersion, analysis.ProviderProfileVersion, analysis.Status, analysis.ErrorCode, analysis.ProviderCalled, analysis.Summary, payload["observations"], payload["suggestions"], payload["fact_refs"], payload["usage"], analysis.CreatedAt.UTC(), analysis.UpdatedAt.UTC()).Error
+	return tx.WithContext(context.Background()).Exec(`INSERT INTO report_analyses(id, owner_id, snapshot_id, job_key, client_request_id, payload_hash, analysis_fingerprint, revision, rule_version, prompt_version, provider_profile_version, status, error_code, provider_called, summary, observations, suggestions, fact_refs, usage, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`, analysis.ID, analysis.OwnerID, analysis.SnapshotID, analysis.JobKey, analysis.ClientRequestID, analysis.PayloadHash, analysis.AnalysisFingerprint, analysis.Revision, analysis.RuleVersion, analysis.PromptVersion, analysis.ProviderProfileVersion, analysis.Status, analysis.ErrorCode, analysis.ProviderCalled, analysis.Summary, payload["observations"], payload["suggestions"], payload["fact_refs"], payload["usage"], analysis.CreatedAt.UTC(), analysis.UpdatedAt.UTC()).Error
 }
 
 func analysisPayload(analysis *entity.ReportAnalysis) (map[string]any, error) {
@@ -228,7 +276,7 @@ func analysisPayload(analysis *entity.ReportAnalysis) (map[string]any, error) {
 }
 
 func decodeReportAnalysis(row reportAnalysisRow) (*entity.ReportAnalysis, error) {
-	result := &entity.ReportAnalysis{ID: row.ID, OwnerID: row.OwnerID, SnapshotID: row.SnapshotID, JobKey: row.JobKey, ClientRequestID: row.ClientRequestID, PayloadHash: row.PayloadHash, Revision: row.Revision, RuleVersion: row.RuleVersion, PromptVersion: row.PromptVersion, ProviderProfileVersion: row.ProviderProfileVersion, Status: row.Status, ErrorCode: row.ErrorCode, ProviderCalled: row.ProviderCalled, Summary: row.Summary, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, StartedAt: row.StartedAt, FinishedAt: row.FinishedAt, LeaseUntil: row.LeaseUntil, LeaseToken: row.LeaseToken, DeadlineAt: row.DeadlineAt}
+	result := &entity.ReportAnalysis{ID: row.ID, OwnerID: row.OwnerID, SnapshotID: row.SnapshotID, JobKey: row.JobKey, ClientRequestID: row.ClientRequestID, PayloadHash: row.PayloadHash, AnalysisFingerprint: row.AnalysisFingerprint, Revision: row.Revision, RuleVersion: row.RuleVersion, PromptVersion: row.PromptVersion, ProviderProfileVersion: row.ProviderProfileVersion, Status: row.Status, ErrorCode: row.ErrorCode, ProviderCalled: row.ProviderCalled, Summary: row.Summary, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, StartedAt: row.StartedAt, FinishedAt: row.FinishedAt, LeaseUntil: row.LeaseUntil, LeaseToken: row.LeaseToken, DeadlineAt: row.DeadlineAt, RetainedUntil: row.CreatedAt.Add(entity.ReportSnapshotRetention)}
 	if len(row.Observations) > 0 {
 		if err := json.Unmarshal(row.Observations, &result.Observations); err != nil {
 			return nil, err

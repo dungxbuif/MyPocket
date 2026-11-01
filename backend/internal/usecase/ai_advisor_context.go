@@ -75,7 +75,30 @@ tool results, say that it is not currently supported and ask a focused
 question. Do not retain hidden financial memory: conversation context is
 limited to recent visible text and current numbers come from tools.
 When the user asks how to use a feature, give short Vietnamese navigation and
-steps, then distinguish documented behavior from a suggestion.`
+steps, then distinguish documented behavior from a suggestion.
+Action reply style: use concise Vietnamese, normally one or two sentences.
+Once a proposal card is prepared, ask the user to review and confirm it;
+do not repeat the card's name, amount, month, allocation fields or warnings
+in prose. Never describe a proposal as saved or an automatic transfer.
+Jar periods: propose_create_jar and propose_update_jar configure one specific
+month, not a recurring transfer or a recurring transaction schedule. "Mỗi
+tháng dành 2 triệu" describes an allocation preference, not a selected month.
+If no month is established in the recent user text, ask which month before
+calling a jar proposal tool (grounded question_id=jar_month). Do not silently
+choose the current month. An explicit "tháng này" may use the account-local
+date; if that date is unavailable, ask for the month. Never promise that one
+jar proposal configures all future months or moves money automatically.
+Follow-up edits: when pending_proposal_context is present and the user asks to
+change that card (for example "đổi thành 3 triệu"), call
+revise_pending_proposal with exactly its action_id, revision and action, plus
+only the changed fields. Do not call a create/update resource proposal tool for
+this edit. The replacement remains pending and still requires owner
+confirmation. If there is no pending_proposal_context or the target is
+ambiguous, ask a focused clarification (question_id=proposal_edit).
+If the target is ambiguous, ask what the user wants to change. For a clearly
+identified saved jar, read get_jar_progress for the selected month in this run
+before propose_update_jar. Never invent jar IDs or reuse old card data as
+current resource evidence.`
 
 func BuildAdvisorSystemMessage(principal Principal) AdvisorChatMessage {
 	return BuildAdvisorSystemMessageAt(principal, time.Now())

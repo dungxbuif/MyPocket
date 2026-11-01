@@ -238,10 +238,11 @@ func (s *AIEntryService) send(ctx context.Context, owner, id string, in AIEntryM
 			return nil, ErrAIProvider
 		}
 	}
-	if len(out.Reply) > 16000 || len(out.SourceText) > 200000 {
+	if len(out.SourceText) > 200000 {
 		s.fail(owner, id, token, "")
 		return nil, ErrAIProvider
 	}
+	invalidDrafts := 0
 	for i := range out.Drafts {
 		d := &out.Drafts[i]
 		var wallet entity.Wallet
@@ -306,9 +307,12 @@ func (s *AIEntryService) send(ctx context.Context, owner, id string, in AIEntryM
 			d.Questions = []string{}
 		}
 		if e := ValidateAIEntryDraft(d.AIEntryDraft, wallet, category); e != nil {
-			d.Questions = append(d.Questions, e.Error())
+			invalidDrafts++
+			appendAIQuestion(d, e.Error())
 		}
+		d.Questions = normalizeAIEntryQuestions(d.Questions, wallet.ID != "")
 	}
+	out.Reply = aiEntrySummary(out.Drafts, invalidDrafts)
 	if err = s.Entries.FinishMessage(ctx, owner, id, token, out); err != nil {
 		slog.Warn("AI entry result persistence failed", "process_id", id, "stage", "persistence", "code", "result_persist_failed", "draft_count", len(out.Drafts), "usage_present", out.ModelUsage != nil)
 		s.fail(owner, id, token, boundedAIContext(out.SourceText, 64000))

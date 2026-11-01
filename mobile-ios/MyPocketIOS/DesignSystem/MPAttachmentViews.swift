@@ -189,13 +189,15 @@ struct MPDocumentPicker: View {
     let onImport: ([URL]) -> Void
     @State private var isLoading = false
     var compact = false
+    var iconOnly = false
 
-    init(title: String, count: Int, maxCount: Int, isPresented: Binding<Bool>, compact: Bool = false,
+    init(title: String, count: Int, maxCount: Int, isPresented: Binding<Bool>, compact: Bool = false, iconOnly: Bool = false,
          onPhotoImport: (([MPPickedImage]) -> Void)? = nil,
          onImport: @escaping ([URL]) -> Void) {
         self.title = title; self.count = count; self.maxCount = maxCount
         self._isPresented = isPresented
         self.compact = compact
+        self.iconOnly = iconOnly
         self.onPhotoImport = onPhotoImport; self.onImport = onImport
     }
 
@@ -204,11 +206,16 @@ struct MPDocumentPicker: View {
             MPButton(style: compact ? .plain : .secondary, fullWidth: !compact) { isPresented = true } label: {
                 HStack(spacing: 6) {
                     MPIconImage(systemName: "paperclip")
-                    Text(compact ? "Đính kèm" : title)
-                    if compact && count > 0 { Text("\(count)").font(MPFont.labelSmall) }
+                    if !iconOnly {
+                        Text(compact ? "Đính kèm" : title)
+                        if compact && count > 0 { Text("\(count)").font(MPFont.labelSmall) }
+                    }
                 }
+                .frame(minWidth: iconOnly ? MPMetrics.hitTarget : nil, minHeight: MPMetrics.hitTarget)
             }
                 .disabled(count >= maxCount || isLoading)
+                .accessibilityLabel(title)
+                .accessibilityValue("\(count) / \(maxCount) tệp")
                 .accessibilityHint("JPEG, PNG, PDF hoặc XLSX; tối đa 5 MiB mỗi tệp")
                 .mpFormBottomSheet(isPresented: $isPresented, title: "Đính kèm chứng từ",
                     accessibilityIdentifier: "attachment-source-picker",

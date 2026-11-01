@@ -66,3 +66,55 @@ func (s *MonthlyReportService) Transactions(ctx context.Context, principal Princ
 	}
 	return reader.ReadMonthlyTransactions(ctx, principal.OwnerID, scope, categoryID, kind, limit, offset, now)
 }
+
+func (s *MonthlyReportService) TransactionsTarget(ctx context.Context, principal Principal, snapshotID, targetID string, limit, offset int) (entity.SavingsTransactionPage, error) {
+	if s == nil || s.Snapshots == nil {
+		return entity.SavingsTransactionPage{}, repository.ErrNotFound
+	}
+	reader, ok := s.Reader.(repository.MonthlyReportTransactionReader)
+	if !ok {
+		return entity.SavingsTransactionPage{}, repository.ErrNotFound
+	}
+	now := time.Now().UTC()
+	if s.Now != nil {
+		now = s.Now().UTC()
+	}
+	snapshot, err := s.Snapshots.GetOwned(ctx, principal.OwnerID, snapshotID, now)
+	if err != nil {
+		return entity.SavingsTransactionPage{}, err
+	}
+	revision, err := s.Snapshots.CurrentRevision(ctx, principal.OwnerID)
+	if err != nil {
+		return entity.SavingsTransactionPage{}, err
+	}
+	if revision != snapshot.DataRevision {
+		return entity.SavingsTransactionPage{}, entity.ErrReportSnapshotStale
+	}
+	var selected *entity.ReportDrilldown
+	for index := range snapshot.Report.Categories {
+		if snapshot.Report.Categories[index].TargetID == targetID {
+			selected = &snapshot.Report.Categories[index].Drilldown
+			break
+		}
+	}
+	if selected == nil {
+		for index := range snapshot.Report.Contributors {
+			if snapshot.Report.Contributors[index].TargetID == targetID {
+				selected = &snapshot.Report.Contributors[index].Drilldown
+				break
+			}
+		}
+	}
+	if selected == nil {
+		for index := range snapshot.Report.Insights {
+			if snapshot.Report.Insights[index].Drilldown.TargetID == targetID {
+				selected = &snapshot.Report.Insights[index].Drilldown
+				break
+			}
+		}
+	}
+	if selected == nil {
+		return entity.SavingsTransactionPage{}, repository.ErrNotFound
+	}
+	return reader.ReadMonthlyTransactionsByDrilldown(ctx, principal.OwnerID, snapshot.Scope, *selected, limit, offset, now)
+}

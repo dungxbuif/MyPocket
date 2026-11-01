@@ -792,6 +792,15 @@ final class DesignSystemTests: XCTestCase {
         XCTAssertTrue(retryable.canConfirm, "A failed request must remain retryable.")
     }
 
+    func testAssistantPersistedActionStatePreventsReconfirmingTerminalCards() {
+        XCTAssertEqual(AssistantPersistedActionState.decode([:]), .pending)
+        XCTAssertEqual(AssistantPersistedActionState.decode(["status": .string("pending")]), .pending)
+        XCTAssertEqual(AssistantPersistedActionState.decode(["status": .string("applying")]), .applying)
+        XCTAssertEqual(AssistantPersistedActionState.decode(["status": .string("applied")]), .applied)
+        XCTAssertEqual(AssistantPersistedActionState.decode(["status": .string("rejected")]), .unavailable)
+        XCTAssertEqual(AssistantPersistedActionState.decode(["status": .string("superseded")]), .unavailable)
+    }
+
     func testAssistantMalformedWalletProposalRendersInvalidStatusInsteadOfConfirmation() {
         let reference = UIHostingController(rootView: MPAssistantCard(title: "Đề xuất tạo ví") {
             MPStatusMessage(text: "Đề xuất tạo ví chưa đủ dữ liệu để xác nhận.", tone: .danger)
@@ -1057,11 +1066,11 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
     func testAssistantCardMetadataUsesSafeSourceAndCountFallbacks() {
         XCTAssertEqual(
             AssistantCardType.sourceLabel(.object(["timezone": .string("Asia/Ho_Chi_Minh")])),
-            "Nguồn dữ liệu · Asia/Ho_Chi_Minh"
+            "Dựa trên dữ liệu trong MyPocket"
         )
         XCTAssertEqual(
             AssistantCardType.sourceLabel(.object(["timezone": .string("  ")])),
-            "Nguồn dữ liệu tài chính"
+            "Dựa trên dữ liệu trong MyPocket"
         )
         XCTAssertEqual(AssistantCardType.transactionCount(["total_count": .number(42)]), 42)
         XCTAssertEqual(AssistantCardType.transactionCount(["items": .array([.null, .null])]), 0)
@@ -1302,16 +1311,55 @@ func testAssistantPrivacyMaskRedactsMoneyAndProse() {
         )
     }
 
-    func testAssistantComposerUsesARealMultilineReadingAreaAcrossModes() {
-        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .welcome, accessibilitySize: false), 3...5)
-        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .conversation, accessibilitySize: false), 2...5)
-        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .conversation, accessibilitySize: true), 2...3)
-        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .welcome, keyboardVisible: false, accessibilitySize: false), 72)
-        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .conversation, keyboardVisible: false, accessibilitySize: false), 64)
-        XCTAssertGreaterThan(
+    func testAssistantComposerStartsCompactAndKeepsBoundedGrowthAcrossModes() {
+        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .welcome, accessibilitySize: false), 1...4)
+        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .conversation, accessibilitySize: false), 1...4)
+        XCTAssertEqual(MPChatComposerMetrics.lineLimit(mode: .conversation, accessibilitySize: true), 1...3)
+        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .welcome, keyboardVisible: false, accessibilitySize: false), 44)
+        XCTAssertEqual(MPChatComposerMetrics.minimumHeight(mode: .conversation, keyboardVisible: false, accessibilitySize: false), 44)
+        XCTAssertEqual(
             MPChatComposerMetrics.minimumHeight(mode: .conversation, keyboardVisible: true, accessibilitySize: false),
             44
         )
+    }
+
+    func testAssistantHeaderDoesNotGrowIntoLetterByLetterTitleAtSmallPhoneWidth() {
+        let header = MPChatHeader(status: "Sẵn sàng hỗ trợ", onBack: {}, actions: [
+            MPOverflowAction(title: "Tổng quan tài chính") {},
+            MPOverflowAction(title: "Tải lại lịch sử") {},
+            MPOverflowAction(title: "Chat mới") {},
+            MPOverflowAction(title: "Đóng bàn phím") {}
+        ])
+        for width in [CGFloat(320), 375, 430] {
+            let size = UIHostingController(rootView: header.environment(\.dynamicTypeSize, .large))
+                .sizeThatFits(in: CGSize(width: width, height: 1000))
+            XCTAssertLessThanOrEqual(size.height, 64)
+            XCTAssertLessThanOrEqual(size.width, width)
+        }
+        let accessible = UIHostingController(rootView: header.environment(\.dynamicTypeSize, .accessibility3))
+            .sizeThatFits(in: CGSize(width: 320, height: 1000))
+        XCTAssertGreaterThan(accessible.height, 64, "Accessible title gets its own growing row.")
+        XCTAssertLessThanOrEqual(accessible.width, 320)
+    }
+
+    func testAssistantComposerWithAttachmentStartsInOneRowAndGrowsForDraft() {
+        func height(_ text: String) -> CGFloat {
+            let composer = MPChatComposer(
+                text: .constant(text), isBusy: false, isEnabled: true, onSend: {}, mode: .welcome,
+                attachmentControl: AnyView(MPDocumentPicker(
+                    title: "Đính kèm chứng từ", count: 0, maxCount: 20,
+                    isPresented: .constant(false), compact: true, iconOnly: true,
+                    onPhotoImport: { _ in }, onImport: { _ in }
+                ))
+            )
+            return UIHostingController(rootView: composer.environment(\.dynamicTypeSize, .large))
+                .sizeThatFits(in: CGSize(width: 343, height: 1000)).height
+        }
+        let empty = height("")
+        XCTAssertLessThanOrEqual(empty, 72, "No separate send or attachment row at rest.")
+        XCTAssertGreaterThan(height("Một\nHai\nBa\nBốn"), empty)
+        XCTAssertLessThanOrEqual(height(Array(repeating: "Dòng", count: 12).joined(separator: "\n")), 150,
+                                 "Long drafts scroll internally instead of consuming the transcript.")
     }
 
     func testBaseProseUsesSlightlyHeavierNativeWeight() throws {

@@ -1,6 +1,6 @@
 # ADR-027: Durable report snapshots and on-demand grounded analysis
 
-- Status: proposed
+- Status: accepted; local candidate implemented
 - Date: 2026-11-01
 - Scope: Reports & Money Insider backend
 

@@ -18,6 +18,15 @@ required path when optional financial metrics must be hidden while unavailable
 copy such as `Chưa có giá` remains readable. It keeps visible masking and
 VoiceOver's `Đã ẩn số tiền` announcement aligned.
 
+Report visualization candidate: `MPCumulativeReportChart`,
+`MPReportCategoryDistribution` and `MPReportContributorChart` are the only native
+owners of report chart geometry, axes, legends, selection, masking and accessible
+summaries. `MPReportPeriodPicker` owns month stepping; `MPReportInsightCard` and
+`MPReportAnalysisArticle` own deterministic evidence and retained analysis
+presentation. Report screens provide typed DTOs and actions only—no local colors,
+radii, chart math or ledger aggregation. Masked mode removes values from text,
+VoiceOver and chart shape, not merely labels.
+
 `MPProfileCard` renders its `accountSubtitle` in compact and reference variants.
 A badge may add hierarchy but must not discard account context supplied by the
 caller.

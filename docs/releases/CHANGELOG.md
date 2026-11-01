@@ -10,6 +10,25 @@ shared_fields: [status]
 
 # Changelog
 
+## Unreleased — Reports/Insider visual reporting and saved analysis
+
+- Replace the transaction-list-heavy report with shared native cumulative,
+  category-distribution and contributor charts backed by server aggregates.
+- Bind category, contributor and Insider evidence to opaque snapshot targets so
+  drill-down uses the same scope and revision as the displayed report.
+- Restore retained AI analysis by scope without calling the provider on screen
+  open; separate active/completed states, fingerprint reuse, retention and cache
+  expiry. This remains a local candidate; provider/device/production gates are open.
+
+## Unreleased — Assistant correction
+
+- Fix create/update Assistant confirmations failing when PostgreSQL receives
+  proposal parts as a record instead of serialized JSONB.
+- Preserve applied/rejected proposal state after chat reload so completed cards
+  cannot be confirmed again.
+- Present jar months and Assistant data-source labels in user-facing language;
+  hide IANA timezone and internal source identifiers.
+
 ## 1.3.0 build 7 — 2026-11-01
 
 - Add privacy-safe per-file AI attachment diagnostics to process/recovery
@@ -1906,3 +1925,9 @@ management navigates to `/transactions?wallet_id=<id>` and applies the same
 wallet-scoped weekly ledger used by the transaction selector. The old separate
 wallet-detail route is no longer opened by that selection path. Coverage is in
 `npm run test:wallet-scope`, with design, typecheck and build gates rerun.
+
+Finance Assistant pending cards can now be revised through natural follow-up
+messages without creating a second resource proposal. The previous card stays
+in history as superseded, the replacement still requires explicit confirmation,
+and proposal cards share a more compact reference-style layout with friendly
+labels instead of internal identifiers.

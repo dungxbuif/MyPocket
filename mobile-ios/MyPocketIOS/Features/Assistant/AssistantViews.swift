@@ -198,6 +198,24 @@ enum AssistantWalletConfirmationState: Equatable {
     }
 }
 
+enum AssistantPersistedActionState: Equatable {
+    case pending
+    case applying
+    case applied
+    case unavailable
+
+    static func decode(_ view: [String: JSONValue]) -> Self {
+        guard case .string(let rawStatus) = view["status"] else { return .pending }
+        switch rawStatus.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "", "pending", "proposed": return .pending
+        case "applying": return .applying
+        case "applied", "saved", "completed": return .applied
+        case "rejected", "superseded", "conflict": return .unavailable
+        default: return .unavailable
+        }
+    }
+}
+
 enum AssistantJarProposal {
     static func actionID(_ view: [String: JSONValue]) -> String? {
         guard case .string(let value) = view["action_id"], !value.isEmpty, value.utf8.count <= 128 else { return nil }
@@ -400,47 +418,14 @@ struct AssistantView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack)
-                ZStack(alignment: .bottomTrailing) {
-                    MPIcon(iconID: .assistant, color: MPColor.action, size: 22)
-                        .frame(width: 40, height: 40)
-                        .background(MPColor.successSoft, in: Circle())
-                    Circle().fill(MPColor.action).frame(width: 10, height: 10)
-                        .overlay(Circle().stroke(MPColor.canvas, lineWidth: 2))
-                }
-                VStack(alignment: .leading, spacing: 1) {
-                    MPText("Trợ lý tài chính", style: .emphasis)
-                    MPText(activeRunID == nil && activeEntryTaskID == nil ? "Sẵn sàng hỗ trợ" : "Đang phân tích…", style: .secondary)
-                        .font(MPFont.labelSmall)
-                }
-                Spacer(minLength: 4)
-                HStack(spacing: 8) {
-                    if overview != nil {
-                        MPIconButton(systemName: MPIconCatalog.assetName(for: .report), label: "Tổng quan tài chính") { overviewPresented = true }
-                            .accessibilityIdentifier("assistant-header-overview")
-                    }
-                    if keyboardVisible {
-                        MPIconButton(systemName: "keyboard.chevron.compact.down", label: "Đóng bàn phím") { dismissKeyboardRequest += 1 }
-                            .accessibilityIdentifier("assistant-dismiss-keyboard")
-                    }
-                }
-                if !keyboardVisible && !conversationID.isEmpty {
-                    HStack(spacing: 4) {
-                        MPIconButton(systemName: "arrow.clockwise", label: "Tải lại lịch sử") { Task { await reloadHistory() } }
-                        MPOverflowMenu(label: "Tùy chọn hội thoại", actions: [
-                            MPOverflowAction(title: "Chat mới") { resetConfirmation = true }
-                        ])
-                    }
-                }
-                MPIconButton(systemName: "xmark", label: "Đóng trợ lý", action: onBack)
-                    .accessibilityIdentifier("assistant-close")
-            }
-            .frame(minHeight: 56)
-            .padding(.horizontal, MPMetrics.pagePadding)
-            .background(MPColor.canvas.opacity(0.96))
+            MPChatHeader(
+                status: sending || activeRunID != nil || activeEntryTaskID != nil
+                    ? "Đang phân tích…"
+                    : capabilities?.enabled == true ? "Sẵn sàng hỗ trợ" : "Chưa sẵn sàng",
+                onBack: onBack,
+                actions: headerActions
+            )
             VStack(spacing: 0) {
-                MPChatSurface {
                     VStack(spacing: 0) {
                     ScrollViewReader { proxy in
                     ScrollView {
@@ -449,6 +434,11 @@ struct AssistantView: View {
                         // LazyVStack can repeatedly invalidate placement when
                         // the welcome composer becomes a conversation composer.
                         VStack(alignment: .leading, spacing: 16) {
+                            MPChatGreeting(
+                                income: overviewMoney("income"),
+                                expense: overviewMoney("expense"),
+                                onDetails: { overviewPresented = true }
+                            )
                             if !shouldFollowLatest && !messages.isEmpty {
                                 MPButton("Tin mới", style: .secondary, fullWidth: false) {
                                     shouldFollowLatest = true
@@ -458,10 +448,9 @@ struct AssistantView: View {
                             }
                             if let capabilities, !capabilities.enabled { MPStatusMessage(text: "Finance Assistant chưa được bật.", tone: .info) }
                             if let walletActionMessage { MPStatusMessage(text: walletActionMessage, tone: .success) }
-                            if !historyLoading && messages.isEmpty {
+                            if !historyLoading && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 VStack(alignment: .leading, spacing: 10) {
-                                    MPText("Mình có thể giúp gì cho bạn?", style: .title)
-                                    MPText("Hỏi về chi tiêu, tìm một giao dịch hoặc cùng xem lại tháng này.", style: .secondary)
+                                    MPText("Gợi ý câu hỏi", style: .secondary)
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: MPMetrics.rowSpacing) {
                                         ForEach(Array(suggestions.enumerated()), id: \.offset) { index, suggestion in
@@ -469,6 +458,7 @@ struct AssistantView: View {
                                                 input = suggestion
                                                 composerFocusRequest += 1
                                             }
+                                            .fixedSize(horizontal: true, vertical: false)
                                             .accessibilityIdentifier("assistant-suggestion-\(index)")
                                         }
                                     }
@@ -497,13 +487,11 @@ struct AssistantView: View {
                                     VStack(alignment: .leading, spacing: 8) {
                                         ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
                                             if let text = part.text {
-                                                if masked {
-                                                    MPText(AssistantPrivacyPolicy.maskedText, style: .secondary)
-                                                } else if message.role == "assistant" {
-                                                    MPMarkdown(content: text)
-                                                } else {
-                                                    MPText(text)
-                                                }
+                                                MPChatTextBubble(
+                                                    text: AssistantPrivacyPolicy.text(text, masked: masked),
+                                                    isUser: message.role == "user",
+                                                    masked: masked
+                                                )
                                             }
                                             else if let batch = part.entryBatchEnvelope {
                                                 AssistantEntryBatchView(
@@ -613,22 +601,12 @@ struct AssistantView: View {
                                                 files.remove(at: index)
                                             }
                                             .frame(width: 220)
+                                            .disabled(sending || activeRunID != nil || activeEntryTaskID != nil || advisorSubmitUncertain)
                                         }
                                     }
                                 }
                                 .accessibilityIdentifier("assistant-attachment-pills")
                             }
-                            MPDocumentPicker(
-                                title: files.isEmpty ? "Đính kèm chứng từ" : "Thêm chứng từ",
-                                count: files.count,
-                                maxCount: capabilities?.attachmentMaxCount ?? 20,
-                                isPresented: $showFilePicker,
-                                compact: true,
-                                onPhotoImport: importAssistantPhotos,
-                                onImport: importAssistantFiles
-                            )
-                            .disabled(sending || activeRunID != nil || activeEntryTaskID != nil || advisorSubmitUncertain)
-                            .accessibilityIdentifier("assistant-attachment-picker")
                         }
                         MPChatComposer(
                             text: inputBinding,
@@ -640,25 +618,16 @@ struct AssistantView: View {
                             isKeyboardVisible: keyboardVisible,
                             focusRequest: composerFocusRequest,
                             dismissKeyboardRequest: dismissKeyboardRequest,
-                            embedded: true,
-                            allowsEmptySend: !files.isEmpty
+                            allowsEmptySend: !files.isEmpty,
+                            attachmentControl: attachmentControl
                         )
                         .frame(maxWidth: .infinity)
                         .disabled(advisorSubmitUncertain)
                     }
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 12)
-                    .background(MPColor.surface)
-                    .overlay(alignment: .top) {
-                        Rectangle()
-                            .fill(MPColor.line)
-                            .frame(height: MPMetrics.inputBorderWidth)
+                    .padding(.horizontal, MPMetrics.pagePadding)
+                    .padding(.vertical, 8)
                     }
-                    }
-                }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .padding(.horizontal, MPMetrics.pagePadding)
-                .padding(.bottom, 8)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .accessibilityElement(children: .contain)
@@ -704,6 +673,8 @@ struct AssistantView: View {
                     onConfirmJarAction: confirmJarAction,
                     onConfirmBudgetAction: confirmBudgetAction
                 )
+            } else {
+                MPStatusMessage(text: "Chưa có dữ liệu tổng quan tài chính.", tone: .info)
             }
         } footer: {
             MPButton("Đóng", style: .secondary) { overviewPresented = false }
@@ -716,6 +687,40 @@ struct AssistantView: View {
         ) {
             Task { await resetConversation() }
         }
+    }
+
+    private var headerActions: [MPOverflowAction] {
+        var actions: [MPOverflowAction] = []
+        if overview != nil {
+            actions.append(MPOverflowAction(title: "Tổng quan tài chính") { overviewPresented = true })
+        }
+        if keyboardVisible {
+            actions.append(MPOverflowAction(title: "Đóng bàn phím") { dismissKeyboardRequest += 1 })
+        }
+        if !conversationID.isEmpty {
+            actions.append(MPOverflowAction(title: "Tải lại lịch sử") { Task { await reloadHistory() } })
+            actions.append(MPOverflowAction(title: "Chat mới") { resetConfirmation = true })
+        }
+        actions.append(MPOverflowAction(title: "Đóng trợ lý", action: onBack))
+        return actions
+    }
+
+    private var attachmentControl: AnyView? {
+        guard capabilities?.entryIntegration == true else { return nil }
+        return AnyView(
+            MPDocumentPicker(
+                title: files.isEmpty ? "Đính kèm chứng từ" : "Thêm chứng từ",
+                count: files.count,
+                maxCount: capabilities?.attachmentMaxCount ?? 20,
+                isPresented: $showFilePicker,
+                compact: true,
+                iconOnly: true,
+                onPhotoImport: importAssistantPhotos,
+                onImport: importAssistantFiles
+            )
+            .disabled(sending || activeRunID != nil || activeEntryTaskID != nil || advisorSubmitUncertain)
+            .accessibilityIdentifier("assistant-attachment-picker")
+        )
     }
 
     private func overviewMoney(_ key: String) -> String {
@@ -1251,12 +1256,7 @@ enum AssistantCardType {
     }
 
     static func sourceLabel(_ value: JSONValue?) -> String {
-        guard let value, case .object(let source) = value,
-              case .string(let rawTimezone) = source["timezone"] else {
-            return "Nguồn dữ liệu tài chính"
-        }
-        let timezone = rawTimezone.trimmingCharacters(in: .whitespacesAndNewlines)
-        return timezone.isEmpty ? "Nguồn dữ liệu tài chính" : "Nguồn dữ liệu · \(timezone)"
+        "Dựa trên dữ liệu trong MyPocket"
     }
 
     struct ProductHelpSource: Equatable, Sendable {
@@ -1433,7 +1433,6 @@ struct AssistantStructuredCard: View {
                     VStack(alignment: .leading, spacing: 3) {
                         MPText(source.title, style: .emphasis)
                         MPText(source.excerpt, style: .secondary)
-                        MPText(source.id, style: .secondary)
                     }
                 }
             }
@@ -1497,21 +1496,24 @@ struct AssistantStructuredCard: View {
 
     @ViewBuilder private func walletConfirmationView(_ view: [String: JSONValue]) -> some View {
         if let input = AssistantWalletProposal.decode(view) {
-            MPText("\(input.name) · \(walletTypeLabel(input.type))")
+            let persistedState = AssistantPersistedActionState.decode(view)
+            MPAssistantProposalHeader(title: input.name, subtitle: walletTypeLabel(input.type), iconID: .wallet)
             ForEach(Array(AssistantWalletConfirmationSummary.lines(for: input, masked: masked).enumerated()), id: \.offset) { _, line in
                 MPText(line, style: .secondary)
             }
-            if walletConfirmationState == .succeeded {
+            if walletConfirmationState == .succeeded || persistedState == .applied {
                 MPStatusMessage(text: "Đã tạo ví sau khi bạn xác nhận.", tone: .success)
+            } else if persistedState == .unavailable {
+                MPStatusMessage(text: "Đề xuất này không còn hiệu lực. Hãy yêu cầu trợ lý tạo đề xuất mới.", tone: .info)
             } else {
                 if let walletConfirmationError {
                     MPStatusMessage(text: walletConfirmationError, tone: .danger)
                 }
                 MPButton(
                     "Xác nhận tạo ví",
-                    style: .secondary,
+                    style: .primary,
                     isLoading: walletConfirmationState == .saving,
-                    isDisabled: (onCreateWallet == nil && onConfirmWalletAction == nil) || !walletConfirmationState.canConfirm
+                    isDisabled: persistedState == .applying || (onCreateWallet == nil && onConfirmWalletAction == nil) || !walletConfirmationState.canConfirm
                 ) {
                     confirmWallet(
                         input,
@@ -1543,16 +1545,19 @@ struct AssistantStructuredCard: View {
     @ViewBuilder private func budgetConfirmationView(_ view: [String: JSONValue]) -> some View {
         if let proposal = AssistantBudgetProposal.decode(view) {
             let isUpdate = proposal.action == "update_budget"
-            MPText(proposal.name, style: .emphasis)
-            MPText("Giới hạn: \(MPFormat.money(proposal.limitAmount, masked: masked))", style: .secondary)
-            MPText("Thời gian: \(proposal.startDate) → \(proposal.endDate)", style: .secondary)
-            if let walletID = proposal.walletID { MPText("Ví: \(walletID)", style: .secondary) }
-            if let categoryID = proposal.categoryID { MPText("Danh mục: \(categoryID)", style: .secondary) }
-            if walletConfirmationState == .succeeded {
+            let persistedState = AssistantPersistedActionState.decode(view)
+            MPAssistantProposalHeader(title: proposal.name, subtitle: isUpdate ? "Cập nhật ngân sách" : "Ngân sách mới", iconID: .report)
+            MPAssistantDetailRow(label: "Giới hạn", value: MPFormat.money(proposal.limitAmount, masked: masked), emphasized: true)
+            MPAssistantDetailRow(label: "Thời gian", value: "\(proposal.startDate) → \(proposal.endDate)")
+            if proposal.walletID != nil { MPAssistantDetailRow(label: "Phạm vi ví", value: "Ví đã chọn") }
+            if proposal.categoryID != nil { MPAssistantDetailRow(label: "Danh mục", value: "Danh mục đã chọn") }
+            if walletConfirmationState == .succeeded || persistedState == .applied {
                 MPStatusMessage(text: isUpdate ? "Đã cập nhật ngân sách sau khi bạn xác nhận." : "Đã tạo ngân sách sau khi bạn xác nhận.", tone: .success)
+            } else if persistedState == .unavailable {
+                MPStatusMessage(text: "Đề xuất này không còn hiệu lực. Hãy yêu cầu trợ lý tạo đề xuất mới.", tone: .info)
             } else {
                 if let walletConfirmationError { MPStatusMessage(text: walletConfirmationError, tone: .danger) }
-                MPButton(isUpdate ? "Xác nhận cập nhật ngân sách" : "Xác nhận tạo ngân sách", style: .secondary, isLoading: walletConfirmationState == .saving, isDisabled: onConfirmBudgetAction == nil || !walletConfirmationState.canConfirm) {
+                MPButton(isUpdate ? "Xác nhận cập nhật ngân sách" : "Xác nhận tạo ngân sách", style: .primary, isLoading: walletConfirmationState == .saving || persistedState == .applying, isDisabled: persistedState == .applying || onConfirmBudgetAction == nil || !walletConfirmationState.canConfirm) {
                     guard walletConfirmationState.begin(), let actionID = AssistantJarProposal.actionID(view), let context = AssistantJarProposal.actionContext(view), let onConfirmBudgetAction else {
                         walletConfirmationError = "Đề xuất ngân sách chưa đủ dữ liệu để xác nhận."
                         return
@@ -1581,20 +1586,23 @@ struct AssistantStructuredCard: View {
     @ViewBuilder private func jarConfirmationView(_ view: [String: JSONValue]) -> some View {
         if let proposal = AssistantJarProposal.decode(view) {
             let isUpdate = proposal.action == "update_jar"
-            MPText(proposal.name, style: .emphasis)
-            MPText("Tháng \(proposal.month)", style: .secondary)
+            let persistedState = AssistantPersistedActionState.decode(view)
+            MPAssistantProposalHeader(title: proposal.name, subtitle: isUpdate ? "Cập nhật hũ" : "Hũ mới", iconID: .savings)
+            MPAssistantDetailRow(label: "Tháng", value: proposal.month.split(separator: "-").reversed().joined(separator: "/"))
             switch proposal.mode {
-            case "fixed": MPText("Phân bổ cố định: \(MPFormat.money(proposal.amount ?? 0, masked: masked))", style: .secondary)
+            case "fixed": MPAssistantDetailRow(label: "Phân bổ", value: MPFormat.money(proposal.amount ?? 0, masked: masked), emphasized: true)
             case "percent":
                 let percentage = String(format: "%.2f", proposal.percent ?? 0)
-                MPText("Phân bổ: \(percentage)% thu nhập", style: .secondary)
-            default: MPText("Không đặt mức phân bổ", style: .secondary)
+                MPAssistantDetailRow(label: "Phân bổ", value: "\(percentage)% thu nhập", emphasized: true)
+            default: MPAssistantDetailRow(label: "Phân bổ", value: "Không đặt")
             }
-            if walletConfirmationState == .succeeded {
+            if walletConfirmationState == .succeeded || persistedState == .applied {
                 MPStatusMessage(text: isUpdate ? "Đã cập nhật hũ sau khi bạn xác nhận." : "Đã tạo hũ sau khi bạn xác nhận.", tone: .success)
+            } else if persistedState == .unavailable {
+                MPStatusMessage(text: "Đề xuất này không còn hiệu lực. Hãy yêu cầu trợ lý tạo đề xuất mới.", tone: .info)
             } else {
                 if let walletConfirmationError { MPStatusMessage(text: walletConfirmationError, tone: .danger) }
-                MPButton(isUpdate ? "Xác nhận cập nhật hũ" : "Xác nhận tạo hũ", style: .secondary, isLoading: walletConfirmationState == .saving, isDisabled: onConfirmJarAction == nil || !walletConfirmationState.canConfirm) {
+                MPButton(isUpdate ? "Xác nhận cập nhật hũ" : "Xác nhận tạo hũ", style: .primary, isLoading: walletConfirmationState == .saving || persistedState == .applying, isDisabled: persistedState == .applying || onConfirmJarAction == nil || !walletConfirmationState.canConfirm) {
                     guard walletConfirmationState.begin(), let actionID = AssistantJarProposal.actionID(view), let context = AssistantJarProposal.actionContext(view), let onConfirmJarAction else {
                         walletConfirmationError = "Đề xuất hũ chưa đủ dữ liệu để xác nhận."
                         return

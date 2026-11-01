@@ -51,10 +51,104 @@ func NewAdvisorToolRegistry(finance *FinanceQueryService) *AdvisorToolRegistry {
 		&transactionTool{finance: finance}, &categoryCatalogTool{finance: finance}, &categoryDetailTool{finance: finance}, &productHelpTool{}, &walletProposalTool{}, &jarProposalTool{}, &jarUpdateProposalTool{}, &budgetProposalTool{}, &budgetUpdateProposalTool{},
 		&transactionCreateProposalTool{}, &transactionUpdateProposalTool{}, &transactionDeleteProposalTool{}, &walletTransferProposalTool{},
 		&categoryCreateProposalTool{}, &categoryUpdateProposalTool{}, &transactionRecategorizeProposalTool{},
+		&proposalRevisionTool{},
 	} {
 		registry.tools[tool.Name()] = tool
 	}
 	return registry
+}
+
+type proposalRevisionArgs struct {
+	ActionID string         `json:"action_id"`
+	Revision int64          `json:"revision"`
+	Action   string         `json:"action"`
+	Patch    map[string]any `json:"patch"`
+}
+
+// proposalRevisionTool prepares a replacement for the latest pending card.
+// It only carries a validated patch; persistence resolves the original card
+// and atomically supersedes it when the assistant message is committed.
+type proposalRevisionTool struct{}
+
+func (t *proposalRevisionTool) Name() string { return "revise_pending_proposal" }
+
+func (t *proposalRevisionTool) Definition() ToolDefinition {
+	return readDefinition(t.Name(), "Revise the server-provided pending proposal after the owner asks to change one or more fields. Use exactly the action_id, revision and action from pending_proposal_context. Put only changed fields in patch. This still requires confirmation and never writes financial data directly.", map[string]any{
+		"action_id": map[string]any{"type": "string", "format": "uuid"},
+		"revision":  map[string]any{"type": "integer", "minimum": 1},
+		"action":    map[string]any{"type": "string"},
+		"patch":     map[string]any{"type": "object", "minProperties": 1, "additionalProperties": true},
+	}, []string{"action_id", "revision", "action", "patch"})
+}
+
+func (t *proposalRevisionTool) Execute(_ context.Context, _ Principal, raw json.RawMessage) (entity.FinanceResult, error) {
+	var args proposalRevisionArgs
+	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
+		return entity.FinanceResult{}, err
+	}
+	args.ActionID = strings.TrimSpace(args.ActionID)
+	args.Action = strings.TrimSpace(args.Action)
+	if _, err := uuid.Parse(args.ActionID); err != nil || args.Revision <= 0 || len(args.Patch) == 0 {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	allowed := advisorSupportedEditFields(args.Action)
+	allowedSet := make(map[string]bool, len(allowed))
+	for _, field := range allowed {
+		allowedSet[field] = true
+	}
+	for field := range args.Patch {
+		if !allowedSet[field] {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+	}
+	viewKind := advisorProposalViewKind(args.Action)
+	if viewKind == "" {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	view, err := json.Marshal(map[string]any{
+		"action_id":          uuid.NewString(),
+		"action":             args.Action,
+		"revision":           args.Revision + 1,
+		"status":             entity.AIProposalPending,
+		"replaces_action_id": args.ActionID,
+		"replaces_revision":  args.Revision,
+		"patch":              args.Patch,
+	})
+	if err != nil {
+		return entity.FinanceResult{}, ErrAdvisorToolInvalid
+	}
+	return entity.FinanceResult{QueryKey: "proposal_revision", Status: "proposed", ViewKind: viewKind, View: view}, nil
+}
+
+func advisorProposalViewKind(action string) string {
+	switch action {
+	case "create_wallet":
+		return "wallet_creation_proposal"
+	case "create_jar":
+		return "jar_creation_proposal"
+	case "update_jar":
+		return "jar_update_proposal"
+	case "create_budget":
+		return "budget_creation_proposal"
+	case "update_budget":
+		return "budget_update_proposal"
+	case "create_transaction":
+		return "transaction_creation_proposal"
+	case "update_transaction":
+		return "transaction_update_proposal"
+	case "delete_transaction":
+		return "transaction_delete_proposal"
+	case "recategorize_transaction":
+		return "transaction_recategorize_proposal"
+	case "transfer_wallet":
+		return "wallet_transfer_proposal"
+	case "create_category":
+		return "category_creation_proposal"
+	case "update_category":
+		return "category_update_proposal"
+	default:
+		return ""
+	}
 }
 
 func (r *AdvisorToolRegistry) Lookup(name string) (AdvisorTool, bool) {
@@ -535,7 +629,7 @@ type jarProposalTool struct{}
 
 func (t *jarProposalTool) Name() string { return "propose_create_jar" }
 func (t *jarProposalTool) Definition() ToolDefinition {
-	return readDefinition(t.Name(), "Prepare a monthly spending jar for the user to review and confirm; never create it directly", map[string]any{
+	return readDefinition(t.Name(), "Prepare a jar allocation for one explicitly selected month for review and confirmation. Ask which month if missing; never infer a month from 'every month'. This does not schedule transfers or allocate all future months. Never create it directly or use this tool to edit a pending card.", map[string]any{
 		"month":              monthSchema(),
 		"name":               map[string]any{"type": "string", "minLength": 1, "maxLength": 100},
 		"allocation_mode":    map[string]any{"type": "string", "enum": []string{entity.JarAllocationNone, entity.JarAllocationFixed, entity.JarAllocationPercent}},

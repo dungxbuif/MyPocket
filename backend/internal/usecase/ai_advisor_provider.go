@@ -167,7 +167,7 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 	system := BuildAdvisorSystemMessage(principal)
 	if o.GroundingEnabled {
 		system.Content += "\nFor every final answer, call finish_answer. Finance answers must use mode=finance with claims bound to the exact source_ref values in tool facts from this run. For prepared actions use template_id=proposal with no claims. For product_help, read get_product_help then provide source_id from its sources. Server renders labels/help/clarification; explanation and slot text are not displayed. Never put unverified amounts in free text."
-		system.Content += " For clarification choose one question_id: intent, wallet, category, period, transaction, amount. Ask only for the next missing input."
+		system.Content += " For clarification choose one question_id: intent, wallet, category, period, transaction, amount, jar_month, proposal_edit. Use jar_month when a jar allocation month is missing; use proposal_edit for an amount-only edit to a pending card. Ask only for the next missing input."
 		system.Content += " Finance mode REQUIRES template_id: choose summary, period_comparison, transaction, wallet, budget, goal, jar, or proposal. Do not omit template_id. The fact_ref must equal the full source_ref string from the tool result."
 	}
 	working = append(working, system)
@@ -256,7 +256,11 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 			if usageSeen {
 				storedUsage = usage
 			}
-			return AdvisorAnswer{Text: response.Text, Results: results, Usage: storedUsage, Evidence: evidence}, nil
+			text := response.Text
+			if advisorProposalOnly(results) {
+				text = advisorProposalReply
+			}
+			return AdvisorAnswer{Text: text, Results: results, Usage: storedUsage, Evidence: evidence}, nil
 		}
 		// Validate the complete provider batch before executing any call. Tool
 		// results are correlated by ID in the next provider request; accepting
@@ -401,7 +405,11 @@ func groundedFallbackAnswer(results []entity.FinanceResult, usage map[string]any
 	if usageSeen {
 		storedUsage = usage
 	}
-	return AdvisorAnswer{Text: "Mình đã lấy được dữ liệu từ hệ thống; hãy xem các thẻ kết quả bên dưới.", Results: results, Usage: storedUsage, Evidence: evidence}
+	text := "Mình đã lấy được dữ liệu từ hệ thống; hãy xem các thẻ kết quả bên dưới."
+	if advisorProposalOnly(results) {
+		text = advisorProposalReply
+	}
+	return AdvisorAnswer{Text: text, Results: results, Usage: storedUsage, Evidence: evidence}
 }
 
 func validateAdvisorToolCalls(calls []AdvisorToolCall) error {
@@ -428,7 +436,7 @@ func advisorFinishAnswerDefinition() ToolDefinition {
 			"additionalProperties": false,
 			"required":             []string{"mode"},
 			"properties": map[string]any{
-				"question_id": map[string]any{"type": "string", "enum": []string{"intent", "wallet", "category", "period", "transaction", "amount"}},
+				"question_id": map[string]any{"type": "string", "enum": []string{"intent", "wallet", "category", "period", "transaction", "amount", "jar_month", "proposal_edit"}},
 				"source_id":   map[string]any{"type": "string", "maxLength": 200},
 				"mode":        map[string]any{"type": "string", "enum": []string{"finance", "product_help", "clarification"}},
 				"template_id": map[string]any{"type": "string", "description": "Required in finance mode; choose a server template.", "enum": []string{"summary", "period_comparison", "transaction", "wallet", "budget", "goal", "jar", "proposal"}},

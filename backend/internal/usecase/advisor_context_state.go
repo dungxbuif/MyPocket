@@ -135,7 +135,55 @@ func BuildAdvisorRequestContext(history []entity.AdvisorMessage, state entity.Ad
 		}
 		chat = append([]AdvisorChatMessage{{Role: "system", Content: content}}, chat...)
 	}
+	if pending := latestPendingAdvisorProposal(ordered); pending != nil {
+		payload, _ := json.Marshal(pending)
+		content := "pending_proposal_context (server-validated, user-visible proposal; use revise_pending_proposal for follow-up edits): " + string(payload)
+		for len(chat) > 1 && advisorChatBytes(chat)+len(content) > advisorContextTextBudget {
+			chat = chat[1:]
+		}
+		if advisorChatBytes(chat)+len(content) > advisorContextTextBudget {
+			return nil, ErrAdvisorContextStateInvalid
+		}
+		chat = append([]AdvisorChatMessage{{Role: "system", Content: content}}, chat...)
+	}
 	return chat, nil
+}
+
+func latestPendingAdvisorProposal(messages []entity.AdvisorMessage) map[string]any {
+	for messageIndex := len(messages) - 1; messageIndex >= 0; messageIndex-- {
+		message := messages[messageIndex]
+		if message.Role != entity.AdvisorRoleAssistant {
+			continue
+		}
+		for partIndex := len(message.Parts) - 1; partIndex >= 0; partIndex-- {
+			part := message.Parts[partIndex]
+			switch part.Type {
+			case "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation":
+			default:
+				continue
+			}
+			encoded, err := json.Marshal(part.Data)
+			if err != nil {
+				continue
+			}
+			var envelope map[string]any
+			if json.Unmarshal(encoded, &envelope) != nil {
+				continue
+			}
+			view, _ := envelope["view"].(map[string]any)
+			if stringValue(view["status"]) != entity.AIProposalPending {
+				continue
+			}
+			context := make(map[string]any)
+			for _, key := range append([]string{"action_id", "revision", "action"}, advisorSupportedEditFields(stringValue(view["action"]))...) {
+				if value, ok := view[key]; ok {
+					context[key] = value
+				}
+			}
+			return context
+		}
+	}
+	return nil
 }
 
 func revalidateAdvisorContext(ctx context.Context, principal Principal, registry *AdvisorToolRegistry, state entity.AdvisorContextState) (entity.AdvisorContextState, error) {
