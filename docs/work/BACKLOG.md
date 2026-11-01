@@ -18,6 +18,20 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## Manual production migration pipeline — ready, 2026-11-01
+
+The source now includes a separate protected manual `migrate:production` job
+alongside Auto DevOps. It pulls an immutable image from
+`registry.dungxbuif.com`, runs the image's migration command on the production
+network, verifies the expected version, and serializes access to the production
+database. Project variables are configured with the `production` environment
+scope; secrets are protected and masked, while the expected migration version
+is protected and visible because it is not a secret and GitLab masked variables
+require a longer value.
+
+Source contract checks are the only verification performed here. The manual
+production job was not started, so no production schema mutation is claimed.
+
 ## Reports / Insider visual reporting and saved AI — local candidate, 2026-11-01
 
 [Detail design](tickets/REPORTS-INSIDER-VISUAL-20261101-DETAIL_DESIGN.md) and

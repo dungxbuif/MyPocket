@@ -22,6 +22,24 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## Manual production migration pipeline — 2026-11-01
+
+The repository now keeps the existing Auto DevOps include and adds a separate
+protected, manual `migrate:production` job. It pulls an immutable
+`registry.dungxbuif.com` application image, checks the migration state, runs
+`/app/migrate up` on the production Docker network, and verifies the expected
+schema version without resetting data. The job is serialized with
+`mypocket-production-db` and uses production-scoped protected project
+variables: `DATABASE_URL`, `MYPOCKET_IMAGE_REF`, `MYPOCKET_MIGRATION_NETWORK`,
+and the non-secret `MYPOCKET_EXPECTED_MIGRATION_VERSION`.
+The online project runner tagged `homelab-vm100-deploy` is assigned to the
+project so the manual job can be picked up when explicitly started.
+
+The pipeline contract and local migration chain are verified in source. The
+production migration job itself has not been run as part of this change, so the
+deployed database remains documented at the previously observed version until
+an owner explicitly starts the manual job.
+
 ## Reports / Insider visual and saved-analysis local candidate — 2026-11-01
 
 Owner requests detailed requirements and technical design for clearer charts,

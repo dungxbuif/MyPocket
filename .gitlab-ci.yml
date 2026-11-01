@@ -1,0 +1,4 @@
+include:
+  # Preserve GitLab's existing Auto DevOps flow for the normal pipeline.
+  - template: Auto-DevOps.gitlab-ci.yml
+  - local: .gitlab/ci/migrate-production.yml

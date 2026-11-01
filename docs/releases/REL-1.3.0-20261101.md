@@ -29,6 +29,10 @@ physical-device install is claimed here.
 - Real APNs token-authenticated transport and durable delivery worker queue;
   APNs is disabled by default until Apple secrets, entitlements and device UAT
   are available.
+- Separate protected manual production migration pipeline that preserves the
+  existing Auto DevOps flow and verifies the image migration reaches version
+  `000053` without resetting data. The job is source-verified but was not
+  executed in this release task.
 
 ## Verification
 

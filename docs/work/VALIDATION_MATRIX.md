@@ -16,6 +16,20 @@ shared_fields:
 updated: 2026-11-01
 ---
 
+## Manual production migration pipeline — 2026-11-01
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| CI contract | `rtk bash scripts/mypocket-migrate-pipeline.test.sh` | PASS after the final protected-ref guard; Auto DevOps remains included and the migration job is manual, production-scoped, serialized, and pinned to the registry image contract |
+| Local migration contract | `rtk bash scripts/mypocket-rollout-preflight.test.sh`; backend migration tests | PASS in source for migration `000053` and its down migration |
+| Touched backend package | `rtk go test ./migrations -count=1`; `rtk go build ./cmd/migrate` | PASS: 7 migration tests and migration command build |
+| Combined backend regression | `rtk go test ./... -count=1` | BLOCKED by pre-existing report-analysis stub/interface, MCP route-catalog, OCR, and report-fact test failures outside this pipeline change; 607 tests passed and 142 skipped before the failing packages |
+| iOS project/source guards | `rtk bash mobile-ios/scripts/verify-project.sh`; `rtk bash mobile-ios/scripts/check-icon-catalog.sh` | PASS: project verification and 38-role Phosphor catalog verification |
+| iOS base-component guard | `rtk bash mobile-ios/scripts/check-base-components.sh` | BLOCKED by an existing `MainTabView.swift` `fullScreenCover` route modifier; no `mobile-ios/` file changed in this pipeline task |
+| GitLab project variables | Project CI/CD settings | PASS: `DATABASE_URL`, `MYPOCKET_IMAGE_REF`, and `MYPOCKET_MIGRATION_NETWORK` use `production` + Protected + Masked; expected version uses `production` + Protected and is non-secret/Visible |
+| GitLab runner availability | MyPocket CI/CD Settings → Runners | PASS: online idle runner tagged `homelab-vm100-deploy` assigned to the project |
+| Production migration execution | Manual GitLab job | OPEN: intentionally not started in this source/release task; no production schema mutation is claimed |
+
 ## Reports / Insider visual and saved-analysis local candidate — 2026-11-01
 
 | Gate | Evidence | Result |
