@@ -68,5 +68,5 @@
 - [x] Create the MyPocket project variables with environment scope `production`; protect and mask secret values.
 - [x] Exclude seed/test/local-only values from production variables.
 - [x] Run the combined backend, migration contract, pipeline contract, and iOS/source verification requested by the owner; the touched migration package and command pass, while the full suite has unrelated pre-existing failures recorded in the validation matrix.
-- [ ] Create the agreed release tag and push the mobile source/tag to GitHub; push the repository release to GitLab as already requested for this project.
+- [x] Create the agreed release tag and push the mobile source/tag to GitHub; push the repository release to GitLab as already requested for this project.
 
