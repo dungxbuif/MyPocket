@@ -21,6 +21,7 @@ updated: 2026-11-01
 | Gate | Evidence | Result |
 | --- | --- | --- |
 | CI contract | `rtk bash scripts/mypocket-migrate-pipeline.test.sh` | PASS after the final protected-ref guard; Auto DevOps remains included and the migration job is manual, production-scoped, serialized, and pinned to the registry image contract |
+| GitLab CI lint | MyPocket Pipeline Editor on `main` | PASS: GitLab reports "Pipeline syntax is correct" for the pushed configuration |
 | Local migration contract | `rtk bash scripts/mypocket-rollout-preflight.test.sh`; backend migration tests | PASS in source for migration `000053` and its down migration |
 | Touched backend package | `rtk go test ./migrations -count=1`; `rtk go build ./cmd/migrate` | PASS: 7 migration tests and migration command build |
 | Combined backend regression | `rtk go test ./... -count=1` | BLOCKED by pre-existing report-analysis stub/interface, MCP route-catalog, OCR, and report-fact test failures outside this pipeline change; 607 tests passed and 142 skipped before the failing packages |
