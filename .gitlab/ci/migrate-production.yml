@@ -7,6 +7,9 @@ migrate:production:
     name: production
     action: prepare
   resource_group: mypocket-production-db
+  # Migration is an explicit production action and must not be blocked by
+  # unrelated Auto DevOps build/security jobs waiting for an untagged runner.
+  needs: []
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
       when: manual
