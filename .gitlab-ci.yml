@@ -40,9 +40,17 @@ build:
       : "${REGISTRY_PASSWORD:?REGISTRY_PASSWORD must be set for image publishing}"
       image_tag="registry.dungxbuif.com/mypocket-api:${CI_COMMIT_SHA}"
       printf '%s' "${REGISTRY_PASSWORD}" | docker login registry.dungxbuif.com --username "${REGISTRY_USERNAME}" --password-stdin
-      docker build --pull -f backend/Dockerfile -t "${image_tag}" .
-      docker push "${image_tag}"
-      digest_ref="$(docker image inspect --format='{{index .RepoDigests 0}}' "${image_tag}")"
+      docker buildx create --name mypocket-builder --driver docker-container --use
+      docker buildx build --pull \
+        --platform linux/amd64,linux/arm64 \
+        --file backend/Dockerfile \
+        --tag "${image_tag}" \
+        --push \
+        --metadata-file build-metadata.json \
+        .
+      digest_ref="$(awk -F'"' '/"containerimage.digest"/ {print $4; exit}' build-metadata.json)"
+      test -n "${digest_ref}"
+      digest_ref="registry.dungxbuif.com/mypocket-api@${digest_ref}"
       case "${digest_ref}" in
         registry.dungxbuif.com/mypocket-api@sha256:*) ;;
         *) echo 'image push did not return an immutable registry digest' >&2; exit 1 ;;
