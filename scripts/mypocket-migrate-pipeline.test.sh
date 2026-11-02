@@ -8,6 +8,7 @@ job_file="${repo_root}/.gitlab/ci/migrate-production.yml"
 [[ -f "${ci_file}" ]] || { echo 'FAIL: .gitlab-ci.yml missing' >&2; exit 1; }
 [[ -f "${job_file}" ]] || { echo 'FAIL: migration job file missing' >&2; exit 1; }
 
+grep -Fq 'CI_PIPELINE_SOURCE == "web"' "${ci_file}"
 grep -Fq 'Auto-DevOps.gitlab-ci.yml' "${ci_file}"
 grep -Fq '.gitlab/ci/migrate-production.yml' "${ci_file}"
 grep -Fq 'migrate:production:' "${job_file}"

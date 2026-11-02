@@ -1,3 +1,13 @@
+workflow:
+  rules:
+    # Allow an owner-triggered production run as well as normal branch/tag and
+    # merge-request pipelines from Auto DevOps.
+    - if: '$CI_PIPELINE_SOURCE == "web"'
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+    - when: never
+
 include:
   # Preserve GitLab's existing Auto DevOps flow for the normal pipeline.
   - template: Auto-DevOps.gitlab-ci.yml
