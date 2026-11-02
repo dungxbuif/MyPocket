@@ -19,7 +19,8 @@ grep -Fq 'name: production' "${job_file}"
 grep -Fq 'homelab-vm100-deploy' "${job_file}"
 grep -Fq 'resource_group: mypocket-production-db' "${job_file}"
 grep -Fq 'registry.dungxbuif.com' "${job_file}"
-grep -Fq '/app/migrate up' "${job_file}"
+grep -Fq -- '--entrypoint /app/migrate' "${job_file}"
+grep -Fq '"${MYPOCKET_IMAGE_REF}" up' "${job_file}"
 grep -Fq 'version: ${MYPOCKET_EXPECTED_MIGRATION_VERSION:-53} dirty: false' "${job_file}"
 
 echo 'PASS: MyPocket manual production migration pipeline contract'
