@@ -13,10 +13,10 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: 2026-11-01
+updated: 2026-11-02
 ---
 
-## Manual production migration pipeline — 2026-11-01
+## Manual production migration pipeline — 2026-11-02
 
 | Gate | Evidence | Result |
 | --- | --- | --- |
@@ -29,7 +29,8 @@ updated: 2026-11-01
 | iOS base-component guard | `rtk bash mobile-ios/scripts/check-base-components.sh` | BLOCKED by an existing `MainTabView.swift` `fullScreenCover` route modifier; no `mobile-ios/` file changed in this pipeline task |
 | GitLab project variables | Project CI/CD settings | PASS: `DATABASE_URL`, `MYPOCKET_IMAGE_REF`, and `MYPOCKET_MIGRATION_NETWORK` use `production` + Protected + Masked; expected version uses `production` + Protected and is non-secret/Visible |
 | GitLab runner availability | MyPocket CI/CD Settings → Runners | PASS: online idle runner tagged `homelab-vm100-deploy` assigned to the project |
-| Production migration execution | Manual GitLab job | OPEN: intentionally not started in this source/release task; no production schema mutation is claimed |
+| Production migration execution | GitLab pipeline `#764`, job `migrate:production #2546`; immutable image `registry.dungxbuif.com/mypocket-api@sha256:2709d78bab378ff9931381e92d89d168cf9b0da906b6d0ff675163c43e8767ec` | PASS: runner pulled `linux/amd64`; pre-readback `version: 52 dirty: false`, `up` completed, post-readback `version: 53 dirty: false`, job succeeded |
+| API/worker runtime re-rollout after migration | No Swarm service update was part of job `#2546` | OPEN: image publish and database migration are verified; API/worker service convergence to the new image still requires a separate rollout action |
 
 ## Reports / Insider visual and saved-analysis local candidate — 2026-11-01
 

@@ -31,8 +31,8 @@ physical-device install is claimed here.
   are available.
 - Separate protected manual production migration pipeline that preserves the
   existing Auto DevOps flow and verifies the image migration reaches version
-  `000053` without resetting data. The job is source-verified but was not
-  executed in this release task.
+  `000053` without resetting data. The pipeline also publishes a multi-platform
+  image from the Dockerfile so the VM100 migration runner receives `linux/amd64`.
 
 ## Verification
 
@@ -50,6 +50,17 @@ physical-device install is claimed here.
   interrupted. Focused visual/device acceptance remains open.
 
 ## Deployment record
+
+### Database migration follow-up — 2026-11-02
+
+- Source commit: `d2e08bfe7247cf0078eff9e93b610e646044729d`
+- GitLab pipeline/job: `#764` / `migrate:production #2546`
+- Image: `registry.dungxbuif.com/mypocket-api:d2e08bfe7247cf0078eff9e93b610e646044729d`
+- Immutable multi-platform index digest: `sha256:2709d78bab378ff9931381e92d89d168cf9b0da906b6d0ff675163c43e8767ec`
+- Migration evidence: `version: 52 dirty: false` → `up` → `version: 53 dirty: false`; job succeeded
+- The migration job did not update Swarm API/worker services; their runtime re-rollout is not claimed by this record.
+
+### Previous service rollout — 2026-11-01
 
 - Source commit: `fe5344fc053a1c26ea7283b96174414290861b59`
 - Image: `registry.dungxbuif.com/mypocket-api:release-1.3.0-build7-fe5344fc`

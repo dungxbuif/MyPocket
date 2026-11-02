@@ -1,7 +1,7 @@
 ---
 artifact_type: operational_runbook
 id: ROLLOUT_READINESS
-status: deployed-release-1.3.0-build7-2026-11-01
+status: production-migration-000053-verified-2026-11-02
 owner: shared
 trace:
   database: ../architecture/DATABASE.md
@@ -13,20 +13,18 @@ trace:
 
 # Release rollout readiness
 
-## Current release — 1.3.0 build 7 — 2026-11-01
+## Current production state — migration 000053 verified — 2026-11-02
 
-The release image
-`registry.dungxbuif.com/mypocket-api:release-1.3.0-build7-fe5344fc` at
-`sha256:f0bf37e65759d8d6fef61389b93acdb1e7154151ca1966f2d4d011da3cdf7a44`
-is deployed to both API and worker. The pre-release backup was validated at
-`/var/backups/mypocket/release-1.3.0-build7-20261031T214222Z/pre-release.dump`
-with SHA-256
-`48be77ce25b2169927b242fe73ab48dd5e165fd264b0b2da3c7e7a57df6f4cc4`.
-Production readback is `version: 52 dirty: false`; both services are `1/1`,
-health is HTTP 200 and strict route parity is `96/96`. The native `1.3.0 (7)`
-simulator artifact is installed/launched. APNs remains disabled by default;
-the app's physical installation/launch is complete, while live Apple/device
-delivery and owner visual UAT remain open.
+The protected GitLab pipeline `#764` / job `migrate:production #2546` pulled
+the immutable multi-platform image
+`registry.dungxbuif.com/mypocket-api@sha256:2709d78bab378ff9931381e92d89d168cf9b0da906b6d0ff675163c43e8767ec`
+on the `homelab-vm100-deploy` runner. It verified `version: 52 dirty: false`,
+ran `up`, and verified `version: 53 dirty: false`.
+
+This is migration evidence, not a claim that the API/worker Swarm services
+were re-pointed to the new image. The last separately recorded service rollout
+remains the 1.3.0 build 7 deployment below; health/route and native UAT notes
+remain unchanged. APNs remains disabled by default.
 
 This runbook is for the current native/API candidate. The repository preflight
 commands remain read-only. The 2026-11-01 rollout evidence is recorded first;
@@ -37,9 +35,9 @@ migration, updates a Swarm service, or writes to a database.
 
 ### Release 1.2.1 — 2026-10-20
 
-Production currently runs the plan candidate at schema 52 (`dirty=false`) on
-both API and worker. The immutable image digest, validated backup and strict
-route-parity evidence are recorded in the current-status section below. Runtime
+Production database schema is now 53 (`dirty=false`) after the protected
+migration job. The immutable image digest and migration evidence are recorded
+in the current-status section above; runtime
 and grounding flags remain off by design for mixed rollout; broader provider
 and owner acceptance remains open. Older upgrade paths below are historical
 context.

@@ -1,5 +1,22 @@
 # Deployment
 
+## Production database migration — 2026-11-02
+
+The protected GitLab pipeline `#764` ran `migrate:production #2546` on the
+`homelab-vm100-deploy` runner using the immutable multi-platform image built
+from `d2e08bfe7247cf0078eff9e93b610e646044729d`:
+
+```text
+registry.dungxbuif.com/mypocket-api:d2e08bfe7247cf0078eff9e93b610e646044729d
+sha256:2709d78bab378ff9931381e92d89d168cf9b0da906b6d0ff675163c43e8767ec
+```
+
+The job pulled the `linux/amd64` image, read `version: 52 dirty: false`,
+completed `up`, and verified `version: 53 dirty: false`. No data reset or
+destructive operation was performed. This was the database migration path;
+the API/worker Swarm service update to this new image is a separate rollout
+and is not claimed here.
+
 ## Release 1.3.0 build 7 rollout — 2026-11-01
 
 The explicit owner-approved release instruction deployed the same immutable

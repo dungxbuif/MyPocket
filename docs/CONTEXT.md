@@ -19,10 +19,10 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-11-01
+updated: 2026-11-02
 ---
 
-## Manual production migration pipeline — 2026-11-01
+## Manual production migration pipeline — 2026-11-02
 
 The repository now keeps the existing Auto DevOps include and adds a separate
 protected, manual `migrate:production` job. It pulls an immutable
@@ -35,10 +35,13 @@ and the non-secret `MYPOCKET_EXPECTED_MIGRATION_VERSION`.
 The online project runner tagged `homelab-vm100-deploy` is assigned to the
 project so the manual job can be picked up when explicitly started.
 
-The pipeline contract and local migration chain are verified in source. The
-production migration job itself has not been run as part of this change, so the
-deployed database remains documented at the previously observed version until
-an owner explicitly starts the manual job.
+Pipeline #764 built and published the reviewed multi-platform image from
+commit `d2e08bfe`; the manual job #2546 pulled its immutable digest on the
+`homelab-vm100-deploy` runner and completed successfully. The production
+database readback was `version: 52 dirty: false`, migration `up` completed,
+and the post-readback was `version: 53 dirty: false`. This proves the database
+migration and image path; it does not by itself claim that the API/worker Swarm
+services were re-pointed to this new image.
 
 ## Reports / Insider visual and saved-analysis local candidate — 2026-11-01
 
@@ -100,8 +103,10 @@ run was interrupted after the simulator runner made no completion progress for
 more than eleven minutes, so it is not claimed as a full UI-suite pass. APNs
 remains disabled by default pending Apple credentials/entitlements and signed
 device delivery acceptance. Production is running the same immutable API/worker
-digest with schema 52 clean, health 200 and route parity 96/96. Full evidence
-is recorded in the [release note](releases/REL-1.3.0-20261101.md).
+digest with schema 53 clean, health 200 and route parity 96/96. The schema
+update was executed separately through the protected migration job; service
+re-rollout to the new image remains a separate operational action. Full
+evidence is recorded in the [release note](releases/REL-1.3.0-20261101.md).
 
 ## AI attachment diagnostics and APNs transport — 2026-11-01
 

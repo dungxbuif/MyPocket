@@ -70,3 +70,16 @@
 - [x] Run the combined backend, migration contract, pipeline contract, and iOS/source verification requested by the owner; the touched migration package and command pass, while the full suite has unrelated pre-existing failures recorded in the validation matrix.
 - [x] Create the agreed release tag and push the mobile source/tag to GitHub; push the repository release to GitLab as already requested for this project.
 
+## Execution evidence — 2026-11-02
+
+- Pipeline `#764` built and published a multi-platform image from commit
+  `d2e08bfe7247cf0078eff9e93b610e646044729d`.
+- Manual job `migrate:production #2546` ran on `homelab-vm100-deploy` and
+  pulled immutable digest
+  `sha256:2709d78bab378ff9931381e92d89d168cf9b0da906b6d0ff675163c43e8767ec`.
+- The migration readback changed from `version: 52 dirty: false` to
+  `version: 53 dirty: false`; the job ended with `Job succeeded`.
+- This execution record covers image publication and database migration. A
+  Swarm API/worker service re-rollout is intentionally not inferred from the
+  migration job and remains a separate operational action.
+
