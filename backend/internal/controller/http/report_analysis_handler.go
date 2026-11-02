@@ -131,6 +131,8 @@ func reportAnalysisMapError(c *gin.Context, err error) {
 		Fail(c, http.StatusTooManyRequests, Problem{Code: "REPORT_ANALYSIS_COOLDOWN", Title: "Too Many Requests", Detail: "Vui lòng thử lại sau thời gian chờ phân tích."})
 	case errors.Is(err, usecase.ErrReportAnalysisRequestConflict):
 		Fail(c, http.StatusConflict, Problem{Code: "REPORT_ANALYSIS_CONFLICT", Title: "Conflict", Detail: "Yêu cầu phân tích bị trùng với yêu cầu khác."})
+	case errors.Is(err, entity.ErrReportSnapshotStale):
+		Fail(c, http.StatusConflict, Problem{Code: "REPORT_SNAPSHOT_STALE", Title: "Conflict", Detail: "Cách tính báo cáo đã thay đổi. Hãy tải lại báo cáo trước khi phân tích."})
 	case errors.Is(err, repository.ErrSnapshotExpired):
 		Fail(c, http.StatusGone, Problem{Code: "REPORT_SNAPSHOT_EXPIRED", Title: problemTitleNotFound, Detail: "Bản chụp báo cáo đã hết hạn."})
 	case errors.Is(err, repository.ErrNotFound):

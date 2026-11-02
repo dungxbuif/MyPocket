@@ -17,7 +17,7 @@ final class MonthlyReportsTests: XCTestCase {
         }
         """.data(using: .utf8)!
 
-        let report = try JSONDecoder().decode(MonthlyReportModel.self, from: payload)
+        let report = try JSONDecoder.mypocket.decode(MonthlyReportModel.self, from: payload)
 
         XCTAssertEqual(report.month, "2026-10")
         XCTAssertEqual(report.timezone, "Asia/Ho_Chi_Minh")

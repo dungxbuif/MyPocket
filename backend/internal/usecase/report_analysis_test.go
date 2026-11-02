@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"context"
-	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -25,6 +25,9 @@ func (s *reportSnapshotRepositoryStub) GetOwned(_ context.Context, ownerID, snap
 }
 func (s *reportSnapshotRepositoryStub) CurrentRevision(context.Context, string) (int64, error) {
 	return 1, nil
+}
+func (s *reportSnapshotRepositoryStub) GetRetainedOwned(ctx context.Context, ownerID, snapshotID string, now time.Time) (*entity.ReportSnapshot, error) {
+	return s.GetOwned(ctx, ownerID, snapshotID, now)
 }
 func (s *reportSnapshotRepositoryStub) DeleteExpired(context.Context, time.Time, int) (int, error) {
 	return 0, nil
@@ -54,6 +57,38 @@ func (r *reportAnalysisRepositoryStub) GetOwned(context.Context, string, string)
 	}
 	return r.created, nil
 }
+
+func TestReportFollowUpContextKeepsSavedScopeAndRejectsMismatchedIdentifiers(t *testing.T) {
+	snapshot := reportSnapshotForAnalysis("owner", "snapshot", 10)
+	snapshot.Report.Scope.WalletID = "wallet-a"
+	analysis := &entity.ReportAnalysis{ID: "analysis", SnapshotID: "snapshot", Status: entity.ReportAnalysisStatusCompleted, RetainedUntil: snapshot.AsOf.Add(time.Hour), Observations: []entity.ReportInsight{{ID: "finding", Title: "Mua sắm vượt 350.000 đ"}}}
+	analysis.Suggestions = []entity.ReportInsight{{ID: "legacy-suggestion", Body: "Gợi ý được lưu trước đó"}}
+	service := NewReportAnalysisService(&reportAnalysisRepositoryStub{created: analysis}, &reportSnapshotRepositoryStub{snapshot: snapshot}, nil)
+	service.Now = func() time.Time { return snapshot.AsOf }
+	request := ReportFollowUpRequest{AnalysisID: "analysis", SnapshotID: "snapshot", FindingID: "finding"}
+	result, err := service.FollowUpContext(context.Background(), Principal{OwnerID: "owner"}, request)
+	if err != nil || result["scope"].(entity.MonthlyReportScope).WalletID != "wallet-a" {
+		t.Fatalf("context %+v %v", result, err)
+	}
+	for _, bad := range []ReportFollowUpRequest{{AnalysisID: "analysis", SnapshotID: "different", FindingID: "finding"}, {AnalysisID: "analysis", SnapshotID: "snapshot", FindingID: "missing"}} {
+		if _, err := service.FollowUpContext(context.Background(), Principal{OwnerID: "owner"}, bad); err == nil {
+			t.Fatal("mismatched context accepted")
+		}
+	}
+	if _, err := service.FollowUpContext(context.Background(), Principal{OwnerID: "foreign"}, request); err == nil {
+		t.Fatal("foreign snapshot accepted")
+	}
+	legacyRequest := request
+	legacyRequest.FindingID = "legacy-suggestion"
+	legacy, err := service.FollowUpContext(context.Background(), Principal{OwnerID: "owner"}, legacyRequest)
+	if err != nil || legacy["findings"].([]entity.ReportInsight)[0].ID != "legacy-suggestion" {
+		t.Fatalf("legacy suggestion rejected: %+v %v", legacy, err)
+	}
+	text := messageText(entity.AdvisorMessage{Parts: []entity.AdvisorPart{{Type: "text", Text: "Khoản nào cần xem?"}, {Type: "report_context", Data: result}}})
+	if !strings.Contains(text, "wallet-a") || !strings.Contains(text, "finding") {
+		t.Fatal("saved context absent from model input")
+	}
+}
 func (r *reportAnalysisRepositoryStub) Cancel(context.Context, string, string, time.Time) (*entity.ReportAnalysis, error) {
 	return nil, repository.ErrNotFound
 }
@@ -79,6 +114,12 @@ func (r *reportAnalysisRepositoryStub) Fail(_ context.Context, _ string, _ strin
 }
 func (r *reportAnalysisRepositoryStub) DeleteExpired(context.Context, time.Time, int) (int, error) {
 	return 0, nil
+}
+func (r *reportAnalysisRepositoryStub) LatestForScope(context.Context, string, entity.MonthlyReportScope, string, time.Time) (*entity.ReportAnalysis, *entity.ReportAnalysis, error) {
+	return r.completed, nil, nil
+}
+func (r *reportAnalysisRepositoryStub) RenewLease(context.Context, string, string, time.Time, time.Duration) error {
+	return nil
 }
 
 type reportAnalysisProviderStub struct {
@@ -119,18 +160,102 @@ func TestReportAnalysisBeginCompletesNoDataWithoutProviderCall(t *testing.T) {
 	}
 }
 
-func TestReportAnalysisBeginRequiresConfiguredProviderForNonEmptyReport(t *testing.T) {
+func TestReportAnalysisBeginSkipsProviderWhenEvidenceIsInsufficient(t *testing.T) {
 	snapshot := reportSnapshotForAnalysis("owner-1", "snapshot-1", 1)
 	analyses := &reportAnalysisRepositoryStub{}
 	provider := &reportAnalysisProviderStub{available: false}
 	service := NewReportAnalysisService(analyses, &reportSnapshotRepositoryStub{snapshot: snapshot}, provider)
 
-	_, _, err := service.Begin(context.Background(), Principal{OwnerID: "owner-1"}, ReportAnalysisBeginRequest{SnapshotID: snapshot.ID, ClientRequestID: "request-1"})
-	if !errors.Is(err, ErrReportAnalysisProviderUnavailable) {
-		t.Fatalf("Begin() error = %v, want ErrReportAnalysisProviderUnavailable", err)
+	result, _, err := service.Begin(context.Background(), Principal{OwnerID: "owner-1"}, ReportAnalysisBeginRequest{SnapshotID: snapshot.ID, ClientRequestID: "request-1"})
+	if err != nil || result.Status != entity.ReportAnalysisStatusCompleted || result.ErrorCode != "insufficient_evidence" || provider.calls != 0 {
+		t.Fatalf("insufficient evidence result=%+v calls=%d err=%v", result, provider.calls, err)
 	}
-	if analyses.created != nil || provider.calls != 0 {
-		t.Fatalf("provider unavailable path created=%+v calls=%d", analyses.created, provider.calls)
+}
+
+func TestReportAnalysisBeginRejectsOldQueryRules(t *testing.T) {
+	snapshot := reportSnapshotForAnalysis("owner", "snapshot", 10)
+	snapshot.RuleVersion = "monthly-report-v2"
+	analyses := &reportAnalysisRepositoryStub{}
+	service := NewReportAnalysisService(analyses, &reportSnapshotRepositoryStub{snapshot: snapshot}, nil)
+	_, _, err := service.Begin(context.Background(), Principal{OwnerID: "owner"}, ReportAnalysisBeginRequest{SnapshotID: "snapshot", ClientRequestID: "new-analysis"})
+	if err != entity.ErrReportSnapshotStale || analyses.created != nil {
+		t.Fatalf("old calculation accepted: %v %+v", err, analyses.created)
+	}
+}
+
+func TestProviderSelectionRendersExactServerEvidenceAndScopedTarget(t *testing.T) {
+	report := reportSnapshotForAnalysis("owner", "snapshot", 10).Report
+	report.Budgets = []entity.ReportBudgetPreview{{ID: "shopping", Name: "Mua sắm", FactRef: "budget:shopping", LimitAmount: 1500000, Spent: 1850000, Remaining: -350000, OverLimit: true}}
+	result := entity.ReportProviderResult{Observations: []entity.ReportProviderObservation{{FindingID: "budget-over:shopping", Intent: "review_plan"}}}
+	analysis := &entity.ReportAnalysis{}
+	applyProviderAnalysis(analysis, report, result)
+	if len(analysis.Observations) != 1 || len(analysis.Suggestions) != 0 {
+		t.Fatalf("output %+v", analysis)
+	}
+	item := analysis.Observations[0]
+	if !strings.Contains(item.Title, "350.000") || item.Drilldown.TargetID != "budget:shopping" || item.Metrics[0].Amount != 1850000 {
+		t.Fatalf("evidence %+v", item)
+	}
+	if !strings.Contains(analysis.Summary, "Chưa đủ") {
+		t.Fatalf("comparison guard absent: %s", analysis.Summary)
+	}
+}
+
+func TestReportFallbackPreservesDistinctEvidenceKinds(t *testing.T) {
+	report := reportSnapshotForAnalysis("owner", "snapshot", 10).Report
+	for _, id := range []string{"a", "b", "c"} {
+		report.Budgets = append(report.Budgets, entity.ReportBudgetPreview{ID: id, Name: id, LimitAmount: 1000000, Spent: 2000000, OverLimit: true})
+	}
+	categoryID := "food"
+	bps := int64(10000)
+	report.Comparison = entity.ReportComparison{Comparable: true, CommonDays: 10}
+	report.Contributors = []entity.ReportContributor{{CategoryID: &categoryID, Name: "Ăn uống", FactRef: "category:food", CurrentAmount: 2000000, PreviousAmount: 1000000, Delta: 1000000, CurrentCount: 10, PreviousCount: 10, ChangeBPS: &bps}}
+	analysis := &entity.ReportAnalysis{}
+	applyDeterministicAnalysis(analysis, report, "provider_empty")
+	found := false
+	for _, item := range analysis.Observations {
+		if item.Kind == entity.ReportInsightKindCategory {
+			found = true
+		}
+	}
+	if len(analysis.Observations) != 3 || !found {
+		t.Fatalf("fallback lost category evidence: %+v", analysis.Observations)
+	}
+}
+
+func TestReportAnalysisFingerprintIgnoresRenderTimeButTracksEligibilityAndNames(t *testing.T) {
+	snapshot := reportSnapshotForAnalysis("owner", "snapshot", 10)
+	snapshot.Report.Timezone = "Asia/Ho_Chi_Minh"
+	snapshot.Report.CurrentRange = entity.ReportRange{From: time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), EndExclusive: snapshot.AsOf, IsPartial: true}
+	snapshot.Report.Budgets = []entity.ReportBudgetPreview{{ID: "b", Name: "Ăn uống", Spent: 200, LimitAmount: 100, OverLimit: true}}
+	fingerprint := func() string {
+		facts, _ := entity.BuildReportFactBundle(*snapshot)
+		value, err := reportAnalysisFingerprint(*snapshot, facts)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+	original := fingerprint()
+	snapshot.Report.AsOf = snapshot.Report.AsOf.Add(time.Hour)
+	snapshot.Report.CurrentRange.EndExclusive = snapshot.Report.AsOf
+	snapshot.Report.Scope.Granularity = "week"
+	if fingerprint() != original {
+		t.Fatal("render time/granularity invalidates cache")
+	}
+	snapshot.Report.CurrentRange.EndExclusive = snapshot.Report.CurrentRange.EndExclusive.AddDate(0, 0, 1)
+	if fingerprint() == original {
+		t.Fatal("calendar coverage must invalidate cache")
+	}
+	snapshot.Report.CurrentRange.EndExclusive = snapshot.Report.CurrentRange.EndExclusive.AddDate(0, 0, -1)
+	snapshot.Report.Budgets[0].Name = "Tên mới"
+	if fingerprint() == original {
+		t.Fatal("renamed evidence must invalidate cache")
+	}
+	original = fingerprint()
+	snapshot.Report.Comparison.Comparable = true
+	if fingerprint() == original {
+		t.Fatal("eligibility must invalidate cache")
 	}
 }
 

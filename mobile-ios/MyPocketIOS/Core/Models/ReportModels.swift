@@ -311,6 +311,11 @@ struct MonthlyReportModel: Decodable, Sendable, Equatable {
     }
 }
 
+struct ReportInsightMetricModel: Codable, Sendable, Equatable {
+    var label: String
+    var amount: Int64
+}
+
 struct ReportInsightModel: Codable, Identifiable, Sendable, Equatable {
     var id: String
     var kind: String?
@@ -319,13 +324,18 @@ struct ReportInsightModel: Codable, Identifiable, Sendable, Equatable {
     var factRefs: [String] = []
     var drilldown: ReportDrilldownModel? = nil
 
+    var metrics: [ReportInsightMetricModel] = []
+    var periodLabel: String?
+    var actionHint: String?
+
     enum CodingKeys: String, CodingKey {
         case id, kind, title, body, drilldown
-        case factRefs
+        case factRefs, metrics, periodLabel, actionHint
     }
 
-    init(id: String, kind: String? = nil, title: String? = nil, body: String, factRefs: [String] = [], drilldown: ReportDrilldownModel? = nil) {
+    init(id: String, kind: String? = nil, title: String? = nil, body: String, factRefs: [String] = [], drilldown: ReportDrilldownModel? = nil, metrics: [ReportInsightMetricModel] = [], periodLabel: String? = nil, actionHint: String? = nil) {
         self.id = id; self.kind = kind; self.title = title; self.body = body; self.factRefs = factRefs; self.drilldown = drilldown
+        self.metrics = metrics; self.periodLabel = periodLabel; self.actionHint = actionHint
     }
 
     init(from decoder: Decoder) throws {
@@ -336,6 +346,9 @@ struct ReportInsightModel: Codable, Identifiable, Sendable, Equatable {
         body = try values.decodeIfPresent(String.self, forKey: .body) ?? ""
         factRefs = try values.decodeIfPresent([String].self, forKey: .factRefs) ?? []
         drilldown = try values.decodeIfPresent(ReportDrilldownModel.self, forKey: .drilldown)
+        metrics = try values.decodeIfPresent([ReportInsightMetricModel].self, forKey: .metrics) ?? []
+        periodLabel = try values.decodeIfPresent(String.self, forKey: .periodLabel)
+        actionHint = try values.decodeIfPresent(String.self, forKey: .actionHint)
     }
 }
 
@@ -363,6 +376,9 @@ struct ReportAnalysisModel: Decodable, Sendable {
     var retainedUntil: String?
     var analysisFingerprint: String?
     var error: String?
+    var providerCalled: Bool?
+    var ruleVersion: String?
+    var promptVersion: String?
 
     enum CodingKeys: String, CodingKey {
         case id
@@ -371,13 +387,14 @@ struct ReportAnalysisModel: Decodable, Sendable {
         case clientRequestID, serverTime
         case revision
         case summary, observations, suggestions, article
-        case errorCode, expiresAt, retainedUntil, analysisFingerprint
+        case errorCode, expiresAt, retainedUntil, analysisFingerprint, providerCalled, ruleVersion, promptVersion
     }
 
-    init(id: String, snapshotID: String? = nil, status: String, clientRequestID: String? = nil, serverTime: String? = nil, revision: Int64? = nil, summary: String? = nil, observations: [ReportInsightModel] = [], suggestions: [ReportInsightModel] = [], article: String? = nil, expiresAt: String? = nil, retainedUntil: String? = nil, analysisFingerprint: String? = nil, error: String? = nil) {
+    init(id: String, snapshotID: String? = nil, status: String, clientRequestID: String? = nil, serverTime: String? = nil, revision: Int64? = nil, summary: String? = nil, observations: [ReportInsightModel] = [], suggestions: [ReportInsightModel] = [], article: String? = nil, expiresAt: String? = nil, retainedUntil: String? = nil, analysisFingerprint: String? = nil, error: String? = nil, providerCalled: Bool? = nil, ruleVersion: String? = nil, promptVersion: String? = nil) {
         self.id = id; self.snapshotID = snapshotID; self.status = status; self.clientRequestID = clientRequestID; self.serverTime = serverTime
         self.revision = revision; self.summary = summary; self.observations = observations; self.suggestions = suggestions; self.article = article
         self.expiresAt = expiresAt; self.retainedUntil = retainedUntil; self.analysisFingerprint = analysisFingerprint; self.error = error
+        self.providerCalled = providerCalled; self.ruleVersion = ruleVersion; self.promptVersion = promptVersion
     }
 
     init(from decoder: Decoder) throws {
@@ -396,6 +413,26 @@ struct ReportAnalysisModel: Decodable, Sendable {
         retainedUntil = try values.decodeIfPresent(String.self, forKey: .retainedUntil)
         analysisFingerprint = try values.decodeIfPresent(String.self, forKey: .analysisFingerprint)
         error = try values.decodeIfPresent(String.self, forKey: .errorCode)
+        providerCalled = try values.decodeIfPresent(Bool.self, forKey: .providerCalled)
+        ruleVersion = try values.decodeIfPresent(String.self, forKey: .ruleVersion)
+        promptVersion = try values.decodeIfPresent(String.self, forKey: .promptVersion)
+    }
+
+    // Historical provider_called=false was a persistence bug, not provenance.
+    var hasCurrentProvenance: Bool {
+        ruleVersion == "report-analysis-v3" && promptVersion == "report-analysis-prompt-v3" && providerCalled != nil
+    }
+
+    var provenanceLabel: String {
+        guard hasCurrentProvenance, let providerCalled else {
+            return "Bản cũ chưa có thông tin xác thực về cách tạo nhận xét."
+        }
+        if error == "provider_output_invalid" || error == "provider_empty" {
+            return "Nhận xét theo quy tắc từ số liệu; lựa chọn của AI chưa đạt yêu cầu."
+        }
+        return providerCalled
+            ? "AI chọn điểm đáng chú ý; số liệu và nội dung được đối chiếu từ báo cáo."
+            : "Nhận xét theo quy tắc từ số liệu báo cáo, không gọi AI."
     }
 
     var renderedArticle: String {

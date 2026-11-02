@@ -10,6 +10,8 @@ final class MonthlyReportsViewModel: ObservableObject {
     @Published private(set) var wallets: [WalletModel] = []
     private var cache: [ReportScope: MonthlyReportModel] = [:]
     private var requestGeneration = 0
+    private var walletRequestGeneration = 0
+    private var walletsOwnerID: String?
 
     func load(api: FinanceAPI, month: String, walletID: String? = nil, ownerID: String? = nil, granularity: String = "day") async {
         let scope = ReportScope(ownerID: ownerID, month: month, walletID: walletID, granularity: granularity)
@@ -17,7 +19,7 @@ final class MonthlyReportsViewModel: ObservableObject {
         let generation = requestGeneration
         // A cached snapshot is only presentation while the revision-aware
         // server read refreshes it; never early-return stale financial data.
-        if let cached = cache[scope] { report = cached }
+        report = cache[scope]
         isLoading = true
         error = nil
         usedFallback = false
@@ -25,18 +27,19 @@ final class MonthlyReportsViewModel: ObservableObject {
         do {
             let loaded = try await api.monthlyReport(month: month, walletID: walletID, granularity: granularity, ownerID: ownerID)
             try Task.checkCancellation()
-            guard generation == requestGeneration, loaded.month == month else { return }
+            guard generation == requestGeneration, loaded.month == month, loaded.walletID == walletID else { return }
             cache[scope] = loaded
             report = loaded
         } catch {
-            guard generation == requestGeneration else { return }
+            guard generation == requestGeneration, !Task.isCancelled else { return }
             if walletID == nil { do {
                 let fallback = try await loadAggregateFallback(api: api, month: month, ownerID: ownerID)
-                guard generation == requestGeneration else { return }
+                guard generation == requestGeneration, !Task.isCancelled else { return }
                 cache[scope] = fallback
                 report = fallback
                 usedFallback = true
             } catch {
+                guard generation == requestGeneration, !Task.isCancelled else { return }
                 if cache[scope] == nil { report = nil }
                 self.error = "Không thể tải báo cáo cho tháng này."
             } } else {
@@ -47,8 +50,14 @@ final class MonthlyReportsViewModel: ObservableObject {
     }
 
     func loadWallets(api: FinanceAPI, ownerID: String?) async {
-        guard wallets.isEmpty else { return }
-        wallets = (try? await api.wallets(ownerID: ownerID)) ?? []
+        guard wallets.isEmpty || walletsOwnerID != ownerID else { return }
+        walletRequestGeneration += 1
+        let generation = walletRequestGeneration
+        if walletsOwnerID != ownerID { wallets = [] }
+        walletsOwnerID = ownerID
+        let loaded = (try? await api.wallets(ownerID: ownerID)) ?? []
+        guard generation == walletRequestGeneration, !Task.isCancelled else { return }
+        wallets = loaded
     }
 
     func clear() {

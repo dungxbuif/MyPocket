@@ -1,5 +1,38 @@
 # Reports and Money Insider page contract
 
+## Evidence-backed findings — local in_review, 2026-11-02
+
+The [approved design](../../../work/tickets/REPORTS-AI-USEFULNESS-20261102-DETAIL_DESIGN.md)
+extends the November 1 candidate below. Backend-owned budget periods/carryover
+and matched comparison intervals supply typed findings. The provider selects
+eligible IDs/actions; the server renders names, amounts and claims. Findings are
+distinct, capped at three, and do not infer purchase causes from category totals.
+Non-comparable periods show “Chưa đủ dữ liệu tương ứng để so sánh”.
+
+`MPReportInsightCard` renders title, supplied metrics, period, explanation and
+actions; compact Insider omits the duplicated full explanation.
+`MPReportAnalysisArticle` reuses these cards and keeps one saved-state indicator.
+“Xem giao dịch” uses the saved snapshot and exact target, including cross-month
+budget periods and matched-day category intervals. Expired/revision-stale targets
+show update guidance; they never silently substitute a live-month query.
+
+Opening/restoring reads saved analysis without generation. Same-day day/week
+changes reuse unchanged evidence fingerprints; persisted evidence endpoints stay
+exact. Historical payloads remain readable with explicit stale/unknown provenance
+where applicable. “Hỏi tiếp” preserves the draft and carries analysis/snapshot/
+finding IDs as hidden context; its neutral visible prompt contains no amounts or
+raw IDs. The shared fullscreen Assistant hides navigation and Feedback. Budget
+cards consume server-filtered items and disclose any remaining relevant count.
+
+Targeted native/backend checks and three source reviews pass. Live November and
+October provider results, day/week reuse, the exact 1,850,000 VND vacuum drilldown,
+and two legible saved November findings were observed. Report Feedback remains a
+floating overlay with no reserved container. Follow-up returned correct overrun
+prose and one relevant budget card, but its optional transaction card included
+18 broadly searched rows, including transfers. This remains an acceptance gap;
+not all Assistant UX is accepted. Owner acceptance stays open. Full evidence and
+non-green backend/web gates: [validation](../../../work/VALIDATION_MATRIX.md).
+
 ## New native local candidate — 2026-11-01
 
 The owner requests a visual redesign and saved AI analysis restoration.

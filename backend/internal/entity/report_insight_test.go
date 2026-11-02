@@ -14,7 +14,7 @@ func TestReportInsightsThresholdsAndBudgetPriority(t *testing.T) {
 		Scope:        MonthlyReportScope{Month: "2026-10", Granularity: "day"},
 		Totals:       ReportTotals{TransactionCount: 12},
 		CurrentRange: ReportRange{Days: 31},
-		Comparison:   ReportComparison{CommonDays: 10},
+		Comparison:   ReportComparison{Comparable: true, CommonDays: 10},
 		Budgets: []ReportBudgetPreview{
 			{ID: "budget-1", Name: "Ăn uống", OverLimit: true, CategoryID: reportString("cat-1"), FactRef: "budget:budget-1"},
 			{ID: "budget-2", Name: "Mua sắm", OverLimit: true, CategoryID: reportString("cat-2"), FactRef: "budget:budget-2"},
@@ -43,9 +43,9 @@ func TestReportInsightsThresholdsAndBudgetPriority(t *testing.T) {
 
 func TestReportInsightsDoNotInventComparisonFromZeroBaseline(t *testing.T) {
 	report := MonthlyReport{
-		Scope:        MonthlyReportScope{Month: "2026-10", Granularity: "day"},
-		Totals:       ReportTotals{TransactionCount: 1},
-		Comparison:   ReportComparison{CommonDays: 31},
+		Scope:      MonthlyReportScope{Month: "2026-10", Granularity: "day"},
+		Totals:     ReportTotals{TransactionCount: 1},
+		Comparison: ReportComparison{CommonDays: 31},
 		Contributors: []ReportContributor{{
 			CategoryID: reportString("cat-1"), Name: "Danh mục mới", Delta: 900000,
 			CurrentCount: 5, PreviousCount: 5, ChangeBPS: nil, FactRef: "category:cat-1",

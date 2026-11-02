@@ -209,6 +209,9 @@ type objectArgs struct {
 }
 
 type budgetArgs struct {
+	BudgetID  string   `json:"budget_id"`
+	Query     string   `json:"query"`
+	Month     string   `json:"month"`
 	BudgetIDs []string `json:"budget_ids"`
 	ActiveOn  string   `json:"active_on"`
 }
@@ -408,14 +411,31 @@ type budgetTool struct{ finance *FinanceQueryService }
 
 func (t *budgetTool) Name() string { return "get_budget_progress" }
 func (t *budgetTool) Definition() ToolDefinition {
-	return readDefinition(t.Name(), "Read budget limits and report-included spending", map[string]any{"budget_ids": stringArraySchema(), "active_on": dateSchema()}, nil)
+	return readDefinition(t.Name(), "Read canonical budget limits and spending. Pass budget_id (or budget_ids) for known IDs, query for a budget name, and month (YYYY-MM) for all periods overlapping a requested month; active_on selects budgets active on that local date. Filters intersect. Without filters, show the current month. Explicit IDs alone may select historical budgets.", map[string]any{"budget_ids": stringArraySchema(), "budget_id": map[string]any{"type": "string", "format": "uuid"}, "query": stringSchema(200), "active_on": dateSchema(), "month": monthSchema()}, nil)
 }
 func (t *budgetTool) Execute(ctx context.Context, principal Principal, raw json.RawMessage) (entity.FinanceResult, error) {
 	var args budgetArgs
 	if err := DecodeAdvisorToolArgs(raw, &args); err != nil {
 		return entity.FinanceResult{}, err
 	}
-	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: args.BudgetIDs, ActiveOn: args.ActiveOn})
+	if id := strings.TrimSpace(args.BudgetID); id != "" {
+		if _, err := uuid.Parse(id); err != nil {
+			return entity.FinanceResult{}, ErrAdvisorToolInvalid
+		}
+		if len(args.BudgetIDs) > 0 {
+			found := false
+			for _, selected := range args.BudgetIDs {
+				if selected == id {
+					found = true
+				}
+			}
+			if !found {
+				return entity.FinanceResult{}, ErrAdvisorToolInvalid
+			}
+		}
+		args.BudgetIDs = []string{id}
+	}
+	return t.finance.Execute(ctx, principal.OwnerID, entity.NormalizedQuery{Key: "q1", Kind: t.Name(), ObjectIDs: args.BudgetIDs, ActiveOn: args.ActiveOn, Month: args.Month, BudgetNameQuery: strings.TrimSpace(args.Query)})
 }
 
 type goalTool struct{ finance *FinanceQueryService }

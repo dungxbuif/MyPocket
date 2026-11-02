@@ -69,16 +69,17 @@ type NormalizedFinanceFilter struct {
 }
 
 type NormalizedQuery struct {
-	Key            string                  `json:"key"`
-	Kind           string                  `json:"kind"`
-	Filter         NormalizedFinanceFilter `json:"filter"`
-	CompareRange   *DateRange              `json:"compare_range,omitempty"`
-	ObjectIDs      []string                `json:"object_ids,omitempty"`
-	Month          string                  `json:"month,omitempty"`
-	ActiveOn       string                  `json:"active_on,omitempty"`
-	Limit          int                     `json:"limit,omitempty"`
-	Cursor         string                  `json:"cursor,omitempty"`
-	CategoryFilter *CategoryCatalogFilter  `json:"category_filter,omitempty"`
+	Key             string                  `json:"key"`
+	Kind            string                  `json:"kind"`
+	Filter          NormalizedFinanceFilter `json:"filter"`
+	CompareRange    *DateRange              `json:"compare_range,omitempty"`
+	BudgetNameQuery string                  `json:"budget_name_query,omitempty"`
+	ObjectIDs       []string                `json:"object_ids,omitempty"`
+	Month           string                  `json:"month,omitempty"`
+	ActiveOn        string                  `json:"active_on,omitempty"`
+	Limit           int                     `json:"limit,omitempty"`
+	Cursor          string                  `json:"cursor,omitempty"`
+	CategoryFilter  *CategoryCatalogFilter  `json:"category_filter,omitempty"`
 }
 
 type SourceScope struct {

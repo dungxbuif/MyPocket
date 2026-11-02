@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -29,6 +30,47 @@ type ReportAnalysisProvider interface {
 type ReportAnalysisBeginRequest struct {
 	SnapshotID      string
 	ClientRequestID string
+}
+
+type ReportFollowUpRequest struct {
+	AnalysisID string `json:"analysis_id"`
+	SnapshotID string `json:"snapshot_id"`
+	FindingID  string `json:"finding_id,omitempty"`
+}
+
+// FollowUpContext accepts identifiers only. Every financial claim is reloaded
+// from the owner's saved analysis, never trusted from client supplied prose.
+func (s *ReportAnalysisService) FollowUpContext(ctx context.Context, principal Principal, input ReportFollowUpRequest) (map[string]any, error) {
+	analysis, err := s.Get(ctx, principal, input.AnalysisID)
+	if err != nil {
+		return nil, err
+	}
+	if analysis.Status != entity.ReportAnalysisStatusCompleted || analysis.SnapshotID != input.SnapshotID || s.Snapshots == nil {
+		return nil, repository.ErrNotFound
+	}
+	now := time.Now().UTC()
+	if s.Now != nil {
+		now = s.Now().UTC()
+	}
+	snapshot, err := s.Snapshots.GetRetainedOwned(ctx, principal.OwnerID, analysis.SnapshotID, now)
+	if err != nil {
+		return nil, err
+	}
+	findings := append(append([]entity.ReportInsight(nil), analysis.Observations...), analysis.Suggestions...)
+	if input.FindingID != "" {
+		allFindings := findings
+		findings = nil
+		for _, item := range allFindings {
+			if item.ID == input.FindingID {
+				findings = append(findings, item)
+				break
+			}
+		}
+		if len(findings) == 0 {
+			return nil, repository.ErrNotFound
+		}
+	}
+	return map[string]any{"analysis_id": analysis.ID, "snapshot_id": snapshot.ID, "scope": snapshot.Report.Scope, "timezone": snapshot.Timezone, "as_of": snapshot.AsOf, "summary": analysis.Summary, "findings": findings, "instruction": "Dữ liệu đã lưu tại as_of, không phải dữ liệu hiện tại. Giữ nguyên phạm vi tháng/ví; dùng công cụ truy vấn khi cần số liệu mới. Không suy diễn nguyên nhân từ tổng tiền."}, nil
 }
 
 type ReportAnalysisService struct {
@@ -67,6 +109,9 @@ func (s *ReportAnalysisService) Begin(ctx context.Context, principal Principal, 
 	if err != nil {
 		return nil, false, err
 	}
+	if snapshot.RuleVersion != "" && snapshot.RuleVersion != entity.MonthlyReportRuleVersion {
+		return nil, false, entity.ErrReportSnapshotStale
+	}
 	facts, err := entity.BuildReportFactBundle(*snapshot)
 	if err != nil {
 		return nil, false, err
@@ -82,10 +127,13 @@ func (s *ReportAnalysisService) Begin(ctx context.Context, principal Principal, 
 	if snapshot.Report.Totals.TransactionCount == 0 {
 		status = entity.ReportAnalysisStatusCompleted
 		errorCode = "no_data"
+	} else if len(facts.Candidates) == 0 {
+		status = entity.ReportAnalysisStatusCompleted
+		errorCode = "insufficient_evidence"
 	}
 	analysis := &entity.ReportAnalysis{ID: uuid.NewString(), OwnerID: principal.OwnerID, SnapshotID: snapshot.ID, JobKey: jobKey, ClientRequestID: request.ClientRequestID, PayloadHash: hex.EncodeToString(hash[:]), AnalysisFingerprint: fingerprint, Revision: snapshot.DataRevision, RuleVersion: entity.ReportAnalysisRuleVersion, PromptVersion: entity.ReportAnalysisPromptVersion, ProviderProfileVersion: "advisor-v1", Status: status, ErrorCode: errorCode, CreatedAt: now, UpdatedAt: now, RetainedUntil: now.Add(entity.ReportSnapshotRetention)}
 	if status == entity.ReportAnalysisStatusCompleted {
-		applyDeterministicAnalysis(analysis, snapshot.Report, "no_data")
+		applyDeterministicAnalysis(analysis, snapshot.Report, errorCode)
 	}
 	created, replay, err := s.Analyses.CreateOrGet(ctx, analysis)
 	if err != nil {
@@ -137,16 +185,41 @@ func (s *ReportAnalysisService) Latest(ctx context.Context, principal Principal,
 func reportAnalysisFingerprint(snapshot entity.ReportSnapshot, facts entity.ReportFactBundle) (string, error) {
 	scope := snapshot.Report.Scope
 	scope.Granularity = ""
+	// Evaluation time and chart granularity do not change the underlying claims.
+	evidence := facts
+	evidence.SnapshotID, evidence.Revision, evidence.AsOf = "", 0, time.Time{}
+	evidence.Scope = scope
+	evidence.Candidates = append([]entity.ReportInsight(nil), facts.Candidates...)
+	// Exact sub-day cutoffs remain on the persisted evidence. The fingerprint
+	// compares calendar coverage and financial claims, not incidental read time.
+	location, locationErr := time.LoadLocation(snapshot.Report.Timezone)
+	if locationErr != nil {
+		location = time.UTC
+	}
+	calendarEnd := func(value time.Time) time.Time {
+		if value.IsZero() {
+			return value
+		}
+		day := value.Add(-time.Nanosecond).In(location)
+		return time.Date(day.Year(), day.Month(), day.Day()+1, 0, 0, 0, 0, location).UTC()
+	}
+	evidence.CurrentRange.EndExclusive = calendarEnd(evidence.CurrentRange.EndExclusive)
+	for i := range evidence.Candidates {
+		evidence.Candidates[i].AsOf = time.Time{}
+		evidence.Candidates[i].Scope.Granularity = ""
+		evidence.Candidates[i].EndExclusive = calendarEnd(evidence.Candidates[i].EndExclusive)
+		evidence.Candidates[i].Drilldown.EndExclusive = calendarEnd(evidence.Candidates[i].Drilldown.EndExclusive)
+	}
 	payload := struct {
 		Scope      entity.MonthlyReportScope `json:"scope"`
 		Timezone   string                    `json:"timezone"`
 		MonthStart time.Time                 `json:"month_start"`
 		Comparison entity.ReportRange        `json:"comparison"`
-		Facts      []entity.ReportFact       `json:"facts"`
+		Facts      entity.ReportFactBundle   `json:"facts"`
 		Rule       string                    `json:"rule"`
 		Prompt     string                    `json:"prompt"`
 		Profile    string                    `json:"profile"`
-	}{scope, snapshot.Timezone, snapshot.Report.CurrentRange.From, snapshot.Report.ComparisonRange, facts.Facts, entity.ReportAnalysisRuleVersion, entity.ReportAnalysisPromptVersion, "advisor-v1"}
+	}{scope, snapshot.Timezone, snapshot.Report.CurrentRange.From, snapshot.Report.ComparisonRange, evidence, entity.ReportAnalysisRuleVersion, entity.ReportAnalysisPromptVersion, "advisor-v1"}
 	encoded, err := json.Marshal(payload)
 	if err != nil {
 		return "", err
@@ -232,14 +305,14 @@ func (w *ReportAnalysisWorker) RunPass(ctx context.Context, limit int) (int, err
 			continue
 		}
 		providerResult, err := w.analyzeWithLease(ctx, lease, facts)
-		if err != nil {
+		if err != nil && !errors.Is(err, entity.ErrReportAnalysisOutputInvalid) {
 			_ = w.Analyses.Fail(ctx, lease.ID, lease.LeaseToken, now, "provider_failed")
 			continue
 		}
 		completed := *lease
 		completed.ProviderCalled = true
 		completed.Usage = providerResult.Usage
-		if err := entity.ValidateReportProviderResult(providerResult, facts); err != nil {
+		if validationErr := entity.ValidateReportProviderResult(providerResult, facts); err != nil || validationErr != nil {
 			applyDeterministicAnalysis(&completed, snapshot.Report, "provider_output_invalid")
 			completed.ErrorCode = "provider_output_invalid"
 		} else {
@@ -287,20 +360,22 @@ func (w *ReportAnalysisWorker) analyzeWithLease(ctx context.Context, lease *enti
 }
 
 func applyProviderAnalysis(analysis *entity.ReportAnalysis, report entity.MonthlyReport, result entity.ReportProviderResult) {
-	analysis.Summary = "Phân tích dựa trên dữ liệu đã ghi nhận trong báo cáo."
-	analysis.FactRefs = make([]string, 0, len(result.Observations)+len(result.Suggestions))
-	for _, observation := range result.Observations {
-		text := insightTextForFact(report, observation.FactRef, observation.Direction, observation.Text)
-		analysis.Observations = append(analysis.Observations, entity.ReportInsight{ID: "analysis-observation:" + observation.FactRef, RuleVersion: entity.ReportAnalysisRuleVersion, Kind: "observation", Title: "Quan sát từ dữ liệu", Body: text, FactRefs: []string{observation.FactRef}, Scope: report.Scope, From: report.CurrentRange.From, EndExclusive: report.CurrentRange.EndExclusive, AsOf: report.AsOf, Drilldown: report.Drilldown})
-		analysis.FactRefs = appendUnique(analysis.FactRefs, observation.FactRef)
+	analysis.Summary = reportAnalysisSummary(report)
+	analysis.Observations, analysis.Suggestions, analysis.FactRefs = nil, nil, nil
+	candidates := map[string]entity.ReportInsight{}
+	for _, candidate := range entity.BuildReportAnalysisCandidates(report) {
+		candidates[candidate.ID] = candidate
 	}
-	for _, suggestion := range result.Suggestions {
-		text := strings.TrimSpace(suggestion.Text)
-		if text == "" {
-			text = "Theo dõi dữ liệu này trong kỳ tiếp theo."
+	for _, observation := range result.Observations {
+		candidate, ok := candidates[observation.FindingID]
+		if !ok {
+			continue
 		}
-		analysis.Suggestions = append(analysis.Suggestions, entity.ReportInsight{ID: "analysis-suggestion:" + suggestion.FactRef, RuleVersion: entity.ReportAnalysisRuleVersion, Kind: "suggestion", Title: "Gợi ý theo dõi", Body: text, FactRefs: []string{suggestion.FactRef}, Scope: report.Scope, From: report.CurrentRange.From, EndExclusive: report.CurrentRange.EndExclusive, AsOf: report.AsOf, Drilldown: report.Drilldown})
-		analysis.FactRefs = appendUnique(analysis.FactRefs, suggestion.FactRef)
+		if observation.Intent == "inspect_evidence" {
+			candidate.ActionHint = "Mở các giao dịch liên quan để kiểm tra số liệu trước khi quyết định điều chỉnh."
+		}
+		analysis.Observations = append(analysis.Observations, candidate)
+		analysis.FactRefs = appendUnique(analysis.FactRefs, candidate.FactRefs...)
 	}
 	if len(analysis.Observations) == 0 && len(analysis.Suggestions) == 0 {
 		applyDeterministicAnalysis(analysis, report, "provider_empty")
@@ -308,32 +383,45 @@ func applyProviderAnalysis(analysis *entity.ReportAnalysis, report entity.Monthl
 }
 
 func applyDeterministicAnalysis(analysis *entity.ReportAnalysis, report entity.MonthlyReport, reason string) {
-	analysis.Summary = "Phân tích định lượng vẫn khả dụng từ báo cáo đã ghi nhận."
+	analysis.Summary = reportAnalysisSummary(report)
 	analysis.ErrorCode = reason
-	analysis.Observations = append([]entity.ReportInsight(nil), report.Insights...)
-	if len(analysis.Observations) > 3 {
-		analysis.Observations = analysis.Observations[:3]
+	candidates := entity.BuildReportAnalysisCandidates(report)
+	analysis.Observations = nil
+	seenKinds, seenIDs := map[string]bool{}, map[string]bool{}
+	for _, candidate := range candidates {
+		if len(analysis.Observations) == 3 {
+			break
+		}
+		if seenKinds[candidate.Kind] {
+			continue
+		}
+		analysis.Observations = append(analysis.Observations, candidate)
+		seenKinds[candidate.Kind], seenIDs[candidate.ID] = true, true
 	}
+	for _, candidate := range candidates {
+		if len(analysis.Observations) == 3 {
+			break
+		}
+		if !seenIDs[candidate.ID] {
+			analysis.Observations = append(analysis.Observations, candidate)
+			seenIDs[candidate.ID] = true
+		}
+	}
+	analysis.Suggestions, analysis.FactRefs = nil, nil
 	for _, insight := range analysis.Observations {
 		analysis.FactRefs = appendUnique(analysis.FactRefs, insight.FactRefs...)
 	}
 }
 
-func insightTextForFact(report entity.MonthlyReport, factRef, direction, providerText string) string {
-	for _, insight := range report.Insights {
-		for _, ref := range insight.FactRefs {
-			if ref == factRef {
-				return insight.Body
-			}
-		}
+func reportAnalysisSummary(report entity.MonthlyReport) string {
+	if report.Totals.TransactionCount == 0 {
+		return "Kỳ này chưa có giao dịch để phân tích."
 	}
-	if strings.TrimSpace(providerText) != "" {
-		return strings.TrimSpace(providerText)
+	period := entity.ReportPeriodLabel(report.CurrentRange.From, report.CurrentRange.EndExclusive, report.Timezone)
+	if !report.Comparison.Comparable {
+		return fmt.Sprintf("Dữ liệu %s · %d giao dịch. Chưa đủ dữ liệu tương ứng để kết luận xu hướng so với tháng trước.", period, report.Totals.TransactionCount)
 	}
-	if strings.TrimSpace(direction) == "" {
-		return "Có thay đổi được ghi nhận trong dữ liệu báo cáo."
-	}
-	return "Dữ liệu báo cáo cho thấy một thay đổi " + strings.TrimSpace(direction) + "."
+	return fmt.Sprintf("Dữ liệu %s · %d giao dịch. So sánh dùng %d ngày đầu của mỗi kỳ; tổng thu–chi dùng toàn bộ kỳ đang xem.", period, report.Totals.TransactionCount, report.Comparison.CommonDays)
 }
 
 func appendUnique(values []string, additions ...string) []string {

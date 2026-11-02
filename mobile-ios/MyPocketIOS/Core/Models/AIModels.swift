@@ -402,3 +402,47 @@ struct AdvisorEntryDecisionModel: Codable, Sendable {
         case clientRequestID = "client_request_id"
     }
 }
+
+/// IDs travel as structured scope; none of them belong in visible chat text.
+struct AdvisorReportContextModel: Codable, Sendable, Equatable {
+    var analysisID: String
+    var snapshotID: String
+    var findingID: String?
+}
+
+struct ReportAssistantHandoff: Sendable, Equatable {
+    var context: AdvisorReportContextModel
+    var label: String
+    var prompt: String
+}
+
+extension ReportAssistantHandoff {
+    static func make(analysis: ReportAnalysisModel, finding: ReportInsightModel?, month: String, walletLabel: String) -> Self? {
+        guard let snapshotID = analysis.snapshotID, !snapshotID.isEmpty, !analysis.id.isEmpty else { return nil }
+        let parts = month.split(separator: "-")
+        let monthLabel = parts.count == 2 ? "tháng \(parts[1])/\(parts[0])" : "kỳ đang xem"
+        let title = finding?.title ?? "Phân tích báo cáo"
+        let period = finding?.periodLabel ?? monthLabel
+        return Self(
+            context: AdvisorReportContextModel(analysisID: analysis.id, snapshotID: snapshotID, findingID: finding?.id),
+            label: "\(title) · \(period) · \(walletLabel)",
+            // Financial titles may contain amounts. The selected identity lives
+            // in hidden context, so the editable draft stays safe in mask mode.
+            prompt: "Tôi muốn hỏi thêm về \(finding == nil ? "bài phân tích" : "nhận xét đã chọn") trong báo cáo \(monthLabel)."
+        )
+    }
+}
+
+struct AdvisorReportMessageInputModel: Codable, Sendable {
+    var clientRequestID: String
+    var text: String
+    var reportContext: AdvisorReportContextModel?
+}
+
+/// The shell retains the exact submitted payload across Assistant dismissal.
+/// An uncertain retry must not pick up an edited draft or a new report scope.
+struct AdvisorPendingMessageModel: Sendable {
+    var input: AdvisorReportMessageInputModel
+    var handoff: ReportAssistantHandoff?
+    var uncertain = false
+}

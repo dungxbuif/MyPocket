@@ -27,6 +27,28 @@ presentation. Report screens provide typed DTOs and actions only—no local colo
 radii, chart math or ledger aggregation. Masked mode removes values from text,
 VoiceOver and chart shape, not merely labels.
 
+Report findings extension (2026-11-02, local `in_review`):
+`MPReportInsightCard` owns specific title, up to three supplied metrics, period,
+body, action hint and evidence/follow-up actions. Its compact Insider variant
+omits the repeated full explanation. `MPReportAnalysisArticle` reuses the same
+cards; the containing analysis section owns the single saved-state badge.
+Optional historical fields remain decodable, and provenance copy distinguishes
+current provider selection, deterministic fallback and unknown historical origin.
+Screens supply server-owned claims/targets and callbacks using existing shared
+styles; they do not calculate financial claims or introduce local visual tokens.
+
+`MPReportContextAttachment` owns the natural finding/period/wallet label and
+accessible clear action, honoring amount masking. Raw identifiers remain hidden;
+the generated editable question is neutral and omits financial title amounts.
+The shell owns draft/context and uncertain-request retention; shared
+`.mpFullScreenCover` preserves fullscreen Assistant behavior with navigation and
+Feedback hidden. Exact evidence routing remains the feature's responsibility.
+Native budget cards retain server-filtered rows and disclose relevant overflow,
+rather than applying an unrelated first-eight prefix. Scoped native/base checks
+pass; owner acceptance remains open, including the optional broad transaction
+card returned by follow-up. See [report contract](../pages/reports/README.md) and
+[validation](../../work/VALIDATION_MATRIX.md).
+
 `MPProfileCard` renders its `accountSubtitle` in compact and reference variants.
 A badge may add hierarchy but must not discard account context supplied by the
 caller.
@@ -62,6 +84,9 @@ Feature validators retain positivity/scale rules; money stays `MPAmountField`.
 
 `MPEditorScaffold(title:isBusy:onCancel:fields:footer:)` owns long-form header,
 one scroll area, keyboard-safe pinned actions and pending edit/dismiss prevention.
+`isBusy` disables the header, fields and entire footer, including secondary
+actions such as AI entry or wallet delete. Features supply pending labels and
+may place `MPStatusMessage` in the pinned footer so save errors stay beside Save.
 Features own drafts, requests and errors; full-screen wrapper owns presentation.
 Short manual-price/choice forms use shared form sheet instead.
 The scaffold publishes `MPInteractiveBackBlockedKey` while mounted. Native
@@ -80,6 +105,16 @@ obstacle/clearance preference plumbing remains source-compatible for screen
 consumers but no longer repositions the shared bubble. The shell observes
 keyboard visibility with `mpObserveKeyboardVisibility`; Feedback hides while
 typing without relayout. Capture and Feedback presentation hide only the trigger.
+
+`mpConfirmDialog(isPresented:title:message:confirmTitle:cancelTitle:confirm:)`
+supports an optional `cancelTitle` argument, defaulting to “Hủy”; existing
+consumers retain their copy. The cancel action keeps the presented form, while
+the destructive confirmation invokes the supplied callback. Ordinary transaction
+draft protection supplies “Tiếp tục nhập” and “Bỏ thay đổi”; snapshot comparison
+and dirty/busy swipe-dismiss policy remain feature-owned. This shared-base update
+is [in review](../../work/tickets/TRANSACTION-DRAFT-SAFETY-20261102-DETAIL_DESIGN.md):
+compile evidence is available, UI scenarios are unexecuted, runtime UAT is open,
+and the unrelated existing MainTabView base-guard failure remains unresolved.
 
 `MPOptionalDateField(title:value:timeZone:accessibilityIdentifier:)` binds an
 optional calendar date as an empty/`YYYY-MM-DD` string. Enabling defaults to

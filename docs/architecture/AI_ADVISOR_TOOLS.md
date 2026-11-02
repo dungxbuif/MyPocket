@@ -98,7 +98,7 @@ authoritative boundary.
 | `get_finance_summary` | `range`, optional wallet/category IDs and descendants | report-included income, expense, net and count; transfers/system transfer categories excluded |
 | `compare_spending_periods` | `current`, `previous`, optional wallet/category filters | current/previous expense, delta and nullable basis-point change when baseline is zero |
 | `get_wallet_balances` | optional `wallet_ids` | current owner-wallet balances from opening balance plus full ledger |
-| `get_budget_progress` | optional `budget_ids`, optional `active_on` | existing budget calculation and scope |
+| `get_budget_progress` | optional `budget_id`/`budget_ids`, `query` name, `month`, `active_on` | canonical carryover first, then intersect requested budget/date/name filters; unfiltered defaults to account-local current month |
 | `get_goal_progress` | optional goal wallet IDs | goal wallet current/target/remaining view |
 | `get_jar_progress` | `month`, optional `jar_ids` | SELECT-only jar allocation/spend; does not initialize month/config rows |
 | `get_product_help` | `{ "query": "...", "max_results": 1..5 }` | versioned handbook excerpts with stable source IDs; no owner data or external URLs |

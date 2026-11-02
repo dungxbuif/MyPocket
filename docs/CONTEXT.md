@@ -22,6 +22,74 @@ shared_fields:
 updated: 2026-11-02
 ---
 
+## Evidence-backed report findings — in_review, 2026-11-02
+
+The [approved design](work/tickets/REPORTS-AI-USEFULNESS-20261102-DETAIL_DESIGN.md)
+is implemented locally: canonical budget periods/carryover, typed findings with
+server-rendered claims, saved provenance, exact evidence actions and scoped
+Assistant handoff. Three final source reviews PASS after correcting candidate
+diversity, same-day fingerprints, historical follow-up and matched endpoints.
+Native checks passed 123 selected tests plus five follow-up tests; targeted
+backend checks passed. Full backend/web checks are not green; precise limits and
+live timings are in the [validation matrix](work/VALIDATION_MATRIX.md).
+
+Real-provider November analysis identifies the 350,000 VND shopping overrun;
+October identifies a 5,544,000 VND overrun and food spending of 3,905,000 versus
+6,935,000 VND over 30 matched days. Day/week reads reuse the same CURRENT analysis.
+Weekly partial-day termination passed regression and three scoped reviews.
+Empty Assistant history now returns `[]`; targeted HTTP regression and live
+readback pass. Native saved findings, exact metrics/actions, the single 1,850,000
+VND vacuum drilldown, and fullscreen follow-up were observed. Follow-up returned
+correct prose and one relevant budget card, but an optional transaction card
+included 18 broadly searched rows, including transfers: this remains an open
+acceptance gap, outside this slice's prompt/tool-scope redesign.
+
+The 21:22 host reboot removed prior temporary logs/xcresults; those test outcomes
+are historical recorded results. The fixture DB (1,295 transactions) and installed
+signed app survived. Latest reported local processes are API 7305, worker 7306,
+Redis 49473, using API 8081 and the same DB. The simulator is left on the saved
+November findings for owner review. Status remains `in_review`; owner acceptance
+and broader Assistant UX remain open. No new migration, production change or
+merge. [Work ledger](../.superpowers/sdd/2026-11-02-report-findings/progress.md).
+
+## Saved report AI usefulness — historical runtime audit, 2026-11-02
+
+Owner rejected generic saved analysis and requested testing/thinking. Targeted
+manual review confirmed budget drill-down and full-screen Assistant; direct chat
+answered the 350,000 VND overrun correctly, while its card included 27 budgets
+and displayed unrelated historical rows. Monthly report omits the active weekly
+budget. Prompt forbids numerical prose and fact bundle strips names/comparison
+eligibility. [Audit and proposal](work/tickets/REPORTS-AI-USEFULNESS-20261102-AUDIT.md)
+separates observed bugs from source risks. This was the pre-implementation audit;
+the local candidate and remaining acceptance limits are recorded above.
+
+## Rich local product review data — ready for owner, 2026-11-02
+
+[Fixture record](work/tickets/LOCAL-RICH-DATA-20261102.md) documents 1,338
+additive API writes plus bounded sample-only jar config backfill. Existing local
+account now has 1,295 transactions across January–November, 14 wallets, 10 jars,
+27 budgets, 10 assets/37 gold trades, six recurring schedules and four trips.
+Signed app with draft-safety changes is installed on MyPocket-iPhone-16 using
+API 8081; authenticated Overview visibly shows seeded transactions. Backend/DB
+remain running for owner review. Production untouched; automated suites skipped.
+Preserve the private seed journal for resumability; do not reset the fixture.
+
+## Ordinary transaction draft safety — in review, 2026-11-02
+
+The [bounded design](work/tickets/TRANSACTION-DRAFT-SAFETY-20261102-DETAIL_DESIGN.md)
+is implemented locally: ordinary entry/edit compares a normalized initial draft
+snapshot, confirms changed-draft Cancel/AI exits, blocks swipe dismissal while
+dirty or saving, and pins errors beside Save with “Đang lưu…” pending copy.
+Shared scaffold footers now disable while busy; confirmation dialogs accept an
+optional cancel label. Build-for-testing succeeded with zero errors/warnings;
+project verification and diff checks passed. At that checkpoint the base guard
+failed at `MainTabView.swift:235` `fullScreenCover`; the later report-findings
+integration replaced it with the shared wrapper and passed the native base guard.
+This supersedes that guard failure only. Two UI scenarios were added
+and compiled, not executed by owner preference. Runtime/device UAT remains OPEN;
+next is manual draft/save interaction review. This does not complete the wider
+transaction/product work; rich-data seeding is handled independently.
+
 ## Manual production migration pipeline — 2026-11-02
 
 The repository now keeps the existing Auto DevOps include and adds a separate

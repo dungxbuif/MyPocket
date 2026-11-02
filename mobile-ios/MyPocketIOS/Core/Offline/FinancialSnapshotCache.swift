@@ -125,16 +125,22 @@ private struct CachedReportAnalysis: Codable {
     let suggestions: [ReportInsightModel]
     let article: String?
     let retainedUntil: String?
+    let providerCalled: Bool?
+    let ruleVersion: String?
+    let promptVersion: String?
+    let errorCode: String?
 
     init(ownerID: String, scopeKey: String, freshness: String, analysis: ReportAnalysisModel) {
         version = 1; self.ownerID = ownerID; self.scopeKey = scopeKey; self.freshness = freshness
         id = analysis.id; snapshotID = analysis.snapshotID; status = analysis.status; revision = analysis.revision
         summary = analysis.summary; observations = analysis.observations; suggestions = analysis.suggestions
         article = analysis.article; retainedUntil = analysis.retainedUntil
+        providerCalled = analysis.providerCalled; ruleVersion = analysis.ruleVersion
+        promptVersion = analysis.promptVersion; errorCode = analysis.error
     }
 
     var model: ReportAnalysisModel {
-        ReportAnalysisModel(id: id, snapshotID: snapshotID, status: status, revision: revision, summary: summary, observations: observations, suggestions: suggestions, article: article, retainedUntil: retainedUntil)
+        ReportAnalysisModel(id: id, snapshotID: snapshotID, status: status, revision: revision, summary: summary, observations: observations, suggestions: suggestions, article: article, retainedUntil: retainedUntil, error: errorCode, providerCalled: providerCalled, ruleVersion: ruleVersion, promptVersion: promptVersion)
     }
 }
 

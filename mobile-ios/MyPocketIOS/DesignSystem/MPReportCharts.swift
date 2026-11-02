@@ -35,7 +35,7 @@ struct MPCumulativeReportChart: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 16) {
                 legend("Kỳ này", color: MPColor.action, dashed: false)
-                legend("Kỳ trước", color: MPColor.secondary, dashed: true)
+                if !previous.isEmpty { legend("Kỳ trước", color: MPColor.secondary, dashed: true) }
             }
             if masked {
                 MPText("Hiện số tiền để xem hình dạng xu hướng.", style: .secondary)
@@ -272,45 +272,92 @@ struct MPReportPeriodPicker: View {
 struct MPReportInsightCard: View {
     let insight: ReportInsightModel
     let masked: Bool
+    var compact = false
     let onOpen: () -> Void
+    var onAsk: (() -> Void)? = nil
 
     var body: some View {
-        MPButton(style: .plain, action: onOpen) {
-            VStack(alignment: .leading, spacing: 6) {
-                MPText(insight.title ?? "Điểm đáng chú ý", style: .emphasis)
-                MPText(masked ? AssistantPrivacyPolicy.maskedText : insight.body, style: .body)
-                MPText("Xem số liệu", style: .action)
+        VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
+            MPText(masked ? "Điểm đáng chú ý" : (insight.title ?? "Điểm đáng chú ý"), style: .emphasis)
+            if let period = insight.periodLabel, !period.isEmpty {
+                MPText(period, style: .secondary)
             }
-            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+            if !compact {
+                if !insight.metrics.isEmpty {
+                    MPMetricGrid(items: insight.metrics.prefix(3).map {
+                        MPMetricItem(title: $0.label, value: MPFormat.money($0.amount), masked: masked)
+                    })
+                }
+                if !insight.body.isEmpty {
+                    MPText(masked ? AssistantPrivacyPolicy.maskedText : insight.body, style: .body)
+                }
+                if let hint = insight.actionHint, !hint.isEmpty {
+                    MPText(masked ? AssistantPrivacyPolicy.maskedText : hint, style: .secondary)
+                }
+            }
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: MPMetrics.sectionSpacing) { actions }
+                VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) { actions }
+            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .contain)
+    }
+
+    @ViewBuilder private var actions: some View {
+        MPButton("Xem giao dịch", style: .plain, fullWidth: false, action: onOpen)
+        if let onAsk { MPButton("Hỏi tiếp", style: .plain, fullWidth: false, action: onAsk) }
     }
 }
 
 struct MPReportAnalysisArticle: View {
     let analysis: ReportAnalysisModel
     let masked: Bool
+    var onOpen: (ReportInsightModel) -> Void = { _ in }
+    var onAsk: ((ReportInsightModel) -> Void)? = nil
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            if analysis.retainedUntil != nil {
-                MPText("Bản phân tích đã lưu", style: .secondary)
+        VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
+            MPText(analysis.provenanceLabel, style: .secondary)
+            if let summary = analysis.summary, !summary.isEmpty {
+                MPText(masked ? AssistantPrivacyPolicy.maskedText : summary, style: .body)
             }
-            if masked {
-                MPText(AssistantPrivacyPolicy.maskedText, style: .body)
-            } else {
-                if let summary = analysis.summary, !summary.isEmpty { MPText(summary, style: .body) }
-                ForEach(analysis.observations) { item in
-                    VStack(alignment: .leading, spacing: 3) {
-                        MPText(item.title ?? "Quan sát", style: .emphasis)
-                        MPText(item.body, style: .body)
-                    }
+            if analysis.observations.isEmpty && analysis.suggestions.isEmpty {
+                MPText(analysis.error == "no_data"
+                    ? "Kỳ này chưa có giao dịch để phân tích."
+                    : "Chưa có đủ bằng chứng để đưa ra điểm đáng chú ý. Bạn có thể cập nhật khi có thêm dữ liệu.", style: .secondary)
+                if let article = analysis.article, !article.isEmpty {
+                    MPText(masked ? AssistantPrivacyPolicy.maskedText : article, style: .body)
                 }
-                if !analysis.suggestions.isEmpty {
-                    MPText("Gợi ý theo dõi", style: .emphasis)
-                    ForEach(analysis.suggestions) { item in MPText("• " + item.body, style: .body) }
+            }
+            ForEach(analysis.observations) { item in
+                MPReportInsightCard(insight: item, masked: masked, onOpen: { onOpen(item) }, onAsk: onAsk.map { ask in { ask(item) } })
+            }
+            // Retained historical suggestions remain readable, without repeating
+            // their body in a separate rendered-article block.
+            if !analysis.suggestions.isEmpty {
+                MPText("Gợi ý trong bản cũ", style: .emphasis)
+                ForEach(analysis.suggestions) { item in
+                    MPReportInsightCard(insight: item, masked: masked, onOpen: { onOpen(item) }, onAsk: onAsk.map { ask in { ask(item) } })
                 }
             }
         }
+    }
+}
+
+/// Reusable composer context accessory: natural label plus explicit removal.
+/// The consumer owns the hidden scope and retry lock; the base owns appearance.
+struct MPReportContextAttachment: View {
+    let label: String
+    let onClear: () -> Void
+
+    var body: some View {
+        HStack(alignment: .center, spacing: MPMetrics.sectionSpacing) {
+            MPText(label, style: .secondary)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            MPIconButton(systemName: "xmark", label: "Bỏ ngữ cảnh báo cáo", action: onClear)
+        }
+        .accessibilityElement(children: .contain)
     }
 }
 
@@ -324,11 +371,11 @@ struct MPReportInsiderCard: View {
             VStack(alignment: .leading, spacing: 10) {
                 MPSectionHeader(title: "Money Insider", actionTitle: "Xem báo cáo", action: onOpen)
                 if let first = insights.first {
-                    MPText(first.title ?? "Điểm đáng chú ý", style: .title)
+                    MPText(masked ? "Điểm đáng chú ý" : (first.title ?? "Điểm đáng chú ý"), style: .title)
                     MPText(masked ? AssistantPrivacyPolicy.maskedText : first.body, style: .body)
                     ForEach(Array(insights.dropFirst().prefix(2))) { insight in
                         MPInsetDivider()
-                        MPText(insight.title ?? insight.body, style: .emphasis)
+                        MPText(masked ? "Điểm đáng chú ý" : (insight.title ?? insight.body), style: .emphasis)
                     }
                 } else {
                     MPText("Chưa có dữ liệu đủ để đưa ra nhận xét.", style: .secondary)

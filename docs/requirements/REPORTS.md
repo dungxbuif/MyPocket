@@ -17,6 +17,25 @@ trace:
 
 # Reports, Money Insider và tổng kết tháng
 
+## Local candidate: nhận xét có bằng chứng — 2026-11-02
+
+[Thiết kế đã được duyệt](../work/tickets/REPORTS-AI-USEFULNESS-20261102-DETAIL_DESIGN.md)
+thay phần nhận xét chung chung bằng tối đa ba phát hiện có tên, số tiền, kỳ và
+đường dẫn giao dịch khớp dữ liệu. Backend tính các ứng viên: vượt ngân sách,
+biến động danh mục đủ điều kiện so sánh, tỷ trọng chi và thiếu hụt thu–chi.
+AI chọn ứng viên/hướng xem tiếp; không tự viết số tiền hoặc suy đoán nguyên nhân.
+Không có điểm đáng chú ý thì trả trạng thái chưa đủ bằng chứng, không gọi model
+để lấp đủ số nhận xét. Phạm vi này chưa suy luận khoản mua cụ thể từ tổng danh mục.
+
+Ngân sách dùng kỳ thực tế và hạn mức hiệu lực có chuyển tiếp. Drilldown giữ cùng
+kỳ/ví/danh mục; ngân sách giao tháng có thể bắt đầu trước tháng báo cáo. So sánh
+chỉ dùng cùng số ngày và phải đạt điều kiện comparable. Thu trừ chi không được
+gọi là số dư ví. Bản phân tích đã lưu vẫn đọc được; thay dữ liệu hoặc luật đánh
+dấu cũ, chỉ tạo lại khi user yêu cầu. Hỏi tiếp giữ ngữ cảnh bản phân tích đã lưu,
+không âm thầm đổi sang tổng tài khoản hoặc dữ liệu mới.
+
+Đây là thay đổi local đang tích hợp; không phải xác nhận rollout production hay UAT.
+
 ## Nguyên tắc chung
 
 Reports là trung tâm xem số liệu; Money Insider là phần phân tích tổng hợp dẫn về các report tương ứng. Mọi số liệu dùng cùng công thức và bộ lọc account/ví/ngày/timezone. Số tiền dùng VND. Hành vi nghiệp vụ nền ở các nhóm REP, MONTH, TIME và JAR của [BUSINESS_RULES.md](BUSINESS_RULES.md).

@@ -196,6 +196,7 @@ func main() {
 	advisorService := usecase.NewAdvisorServiceWithRuntime(advisorStore, advisorOrchestrator, cfg.AIAdvisorRunLeasesEnabled)
 	advisorEntryTasks := repo.NewAdvisorEntryPostgresRepository(database)
 	handlers.Advisor = &httpapi.AdvisorHandler{
+		Reports:      handlers.ReportAnalysis.Service,
 		Service:      advisorService,
 		Entry:        &usecase.AdvisorEntryService{Tasks: advisorEntryTasks, Entries: aiEntryService},
 		Users:        userRepo,

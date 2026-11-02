@@ -16,6 +16,78 @@ shared_fields:
 updated: 2026-11-02
 ---
 
+## Report findings local slice — done (owner accepted), 2026-11-02
+
+[Detail design](tickets/REPORTS-AI-USEFULNESS-20261102-DETAIL_DESIGN.md),
+[work ledger](../../.superpowers/sdd/2026-11-02-report-findings/progress.md) and
+[fix-round evidence](../../.superpowers/sdd/2026-11-02-report-findings/fix-round-1.md).
+These are controller-recorded results, not reruns by the docs sidecar. The 21:22
+host reboot cleared pre-reboot `/tmp` logs and xcresults; their results remain
+historical observations, not currently available artifact links.
+
+| Gate | Result and evidence | Limit |
+| --- | --- | --- |
+| Native selected checks | PASS: signed build and 123 selected tests; five `ReportAnalysisTests` after neutral-prompt correction; native base guard/base tests/project verification PASS | Prior `/tmp` artifacts lost at reboot; not full-device acceptance. The earlier draft-safety `MainTabView.fullScreenCover` guard failure is superseded by this shared-wrapper integration pass, not erased from history |
+| Targeted backend | PASS: `go test -count=1 -p 1 -run 'Test(Report\|Monthly\|Analysis\|ProviderSelection\|AdvisorBudget\|AdvisorToolDefinitions\|FinanceBudget)' ./internal/entity ./internal/usecase ./internal/infrastructure/repository ./internal/controller/http` with migrated disposable `TEST_DATABASE_URL` | Entity/usecase/repository executed; HTTP compiled with no matching tests in this run, so it is not HTTP runtime proof |
+| Full backend | NOT GREEN: initial nil-category fixtures and retention fingerprint collision corrected; remaining recorded failures concern MCP latest-route classification, two OCR source limits, AIEntry `batch_version` fixture and jar-tool description assertion | Targeted success does not establish a full-suite pass |
+| Web | Design tests PASS; `check:design` and `npm build` blocked by existing non-spec icon-reference `comparison.html`/`manifest.json` | Web gates remain not green |
+| Independent source reviews | Final scoped verdicts PASS in [review 1](../../.superpowers/sdd/2026-11-02-report-findings/review-1.md), [review 2](../../.superpowers/sdd/2026-11-02-report-findings/review-2.md), [review 3](../../.superpowers/sdd/2026-11-02-report-findings/review-3.md) after four P2 corrections | Source review, not owner sign-off |
+| Weekly partial-day hang | Live GET timed out at 120 s; regression RED timed out at 2 s in `seriesForRange`. Final-endpoint break: repository `TestMonthly*` GREEN, 0.620 s; three `review-weekly-{1,2,3}.md` verdicts PASS | Daily/full-month/previous semantics also reviewed; no broader runtime claim |
+| November real provider | 1,168 ms provider time, 1,809 tokens; initial queued readback 4.04 s; shopping overrun 350,000 VND | Single observed call, not a statistical benchmark |
+| October real provider | 6,123 ms provider time, 3,331 tokens; queued readback 22.14 s; shopping overrun 5,544,000 VND and food 3,905,000 versus 6,935,000 VND over 30 matched days | Single observed call; exact matched evidence retained |
+| Day/week reuse | Both scopes returned the same saved analysis with CURRENT freshness; weekly reads 35/40 ms | No extra provider generation observed |
+| Empty Assistant history | RED: HTTP 200 `data:null` caused native array decoding failure. GREEN: `go test -count=1 -run 'TestAdvisor(EmptyHistory\|ConfirmOlder)' ./internal/controller/http`, 0.633 s; live GET 200 `data:[]` confirmed | Successful-response normalization; preserve ownership/errors/meta |
+| Native report UI | CUA login restored; exact titles/metrics visible in AX and final screenshot; two saved November findings with legible periods/status/actions. Floating bubble retained without reserved container; “Xem giao dịch” opens the single 1,850,000 VND vacuum purchase | Targeted observed UI, not all accessibility/device states |
+| Native follow-up | Fullscreen hides navigation/bubble; correct context badge and neutral prompt. Run `6025247b-c777-4661-ac1d-f17c990644e9`, 21:35:52–21:36:04 (~12.08 s), completed with correct 350,000/1,850,000/1,500,000 VND prose and one relevant budget card | Optional transaction card remains overbroad: extra `search_transactions` with empty `category_ids`, `report_scope=all`, returned 18 rows including transfers. Open acceptance gap; no prompt/tool-scope redesign in this slice |
+| Recovery and disposition | Signed installed app and same DB with 1,295 transactions survived reboot; latest reported API 7305/worker 7306, Redis 49473, API 8081. Simulator left on saved November findings | Owner accepted saved findings 2026-11-02; slice `done`. No new migration, production change or merge; residual card scope and suite failures tracked as backlog follow-ups |
+
+Post-reboot live evidence is recorded in `/tmp/mypocket-report-findings-live.json`
+and `/tmp/mypocket-report-followup-live.json` (controller-reported existing files).
+These are distinct from the lost pre-reboot test logs. No full Assistant UX or
+full-app UAT acceptance is claimed.
+
+## Report AI usefulness review — historical audit, 2026-11-02
+
+The following failures describe the audit baseline; current implementation proof
+and remaining gaps are recorded above.
+
+| Scenario | Evidence | Result |
+| --- | --- | --- |
+| November/October report and Insider action | Device Hub actual native UI and API readback | Loaded both scopes; overrun action opened the single 1,850,000 VND purchase |
+| Saved analysis restore | Analysis `01f42926-3f9c-4a73-a856-7c4ca3305d86`, latest endpoint, native article | Restored, but product quality FAIL: generic repeated copy lacks amounts/names/actions |
+| Follow-up | Native Hỏi tiếp → Assistant | Dedicated screen hides navigation/bubble; context handoff carries only month |
+| Specific budget question | UI run `be1e02ea-8172-42e5-aa06-1d5338c0e653`, 8.64 s | Prose correct (350,000 VND overrun); card scope FAIL: 27 budgets, first eight January–April |
+| Weekly budget visibility | Live budgets API versus November monthly report | FAIL: active Nov 2–8 weekly budget omitted from report previews |
+| Audit scope | [Findings/proposal](tickets/REPORTS-AI-USEFULNESS-20261102-AUDIT.md) | Targeted manual/API review; no full-app regression or replacement implementation claimed |
+
+## Rich local fixture — 2026-11-02
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Local target | Installed Info.plist, pg_stat_activity, authenticated profile | API 8081, local native fixture DB and existing native-fixture account verified |
+| Seed | `seed-rich-local-data.py`, private journal; API/SQL counts | 1,338 successful API operations, no pending journal request; 1,295 total transaction rows January–November, existing data retained |
+| Domain readback | Wallets, jars, budgets, portfolio, monthly reports, recurring, notifications | Data available through application API; coverage and limits in [fixture record](tickets/LOCAL-RICH-DATA-20261102.md) |
+| Assistant draft | Run `379c3784-455c-4d4d-86f9-2e9a68283fc2`, persisted transcript | Completed; pending jar confirmation present, not approved |
+| Signed app | `xcodebuild ... build MP_API_BASE_URL=http://127.0.0.1:8081/api/v1`; simctl install/launch; Device Hub AX | Build succeeded and authenticated Overview showed new data. Initial unsigned install Keychain failure corrected by project signing |
+| Automated suites / owner acceptance | Owner preference | Suites NOT RUN; manual product acceptance OPEN |
+
+## Ordinary transaction draft safety — 2026-11-02
+
+[Design](tickets/TRANSACTION-DRAFT-SAFETY-20261102-DETAIL_DESIGN.md): `in_review`.
+Build/static results below were supplied by the implementation turn; docs
+reconciliation inspected the Swift diff and build manifest without rerunning tests.
+
+| Gate | Evidence | Result |
+| --- | --- | --- |
+| Native build-for-testing | `xcodebuild` build-for-testing using `/tmp/mypocket-draft-safety-20261102`; `Logs/Build/LogStoreManifest.plist`, build `7BEDA300-AC75-46F8-A418-D161062C069F` | PASS: `highLevelStatus=S`, zero errors and warnings; compilation is not test execution |
+| Project verification | `mobile-ios/scripts/verify-project.sh` | PASS, supplied implementation-turn result |
+| Whitespace/diff check | `git diff --check` | PASS, supplied implementation-turn result |
+| Base-component guard | `mobile-ios/scripts/check-base-components.sh` | FAIL: existing `MainTabView.swift:235` `fullScreenCover`, unchanged by this slice |
+| Draft exit UI scenario | `LaunchTests.testTransactionExitKeepsDraftUntilDiscardConfirmed` | Added and compiled; NOT EXECUTED by owner preference. Covers untouched Cancel, changed-note Cancel/AI stay, and confirmed Cancel discard |
+| Invalid-save UI scenario | `LaunchTests.testTransactionInvalidSaveShowsFooterErrorAndPreservesDraft` | Added and compiled; NOT EXECUTED by owner preference. Asserts visible footer error, retained note and enabled Save |
+| Runtime/device UAT | Dirty amount/note/date and other editable fields; stay/discard/AI destination; dirty/busy swipe blocking; busy footer actions; failed/successful save | OPEN; no runtime interaction or owner acceptance claimed by compilation |
+| Docs review | Screen/base contracts, design, context, backlog and unreleased changelog reconciled against three Swift diffs | PASS for this bounded documentation review; broader transaction/product completion remains open |
+
 ## Manual production migration pipeline — 2026-11-02
 
 | Gate | Evidence | Result |

@@ -10,6 +10,30 @@ shared_fields: [status, trace]
 
 # API
 
+## Local report-analysis candidate — 2026-11-02
+
+Report rule and analysis rule/prompt versions are v3. ReportInsight keeps its
+existing fields and adds optional `metrics:[{label,amount}]`, `period_label`,
+and `action_hint`. Claims and drilldown targets are backend-calculated; the
+provider selects candidate IDs/intents. Analysis completion persists summary,
+provider_called and error_code as well as observations/usage. No new columns
+or migration are introduced. Saved v2 results remain readable but stale.
+
+Advisor message sync/async inputs accept optional
+`report_context:{analysis_id,snapshot_id,finding_id?}`. The handler reloads
+owner-scoped retained analysis/snapshot, validates the selected finding, and
+persists a hidden report_context message part. Client prose/amounts are not
+accepted as authoritative context. Request identity includes context IDs;
+legacy text-only request hashes remain compatible. Native sends ordinary
+user-visible text separately. The model receives the saved scope and evidence
+with a saved-time warning; fresh queries remain owner scoped. This candidate
+does not change production runtime or deployment configuration.
+
+Successful `GET /api/v1/ai/advisor/conversation/messages` responses always use
+an array in `data`, including `[]` for empty/expired retained history. Lifecycle
+metadata and existing authorization/error responses are preserved. A successful
+empty history must not serialize as `data:null`.
+
 ## MCP integration candidate — 2026-10-20
 
 The local candidate adds authenticated `/api/v1/mcp` using the official Go SDK

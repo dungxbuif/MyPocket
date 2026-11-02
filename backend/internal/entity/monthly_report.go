@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	MonthlyReportRuleVersion = "monthly-report-v2"
-	ReportInsightRuleVersion = "report-insight-v2"
+	MonthlyReportRuleVersion = "monthly-report-v3"
+	ReportInsightRuleVersion = "report-insight-v3"
 	ReportSnapshotRetention  = 90 * 24 * time.Hour
 	ReportAnalysisCooldown   = 60 * time.Second
 )
@@ -105,15 +105,18 @@ type ReportContributor struct {
 }
 
 type ReportBudgetPreview struct {
-	ID          string  `json:"id"`
-	Name        string  `json:"name"`
-	LimitAmount int64   `json:"limit_amount"`
-	Spent       int64   `json:"spent"`
-	Remaining   int64   `json:"remaining"`
-	OverLimit   bool    `json:"over_limit"`
-	WalletID    *string `json:"wallet_id,omitempty"`
-	CategoryID  *string `json:"category_id,omitempty"`
-	FactRef     string  `json:"fact_ref"`
+	ID           string          `json:"id"`
+	Name         string          `json:"name"`
+	LimitAmount  int64           `json:"limit_amount"`
+	Spent        int64           `json:"spent"`
+	Remaining    int64           `json:"remaining"`
+	OverLimit    bool            `json:"over_limit"`
+	WalletID     *string         `json:"wallet_id,omitempty"`
+	CategoryID   *string         `json:"category_id,omitempty"`
+	FactRef      string          `json:"fact_ref"`
+	From         time.Time       `json:"from"`
+	EndExclusive time.Time       `json:"end_exclusive"`
+	Drilldown    ReportDrilldown `json:"drilldown"`
 }
 
 type ReportJarPreview struct {
@@ -152,6 +155,15 @@ type ReportInsight struct {
 	Drilldown    ReportDrilldown    `json:"drilldown"`
 	Priority     int                `json:"-"`
 	Impact       int64              `json:"-"`
+	Metrics      []ReportMetric     `json:"metrics,omitempty"`
+	PeriodLabel  string             `json:"period_label,omitempty"`
+	ActionHint   string             `json:"action_hint,omitempty"`
+}
+
+// ReportMetric contains server-calculated money, never provider-authored prose.
+type ReportMetric struct {
+	Label  string `json:"label"`
+	Amount int64  `json:"amount"`
 }
 
 type MonthlyReport struct {

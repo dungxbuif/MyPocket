@@ -1,63 +1,91 @@
 package entity
 
 import (
-	"errors"
+	"strings"
 	"testing"
 	"time"
 )
 
-func TestBuildReportFactBundlePreservesSnapshotIdentityAndCapsFacts(t *testing.T) {
-	snapshot := ReportSnapshot{
-		ID:           "snapshot-1",
-		DataRevision: 7,
-		AsOf:         time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC),
-		Scope:        MonthlyReportScope{Month: "2026-10", Granularity: "day"},
-		Report: MonthlyReport{
-			Scope:        MonthlyReportScope{Month: "2026-10", Granularity: "day"},
-			AsOf:         time.Date(2026, 10, 31, 12, 0, 0, 0, time.UTC),
-			Totals:       ReportTotals{Income: 100, Expense: 50, Net: 50, TransactionCount: 2},
-			Contributors: []ReportContributor{{FactRef: "category:coffee", CurrentAmount: 50, Delta: 10}},
-		},
-	}
-	bundle, err := BuildReportFactBundle(snapshot)
-	if err != nil {
-		t.Fatalf("BuildReportFactBundle() error = %v", err)
-	}
-	if bundle.SnapshotID != snapshot.ID || bundle.Revision != snapshot.DataRevision || bundle.Scope != snapshot.Report.Scope {
-		t.Fatalf("bundle identity = %+v", bundle)
-	}
-	if len(bundle.Facts) == 0 || bundle.Facts[0].ID != "totals.income" {
-		t.Fatalf("facts = %+v", bundle.Facts)
-	}
+func evidenceReport() MonthlyReport {
+	from := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
+	return MonthlyReport{Scope: MonthlyReportScope{Month: "2026-11"}, Timezone: "Asia/Ho_Chi_Minh", CurrentRange: ReportRange{From: from, EndExclusive: from.AddDate(0, 0, 2)}, Totals: ReportTotals{Income: 48000000, Expense: 12367000, Net: 35633000, TransactionCount: 17}, Comparison: ReportComparison{CommonDays: 1}, Budgets: []ReportBudgetPreview{{ID: "shopping", Name: "Mua sắm", LimitAmount: 1500000, Spent: 1850000, Remaining: -350000, OverLimit: true, FactRef: "budget:shopping", CategoryID: reportString("shopping-category")}}}
+}
 
-	tooMany := snapshot
-	tooMany.Report.Contributors = make([]ReportContributor, 20)
-	for index := range tooMany.Report.Contributors {
-		tooMany.Report.Contributors[index] = ReportContributor{FactRef: "category:" + string(rune('a'+index)), CurrentAmount: 1, Delta: 1}
+func TestAnalysisCandidatesKeepBudgetEvidenceAndRejectEarlyTrend(t *testing.T) {
+	report := evidenceReport()
+	for i := 0; i < 40; i++ {
+		report.Contributors = append(report.Contributors, ReportContributor{FactRef: "category:x", Name: "Ăn uống", CurrentAmount: 2000000, PreviousAmount: 1000000, Delta: 1000000, CurrentCount: 10, PreviousCount: 10, ChangeBPS: reportBPS(10000)})
 	}
-	if _, err := BuildReportFactBundle(tooMany); !errors.Is(err, ErrReportAnalysisFactsInvalid) {
-		t.Fatalf("too many facts error = %v, want ErrReportAnalysisFactsInvalid", err)
+	bundle, err := BuildReportFactBundle(ReportSnapshot{ID: "snapshot", DataRevision: 7, Report: report})
+	if err != nil || bundle.SnapshotID != "snapshot" || bundle.Revision != 7 {
+		t.Fatalf("identity/error: %+v %v", bundle, err)
+	}
+	if len(bundle.Candidates) != 1 {
+		t.Fatalf("early trend or lost budget: %+v", bundle.Candidates)
+	}
+	finding := bundle.Candidates[0]
+	if !strings.Contains(finding.Title, "350.000") || finding.Metrics[0].Amount != 1850000 || finding.Drilldown.TargetID != "budget:shopping" || finding.Drilldown.CategoryIDs[0] != "shopping-category" {
+		t.Fatalf("wrong budget evidence: %+v", finding)
+	}
+	if bundle.Comparable || bundle.CommonDays != 1 {
+		t.Fatal("comparison quality lost")
 	}
 }
 
-func TestValidateReportProviderResultRejectsUnsupportedReferencesAndNumbers(t *testing.T) {
-	facts := ReportFactBundle{Facts: []ReportFact{{ID: "totals.expense", SourceRef: "totals.expense"}}}
-	for name, result := range map[string]ReportProviderResult{
-		"unknown fact":  {Observations: []ReportProviderObservation{{FactRef: "totals.income", Text: "Theo dõi nhịp chi"}}},
-		"numeric prose": {Observations: []ReportProviderObservation{{FactRef: "totals.expense", Text: "Chi tăng 12 phần trăm"}}},
-		"too many observations": {Observations: []ReportProviderObservation{
-			{FactRef: "totals.expense"}, {FactRef: "totals.expense"}, {FactRef: "totals.expense"}, {FactRef: "totals.expense"},
-		}},
+func TestAnalysisSelectionOnlyAcceptsDistinctEligibleCandidates(t *testing.T) {
+	bundle, _ := BuildReportFactBundle(ReportSnapshot{Report: evidenceReport()})
+	valid := ReportProviderObservation{FindingID: bundle.Candidates[0].ID, Intent: "review_plan"}
+	if err := ValidateReportProviderResult(ReportProviderResult{Observations: []ReportProviderObservation{valid}}, bundle); err != nil {
+		t.Fatal(err)
+	}
+	for name, rows := range map[string][]ReportProviderObservation{
+		"unknown":            {{FindingID: "category-change:fake", Intent: "inspect_evidence"}},
+		"duplicate":          {valid, valid},
+		"unsupported intent": {{FindingID: valid.FindingID, Intent: "buy_gold"}},
+		"invented claims":    {{FindingID: valid.FindingID, Intent: "review_plan", Text: "Bạn đã chi 999 đồng"}},
+		"legacy prose":       {{FactRef: "totals.net", Direction: "down", Text: "Số dư giảm"}},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if err := ValidateReportProviderResult(result, facts); !errors.Is(err, ErrReportAnalysisOutputInvalid) {
-				t.Fatalf("ValidateReportProviderResult() error = %v, want ErrReportAnalysisOutputInvalid", err)
+			if ValidateReportProviderResult(ReportProviderResult{Observations: rows}, bundle) == nil {
+				t.Fatal("invalid output accepted")
 			}
 		})
 	}
+}
 
-	valid := ReportProviderResult{Observations: []ReportProviderObservation{{FactRef: "totals.expense", Text: "Theo dõi nhịp chi trong kỳ tiếp theo"}}}
-	if err := ValidateReportProviderResult(valid, facts); err != nil {
-		t.Fatalf("valid provider result rejected: %v", err)
+func TestAnalysisConcentrationIsNotTrendAndDoesNotDuplicateBudget(t *testing.T) {
+	report := evidenceReport()
+	report.Categories = []ReportCategoryBreakdown{{CategoryID: reportString("shopping-category"), Name: "Mua sắm", TargetID: "category:shopping", Amount: 1850000, ShareBPS: 3000, TransactionCount: 1}, {Name: "Nhà ở", TargetID: "category:rent", Amount: 6000000, ShareBPS: 4800, TransactionCount: 1}}
+	items := BuildReportAnalysisCandidates(report)
+	if len(items) != 2 || items[1].Kind != "category_concentration" || !strings.Contains(items[1].Body, "48,0%") {
+		t.Fatalf("candidates %+v", items)
+	}
+	if abs(0) != 0 {
+		t.Fatal("zero must remain zero when ranking impacts")
+	}
+}
+
+func TestAnalysisCandidateDiversitySurvivesInsiderDisplayLimit(t *testing.T) {
+	report := evidenceReport()
+	for _, id := range []string{"travel", "housing"} {
+		report.Budgets = append(report.Budgets, ReportBudgetPreview{ID: id, Name: id, LimitAmount: 1000000, Spent: 2000000, OverLimit: true, FactRef: "budget:" + id, CategoryID: reportString(id)})
+	}
+	report.Comparison = ReportComparison{Comparable: true, CommonDays: 10}
+	report.ComparisonRange = ReportRange{From: report.CurrentRange.From, EndExclusive: report.CurrentRange.From.AddDate(0, 0, 1)}
+	report.Contributors = []ReportContributor{{CategoryID: reportString("food"), Name: "Ăn uống", FactRef: "category:food", CurrentAmount: 2000000, PreviousAmount: 1000000, Delta: 1000000, CurrentCount: 10, PreviousCount: 10, ChangeBPS: reportBPS(10000)}}
+	if len(BuildReportInsights(report)) != 3 {
+		t.Fatal("Insider display cap changed")
+	}
+	found := false
+	for _, item := range BuildReportAnalysisCandidates(report) {
+		if item.ID == "category-change:category:food" {
+			found = true
+			if !item.EndExclusive.Equal(report.ComparisonRange.EndExclusive) {
+				t.Fatal("finding metadata exceeds matched evidence window")
+			}
+		}
+	}
+	if !found {
+		t.Fatal("budget warnings starved eligible category evidence")
 	}
 }

@@ -272,7 +272,7 @@ func analysisPayload(analysis *entity.ReportAnalysis) (map[string]any, error) {
 	if err != nil {
 		return nil, err
 	}
-	return map[string]any{"observations": observations, "suggestions": suggestions, "fact_refs": factRefs, "usage": usage}, nil
+	return map[string]any{"observations": observations, "suggestions": suggestions, "fact_refs": factRefs, "usage": usage, "provider_called": analysis.ProviderCalled, "summary": analysis.Summary, "error_code": analysis.ErrorCode}, nil
 }
 
 func decodeReportAnalysis(row reportAnalysisRow) (*entity.ReportAnalysis, error) {

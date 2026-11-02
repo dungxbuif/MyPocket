@@ -693,62 +693,81 @@ func (r *FinanceQueryPostgresRepository) readBudgetProgress(ctx context.Context,
 	if err := tx.WithContext(ctx).Where("owner_id = ? OR owner_id IS NULL", ownerID).Find(&categories).Error; err != nil {
 		return entity.FinanceResult{}, err
 	}
-	// Evaluate an active budget against the same snapshot timestamp used by the
-	// rest of the bundle. This avoids a budget boundary moving while a bundle
-	// is being assembled.
-	now := asOf.In(location)
-	if query.ActiveOn != "" {
-		parsed, err := time.ParseInLocation("2006-01-02", query.ActiveOn, location)
+	// Selection is separate from calculation: historical periods must remain
+	// available for carryover, but must not crowd the requested card list.
+	month := strings.TrimSpace(query.Month)
+	activeOn := strings.TrimSpace(query.ActiveOn)
+	if month == "" && activeOn == "" && len(query.ObjectIDs) == 0 {
+		month = asOf.In(location).Format("2006-01")
+	}
+	var monthStart, monthEnd time.Time
+	cutoff := asOf
+	if month != "" {
+		parsed, err := entity.ParseMonth(month)
 		if err != nil {
 			return entity.FinanceResult{}, entity.ErrFinanceDateInvalid
 		}
-		// A date-only selection includes that whole local day, not just midnight.
-		now = parsed.AddDate(0, 0, 1).Add(-time.Nanosecond)
-	}
-	visibleRows := transactions[:0]
-	for _, row := range transactions {
-		if !row.OccurredAt.After(asOf) {
-			visibleRows = append(visibleRows, row)
+		monthStart = time.Date(parsed.Year(), parsed.Month(), 1, 0, 0, 0, 0, location)
+		monthEnd = monthStart.AddDate(0, 1, 0)
+		if end := monthEnd.Add(-time.Nanosecond); end.Before(cutoff) {
+			cutoff = end
 		}
 	}
-	transactions = visibleRows
-	summary, err := entity.CalculateBudgetsChecked(budgets, transactions, categories, now, location)
+	if activeOn != "" {
+		parsed, err := time.ParseInLocation("2006-01-02", activeOn, location)
+		if err != nil {
+			return entity.FinanceResult{}, entity.ErrFinanceDateInvalid
+		}
+		// A date-only selection includes the whole local day, up to the
+		// immutable bundle timestamp when the requested date is today/future.
+		if end := parsed.AddDate(0, 0, 1).Add(-time.Nanosecond); end.Before(cutoff) {
+			cutoff = end
+		}
+	}
+	summary, err := entity.CalculateBudgetsChecked(budgets, transactions, categories, cutoff, location)
 	if err != nil {
 		return entity.FinanceResult{}, err
 	}
-	if len(query.ObjectIDs) > 0 {
-		selected := make(map[string]bool, len(query.ObjectIDs))
-		for _, id := range query.ObjectIDs {
-			selected[id] = true
+	selected := make(map[string]bool, len(query.ObjectIDs))
+	for _, id := range query.ObjectIDs {
+		selected[id] = true
+	}
+	items := []entity.Budget{}
+	summary.LimitAmount, summary.Spent = 0, 0
+	counted := map[string]bool{}
+	for _, budget := range summary.Items {
+		if name := strings.ToLower(strings.TrimSpace(query.BudgetNameQuery)); name != "" && !strings.Contains(strings.ToLower(budget.Name), name) {
+			continue
 		}
-		items := []entity.Budget{}
-		summary.LimitAmount, summary.Spent = 0, 0
-		counted := map[string]bool{}
-		label := now.In(location).Format("2006-01-02")
-		for _, budget := range summary.Items {
-			if !selected[budget.ID] {
+		if len(selected) > 0 && !selected[budget.ID] {
+			continue
+		}
+		startLabel, endLabel := budget.StartDate.Format("2006-01-02"), budget.EndDate.Format("2006-01-02")
+		if month != "" && (startLabel >= monthEnd.Format("2006-01-02") || endLabel < monthStart.Format("2006-01-02")) {
+			continue
+		}
+		if activeOn != "" && (startLabel > activeOn || endLabel < activeOn) {
+			continue
+		}
+		items = append(items, budget)
+		// Totals describe the displayed selection, including ended weekly
+		// periods and explicit historical IDs. Overlapping spend is counted once.
+		if summary.LimitAmount > entity.MaxSafeMoneyAmount-budget.EffectiveLimitAmount {
+			return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
+		}
+		summary.LimitAmount += budget.EffectiveLimitAmount
+		for _, row := range entity.MatchBudgetTransactions(budget, transactions, categories, cutoff, location) {
+			if counted[row.ID] {
 				continue
 			}
-			items = append(items, budget)
-			if budget.StartDate.Format("2006-01-02") <= label && label <= budget.EndDate.Format("2006-01-02") {
-				if summary.LimitAmount > entity.MaxSafeMoneyAmount-budget.EffectiveLimitAmount {
-					return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
-				}
-				summary.LimitAmount += budget.EffectiveLimitAmount
-				for _, row := range entity.MatchBudgetTransactions(budget, transactions, categories, now, location) {
-					if counted[row.ID] {
-						continue
-					}
-					counted[row.ID] = true
-					if row.Amount < 0 || summary.Spent > entity.MaxSafeMoneyAmount-row.Amount {
-						return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
-					}
-					summary.Spent += row.Amount
-				}
+			counted[row.ID] = true
+			if row.Amount < 0 || summary.Spent > entity.MaxSafeMoneyAmount-row.Amount {
+				return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
 			}
+			summary.Spent += row.Amount
 		}
-		summary.Items = items
 	}
+	summary.Items = items
 	encoded, err := json.Marshal(summary)
 	if err != nil {
 		return entity.FinanceResult{}, err

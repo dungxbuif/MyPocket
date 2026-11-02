@@ -10,6 +10,47 @@ shared_fields: [status]
 
 # Changelog
 
+## Unreleased — Evidence-backed report findings, 2026-11-02
+
+- Use canonical budget periods/carryover and exact evidence targets, including
+  overlapping weekly budgets. Filter Assistant budget results before display.
+- Replace generic saved prose with distinct typed findings, server-rendered
+  claims, truthful provider/fallback provenance, exact transaction actions and
+  scoped follow-up. Preserve historical payloads and saved-analysis reuse across
+  day/week views without rewriting persisted evidence.
+- Stop weekly series at the final partial-day endpoint. Return `[]` for empty
+  successful Assistant message history to preserve native array decoding.
+- Local [slice accepted by owner](../work/tickets/REPORTS-AI-USEFULNESS-20261102-DETAIL_DESIGN.md) (done).
+  Native 123+5 and targeted backend checks pass; weekly and empty-history
+  regressions pass. Three final source reviews and three weekly reviews pass.
+  Live November/October findings, exact drilldown and fullscreen follow-up were
+  observed. The optional follow-up transaction card remains overbroad, and full
+  backend/web checks are not green; both are tracked as backlog follow-ups. No new
+  migration, production deployment or merge. [Evidence and limits](../work/VALIDATION_MATRIX.md).
+
+## Local development — Rich product fixtures, 2026-11-02
+
+- Add a resumable, loopback-only seed script for January–November manual review:
+  transactions, goals, jars, budgets, recurring, credit, travel and gold portfolios.
+  Preserve existing data and reconcile portfolio funding through separate cashflows.
+- Install the signed simulator candidate with local API and transaction draft
+  protection. This is an owner review build, not a production release.
+
+## Unreleased — Ordinary transaction draft safety, 2026-11-02
+
+- Confirm discarding changed ordinary transaction drafts on Cancel or switching
+  to AI; “Tiếp tục nhập” retains the draft. Prevent swipe dismissal while dirty
+  or saving.
+- Keep validation/save errors beside the pinned Save action and show “Đang lưu…”
+  while saving. Disable shared editor footer actions while busy and support an
+  optional confirmation cancel label without changing existing defaults.
+- Local candidate [in review](../work/tickets/TRANSACTION-DRAFT-SAFETY-20261102-DETAIL_DESIGN.md):
+  build-for-testing passes; two UI scenarios compile but were not executed.
+  Runtime UAT remains open. The MainTabView base-guard failure recorded at that
+  checkpoint was superseded by the report-findings shared-wrapper correction
+  and passing native base guard; this does not close draft-safety runtime UAT.
+  This entry is not a release or a claim of complete transaction/product acceptance.
+
 ## Unreleased — Reports/Insider visual reporting and saved analysis
 
 - Replace the transaction-list-heavy report with shared native cumulative,

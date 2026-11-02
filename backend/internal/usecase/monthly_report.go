@@ -91,6 +91,9 @@ func (s *MonthlyReportService) TransactionsTarget(ctx context.Context, principal
 		return entity.SavingsTransactionPage{}, entity.ErrReportSnapshotStale
 	}
 	var selected *entity.ReportDrilldown
+	if targetID == "report:all" {
+		selected = &snapshot.Report.Drilldown
+	}
 	for index := range snapshot.Report.Categories {
 		if snapshot.Report.Categories[index].TargetID == targetID {
 			selected = &snapshot.Report.Categories[index].Drilldown
@@ -114,7 +117,16 @@ func (s *MonthlyReportService) TransactionsTarget(ctx context.Context, principal
 		}
 	}
 	if selected == nil {
+		for index := range snapshot.Report.Budgets {
+			if snapshot.Report.Budgets[index].Drilldown.TargetID == targetID {
+				selected = &snapshot.Report.Budgets[index].Drilldown
+				break
+			}
+		}
+	}
+	if selected == nil {
 		return entity.SavingsTransactionPage{}, repository.ErrNotFound
 	}
+
 	return reader.ReadMonthlyTransactionsByDrilldown(ctx, principal.OwnerID, snapshot.Scope, *selected, limit, offset, now)
 }

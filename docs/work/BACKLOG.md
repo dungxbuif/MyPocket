@@ -15,8 +15,50 @@ ai_fields:
 shared_fields:
   - queue_items
   - status
-updated: 2026-11-01
+updated: 2026-11-02
 ---
+
+## Report/Assistant usefulness — local candidate in_review, 2026-11-02
+
+Owner screenshot and live review establish low-value generic AI output plus
+budget scope defects. [Audit](tickets/REPORTS-AI-USEFULNESS-20261102-AUDIT.md)
+led to the implemented [detail design](tickets/REPORTS-AI-USEFULNESS-20261102-DETAIL_DESIGN.md):
+canonical budget calculations, typed findings, exact evidence actions, scoped
+follow-up and truthful saved provenance. Three final source reviews and three
+weekly-boundary reviews PASS; native 123+5, targeted backend, weekly regression
+(0.620 s) and empty-history HTTP regression (0.633 s) pass. Full backend/web
+checks remain not green; see [validation](VALIDATION_MATRIX.md).
+
+Live November/October provider results, same-analysis day/week reuse, saved
+finding presentation and the single 1,850,000 VND vacuum drilldown are observed.
+Fullscreen follow-up preserves the correct context and returns the 350,000 VND
+overrun with one relevant budget card. Its optional transaction card is still
+too broad: an additional `report_scope=all` search with empty `category_ids`
+returned 18 rows including transfers. Track this as an open follow-up/acceptance
+gap; prompt/tool-scope redesign is outside this slice. Next: owner acceptance of
+the saved November findings left visible on the simulator, then disposition of
+the residual Assistant card scope and broader validation failures. Status stays
+`in_review`; no full-app UAT, migration, production change or merge is claimed.
+
+## Rich local product data — in_review, 2026-11-02
+
+[Fixture](tickets/LOCAL-RICH-DATA-20261102.md) prepared and read back across
+January–November. Signed simulator app restored authenticated access with the
+new data and draft-safety slice. Next: owner manual product review. Counts and
+unseeded device-only/business limitations are explicit in the fixture record.
+
+## Ordinary transaction draft safety — in_review, 2026-11-02
+
+[Design](tickets/TRANSACTION-DRAFT-SAFETY-20261102-DETAIL_DESIGN.md) implements
+dirty-draft Cancel/AI confirmation, dirty/busy swipe-dismiss prevention, pinned
+save errors and pending copy through shared bases. Build-for-testing, project
+verification and diff checks pass; the base guard fails on unchanged
+`MainTabView.swift:235` (`fullScreenCover`). Two focused UI scenarios compile but
+remain NOT EXECUTED by owner preference. Next: manual runtime/device UAT and
+separate resolution of the existing base-guard finding; see
+[validation](VALIDATION_MATRIX.md#ordinary-transaction-draft-safety--2026-11-02).
+This bounded slice does not close wider transaction/product acceptance.
+Rich-data seeding proceeds independently.
 
 ## Manual production migration pipeline — ready, 2026-11-01
 

@@ -81,12 +81,27 @@ enum AssistantHistoryExpiryPolicy {
         guard let error = error as? APIError else { return false }
         switch error {
         case .problem(let problem):
+            if problem.code == "advisor_report_expired" { return false }
             return problem.status == 410 || problem.code == "advisor_history_expired"
         case .http(let status):
             // Keep the client safe if a proxy strips the problem envelope.
             return status == 410
         default:
             return false
+        }
+    }
+}
+
+enum AssistantReportExpiryPolicy {
+    static func isExpired(_ error: APIError, hasReportContext: Bool) -> Bool {
+        switch error {
+        case .problem(let problem):
+            return problem.code == "advisor_report_expired" ||
+                (hasReportContext && problem.status == 410 && problem.code != "advisor_history_expired")
+        case .http(let status):
+            // An untyped 410 on a scoped request cannot prove history expiry.
+            return hasReportContext && status == 410
+        default: return false
         }
     }
 }
@@ -330,6 +345,10 @@ struct AssistantView: View {
     @State private var conversationID = ""
     @State private var localInput = ""
     private let draft: Binding<String>?
+    private let reportHandoff: Binding<ReportAssistantHandoff?>?
+    private let pendingMessage: Binding<AdvisorPendingMessageModel?>?
+    @State private var localReportHandoff: ReportAssistantHandoff?
+    @State private var localPendingMessage: AdvisorPendingMessageModel?
     @State private var sending = false
     @State private var historyLoading = true
     @State private var loadingOlder = false
@@ -348,8 +367,8 @@ struct AssistantView: View {
     @State private var resetting = false
     @State private var historyRequestToken = UUID()
     @State private var advisorPollToken = UUID()
-    @State private var advisorSubmitRequestID: String?
-    @State private var advisorSubmitUncertain = false
+    @State private var localAdvisorSubmitRequestID: String?
+    @State private var localAdvisorSubmitUncertain = false
     @State private var chatState: AssistantChatState = .idle
     @State private var shouldFollowLatest = true
     @State private var pendingRestoreAnchor: AssistantScrollAnchor?
@@ -365,12 +384,14 @@ struct AssistantView: View {
         "So sánh chi tiêu với tháng trước"
     ]
 
-    init(api: FinanceAPI, onBack: @escaping () -> Void, ownerID: String, masked: Bool = false, draft: Binding<String>? = nil) {
+    init(api: FinanceAPI, onBack: @escaping () -> Void, ownerID: String, masked: Bool = false, draft: Binding<String>? = nil, reportHandoff: Binding<ReportAssistantHandoff?>? = nil, pendingMessage: Binding<AdvisorPendingMessageModel?>? = nil) {
         self.api = api
         self.onBack = onBack
         self.ownerID = ownerID
         self.masked = masked
         self.draft = draft
+        self.reportHandoff = reportHandoff
+        self.pendingMessage = pendingMessage
         _runObserver = StateObject(wrappedValue: AdvisorRunObserver(fetchRun: { runID in
             try await api.advisorRun(id: runID)
         }))
@@ -391,6 +412,38 @@ struct AssistantView: View {
     }
 
     private var inputBinding: Binding<String> { draft ?? $localInput }
+
+    private var reportHandoffBinding: Binding<ReportAssistantHandoff?> { reportHandoff ?? $localReportHandoff }
+    private var pendingMessageBinding: Binding<AdvisorPendingMessageModel?> { pendingMessage ?? $localPendingMessage }
+
+    private var advisorSubmitRequestID: String? {
+        get { pendingMessageBinding.wrappedValue?.input.clientRequestID ?? localAdvisorSubmitRequestID }
+        nonmutating set {
+            localAdvisorSubmitRequestID = newValue
+            if newValue == nil { pendingMessageBinding.wrappedValue = nil }
+        }
+    }
+
+    private var advisorSubmitUncertain: Bool {
+        get { pendingMessageBinding.wrappedValue?.uncertain == true || localAdvisorSubmitUncertain }
+        nonmutating set {
+            localAdvisorSubmitUncertain = newValue
+            if var pending = pendingMessageBinding.wrappedValue {
+                pending.uncertain = newValue
+                pendingMessageBinding.wrappedValue = pending
+            }
+        }
+    }
+
+    private var displayedReportHandoff: ReportAssistantHandoff? {
+        if let pending = pendingMessageBinding.wrappedValue { return pending.handoff }
+        return reportHandoffBinding.wrappedValue
+    }
+
+    private func restoreSubmittedDraft(_ text: String, handoff: ReportAssistantHandoff?) {
+        if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { input = text }
+        if reportHandoffBinding.wrappedValue == nil { reportHandoffBinding.wrappedValue = handoff }
+    }
 
     private var composerMode: MPChatComposerMode {
         messages.isEmpty && input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -471,7 +524,7 @@ struct AssistantView: View {
                             if hasOlder {
                                 MPButton("Tải tin cũ", style: .secondary, isLoading: loadingOlder) { Task { await loadOlderMessages() } }
                             }
-                            ForEach(messages) { message in
+                            ForEach(messages.filter { $0.parts.contains { $0.type != "report_context" } }) { message in
                                 if let restoreAnchor = pendingRestoreAnchor,
                                    restoreAnchor.messageID == message.id {
                                     // ScrollViewReader can restore an item, but
@@ -485,7 +538,7 @@ struct AssistantView: View {
                                 }
                                 MPChatMessage(isUser: message.role == "user") {
                                     VStack(alignment: .leading, spacing: 8) {
-                                        ForEach(Array(message.parts.enumerated()), id: \.offset) { _, part in
+                                        ForEach(Array(message.parts.filter { $0.type != "report_context" }.enumerated()), id: \.offset) { _, part in
                                             if let text = part.text {
                                                 MPChatTextBubble(
                                                     text: AssistantPrivacyPolicy.text(text, masked: masked),
@@ -607,6 +660,21 @@ struct AssistantView: View {
                                 }
                                 .accessibilityIdentifier("assistant-attachment-pills")
                             }
+                        }
+                        if let handoff = displayedReportHandoff {
+                            MPReportContextAttachment(label: masked ? "Ngữ cảnh báo cáo đã chọn" : handoff.label) {
+                                reportHandoffBinding.wrappedValue = nil
+                            }
+                            .disabled(sending || advisorSubmitUncertain || resetting)
+                            .accessibilityIdentifier("assistant-report-context")
+                        }
+                        if let pending = pendingMessageBinding.wrappedValue,
+                           reportHandoffBinding.wrappedValue != pending.handoff,
+                           reportHandoffBinding.wrappedValue != nil {
+                            MPStatusMessage(text: "Báo cáo vừa chọn được giữ cho câu hỏi tiếp theo. Thử lại sẽ dùng nguyên câu hỏi và ngữ cảnh của yêu cầu chưa xác nhận.", tone: .info)
+                        }
+                        if reportHandoffBinding.wrappedValue != nil && !files.isEmpty {
+                            MPStatusMessage(text: "Câu hỏi theo báo cáo chưa hỗ trợ chứng từ đính kèm. Hãy bỏ chứng từ để hỏi theo báo cáo, hoặc bỏ ngữ cảnh báo cáo để gửi chứng từ.", tone: .info)
                         }
                         MPChatComposer(
                             text: inputBinding,
@@ -733,7 +801,7 @@ struct AssistantView: View {
     }
 
     private func resetConversation() async {
-        guard !resetting else { return }
+        guard !resetting, !sending else { return }
         resetting = true
         defer { resetting = false }
         let pendingKeyName = "mypocket.advisor.reset-request.\(ownerID)"
@@ -743,6 +811,7 @@ struct AssistantView: View {
             _ = try await api.resetAdvisorConversation(idempotencyKey: requestID)
             UserDefaults.standard.removeObject(forKey: pendingKeyName)
             clearExpiredConversation()
+            reportHandoffBinding.wrappedValue = nil
             error = "Đã bắt đầu cuộc trò chuyện mới."
         } catch let error as APIError {
             self.error = error.userMessage
@@ -912,8 +981,11 @@ struct AssistantView: View {
     }
 
     private func send() async {
-        let text = input.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !advisorSubmitUncertain,
+        let pending = pendingMessageBinding.wrappedValue
+        let text = pending?.input.text ?? input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let submittedHandoff = pending != nil ? pending?.handoff : reportHandoffBinding.wrappedValue
+        let sendsAttachments = !files.isEmpty
+        guard !resetting, activeEntryTaskID == nil, !advisorSubmitUncertain,
               AssistantComposerPolicy.canSend(
                   enabled: capabilities?.enabled == true,
                   text: text,
@@ -921,6 +993,10 @@ struct AssistantView: View {
                   activeRunID: activeRunID,
                   isLocallySending: sending
               ) else { return }
+        guard files.isEmpty || submittedHandoff == nil else {
+            error = "Hãy bỏ chứng từ hoặc bỏ ngữ cảnh báo cáo trước khi gửi. Ngữ cảnh chưa được gửi."
+            return
+        }
         sending = true; error = nil; defer { sending = false }
         let clientRequestID = advisorSubmitRequestID ?? UUID().uuidString
         advisorSubmitRequestID = clientRequestID
@@ -954,7 +1030,16 @@ struct AssistantView: View {
                 chatState = .idle
                 return
             }
-            let result = try await api.beginAdvisorMessage(AdvisorMessageInputModel(clientRequestID: clientRequestID, text: text))
+            let request = pending?.input ?? AdvisorReportMessageInputModel(clientRequestID: clientRequestID, text: text, reportContext: submittedHandoff?.context)
+            // Keep the exact payload in the shell until acknowledgement, including
+            // if this full-screen Assistant is dismissed during the request.
+            pendingMessageBinding.wrappedValue = AdvisorPendingMessageModel(input: request, handoff: submittedHandoff, uncertain: true)
+            let result: AdvisorAsyncSubmitModel = try await api.client.send(APIRequest(
+                path: "/ai/advisor/messages/async", method: .post,
+                body: try JSONEncoder.mypocket.encode(request),
+                idempotencyKey: clientRequestID, expectedOwnerID: ownerID
+            ))
+            guard pendingMessageBinding.wrappedValue?.input.clientRequestID == clientRequestID else { return }
             advisorSubmitRequestID = nil
             advisorSubmitUncertain = false
             conversationID = result.conversationID
@@ -963,15 +1048,16 @@ struct AssistantView: View {
             chatState = .accepted(runID: result.runID)
             let pollToken = UUID()
             advisorPollToken = pollToken
-            input = ""
+            if input.trimmingCharacters(in: .whitespacesAndNewlines) == text { input = "" }
+            if reportHandoffBinding.wrappedValue == submittedHandoff { reportHandoffBinding.wrappedValue = nil }
             if result.status == "queued" || result.status == "running" {
                 chatState = .processing(runID: result.runID)
                 await runObserver.observe(ownerID: ownerID, runID: result.runID)
                 guard advisorPollToken == pollToken, activeRunID == result.runID else { return }
                 if let run = runObserver.terminalResult {
                     if run.status == "purged" {
-                        input = text
                         clearExpiredConversation()
+                        restoreSubmittedDraft(text, handoff: submittedHandoff)
                         self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
                     } else if run.status != "completed" {
                         self.error = "Yêu cầu trợ lý kết thúc với trạng thái \(MPSelectionLabels.display(for: run.status))."
@@ -983,9 +1069,17 @@ struct AssistantView: View {
             activeRunID = nil
             chatState = .idle
         } catch let apiError as APIError {
-            if AssistantHistoryExpiryPolicy.isExpired(apiError) {
-                input = text
+            guard sendsAttachments || pendingMessageBinding.wrappedValue?.input.clientRequestID == clientRequestID else { return }
+            if AssistantReportExpiryPolicy.isExpired(apiError, hasReportContext: submittedHandoff != nil) {
+                advisorSubmitRequestID = nil
+                advisorSubmitUncertain = false
+                restoreSubmittedDraft(text, handoff: submittedHandoff)
+                let guidance = "Bản phân tích đính kèm đã hết hạn. Hãy mở lại Báo cáo, cập nhật phân tích rồi chọn Hỏi tiếp. Cuộc trò chuyện và câu hỏi đang soạn vẫn được giữ."
+                chatState = .failed(message: guidance)
+                self.error = guidance
+            } else if AssistantHistoryExpiryPolicy.isExpired(apiError) {
                 clearExpiredConversation()
+                restoreSubmittedDraft(text, handoff: submittedHandoff)
                 self.error = "Lịch sử trợ lý đã hết hạn. Bạn có thể gửi lại câu hỏi đang soạn."
             } else if advisorSubmitRequestID != nil && AssistantAdvisorRecoveryPolicy.shouldReplay(after: apiError) {
                 advisorSubmitUncertain = true
@@ -993,11 +1087,13 @@ struct AssistantView: View {
                 self.error = "Không thể xác nhận phản hồi của máy chủ. Giữ nguyên nội dung và tải lại yêu cầu trước khi gửi lại."
             } else {
                 if advisorSubmitRequestID != nil { advisorSubmitRequestID = nil }
+                advisorSubmitUncertain = false
                 chatState = .failed(message: apiError.userMessage)
                 self.error = apiError.userMessage
             }
         }
         catch {
+            guard sendsAttachments || pendingMessageBinding.wrappedValue?.input.clientRequestID == clientRequestID else { return }
             if advisorSubmitRequestID != nil {
                 advisorSubmitUncertain = true
                 chatState = .uncertain(requestID: clientRequestID)
@@ -1186,14 +1282,25 @@ enum AssistantCardType {
         }
     }
 
-    /// Match the web card renderer's intentionally bounded visible prefixes.
-    /// This does not change source totals or the backend response.
+    /// Budget filtering belongs to the server. Preserve every relevant budget
+    /// it returns; historical web prefix limits must not narrow that scope.
     static func visibleItems(_ items: [JSONValue], for type: String) -> [JSONValue] {
         switch normalized(type) {
         case "transaction_list": return Array(items.prefix(5))
-        case "wallet_balances", "goal_progress", "budget_status", "jar_progress": return Array(items.prefix(8))
+        case "budget_status": return items
+        case "wallet_balances", "goal_progress", "jar_progress": return Array(items.prefix(8))
         default: return items
         }
+    }
+
+    static func remainingBudgetCount(_ view: [String: JSONValue], displayedCount: Int) -> Int {
+        func count(_ value: JSONValue?) -> Int? {
+            guard case .number(let number) = value, let exact = Int(exactly: number), exact >= 0 else { return nil }
+            return exact
+        }
+        if let remaining = count(view["remaining_count"]) { return remaining }
+        if let total = count(view["total_count"]) { return max(0, total - displayedCount) }
+        return 0
     }
 
     static func transactionDetailSummary(_ view: [String: JSONValue]) -> String {
@@ -1477,6 +1584,13 @@ struct AssistantStructuredCard: View {
                 }
             }
             if AssistantCardType.normalized(type) == "budget_status" {
+                let remaining = AssistantCardType.remainingBudgetCount(view, displayedCount: values.count)
+                if remaining > 0 {
+                    MPText("Còn \(remaining) ngân sách phù hợp chưa hiển thị. Hãy hỏi theo tên ngân sách hoặc kỳ cụ thể để thu hẹp kết quả.", style: .secondary)
+                } else if case .bool(true) = view["truncated"] {
+                    MPText("Còn ngân sách phù hợp chưa hiển thị. Hãy hỏi theo tên ngân sách hoặc kỳ cụ thể.", style: .secondary)
+                }
+                if values.isEmpty { MPText("Không có ngân sách phù hợp với phạm vi đã hỏi.", style: .secondary) }
                 MPText("Tổng: \(money(view["spent"])) / \(money(view["limit_amount"]))", style: .secondary)
             } else {
                 MPText("Kỳ \(string(view["month"]) ?? "đang chọn")", style: .secondary)

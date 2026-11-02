@@ -6,21 +6,24 @@ struct MonthlyReportsView: View {
     let masked: Bool
     let ownerID: String?
     let showsBack: Bool
-    let onChatHandoff: (String) -> Void
+    @Environment(\.reportAssistantHandoff) private var onReportHandoff
+    @State private var insiderRequest = UUID()
     @StateObject private var model = MonthlyReportsViewModel()
     @State private var month = MPFormat.currentMonth
     @State private var walletSelection = "__all__"
     @State private var selectedPoint: ReportPoint?
     @State private var drilldown: ReportTransactionScope?
+    @State private var evidenceError: String?
     @State private var accountTimezone = TimeZone.current.identifier
 
     init(api: FinanceAPI, onBack: @escaping () -> Void, masked: Bool, ownerID: String?, showsBack: Bool = true, onChatHandoff: @escaping (String) -> Void = { _ in }) {
         self.api = api; self.onBack = onBack; self.masked = masked; self.ownerID = ownerID
-        self.showsBack = showsBack; self.onChatHandoff = onChatHandoff
+        self.showsBack = showsBack
+        // The shell environment carries structured report handoffs for every entry route.
     }
 
     private var walletID: String? { walletSelection == "__all__" ? nil : walletSelection }
-    private var scopeKey: String { month + ":" + (walletID ?? "all") }
+    private var scopeKey: String { (ownerID ?? "") + ":" + month + ":" + (walletID ?? "all") }
 
     var body: some View {
         Group {
@@ -40,14 +43,15 @@ struct MonthlyReportsView: View {
                             MPWalletScopeSelector(wallets: model.wallets, selectionID: $walletSelection)
                         }
 
-                        if let report = model.report {
+                        if let evidenceError { MPStatusMessage(text: evidenceError, tone: .info) }
+                        if let report = model.report, report.month == month, report.walletID == walletID {
                             if model.usedFallback {
                                 MPStatusMessage(text: "Đang hiển thị bản tổng hợp tương thích; biểu đồ chi tiết cần máy chủ mới.", tone: .info)
                             }
                             summary(report)
                             sectionTitle("Xu hướng", detail: comparisonCaption(report))
                             MPSurfaceCard(style: .grouped) {
-                                MPCumulativeReportChart(current: report.daily, previous: report.previousDaily, masked: masked) { selectedPoint = $0 }
+                                MPCumulativeReportChart(current: report.daily, previous: report.comparison?.comparable == true ? report.previousDaily : [], masked: masked) { selectedPoint = $0 }
                             }
                             if let selectedPoint {
                                 MPStatusMessage(text: masked ? AssistantPrivacyPolicy.maskedText : "\(selectedPoint.label) · Chi \(MPFormat.money(selectedPoint.expense ?? selectedPoint.value))", tone: .info)
@@ -56,14 +60,14 @@ struct MonthlyReportsView: View {
                             sectionTitle("Chi vào đâu?", detail: "Tỷ trọng trên tổng chi của kỳ đang xem")
                             MPSurfaceCard(style: .grouped) {
                                 MPReportCategoryDistribution(categories: report.categories, masked: masked) { category in
-                                    openTarget(snapshotID: report.snapshotID, targetID: category.targetID, legacyCategoryID: category.categoryID, title: category.name)
+                                    openTarget(snapshotID: report.snapshotID, targetID: category.targetID, title: category.name)
                                 }
                             }
 
                             sectionTitle("Điều gì thay đổi?", detail: comparisonCaption(report))
                             MPSurfaceCard(style: .grouped) {
-                                MPReportContributorChart(contributors: report.contributors, masked: masked) { item in
-                                    openTarget(snapshotID: report.snapshotID, targetID: item.targetID, legacyCategoryID: item.categoryID, title: item.name)
+                                MPReportContributorChart(contributors: report.comparison?.comparable == true ? report.contributors : [], masked: masked) { item in
+                                    openTarget(snapshotID: report.snapshotID, targetID: item.targetID, title: item.name)
                                 }
                             }
 
@@ -73,15 +77,22 @@ struct MonthlyReportsView: View {
                                     VStack(spacing: 0) {
                                         ForEach(Array(report.insights.prefix(3)).indices, id: \.self) { index in
                                             let insight = report.insights[index]
-                                            MPReportInsightCard(insight: insight, masked: masked) {
-                                                openTarget(snapshotID: report.snapshotID, targetID: insight.drilldown?.targetID, legacyCategoryID: insight.drilldown?.categoryIDs.first, title: insight.title ?? "Chi tiết")
-                                            }
+                                            MPReportInsightCard(insight: insight, masked: masked, compact: true, onOpen: {
+                                                openTarget(snapshotID: report.snapshotID, targetID: insight.drilldown?.targetID, title: evidenceTitle(insight))
+                                            }, onAsk: {
+                                                Task { await askInsider(insight, report: report) }
+                                            })
                                             if index < min(3, report.insights.count) - 1 { MPInsetDivider() }
                                         }
                                     }
                                 }
                             }
-                            ReportAnalysisView(api: api, report: report, ownerID: ownerID, masked: masked, onChatHandoff: onChatHandoff)
+                            ReportAnalysisView(api: api, report: report, ownerID: ownerID, masked: masked,
+                                walletLabel: walletLabel,
+                                onOpenEvidence: { savedSnapshotID, insight in
+                                    openTarget(snapshotID: savedSnapshotID, targetID: insight.drilldown?.targetID, title: evidenceTitle(insight))
+                                })
+                                .id(scopeKey)
                         } else if model.isLoading {
                             MPLoadingView(label: "Đang tải báo cáo…")
                         } else if let error = model.error {
@@ -94,8 +105,13 @@ struct MonthlyReportsView: View {
                 }
                 .background(MPColor.canvas.ignoresSafeArea())
                 .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
-                .task { await model.loadWallets(api: api, ownerID: ownerID); await load() }
-                .task(id: scopeKey) { await load() }
+                .task(id: ownerID) { await model.loadWallets(api: api, ownerID: ownerID) }
+                .task(id: scopeKey) {
+                    insiderRequest = UUID()
+                    selectedPoint = nil; evidenceError = nil; drilldown = nil
+                    await load()
+                }
+                .onDisappear { insiderRequest = UUID() }
             }
         }
     }
@@ -126,7 +142,7 @@ struct MonthlyReportsView: View {
     }
 
     private func comparisonCaption(_ report: MonthlyReportModel) -> String {
-        guard let comparison = report.comparison, comparison.commonDays > 0 else { return "Chưa đủ ngày hoàn tất để so sánh" }
+        guard let comparison = report.comparison, comparison.comparable, comparison.commonDays > 0 else { return "Chưa đủ dữ liệu tương ứng để so sánh" }
         return "So với cùng \(comparison.commonDays) ngày của kỳ trước"
     }
 
@@ -135,11 +151,46 @@ struct MonthlyReportsView: View {
         return parts.count == 2 ? "Tháng \(parts[1])/\(parts[0])" : value
     }
 
-    private func openTarget(snapshotID: String?, targetID: String?, legacyCategoryID: String?, title: String) {
+    private var walletLabel: String {
+        walletID == nil ? "Tất cả ví" : (model.wallets.first { $0.id == walletID }?.name ?? "Ví đã chọn")
+    }
+
+    private func askInsider(_ insight: ReportInsightModel, report: MonthlyReportModel) async {
+        let token = UUID()
+        insiderRequest = token
+        guard let snapshotID = report.snapshotID, let onReportHandoff else {
+            evidenceError = "Hãy tải lại báo cáo và mở phân tích sâu để hỏi tiếp theo số liệu đã lưu."
+            return
+        }
+        do {
+            // Read only. Insider must never silently generate an analysis or
+            // invent a saved finding identity for the Assistant endpoint.
+            let latest = try await api.latestReportAnalysis(snapshotID: snapshotID)
+            guard insiderRequest == token, !Task.isCancelled else { return }
+            guard latest.freshness == "current", let analysis = latest.completed,
+                  let savedFinding = analysis.observations.first(where: { $0.id == insight.id }),
+                  let handoff = ReportAssistantHandoff.make(analysis: analysis, finding: savedFinding, month: report.month, walletLabel: walletLabel) else {
+                evidenceError = "Điểm này chưa có trong bản phân tích hiện hành đã lưu. Hãy mở hoặc cập nhật Phân tích sâu bên dưới để chọn điểm cần hỏi tiếp."
+                return
+            }
+            onReportHandoff(handoff)
+        } catch {
+            guard insiderRequest == token, !Task.isCancelled else { return }
+            evidenceError = "Chưa tải được ngữ cảnh đã lưu. Hãy thử lại khi có kết nối hoặc mở Phân tích sâu."
+        }
+    }
+
+    private func evidenceTitle(_ insight: ReportInsightModel) -> String {
+        let title = masked ? "Giao dịch liên quan" : (insight.title ?? "Giao dịch liên quan")
+        guard let period = insight.periodLabel, !period.isEmpty else { return title }
+        return title + " · " + period
+    }
+
+    private func openTarget(snapshotID: String?, targetID: String?, title: String) {
         if let snapshotID, let targetID, !snapshotID.isEmpty, !targetID.isEmpty {
             drilldown = .monthlyTarget(snapshotID: snapshotID, targetID: targetID, title: title)
         } else {
-            drilldown = .monthly(month: month, walletID: walletID, categoryID: legacyCategoryID, title: title)
+            evidenceError = "Bản báo cáo này chưa có phạm vi giao dịch được lưu. Hãy tải lại báo cáo và cập nhật phân tích trước khi xem bằng chứng."
         }
     }
 

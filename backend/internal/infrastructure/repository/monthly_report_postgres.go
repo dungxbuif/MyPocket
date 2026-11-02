@@ -68,11 +68,29 @@ func (r *MonthlyReportPostgresRepository) ReadMonthlyTransactionsByDrilldown(ctx
 	if err != nil {
 		return entity.SavingsTransactionPage{}, err
 	}
+	from, end, walletID := queryScope.Current.From, queryScope.Current.EndExclusive, queryScope.Scope.WalletID
+	// Targets come from an owned immutable snapshot. Their range may be a
+	// matched-day comparison or a budget period crossing the month boundary.
+	if !drilldown.From.IsZero() || !drilldown.EndExclusive.IsZero() {
+		if drilldown.From.IsZero() || !drilldown.EndExclusive.After(drilldown.From) || drilldown.EndExclusive.After(now) {
+			return entity.SavingsTransactionPage{}, entity.ErrMonthlyReportScopeInvalid
+		}
+		from, end = drilldown.From, drilldown.EndExclusive
+	}
+	if drilldown.WalletID != "" {
+		if walletID != "" && walletID != drilldown.WalletID {
+			return entity.SavingsTransactionPage{}, entity.ErrMonthlyReportScopeInvalid
+		}
+		walletID = drilldown.WalletID
+	}
 	query := r.db.WithContext(ctx).Model(&entity.Transaction{}).
-		Where("owner_id = ? AND occurred_at >= ? AND occurred_at < ?", ownerID, queryScope.Current.From, queryScope.Current.EndExclusive)
+		Where("owner_id = ? AND occurred_at >= ? AND occurred_at < ?", ownerID, from, end)
 	query = applyCanonicalReportEligibility(query, "transactions")
-	if queryScope.Scope.WalletID != "" {
-		query = query.Where("wallet_id = ?", queryScope.Scope.WalletID)
+	if strings.HasPrefix(drilldown.TargetID, "budget:") {
+		query = query.Where("credit_payment_id IS NULL")
+	}
+	if walletID != "" {
+		query = query.Where("wallet_id = ?", walletID)
 	}
 	switch drilldown.CategoryBucket {
 	case "":
@@ -380,6 +398,11 @@ func (r *MonthlyReportPostgresRepository) seriesForRange(ctx context.Context, tx
 			return nil, err
 		}
 		points = append(points, entity.ReportSeriesPoint{Label: label, From: bucketStart.UTC(), EndExclusive: bucketEnd.UTC(), Income: income, Expense: expense, Net: net, TransactionCount: count})
+		// A current-month range can end partway through a day. Converting that
+		// clipped end to a day index would revisit the same final weekly bucket.
+		if !bucketEnd.Before(reportRange.EndExclusive) {
+			break
+		}
 		if scope.Scope.Granularity == "day" {
 			index++
 		} else {
@@ -545,12 +568,15 @@ func (r *MonthlyReportPostgresRepository) categoriesAndContributors(ctx context.
 		if err != nil {
 			return nil, nil, err
 		}
-		bucket, targetID := "root", "category:"+item.id
+		bucket, targetID := "root", "comparison:category:"+item.id
 		rootIDs := []string{item.id}
 		if item.id == "" {
-			bucket, targetID, rootIDs = "uncategorized", "category:uncategorized", nil
+			bucket, targetID, rootIDs = "uncategorized", "comparison:category:uncategorized", nil
 		}
-		contributors = append(contributors, entity.ReportContributor{CategoryID: categoryPointer(item.id), Name: item.name, CurrentAmount: item.current, PreviousAmount: item.previous, Delta: delta, CurrentCount: item.currentCount, PreviousCount: item.previousCount, ChangeBPS: change, FactRef: "category:" + item.id, TargetID: targetID, Drilldown: drilldownFor(targetID, bucket, rootIDs)})
+		drilldown := drilldownFor(targetID, bucket, rootIDs)
+		drilldown.From = scope.Comparison.From
+		drilldown.EndExclusive = scope.Comparison.EndExclusive
+		contributors = append(contributors, entity.ReportContributor{CategoryID: categoryPointer(item.id), Name: item.name, CurrentAmount: item.current, PreviousAmount: item.previous, Delta: delta, CurrentCount: item.currentCount, PreviousCount: item.previousCount, ChangeBPS: change, FactRef: "category:" + item.id, TargetID: targetID, Drilldown: drilldown})
 	}
 	sort.SliceStable(contributors, func(i, j int) bool {
 		left, right := absReport(contributors[i].Delta), absReport(contributors[j].Delta)
@@ -585,44 +611,83 @@ func (r *MonthlyReportPostgresRepository) categoryAggregates(ctx context.Context
 }
 
 func (r *MonthlyReportPostgresRepository) budgetPreviews(ctx context.Context, tx *gorm.DB, ownerID string, scope reportQueryScope, income int64) ([]entity.ReportBudgetPreview, error) {
+	// Keep the owned history until after calculation: prior periods determine
+	// carryover even when they do not overlap the displayed month.
 	var budgets []entity.Budget
-	monthDate := time.Date(scope.Month.Year(), scope.Month.Month(), 1, 0, 0, 0, 0, time.UTC)
-	if err := tx.WithContext(ctx).Where("owner_id = ? AND start_date <= ? AND end_date >= ?", ownerID, monthDate, monthDate).Order("id ASC").Limit(20).Find(&budgets).Error; err != nil {
+	if err := tx.WithContext(ctx).Where("owner_id = ?", ownerID).Order("start_date ASC, id ASC").Find(&budgets).Error; err != nil {
 		return nil, err
 	}
-	result := make([]entity.ReportBudgetPreview, 0, len(budgets))
-	for _, budget := range budgets {
+	var transactions []entity.Transaction
+	query := tx.WithContext(ctx).Where("owner_id = ? AND occurred_at < ? AND type = ?", ownerID, scope.Current.EndExclusive, entity.TransactionTypeExpense)
+	query = applyCanonicalReportEligibility(query, "transactions")
+	if err := query.Find(&transactions).Error; err != nil {
+		return nil, err
+	}
+	var categories []entity.Category
+	if err := tx.WithContext(ctx).Where("owner_id = ? OR owner_id IS NULL", ownerID).Find(&categories).Error; err != nil {
+		return nil, err
+	}
+	summary, err := entity.CalculateBudgetsChecked(budgets, transactions, categories, scope.Current.EndExclusive.Add(-time.Nanosecond), scope.Location)
+	if err != nil {
+		return nil, err
+	}
+	children := map[string][]string{}
+	for _, category := range categories {
+		if category.ParentID != nil {
+			children[*category.ParentID] = append(children[*category.ParentID], category.ID)
+		}
+	}
+	result := make([]entity.ReportBudgetPreview, 0)
+	for _, budget := range summary.Items {
+		start := time.Date(budget.StartDate.Year(), budget.StartDate.Month(), budget.StartDate.Day(), 0, 0, 0, 0, scope.Location).UTC()
+		end := time.Date(budget.EndDate.Year(), budget.EndDate.Month(), budget.EndDate.Day(), 0, 0, 0, 0, scope.Location).AddDate(0, 0, 1).UTC()
+		if !start.Before(scope.Current.EndExclusive) || !end.After(scope.Current.From) {
+			continue
+		}
 		if budget.WalletID != nil && scope.Scope.WalletID != "" && *budget.WalletID != scope.Scope.WalletID {
 			continue
 		}
-		query := tx.WithContext(ctx).Table("transactions AS t").Where("t.owner_id = ? AND t.occurred_at >= ? AND t.occurred_at < ? AND t.type = ?", ownerID, scope.Current.From, scope.Current.EndExclusive, entity.TransactionTypeExpense)
-		query = applyCanonicalReportEligibility(query, "t")
-		if scope.Scope.WalletID != "" {
-			query = query.Where("t.wallet_id = ?", scope.Scope.WalletID)
+		if end.After(scope.Current.EndExclusive) {
+			end = scope.Current.EndExclusive
 		}
+		// A crossing period keeps its canonical start; month-only spending would
+		// understate its consumption. Carryover above always uses the full scope.
+		walletID := scope.Scope.WalletID
 		if budget.WalletID != nil {
-			query = query.Where("t.wallet_id = ?", *budget.WalletID)
+			walletID = *budget.WalletID
 		}
+		drilldown := entity.ReportDrilldown{TargetID: "budget:" + budget.ID, From: start, EndExclusive: end, WalletID: walletID, Type: entity.TransactionTypeExpense}
 		if budget.CategoryID != nil {
-			ids := categoryDescendants(ctx, tx, ownerID, *budget.CategoryID)
-			if len(ids) == 0 {
-				ids = []string{*budget.CategoryID}
+			drilldown.CategoryBucket = "root"
+			drilldown.CategoryIDs = []string{*budget.CategoryID}
+			seen := map[string]bool{*budget.CategoryID: true}
+			for i := 0; i < len(drilldown.CategoryIDs); i++ {
+				for _, id := range children[drilldown.CategoryIDs[i]] {
+					if !seen[id] {
+						seen[id] = true
+						drilldown.CategoryIDs = append(drilldown.CategoryIDs, id)
+					}
+				}
 			}
-			query = query.Where("t.category_id IN ?", ids)
+			sort.Strings(drilldown.CategoryIDs)
 		}
-		var row struct{ Amount sql.NullString }
-		if err := query.Select("COALESCE(SUM(t.amount)::text, '0') AS amount").Scan(&row).Error; err != nil {
-			return nil, err
+		spent := budget.Spent
+		if budget.WalletID == nil && walletID != "" {
+			spent = 0
+			scopedBudget := budget
+			scopedBudget.WalletID = &walletID
+			for _, row := range entity.MatchBudgetTransactions(scopedBudget, transactions, categories, end.Add(-time.Nanosecond), scope.Location) {
+				spent, err = entity.CheckedMoneyAdd(spent, row.Amount)
+				if err != nil {
+					return nil, err
+				}
+			}
 		}
-		spent, err := parseReportMoney(row.Amount.String)
+		remaining, err := entity.CheckedMoneyDifference(budget.EffectiveLimitAmount, spent)
 		if err != nil {
 			return nil, err
 		}
-		remaining, err := entity.CheckedMoneyDifference(budget.LimitAmount, spent)
-		if err != nil {
-			return nil, err
-		}
-		result = append(result, entity.ReportBudgetPreview{ID: budget.ID, Name: budget.Name, LimitAmount: budget.LimitAmount, Spent: spent, Remaining: remaining, OverLimit: spent > budget.LimitAmount, WalletID: budget.WalletID, CategoryID: budget.CategoryID, FactRef: "budget:" + budget.ID})
+		result = append(result, entity.ReportBudgetPreview{ID: budget.ID, Name: budget.Name, LimitAmount: budget.EffectiveLimitAmount, Spent: spent, Remaining: remaining, OverLimit: spent > budget.EffectiveLimitAmount, WalletID: budget.WalletID, CategoryID: budget.CategoryID, FactRef: "budget:" + budget.ID, From: start, EndExclusive: end, Drilldown: drilldown})
 	}
 	return result, nil
 }

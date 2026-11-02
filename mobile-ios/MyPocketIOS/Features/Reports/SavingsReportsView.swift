@@ -286,6 +286,15 @@ struct ReportTransactionsView: View {
             page = result
             if categories.isEmpty { categories = (try? await api.categories(ownerID: ownerID)) ?? [] }
         } catch is CancellationError { }
-        catch { self.error = (error as? APIError)?.userMessage ?? "Không thể tải giao dịch. Thử lại." }
+        catch {
+            if case .monthlyTarget = scope {
+                // Never present a previous page as successful evidence after a
+                // revision/retention rejection, nor substitute the live month.
+                page = nil
+                self.error = "Chưa thể mở giao dịch đúng phạm vi của bản đã lưu. Bản dữ liệu có thể đã cũ hoặc hết hạn. Hãy quay lại tải báo cáo và cập nhật phân tích; nếu mất kết nối, bạn có thể thử lại."
+            } else {
+                self.error = (error as? APIError)?.userMessage ?? "Không thể tải giao dịch. Thử lại."
+            }
+        }
     }
 }

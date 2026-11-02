@@ -33,11 +33,13 @@ type AdvisorHandler struct {
 	Budgets      repository.BudgetRepository
 	Categories   repository.CategoryRepository
 	Transactions repository.TransactionRepository
+	Reports      *usecase.ReportAnalysisService
 }
 
 type advisorMessageInput struct {
-	ClientRequestID string `json:"client_request_id"`
-	Text            string `json:"text"`
+	ClientRequestID string                         `json:"client_request_id"`
+	Text            string                         `json:"text"`
+	ReportContext   *usecase.ReportFollowUpRequest `json:"report_context,omitempty"`
 }
 
 type advisorSubmitResponse struct {
@@ -791,6 +793,11 @@ func (h *AdvisorHandler) Messages(c *gin.Context) {
 		}
 		meta = historyMeta
 	}
+	// Empty or expired history is a successful empty collection, not JSON null.
+	// Native clients decode the documented array contract before reading meta.
+	if rows == nil {
+		rows = []entity.AdvisorMessage{}
+	}
 	OKWithMeta(c, rows, meta)
 }
 
@@ -831,10 +838,14 @@ func (h *AdvisorHandler) MessagesPost(c *gin.Context) {
 		advisorFailure(c, err)
 		return
 	}
-	hash := sha256.Sum256([]byte(input.Text))
 	principal := advisorPrincipal(c, owner)
 	principal.Timezone = user.Timezone
-	answer, err := h.Service.Submit(c.Request.Context(), principal, repository.AdvisorRunInput{OwnerID: owner, CredentialKind: principal.CredentialKind, CredentialID: principal.CredentialID, ExpiresAt: timePtr(principal.ExpiresAt), RequestID: input.ClientRequestID, PayloadHash: hex.EncodeToString(hash[:]), Parts: []entity.AdvisorPart{{Type: "text", Text: input.Text}}})
+	parts, hash, err := h.messageParts(c.Request.Context(), principal, input)
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
+	answer, err := h.Service.Submit(c.Request.Context(), principal, repository.AdvisorRunInput{OwnerID: owner, CredentialKind: principal.CredentialKind, CredentialID: principal.CredentialID, ExpiresAt: timePtr(principal.ExpiresAt), RequestID: input.ClientRequestID, PayloadHash: hash, Parts: parts})
 	if err != nil {
 		advisorFailure(c, err)
 		return
@@ -885,13 +896,17 @@ func (h *AdvisorHandler) MessagesPostAsync(c *gin.Context) {
 		advisorFailure(c, err)
 		return
 	}
-	hash := sha256.Sum256([]byte(input.Text))
 	principal := advisorPrincipal(c, owner)
 	principal.Timezone = user.Timezone
+	parts, hash, err := h.messageParts(c.Request.Context(), principal, input)
+	if err != nil {
+		advisorFailure(c, err)
+		return
+	}
 	run, replay, err := h.Service.Begin(c.Request.Context(), principal, repository.AdvisorRunInput{
 		OwnerID: owner, CredentialKind: principal.CredentialKind, CredentialID: principal.CredentialID,
 		ExpiresAt: timePtr(principal.ExpiresAt), RequestID: input.ClientRequestID,
-		PayloadHash: hex.EncodeToString(hash[:]), Parts: []entity.AdvisorPart{{Type: "text", Text: input.Text}},
+		PayloadHash: hash, Parts: parts,
 	})
 	if err != nil {
 		advisorFailure(c, err)
@@ -1084,6 +1099,8 @@ func advisorFailure(c *gin.Context, err error) {
 		status, code = http.StatusConflict, "advisor_request_conflict"
 	} else if errors.Is(err, repository.ErrAdvisorPurged) {
 		status, code = http.StatusGone, "advisor_history_expired"
+	} else if errors.Is(err, repository.ErrSnapshotExpired) {
+		status, code = http.StatusGone, "advisor_report_expired"
 	} else if errors.Is(err, repository.ErrNotFound) {
 		status, code = http.StatusNotFound, "advisor_not_found"
 	} else if errors.Is(err, repository.ErrAdvisorEntryInvalid) {

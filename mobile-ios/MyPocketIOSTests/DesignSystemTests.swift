@@ -762,8 +762,11 @@ final class DesignSystemTests: XCTestCase {
 
         XCTAssertEqual(AssistantCardType.visibleItems(items, for: "transaction_list").count, 5)
         XCTAssertEqual(AssistantCardType.visibleItems(items, for: "transaction_search").count, 5)
-        for type in ["wallet_balances", "goal_progress", "budget_status", "budget_progress", "jar_progress"] {
+        for type in ["wallet_balances", "goal_progress", "jar_progress"] {
             XCTAssertEqual(AssistantCardType.visibleItems(items, for: type).count, 8, type)
+        }
+        for type in ["budget_status", "budget_progress"] {
+            XCTAssertEqual(AssistantCardType.visibleItems(items, for: type).count, 10, "Server-filtered relevant budgets must not be hidden")
         }
         XCTAssertEqual(
             AssistantCardType.visibleItems(items, for: "transaction_search").map(\.prettyDescription),

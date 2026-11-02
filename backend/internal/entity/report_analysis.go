@@ -3,7 +3,6 @@ package entity
 import (
 	"encoding/json"
 	"errors"
-	"strings"
 	"time"
 )
 
@@ -13,8 +12,8 @@ const (
 	ReportAnalysisStatusCompleted = "completed"
 	ReportAnalysisStatusFailed    = "failed"
 	ReportAnalysisStatusCancelled = "cancelled"
-	ReportAnalysisRuleVersion     = "report-analysis-v2"
-	ReportAnalysisPromptVersion   = "report-analysis-prompt-v2"
+	ReportAnalysisRuleVersion     = "report-analysis-v3"
+	ReportAnalysisPromptVersion   = "report-analysis-prompt-v3"
 	ReportAnalysisLease           = 2 * time.Minute
 	ReportAnalysisDeadline        = 5 * time.Minute
 )
@@ -33,14 +32,22 @@ type ReportFact struct {
 }
 
 type ReportFactBundle struct {
-	SnapshotID string             `json:"snapshot_id"`
-	Revision   int64              `json:"revision"`
-	Scope      MonthlyReportScope `json:"scope"`
-	AsOf       time.Time          `json:"as_of"`
-	Facts      []ReportFact       `json:"facts"`
+	SnapshotID      string             `json:"snapshot_id"`
+	Revision        int64              `json:"revision"`
+	Scope           MonthlyReportScope `json:"scope"`
+	AsOf            time.Time          `json:"as_of"`
+	Facts           []ReportFact       `json:"facts"`
+	Candidates      []ReportInsight    `json:"candidates"`
+	Comparable      bool               `json:"comparable"`
+	CommonDays      int                `json:"common_days"`
+	CurrentRange    ReportRange        `json:"current_range"`
+	ComparisonRange ReportRange        `json:"comparison_range"`
+	QualityFlags    []string           `json:"quality_flags"`
 }
 
 type ReportProviderObservation struct {
+	FindingID string `json:"finding_id"`
+	Intent    string `json:"intent"`
 	FactRef   string `json:"fact_ref"`
 	Direction string `json:"direction"`
 	Text      string `json:"text"`
@@ -109,66 +116,33 @@ func BuildReportFactBundle(snapshot ReportSnapshot) (ReportFactBundle, error) {
 	}{
 		{"totals.income", report.Totals.Income}, {"totals.expense", report.Totals.Expense},
 		{"totals.net", report.Totals.Net}, {"totals.transaction_count", report.Totals.TransactionCount},
-		{"comparison.income_delta", report.Comparison.IncomeDelta}, {"comparison.expense_delta", report.Comparison.ExpenseDelta},
-		{"comparison.net_delta", report.Comparison.NetDelta},
 	} {
 		appendFact(ReportFact{ID: item.id, Kind: "money_or_count", Value: item.value, SourceRef: item.id})
 	}
-	for _, contributor := range report.Contributors {
-		if len(facts)+2 > 30 {
-			break
-		}
-		appendFact(ReportFact{ID: contributor.FactRef + ".current", Kind: "money", Value: contributor.CurrentAmount, SourceRef: contributor.FactRef})
-		appendFact(ReportFact{ID: contributor.FactRef + ".delta", Kind: "money", Value: contributor.Delta, SourceRef: contributor.FactRef})
-	}
-	for _, budget := range report.Budgets {
-		if len(facts)+2 > 30 {
-			break
-		}
-		appendFact(ReportFact{ID: budget.FactRef + ".spent", Kind: "money", Value: budget.Spent, SourceRef: budget.FactRef})
-		appendFact(ReportFact{ID: budget.FactRef + ".remaining", Kind: "money", Value: budget.Remaining, SourceRef: budget.FactRef})
-	}
-	for _, jar := range report.Jars {
-		if !appendFact(ReportFact{ID: jar.FactRef + ".spent", Kind: "money", Value: jar.Spent, SourceRef: jar.FactRef}) {
-			break
-		}
-	}
-	return ReportFactBundle{SnapshotID: snapshot.ID, Revision: snapshot.DataRevision, Scope: report.Scope, AsOf: report.AsOf, Facts: facts}, nil
+	return ReportFactBundle{SnapshotID: snapshot.ID, Revision: snapshot.DataRevision, Scope: report.Scope, AsOf: report.AsOf, Facts: facts, Candidates: BuildReportAnalysisCandidates(report), Comparable: report.Comparison.Comparable, CommonDays: report.Comparison.CommonDays, CurrentRange: report.CurrentRange, ComparisonRange: report.ComparisonRange, QualityFlags: report.QualityFlags}, nil
 }
 
 func ValidateReportProviderResult(result ReportProviderResult, facts ReportFactBundle) error {
-	known := make(map[string]struct{}, len(facts.Facts))
-	for _, fact := range facts.Facts {
-		known[fact.ID] = struct{}{}
-		known[fact.SourceRef] = struct{}{}
+	known := make(map[string]struct{}, len(facts.Candidates))
+	for _, candidate := range facts.Candidates {
+		known[candidate.ID] = struct{}{}
 	}
-	if len(result.Observations) > 3 || len(result.Suggestions) > 3 {
+	if len(result.Observations) > 3 || len(result.Suggestions) != 0 {
 		return ErrReportAnalysisOutputInvalid
 	}
-	for _, item := range append(append([]ReportProviderObservation(nil), result.Observations...), convertSuggestions(result.Suggestions)...) {
-		if _, ok := known[item.FactRef]; !ok {
+	seen := map[string]bool{}
+	for _, item := range result.Observations {
+		if _, ok := known[item.FindingID]; !ok || seen[item.FindingID] {
 			return ErrReportAnalysisOutputInvalid
 		}
-		if len([]rune(strings.TrimSpace(item.Text))) > 500 || containsDigit(item.Text) {
+		seen[item.FindingID] = true
+		if item.Intent != "inspect_evidence" && item.Intent != "review_plan" {
+			return ErrReportAnalysisOutputInvalid
+		}
+		// Free-form claims are not part of the selection contract.
+		if item.Text != "" || item.Direction != "" || item.FactRef != "" {
 			return ErrReportAnalysisOutputInvalid
 		}
 	}
 	return nil
-}
-
-func convertSuggestions(items []ReportProviderSuggestion) []ReportProviderObservation {
-	result := make([]ReportProviderObservation, 0, len(items))
-	for _, item := range items {
-		result = append(result, ReportProviderObservation{FactRef: item.FactRef, Text: item.Text})
-	}
-	return result
-}
-
-func containsDigit(value string) bool {
-	for _, r := range value {
-		if r >= '0' && r <= '9' {
-			return true
-		}
-	}
-	return false
 }

@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -14,6 +15,24 @@ import (
 )
 
 type pagedAdvisorActionStore struct{ advisorActionStore }
+
+func TestAdvisorEmptyHistoryReturnsArray(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	engine := gin.New()
+	engine.Use(func(c *gin.Context) { c.Set(contextUserIDKey, "owner-1"); c.Next() })
+	engine.GET("/messages", (&AdvisorHandler{Service: &usecase.AdvisorService{Store: &pagedAdvisorActionStore{}}}).Messages)
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/messages?conversation_id=conversation-1", nil))
+	var body struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if recorder.Code != http.StatusOK || string(body.Data) != "[]" {
+		t.Fatalf("empty history must be a decodable array: status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
 
 func (s *pagedAdvisorActionStore) ListMessages(_ context.Context, ownerID, conversationID string, beforeSeq int64, limit int) ([]entity.AdvisorMessage, error) {
 	var page []entity.AdvisorMessage

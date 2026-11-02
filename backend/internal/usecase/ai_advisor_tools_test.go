@@ -36,7 +36,7 @@ func TestAdvisorToolDefinitionsExposeModelParameters(t *testing.T) {
 		"search_transactions":              {"range", "wallet_ids", "category_ids", "include_children", "type", "report_scope", "note_contains", "min_amount", "max_amount", "limit", "cursor"},
 		"compare_spending_periods":         {"current", "previous", "wallet_ids", "category_ids", "include_children"},
 		"get_wallet_balances":              {"wallet_ids"},
-		"get_budget_progress":              {"budget_ids", "active_on"},
+		"get_budget_progress":              {"budget_ids", "budget_id", "query", "active_on", "month"},
 		"get_goal_progress":                {"wallet_ids"},
 		"get_jar_progress":                 {"month", "jar_ids"},
 		"get_transaction":                  {"transaction_id"},

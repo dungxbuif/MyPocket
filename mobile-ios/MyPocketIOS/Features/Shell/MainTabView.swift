@@ -20,6 +20,8 @@ struct MainTabView: View {
     @State private var feedbackScreenshot: Data?
     @State private var keyboardVisible = false
     @State private var assistantDraft = ""
+    @State private var assistantReportHandoff: ReportAssistantHandoff?
+    @State private var assistantPendingMessage: AdvisorPendingMessageModel?
     @State private var assistantPresented = false
     @State private var footerClearance: CGFloat = 0
     @State private var requestedWalletID: String?
@@ -231,14 +233,20 @@ struct MainTabView: View {
         .environment(\.mpFinancialValuesMasked, masked)
         .onPreferenceChange(MPFloatingActionClearanceKey.self) { footerClearance = $0 }
         .mpObserveKeyboardVisibility($keyboardVisible)
-        .onChange(of: authenticatedUserID) { _, _ in assistantDraft = "" }
-        .fullScreenCover(isPresented: $assistantPresented) {
+        .environment(\.reportAssistantHandoff, presentReportAssistant)
+        .onChange(of: authenticatedUserID) { _, _ in
+            assistantDraft = ""; assistantReportHandoff = nil; assistantPendingMessage = nil
+            assistantPresented = false
+        }
+        .mpFullScreenCover(isPresented: $assistantPresented) {
             AssistantView(
                 api: auth.financeAPI,
                 onBack: { assistantPresented = false },
                 ownerID: assistantOwnerID,
                 masked: masked,
-                draft: $assistantDraft
+                draft: $assistantDraft,
+                reportHandoff: $assistantReportHandoff,
+                pendingMessage: $assistantPendingMessage
             )
         }
         .onAppear { apply(externalRoute) }
@@ -257,7 +265,20 @@ struct MainTabView: View {
     }
 
     private func presentAssistant(_ draft: String) {
-        if !draft.isEmpty { assistantDraft = draft }
+        if !draft.isEmpty {
+            if assistantDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty { assistantDraft = draft }
+            else if assistantDraft != draft { assistantDraft += "\n\n" + draft }
+        }
+        assistantPresented = true
+    }
+
+    private func presentReportAssistant(_ handoff: ReportAssistantHandoff) {
+        assistantReportHandoff = handoff
+        // Context is visible beside the composer; an existing user draft is
+        // preserved verbatim, including while an older request awaits retry.
+        if assistantDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            assistantDraft = handoff.prompt
+        }
         assistantPresented = true
     }
 
