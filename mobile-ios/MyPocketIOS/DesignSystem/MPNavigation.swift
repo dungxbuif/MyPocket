@@ -136,6 +136,7 @@ struct MPEditorScaffold<Header: View, Fields: View, Footer: View>: View {
             }
             .onPreferenceChange(MPFeedbackFieldsViewportKey.self) { fieldsViewport = $0 }
             VStack(spacing: 8, content: footer)
+                .disabled(isBusy)
                 .padding(.horizontal, MPMetrics.pagePadding)
                 .padding(.vertical, 8)
                 .background(MPColor.canvas)
@@ -998,11 +999,12 @@ struct MPConfirmDialog: ViewModifier {
     let title: String
     let message: String
     let confirmTitle: String
+    var cancelTitle: String = "Hủy"
     let confirm: () -> Void
 
     func body(content: Content) -> some View {
         content.alert(title, isPresented: $isPresented) {
-            Button("Hủy", role: .cancel) {}
+            Button(cancelTitle, role: .cancel) {}
             Button(confirmTitle, role: .destructive, action: confirm)
         } message: {
             Text(message)
@@ -1016,8 +1018,9 @@ extension View {
         title: String,
         message: String,
         confirmTitle: String = "Xác nhận",
+        cancelTitle: String = "Hủy",
         confirm: @escaping () -> Void
     ) -> some View {
-        modifier(MPConfirmDialog(isPresented: isPresented, title: title, message: message, confirmTitle: confirmTitle, confirm: confirm))
+        modifier(MPConfirmDialog(isPresented: isPresented, title: title, message: message, confirmTitle: confirmTitle, cancelTitle: cancelTitle, confirm: confirm))
     }
 }

@@ -1058,6 +1058,43 @@ struct TransactionEditorView: View {
     @State private var showDetails = false
     @State private var noteEditorPresented = false
     @State private var noteDraft = ""
+    @State private var initialDraft: DraftSnapshot?
+    @State private var discardPresented = false
+    @State private var exitToAI = false
+
+    private struct DraftSnapshot: Equatable {
+        let type: String
+        let amount: String
+        let note: String
+        let walletID: String
+        let categoryID: String
+        let jarID: String
+        let includedInReports: Bool
+        let date: Date
+    }
+
+    private var draftSnapshot: DraftSnapshot {
+        DraftSnapshot(type: type, amount: amount, note: note, walletID: walletID,
+                      categoryID: categoryID, jarID: jarID,
+                      includedInReports: includedInReports, date: date)
+    }
+
+    private var hasUnsavedChanges: Bool {
+        initialDraft.map { $0 != draftSnapshot } ?? false
+    }
+
+    private func requestExit(toAI: Bool = false) {
+        guard !isSaving else { return }
+        exitToAI = toAI
+        if hasUnsavedChanges { discardPresented = true }
+        else { finishExit() }
+    }
+
+    private func finishExit() {
+        guard !isSaving else { return }
+        if exitToAI { onAIEntry?() }
+        else { onCancel() }
+    }
 
     init(api: FinanceAPI, wallets: [WalletModel], categories: [CategoryModel], timezone: String = TimeZone.current.identifier, transaction: TransactionModel? = nil, queuedMutation: OutboxMutation? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void, onAIEntry: (() -> Void)? = nil) {
         self.api = api
@@ -1088,7 +1125,7 @@ struct TransactionEditorView: View {
         MPEditorScaffold(
             title: queuedMutation != nil ? "Sửa bản nháp" : transaction == nil ? "Thêm giao dịch" : "Sửa giao dịch",
             isBusy: isSaving,
-            onCancel: onCancel
+            onCancel: { requestExit() }
         ) {
             if queuedMutation != nil {
                 MPStatusMessage(text: "Hãy thay đổi thông tin rồi xác nhận. Bản cũ sẽ ngừng gửi; bản sửa dùng key mới và không sửa giao dịch đã có trên máy chủ.")
@@ -1189,23 +1226,36 @@ struct TransactionEditorView: View {
                     }
                 }
             }
-            if let errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
         } footer: {
+            if let errorMessage {
+                MPStatusMessage(text: errorMessage, tone: .danger)
+                    .accessibilityIdentifier("transaction-save-error")
+            }
             HStack(spacing: MPMetrics.sectionSpacing) {
-                MPButton(queuedMutation != nil ? "Xác nhận bản sửa" : transaction == nil ? "Lưu giao dịch" : "Lưu thay đổi", isLoading: isSaving) {
+                MPButton(isSaving ? "Đang lưu…" : queuedMutation != nil ? "Xác nhận bản sửa" : transaction == nil ? "Lưu giao dịch" : "Lưu thay đổi", isLoading: isSaving) {
                     Task { await save() }
                 }
                 .accessibilityIdentifier("transaction-save-footer")
-                if transaction == nil, let onAIEntry {
-                    MPActionIconButton(systemName: "photo.on.rectangle.angled", label: "Nhập bằng AI từ ảnh hoặc nội dung", action: onAIEntry)
+                if transaction == nil, onAIEntry != nil {
+                    MPActionIconButton(systemName: "photo.on.rectangle.angled", label: "Nhập bằng AI từ ảnh hoặc nội dung", action: { requestExit(toAI: true) })
                         .accessibilityIdentifier("transaction-ai-entry-button")
                 }
             }
         }
         .environment(\.timeZone, TimeZone(identifier: timezone) ?? .current)
+        .interactiveDismissDisabled(isSaving || hasUnsavedChanges)
+        .mpConfirmDialog(
+            isPresented: $discardPresented,
+            title: "Bỏ thay đổi chưa lưu?",
+            message: "Thông tin bạn vừa nhập sẽ không được lưu.",
+            confirmTitle: "Bỏ thay đổi",
+            cancelTitle: "Tiếp tục nhập",
+            confirm: { finishExit() }
+        )
         .task {
             if walletID.isEmpty { walletID = TransactionsViewModel.ordinaryTransactionWallets(wallets).first?.id ?? "" }
             clearInvalidCategory()
+            if initialDraft == nil { initialDraft = draftSnapshot }
             await loadJarSummary()
         }
         .onChange(of: type) { _, _ in
@@ -1288,6 +1338,7 @@ struct TransactionEditorView: View {
             }
         }
         isSaving = true
+        errorMessage = nil
         defer { isSaving = false }
         do {
             let occurredAt = queuedTransactionInput.flatMap { MPFormat.parseInstant($0.occurredAt) == date ? $0.occurredAt : nil } ?? Self.timestamp(from: date, timezone: timezone)

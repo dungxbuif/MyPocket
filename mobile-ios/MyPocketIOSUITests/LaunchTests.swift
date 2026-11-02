@@ -1862,6 +1862,68 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(app.textFields["Ghi chú"].exists, "Report details must not contain a duplicate note editor.")
     }
 
+    func testTransactionExitKeepsDraftUntilDiscardConfirmed() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        let add = app.buttons["add-transaction-button"]
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+        let close = app.buttons["screen-close"].firstMatch
+        XCTAssertTrue(close.waitForExistence(timeout: 5))
+        close.tap()
+        XCTAssertFalse(app.alerts["Bỏ thay đổi chưa lưu?"].exists)
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        add.tap()
+
+        let noteRow = app.buttons["transaction-note-row"]
+        XCTAssertTrue(noteRow.waitForExistence(timeout: 5))
+        noteRow.tap()
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        editor.typeText("Giu ban nhap")
+        app.buttons["transaction-note-save"].tap()
+        close.tap()
+        let alert = app.alerts["Bỏ thay đổi chưa lưu?"]
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["Tiếp tục nhập"].tap()
+        XCTAssertTrue(noteRow.label.contains("Giu ban nhap"))
+
+        app.buttons["transaction-ai-entry-button"].tap()
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["Tiếp tục nhập"].tap()
+        XCTAssertTrue(noteRow.label.contains("Giu ban nhap"))
+        close.tap()
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        alert.buttons["Bỏ thay đổi"].tap()
+        XCTAssertTrue(add.waitForExistence(timeout: 5))
+        XCTAssertFalse(noteRow.exists)
+    }
+
+    func testTransactionInvalidSaveShowsFooterErrorAndPreservesDraft() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticated"]
+        app.launch()
+        app.buttons["add-transaction-button"].tap()
+        let noteRow = app.buttons["transaction-note-row"]
+        XCTAssertTrue(noteRow.waitForExistence(timeout: 5))
+        noteRow.tap()
+        let editor = app.textViews.firstMatch
+        XCTAssertTrue(editor.waitForExistence(timeout: 5))
+        editor.tap()
+        editor.typeText("Chua nhap so tien")
+        app.buttons["transaction-note-save"].tap()
+        let save = app.buttons["transaction-save-footer"]
+        save.tap()
+        let error = app.staticTexts["Chọn ví và nhập số tiền hợp lệ."]
+        XCTAssertTrue(error.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.frame.contains(error.frame))
+        XCTAssertLessThanOrEqual(error.frame.maxY, save.frame.minY)
+        XCTAssertTrue(noteRow.label.contains("Chua nhap so tien"))
+        XCTAssertTrue(save.isEnabled)
+    }
+
     func testAddTransactionUsesStitchFormBaseControls() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticated"]

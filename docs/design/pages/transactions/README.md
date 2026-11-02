@@ -1,5 +1,29 @@
 # Transactions — list and basic income/expense editor
 
+## Ordinary native draft safety — in review, 2026-11-02
+
+`TransactionEditorView` snapshots type, amount text, note, wallet, category, jar,
+report inclusion and date after initial wallet/category normalization and before
+asynchronous jar loading. Cancel and the available AI-entry action close directly
+when unchanged; a changed draft opens shared `mpConfirmDialog` with
+“Bỏ thay đổi chưa lưu?”, “Bỏ thay đổi” and “Tiếp tục nhập”. Staying preserves the
+fields; confirming invokes the selected Cancel or AI destination. Swipe dismissal
+is disabled while dirty or saving; exit handlers also refuse exits during saving.
+
+The shared `MPEditorScaffold` disables header, fields and footer actions while
+busy. Validation/save errors use `MPStatusMessage` above the pinned Save action
+(`transaction-save-error`); entered data stays intact. Save shows “Đang lưu…”
+while pending, clears the previous error when a valid submission starts and keeps
+the existing success callback. No autosave or durable draft storage is added.
+Transfer, credit and other specialized editors are outside this dirty-draft slice.
+
+[Design](../../../work/tickets/TRANSACTION-DRAFT-SAFETY-20261102-DETAIL_DESIGN.md)
+and [validation](../../../work/VALIDATION_MATRIX.md#ordinary-transaction-draft-safety--2026-11-02):
+build-for-testing passes, two focused UI scenarios are compiled but NOT EXECUTED
+by owner preference, and runtime/device UAT is OPEN. The MainTabView base-guard
+failure recorded at that checkpoint was subsequently resolved by the report
+integration's shared fullscreen wrapper. Broader transaction acceptance remains open.
+
 ## Native daily-money loop integration — 2026-10-26
 
 Task 3 composes the completed ordinary-ledger search and all high-frequency
@@ -255,7 +279,7 @@ the transaction's persisted report-inclusion value.
 | Activate a transaction | Open the editor populated from that API row. |
 | Open the group selector | Search the category tree, choose an applicable root/child group, or clear the selection; the picker composes the same `BaseCategoryTree` selection mode used by group management. Non-applicable parents may remain visible only as hierarchy context. Native iOS uses the `MPCategoryPicker` sheet and retains the same required-category and wallet/type eligibility rules. |
 | Delete in edit mode | Show destructive confirmation, delete through API, close, then refresh transactions and wallets. |
-| Cancel/Escape/backdrop | Close without persistence. No autosave. |
+| Cancel/Escape/backdrop | No autosave. Ordinary native Cancel confirms discarding a changed draft; unchanged drafts close directly. Native swipe dismissal is blocked while dirty or saving. Other surfaces retain their existing dismissal behavior. |
 | API failure | Keep current data, show retryable error, and leave the editor open when a save/delete failed. |
 
 ## States
