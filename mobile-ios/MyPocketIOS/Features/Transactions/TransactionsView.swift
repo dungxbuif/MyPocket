@@ -238,6 +238,8 @@ final class TransactionsViewModel: ObservableObject {
         didSet { MPWalletScopePreference.store(walletSelection, ownerID: ownerID, defaults: preferences) }
     }
     @Published var periodSelection = "week"
+    @Published var jarSelection = JarLedgerFilter.all
+    @Published private(set) var jarSummary: JarMonthSummaryModel?
     @Published var weekOffset = 0
     @Published var groupByCategory = false
     @Published var customStart = Calendar.current.date(byAdding: .day, value: -30, to: Date()) ?? Date()
@@ -281,8 +283,27 @@ final class TransactionsViewModel: ObservableObject {
             customStart: customStart,
             customEnd: customEnd,
             accountTimezone: accountTimezone,
-            weekOffset: weekOffset
+            weekOffset: weekOffset,
+            jarSelection: jarSelection
         )
+    }
+
+    var jarOptions: [MPSelectionOption] { JarLedgerFilter.options(summary: jarSummary, transactions: transactions) }
+
+    /// Month of the viewed range (week start, or custom start) in the account timezone.
+    var viewedMonth: String {
+        let timeZone = TimeZone(identifier: accountTimezone) ?? .current
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        let anchor = periodSelection == "week" ? MPFormat.weekRange(offset: weekOffset, timeZone: timeZone).start : customStart
+        let parts = calendar.dateComponents([.year, .month], from: anchor)
+        return String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+    }
+
+    /// Background, non-blocking: jars of the viewed month feed the filter; failures leave the transaction-derived options.
+    func loadJars() async {
+        let month = viewedMonth
+        if let summary = try? await api.jarMonth(month: month), month == viewedMonth { jarSummary = summary }
     }
 
     static func applyFilters(
@@ -293,9 +314,11 @@ final class TransactionsViewModel: ObservableObject {
         customEnd: Date,
         accountTimezone: String,
         weekOffset: Int = 0,
+        jarSelection: String = JarLedgerFilter.all,
         now: Date = Date()
     ) -> [TransactionModel] {
-        let walletFiltered = walletSelection == "__all__" ? transactions : transactions.filter { $0.walletID == walletSelection }
+        let walletOnly = walletSelection == "__all__" ? transactions : transactions.filter { $0.walletID == walletSelection }
+        let walletFiltered = jarSelection == JarLedgerFilter.all ? walletOnly : walletOnly.filter { JarLedgerFilter.matches($0, selection: jarSelection) }
         if periodSelection == "all" { return walletFiltered.sorted { $0.occurredAt > $1.occurredAt } }
         let timeZone = TimeZone(identifier: accountTimezone) ?? .current
         var calendar = Calendar(identifier: .gregorian)
@@ -722,6 +745,20 @@ struct TransactionsView: View {
                         .accessibilityElement(children: .combine)
                         .accessibilityIdentifier("transactions-scope-balance")
                     }
+                    if model.jarOptions.count > 2 || model.jarSelection != JarLedgerFilter.all {
+                        MPSurfaceCard(style: .grouped) {
+                            MPGroupedRow {
+                                MPOptionSelector(
+                                    title: "Hũ",
+                                    options: model.jarOptions,
+                                    selectionID: $model.jarSelection,
+                                    emptyLabel: "Tất cả",
+                                    iconName: "shippingbox.fill",
+                                    accessibilityIdentifier: "transactions-jar-filter"
+                                )
+                            }
+                        }
+                    }
                     MPSegmentedControl(options: [("week", "Theo tuần"), ("custom", "Tùy chọn")], selection: $model.periodSelection)
                     if model.periodSelection == "week" {
                         MPWeekNavigator(
@@ -837,7 +874,9 @@ struct TransactionsView: View {
                 addRequested = false
             }
             await model.load()
+            await model.loadJars()
         }
+        .onChange(of: model.viewedMonth) { _, _ in Task { await model.loadJars() } }
         .mpRefreshOnTabActivation(tabIsActive) { await model.load() }
         .onChange(of: model.walletSelection) { _, newValue in
             let selectedType = model.wallets.first(where: { $0.id == newValue })?.type
@@ -937,6 +976,7 @@ struct TransactionsView: View {
                     deleteTarget = selectedTransaction
                     self.selectedTransaction = nil
                 }, onClose: { self.selectedTransaction = nil })
+                .mpHidesShellAdd()
                 .background(MPColor.canvas.ignoresSafeArea())
             }
         }
@@ -1065,7 +1105,7 @@ struct TransactionsView: View {
             subtitle: presentedRow.subtitle, amount: presentedRow.amount,
             iconName: presentedRow.iconName, iconTone: presentedRow.iconTone,
             amountTone: presentedRow.amountTone
-        ) : presentedRow
+        ) : presentedRow.badge(JarLedgerFilter.chip(transaction))
         if selectionMode {
             MPButton(style: .plain, isDisabled: !selectable) {
                 if selectable {
@@ -1283,6 +1323,12 @@ struct TransactionEditorView: View {
                         if let jarLoadError {
                             MPGroupedRow { MPStatusMessage(text: jarLoadError, tone: .danger) }
                         }
+                        if let hint = jarHint {
+                            MPGroupedRow {
+                                MPText(hint.text, style: hint.exceeds ? .danger : .secondary)
+                                    .accessibilityIdentifier("transaction-jar-hint")
+                            }
+                        }
                     }
                 }
             }
@@ -1446,6 +1492,15 @@ struct TransactionEditorView: View {
         return input
     }
     private var selectedWallet: WalletModel? { wallets.first(where: { $0.id == walletID }) }
+    private var jarHint: JarPlanPresentation.EditorHint? {
+        guard canUseJar, !jarID.isEmpty else { return nil }
+        let same = transaction.flatMap { $0.jarID == jarID && String($0.occurredAt.prefix(7)) == jarSummary?.month ? $0.amount : nil } ?? 0
+        return JarPlanPresentation.editorHint(
+            summary: jarSummary, jarID: jarID,
+            amount: MPFormat.parsePositiveInteger(amount) ?? 0, existingAmount: same
+        )
+    }
+
     private var canUseJar: Bool {
         TransactionEditorPolicy.canUseJar(type: type, category: selectedCategory, walletType: selectedWallet?.type ?? "")
     }
@@ -1607,7 +1662,7 @@ struct TransactionDetailView: View {
                         MPInsetDivider()
                         MPGroupedRow {
                         MPOptionSelector(
-                            title: "Travel Mode",
+                            title: "Chế độ du lịch",
                             options: [MPSelectionOption(id: "", label: "Không gắn chuyến")] + travelEvents.map { MPSelectionOption(id: $0.id, label: $0.name) },
                             selectionID: $travelEventID,
                             emptyLabel: "Không gắn chuyến"
@@ -1657,7 +1712,7 @@ struct TransactionDetailView: View {
             do {
                 travelEvents = try await api.travelEvents()
                 travelEventID = transaction.travelEventID ?? ""
-            } catch { travelError = "Không thể tải Travel Mode." }
+            } catch { travelError = "Không thể tải chế độ du lịch." }
         }
     }
 }

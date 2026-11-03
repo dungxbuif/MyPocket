@@ -63,4 +63,83 @@ final class JarPlanPresentationTests: XCTestCase {
         XCTAssertNil(decoded.items.first?.remainingPlan)
         XCTAssertNil(decoded.remainingPlanTotal)
     }
+
+    // MARK: Ledger filter, row chip, editor hint, overview rows
+
+    private func tx(type: String = "expense", jarID: String? = nil, jarName: String? = nil, transferID: String? = nil, amount: Int64 = 1_000) -> TransactionModel {
+        TransactionModel(id: UUID().uuidString, ownerID: "o", walletID: "w", categoryID: nil, jarID: jarID, jarName: jarName, type: type,
+                         amount: amount, adjustmentDirection: nil, creditKind: nil, creditPaymentID: nil, travelEventID: nil,
+                         occurredAt: "2026-11-02T03:00:00Z", note: nil, includedInReports: true, transferID: transferID,
+                         createdAt: "", updatedAt: "")
+    }
+
+    private func summary(_ items: [JarItemModel], unassigned: Int64 = 0) -> JarMonthSummaryModel {
+        JarMonthSummaryModel(month: "2026-11", timezone: "Asia/Ho_Chi_Minh", actualIncome: 0, totalSpent: 0, unassignedSpent: unassigned,
+                             totalAllocated: 0, totalAllocationPercent: 0, overIncome: false, overOneHundredPercent: false,
+                             jars: items.map { JarIdentityModel(jarID: $0.jarID, name: $0.name) }, items: items,
+                             remainingPlanTotal: items.compactMap(\.remainingPlan).reduce(0, +), unassignedCumulative: nil,
+                             walletsInTotalBalance: nil, planExceedsWalletsBy: nil)
+    }
+
+    func testLedgerFilterMatchesJarAndUnassignedOrdinaryExpensesOnly() {
+        let withJar = tx(jarID: "j1", jarName: "Ăn uống")
+        let noJar = tx()
+        let income = tx(type: "income")
+        let transfer = tx(transferID: "t1")
+        XCTAssertTrue(JarLedgerFilter.matches(withJar, selection: "j1"))
+        XCTAssertFalse(JarLedgerFilter.matches(noJar, selection: "j1"))
+        XCTAssertTrue(JarLedgerFilter.matches(noJar, selection: JarLedgerFilter.unassigned))
+        XCTAssertFalse(JarLedgerFilter.matches(withJar, selection: JarLedgerFilter.unassigned))
+        XCTAssertFalse(JarLedgerFilter.matches(income, selection: JarLedgerFilter.unassigned))
+        XCTAssertFalse(JarLedgerFilter.matches(transfer, selection: JarLedgerFilter.unassigned))
+        XCTAssertTrue(JarLedgerFilter.matches(income, selection: JarLedgerFilter.all))
+    }
+
+    func testLedgerOptionsListMonthJarsThenUsedJarsAndUnassigned() {
+        let options = JarLedgerFilter.options(summary: summary([item(remaining: 1, allocation: 1, spent: 0)]),
+                                              transactions: [tx(jarID: "old", jarName: "Cũ"), tx(jarID: "j", jarName: "Du lịch")])
+        XCTAssertEqual(options.map(\.label), ["Tất cả", "Du lịch", "Cũ", "Chưa gắn hũ"])
+    }
+
+    func testJarChipOnlyOnOrdinaryExpenses() {
+        XCTAssertEqual(JarLedgerFilter.chip(tx(jarID: "j", jarName: "Ăn uống")), "Ăn uống")
+        XCTAssertNil(JarLedgerFilter.chip(tx(type: "income", jarID: "j", jarName: "Ăn uống")))
+        XCTAssertNil(JarLedgerFilter.chip(tx()))
+    }
+
+    @MainActor func testApplyFiltersCombinesWalletPeriodAndJar() {
+        let rows = [tx(jarID: "j1", jarName: "A"), tx(), tx(jarID: "j2", jarName: "B")]
+        let result = TransactionsViewModel.applyFilters(rows, walletSelection: "__all__", periodSelection: "all", customStart: Date(),
+                                                        customEnd: Date(), accountTimezone: "Asia/Ho_Chi_Minh", jarSelection: "j2")
+        XCTAssertEqual(result.count, 1)
+        XCTAssertEqual(result.first?.jarID, "j2")
+    }
+
+    func testEditorHintShowsRemainingPlanThenOverrunWithoutBlocking() {
+        let jar = item(remaining: 20_000_000, allocation: 15_000_000, spent: 0)
+        let s = summary([jar])
+        XCTAssertEqual(JarPlanPresentation.editorHint(summary: s, jarID: "j", amount: 0)?.exceeds, false)
+        let fine = JarPlanPresentation.editorHint(summary: s, jarID: "j", amount: 5_000_000)
+        XCTAssertTrue(fine?.text.hasPrefix("Hũ Du lịch còn có thể chi 15.000.000") == true, fine?.text ?? "")
+        let over = JarPlanPresentation.editorHint(summary: s, jarID: "j", amount: 17_000_000)
+        XCTAssertEqual(over?.exceeds, true)
+        XCTAssertTrue(over?.text.contains("sẽ vượt mức tháng 2.000.000") == true, over?.text ?? "")
+        XCTAssertNil(JarPlanPresentation.editorHint(summary: s, jarID: "missing", amount: 1))
+    }
+
+    func testEditorHintDoesNotDoubleCountTheEditedTransaction() {
+        let jar = item(remaining: 5_000_000, allocation: 15_000_000, spent: 10_000_000)
+        let hint = JarPlanPresentation.editorHint(summary: summary([jar]), jarID: "j", amount: 10_000_000, existingAmount: 10_000_000)
+        XCTAssertEqual(hint?.exceeds, false)
+        XCTAssertTrue(hint?.text.contains("5.000.000") == true, hint?.text ?? "")
+    }
+
+    @MainActor func testOverviewJarRowsShowPlanTotalAndUnassigned() {
+        let s = summary([item(remaining: 20_000_000, allocation: 15_000_000, spent: 0)], unassigned: 3_000_000)
+        let rows = OverviewViewModel.jarRows(s, masked: false)
+        XCTAssertEqual(rows.map(\.title), ["Hũ: còn có thể chi tổng", "Chưa phân bổ tháng này"])
+        XCTAssertTrue(rows[0].value.contains("20.000.000"))
+        XCTAssertTrue(rows[1].value.contains("3.000.000"))
+        XCTAssertTrue(OverviewViewModel.jarRows(nil, masked: false).isEmpty)
+    }
 }

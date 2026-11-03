@@ -2070,7 +2070,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertFalse(app.staticTexts["Phản hồi"].firstMatch.waitForExistence(timeout: 5), "Overlay should close after text-only fallback succeeds.")
 
         openMore(app)
-        let feedbackRoute = app.buttons["Phản hồi & changelog"].firstMatch
+        let feedbackRoute = app.buttons["Phản hồi & nhật ký thay đổi"].firstMatch
         XCTAssertTrue(feedbackRoute.waitForExistence(timeout: 10))
         reveal(feedbackRoute, in: app)
         feedbackRoute.tap()
@@ -2099,7 +2099,7 @@ final class LaunchTests: XCTestCase {
             ("Tháng", "months"),
             ("Danh mục", "categories"),
             ("Giao dịch định kỳ", "recurring"),
-            ("Travel Mode", "travel"),
+            ("Chế độ du lịch", "travel"),
             ("Báo cáo", "reports"),
             ("Nhập giao dịch bằng AI", "aiEntry")
         ]
@@ -3686,7 +3686,7 @@ final class LaunchTests: XCTestCase {
         let cases = [("Ngân sách", "budget-add", "Tạo ngân sách"),
                      ("Hũ chi tiêu", "jar-add-month", "Tạo hũ"),
                      ("Giao dịch định kỳ", "recurring-add", "Tạo lịch"),
-                     ("Travel Mode", "travel-add", "Chuyến đi mới")]
+                     ("Chế độ du lịch", "travel-add", "Chuyến đi mới")]
         for (title, addID, editorTitle) in cases {
             let app = XCUIApplication()
             app.launchArguments = ["-UITestAuthenticatedAPI"]
@@ -4662,7 +4662,7 @@ final class LaunchTests: XCTestCase {
         app.launchArguments = ["-UITestAuthenticatedAPI"]
         app.launch()
         openMore(app)
-        let entry = app.buttons["Travel Mode"]
+        let entry = app.buttons["Chế độ du lịch"]
         reveal(entry, in: app); entry.tap()
         app.buttons["travel-add"].tap()
         let start = app.buttons["optional-date-toggle-travel-start"]
@@ -4743,11 +4743,11 @@ final class LaunchTests: XCTestCase {
         app.launchArguments = ["-UITestAuthenticatedAPI"]
         app.launch()
         openMore(app)
-        let travelEntry = app.buttons["Travel Mode"]
+        let travelEntry = app.buttons["Chế độ du lịch"]
         XCTAssertTrue(travelEntry.waitForExistence(timeout: 10))
         reveal(travelEntry, in: app)
         travelEntry.tap()
-        XCTAssertTrue(app.staticTexts["Travel Mode"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Chế độ du lịch"].firstMatch.waitForExistence(timeout: 10))
 
         app.buttons["travel-add"].tap()
         XCTAssertTrue(app.staticTexts["Chuyến đi mới"].waitForExistence(timeout: 10))
@@ -4826,11 +4826,11 @@ final class LaunchTests: XCTestCase {
         app.launchArguments = ["-UITestAuthenticatedAPI"]
         app.launch()
         openMore(app)
-        let travelEntry = app.buttons["Travel Mode"]
+        let travelEntry = app.buttons["Chế độ du lịch"]
         XCTAssertTrue(travelEntry.waitForExistence(timeout: 10))
         reveal(travelEntry, in: app)
         travelEntry.tap()
-        XCTAssertTrue(app.staticTexts["screen-title-Travel Mode"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["screen-title-Chế độ du lịch"].waitForExistence(timeout: 10))
         let addTravel = app.buttons["travel-add"]
         XCTAssertTrue(addTravel.waitForExistence(timeout: 10))
         addTravel.tap()
@@ -4858,7 +4858,7 @@ final class LaunchTests: XCTestCase {
         transactionRow.tap()
 
         let travelSelector = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Travel Mode: ")
+            NSPredicate(format: "label BEGINSWITH %@", "Chế độ du lịch: ")
         ).firstMatch
         XCTAssertTrue(travelSelector.waitForExistence(timeout: 10), app.debugDescription)
         reveal(travelSelector, in: app)
@@ -4880,7 +4880,7 @@ final class LaunchTests: XCTestCase {
         XCTAssertEqual(linked?.travelEventID, createdTravelEvent.id)
 
         let selectorAfterLink = app.buttons.matching(
-            NSPredicate(format: "label BEGINSWITH %@", "Travel Mode: ")
+            NSPredicate(format: "label BEGINSWITH %@", "Chế độ du lịch: ")
         ).firstMatch
         XCTAssertTrue(selectorAfterLink.waitForExistence(timeout: 5))
         selectorAfterLink.tap()
@@ -6033,6 +6033,49 @@ final class LaunchTests: XCTestCase {
 }
 
 #if LOCAL_API_UI
+private extension LocalAPIFixture {
+    /// Creates a fixed-allocation jar for `previousMonth`, extends it to `currentMonth`, and adds one expense in `previousMonth`.
+    static func jarPlanFixture(name: String, previousMonth: String, currentMonth: String, allocation: Int64, spent: Int64, walletID: String) async throws -> String {
+        let token = try await loginToken()
+        func json(_ object: [String: Any]) throws -> Data { try JSONSerialization.data(withJSONObject: object) }
+        func post(_ path: String, _ object: [String: Any]) async throws -> [String: Any] {
+            var request = URLRequest(url: baseURL.appendingPathComponent(String(path.dropFirst())))
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue(UUID().uuidString, forHTTPHeaderField: "Idempotency-Key")
+            request.httpBody = try json(object)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(code) else { throw LocalFixtureError.http(code, String(data: data, encoding: .utf8) ?? "") }
+            return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        }
+        func get(_ path: String) async throws -> Data {
+            var request = URLRequest(url: URL(string: baseURL.absoluteString + path)!)
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(code) else { throw LocalFixtureError.http(code, String(data: data, encoding: .utf8) ?? "") }
+            return data
+        }
+        let created = try await post("/jars", ["month": previousMonth, "name": name, "allocation_mode": "fixed", "allocation_amount": allocation])
+        let jar = (created["data"] as? [String: Any]) ?? created
+        guard let jarID = (jar["jar_id"] as? String) ?? (jar["id"] as? String) else {
+            throw LocalFixtureError.http(0, "No jar id in \(created)")
+        }
+        // A month created for the first time copies the latest earlier month's jars with the same identity.
+        _ = try await get("/jars?month=\(currentMonth)")
+        let category = try await category(kind: "expense", walletID: walletID)
+        _ = try await post("/transactions", [
+            "wallet_id": walletID, "category_id": category.id, "jar_id": jarID, "type": "expense", "amount": spent,
+            "occurred_at": "\(previousMonth)-15T05:00:00Z", "note": "Jar plan fixture", "included_in_reports": true
+        ])
+        return jarID
+    }
+}
+#endif
+
+#if LOCAL_API_UI
 /// Runtime proof for the local-first contract against the local fixture API (`-UITestAuthenticatedAPI`):
 /// revisiting tabs must not show a blocking loader, and saving a transaction must close the editor
 /// without waiting for the network round trip. Timings are attached to the result bundle.
@@ -6141,6 +6184,65 @@ final class LocalFirstRuntimeTests: XCTestCase {
         }
         app.buttons["bottom-tab-reports"].tap()
         XCTAssertTrue(reportOnly.waitForExistence(timeout: 5), "Reports control is exposed when its own tab is active")
+    }
+    /// Visual acceptance for the wallet-style jar list: October 15M plan with 10M spent, November 15M plan
+    /// -> "Còn có thể chi 20.000.000", the Chưa phân bổ row, the reconciliation line, and the jar detail.
+    func testJarsScreenShowsCumulativePlanLikeWalletCards() async throws {
+        continueAfterFailure = true
+        let wallet = try await LocalAPIFixture.wallet(name: "Jar Cash \(UUID().uuidString.prefix(4))", type: "basic")
+        let timezone = TimeZone(identifier: try await LocalAPIFixture.ownerTimezone()) ?? .current
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
+        // The fixture account copies jars forward only when a month is first created, so each run uses a random
+        // untouched pair of months in the past (the Hũ month selector reaches back 24 months).
+        let offset = Int.random(in: 3...21)
+        let now = calendar.date(byAdding: .month, value: -offset, to: Date()) ?? Date()
+        let previous = calendar.date(byAdding: .month, value: -1, to: now) ?? now
+        func key(_ date: Date) -> String {
+            let parts = calendar.dateComponents([.year, .month], from: date)
+            return String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        }
+        let jarName = "Ăn uống \(UUID().uuidString.prefix(4))"
+        let jarID = try await LocalAPIFixture.jarPlanFixture(name: jarName, previousMonth: key(previous), currentMonth: key(now),
+                                                            allocation: 15_000_000, spent: 10_000_000, walletID: wallet.wallet.id)
+        func shot(_ app: XCUIApplication, _ name: String) {
+            let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        app.buttons["bottom-tab-account"].tap()
+        let entry = app.buttons["more-destination-jars"].firstMatch
+        for _ in 0..<16 where !(entry.exists && entry.isHittable) { app.scrollViews.allElementsBoundByIndex.last?.swipeUp() }
+        XCTAssertTrue(entry.waitForExistence(timeout: 5), "Hũ chi tiêu entry")
+        entry.tap()
+        XCTAssertTrue(app.staticTexts["screen-title-Hũ chi tiêu"].firstMatch.waitForExistence(timeout: 10))
+        app.buttons["jars-month-selector"].firstMatch.tap()
+        let monthPart = key(now).split(separator: "-")
+        let monthButton = app.buttons["Tháng \(monthPart[1]) năm \(monthPart[0])"].firstMatch
+        XCTAssertTrue(monthButton.waitForExistence(timeout: 5), "month option")
+        monthButton.tap()
+        let row = app.buttons["jar-row-\(jarID)"].firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "jar row")
+        sleep(1)
+        shot(app, "jars-list")
+        let rowText = row.staticTexts.allElementsBoundByIndex.map(\.label).joined(separator: " | ") + " | " + row.label
+        XCTAssertTrue(rowText.contains("Còn có thể chi"), rowText)
+        XCTAssertTrue(rowText.contains("20.000.000"), rowText)
+        XCTAssertFalse(rowText.lowercased().contains("số dư hũ"))
+        XCTAssertTrue(app.buttons["jar-row-unassigned"].firstMatch.exists || { app.swipeUp(); return app.buttons["jar-row-unassigned"].firstMatch.exists }(), "Chưa phân bổ row")
+        XCTAssertTrue(app.descendants(matching: .any)["jars-reconciliation"].firstMatch.exists, "reconciliation line")
+        shot(app, "jars-list-unassigned")
+        app.swipeDown()
+        row.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["jar-detail-summary"].firstMatch.waitForExistence(timeout: 10), "jar detail")
+        sleep(2)
+        shot(app, "jar-detail")
+        let note = app.descendants(matching: .any)["jar-detail-note"].firstMatch
+        XCTAssertTrue(note.exists)
+        XCTAssertTrue(note.label.contains("Dư từ tháng trước"), note.label)
+        try await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
+        try await LocalAPIFixture.delete(wallet)
     }
 }
 #endif

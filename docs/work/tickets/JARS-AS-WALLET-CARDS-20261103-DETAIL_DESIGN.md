@@ -148,7 +148,8 @@ Tất cả owner-scoped như hiện nay. Không có migration.
 - Giai đoạn 1 — **backend xong**: `GET /jars?month=` có các trường cộng dồn và tổng đối chiếu; `GET /transactions?jar_id=<id>|unassigned`; test repository cho ví dụ 15/10/20, vượt mức, đối chiếu ví, cô lập tháng. Số liệu thật trên fixture đã đọc lại.
 - Giai đoạn 1 — **iOS đã code, chưa nghiệm thu bằng mắt**: model có trường cộng dồn (optional, payload cũ vẫn decode), base mới `MPJarPlanRow`, `JarPlanPresentation` (tiêu đề/số chính/chú thích/đối chiếu; âm hiển thị "Vượt kế hoạch"), màn Hũ dạng ví + thẻ Chưa phân bổ + dòng đối chiếu, màn chi tiết hũ. Unit test 465 qua; chưa có UI test/ảnh chụp vì tài khoản UI-test không có hũ.
 - Còn lại giai đoạn 1: UI test với hũ tạo qua API, đối chiếu ảnh chụp; thay `MPJarPlanRow` bằng biến thể của `MPWalletRow` nếu owner muốn giống hệt ví.
-- Giai đoạn 2 và 3 chưa làm.
+- Giai đoạn 3 — **backend xong (chưa nghiệm thu bằng mắt/iOS)**: công cụ `propose_assign_jar`, phần `jar_assignment_confirmation`, áp dụng từng dòng với `expected_version` qua `assign_jar`, `jar_context`, prompt/handbook, `jar_id`/`jar_name` trong `search_transactions`. Test: validation, xung đột một dòng, confirm lặp, owner scope `jar_context`, hash. Thẻ iOS và đo tỷ lệ đúng trên 20 khoản: xem VALIDATION_MATRIX.
+- Giai đoạn 2 chưa làm.
 
 ## Giai đoạn và thứ tự
 
@@ -175,3 +176,4 @@ Tất cả owner-scoped như hiện nay. Không có migration.
 ## Trace
 
 [Backlog](../BACKLOG.md) · [ADR-029](../../decisions/ADR-029-jar-cumulative-plan-presentation.md) · [Spec màn Hũ](../../design/pages/jars/README.md) · [Sổ giao dịch](../../design/pages/transactions/README.md) · [Tổng quan](../../design/pages/overview/README.md) · [Tháng](../../design/pages/month-detail/README.md) · [Báo cáo](../../design/pages/reports/README.md) · [Trợ lý](../../design/pages/finance-assistant/README.md) · [Quy tắc](../../requirements/BUSINESS_RULES.md) · [API](../../architecture/API.md) · [Validation](../VALIDATION_MATRIX.md) · [Context](../../CONTEXT.md)
+- Giai đoạn 2 — **iOS đã code và nghiệm thu bằng ảnh cho màn Hũ và chi tiết hũ**: sổ giao dịch có bộ lọc hũ (Tất cả · hũ · Chưa gắn hũ), chip tên hũ trên dòng chi, dòng gợi ý "còn có thể chi / sẽ vượt mức" dưới ô chọn hũ (chỉ thông tin); Tổng quan có hai dòng hũ (cache-first, tải nền); màn Tháng dùng từ "Còn có thể chi" và dòng "Chưa phân bổ"; Báo cáo iOS không có khối hũ nên không đổi. Dọn UX: ẩn nút "+" ở chi tiết giao dịch, Việt hoá "Chế độ du lịch"/"Nhật ký thay đổi", "Xem tất cả N ví", đổi tiêu đề nhóm "Ví của tôi" thành "Tài sản", đồng nhất ô tìm danh mục. UI test `testJarsScreenShowsCumulativePlanLikeWalletCards` qua. Chưa chụp ảnh riêng: bộ lọc hũ, gợi ý trong editor, thẻ tháng Tổng quan, màn Tháng.

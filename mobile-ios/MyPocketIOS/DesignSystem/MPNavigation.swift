@@ -14,6 +14,12 @@ struct MPInteractiveBackBlockedKey: PreferenceKey {
     static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
 }
 
+/// A full-screen detail that owns a destructive action at the bottom asks the shell to hide the global add button.
+struct MPShellAddHiddenKey: PreferenceKey {
+    static let defaultValue = false
+    static func reduce(value: inout Bool, nextValue: () -> Bool) { value = value || nextValue() }
+}
+
 struct MPInteractiveBack: UIViewControllerRepresentable {
     let isBlocked: Bool
 
@@ -83,6 +89,10 @@ private struct MPKeyboardVisibilityObserver: ViewModifier {
 extension View {
     func mpInteractiveBackBlocked(_ blocked: Bool = true) -> some View {
         preference(key: MPInteractiveBackBlockedKey.self, value: blocked)
+    }
+
+    func mpHidesShellAdd(_ hidden: Bool = true) -> some View {
+        preference(key: MPShellAddHiddenKey.self, value: hidden)
     }
 
     func mpObserveKeyboardVisibility(_ visible: Binding<Bool>) -> some View {

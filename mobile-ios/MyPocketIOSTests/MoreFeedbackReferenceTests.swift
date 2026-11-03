@@ -6,7 +6,7 @@ final class MoreFeedbackReferenceTests: XCTestCase {
     func testMoreReferenceSectionsKeepAccountGroupsAndDestinationOrder() {
         XCTAssertEqual(
             MoreReferencePresentation.sections.map(\.title),
-            ["Phản hồi", "Ví của tôi", "Kế hoạch", "Giao dịch", "Trợ lý"]
+            ["Phản hồi", "Tài sản", "Kế hoạch", "Giao dịch", "Trợ lý"]
         )
         XCTAssertEqual(MoreReferencePresentation.sections[1].items, [.wallets, .credit, .portfolio])
         XCTAssertEqual(MoreReferencePresentation.sections[2].items, [.budgets, .jars, .months])

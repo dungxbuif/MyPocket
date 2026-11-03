@@ -63,6 +63,12 @@ enum JarPlanPresentation {
     static func reconciliation(_ summary: JarMonthSummaryModel, masked: Bool) -> Reconciliation? {
         guard let plan = summary.remainingPlanTotal, let wallets = summary.walletsInTotalBalance,
               summary.items.contains(where: { $0.remainingPlan != nil }) else { return nil }
+        if let exceeds = summary.planExceedsWalletsBy, exceeds > 0, wallets < 0 {
+            return Reconciliation(
+                text: "Kế hoạch còn lại \(MPFormat.money(plan, masked: masked)) trong khi các ví tính vào tổng đang âm \(MPFormat.money(-wallets, masked: masked)). Đây là cảnh báo, không chặn giao dịch.",
+                exceeds: true
+            )
+        }
         if let exceeds = summary.planExceedsWalletsBy, exceeds > 0 {
             return Reconciliation(
                 text: "Kế hoạch còn lại \(MPFormat.money(plan, masked: masked)) vượt tiền thực có \(MPFormat.money(wallets, masked: masked)) là \(MPFormat.money(exceeds, masked: masked)). Đây là cảnh báo, không chặn giao dịch.",
@@ -80,6 +86,71 @@ enum JarPlanPresentation {
             return "Cộng dồn: \(MPFormat.money(cumulative, masked: masked))"
         }
         return "Chi thường chưa gắn hũ"
+    }
+}
+
+/// Jar filter of the transaction ledger (Tất cả · each jar · Chưa gắn hũ) and the editor's informational jar hint.
+enum JarLedgerFilter {
+    static let all = "__all__"
+    static let unassigned = "unassigned"
+
+    /// "Unassigned" is an ordinary expense without a jar (JAR-14); income, transfers, credit rows and adjustments never match it.
+    static func isOrdinaryExpense(_ transaction: TransactionModel) -> Bool {
+        transaction.type == "expense" && transaction.transferID == nil && transaction.creditKind == nil
+    }
+
+    static func matches(_ transaction: TransactionModel, selection: String) -> Bool {
+        switch selection {
+        case all: return true
+        case unassigned: return isOrdinaryExpense(transaction) && (transaction.jarID ?? "").isEmpty
+        default: return transaction.jarID == selection
+        }
+    }
+
+    /// Jars of the viewed month plus any jar still referenced by loaded rows, so a filter never hides a used jar.
+    static func options(summary: JarMonthSummaryModel?, transactions: [TransactionModel]) -> [MPSelectionOption] {
+        var seen = Set<String>()
+        var jars: [MPSelectionOption] = []
+        for jar in summary?.jars ?? [] where seen.insert(jar.jarID).inserted {
+            jars.append(MPSelectionOption(id: jar.jarID, label: jar.name))
+        }
+        for row in transactions {
+            guard let id = row.jarID, !id.isEmpty, seen.insert(id).inserted else { continue }
+            jars.append(MPSelectionOption(id: id, label: row.jarName ?? "Hũ đã gỡ"))
+        }
+        return [MPSelectionOption(id: all, label: "Tất cả")] + jars + [MPSelectionOption(id: unassigned, label: "Chưa gắn hũ")]
+    }
+
+    /// Jar name chip shown on ordinary expense rows only.
+    static func chip(_ transaction: TransactionModel) -> String? {
+        guard isOrdinaryExpense(transaction), let name = transaction.jarName, !name.isEmpty else { return nil }
+        return name
+    }
+}
+
+extension JarPlanPresentation {
+    struct EditorHint: Equatable {
+        let text: String
+        let exceeds: Bool
+    }
+
+    /// Informational line under the editor's jar selector; never blocks saving (JAR-05).
+    /// `existingAmount` is this transaction's own amount when it is already counted in the jar's spent.
+    static func editorHint(summary: JarMonthSummaryModel?, jarID: String, amount: Int64, existingAmount: Int64 = 0) -> EditorHint? {
+        guard let item = summary?.items.first(where: { $0.jarID == jarID && $0.active }) else { return nil }
+        let delta = max(amount, 0) - existingAmount
+        if let allocation = item.calculatedAllocation, allocation - item.spent - delta < 0 {
+            let over = item.spent + delta - allocation
+            return EditorHint(text: "Hũ \(item.name) sẽ vượt mức tháng \(MPFormat.money(over))", exceeds: true)
+        }
+        guard let remaining = item.remainingPlan else {
+            return EditorHint(text: "Hũ \(item.name) chưa đặt mức tháng này", exceeds: false)
+        }
+        let after = remaining - delta
+        if after < 0 {
+            return EditorHint(text: "Hũ \(item.name) sẽ vượt kế hoạch \(MPFormat.money(-after))", exceeds: true)
+        }
+        return EditorHint(text: "Hũ \(item.name) còn có thể chi \(MPFormat.money(after))", exceeds: false)
     }
 }
 

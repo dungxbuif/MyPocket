@@ -92,7 +92,7 @@ final class FeedbackViewModel: ObservableObject {
             guard snapshotRevision == mutationRevision else { return }
             items = loadedItems
             self.changelog = loadedChangelog
-        } catch { errorMessage = "Không thể tải phản hồi và changelog." }
+        } catch { errorMessage = "Không thể tải phản hồi và nhật ký thay đổi." }
     }
 
     func submit(screenshot: Data? = nil) async -> Bool {
@@ -258,10 +258,10 @@ struct FeedbackView: View {
                             }
                         }
                     }
-                MPButton(showChangelog ? "Ẩn changelog" : "Xem changelog", style: .plain) { showChangelog.toggle() }
+                MPButton(showChangelog ? "Ẩn nhật ký thay đổi" : "Xem nhật ký thay đổi", style: .plain) { showChangelog.toggle() }
                 if showChangelog {
                 MPSurfaceCard(style: .reference) {
-                    MPText("Changelog", style: .emphasis)
+                    MPText("Nhật ký thay đổi", style: .emphasis)
                     ForEach(model.changelog) { item in
                         VStack(alignment: .leading, spacing: 4) {
                             MPText("v\(item.version) — \(item.title)", style: .emphasis)

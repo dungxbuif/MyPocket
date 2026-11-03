@@ -141,7 +141,7 @@ struct MPFeedbackStatus: View {
         VStack(alignment: .trailing, spacing: 2) {
             MPText(statusLabel, style: .secondary)
             if isFixed, let changelogVersion {
-                MPText("Fixed in \(changelogVersion)", style: .secondary)
+                MPText("Đã sửa ở \(changelogVersion)", style: .secondary)
             }
         }
         .multilineTextAlignment(.trailing)
@@ -151,7 +151,7 @@ struct MPFeedbackStatus: View {
 
     private var accessibilityLabel: String {
         if isFixed, let changelogVersion {
-            return "\(statusLabel), Fixed in \(changelogVersion)"
+            return "\(statusLabel), Đã sửa ở \(changelogVersion)"
         }
         return statusLabel
     }

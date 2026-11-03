@@ -419,6 +419,7 @@ struct WalletDetailView: View {
                     },
                     onClose: { self.selectedTransaction = nil }
                 )
+                .mpHidesShellAdd()
                 .background(MPColor.canvas.ignoresSafeArea())
             } else {
                 walletContent

@@ -16,13 +16,13 @@ enum MoreDestination: String, CaseIterable, Identifiable, Hashable {
         case .jars: return "Hũ chi tiêu"
         case .months: return "Tháng"
         case .recurring: return "Giao dịch định kỳ"
-        case .travel: return "Travel Mode"
+        case .travel: return "Chế độ du lịch"
         case .portfolio: return "Tài sản tích lũy"
         case .credit: return "Sổ tín dụng"
         case .notifications: return "Thông báo"
         case .assistant: return "Trợ lý tài chính"
         case .aiEntry: return "Nhập giao dịch bằng AI"
-        case .feedback: return "Phản hồi & changelog"
+        case .feedback: return "Phản hồi & nhật ký thay đổi"
         case .account: return "Tài khoản"
         }
     }
@@ -60,7 +60,7 @@ enum MoreReferencePresentation {
 
     static let sections: [Section] = [
         Section(title: "Phản hồi", items: [.feedback]),
-        Section(title: "Ví của tôi", items: [.wallets, .credit, .portfolio]),
+        Section(title: "Tài sản", items: [.wallets, .credit, .portfolio]),
         Section(title: "Kế hoạch", items: [.budgets, .jars, .months]),
         Section(title: "Giao dịch", items: [.categories, .recurring, .travel, .reports]),
         Section(title: "Trợ lý", items: [.assistant, .aiEntry])

@@ -68,6 +68,6 @@ passed 24/24 and the normally signed `MyPocketIOSTests` target passed 422/422 on
 the iPhone 16 iOS 18.5 simulator. The Release warnings-as-errors build,
 base-component guard, and project verification also passed.
 
-## Hũ trong màn Tháng — planned 2026-11-03
+## Hũ trong màn Tháng — implemented 2026-11-03
 
 Phần bối cảnh hũ dùng cùng dòng `MPWalletRow(.jar)` như màn Hũ nhưng chỉ đọc; "Còn có thể chi" tính đến tháng đang xem; chạm dòng mở chi tiết hũ ở tháng đó. Xem [JARS-AS-WALLET-CARDS](../../../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md).

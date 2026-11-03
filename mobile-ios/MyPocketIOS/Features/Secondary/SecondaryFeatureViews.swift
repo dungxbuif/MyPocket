@@ -776,7 +776,7 @@ struct CategoriesView: View {
                         MPTextField(
                             title: "Tìm danh mục",
                             text: $searchText,
-                            placeholder: "Nhập tên nhóm",
+                            placeholder: "Nhập tên danh mục",
                             accessibilityIdentifier: CategoriesReferenceCopy.searchAccessibilityID
                         )
                         MPButton(showInactiveCategories ? "Nhóm không hoạt động đang hiển thị" : "Hiển thị nhóm không hoạt động", systemName: showInactiveCategories ? "checkmark.circle.fill" : "circle", style: .secondary) {
@@ -1359,12 +1359,21 @@ struct MonthsView: View {
                             ForEach(jarSummary.items) { item in
                                 let allocation = item.calculatedAllocation ?? (item.allocationMode == "fixed" ? item.allocationAmount : nil)
                                 VStack(alignment: .leading, spacing: MPMetrics.rowSpacing) {
-                                    HStack { MPText(item.name); Spacer(); MPText(MPFormat.money(item.spent, masked: masked), style: .secondary) }
+                                    HStack {
+                                        MPText(item.name); Spacer()
+                                        MPText("\(JarPlanPresentation.headlineTitle(item)) \(MPFormat.money(JarPlanPresentation.headlineAmount(item), masked: masked))", style: .secondary)
+                                    }
+                                    MPText(JarPlanPresentation.monthLine(item, masked: masked), style: .secondary)
                                     if let allocation {
                                         MPProgressBar(progress: Double(item.spent) / Double(max(1, allocation)), label: "Mức sử dụng hũ")
                                     }
                                 }
                             }
+                            HStack {
+                                MPText("Chưa phân bổ"); Spacer()
+                                MPText(MPFormat.money(jarSummary.unassignedSpent, masked: masked), style: .secondary)
+                            }
+                            .accessibilityIdentifier("month-jar-unassigned")
                         } else {
                             MPEmptyView(title: "Chưa có hũ", detail: "Quản lý hũ cho tháng này nếu cần.")
                         }
@@ -1779,11 +1788,11 @@ struct TravelView: View {
     }
     private var listContent: some View {
         ScrollView { VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
-            MPScreenHeader(title: "Travel Mode", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
+            MPScreenHeader(title: "Chế độ du lịch", leading: { MPIconButton(systemName: "chevron.left", label: "Quay lại", action: onBack) }, trailing: { EmptyView() })
             MPSurfaceCard(style: .reference) {
                 VStack(alignment: .leading, spacing: TravelReferencePresentation.contentSpacing) {
                     HStack {
-                        MPText("Travel Mode", style: .title)
+                        MPText("Chế độ du lịch", style: .title)
                         Spacer()
                         MPButton(TravelReferenceCopy.addAction, fullWidth: false) {
                             if editTarget != nil { resetEditor() }
@@ -1797,11 +1806,11 @@ struct TravelView: View {
                     if let active = events.first(where: { $0.active }) {
                         MPText("Đang bật: \(active.name). Giao dịch thu/chi thường mới sẽ tự gắn chuyến này.", style: .secondary)
                     } else {
-                        MPText("Chưa bật chuyến nào. Giao dịch mới sẽ không tự gắn Travel Mode.", style: .secondary)
+                        MPText("Chưa bật chuyến nào. Giao dịch mới sẽ không tự gắn chế độ du lịch.", style: .secondary)
                     }
                 }
             }
-            if let error { MPErrorView(title: "Không tải được Travel Mode", detail: error) { Task { await load() } } }
+            if let error { MPErrorView(title: "Không tải được chế độ du lịch", detail: error) { Task { await load() } } }
             if events.isEmpty { MPEmptyView(title: "Chưa có chuyến đi", detail: "Tạo một sự kiện để gắn giao dịch du lịch.") }
             if !events.isEmpty {
                 MPSurfaceCard(style: TravelReferencePresentation.listSurfaceStyle) {
@@ -1878,7 +1887,7 @@ struct TravelView: View {
             self.error = nil
         } catch { self.error = "Không thể tải sự kiện du lịch." }
     }
-    private func toggle(_ event: TravelEventModel) async { do { _ = try await api.setTravelEventActive(id: event.id, active: !event.active); await load() } catch { self.error = "Không thể cập nhật Travel Mode." } }
+    private func toggle(_ event: TravelEventModel) async { do { _ = try await api.setTravelEventActive(id: event.id, active: !event.active); await load() } catch { self.error = "Không thể cập nhật chế độ du lịch." } }
     private func resetEditor() { name = ""; context = ""; startsOn = ""; endsOn = "" }
     private func beginEditing(_ event: TravelEventModel) {
         if editTarget?.id == event.id {

@@ -5921,3 +5921,23 @@ command; no Keychain/outbox source was changed for that invalid invocation.
 
 This is owner-authorized production data reconciliation under existing API
 contracts. No source, schema, deployment or public-document behavior changed.
+
+## JARS-AS-WALLET-CARDS stage 3 backend: Assistant jar assignment (2026-11-03)
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| `propose_assign_jar` validation (income/transfer/credit/foreign/duplicate rejected per row, inactive jar rejected, unassign, max 50) | PASS | `usecase/ai_advisor_jar_assignment_test.go` |
+| Confirm applies per row with `expected_version`; version conflict on one row, others applied; repeat confirm applies nothing | PASS | `controller/http/advisor_jar_assignment_test.go` |
+| `jar_context` owner scoping, server reload, payload hash | PASS | same file |
+| Edit merge keeps server facts, drops unknown rows; search rows expose `jar_id`/`jar_name` (DB) | PASS | `infrastructure/repository/ai_advisor_jar_assignment_test.go`, `finance_query_postgres_test.go` |
+| Full backend suite and `go vet ./...` | PASS | `go test -count=1 -p 1 ./...` against the disposable DB |
+| Real-provider accuracy on fixture notes (target >= 80% on 20 rows) | NOT RUN | see report |
+
+## Jars as wallet cards, phase 2 iOS — 2026-11-03
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Unit target | PASS 469/469 | new tests for ledger jar filter, row chip, editor hint, Overview jar rows |
+| Base guard, project verification | PASS | `check-base-components.sh`, `verify-project.sh` |
+| `LocalFirstRuntimeTests/testJarsScreenShowsCumulativePlanLikeWalletCards` | PASS | jar 15M x 2 months, 10M spent in the first: headline "Còn có thể chi 20.000.000 đ", "Chưa phân bổ" row, reconciliation line, detail note "Dư từ tháng trước +5.000.000 đ"; screenshots viewed (list, detail) |
+| Audit items 6-8 (FAB over delete, English copy, 3 wallets, duplicate title, search label) | FIXED in code, not re-screenshotted | unit target green; AccessibilityXL tab bar item still OPEN |

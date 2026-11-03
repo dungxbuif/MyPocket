@@ -596,6 +596,14 @@ struct MPTransactionRow: View {
     let iconName: String
     let iconTone: String
     let amountTone: MPTransactionAmountTone
+    var badgeText: String?
+
+    /// Optional muted chip under the subtitle (e.g. the jar name of an expense).
+    func badge(_ text: String?) -> MPTransactionRow {
+        var copy = self
+        copy.badgeText = text
+        return copy
+    }
 
     init(transaction: TransactionModel, category: CategoryModel? = nil, timeZone: TimeZone, masked: Bool) {
         self.init(
@@ -680,6 +688,7 @@ struct MPTransactionRow: View {
                 if !subtitle.isEmpty {
                     Text(subtitle).font(MPFont.bodySmall).foregroundStyle(MPColor.secondary).lineLimit(2)
                 }
+                if let badgeText { MPStatusBadge(text: badgeText, tone: .muted) }
                 if dynamicTypeSize.isAccessibilitySize { amountLabel }
             }
             .frame(maxWidth: .infinity, alignment: .leading)

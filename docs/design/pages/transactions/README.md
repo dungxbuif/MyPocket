@@ -333,7 +333,7 @@ Automated proof covers backend owner scope, positive amount/type validation, wal
 
 Transfer proof now includes `npm run test:transfer:e2e` (real Chromium UI/state) and `npm run test:transfer:integrated` (Vite proxy/API/PostgreSQL state). Residual gaps remain separate tickets: attachments/OCR, advanced search/filter/pagination, and owner UAT sign-off.
 
-## Hũ trong sổ giao dịch — planned 2026-11-03
+## Hũ trong sổ giao dịch — implemented 2026-11-03
 
 Theo [JARS-AS-WALLET-CARDS](../../../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md):
 

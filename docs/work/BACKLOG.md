@@ -18,31 +18,20 @@ shared_fields:
 updated: 2026-11-02
 ---
 
-## Local-first reads and writes — in_progress (owner approved), 2026-11-03
+## Local-first reads and writes — implemented, in_review, 2026-11-03
 
-Owner requirement: always read local data first and refresh in the background, and
-apply writes locally before syncing, to remove tab-switch loading and slow saves.
-[Detail design](tickets/LOCAL-FIRST-20261103-DETAIL_DESIGN.md) builds on the
-in-progress [offline/loading design](tickets/FEEDBACK-20261019-OFFLINE-LOADING-DETAIL_DESIGN.md).
-Audit: snapshot cache is only a failure fallback and the outbox/sync engine is not
-wired into any screen. Phased: reads, then transaction writes, then the rest. Needs
-owner approval of the design and three open questions before implementation (changes
-architecture and write semantics). Owner approved on 2026-11-03: phase by phase,
-implement first, one combined test pass after. Phase 1 (tab keep-alive + preload +
-reactivation refresh) and the Phase 2 core (non-blocking outbox submit, optimistic
-edit/delete with rollback) are implemented and compile; tests pending. Phase 3 also implemented: disk read-through for Reports/Budgets/Jars, close-first background
-writes for wallet/budget/category/jar/recurring/travel, optimistic balances. Open: combined
-test pass results and device timing before `in_review`.
+Phases 1–3 implemented and committed: kept-alive tabs with preload, outbox submit returning once durable,
+optimistic edit/delete with `expected_version` and rollback, close-first background writes, encrypted
+read-through cache. Evidence: native unit target, runtime UI tests (no blocking loader across 6 switches,
+save closes independent of a 3 s write delay, durable outbox). Open: device (not simulator) timing, dark
+mode and the wallet/budget/recurring/travel form audit, bulk delete and credit/portfolio writes stay
+online-confirmed by decision. [Design](tickets/LOCAL-FIRST-20261103-DETAIL_DESIGN.md).
 
-## Product-wide audit follow-ups — draft, 2026-11-03
+## Product-wide audit follow-ups — done, 2026-11-03
 
-Cross-account isolation and core money flows PASS on a clone
-([validation](VALIDATION_MATRIX.md)). Open items, owner to prioritise: (1) legacy
-credit wallets with ordinary rows are invisible to statements — add a production
-data check and a migration or statement fallback; (2) `/notifications/devices` 500
-on app launch is unlogged — add error logging, then diagnose; (3) `/home` returns
-empty stats and has no caller — remove or fix; (4) decide amount upper bound
-(10^16 accepted) and future-date policy; (5) `/budgets` totals vs full item list.
+All five items closed: legacy credit rows now list in statements; the push-token 500 is logged;
+`/home` returns real counts; amount (≤ 2^53−1) and date (≥ 2000, ≤ +1 year) limits are enforced;
+`/budgets` totals are documented as active-period totals. Evidence in the [validation matrix](VALIDATION_MATRIX.md).
 
 ## Hũ hiển thị như ví + AI gán hũ từ ghi chú — in_progress (phase 1 backend done, iOS coded), owner approved 2026-11-03
 
@@ -72,20 +61,14 @@ scope, Assistant in-flight banner, forward-compatible provenance, vacuous guard,
 pre-existing backend test failures. `/budgets` totals are documented as active-period totals.
 Web design check/build and the full backend suite are green. Open: native UI tests and device timing.
 
-## Follow-up: Assistant follow-up transaction card scope — draft, 2026-11-02
+## Follow-up: Assistant follow-up transaction card scope — done, 2026-11-03
 
-From the accepted report-findings slice: a report follow-up run made an extra
-`search_transactions` call with empty `category_ids` and `report_scope=all`,
-returning 18 rows including transfers in the optional transaction card. Needs a
-detail design (AI tool scope/prompt contract change) and owner approval before
-implementation. Evidence: [validation](VALIDATION_MATRIX.md).
+Server now filters follow-up transaction cards to the finding's category/date/type scope and keeps the
+most specific list; live runs show a single in-scope row. See validation matrix.
 
-## Follow-up: full backend/web suite failures — draft, 2026-11-02
+## Follow-up: full backend/web suite failures — done, 2026-11-03
 
-Pre-existing failures outside the report-findings slice: MCP latest-route
-classification, two OCR source limits, AIEntry `batch_version` fixture, jar-tool
-description assertion; web `check:design`/`npm build` blocked by non-spec
-icon-reference `comparison.html`/`manifest.json`. Next: triage each, fix or record.
+Backend suite and web `check:design`/`test:design`/`build` are green (see validation matrix).
 
 ## Report/Assistant usefulness — done (owner accepted), 2026-11-02
 

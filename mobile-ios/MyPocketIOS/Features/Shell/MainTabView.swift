@@ -24,6 +24,7 @@ struct MainTabView: View {
     @State private var assistantPendingMessage: AdvisorPendingMessageModel?
     @State private var assistantPresented = false
     @State private var footerClearance: CGFloat = 0
+    @State private var addHiddenByRoute = false
     @State private var requestedWalletID: String?
     @State private var overviewPath: [MoreDestination] = []
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
@@ -178,7 +179,7 @@ struct MainTabView: View {
                         },
                         // Account root shares global Add; child routes and chat
                         // retain their own actions and protected input space.
-                        isAddEnabled: selection != "assistant" &&
+                        isAddEnabled: !addHiddenByRoute && selection != "assistant" &&
                             (selection != "account" || requestedAccountDestination == nil)
                     )
                     // Route content is bounded above navigation. Keep this narrow
@@ -235,6 +236,7 @@ struct MainTabView: View {
         }
         .environment(\.mpFinancialValuesMasked, masked)
         .onPreferenceChange(MPFloatingActionClearanceKey.self) { footerClearance = $0 }
+        .onPreferenceChange(MPShellAddHiddenKey.self) { addHiddenByRoute = $0 }
         .mpObserveKeyboardVisibility($keyboardVisible)
         .environment(\.reportAssistantHandoff, presentReportAssistant)
         .onChange(of: authenticatedUserID) { _, _ in

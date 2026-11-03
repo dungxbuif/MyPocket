@@ -13,6 +13,7 @@ struct FinancialSnapshot: Codable, Sendable {
     /// preserves compatibility with existing version-1 ledger snapshots.
     var monthSummary: MonthSummaryModel? = nil
     var insider: InsiderSummaryModel? = nil
+    var jarSummary: JarMonthSummaryModel? = nil
 }
 
 actor FinancialSnapshotCache {

@@ -39,6 +39,7 @@ final class OverviewViewModel: ObservableObject {
     @Published private(set) var categories: [CategoryModel] = []
     @Published private(set) var monthSummary: MonthSummaryModel?
     @Published private(set) var insider: InsiderSummaryModel?
+    @Published private(set) var jarSummary: JarMonthSummaryModel?
     @Published private(set) var reportInsights: [ReportInsightModel] = []
     @Published private(set) var isLoading = false
     @Published private(set) var monthLoading = false
@@ -81,6 +82,8 @@ final class OverviewViewModel: ObservableObject {
         }
         await loadMonthSummary()
         await loadInsider()
+        // Jar plan rows are secondary: refresh in the background, never block the screen.
+        Task { [weak self] in await self?.loadJarSummary() }
         cachedAt = nil // the server answered; the cached banner no longer applies
         await persistSnapshot()
     }
@@ -95,6 +98,7 @@ final class OverviewViewModel: ObservableObject {
             accountTimezone = snapshot.timezone
             monthSummary = snapshot.monthSummary
             insider = snapshot.insider
+            jarSummary = snapshot.jarSummary
             cachedAt = snapshot.fetchedAt
         } catch {
             // A bad cache must never block the authoritative server read.
@@ -117,6 +121,7 @@ final class OverviewViewModel: ObservableObject {
             accountTimezone = snapshot.timezone
             monthSummary = snapshot.monthSummary
             insider = snapshot.insider
+            jarSummary = snapshot.jarSummary
             cachedAt = snapshot.fetchedAt
             errorMessage = nil
             monthErrorMessage = snapshot.monthSummary == nil ? "Chưa có bản lưu tổng kết tháng." : nil
@@ -137,7 +142,8 @@ final class OverviewViewModel: ObservableObject {
                 categories: categories,
                 timezone: accountTimezone,
                 monthSummary: monthSummary,
-                insider: insider
+                insider: insider,
+                jarSummary: jarSummary
             ))
         } catch {
             // A successful online read remains usable; cache failures are
@@ -164,6 +170,23 @@ final class OverviewViewModel: ObservableObject {
         } catch {
             monthErrorMessage = "Không tải được tổng kết tháng."
         }
+    }
+
+    func loadJarSummary() async {
+        guard let summary = try? await api.jarMonth(month: currentMonth) else { return }
+        jarSummary = summary
+        await persistSnapshot()
+    }
+
+    /// Month-card jar rows (JAR-12/14); hidden until a jar summary exists.
+    static func jarRows(_ summary: JarMonthSummaryModel?, masked: Bool) -> [(title: String, value: String)] {
+        guard let summary else { return [] }
+        var rows: [(String, String)] = []
+        if let plan = summary.remainingPlanTotal, summary.items.contains(where: { $0.remainingPlan != nil }) {
+            rows.append(("Hũ: còn có thể chi tổng", MPFormat.money(plan, masked: masked)))
+        }
+        rows.append(("Chưa phân bổ tháng này", MPFormat.money(summary.unassignedSpent, masked: masked)))
+        return rows
     }
 
     static func walletSubtitle(description: String?, type: String) -> String {
@@ -303,6 +326,10 @@ struct OverviewView: View {
                             if !summary.note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                                 MPText(summary.note, style: .secondary).lineLimit(2)
                             }
+                            ForEach(Array(OverviewViewModel.jarRows(model.jarSummary, masked: masked).enumerated()), id: \.offset) { _, row in
+                                MPMetricRow(title: row.title, value: row.value)
+                                    .accessibilityIdentifier("overview-jar-row")
+                            }
                             MPButton(OverviewReferenceCopy.jarsAction, style: .plain, fullWidth: false, action: onOpenJars)
                                 .accessibilityIdentifier(OverviewReferenceCopy.jarsActionAccessibilityID)
                         }
@@ -333,6 +360,13 @@ struct OverviewView: View {
                                 subtitle: OverviewViewModel.walletSubtitle(description: wallet.description, type: wallet.type),
                                 isNegative: wallet.currentBalance < 0
                             )
+                        }
+                    }
+                    if model.wallets.count > 3 {
+                        MPDivider()
+                        MPGroupedRow {
+                            MPButton("Xem tất cả \(model.wallets.count) ví", style: .plain, fullWidth: false, action: onOpenWallets)
+                                .accessibilityIdentifier("overview-view-all-wallets")
                         }
                     }
                 }
