@@ -63,6 +63,13 @@ final class JarAssignmentCardTests: XCTestCase {
         XCTAssertNil(AssistantJarAssignmentPresentation.replacedActionID(.object([:])))
     }
 
+    func testHandoffContextPartsAreNeverRenderedAsCards() {
+        XCTAssertTrue(AssistantCardType.isHiddenContextPart("jar_context"))
+        XCTAssertTrue(AssistantCardType.isHiddenContextPart("report_context"))
+        XCTAssertFalse(AssistantCardType.isHiddenContextPart("jar_assignment_confirmation"))
+        XCTAssertFalse(AssistantCardType.isHiddenContextPart("text"))
+    }
+
     func testJarContextEncodingIsAdditive() throws {
         let handoff = ReportAssistantHandoff.jar(month: "2026-11", jarID: "jar-1", jarName: "Ăn uống")
         XCTAssertEqual(handoff.prompt, "Gợi ý hũ cho các khoản chi chưa phân bổ trong tháng này.")

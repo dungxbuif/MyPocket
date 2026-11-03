@@ -524,7 +524,7 @@ struct AssistantView: View {
                             if hasOlder {
                                 MPButton("Tải tin cũ", style: .secondary, isLoading: loadingOlder) { Task { await loadOlderMessages() } }
                             }
-                            ForEach(messages.filter { $0.parts.contains { $0.type != "report_context" } }) { message in
+                            ForEach(messages.filter { $0.parts.contains { !AssistantCardType.isHiddenContextPart($0.type) } }) { message in
                                 if let restoreAnchor = pendingRestoreAnchor,
                                    restoreAnchor.messageID == message.id {
                                     // ScrollViewReader can restore an item, but
@@ -538,7 +538,7 @@ struct AssistantView: View {
                                 }
                                 MPChatMessage(isUser: message.role == "user") {
                                     VStack(alignment: .leading, spacing: 8) {
-                                        ForEach(Array(message.parts.filter { $0.type != "report_context" }.enumerated()), id: \.offset) { _, part in
+                                        ForEach(Array(message.parts.filter { !AssistantCardType.isHiddenContextPart($0.type) }.enumerated()), id: \.offset) { _, part in
                                             if let text = part.text {
                                                 MPChatTextBubble(
                                                     text: AssistantPrivacyPolicy.text(text, masked: masked),
@@ -1302,6 +1302,11 @@ enum AssistantCardType {
 
     /// Budget filtering belongs to the server. Preserve every relevant budget
     /// it returns; historical web prefix limits must not narrow that scope.
+    /// Handoff context attached to a user message is model input, never a card.
+    static func isHiddenContextPart(_ type: String) -> Bool {
+        type == "report_context" || type == "jar_context"
+    }
+
     static func visibleItems(_ items: [JSONValue], for type: String) -> [JSONValue] {
         switch normalized(type) {
         case "transaction_list": return Array(items.prefix(5))

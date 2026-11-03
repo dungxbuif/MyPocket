@@ -6045,3 +6045,13 @@ error code (previously failed), one clean Vietnamese text part (the no-evidence 
 hashtags or matching history), no tool-call markup, fenced block or JSON key in the text. This closes the "raw `version/amount/id` text"
 item; the original leak was never reproduced, so the check shows the current output is clean, not the cause of the old one.
 
+
+### 2026-11-04 · Simulator re-run and the real cause of the raw `id/version/amount` text
+`LocalFirstRuntimeTests` (14 tests, simulator, fixture API) first run: 13 pass, 1 fail. The failure exposed the real source of the raw
+text the owner saw: the user's own message carries a hidden `jar_context` part (model input) and the Assistant screen filtered only
+`report_context`, so the whole context (`jar_examples`, unassigned expenses, ids, versions) rendered as a "jar context" card under the
+user's bubble. Fixed by `AssistantCardType.isHiddenContextPart` (hides both context parts); unit test added; the UI test now asserts no
+"jar context" card. The earlier "text sanitiser" check was a different, real hardening but not this cause.
+The UI test itself was also made independent of the live provider and of earlier runs (the Assistant thread persists, so older cards stay
+on screen): it waits for a NEW card, counts removable rows relative to the earlier cards and only removes a row when the new card has two or
+more. After the fix: the test passes (1 of 3 rows assigned via API, the removed row stays unassigned) and `JarAssignmentCardTests` 8/8 pass.

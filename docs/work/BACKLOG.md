@@ -47,7 +47,7 @@ Overview jar rows, jar filter menu, jar detail Assistant button and transaction-
 Open (needs real data or a device, cannot be closed from this environment):
 - Suggestion quality on the owner's real, ambiguous notes (add `#ten-hu` hashtags or assign some rows, then re-run classification).
 - Real-device timing (no device attached here).
-- Assistant raw-JSON text bubble: the live render could not be reproduced here (the persisted message of the last run held clean text and a card; no second API instance with provider credentials could be started on a clone). Server now strips leaked JSON/tool markup from assistant text parts; confirm on a live provider run.
+- Assistant raw text bubble (`id/version/amount`): closed 2026-11-04. Cause found and reproduced on the simulator: the hidden `jar_context` part of the user message rendered as a card because the app filtered only `report_context`. Fixed with `AssistantCardType.isHiddenContextPart`; the server-side sanitiser stays as extra hardening.
 
 ## UX polish from the independent audit — mostly done, 2026-11-03
 
