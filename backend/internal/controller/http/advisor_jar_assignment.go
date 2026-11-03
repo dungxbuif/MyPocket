@@ -75,6 +75,7 @@ func (h *AdvisorHandler) jarContext(_ context.Context, principal usecase.Princip
 	}
 	sort.Slice(rows, func(i, j int) bool { return rows[i].OccurredAt.After(rows[j].OccurredAt) })
 	unassigned := []map[string]any{}
+	suggestInput := []usecase.JarSuggestExpense{}
 	total := 0
 	for _, row := range rows {
 		if row.JarID != nil || row.Type != entity.TransactionTypeExpense || row.TransferID != nil || row.CreditKind != nil || row.OccurredAt.In(location).Format("2006-01") != input.Month {
@@ -92,11 +93,30 @@ func (h *AdvisorHandler) jarContext(_ context.Context, principal usecase.Princip
 			item["category_name"] = categoryNames[*row.CategoryID]
 		}
 		unassigned = append(unassigned, item)
+		note := ""
+		if row.Note != nil {
+			note = *row.Note
+		}
+		suggestInput = append(suggestInput, usecase.JarSuggestExpense{ID: row.ID, Note: note, Month: input.Month})
 	}
 	data["unassigned_expenses"] = unassigned
 	data["unassigned_expense_count"] = total
 	if summary != nil {
 		data["jar_examples"] = jarAssignmentExamples(rows, summary.Jars, categoryNames)
+		// Deterministic, evidence-only proposals computed server-side so a weak
+		// model (or none) can still produce the confirmation card.
+		suggester := usecase.JarSuggester{ActiveJars: map[string][]usecase.JarSuggestJar{input.Month: {}}}
+		for _, jar := range summary.Jars {
+			suggester.ActiveJars[input.Month] = append(suggester.ActiveJars[input.Month], usecase.JarSuggestJar{ID: jar.JarID, Name: jar.Name})
+		}
+		for _, row := range rows {
+			if row.JarID != nil && row.Type == entity.TransactionTypeExpense && row.Note != nil {
+				suggester.History = append(suggester.History, usecase.JarSuggestHistory{Note: *row.Note, JarID: *row.JarID})
+			}
+		}
+		suggested := suggester.Suggest(suggestInput)
+		data["suggested_assignments"] = suggested.Suggested
+		data["needs_clarification"] = suggested.NeedsClarification
 	}
 	return data, nil
 }

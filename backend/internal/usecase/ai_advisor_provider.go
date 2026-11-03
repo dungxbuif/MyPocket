@@ -194,6 +194,9 @@ func (o *AdvisorOrchestrator) Answer(ctx context.Context, principal Principal, m
 	forceFinal := false
 	for {
 		if providerCalls >= advisorMaxProviderCalls {
+			if len(results) > 0 {
+				return groundedFallbackAnswer(results, usage, usageSeen, evidence), nil
+			}
 			return AdvisorAnswer{}, ErrAdvisorLoopLimit
 		}
 		if o.Validator != nil {

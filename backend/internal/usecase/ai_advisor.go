@@ -261,7 +261,7 @@ func (s *AdvisorService) answerRun(runCtx, terminalCtx context.Context, principa
 	if len(chat) == 0 {
 		chat = []AdvisorChatMessage{{Role: entity.AdvisorRoleUser, Content: messageText(*userMessage)}}
 	}
-	answer, err := s.Orchestrator.Answer(runCtx, principal, chat)
+	answer, err := s.answerWithJarFallback(runCtx, principal, chat, userMessage)
 	if err != nil {
 		return AdvisorAnswer{}, err
 	}
@@ -360,7 +360,7 @@ func (s *AdvisorService) completeRun(runCtx, terminalCtx context.Context, princi
 	if len(chat) == 0 {
 		chat = []AdvisorChatMessage{{Role: entity.AdvisorRoleUser, Content: messageText(*userMessage)}}
 	}
-	answer, err := s.Orchestrator.Answer(runCtx, principal, chat)
+	answer, err := s.answerWithJarFallback(runCtx, principal, chat, userMessage)
 	if err != nil {
 		_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
 		return AdvisorAnswer{}, err
