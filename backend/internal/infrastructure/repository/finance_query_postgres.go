@@ -283,6 +283,8 @@ type financeTransactionView struct {
 	AdjustmentDirection *string   `json:"adjustment_direction,omitempty"`
 	OccurredAt          time.Time `json:"occurred_at"`
 	Note                *string   `json:"note,omitempty"`
+	JarID               *string   `json:"jar_id,omitempty"`
+	JarName             string    `json:"jar_name,omitempty"`
 	Version             int64     `json:"version"`
 }
 
@@ -534,8 +536,30 @@ func (r *FinanceQueryPostgresRepository) readSearch(ctx context.Context, tx *gor
 		view.NextCursor = cursor
 		rows = rows[:filter.Limit]
 	}
+	jarNames := map[string]string{}
+	var jarIDs []string
 	for _, row := range rows {
-		view.Items = append(view.Items, financeTransactionView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, Type: row.Type, Amount: row.Amount, AdjustmentDirection: row.AdjustmentDirection, OccurredAt: row.OccurredAt, Note: row.Note, Version: row.Version})
+		if row.JarID != nil {
+			jarIDs = append(jarIDs, *row.JarID)
+		}
+	}
+	if len(jarIDs) > 0 {
+		// Additive: the latest configured name of each referenced jar, so the
+		// Assistant can cite "similar rows already in jar X" without a second tool call.
+		var named []struct{ JarID, Name string }
+		if err := tx.Raw("SELECT DISTINCT ON (jar_id) jar_id, name FROM jar_month_configs WHERE owner_id = ? AND jar_id IN ? ORDER BY jar_id, month DESC", ownerID, jarIDs).Scan(&named).Error; err != nil {
+			return entity.FinanceResult{}, err
+		}
+		for _, item := range named {
+			jarNames[item.JarID] = item.Name
+		}
+	}
+	for _, row := range rows {
+		item := financeTransactionView{ID: row.ID, WalletID: row.WalletID, CategoryID: row.CategoryID, Type: row.Type, Amount: row.Amount, AdjustmentDirection: row.AdjustmentDirection, OccurredAt: row.OccurredAt, Note: row.Note, JarID: row.JarID, Version: row.Version}
+		if row.JarID != nil {
+			item.JarName = jarNames[*row.JarID]
+		}
+		view.Items = append(view.Items, item)
 	}
 	encoded, err := json.Marshal(view)
 	if err != nil {

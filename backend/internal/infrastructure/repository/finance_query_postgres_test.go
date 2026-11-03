@@ -189,6 +189,32 @@ func TestFinanceQueryPostgresSummaryUsesOwnerAndReportScope(t *testing.T) {
 	if page.TotalCount != 55 || len(page.Items) != 50 || page.NextCursor == "" {
 		t.Fatalf("aggregate must not use page count: %+v", page)
 	}
+	// Additive jar attribution: search rows expose jar_id and the jar's latest name.
+	jarID := uuid.NewString()
+	month, _ := entity.ParseCalendarDate("2026-09-01")
+	if err := db.Create(&entity.Jar{ID: jarID, OwnerID: owner}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&entity.JarMonth{OwnerID: owner, Month: month}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Create(&entity.JarMonthConfig{OwnerID: owner, Month: month, JarID: jarID, Name: "Ăn uống", AllocationMode: entity.JarAllocationNone, Active: true}).Error; err != nil {
+		t.Fatal(err)
+	}
+	if err := db.Model(&entity.Transaction{}).Where("id = ?", page.Items[0].ID).Update("jar_id", jarID).Error; err != nil {
+		t.Fatal(err)
+	}
+	jarBundle, err := reader.ReadBundle(context.Background(), owner, []entity.NormalizedQuery{{Key: "q-jar", Kind: "search_transactions", Filter: searchFilter}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var jarPage financeSearchView
+	if err := json.Unmarshal(jarBundle.Results[0].View, &jarPage); err != nil {
+		t.Fatal(err)
+	}
+	if jarPage.Items[0].JarID == nil || *jarPage.Items[0].JarID != jarID || jarPage.Items[0].JarName != "Ăn uống" || jarPage.Items[1].JarID != nil {
+		t.Fatalf("search must expose jar attribution: %+v %+v", jarPage.Items[0], jarPage.Items[1])
+	}
 	searchQuery.Cursor = page.NextCursor
 	secondPage, err := reader.ReadBundle(context.Background(), owner, []entity.NormalizedQuery{searchQuery})
 	if err != nil {

@@ -158,7 +158,7 @@ func latestPendingAdvisorProposal(messages []entity.AdvisorMessage) map[string]a
 		for partIndex := len(message.Parts) - 1; partIndex >= 0; partIndex-- {
 			part := message.Parts[partIndex]
 			switch part.Type {
-			case "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation":
+			case "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation", "jar_assignment_confirmation":
 			default:
 				continue
 			}

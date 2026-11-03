@@ -262,8 +262,8 @@ func TestAdvisorCapabilitiesAdvertiseBoundedWriteActionContract(t *testing.T) {
 	if envelope.Data.RunTimeoutSeconds != 240 || envelope.Data.GroundingVersion != 1 {
 		t.Fatalf("advisor lifecycle metadata drifted: %+v", envelope.Data)
 	}
-	wantTools := []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget", "propose_create_transaction", "propose_update_transaction", "propose_delete_transaction", "propose_transfer_wallet", "propose_create_category", "propose_update_category", "propose_recategorize_transaction"}
-	wantActions := []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction"}
+	wantTools := []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget", "propose_create_transaction", "propose_update_transaction", "propose_delete_transaction", "propose_transfer_wallet", "propose_create_category", "propose_update_category", "propose_recategorize_transaction", "propose_assign_jar"}
+	wantActions := []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction", "assign_jar"}
 	if !reflect.DeepEqual(envelope.Data.Tools, wantTools) {
 		t.Fatalf("capability tool set drifted: got=%v want=%v", envelope.Data.Tools, wantTools)
 	}

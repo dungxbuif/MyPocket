@@ -525,6 +525,9 @@ func prepareAdvisorProposalReplacement(tx *gorm.DB, conversationID string, gener
 				for key, value := range patch {
 					newView[key] = value
 				}
+				if stringValue(oldView["action"]) == "assign_jar" {
+					newView["assignments"] = mergeJarAssignmentEdit(oldView["assignments"], patch["assignments"])
+				}
 				newView["action_id"] = revisionView["action_id"]
 				newView["revision"] = replacesRevision + 1
 				newView["status"] = entity.AIProposalPending
@@ -609,6 +612,9 @@ func (r *AdvisorPostgresRepository) ReplaceAction(ctx context.Context, ownerID, 
 				for key, value := range patch {
 					newView[key] = value
 				}
+				if stringValue(view["action"]) == "assign_jar" {
+					newView["assignments"] = mergeJarAssignmentEdit(view["assignments"], patch["assignments"])
+				}
 				oldEnvelope := cloneMap(envelope)
 				oldEnvelope["view"] = oldView
 				newEnvelope := cloneMap(envelope)
@@ -688,7 +694,7 @@ func (r *AdvisorPostgresRepository) MarkAction(ctx context.Context, ownerID, con
 
 func advisorProposalView(part entity.AdvisorPart) (map[string]any, map[string]any, bool) {
 	switch part.Type {
-	case "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation":
+	case "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation", "jar_assignment_confirmation":
 	default:
 		return nil, nil, false
 	}
@@ -729,6 +735,7 @@ func validateAdvisorActionPatch(actionID string, patch map[string]any) error {
 		"create_category":          {"name": true, "kind": true, "parent_id": true, "wallet_ids": true, "icon_key": true},
 		"update_category":          {"name": true, "kind": true, "parent_id": true, "wallet_ids": true, "icon_key": true},
 		"recategorize_transaction": {"category_id": true},
+		"assign_jar":               {"assignments": true},
 	}
 	fields, knownAction := allowed[actionID]
 	if !knownAction {
@@ -742,6 +749,17 @@ func validateAdvisorActionPatch(actionID string, patch map[string]any) error {
 			continue
 		}
 		switch key {
+		case "assignments":
+			items, ok := value.([]any)
+			if !ok || len(items) > 50 {
+				return contract.ErrAdvisorEntryInvalid
+			}
+			for _, item := range items {
+				row, ok := item.(map[string]any)
+				if !ok || strings.TrimSpace(stringValue(row["transaction_id"])) == "" || len(stringValue(row["jar_id"])) > 128 {
+					return contract.ErrAdvisorEntryInvalid
+				}
+			}
 		case "amount", "opening_balance", "limit_amount", "target_amount", "allocation_amount":
 			if numberValue(value) < 0 || numberValue(value) > 9007199254740991 {
 				return contract.ErrAdvisorEntryInvalid
@@ -914,4 +932,41 @@ func (r *AdvisorPostgresRepository) resetConversation(tx *gorm.DB, conversation 
 
 func isUniqueViolation(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "duplicate key") || strings.Contains(strings.ToLower(err.Error()), "unique constraint")
+}
+
+// mergeJarAssignmentEdit lets the owner remove rows or change a row's jar. The
+// server-read facts of each kept row (version, note, amount, status) always
+// come from the original card; rows unknown to the card are dropped and an
+// edited jar must be re-validated when the card is confirmed.
+func mergeJarAssignmentEdit(original, edited any) []any {
+	originalRows, _ := original.([]any)
+	known := map[string]map[string]any{}
+	for _, item := range originalRows {
+		if row, ok := item.(map[string]any); ok {
+			known[stringValue(row["transaction_id"])] = row
+		}
+	}
+	merged := []any{}
+	seen := map[string]bool{}
+	editedRows, _ := edited.([]any)
+	for _, item := range editedRows {
+		row, _ := item.(map[string]any)
+		base, ok := known[stringValue(row["transaction_id"])]
+		id := stringValue(row["transaction_id"])
+		if !ok || seen[id] {
+			continue
+		}
+		seen[id] = true
+		next := cloneMap(base)
+		if jarID, present := row["jar_id"]; present && stringValue(jarID) != stringValue(base["jar_id"]) {
+			next["jar_id"] = strings.TrimSpace(stringValue(jarID))
+			next["jar_name"] = ""
+			next["edited"] = true
+			if stringValue(base["status"]) == "rejected" {
+				next["status"] = "rejected"
+			}
+		}
+		merged = append(merged, next)
+	}
+	return merged
 }

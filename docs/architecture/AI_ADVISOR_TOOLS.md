@@ -116,6 +116,7 @@ authoritative boundary.
 | `propose_create_category` | name, category kind; optional parent/wallet/icon fields | validated `category_creation_proposal`; no category write |
 | `propose_update_category` | category UUID, replacement category fields, and required positive `expected_version` snapshot | validated `category_update_proposal`; the category/version must have been read in the same advisor run; system/foreign categories rejected by domain handler; stale confirmation returns `409` |
 | `propose_recategorize_transaction` | ordinary transaction UUID, category UUID, and required positive `expected_version` snapshot | validated `transaction_recategorize_proposal`; canonical transaction handler rejects transfer/credit/adjustment rows and stale snapshots |
+| `propose_assign_jar` | `month` (YYYY-MM) and `assignments[]` of `{transaction_id, jar_id (empty = unassign), reason}`, max 50 | `jar_assignment_proposal` card (part `jar_assignment_confirmation`). Server reads each transaction (owner-scoped) and rejects, per row and with a Vietnamese reason, income, wallet-transfer legs, credit rows, adjustments, internal-transfer category, duplicates, unknown/foreign ids and jars without an ACTIVE config in the transaction's account-local month. Each kept row stores the transaction's `expected_version`, note, amount, category name, date and proposed jar. Never writes. |
 
 Wallet proposals require positive target for goal wallets, positive credit limit
 for credit wallets, valid optional calendar dates and statement/due days1–31.
@@ -325,3 +326,11 @@ persists each event in PostgreSQL `audit_outbox` (migration 037) before the
 Redis fast path; the worker uses a leased `SKIP LOCKED` batch and bounded
 backoff to retry delivery. Production migration, worker health and alerting
 are still rollout gates; this buffer is not a compliance archive.
+
+
+## Jar assignment (AI-JAR-01, ADR-029)
+
+- Part `jar_assignment_confirmation` (supported edit field `assignments`): per row `transaction_id`, `note`, `amount`, `occurred_at`, `category_name`, `jar_id`, `jar_name`, `reason`, `status` (`proposed|rejected`), `reject_reason`, `expected_version`. Editing via `PATCH /ai/advisor/actions/{id}/replace` or `revise_pending_proposal` may remove rows or change a row's `jar_id`; the server keeps every other row fact from the original card, drops unknown rows and re-validates the jar at confirm.
+- Confirm (`POST /ai/advisor/actions/{action_id}/confirm`, action `assign_jar`): each `proposed` row goes through the ordinary transaction update handler with its `expected_version`. Response `{status, applied_count, total_count, results[]}` with per-row `applied|unchanged|conflict|skipped` and a detail; a stale or invalid row never blocks the others. A repeated confirm returns the stored receipt (including `assignment_results`) and applies nothing again.
+- `search_transactions` rows additively carry `jar_id` and `jar_name` so similar rows already in a jar can be cited as evidence.
+- `jar_context` on `POST /ai/advisor/messages(/async)`: `{jar_id?, month}`. The server validates ownership (a foreign/unknown jar is not found), reloads the month summary and up to 50 unassigned ordinary expenses by id, stores them as a hidden `jar_context` part and includes the input in the payload hash like `report_context`. Client prose is never trusted.

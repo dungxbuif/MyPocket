@@ -184,7 +184,9 @@ func main() {
 	reportAnalysisProvider := ai.NewReportAnalysisProvider(advisorProvider)
 	handlers.ReportAnalysis = &httpapi.ReportAnalysisHandler{Service: usecase.NewReportAnalysisService(reportAnalysisRepository, reportSnapshots, reportAnalysisProvider)}
 	advisorStore := repo.NewAdvisorPostgresRepository(database)
-	advisorOrchestrator := usecase.NewAdvisorOrchestrator(advisorProvider, usecase.NewAdvisorToolRegistry(financeQueryService))
+	advisorTools := usecase.NewAdvisorToolRegistry(financeQueryService)
+	advisorTools.SetJarAssignmentSource(usecase.NewJarAssignmentSource(transactionRepository, categoryRepository, jarRepository, userRepo))
+	advisorOrchestrator := usecase.NewAdvisorOrchestrator(advisorProvider, advisorTools)
 	advisorOrchestrator.GroundingEnabled = cfg.AIAdvisorGroundingEnabled
 	advisorOrchestrator.Validator = usecase.AdvisorPrincipalValidatorFunc(func(ctx context.Context, principal usecase.Principal) error {
 		switch principal.CredentialKind {

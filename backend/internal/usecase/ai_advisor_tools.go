@@ -50,7 +50,7 @@ func NewAdvisorToolRegistry(finance *FinanceQueryService) *AdvisorToolRegistry {
 		&walletTool{finance: finance}, &budgetTool{finance: finance}, &goalTool{finance: finance}, &jarTool{finance: finance},
 		&transactionTool{finance: finance}, &categoryCatalogTool{finance: finance}, &categoryDetailTool{finance: finance}, &productHelpTool{}, &walletProposalTool{}, &jarProposalTool{}, &jarUpdateProposalTool{}, &budgetProposalTool{}, &budgetUpdateProposalTool{},
 		&transactionCreateProposalTool{}, &transactionUpdateProposalTool{}, &transactionDeleteProposalTool{}, &walletTransferProposalTool{},
-		&categoryCreateProposalTool{}, &categoryUpdateProposalTool{}, &transactionRecategorizeProposalTool{},
+		&categoryCreateProposalTool{}, &categoryUpdateProposalTool{}, &transactionRecategorizeProposalTool{}, &jarAssignProposalTool{},
 		&proposalRevisionTool{},
 	} {
 		registry.tools[tool.Name()] = tool
@@ -138,6 +138,8 @@ func advisorProposalViewKind(action string) string {
 		return "transaction_update_proposal"
 	case "delete_transaction":
 		return "transaction_delete_proposal"
+	case "assign_jar":
+		return "jar_assignment_proposal"
 	case "recategorize_transaction":
 		return "transaction_recategorize_proposal"
 	case "transfer_wallet":

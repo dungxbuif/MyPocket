@@ -78,6 +78,8 @@ func advisorSupportedEditFields(action string) []string {
 		return []string{"name", "kind", "parent_id", "wallet_ids", "icon_key"}
 	case "recategorize_transaction":
 		return []string{"category_id"}
+	case "assign_jar":
+		return []string{"assignments"}
 	default:
 		return []string{}
 	}
@@ -122,6 +124,8 @@ func advisorPartType(viewKind string) (string, bool) {
 		return "transfer_confirmation", true
 	case "category_creation_proposal", "category_update_proposal":
 		return "category_confirmation", true
+	case "jar_assignment_proposal":
+		return "jar_assignment_confirmation", true
 	case "product_help":
 		return "product_help", true
 	default:
@@ -131,7 +135,7 @@ func advisorPartType(viewKind string) (string, bool) {
 
 func isAdvisorProposalView(viewKind string) bool {
 	partType, ok := advisorPartType(viewKind)
-	return ok && (partType == "wallet_confirmation" || partType == "jar_confirmation" || partType == "budget_confirmation" || partType == "transaction_confirmation" || partType == "transfer_confirmation" || partType == "category_confirmation")
+	return ok && (partType == "wallet_confirmation" || partType == "jar_confirmation" || partType == "budget_confirmation" || partType == "transaction_confirmation" || partType == "transfer_confirmation" || partType == "category_confirmation" || partType == "jar_assignment_confirmation")
 }
 
 // narrowReportFollowUpCards keeps a follow-up about one saved report finding focused on that

@@ -40,6 +40,7 @@ type advisorMessageInput struct {
 	ClientRequestID string                         `json:"client_request_id"`
 	Text            string                         `json:"text"`
 	ReportContext   *usecase.ReportFollowUpRequest `json:"report_context,omitempty"`
+	JarContext      *advisorJarContextInput        `json:"jar_context,omitempty"`
 }
 
 type advisorSubmitResponse struct {
@@ -321,6 +322,8 @@ func (h *AdvisorHandler) ConfirmAction(c *gin.Context) {
 		}
 		c.Params = gin.Params{{Key: "id", Value: strings.TrimSpace(stringValue(view["category_id"]))}}
 		(&CategoryHandler{Categories: usecase.NewCategoryInteractor(h.Categories)}).UpdateCategory(c)
+	case "assign_jar":
+		h.applyJarAssignments(c, owner, view)
 	case "recategorize_transaction":
 		if h.Transactions == nil || h.Wallets == nil || h.Categories == nil {
 			advisorFailure(c, errors.New("transaction action unavailable"))
@@ -522,6 +525,9 @@ func (h *AdvisorHandler) EntryDecision(c *gin.Context) {
 
 func advisorActionReceipt(view map[string]any, actionID string) map[string]any {
 	receipt := map[string]any{"action_id": actionID}
+	if results, ok := view["assignment_results"]; ok {
+		receipt["assignment_results"] = results
+	}
 	for _, key := range []string{"transaction_id", "wallet_id", "jar_id", "budget_id", "category_id"} {
 		if value := stringValue(view[key]); value != "" {
 			receipt["resource_id"] = value
@@ -558,7 +564,7 @@ func findPreparedProposal(messages []entity.AdvisorMessage, actionID, conversati
 			continue
 		}
 		for _, part := range message.Parts {
-			if part.Type != "wallet_confirmation" && part.Type != "jar_confirmation" && part.Type != "budget_confirmation" && part.Type != "transaction_confirmation" && part.Type != "transfer_confirmation" && part.Type != "category_confirmation" {
+			if part.Type != "wallet_confirmation" && part.Type != "jar_confirmation" && part.Type != "budget_confirmation" && part.Type != "transaction_confirmation" && part.Type != "transfer_confirmation" && part.Type != "category_confirmation" && part.Type != "jar_assignment_confirmation" {
 				continue
 			}
 			encoded, err := json.Marshal(part.Data)
@@ -590,7 +596,7 @@ func findPreparedProposal(messages []entity.AdvisorMessage, actionID, conversati
 
 func advisorActionAllowed(action string) bool {
 	switch action {
-	case "create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction":
+	case "create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction", "assign_jar":
 		return true
 	default:
 		return false
@@ -671,11 +677,11 @@ func (h *AdvisorHandler) Capabilities(c *gin.Context) {
 		"parts_version":         1,
 		"run_timeout_seconds":   240,
 		"grounding_version":     1,
-		"tools":                 []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget", "propose_create_transaction", "propose_update_transaction", "propose_delete_transaction", "propose_transfer_wallet", "propose_create_category", "propose_update_category", "propose_recategorize_transaction"},
-		"actions":               []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction"},
+		"tools":                 []string{"search_transactions", "get_transaction", "get_finance_summary", "compare_spending_periods", "get_wallet_balances", "get_budget_progress", "get_goal_progress", "get_jar_progress", "get_product_help", "propose_create_wallet", "propose_create_jar", "propose_update_jar", "propose_create_budget", "propose_update_budget", "propose_create_transaction", "propose_update_transaction", "propose_delete_transaction", "propose_transfer_wallet", "propose_create_category", "propose_update_category", "propose_recategorize_transaction", "propose_assign_jar"},
+		"actions":               []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction", "assign_jar"},
 		"entry_integration":     h != nil && h.Entry != nil,
-		"supported_part_kinds":  []string{"text", "metric_group", "transaction_list", "transaction_detail", "period_comparison", "wallet_balances", "budget_status", "goal_progress", "jar_progress", "product_help", "entry_batch", "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation"},
-		"action_kinds":          []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction"},
+		"supported_part_kinds":  []string{"text", "metric_group", "transaction_list", "transaction_detail", "period_comparison", "wallet_balances", "budget_status", "goal_progress", "jar_progress", "product_help", "entry_batch", "wallet_confirmation", "jar_confirmation", "budget_confirmation", "transaction_confirmation", "transfer_confirmation", "category_confirmation", "jar_assignment_confirmation"},
+		"action_kinds":          []string{"create_wallet", "create_jar", "update_jar", "create_budget", "update_budget", "create_transaction", "update_transaction", "delete_transaction", "transfer_wallet", "create_category", "update_category", "recategorize_transaction", "assign_jar"},
 		"attachment_formats":    []string{"image/jpeg", "image/png", "application/pdf", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"},
 		"attachment_max_count":  20,
 		"attachment_max_bytes":  5 * 1024 * 1024,

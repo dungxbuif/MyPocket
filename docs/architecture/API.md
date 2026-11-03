@@ -10,9 +10,9 @@ shared_fields: [status, trace]
 
 # API
 
-## Planned additive jar contract — 2026-11-03 (not implemented)
+## Additive jar contract — 2026-11-03 (Assistant part implemented; other items per ticket status)
 
-Per [JARS-AS-WALLET-CARDS](../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md) / [ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md): `GET /jars?month=` items gain `remaining_plan`, `cumulative_allocated`, `cumulative_spent`, `allocation_months`, `months_in_range`, `first_config_month`, `month_variance`; summary gains `remaining_plan_total`, `unassigned_cumulative`, `wallets_in_total_balance`, `plan_exceeds_wallets_by`. `GET /transactions` gains `jar_id=<id>|unassigned`. `GET /jars/{id}/report` months gain `remaining_plan`. Assistant gains `propose_assign_jar` and the `jar_assignment_confirmation` part, plus `jar_context` on message submit; application goes through the existing action confirm route with `expected_version` per row.
+Per [JARS-AS-WALLET-CARDS](../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md) / [ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md): `GET /jars?month=` items gain `remaining_plan`, `cumulative_allocated`, `cumulative_spent`, `allocation_months`, `months_in_range`, `first_config_month`, `month_variance`; summary gains `remaining_plan_total`, `unassigned_cumulative`, `wallets_in_total_balance`, `plan_exceeds_wallets_by`. `GET /transactions` gains `jar_id=<id>|unassigned`. `GET /jars/{id}/report` months gain `remaining_plan`. Assistant (implemented): `propose_assign_jar`, the `jar_assignment_confirmation` part and `jar_context` on message submit, with `jar_id`/`jar_name` on `search_transactions` rows; see [AI_ADVISOR_TOOLS](AI_ADVISOR_TOOLS.md). Application goes through the existing action confirm route with `expected_version` per row.
 
 ## Contract clarifications — 2026-11-03
 

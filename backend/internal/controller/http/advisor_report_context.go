@@ -30,6 +30,20 @@ func (h *AdvisorHandler) messageParts(ctx context.Context, principal usecase.Pri
 			return nil, "", err
 		}
 	}
+	if input.JarContext != nil {
+		jarContext, err := h.jarContext(ctx, principal, *input.JarContext)
+		if err != nil {
+			return nil, "", err
+		}
+		parts = append(parts, entity.AdvisorPart{Type: "jar_context", Data: jarContext})
+		payload, err = json.Marshal(struct {
+			Payload []byte
+			Jar     *advisorJarContextInput
+		}{payload, input.JarContext})
+		if err != nil {
+			return nil, "", err
+		}
+	}
 	hash := sha256.Sum256(payload)
 	return parts, hex.EncodeToString(hash[:]), nil
 }
