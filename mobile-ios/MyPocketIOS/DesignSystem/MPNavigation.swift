@@ -670,28 +670,9 @@ struct MPBottomNavigation: View {
     }
 
     var body: some View {
-        if dynamicTypeSize.isAccessibilitySize {
-            HStack(spacing: 8) {
-                MPMenuSelector(options: items.map { MPSelectionOption(id: $0.id, label: $0.title) }, onSelect: { selection = $0 }) {
-                    HStack(spacing: 8) {
-                        Text(items.first(where: { $0.id == selection })?.title ?? "Chọn màn hình")
-                            .font(MPFont.labelSmall)
-                            .fixedSize(horizontal: false, vertical: true)
-                        Spacer(minLength: 0)
-                        Image(systemName: "chevron.down").accessibilityHidden(true)
-                    }
-                    .padding(.horizontal, 12)
-                    .frame(maxWidth: .infinity, minHeight: MPMetrics.hitTarget)
-                    .background(MPColor.surface, in: RoundedRectangle(cornerRadius: MPMetrics.buttonCornerRadius))
-                }
-                .accessibilityIdentifier("bottom-navigation-menu")
-                .accessibilityLabel("Chọn màn hình, \(items.first(where: { $0.id == selection })?.title ?? "")")
-                if isAddEnabled { MPBottomAddButton(action: onAdd, onLongPress: onLongPressAdd) }
-            }
-            .padding(.horizontal, MPMetrics.pagePadding)
-            .accessibilityElement(children: .contain)
-            .accessibilityIdentifier("bottom-navigation")
-        } else {
+        // Tab identifiers stay `bottom-tab-<id>` at every size: the bar caps its own
+        // Dynamic Type at xxxLarge instead of swapping to a menu.
+        do {
         ZStack(alignment: .top) {
             HStack(spacing: 0) {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
@@ -755,6 +736,7 @@ struct MPBottomNavigation: View {
                 }
             }
         }
+        .dynamicTypeSize(...DynamicTypeSize.xxxLarge)
         }
     }
 }

@@ -942,7 +942,7 @@ struct WalletEditorView: View {
             walletSettingsFields
             if let errorMessage { MPStatusMessage(text: errorMessage, tone: .danger) }
         } footer: {
-            if let onDelete {
+            if wallet != nil, let onDelete {
                 MPButton("Xóa ví", style: .destructive, action: onDelete)
                     .accessibilityIdentifier("wallet-editor-delete")
             }

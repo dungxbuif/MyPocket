@@ -79,4 +79,13 @@ final class JarAssignmentCardTests: XCTestCase {
         let old = try JSONDecoder().decode(AdvisorReportMessageInputModel.self, from: Data(#"{"clientRequestID":"a","text":"b"}"#.utf8))
         XCTAssertNil(old.jarContext)
     }
+
+    func testReplayedConfirmWithOnlyReceiptStillDecodesAndDerivesCounts() throws {
+        let json = #"{"status":"applied","receipt":{"action_id":"a","assignment_results":[{"transaction_id":"t1","jar_id":"j","status":"applied","detail":""},{"transaction_id":"t2","jar_id":"j","status":"conflict","detail":"đã đổi"}]}}"#
+        let decoded = try JSONDecoder.mypocket.decode(JarAssignmentConfirmModel.self, from: Data(json.utf8))
+        XCTAssertEqual(decoded.totalCount, 2)
+        XCTAssertEqual(decoded.appliedCount, 1)
+        XCTAssertEqual(decoded.results.map(\.status), ["applied", "conflict"])
+        XCTAssertEqual(decoded.summary, "Đã gán 1/2 khoản")
+    }
 }

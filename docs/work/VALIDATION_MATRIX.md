@@ -5975,3 +5975,42 @@ Limit found: the fixture uses non-UUID ids (`rich-tx-006`, `rich-jar-need`), so 
 
 Seen (PNG viewed): ledger with jar filter applied (jar filter row "Hũ", chip "Đi lại" on rows; assistant FAB overlaps the amount of the row at the bottom edge); editor (hint "Hũ Đi lại còn có thể chi 4.890.000 đ" under the selector, correct); Tháng screen jar section (two jar rows plus "Chưa phân bổ"; amount of the last row hidden under the assistant FAB at scroll end); transaction detail (no shell "+", UI test asserts it); Overview with "Xem tất cả 12 ví".
 Not captured: Overview month card jar rows (scroll loop did not move, screenshot equals top of Overview); jar filter open sheet and editor selector-open screenshots exist but were not inspected; Dynamic Type AccessibilityXL pass not run; transaction detail does not show the jar (possible gap). Assistant card has unit proof only.
+
+## Jar suggester leave-one-out — 2026-11-03
+
+Command: export owner-scoped assigned ordinary expenses with notes (766 rows, account `native-fixture@example.test`, all months, 61 active jar configs) as TSV, then
+`JAR_LOO_DIR=<dir> go test -count=1 -run LeaveOneOut -v ./internal/usecase/` (`ai_advisor_jar_loo_test.go`, skipped without the env var; no production code change).
+Each row's jar is hidden and the other 765 rows are history.
+
+| Notes | Rows | Coverage | High: proposed / correct | Medium: proposed / correct | No proposal |
+| --- | --- | --- | --- | --- | --- |
+| Raw (with "[Mẫu 2026]" / "• Mẫu") | 766 | 758 (99.0%) | 752 / 752 (100%) | 6 / 6 (100%) | 4 no matching history, 4 only one matching row |
+| Trailing tag stripped | 766 | 758 (99.0%) | 752 / 752 (100%) | 6 / 6 (100%) | same |
+
+High precision is above 90%, so the rule was not tightened. Caveat (honest limit): the fixture is templated (about 13 distinct notes, each always in
+one jar), so this proves the rules do not mis-fire and handle the tag, but it does NOT predict precision for real users whose notes are ambiguous
+across jars. The earlier 0/47 was on genuinely unassigned October rows whose notes differ from history, not a rule bug. Re-measure on a real account.
+
+## Live jar-assignment confirm with UUID ids — 2026-11-03 (PASSED on a DB clone)
+
+Clone `jar_live_clone` of the fixture, API on :8092 + worker, redis db 3. Data via HTTP: jar "Thử Hũ Zeta" (Oct), 3 assigned expenses "Zeta sạc xe N k" (Oct),
+5 unassigned Nov expenses (3 matching notes, 1 `#Thử-Hũ-Zeta` hashtag, 1 unrelated "Quà sinh nhật Omega"). `POST /ai/advisor/messages/async` with
+`jar_context {month:"2026-11"}` completed with a `jar_assignment_confirmation` card of exactly the 4 evidence rows (hashtag row + 3 history rows, 3 matching
+history rows reason "3 khoản ..."); the unrelated row and the 13 other fixture-unassigned Nov rows were not proposed.
+`PATCH .../replace` (dropping the "70k" row, `revision:1`) returned a new `action_id` at `data.action_id`, `revision:2`; confirming the OLD id returned 409
+`advisor_action_conflict`. After `PATCH /transactions/{id}` bumped one row to version 2, confirm applied 2 rows and returned `conflict` for the modified
+one. A second confirm was idempotent (same results as `receipt`). DB diff before/after: only the 2 applied rows got `jar_id` (version 2) and the
+concurrently edited row changed version only (my own PATCH); the dropped row and every other transaction were untouched. Clone dropped afterwards.
+
+
+## Agent E iOS audit result (2026-11-03)
+
+Unit target 476 green; base guard and verify-project pass. UI run via `LocalFirstRuntimeTests` audit tests. Only screenshots viewed are listed.
+- E2 ledger scroll end: last rows fully visible, bubble sits below the list card, amounts uncovered (after `contentMargins` fix; no "before" shot kept).
+- E4 transaction detail: rows Danh mục, Ví, Hũ ("Đi lại 3F6C"), Ghi chú, Ngày, Báo cáo.
+- E1 overview: top of Overview only, jar rows NOT reached (open).
+- E8 AccessibilityXL overview (before wallet-row fix): "87.655 / đ" wrapped; tab bar kept 4 tabs with truncated labels. After fix (re-run): amount single line, name truncates "LF Cash…".
+- E11 dark-launch overview and E13 editor: rendered light (dark not verified).
+- E15/E16 wallet create editor: showed "Xóa ví" on create (fixed in WalletsView; re-run shot not viewed). Keyboard covers part of form.
+- E18 wallet list after save: new "Dup 90AB" wallet listed, 0 đ.
+- E21 budget empty save: banner "Nhập tên và giới hạn hợp lệ."; Giới hạn field overlaps the recurring toggle row (defect, open).

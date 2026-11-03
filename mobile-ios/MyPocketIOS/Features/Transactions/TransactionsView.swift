@@ -85,6 +85,9 @@ enum TransactionDetailPresentation {
         if includesContext {
             rows.append(Row(title: "Danh mục", value: category.flatMap { $0.isEmpty ? nil : $0 } ?? fallbackCategory(for: transaction)))
             rows.append(Row(title: "Ví", value: wallet.flatMap { $0.isEmpty ? nil : $0 } ?? "Ví đã xóa"))
+            if let jar = transaction.jarName?.trimmingCharacters(in: .whitespacesAndNewlines), !jar.isEmpty {
+                rows.append(Row(title: "Hũ", value: jar))
+            }
         }
         if let note, !note.isEmpty {
             rows.append(Row(title: "Ghi chú", value: note))

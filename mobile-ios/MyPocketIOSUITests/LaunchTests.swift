@@ -6351,5 +6351,139 @@ final class LocalFirstRuntimeTests: XCTestCase {
         try await LocalAPIFixture.delete(wallet)
         for extra in extraWallets { try await LocalAPIFixture.delete(extra) }
     }
+    // MARK: Agent E audit screenshots
+    private func auditShot(_ app: XCUIApplication, _ name: String) {
+        let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+    }
+
+    private func auditOpenAccount(_ app: XCUIApplication, _ destination: String) {
+        app.buttons["bottom-tab-account"].tap()
+        let entry = app.buttons["more-destination-\(destination)"].firstMatch
+        for _ in 0..<16 where !(entry.exists && entry.isHittable) { app.scrollViews.allElementsBoundByIndex.last?.swipeUp() }
+        if entry.waitForExistence(timeout: 5) { entry.tap(); sleep(3) }
+    }
+
+    private func auditSwipeUntil(_ app: XCUIApplication, _ element: XCUIElement, max: Int = 10) {
+        for _ in 0..<max where !element.exists {
+            let viewport = app.otherElements["shell-content-viewport"].firstMatch
+            (viewport.exists ? viewport : app.windows.firstMatch).swipeUp()
+        }
+    }
+
+    func testAuditJarsBubbleDetailScreens() async throws {
+        continueAfterFailure = true
+        let suffix = String(UUID().uuidString.prefix(4))
+        let wallet = try await LocalAPIFixture.wallet(name: "Audit \(suffix)", type: "basic")
+        let timezone = TimeZone(identifier: try await LocalAPIFixture.ownerTimezone()) ?? .current
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
+        let parts = calendar.dateComponents([.year, .month], from: Date())
+        let month = String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        let jarName = "Đi lại \(suffix)"
+        _ = try await LocalAPIFixture.jarLedgerFixture(name: jarName, month: month, walletID: wallet.wallet.id, notesInJar: ["Đổ xăng", "Gửi xe"], notesUnassigned: ["Cà phê", "Ăn trưa"])
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-overview"].waitForExistence(timeout: 20))
+        sleep(3)
+        let jarText = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Hũ: còn có thể chi'")).firstMatch
+        auditSwipeUntil(app, jarText, max: 14)
+        XCTAssertTrue(jarText.exists, "Overview month card must show the jar row")
+        sleep(1); auditShot(app, "E1-overview-month-card-jar-rows")
+        app.buttons["bottom-tab-transactions"].tap(); sleep(3)
+        for _ in 0..<12 { app.otherElements["shell-content-viewport"].firstMatch.swipeUp() }
+        sleep(1); auditShot(app, "E2-ledger-scroll-end-bubble")
+        for _ in 0..<12 { app.otherElements["shell-content-viewport"].firstMatch.swipeDown() }
+        let filter = app.buttons["transactions-jar-filter"].firstMatch
+        if filter.waitForExistence(timeout: 5) { filter.tap(); sleep(1); auditShot(app, "E3-jar-filter-open")
+            let option = app.buttons[jarName].firstMatch
+            if option.waitForExistence(timeout: 3) { option.tap() } else { app.swipeDown() }
+            sleep(2) }
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Đổ xăng'")).firstMatch
+        if row.waitForExistence(timeout: 5) { row.tap(); sleep(2); auditShot(app, "E4-transaction-detail-jar-row")
+            let close = app.buttons["Đóng"].firstMatch
+            if close.exists { close.tap() } else { app.swipeDown() } }
+        if app.buttons["add-transaction-button"].firstMatch.waitForExistence(timeout: 5) {
+            app.buttons["add-transaction-button"].firstMatch.tap(); sleep(2)
+            let hint = app.descendants(matching: .any)["transaction-jar-row"].firstMatch
+            for _ in 0..<5 where !hint.exists { app.swipeUp() }
+            if hint.exists { hint.tap(); sleep(1); auditShot(app, "E5-editor-jar-selector-open") }
+        }
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        auditOpenAccount(app, "months")
+        for _ in 0..<12 { app.swipeUp() }
+        sleep(1); auditShot(app, "E6-month-scroll-end-bubble")
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        auditOpenAccount(app, "jars")
+        let jarRow = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", jarName)).firstMatch
+        if jarRow.waitForExistence(timeout: 5) { jarRow.tap(); sleep(3)
+            let classify = app.buttons["jar-detail-classify-assistant"].firstMatch
+            auditSwipeUntil(app, classify, max: 6)
+            auditShot(app, "E7-jar-detail-classify-button") }
+        try await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
+        try await LocalAPIFixture.delete(wallet)
+    }
+
+    func testAuditLargestDynamicType() throws {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXL"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-overview"].waitForExistence(timeout: 20), "tab ids must exist at AccessibilityXL")
+        sleep(3); auditShot(app, "E8-overview-AXXL")
+        app.buttons["bottom-tab-transactions"].tap(); sleep(3); auditShot(app, "E9-ledger-AXXL")
+        XCTAssertTrue(app.buttons["bottom-tab-account"].exists)
+        app.buttons["bottom-tab-account"].tap(); sleep(2); auditShot(app, "E10-account-AXXL")
+    }
+
+    func testAuditDarkMode() throws {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI", "-AppleInterfaceStyle", "Dark"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-overview"].waitForExistence(timeout: 20))
+        sleep(3); auditShot(app, "E11-dark-overview")
+        app.buttons["bottom-tab-transactions"].tap(); sleep(3); auditShot(app, "E12-dark-ledger")
+        if app.buttons["add-transaction-button"].firstMatch.waitForExistence(timeout: 5) {
+            app.buttons["add-transaction-button"].firstMatch.tap(); sleep(2); auditShot(app, "E13-dark-editor")
+            app.swipeDown() }
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        auditOpenAccount(app, "jars"); auditShot(app, "E14-dark-jars")
+    }
+
+    func testAuditFormEditors() async throws {
+        continueAfterFailure = true
+        let suffix = String(UUID().uuidString.prefix(4))
+        let dup = "Dup \(suffix)"
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        func addWallet(_ tag: String) {
+            let add = app.buttons["wallet-add-button"].firstMatch
+            guard add.waitForExistence(timeout: 8) else { auditShot(app, "E-wallet-add-MISSING"); return }
+            add.tap(); sleep(2); if tag == "1" { auditShot(app, "E15-wallet-editor") }
+            let name = app.textFields["wallet-editor-name"].firstMatch
+            if name.waitForExistence(timeout: 5) { name.tap(); name.typeText(dup) }
+            auditShot(app, "E16-wallet-editor-filled-\(tag)")
+            (app.buttons["wallet-editor-save"].firstMatch.exists ? app.buttons["wallet-editor-save"].firstMatch : app.buttons["Tạo ví"].firstMatch).tap()
+            usleep(300_000); auditShot(app, "E17-wallet-saving-overlay-\(tag)")
+            sleep(3); auditShot(app, "E18-wallet-after-save-\(tag)")
+        }
+        auditOpenAccount(app, "wallets")
+        addWallet("1"); addWallet("2")
+        for (dest, addID, tag) in [("budgets", "budget-add", "budget"), ("recurring", "recurring-add", "recurring"), ("travel", "travel-add", "travel")] {
+            app.terminate(); app.launch()
+            XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+            auditOpenAccount(app, dest)
+            auditShot(app, "E19-\(tag)-list")
+            let add = app.buttons[addID].firstMatch
+            if add.waitForExistence(timeout: 5) { add.tap(); sleep(2); auditShot(app, "E20-\(tag)-editor")
+                let save = app.buttons.matching(NSPredicate(format: "label == 'Lưu' OR label BEGINSWITH 'Lưu'")).firstMatch
+                if save.exists { save.tap(); sleep(2); auditShot(app, "E21-\(tag)-save-empty-or-result") } }
+        }
+    }
 }
 #endif

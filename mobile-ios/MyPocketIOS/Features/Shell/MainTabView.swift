@@ -153,6 +153,9 @@ struct MainTabView: View {
                         )
                     }
                 }
+                // Shared scroll clearance: every shell ScrollView gets room below its
+                // last row so the floating Feedback bubble never covers a trailing amount.
+                .contentMargins(.bottom, MPShellNavigation.feedbackBubbleDiameter + 16, for: .scrollContent)
                 .overlay(alignment: .top) { MPBackgroundWriteStatus(center: backgroundWrites) }
                 .frame(width: geometry.size.width, height: contentHeight, alignment: .top)
                 .clipped()

@@ -24,7 +24,12 @@ struct MPText: View {
         Text(value)
             .font(font)
             .foregroundStyle(color)
+            .lineLimit(isMoneyValue ? 1 : nil)
+            .minimumScaleFactor(isMoneyValue ? 0.6 : 1)
     }
+
+    /// Short currency strings never break between the number and "₫".
+    private var isMoneyValue: Bool { value.contains("₫") && value.count <= 24 }
 
     private var font: Font {
         switch style {

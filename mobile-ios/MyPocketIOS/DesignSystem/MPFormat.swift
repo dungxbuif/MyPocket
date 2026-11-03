@@ -73,7 +73,7 @@ enum MPFormat {
     }()
 
     static func money(_ value: Int64) -> String {
-        currency.string(from: NSNumber(value: value)) ?? "(value) ₫"
+        (currency.string(from: NSNumber(value: value)) ?? "\(value) ₫").replacingOccurrences(of: " ", with: "\u{00A0}").replacingOccurrences(of: "\u{202F}", with: "\u{00A0}")
     }
 
     static func money(_ value: Int64, masked: Bool) -> String {

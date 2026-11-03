@@ -520,6 +520,25 @@ struct JarAssignmentConfirmModel: Codable, Sendable, Equatable {
     var results: [JarAssignmentResultModel]
 
     var summary: String { "Đã gán \(appliedCount)/\(totalCount) khoản" }
+
+    init(status: String, appliedCount: Int, totalCount: Int, results: [JarAssignmentResultModel]) {
+        self.status = status; self.appliedCount = appliedCount; self.totalCount = totalCount; self.results = results
+    }
+
+    private struct Receipt: Decodable { var assignmentResults: [JarAssignmentResultModel]? }
+    private enum Keys: String, CodingKey { case status, appliedCount, totalCount, results, receipt }
+
+    /// The first confirm returns `results` and counts; a replayed confirm returns only
+    /// `receipt.assignment_results`, so the counts are derived from the stored per-row results.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: Keys.self)
+        status = try container.decode(String.self, forKey: .status)
+        let direct = try container.decodeIfPresent([JarAssignmentResultModel].self, forKey: .results)
+        let stored = try container.decodeIfPresent(Receipt.self, forKey: .receipt)?.assignmentResults
+        results = direct ?? stored ?? []
+        totalCount = try container.decodeIfPresent(Int.self, forKey: .totalCount) ?? results.count
+        appliedCount = try container.decodeIfPresent(Int.self, forKey: .appliedCount) ?? results.filter { $0.status == "applied" }.count
+    }
 }
 
 struct JarAssignmentEditBody: Encodable, Sendable, Equatable {
