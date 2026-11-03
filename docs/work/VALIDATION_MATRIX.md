@@ -16,6 +16,106 @@ shared_fields:
 updated: 2026-11-02
 ---
 
+## Independent UI/UX audit (fresh-context agent) and fixes — 2026-11-03
+
+A separate agent explored the app via XCUITest on the simulator (evidence in `/tmp/ux-audit-*-att/`). Findings and disposition:
+
+| # | Finding | Disposition |
+| --- | --- | --- |
+| 1 major | Inactive retained tabs stayed in the accessibility tree (Reports' "Kỳ báo cáo" visible from Tổng quan/Giao dịch/Tài khoản) | Reproduced by `testInactiveTabsAreHiddenFromAccessibility` (FAIL without fix). Fixed in `MPTabKeepAlive` (`.disabled`, `.accessibilityElement(children: .ignore)` when inactive plus `accessibilityHidden`); test PASS, state preserved |
+| 2 major | Overview banner "Bản lưu … Chưa cập nhật từ máy chủ" never cleared and used an English date | Confirmed in code (`cachedAt` never reset on success). Fixed: cleared after a successful read; shared Vietnamese `Date.mpCachedStamp` on all four screens; unit test |
+| 3 major | Background-write failure banner: raw lowercase server text truncated, buttons squeezed, banner pushed the layout and the bottom navigation | Fixed: banner is a top overlay, message names what failed plus the capitalised server detail, buttons on their own row |
+| 4 major | Editing a transaction silently overwrote a concurrent server change (no `expected_version`) | Confirmed: `TransactionModel` did not even decode `version`. Fixed: model decodes `version`; edits send `expected_version`; a 409 rolls back, reloads and says the transaction changed elsewhere; unit tests for encoding and conflict detection |
+| 5 minor | "Closes immediately" measured 1.6–2.0 s | Same XCUITest idle/animation overhead already shown identical with a 3 s write delay; real tap-to-dismiss not measured. Pending banner too brief to capture |
+| 6–8 minor/polish | "+" FAB overlaps "Xóa giao dịch" on the transaction detail; English "Travel Mode"/"changelog"; Overview lists only 3 wallets; duplicate "Ví của tôi"; AccessibilityXL turns the tab bar into a menu and breaks "đ" onto its own line; "Tìm danh mục" label over "Nhập tên nhóm" | OPEN, logged in the backlog |
+
+Not covered by the audit: dark mode (flag produced a light UI), wallet/budget/jar/recurring/travel forms, income/transfer creation, VoiceOver reading, closed-port/offline rejection.
+
+Re-verification after fixes: native unit target PASS 456/456, `LocalFirstRuntimeTests` PASS 3/3, base guard and project verification PASS.
+
+## Simulator runtime proof of local-first — 2026-11-03
+
+Driven by XCUITest `LocalFirstRuntimeTests` (new, gated by `LOCAL_API_UI`) on MyPocket-iPhone-16 against the
+HEAD fixture API (8081). UI-test login maps to its own account (`fixture@example.com`), so the test creates a wallet
+through the fixture API first.
+
+| Check | Result |
+| --- | --- |
+| 6 tab switches (Giao dịch → Báo cáo → Tổng quan, twice) after launch preload | PASS: blocking loader never shown in any round (1.2 s observation window each) |
+| Save a transaction with every write delayed 3 s by a local proxy | PASS: editor closed in ~1.8 s (the same ~1.8 s as with no delay, so the time is UI-test/animation overhead, not network) |
+| Server receives the saved transaction after the delay | PASS: row appears once the background sync completes |
+| App killed right after save | Mutation stays in the encrypted outbox and syncs on the next launch of the same server namespace (+1 row, no duplicate). A launch pointed at a different API base URL does not see it (outbox is namespaced per server by design) |
+| Limits | Timings are simulator + local API, not production latency; no device run; the UI test was built with `SWIFT_ACTIVE_COMPILATION_CONDITIONS=$(inherited) LOCAL_API_UI` and `MYPOCKET_TEST_API_BASE_URL` |
+
+## Final self-check — 2026-11-03 02:00
+
+| Gate | Result |
+| --- | --- |
+| Backend `go vet ./...` and `go test -p 1 ./...` (migrated disposable test DB) | PASS 974/974, 20 packages (previously 4 failing: MCP route classification, two OCR limits, AIEntry fixture, jar-tool assertion — all fixed) |
+| Native unit target `MyPocketIOSTests` | PASS 452/452 |
+| Native base-component guard and self-test, project verification, icon catalog guard | PASS with a real `rg` (guards now exit 2 without it; the earlier vacuous passes are superseded by this run) |
+| Web `check:design`, `test:design`, `build` | PASS (icon study declared as a visual-reference bundle; checker allows its declared `comparison.html`/`manifest.json`) |
+| Live Assistant follow-up on HEAD backend, 2 runs | Correct 350,000 VND overrun; budget card 1 row; transaction card exactly 1 in-scope row in both runs (previously 18) |
+| Not run | Native UI tests; device timing of tab switch and save; interactive walkthrough (simulator session expired and no UI automation available) |
+
+## Audit defect fixes — 2026-11-03
+
+| Defect | Fix | Evidence | Limit |
+| --- | --- | --- | --- |
+| Assistant budget tool total counted carryover twice | `budgetSelectionLimit` adds only the base limit when the previous period of the same series is in the selection | New `TestBudgetSelectionLimitDoesNotCountCarryoverTwice` PASS (2,000,000 vs 2,600,000; unselected previous period still counted: 1,600,000) | DB-backed budget repository tests not rerun |
+| iOS hard-coded provenance v3 | Accept rule/prompt version >= 3 | `ReportAnalysisTests` + `MonthlyReportsTests` PASS | — |
+| Follow-up card scope | Handoff instruction tells the model to search with the finding's drilldown scope | Live run `b9888cb2…` now also returns a correct 1-row card (4 categories, 1–2 Nov) | NOT FIXED: the model still also runs the broad `report_scope=all`, empty-category search (18 rows) and both cards are returned; needs a deterministic rule (card selection or tool restriction), owner decision |
+
+## Local-first phases 1–2 — targeted checks, 2026-11-03
+
+| Gate | Result | Limit |
+| --- | --- | --- |
+| Debug build, signed, API 8081 | PASS; installed on MyPocket-iPhone-16 | — |
+| `FinancialMutationQueueTests` | PASS 16/16 after adapting to non-blocking submit (`settle()` helper; `.queued` result; old-owner form no longer throws because its save completed before the switch) | Contract change recorded in the design |
+| Design-system and transactions view-model suites | PASS (116) before the queue change | Not rerun after the final queue edit |
+| Full native unit target (`MyPocketIOSTests`) after phases 1–3 | PASS 452 tests, 0 failures, signed Debug build | UI tests not run |
+| Backend | `go build ./...`, `go vet` and notification handler tests PASS (push-token 500 now logged) | Full backend suite still not green (pre-existing) |
+| Base guard | Now exits 2 when `rg` is missing (verified in a clean shell); still not run with `rg` installed on this host | Earlier guard PASS records remain unproven |
+| Not run | UI tests, device UAT of tab switching and save latency | Open; no timing measurement. Simulator session had expired after reinstall (login screen), so no live walkthrough was possible without UI automation |
+
+## Product-wide API audit and cross-account isolation — 2026-11-03 00:10
+
+Run against a disposable `pg_dump` clone of the fixture DB served by a second HEAD
+API on port 8082 (stopped and dropped afterwards); the live fixture DB on 8081 was
+not written. Second test account `fixture@example.com` received the fixture
+password hash on the clone only.
+
+| Gate | Result | Limit |
+| --- | --- | --- |
+| Cross-account route sweep | PASS: 118 routes called as user B with user A's IDs (path, query and body) → all 401/404/409; 0 responses containing A data; 0 5xx | Automated body shapes; 2 PATCH cases ran against an empty B transaction id (inconclusive, covered by the equivalent create checks) |
+| Cross-reference writes | PASS: transfers, budgets, recurring, adjustments, credit entries/payments, bulk-delete, jar month, portfolio trade, travel link, category rescope and deletes targeting A objects all rejected; A-owned row fingerprint unchanged across 34 tables; 0 B rows reference A objects | Several rejections are validation (400) before ownership (404); not a code-path proof |
+| Wallet balances | PASS 14/14: `current_balance` = opening + signed transaction sum (SQL) | — |
+| Month / Insider / jars | PASS: Nov income 48,000,000 / expense 12,367,000 = SQL (excludes transfers, credit payments, non-report rows); jar spent 12,187,000 + unassigned 180,000 = total | — |
+| Transaction write flows | PASS: create/edit/move-wallet/delete restore balances; transfer pair create/edit/delete atomic and legs locked (“phải sửa/xóa theo cặp”); self-transfer, credit-wallet ordinary rows, goal-wallet expense, wrong-kind category, ≤0 amounts rejected; idempotent replay returns same id; adjustments immutable and excluded from reports; `run-due` idempotent (0 created twice) | `expected_version` is optional: PATCH without it is accepted (409 only when stale version supplied) |
+| Validation gaps observed | Amount 10^16 (> 2^53) accepted on `POST /transactions`; dates in 2030 accepted | Not asserted as bugs; owner to decide intended limits |
+| Legacy credit data | `Thẻ tín dụng` (older fixture) holds 14 ordinary rows with `credit_kind NULL`: balance −5,250,000 while statement `items` is empty for every month | Production may contain credit wallets created before the credit ledger; needs a data check |
+| `/home` | Returns `wallet_count 0` and “chưa có dữ liệu giao dịch” for an account with 14 wallets/1,295 rows; no iOS/web caller found | Dead or stale endpoint |
+| Push device registration | App launch logs 500 `POST /notifications/devices` on local sim; direct API replay registers fine; handler returns 500 without logging the error | Cause not reproduced; needs server-side error logging |
+| `/budgets` (no month) | `limit_amount`/`spent` totals cover the current month only while `items` lists all 27 budgets | Presentation consistency; iOS usage not checked |
+
+## Independent re-audit of committed code (e2f2bdef, 783e79ba) — 2026-11-02 22:10
+
+API/worker rebuilt from HEAD and restarted on the same fixture DB (1,295 transactions);
+signed Debug app rebuilt from HEAD and installed on MyPocket-iPhone-16 (API 8081).
+No computer-use tools were available, so UI was not tapped; runtime proof is API-level
+plus simulator screenshots (Overview shows the saved 350,000 VND finding after refresh).
+
+| Gate | Result | Limit |
+| --- | --- | --- |
+| Budget spent vs independent SQL | PASS 9/9 budgets (Nov 7, Oct 2): API `spent` = SQL sum (expense, report-included, no transfer, category subtree, window) = drilldown sum | Fixture months only |
+| Finding drilldowns | PASS 5/5 findings: row sums equal first metric; only `expense`, no transfers | — |
+| Day/week reuse | PASS Nov/Oct week snapshot returns the same CURRENT analysis id | `granularity=month` is not a supported report scope (400) |
+| Invalid / foreign IDs | PASS: no auth 401; unknown analysis/snapshot/target 404; report_context with unknown analysis, mismatched snapshot or unknown finding 404 | No second-owner token; cross-owner proven by source review only |
+| Follow-up (real provider) | Run `b512c226…` completed 13.1 s; prose correct (350,000 VND, single 1,850,000 VND purchase); one matching budget card | STILL OPEN: transaction card 18 rows, 1 in the budget category (`report_scope=all`, empty `category_ids`) |
+| Backend source review | go build/vet PASS; 299/300 entity+usecase tests (fails `TestAdvisorOrchestratorPrependsProductHandbook`, jar description, outside diff). Confirmed: budget tool summary sums `EffectiveLimitAmount` across same-series periods (carryover double count) and across overlapping budgets while spend is de-duplicated, overstating `remaining` (`finance_query_postgres.go:758`) | Wallet-scoped report mixes wallet spend with all-wallet carryover limit (`monthly_report_postgres.go:673`) — plausible, pre-existing |
+| iOS source review | Confirmed: `AssistantViews.swift:1036` sets pending `uncertain: true` before the request, so the "Yêu cầu có thể đã được tiếp nhận" banner/retry and disabled composer show during every normal send | Low: hard-coded v3 provenance makes future versions look stale (`ReportModels.swift:422`) |
+| Native base guard | INVALID EVIDENCE: `scripts/check-base-components.sh` prints PASS and exits 0 when `rg` is missing (`rg: command not found` in a clean shell) | Earlier "native base guard PASS" records are unproven on this host |
+
 ## Report findings local slice — done (owner accepted), 2026-11-02
 
 [Detail design](tickets/REPORTS-AI-USEFULNESS-20261102-DETAIL_DESIGN.md),

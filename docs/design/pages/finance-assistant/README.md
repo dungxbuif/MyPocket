@@ -183,3 +183,15 @@ native shell mirrors this contract through `MPShellNavigation` and
 `MPBottomNavigation`.
 
 The markdown contract is covered by `node scripts/ai-advisor-markdown.test.mjs`.
+
+## Phân loại hũ từ ghi chú — planned 2026-11-03
+
+Người dùng hỏi "Gợi ý hũ cho các khoản chi chưa phân bổ tháng này" (hoặc bấm "Phân loại bằng Trợ lý" từ chi tiết hũ, gửi `jar_context` theo ID). Trợ lý đọc ghi chú, danh mục và các giao dịch tương tự đã gắn hũ (qua `search_transactions` với `note_contains`), rồi trả thẻ `jar_assignment_confirmation`:
+
+| Vùng | Base | Contract |
+| --- | --- | --- |
+| Thẻ | `MPAssistantCard` | Tiêu đề "Đề xuất gán hũ · N khoản"; trạng thái `MPStatusBadge` |
+| Từng dòng | `MPTransactionRow` + `MPOptionSelector` (đổi hũ) + `MPText(.secondary)` lý do | Lý do trích ghi chú hoặc "3 khoản tương tự đã gắn hũ X"; bỏ từng dòng |
+| Hành động | `MPButton` "Áp dụng" / "Bỏ qua" | Áp dụng qua `POST /ai/advisor/actions/{id}/confirm`; server `PATCH /transactions/{id}` với `expected_version`; dòng xung đột được báo riêng |
+
+Giới hạn: tối đa 50 dòng; chỉ chi thường; không đổi mức hũ; không tạo hũ (dùng `propose_create_jar` nếu thiếu). Ghi chú có `#ten-hu` khớp tên hũ (bỏ dấu, chữ thường) được ưu tiên. Xem [JARS-AS-WALLET-CARDS](../../../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md).

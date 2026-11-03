@@ -182,3 +182,7 @@ Review remediation evidence (2026-10-27): the four owned reference test classes
 passed 24/24 and the normally signed `MyPocketIOSTests` target passed 422/422 on
 the iPhone 16 iOS 18.5 simulator. The Release warnings-as-errors build,
 base-component guard, and project verification also passed.
+
+## Hũ trong Báo cáo — planned 2026-11-03
+
+"Hũ cộng dồn" giữ dữ liệu; nhãn "Chênh lệch" → "Kế hoạch còn lại"; thêm dòng "Chưa phân bổ" để tổng theo hũ khớp tổng chi tháng. Không thêm biểu đồ. Xem [JARS-AS-WALLET-CARDS](../../../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md).

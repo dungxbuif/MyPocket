@@ -87,6 +87,10 @@ không được suy ra từ các trường hiện tại.
 - JAR-09: Thiếu dữ liệu thì hiển thị trạng thái rỗng hoặc bỏ phần phân tích không có dữ liệu. Giao dịch chưa phân hũ vẫn có thể xem ở bộ lọc riêng và báo cáo chung.
 - JAR-10: Cộng dồn theo hũ từ tháng đầu có dữ liệu đến tháng đang xem hoặc khoảng tháng user chọn. Luôn có tổng chi và diễn biến từng tháng; tổng phân bổ/chênh lệch chỉ tính trong các tháng có cấu hình tương ứng và phải nêu rõ độ bao phủ.
 - JAR-11: Chênh lệch cộng dồn là phép tổng hợp để nhìn lại kế hoạch, không phải tiền trong một ví và không cấp thêm phân bổ cho tháng mới.
+- JAR-12 (2026-11-03): "Còn có thể chi" là kế hoạch còn lại cộng dồn từ tháng đầu có cấu hình đến tháng đang xem; chi ở tháng không đặt mức vẫn trừ. Được hiển thị trên thẻ hũ nhưng không phải tiền trong ví và không cấp thêm mức cho tháng mới (làm rõ JAR-07/JAR-11, không thay thế). Cấm gọi là "số dư hũ".
+- JAR-13 (2026-11-03): Màn hũ luôn hiển thị dòng đối chiếu tổng kế hoạch còn lại với tổng số dư các ví `is_in_total`; vượt thì cảnh báo, không chặn.
+- JAR-14 (2026-11-03): "Chưa phân bổ" là chi thường hợp lệ không gắn hũ, hiển thị theo tháng (chính) và cộng dồn (phụ); luôn có mặt để tổng theo hũ khớp tổng chi.
+- AI-JAR-01 (2026-11-03): Trợ lý chỉ đề xuất gán hũ qua thẻ xác nhận; lý do dẫn từ ghi chú, danh mục hoặc giao dịch tương tự; không gán cho thu nhập, chuyển ví, tín dụng; không tự tạo hũ từ hashtag.
 
 ### Công thức và ví dụ hũ
 

@@ -10,6 +10,26 @@ shared_fields: [status, trace]
 
 # API
 
+## Planned additive jar contract — 2026-11-03 (not implemented)
+
+Per [JARS-AS-WALLET-CARDS](../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md) / [ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md): `GET /jars?month=` items gain `remaining_plan`, `cumulative_allocated`, `cumulative_spent`, `allocation_months`, `months_in_range`, `first_config_month`, `month_variance`; summary gains `remaining_plan_total`, `unassigned_cumulative`, `wallets_in_total_balance`, `plan_exceeds_wallets_by`. `GET /transactions` gains `jar_id=<id>|unassigned`. `GET /jars/{id}/report` months gain `remaining_plan`. Assistant gains `propose_assign_jar` and the `jar_assignment_confirmation` part, plus `jar_context` on message submit; application goes through the existing action confirm route with `expected_version` per row.
+
+## Contract clarifications — 2026-11-03
+
+- Transaction/transfer/adjustment `amount` must be 1..9,007,199,254,740,991; `occurred_at` must be
+  2000-01-01 or later and at most one year ahead (400 otherwise).
+- Credit statement `items` list every income/expense row of the credit wallet, including legacy rows
+  without `credit_kind`, so the list reconciles with `balance`.
+- `GET /home` returns the owner's real wallet and month-note counts.
+- `GET /budgets` totals (`limit_amount`, `spent`) describe active periods only; `items` lists every
+  period. The Assistant budget tool total adds a period's base limit when the previous period of the
+  same series is also selected, so carryover is never counted twice; a name-only search spans all periods.
+- In a wallet-filtered monthly report, an all-wallet budget keeps all wallets in both its calculation
+  and its evidence drilldown.
+- Assistant follow-up about one saved finding drops transaction rows outside that finding's
+  category/date/type scope and keeps only the most specific remaining list.
+- `GET /reports/analyses/latest` is classified as not exposed through MCP.
+
 ## Local report-analysis candidate — 2026-11-02
 
 Report rule and analysis rule/prompt versions are v3. ReportInsight keeps its

@@ -81,3 +81,7 @@ API: `GET /api/v1/months/{YYYY-MM}`. No AI text, fixture data, or manual close a
 Implementation update: the month card is connected to the authenticated month API, formats the current month using the saved account timezone, masks currency with the privacy toggle, retries report errors independently, and links to month detail/Hũ. No fixture totals are rendered.
 
 Automated proof: `npm run check:design`, `npm run test:design`, and `npm run build` pass. `npm run test:calendar` covers account-local month selection. Weekly report totals are additionally covered by deterministic web and native tests for timezone boundaries and excluded transaction kinds. Runtime proof must still verify totals after a persisted transaction change and note independence. Owner browser UAT is pending; AI narrative and other report modules are outside this screen.
+
+## Hũ trong Tổng quan — planned 2026-11-03
+
+Thẻ tháng thêm hai `MPGroupedRow`: "Hũ: còn có thể chi tổng X" và "Chưa phân bổ tháng này: Y", dữ liệu từ `GET /jars?month=`; nút "Xem hũ tháng" giữ nguyên. Xem [JARS-AS-WALLET-CARDS](../../../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md).

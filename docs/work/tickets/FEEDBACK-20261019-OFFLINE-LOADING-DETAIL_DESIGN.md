@@ -8,6 +8,9 @@ parent: FEEDBACK-20261019-DETAIL_DESIGN
 
 # Offline read and loading UX
 
+> Extended by [LOCAL-FIRST-20261103](LOCAL-FIRST-20261103-DETAIL_DESIGN.md): the read contract below
+> now also applies to every screen, and writes become local-first.
+
 ## User feedback
 
 Khi chuyển qua lại giữa các màn native, dữ liệu chưa được giữ ổn định: màn có

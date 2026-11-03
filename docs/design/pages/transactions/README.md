@@ -332,3 +332,15 @@ Automated proof covers backend owner scope, positive amount/type validation, wal
 2026-09-24 weekly-ledger proof: `test:calendar` covers Monday–Sunday and year boundaries in account-local time; `test:transactions` covers wallet + week predicate at UTC boundary; the SSR period-selector fixture covers tab labels/range/future-week disable. Chrome on the local preview showed All → 21–27/9 → 14–20/9 with cashflow/list updates, empty state, next-week disable, and custom-dialog cancel preserving week. Build/design checks pass. Owner mobile visual acceptance remains open. [User guide](../../../guides/transactions.md).
 
 Transfer proof now includes `npm run test:transfer:e2e` (real Chromium UI/state) and `npm run test:transfer:integrated` (Vite proxy/API/PostgreSQL state). Residual gaps remain separate tickets: attachments/OCR, advanced search/filter/pagination, and owner UAT sign-off.
+
+## Hũ trong sổ giao dịch — planned 2026-11-03
+
+Theo [JARS-AS-WALLET-CARDS](../../../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md):
+
+| Thay đổi | Base | Contract |
+| --- | --- | --- |
+| Bộ lọc hũ | capsule thứ hai kiểu `MPWalletScopeSelector` hoặc `MPOptionSelector` | Tất cả · từng hũ của tháng · Chưa gắn hũ; kết hợp với bộ lọc ví và kỳ; API `jar_id=<id>` / `jar_id=unassigned` |
+| Chip hũ | `MPStatusBadge(.muted)` trong `MPTransactionRow` | Chỉ khoản chi có hũ |
+| Gợi ý trong editor | `MPText(.secondary)` dưới `MPOptionSelector` hũ | "Hũ X còn có thể chi N đ" hoặc "sẽ vượt mức tháng N đ" (danger); chỉ thông tin, không chặn lưu |
+
+Mở từ thẻ "Chưa phân bổ" hoặc "Xem tất cả" của chi tiết hũ: sổ mở sẵn với bộ lọc tương ứng và tháng đó.

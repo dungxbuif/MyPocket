@@ -1,5 +1,44 @@
 # Quản lý hũ
 
+## Thiết kế đích 2026-11-03 — hũ hiển thị như ví (planned)
+
+Nguồn: [detail design](../../../work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md), [ADR-029](../../../decisions/ADR-029-jar-cumulative-plan-presentation.md). Trạng thái: `ready`, chưa implement; phần "Composition" lịch sử bên dưới mô tả bản đang chạy.
+
+### Màn Hũ
+
+| Vùng | Base | Contract |
+| --- | --- | --- |
+| Header | `MPSelectionScreenHeader` | "Hũ chi tiêu"; Đóng trái, Sửa/Xong phải như màn Ví |
+| Dòng đối chiếu | `MPStatusMessage` info/danger | "Kế hoạch còn lại của các hũ: X · Tiền trong ví: Y"; X > Y → danger "Kế hoạch vượt tiền thực có Z". Y = Σ số dư ví `is_in_total` |
+| Chọn tháng | `MPOptionSelector` | `YYYY-MM` theo timezone tài khoản; cộng dồn tính đến tháng chọn |
+| Dòng hũ | `MPWalletSelectionList` + `MPWalletRow(.jar)` + `MPProgressBar` + `MPStatusBadge` | Số chính "Còn có thể chi" (cộng dồn); dòng phụ "Tháng này chi / mức"; tiến độ chi/mức tháng; badge "Vượt mức"; hũ không mức: số chính "Đã chi cộng dồn", phụ "Chưa đặt mức" |
+| Chưa phân bổ | `MPWalletRow` glyph trung tính | Chính: chi chưa gắn hũ tháng này; phụ "Cộng dồn: …"; chạm mở sổ giao dịch lọc `Chưa gắn hũ`; luôn hiện |
+| Hành động | `MPButton` | Thêm hũ luôn hiện; Sửa: chạm dòng mở editor; gỡ khỏi tháng có xác nhận trong editor |
+| Editor | `MPEditorScaffold`, `MPAmountField`, `MPNumberField(.percentage)` | Như hiện tại + dòng xem trước "Còn có thể chi sau khi lưu" |
+| Trạng thái | `MPLoadingPresentationPolicy`, `MPEmptyView`, `MPErrorView` | Vẽ từ cache đọc-trước, tải nền; rỗng vẫn hiện Chưa phân bổ và Thêm hũ |
+
+Khối "Cộng dồn" chọn hũ ở cuối màn hiện tại bị bỏ; dữ liệu chuyển lên thẻ và màn chi tiết.
+
+### Màn chi tiết hũ (mới)
+
+| Vùng | Base | Contract |
+| --- | --- | --- |
+| Header | `MPCenteredScreenHeader` + `MPOverflowMenu` | Tên hũ; Sửa mức tháng · Gỡ khỏi tháng · Hỏi Trợ lý về hũ này |
+| Ba số | `MPMetricGrid` ×3 (masked) | Còn có thể chi · Mức tháng này · Đã chi tháng này |
+| Chú thích | `MPText(.secondary)` | "Kế hoạch tháng này: 15.000.000 đ · Dư từ tháng trước: +5.000.000 đ · Còn có thể chi theo kế hoạch: 20.000.000 đ"; tháng không mức: "Tháng này chưa đặt mức; chi vẫn trừ vào kế hoạch còn lại" |
+| Diễn biến | `MPFinanceCard` + `MPGroupedRow` | Mỗi tháng: mức, chi, dư, luỹ kế; "Mức có ở N/M tháng" |
+| Giao dịch | `MPSurfaceCard(.grouped)` + `MPTransactionRow` | Tháng đang xem; "Xem tất cả" mở sổ lọc theo hũ; chạm dòng mở editor |
+| Trợ lý | `MPButton(.secondary)` "Phân loại bằng Trợ lý" | Mở Assistant toàn màn với `jar_context` |
+
+### Copy
+
+"Còn có thể chi", "Mức tháng này", "Đã chi tháng này", "Dư từ tháng trước", "Chưa phân bổ", "Kế hoạch vượt tiền thực có". Cấm: "số dư hũ".
+
+### API
+
+`GET /api/v1/jars?month=` (thêm `remaining_plan`, `cumulative_*`, `allocation_months`, `months_in_range`, summary `remaining_plan_total`, `unassigned_cumulative`, `wallets_in_total_balance`, `plan_exceeds_wallets_by`), `GET /api/v1/transactions?jar_id=<id>|unassigned`, `GET /api/v1/jars/{id}/report` (thêm `remaining_plan` luỹ kế).
+
+
 ## Task 4 ownership boundary
 
 The native implementation remains in

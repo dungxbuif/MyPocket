@@ -18,7 +18,76 @@ shared_fields:
 updated: 2026-11-02
 ---
 
-## Report/Assistant usefulness — local candidate in_review, 2026-11-02
+## Local-first reads and writes — in_progress (owner approved), 2026-11-03
+
+Owner requirement: always read local data first and refresh in the background, and
+apply writes locally before syncing, to remove tab-switch loading and slow saves.
+[Detail design](tickets/LOCAL-FIRST-20261103-DETAIL_DESIGN.md) builds on the
+in-progress [offline/loading design](tickets/FEEDBACK-20261019-OFFLINE-LOADING-DETAIL_DESIGN.md).
+Audit: snapshot cache is only a failure fallback and the outbox/sync engine is not
+wired into any screen. Phased: reads, then transaction writes, then the rest. Needs
+owner approval of the design and three open questions before implementation (changes
+architecture and write semantics). Owner approved on 2026-11-03: phase by phase,
+implement first, one combined test pass after. Phase 1 (tab keep-alive + preload +
+reactivation refresh) and the Phase 2 core (non-blocking outbox submit, optimistic
+edit/delete with rollback) are implemented and compile; tests pending. Phase 3 also implemented: disk read-through for Reports/Budgets/Jars, close-first background
+writes for wallet/budget/category/jar/recurring/travel, optimistic balances. Open: combined
+test pass results and device timing before `in_review`.
+
+## Product-wide audit follow-ups — draft, 2026-11-03
+
+Cross-account isolation and core money flows PASS on a clone
+([validation](VALIDATION_MATRIX.md)). Open items, owner to prioritise: (1) legacy
+credit wallets with ordinary rows are invisible to statements — add a production
+data check and a migration or statement fallback; (2) `/notifications/devices` 500
+on app launch is unlogged — add error logging, then diagnose; (3) `/home` returns
+empty stats and has no caller — remove or fix; (4) decide amount upper bound
+(10^16 accepted) and future-date policy; (5) `/budgets` totals vs full item list.
+
+## Hũ hiển thị như ví + AI gán hũ từ ghi chú — ready, owner approved 2026-11-03
+
+Owner decided to keep one concept (Hũ), show jars like wallets with a cumulative "Còn có thể chi"
+plan figure, an always-present "Chưa phân bổ" card, a mandatory reconciliation line against
+`is_in_total` wallets, monthly targets unchanged, and Assistant-proposed jar assignment from notes
+via a confirmation card. [Detail design](tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md),
+[ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md), screen specs under
+`docs/design/pages/{jars,transactions,overview,month-detail,reports,finance-assistant}`. No schema
+change. Phases: 1 API + jar list/detail; 2 ledger filter/chip/editor hint, overview, month, reports;
+3 Assistant tool/card. Starts after local-first acceptance and commit (phase 0). Supersedes the
+earlier "remove jars / wallet hashtags" draft.
+
+## UX polish from the independent audit — draft, 2026-11-03
+
+"+" FAB overlapping the delete button on transaction detail; English strings ("Travel Mode",
+"changelog"); Overview shows only the first 3 wallets; duplicate "Ví của tôi" on Account;
+AccessibilityXL layout (tab bar menu, wrapped currency); category search label/placeholder
+mismatch; dark mode and the wallet/budget/jar/recurring/travel forms still unaudited.
+
+## Re-audit defects from committed report findings — fixed, 2026-11-03
+
+All items recorded by the 2026-11-02/03 audits were fixed with regression tests (see the
+validation matrix): carryover double count, all-wallet budget scope in wallet reports, name-only
+budget search, legacy credit rows in statements, amount/date limits, `/home` counts, Assistant card
+scope, Assistant in-flight banner, forward-compatible provenance, vacuous guard, and the four
+pre-existing backend test failures. `/budgets` totals are documented as active-period totals.
+Web design check/build and the full backend suite are green. Open: native UI tests and device timing.
+
+## Follow-up: Assistant follow-up transaction card scope — draft, 2026-11-02
+
+From the accepted report-findings slice: a report follow-up run made an extra
+`search_transactions` call with empty `category_ids` and `report_scope=all`,
+returning 18 rows including transfers in the optional transaction card. Needs a
+detail design (AI tool scope/prompt contract change) and owner approval before
+implementation. Evidence: [validation](VALIDATION_MATRIX.md).
+
+## Follow-up: full backend/web suite failures — draft, 2026-11-02
+
+Pre-existing failures outside the report-findings slice: MCP latest-route
+classification, two OCR source limits, AIEntry `batch_version` fixture, jar-tool
+description assertion; web `check:design`/`npm build` blocked by non-spec
+icon-reference `comparison.html`/`manifest.json`. Next: triage each, fix or record.
+
+## Report/Assistant usefulness — done (owner accepted), 2026-11-02
 
 Owner screenshot and live review establish low-value generic AI output plus
 budget scope defects. [Audit](tickets/REPORTS-AI-USEFULNESS-20261102-AUDIT.md)
@@ -35,10 +104,10 @@ Fullscreen follow-up preserves the correct context and returns the 350,000 VND
 overrun with one relevant budget card. Its optional transaction card is still
 too broad: an additional `report_scope=all` search with empty `category_ids`
 returned 18 rows including transfers. Track this as an open follow-up/acceptance
-gap; prompt/tool-scope redesign is outside this slice. Next: owner acceptance of
-the saved November findings left visible on the simulator, then disposition of
-the residual Assistant card scope and broader validation failures. Status stays
-`in_review`; no full-app UAT, migration, production change or merge is claimed.
+gap; prompt/tool-scope redesign is outside this slice. Owner accepted the saved
+November findings on 2026-11-02; status `done`. Residual card scope and broader
+validation failures moved to the follow-ups above. No full-app UAT, migration,
+production change or merge is claimed.
 
 ## Rich local product data — in_review, 2026-11-02
 

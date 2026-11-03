@@ -1,3 +1,5 @@
+artifact_source: visual_reference
+
 # MyPocket icon study
 
 MyPocket ships a small, local-only subset of Phosphor Icons regular 2.1.1 in

@@ -75,6 +75,7 @@ are route classifications, not permission scopes:
     "GET /api/v1/reports/monthly/transactions",
     "POST /api/v1/reports/analyses",
     "GET /api/v1/reports/analyses/{id}",
+    "GET /api/v1/reports/analyses/latest",
     "POST /api/v1/reports/analyses/{id}/cancel",
     "POST /api/v1/ai/advisor/entries",
     "GET /api/v1/ai/advisor/entries/{id}",

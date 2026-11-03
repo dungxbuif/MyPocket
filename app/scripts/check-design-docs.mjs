@@ -8,7 +8,7 @@ for(const file of walk(root)) {
   if(!file.endsWith('.md')) {
     const spec=path.join(path.dirname(file),'README.md');
     const declared=existsSync(spec) && /^artifact_source: visual_reference$/m.test(readFileSync(spec,'utf8'));
-    if(!declared || !['code.html','screen.png'].includes(path.basename(file))) errors.push(`Non-spec artifact: ${file}`);
+    if(!declared || !['code.html','screen.png','comparison.html','manifest.json'].includes(path.basename(file))) errors.push(`Non-spec artifact: ${file}`);
     continue;
   }
   for(const match of readFileSync(file,'utf8').matchAll(/\[[^\]]*\]\(([^)]+)\)/g)) {

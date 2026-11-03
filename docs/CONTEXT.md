@@ -22,7 +22,44 @@ shared_fields:
 updated: 2026-11-02
 ---
 
-## Evidence-backed report findings — in_review, 2026-11-02
+## Local-first reads and writes — in_progress, 2026-11-03
+
+New owner priority: local data first, background sync, no tab-switch loading or slow
+saves. [Detail design](work/tickets/LOCAL-FIRST-20261103-DETAIL_DESIGN.md) awaits owner
+approval (granted 2026-11-03). Implemented: tabs stay mounted with preload, outbox submit no
+longer waits for the network, optimistic edit/delete with rollback. Build passes; tests pending.
+
+## Hũ hiển thị như ví — design ready, 2026-11-03
+
+Owner approved the jar direction: one concept, wallet-style jar cards with cumulative "Còn có thể
+chi", "Chưa phân bổ" card, reconciliation line, monthly targets kept, Assistant jar assignment from
+notes through confirmation. [Design](work/tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md),
+[ADR-029](decisions/ADR-029-jar-cumulative-plan-presentation.md). Implementation waits for local-first
+acceptance/commit.
+
+## Independent UI/UX audit — 2026-11-03
+
+A fresh-context agent drove the simulator. Four major findings (inactive tabs exposed to accessibility,
+stale cache banner, failure banner layout, transaction edit overwrite without `expected_version`) were
+fixed and re-verified (native 456/456, runtime UI tests 3/3). Polish items and the jar-removal /
+wallet-hashtag direction are in the [backlog](work/BACKLOG.md).
+
+## Product-wide audit — 2026-11-03
+
+Cross-account isolation (118 routes + cross-reference writes) and wallet/month/jar/
+transaction/transfer/adjustment/recurring flows PASS on a disposable clone. Five
+lower-severity follow-ups recorded in the [backlog](work/BACKLOG.md). No code changed.
+
+## Re-audit of committed report findings — 2026-11-02 22:10
+
+Runtime rebuilt from HEAD (API/worker on 8081, app on MyPocket-iPhone-16). API audit
+passes budget/drilldown/reuse/ownership checks; independent reviews confirmed three
+defects (budget-tool remaining overstated, Assistant retry banner on every send,
+vacuous base guard without `rg`) plus the still-open broad transaction card. See
+[validation](work/VALIDATION_MATRIX.md) and [backlog](work/BACKLOG.md). Awaiting owner
+decision on fixes.
+
+## Evidence-backed report findings — done (owner accepted), 2026-11-02
 
 The [approved design](work/tickets/REPORTS-AI-USEFULNESS-20261102-DETAIL_DESIGN.md)
 is implemented locally: canonical budget periods/carryover, typed findings with
@@ -47,9 +84,10 @@ acceptance gap, outside this slice's prompt/tool-scope redesign.
 The 21:22 host reboot removed prior temporary logs/xcresults; those test outcomes
 are historical recorded results. The fixture DB (1,295 transactions) and installed
 signed app survived. Latest reported local processes are API 7305, worker 7306,
-Redis 49473, using API 8081 and the same DB. The simulator is left on the saved
-November findings for owner review. Status remains `in_review`; owner acceptance
-and broader Assistant UX remain open. No new migration, production change or
+Redis 49473, using API 8081 and the same DB. The owner accepted the saved
+November findings on 2026-11-02 and the slice is `done`. Next queued follow-ups:
+Assistant follow-up transaction-card scope (needs design approval) and full
+backend/web suite triage; see [backlog](work/BACKLOG.md). No new migration, production change or
 merge. [Work ledger](../.superpowers/sdd/2026-11-02-report-findings/progress.md).
 
 ## Saved report AI usefulness — historical runtime audit, 2026-11-02
