@@ -1,7 +1,7 @@
 ---
 artifact_type: detail_design
 id: JARS-AS-WALLET-CARDS-20261103
-status: ready
+status: in_progress
 owner: shared
 human_fields:
   - approval
@@ -141,6 +141,14 @@ Tất cả owner-scoped như hiện nay. Không có migration.
 - JAR-13: Màn hũ phải hiển thị dòng đối chiếu tổng kế hoạch còn lại với tổng số dư các ví tính vào tổng; vượt thì cảnh báo.
 - JAR-14: "Chưa phân bổ" là chi thường hợp lệ không gắn hũ, hiển thị theo tháng và cộng dồn; luôn có mặt để tổng theo hũ khớp tổng chi.
 - AI-JAR-01: Trợ lý chỉ đề xuất gán hũ qua thẻ xác nhận; lý do phải dẫn từ ghi chú, danh mục hoặc giao dịch tương tự; không gán cho thu nhập/chuyển ví/tín dụng.
+
+## Tiến độ thực hiện
+
+- Giai đoạn 0 xong: ba commit (backend, iOS local-first, docs).
+- Giai đoạn 1 — **backend xong**: `GET /jars?month=` có các trường cộng dồn và tổng đối chiếu; `GET /transactions?jar_id=<id>|unassigned`; test repository cho ví dụ 15/10/20, vượt mức, đối chiếu ví, cô lập tháng. Số liệu thật trên fixture đã đọc lại.
+- Giai đoạn 1 — **iOS đã code, chưa nghiệm thu bằng mắt**: model có trường cộng dồn (optional, payload cũ vẫn decode), base mới `MPJarPlanRow`, `JarPlanPresentation` (tiêu đề/số chính/chú thích/đối chiếu; âm hiển thị "Vượt kế hoạch"), màn Hũ dạng ví + thẻ Chưa phân bổ + dòng đối chiếu, màn chi tiết hũ. Unit test 465 qua; chưa có UI test/ảnh chụp vì tài khoản UI-test không có hũ.
+- Còn lại giai đoạn 1: UI test với hũ tạo qua API, đối chiếu ảnh chụp; thay `MPJarPlanRow` bằng biến thể của `MPWalletRow` nếu owner muốn giống hệt ví.
+- Giai đoạn 2 và 3 chưa làm.
 
 ## Giai đoạn và thứ tự
 

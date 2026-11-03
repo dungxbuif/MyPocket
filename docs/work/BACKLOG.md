@@ -44,7 +44,7 @@ on app launch is unlogged — add error logging, then diagnose; (3) `/home` retu
 empty stats and has no caller — remove or fix; (4) decide amount upper bound
 (10^16 accepted) and future-date policy; (5) `/budgets` totals vs full item list.
 
-## Hũ hiển thị như ví + AI gán hũ từ ghi chú — ready, owner approved 2026-11-03
+## Hũ hiển thị như ví + AI gán hũ từ ghi chú — in_progress (phase 1 backend done, iOS coded), owner approved 2026-11-03
 
 Owner decided to keep one concept (Hũ), show jars like wallets with a cumulative "Còn có thể chi"
 plan figure, an always-present "Chưa phân bổ" card, a mandatory reconciliation line against

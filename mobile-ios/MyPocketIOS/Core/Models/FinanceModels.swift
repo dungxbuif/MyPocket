@@ -786,6 +786,14 @@ struct JarItemModel: Codable, Identifiable, Sendable {
     var calculatedAllocation: Int64?
     var spent: Int64
     var active: Bool
+    // Cumulative plan (JAR-12); optional so cached/older payloads still decode.
+    var cumulativeAllocated: Int64?
+    var cumulativeSpent: Int64?
+    var remainingPlan: Int64?
+    var allocationMonths: Int?
+    var monthsInRange: Int?
+    var firstConfigMonth: String?
+    var monthVariance: Int64?
 }
 
 struct JarMonthSummaryModel: Codable, Sendable {
@@ -800,6 +808,10 @@ struct JarMonthSummaryModel: Codable, Sendable {
     var overOneHundredPercent: Bool
     var jars: [JarIdentityModel]
     var items: [JarItemModel]
+    var remainingPlanTotal: Int64?
+    var unassignedCumulative: Int64?
+    var walletsInTotalBalance: Int64?
+    var planExceedsWalletsBy: Int64?
 }
 
 struct JarIdentityModel: Codable, Identifiable, Sendable {

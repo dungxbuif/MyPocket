@@ -1055,16 +1055,26 @@ struct JarsView: View {
     @State private var removalTarget: JarItemModel?
     @State private var removingJarID: String?
     @State private var accountTimezone = TimeZone.current.identifier
+    @State private var detailTarget: JarDetailTarget?
 
     var body: some View {
         Group {
-            if editorSession.isPresented { editorContent } else { listContent }
+            if editorSession.isPresented { editorContent }
+            else if let detailTarget, let summary = currentSummary {
+                JarDetailView(
+                    api: api, target: detailTarget, summary: summary, month: month, timeZone: accountTimezoneValue, masked: masked,
+                    onBack: { self.detailTarget = nil },
+                    onEdit: { item in self.detailTarget = nil; beginEditing(item) },
+                    onRemove: { item in removalTarget = item }
+                )
+            } else { listContent }
         }
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, TimeZone(identifier: accountTimezone) ?? .current)
         .task { await load() }
         .onChange(of: month) { _, _ in
             editTarget = nil
+            detailTarget = nil
             resetEditor()
             editorSession.complete()
             report = nil
@@ -1122,22 +1132,10 @@ struct JarsView: View {
                     }
                 }
                 if let summary = currentSummary {
-                    MPFinanceCard {
-                        MPText(JarsFlowCopy.summaryTitle, style: .emphasis)
-                        MPText(
-                            JarsReferencePresentation.monthContext(
-                                month: summary.month,
-                                currentMonth: MPFormat.currentMonth(timeZone: TimeZone(identifier: summary.timezone) ?? accountTimezoneValue)
-                            ),
-                            style: .secondary
-                        )
-                        MPMetricGrid(items: [
-                            MPMetricItem(title: "Thu thực tế", value: MPFormat.money(summary.actualIncome), masked: masked),
-                            MPMetricItem(title: "Chi thực tế", value: MPFormat.money(summary.totalSpent), masked: masked),
-                            MPMetricItem(title: "Đã phân bổ", value: MPFormat.money(summary.totalAllocated), masked: masked)
-                        ], masked: false)
+                    if let reconciliation = JarPlanPresentation.reconciliation(summary, masked: masked) {
+                        MPStatusMessage(text: reconciliation.text, tone: reconciliation.exceeds ? .danger : .info)
+                            .accessibilityIdentifier("jars-reconciliation")
                     }
-                    .accessibilityIdentifier(JarsReferencePresentation.summaryAccessibilityID)
                     if summary.overIncome || summary.overOneHundredPercent {
                         MPStatusMessage(text: "Tổng phân bổ vượt thu thực tế. Đây là cảnh báo, không chặn giao dịch.", tone: .danger)
                             .accessibilityIdentifier("jars-allocation-warning")
@@ -1154,113 +1152,36 @@ struct JarsView: View {
                         .accessibilityIdentifier(JarsReferenceCopy.addActionAccessibilityID)
                     }
                     if summary.items.isEmpty { MPEmptyView(title: "Chưa có hũ cho tháng này", detail: "Chi tiêu vẫn được ghi nhận bình thường.") }
-                    if !summary.items.isEmpty {
-                        MPSurfaceCard(style: JarsReferencePresentation.listSurfaceStyle) {
-                            VStack(alignment: .leading, spacing: JarsReferencePresentation.rowSpacing) {
-                                ForEach(Array(summary.items.enumerated()), id: \.element.id) { index, item in
-                                    if index > 0 { MPInsetDivider() }
-                                    MPGroupedRow {
-                                        VStack(alignment: .leading, spacing: MPMetrics.rowSpacing) {
-                                            HStack(alignment: .top, spacing: MPMetrics.rowSpacing) {
-                                                VStack(alignment: .leading, spacing: 4) {
-                                                    MPText(item.name, style: .emphasis).lineLimit(2)
-                                                    MPStatusBadge(
-                                                        text: item.active ? "Đang dùng tháng này" : "Lịch sử",
-                                                        tone: MPStatusBadge.tone(for: item.active)
-                                                    )
-                                                }
-                                                Spacer(minLength: MPMetrics.sectionSpacing)
-                                                VStack(alignment: .trailing, spacing: 4) {
-                                                    MPText("Chi thực tế", style: .secondary)
-                                                    MPText(MPFormat.money(item.spent, masked: masked), style: .emphasis)
-                                                }
-                                            }
-                                            if let allocation = JarsReferencePresentation.allocation(for: item),
-                                               let progress = JarsReferencePresentation.progress(spent: item.spent, allocation: allocation) {
-                                                MPProgressBar(progress: progress, label: "Đã chi / phân bổ")
-                                                HStack {
-                                                    MPText("Phân bổ \(MPFormat.money(allocation, masked: masked))", style: .secondary)
-                                                    Spacer(minLength: MPMetrics.rowSpacing)
-                                                    if JarsReferencePresentation.isOverspent(spent: item.spent, allocation: allocation) {
-                                                        MPStatusBadge(text: "Vượt mức", tone: .danger)
-                                                    }
-                                                }
-                                            } else {
-                                                MPStatusBadge(text: "Chưa đặt phân bổ", tone: .muted)
-                                            }
-                                            if item.active {
-                                                HStack(spacing: MPMetrics.rowSpacing) {
-                                                    MPButton("Sửa tháng này", style: .secondary, fullWidth: false) { beginEditing(item) }
-                                                        .accessibilityIdentifier("jar-edit-\(item.jarID)")
-                                                    MPButton("Gỡ khỏi tháng", style: .destructive, isDisabled: removingJarID != nil, fullWidth: false) { removalTarget = item }
-                                                        .accessibilityIdentifier("jar-remove-\(item.jarID)")
-                                                        .accessibilityHint("Chỉ gỡ cấu hình của tháng này")
-                                                }
-                                            } else {
-                                                MPText("Cấu hình lịch sử; giao dịch vẫn được giữ.", style: .secondary)
-                                            }
-                                        }
-                                    }
+                    MPSurfaceCard(style: JarsReferencePresentation.listSurfaceStyle) {
+                        VStack(alignment: .leading, spacing: JarsReferencePresentation.rowSpacing) {
+                            ForEach(Array(summary.items.enumerated()), id: \.element.id) { index, item in
+                                if index > 0 { MPInsetDivider() }
+                                MPGroupedRow {
+                                    MPJarPlanRow(
+                                        title: item.name,
+                                        amount: MPFormat.money(JarPlanPresentation.headlineAmount(item), masked: masked),
+                                        amountCaption: JarPlanPresentation.headlineTitle(item),
+                                        subtitle: JarPlanPresentation.monthLine(item, masked: masked),
+                                        progress: JarPlanPresentation.monthProgress(item),
+                                        badge: JarPlanPresentation.isOverMonth(item) ? (text: "Vượt mức", tone: .danger) : (item.active ? nil : (text: "Lịch sử", tone: .muted)),
+                                        accessibilityIdentifier: "jar-row-\(item.jarID)"
+                                    ) { detailTarget = .jar(item) }
                                 }
                             }
-                        }
-                        .accessibilityIdentifier(JarsReferencePresentation.listAccessibilityID)
-                    }
-                    MPFinanceCard {
-                        MPText(JarsFlowCopy.unassignedTitle, style: .emphasis)
-                        MPMetricGrid(items: [
-                            MPMetricItem(title: "Chi chưa gắn hũ", value: MPFormat.money(summary.unassignedSpent), masked: masked),
-                            MPMetricItem(title: "Tổng chi tháng", value: MPFormat.money(summary.totalSpent), masked: masked)
-                        ], masked: false)
-                        MPText("Giao dịch chưa gắn hũ vẫn hợp lệ và được tính trong chi thực tế của tháng.", style: .secondary)
-                    }
-                    .accessibilityIdentifier(JarsReferencePresentation.unassignedAccessibilityID)
-                    MPFinanceCard {
-                        MPText(JarsFlowCopy.cumulativeTitle, style: .emphasis)
-                        MPText("Chọn một hũ theo stable ID để xem toàn bộ lịch sử đến tháng đang xem.", style: .secondary)
-                        if summary.jars.isEmpty {
-                            MPEmptyView(title: "Chưa có hũ", detail: "Tạo hũ để xem chi tiêu cộng dồn.")
-                        } else {
-                            MPOptionSelector(title: "Chọn hũ cộng dồn", options: summary.jars.map { MPSelectionOption(id: $0.jarID, label: $0.name) }, selectionID: $reportJarID)
-                                .accessibilityIdentifier("jars-cumulative-selector")
-                            if reportLoading { MPLoadingView(label: "Đang tải báo cáo cộng dồn...") }
-                            if let reportError {
-                                MPStatusMessage(text: reportError, tone: .danger)
-                                MPButton("Thử lại", style: .plain, fullWidth: false) {
-                                    Task { await loadReport(jarID: reportJarID) }
-                                }
-                            }
-                            if let report {
-                                MPMetricGrid(items: [
-                                    MPMetricItem(title: "Chi thực tế", value: MPFormat.money(report.totalSpent), masked: masked),
-                                    MPMetricItem(title: "Đã phân bổ", value: MPFormat.money(report.totalAllocated), masked: masked),
-                                    MPMetricItem(title: "Tháng có phân bổ", value: "\(report.allocationMonths)/\(report.monthsInRange)")
-                                ], masked: false)
-                                if let variance = report.allocationVariance {
-                                    MPText("Chênh lệch phân bổ: \(MPFormat.signedMoney(variance, masked: masked))", style: .secondary)
-                                }
-                                MPText("\(MPFormat.monthLabel(report.fromMonth)) → \(MPFormat.monthLabel(report.toMonth)) · Không cộng dồn số dư.", style: .secondary)
-                                ForEach(report.months, id: \.month) { item in
-                                    VStack(alignment: .leading, spacing: MPMetrics.rowSpacing) {
-                                        HStack {
-                                            MPText(MPFormat.monthLabel(item.month))
-                                            Spacer()
-                                            MPText(MPFormat.money(item.spent, masked: masked), style: .secondary)
-                                        }
-                                        if let allocation = item.calculatedAllocation,
-                                           let progress = JarsReferencePresentation.progress(spent: item.spent, allocation: allocation) {
-                                            MPProgressBar(progress: progress, label: "Đã chi / phân bổ")
-                                        } else if item.allocationCovered {
-                                            MPText("Chưa tính được phân bổ", style: .secondary)
-                                        } else {
-                                            MPText("Tháng này không đặt phân bổ", style: .secondary)
-                                        }
-                                    }
-                                }
+                            if !summary.items.isEmpty { MPInsetDivider() }
+                            MPGroupedRow {
+                                MPJarPlanRow(
+                                    title: "Chưa phân bổ",
+                                    amount: MPFormat.money(summary.unassignedSpent, masked: masked),
+                                    amountCaption: "Chi tháng này",
+                                    subtitle: JarPlanPresentation.unassignedLine(summary, masked: masked),
+                                    accessibilityIdentifier: "jar-row-unassigned"
+                                ) { detailTarget = .unassigned }
                             }
                         }
                     }
-                    .accessibilityIdentifier(JarsReferencePresentation.cumulativeAccessibilityID)
+                    .accessibilityIdentifier(JarsReferencePresentation.listAccessibilityID)
+                    MPText("Số hiển thị là kế hoạch còn lại, không phải số dư ví. Chi tiêu vẫn thuộc ví.", style: .secondary)
                 } else if let error { MPErrorView(title: "Không tải được hũ", detail: error) { Task { await load() } } }
                 else if !loading { MPEmptyView(title: "Chưa chọn tháng", detail: "Hũ là lớp ngân sách theo tháng và không thay đổi số dư ví.") }
 
@@ -1309,16 +1230,6 @@ struct JarsView: View {
                 if firstLoad { month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current) }
             }
             summary = try await api.jarMonth(month: month)
-            if let summary {
-                if summary.jars.isEmpty {
-                    reportJarID = ""
-                    report = nil
-                    reportError = nil
-                } else {
-                    if !summary.jars.contains(where: { $0.jarID == reportJarID }) { reportJarID = summary.jars.first?.jarID ?? "" }
-                    if !reportJarID.isEmpty { await loadReport(jarID: reportJarID) }
-                }
-            }
             self.error = nil
         } catch { self.error = "Không thể tải hũ chi tiêu." }
     }

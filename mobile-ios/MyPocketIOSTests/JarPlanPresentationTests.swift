@@ -1,0 +1,66 @@
+import XCTest
+@testable import MyPocketIOS
+
+final class JarPlanPresentationTests: XCTestCase {
+    private func item(remaining: Int64?, allocation: Int64?, spent: Int64, variance: Int64? = nil, cumulativeSpent: Int64? = nil) -> JarItemModel {
+        JarItemModel(jarID: "j", name: "Du lịch", allocationMode: allocation == nil ? "none" : "fixed", allocationAmount: allocation,
+                     allocationPercent: nil, calculatedAllocation: allocation, spent: spent, active: true,
+                     cumulativeAllocated: nil, cumulativeSpent: cumulativeSpent, remainingPlan: remaining, allocationMonths: 2,
+                     monthsInRange: 2, firstConfigMonth: "2026-10", monthVariance: variance)
+    }
+
+    // Owner example: 15M monthly, 10M spent in October, nothing yet in November -> 20M can still be planned.
+    func testOwnerExampleShowsCarryOverAndRemainingPlan() {
+        let november = item(remaining: 20_000_000, allocation: 15_000_000, spent: 0, variance: 15_000_000)
+        XCTAssertEqual(JarPlanPresentation.headlineTitle(november), "Còn có thể chi")
+        XCTAssertEqual(JarPlanPresentation.headlineAmount(november), 20_000_000)
+        XCTAssertEqual(JarPlanPresentation.carriedOver(november), 5_000_000)
+        let note = JarPlanPresentation.note(november, masked: false)
+        XCTAssertTrue(note.contains("Kế hoạch tháng này"), note)
+        XCTAssertTrue(note.contains("Dư từ tháng trước: +"), note)
+        XCTAssertTrue(note.contains("Còn có thể chi theo kế hoạch"), note)
+        XCTAssertFalse(note.lowercased().contains("số dư hũ"))
+    }
+
+    func testOverspendingKeepsMonthWarningAndNoNegativeCarryOver() {
+        let overspent = item(remaining: 3_000_000, allocation: 15_000_000, spent: 17_000_000, variance: -2_000_000)
+        XCTAssertEqual(JarPlanPresentation.carriedOver(overspent), 5_000_000)
+        XCTAssertTrue(JarPlanPresentation.isOverMonth(overspent))
+    }
+
+    func testOverrunIsShownAsAnOverrunNotANegativeBalance() {
+        let over = item(remaining: -1_228_000, allocation: 5_500_000, spent: 1_264_000)
+        XCTAssertEqual(JarPlanPresentation.headlineTitle(over), "Vượt kế hoạch")
+        XCTAssertEqual(JarPlanPresentation.headlineAmount(over), 1_228_000)
+    }
+
+    func testJarWithoutAllocationShowsCumulativeSpendAndNoFakeWarning() {
+        let none = item(remaining: nil, allocation: nil, spent: 400_000, cumulativeSpent: 900_000)
+        XCTAssertEqual(JarPlanPresentation.headlineTitle(none), "Đã chi cộng dồn")
+        XCTAssertEqual(JarPlanPresentation.headlineAmount(none), 900_000)
+        XCTAssertNil(JarPlanPresentation.carriedOver(none))
+        XCTAssertFalse(JarPlanPresentation.isOverMonth(none))
+        XCTAssertTrue(JarPlanPresentation.monthLine(none, masked: false).hasPrefix("Chưa đặt mức"))
+    }
+
+    func testReconciliationWarnsOnlyWhenPlanExceedsWallets() {
+        func summary(plan: Int64, wallets: Int64, exceeds: Int64) -> JarMonthSummaryModel {
+            JarMonthSummaryModel(month: "2026-11", timezone: "Asia/Ho_Chi_Minh", actualIncome: 0, totalSpent: 0, unassignedSpent: 0,
+                                 totalAllocated: 0, totalAllocationPercent: 0, overIncome: false, overOneHundredPercent: false,
+                                 jars: [], items: [item(remaining: plan, allocation: 1, spent: 0)],
+                                 remainingPlanTotal: plan, unassignedCumulative: nil, walletsInTotalBalance: wallets, planExceedsWalletsBy: exceeds)
+        }
+        let ok = JarPlanPresentation.reconciliation(summary(plan: 20_000_000, wallets: 30_000_000, exceeds: 0), masked: false)
+        XCTAssertEqual(ok?.exceeds, false)
+        let warn = JarPlanPresentation.reconciliation(summary(plan: 20_000_000, wallets: 2_000_000, exceeds: 18_000_000), masked: false)
+        XCTAssertEqual(warn?.exceeds, true)
+        XCTAssertTrue(warn?.text.contains("không chặn") == true)
+    }
+
+    func testOlderPayloadsWithoutPlanFieldsStillDecode() throws {
+        let json = #"{"month":"2026-11","timezone":"Asia/Ho_Chi_Minh","actual_income":0,"total_spent":0,"unassigned_spent":0,"total_allocated":0,"total_allocation_percent":0,"over_income":false,"over_one_hundred_percent":false,"jars":[],"items":[{"jar_id":"j","name":"A","allocation_mode":"none","spent":1,"active":true}]}"#
+        let decoded = try JSONDecoder.mypocket.decode(JarMonthSummaryModel.self, from: Data(json.utf8))
+        XCTAssertNil(decoded.items.first?.remainingPlan)
+        XCTAssertNil(decoded.remainingPlanTotal)
+    }
+}

@@ -138,6 +138,12 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/transactions", expectedOwnerID: ownerID))
     }
 
+    /// Ordinary expenses assigned to one jar, or `jarID == "unassigned"` for expenses without a jar.
+    func transactions(jarID: String, ownerID: String? = nil) async throws -> [TransactionModel] {
+        let escaped = jarID.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? jarID
+        return try await client.send(APIRequest(path: "/transactions?jar_id=\(escaped)", expectedOwnerID: ownerID))
+    }
+
     /// Additive report read. Older deployments may return 404; native callers
     /// should fall back to existing aggregate endpoints, never to a full
     /// ledger read just to draw a chart.
