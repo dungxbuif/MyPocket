@@ -1,6 +1,7 @@
 package repository
 
 import (
+	"errors"
 	"os"
 	"sync"
 	"testing"
@@ -203,3 +204,63 @@ func TestJarMonthInitializationCopiesActiveConfigOnceAndStaysOwnerScoped(t *test
 }
 
 func ptrInt64(value int64) *int64 { return &value }
+
+func TestUpdateMonthConfigIsOwnerScopedUpsert(t *testing.T) {
+	dsn := os.Getenv("TEST_DATABASE_URL")
+	if dsn == "" {
+		t.Skip("requires migrated local TEST_DATABASE_URL")
+	}
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	owner, other := uuid.NewString(), uuid.NewString()
+	for _, id := range []string{owner, other} {
+		if err = db.Create(&entity.User{ID: id, Email: id + "@test.invalid", GoogleSubject: id, Timezone: "Asia/Ho_Chi_Minh"}).Error; err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Cleanup(func() {
+		for _, id := range []string{owner, other} {
+			db.Where("owner_id = ?", id).Delete(&entity.JarMonthConfig{})
+			db.Where("owner_id = ?", id).Delete(&entity.JarMonth{})
+			db.Where("owner_id = ?", id).Delete(&entity.Jar{})
+			db.Where("id = ?", id).Delete(&entity.User{})
+		}
+	})
+	repo := NewJarPostgresRepository(db)
+	created, err := repo.Create(owner, "2026-01", "Asia/Ho_Chi_Minh", "Ăn uống", entity.JarAllocationFixed, ptrInt64(100000), nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Later month without a config: created for the SAME jar id.
+	got, err := repo.UpdateMonthConfig(owner, created.JarID, "2026-05", "Ăn uống", entity.JarAllocationFixed, ptrInt64(250000), nil)
+	if err != nil || got.JarID != created.JarID || got.Month.String()[:7] != "2026-05" || got.AllocationAmount == nil || *got.AllocationAmount != 250000 || !got.Active {
+		t.Fatalf("upsert = %+v, %v", got, err)
+	}
+	var jars int64
+	db.Model(&entity.Jar{}).Where("owner_id = ?", owner).Count(&jars)
+	if jars != 1 {
+		t.Fatalf("jars = %d, want 1 (no new jar)", jars)
+	}
+	// Existing month is edited, removed month reactivates.
+	if err = repo.RemoveMonthConfig(owner, created.JarID, "2026-05"); err != nil {
+		t.Fatal(err)
+	}
+	got, err = repo.UpdateMonthConfig(owner, created.JarID, "2026-05", "Ăn uống 2", entity.JarAllocationNone, nil, nil)
+	if err != nil || !got.Active || got.Name != "Ăn uống 2" {
+		t.Fatalf("reactivate = %+v, %v", got, err)
+	}
+	// Foreign and unknown jars stay not found and write nothing.
+	if _, err = repo.UpdateMonthConfig(other, created.JarID, "2026-06", "x", entity.JarAllocationNone, nil, nil); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("foreign err = %v", err)
+	}
+	if _, err = repo.UpdateMonthConfig(owner, uuid.NewString(), "2026-06", "x", entity.JarAllocationNone, nil, nil); !errors.Is(err, gorm.ErrRecordNotFound) {
+		t.Fatalf("unknown err = %v", err)
+	}
+	var foreign int64
+	db.Model(&entity.JarMonthConfig{}).Where("owner_id = ? AND month = ?", other, "2026-06-01").Count(&foreign)
+	if foreign != 0 {
+		t.Fatalf("foreign rows written = %d", foreign)
+	}
+}

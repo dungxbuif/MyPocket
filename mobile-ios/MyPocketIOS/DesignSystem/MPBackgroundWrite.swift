@@ -84,7 +84,10 @@ struct MPBackgroundWriteStatus: View {
             }
             .padding(MPMetrics.pagePadding)
             .frame(maxWidth: .infinity)
-            .background(MPColor.canvas.opacity(0.96))
+            .background(MPColor.canvas)
+            .overlay(alignment: .bottom) { Divider() }
+            .shadow(color: .black.opacity(0.08), radius: 6, y: 3)
+            .zIndex(1)
             .accessibilityElement(children: .contain)
             .accessibilityIdentifier("background-write-status")
         }

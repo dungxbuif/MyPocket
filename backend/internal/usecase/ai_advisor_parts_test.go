@@ -114,3 +114,25 @@ func TestBuildAdvisorPartsMapsBudgetProposalToConfirmation(t *testing.T) {
 		t.Fatalf("budget proposal lost binding: %+v", parts[0])
 	}
 }
+
+func TestSanitizeAdvisorTextStripsLeakedProposalJSON(t *testing.T) {
+	leaked := "{\"version\":3,\"amount\":120000,\"id\":\"abc\"}"
+	if got := sanitizeAdvisorText(leaked, true); got != advisorProposalCardText {
+		t.Fatalf("json-only with card = %q", got)
+	}
+	if got := sanitizeAdvisorText(leaked, false); got != "" {
+		t.Fatalf("json-only without card = %q", got)
+	}
+	mixed := "Mình đề xuất 2 khoản.\n```json\n{\"version\":1,\"amount\":5,\"id\":\"x\"}\n```\n\"version\": 2,\n<tool_call>{\"id\":1}</tool_call>\nBạn xác nhận nhé."
+	if got := sanitizeAdvisorText(mixed, true); got != "Mình đề xuất 2 khoản.\n\nBạn xác nhận nhé." {
+		t.Fatalf("mixed = %q", got)
+	}
+	plain := "Tháng này bạn chi 3 {khoản}."
+	if got := sanitizeAdvisorText(plain, true); got != plain {
+		t.Fatalf("plain changed: %q", got)
+	}
+	parts := BuildAdvisorParts(AdvisorAnswer{Text: leaked, Results: []entity.FinanceResult{{ViewKind: "jar_assignment_proposal", View: []byte(`{"month":"2026-11"}`), Status: "ok"}}})
+	if len(parts) < 1 || parts[0].Type != "text" || parts[0].Text != advisorProposalCardText {
+		t.Fatalf("parts = %+v", parts)
+	}
+}

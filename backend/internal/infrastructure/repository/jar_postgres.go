@@ -290,14 +290,27 @@ func (r *JarPostgresRepository) UpdateMonthConfig(owner, jarID, monthLabel, name
 		if err := r.lockOwner(tx, owner); err != nil {
 			return err
 		}
-		result := tx.Model(&entity.JarMonthConfig{}).Where("owner_id = ? AND jar_id = ? AND month = ? AND active = true", owner, jarID, month).Updates(map[string]any{
-			"name": name, "allocation_mode": mode, "allocation_amount": amount, "allocation_percent_bps": percentBPS, "updated_at": time.Now().UTC(),
+		// Owner-scoped upsert: the jar must belong to the owner; a month without a
+		// config (or with a removed one) is created or reactivated.
+		var jarCount int64
+		if err := tx.Model(&entity.Jar{}).Where("owner_id = ? AND id = ?", owner, jarID).Count(&jarCount).Error; err != nil {
+			return err
+		}
+		if jarCount == 0 {
+			return gorm.ErrRecordNotFound
+		}
+		if err := r.ensureMonth(tx, owner, month); err != nil {
+			return err
+		}
+		result := tx.Model(&entity.JarMonthConfig{}).Where("owner_id = ? AND jar_id = ? AND month = ?", owner, jarID, month).Updates(map[string]any{
+			"name": name, "allocation_mode": mode, "allocation_amount": amount, "allocation_percent_bps": percentBPS, "active": true, "updated_at": time.Now().UTC(),
 		})
 		if result.Error != nil {
 			return result.Error
 		}
 		if result.RowsAffected == 0 {
-			return gorm.ErrRecordNotFound
+			config = entity.JarMonthConfig{OwnerID: owner, Month: month, JarID: jarID, Name: name, AllocationMode: mode, AllocationAmount: amount, AllocationPercentBPS: percentBPS, Active: true}
+			return tx.Create(&config).Error
 		}
 		return tx.Where("owner_id = ? AND jar_id = ? AND month = ?", owner, jarID, month).First(&config).Error
 	})

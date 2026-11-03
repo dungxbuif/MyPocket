@@ -365,6 +365,12 @@ private enum LocalAPIFixture {
         return item
     }
 
+    static func overallBudget(name: String, start: String, end: String) async throws {
+        let token = try await loginToken()
+        let body = try JSONSerialization.data(withJSONObject: ["name": name, "limit_amount": 100000, "start_date": start, "end_date": end])
+        _ = try await request(path: "/budgets", method: "POST", token: token, body: body, decode: FixtureEnvelope<FixtureBudget>.self)
+    }
+
     static func deleteBudgets(named name: String) async throws {
         let token = try await loginToken()
         let existing = try await request(
@@ -6656,6 +6662,43 @@ final class LocalFirstRuntimeTests: XCTestCase {
         auditShot(app, "G13-overview")
         try await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
         try await LocalAPIFixture.delete(wallet)
+    }
+
+    /// Real server rejection (duplicate overall budget, 409) plus the transient saving overlay; run behind the
+    /// write-delay proxy so the overlay lasts long enough to screenshot.
+    func testGBudgetDuplicateRejectionBannerAndSavingOverlay() async throws {
+        continueAfterFailure = true
+        let suffix = String(UUID().uuidString.prefix(4))
+        let timezone = TimeZone(identifier: try await LocalAPIFixture.ownerTimezone()) ?? .current
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
+        let today = Date()
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: today)) ?? today
+        let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? today
+        let formatter = DateFormatter(); formatter.calendar = calendar; formatter.timeZone = timezone; formatter.dateFormat = "yyyy-MM-dd"
+        try? await LocalAPIFixture.overallBudget(name: "Dup A \(suffix)", start: formatter.string(from: start), end: formatter.string(from: end))
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        auditOpenAccount(app, "budgets")
+        let add = app.buttons["budget-add"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 8))
+        add.tap()
+        let name = app.textFields["Tên"]
+        XCTAssertTrue(name.waitForExistence(timeout: 8))
+        name.tap(); name.typeText("Dup B \(suffix)")
+        let limit = app.textFields["Giới hạn"]
+        XCTAssertTrue(limit.waitForExistence(timeout: 5))
+        limit.tap(); limit.typeText("200000")
+        if app.buttons["Xong"].exists { app.buttons["Xong"].tap() }
+        auditShot(app, "H1-budget-duplicate-filled")
+        app.buttons["Lưu"].tap()
+        usleep(400_000); auditShot(app, "H2-saving-overlay-0")
+        sleep(1); auditShot(app, "H3-saving-overlay-1s")
+        sleep(5); auditShot(app, "H4-rejection-banner-after-6s")
+        sleep(2); auditShot(app, "H5-rejection-banner-after-8s")
+        try? await LocalAPIFixture.deleteBudgets(named: "Dup A \(suffix)")
+        try? await LocalAPIFixture.deleteBudgets(named: "Dup B \(suffix)")
     }
 }
 #endif

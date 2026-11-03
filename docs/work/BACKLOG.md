@@ -47,10 +47,7 @@ Overview jar rows, jar filter menu, jar detail Assistant button and transaction-
 Open (needs real data or a device, cannot be closed from this environment):
 - Suggestion quality on the owner's real, ambiguous notes (add `#ten-hu` hashtags or assign some rows, then re-run classification).
 - Real-device timing (no device attached here).
-- No API to continue the same jar into a later month by hand (months copy forward automatically when opened).
-- Wallet editor: the transient "Đang lưu thay đổi…" overlay and a server rejection banner could not be captured (wallet names are not unique on the
-  server; the overlay is shorter than a screenshot); the progress row is covered by a unit test.
-- Seen, not investigated: an Assistant text bubble above the jar card showed raw `version/amount/id` fields (model text or renderer).
+- Assistant raw-JSON text bubble: the live render could not be reproduced here (the persisted message of the last run held clean text and a card; no second API instance with provider credentials could be started on a clone). Server now strips leaked JSON/tool markup from assistant text parts; confirm on a live provider run.
 
 ## UX polish from the independent audit — mostly done, 2026-11-03
 

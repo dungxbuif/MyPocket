@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"encoding/json"
+	"regexp"
 	"strings"
 	"time"
 
@@ -21,8 +22,8 @@ func BuildAdvisorParts(answer AdvisorAnswer) []entity.AdvisorPart {
 // The context is additive and only attached to proposal views.
 func BuildAdvisorPartsForRun(answer AdvisorAnswer, conversationID string, generation int64, runID string) []entity.AdvisorPart {
 	parts := make([]entity.AdvisorPart, 0, 1+len(answer.Results))
-	if strings.TrimSpace(answer.Text) != "" {
-		parts = append(parts, entity.AdvisorPart{Type: "text", Text: answer.Text})
+	if text := sanitizeAdvisorText(answer.Text, advisorHasProposalCard(answer.Results)); text != "" {
+		parts = append(parts, entity.AdvisorPart{Type: "text", Text: text})
 	}
 	for _, result := range answer.Results {
 		partType, ok := advisorPartType(result.ViewKind)
@@ -265,4 +266,48 @@ func (s *followUpScope) filter(part entity.AdvisorPart) (entity.AdvisorPart, boo
 	narrowedData["view"] = narrowedView
 	part.Data = narrowedData
 	return part, true
+}
+
+// advisorLeakedMarkup matches tool-call envelopes and fenced code blocks a model
+// may echo into its prose instead of leaving the structured card to show them.
+var advisorLeakedMarkup = regexp.MustCompile("(?s)```.*?```|<(tool_call|function_calls|tool_use|tool_result)>.*?</(tool_call|function_calls|tool_use|tool_result)>")
+
+// advisorLeakedJSONLine matches a bare JSON member line such as `"version": 3,`.
+var advisorLeakedJSONLine = regexp.MustCompile(`^"[A-Za-z_]+"\s*:`)
+
+var advisorBlankRun = regexp.MustCompile(`\n{3,}`)
+
+const advisorProposalCardText = "Đã chuẩn bị đề xuất. Bạn kiểm tra và xác nhận trên thẻ để lưu."
+
+func advisorHasProposalCard(results []entity.FinanceResult) bool {
+	for _, result := range results {
+		if isAdvisorProposalView(result.ViewKind) && len(result.View) > 0 && result.Status != "not_found" && result.Status != "unsupported" {
+			return true
+		}
+	}
+	return false
+}
+
+// sanitizeAdvisorText removes raw tool/JSON markup (for example the
+// version/amount/id fields of a proposal) from an assistant text part. When a
+// proposal card is present and nothing readable is left, a short sentence
+// pointing at the card replaces it.
+func sanitizeAdvisorText(text string, hasCard bool) string {
+	cleaned := advisorLeakedMarkup.ReplaceAllString(text, "")
+	kept := make([]string, 0)
+	for _, line := range strings.Split(cleaned, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed != "" && (strings.HasPrefix(trimmed, "{") || strings.HasPrefix(trimmed, "[")) && json.Valid([]byte(trimmed)) {
+			continue
+		}
+		if advisorLeakedJSONLine.MatchString(trimmed) || trimmed == "{" || trimmed == "}" || trimmed == "[" || trimmed == "]" {
+			continue
+		}
+		kept = append(kept, line)
+	}
+	result := strings.TrimSpace(advisorBlankRun.ReplaceAllString(strings.Join(kept, "\n"), "\n\n"))
+	if result == "" && hasCard && strings.TrimSpace(text) != "" {
+		return advisorProposalCardText
+	}
+	return result
 }
