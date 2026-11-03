@@ -337,3 +337,15 @@ are still rollout gates; this buffer is not a compliance archive.
 - Deterministic suggester (`usecase.JarSuggester`, 2026-11-03): the `jar_context` handoff also runs a pure, owner-scoped, evidence-only suggester over the month's unassigned ordinary expenses (max 50) and adds `suggested_assignments` (`transaction_id`, `jar_id`, `jar_name`, Vietnamese `reason`, `confidence` high|medium) and `needs_clarification` (ids) to the hidden part. Rules: (a) a `#ten-hu` token equal to an active jar name after normalisation (accents and đ stripped, lowercase, non-alphanumerics to `-`) is high; (b) the note normalised the same way, digits/amounts stripped, equal to or contained by >=2 history rows that all went to the SAME active jar, with no history row of that note in another jar, is high for >=3 rows and medium for 2. Anything else (including category-only matches) is `needs_clarification`, never guessed. The handbook tells the model to call `propose_assign_jar` ONCE with exactly those rows.
 - Guaranteed fallback: when a message carried a non-empty `suggested_assignments` and the run finished, failed or hit the loop limit without a `jar_assignment_proposal`, the server runs `propose_assign_jar` itself on the suggestions (same validation, `expected_version`, status `proposed`) and attaches the `jar_assignment_confirmation` with the text "Mình đề xuất N khoản dựa trên ghi chú; M khoản cần bạn xác nhận thêm." Cancellation and invalid-principal errors are never masked.
 - Round limit: reaching the provider-call limit with gathered results now returns those results with the grounded fallback text; with nothing gathered the service returns the clear message "Mình chưa gom đủ dữ liệu trong giới hạn số bước cho phép..." instead of a silent `failed` run. Messages without `jar_context` that gather nothing still fail as before.
+
+## Jar assignment confirm and replace response shapes (verified live 2026-11-03)
+
+All responses use the `{"data": ..., "meta": null}` envelope.
+
+- `PATCH /api/v1/ai/advisor/actions/{action_id}/replace` body `{conversation_id, generation, revision, patch:{assignments:[{transaction_id, jar_id}]}}`
+  (the patch lists the rows to KEEP; omitted rows are dropped). `data` IS the new card view (there is no `view` wrapper): `{action:"assign_jar",
+  action_id:<NEW id>, revision:<old+1>, status:"pending", month, conversation_id, generation, run_id, assignments:[...], supported_edit_fields:["assignments"], source}`.
+  The old action id is superseded: confirming it returns 409 `advisor_action_conflict`.
+- `POST .../actions/{action_id}/confirm` first call: `data = {status:"applied", applied_count, total_count, results:[{transaction_id, jar_id, status:"applied"|"conflict"|"unchanged"|"skipped", detail}]}`.
+  Replay of the same action: `data = {status:"applied", receipt:{action_id, assignment_results:[...same rows]}, resource_receipt:{...same}}` (no `applied_count`, no `results`).
+  A row edited after the proposal returns `conflict` while the other rows still apply.
