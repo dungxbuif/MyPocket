@@ -6037,3 +6037,11 @@ Runtime UI tests (`LocalFirstRuntimeTests`, local API, simulator EC80B092), scre
 - 2026-11-04 assistant text sanitizer: `TestSanitizeAdvisorTextStripsLeakedProposalJSON` (JSON-only text with a card becomes the card sentence; fenced/tool markup and `"key":` lines stripped; plain text with braces untouched). Live reproduction of the original bubble NOT achieved.
 - 2026-11-04 budget editor, duplicate overall budget behind a 4 s write-delay proxy (`testGBudgetDuplicateRejectionBannerAndSavingOverlay`, passed): saw "Đang lưu thay đổi…" at 0.4 s and the real 409 banner "Không thể lưu ngân sách. Đã có ngân sách cùng ví, nhóm và khoảng ngày chồng lấn." with Thử lại / Bỏ qua. Defect seen: the 96%-opaque status strip let the navigation title/"Thêm" and scrolled content ghost through; made opaque with divider and shadow (see re-run result below).
   Re-run after the fix (passed): the strip is opaque with a divider/shadow; the header title no longer ghosts through, the banner (409 text, Thử lại / Bỏ qua) is fully legible and the content scrolls under it; it covers the back button while shown. Overlay screenshot H2 at 0.4 s was viewed before the fix only. Proxy on 8093 killed; the fixture budgets were created on the 8081 fixture DB and deleted by the test. Native unit target (477) NOT re-run.
+
+## Live provider confirmation of the sanitised Assistant text — 2026-11-04
+
+API rebuilt from HEAD (sanitizer included) on the fixture, real provider, `jar_context {month: 2026-10}`: run `completed` with an empty
+error code (previously failed), one clean Vietnamese text part (the no-evidence reply, correct because the unmodified fixture has no
+hashtags or matching history), no tool-call markup, fenced block or JSON key in the text. This closes the "raw `version/amount/id` text"
+item; the original leak was never reproduced, so the check shows the current output is clean, not the cause of the old one.
+
