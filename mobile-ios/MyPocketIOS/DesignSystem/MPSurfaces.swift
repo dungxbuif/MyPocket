@@ -878,8 +878,8 @@ struct MPWalletRow: View {
         HStack(spacing: 8) {
             MPWalletGlyph(type: type, size: 32)
             VStack(alignment: .leading, spacing: 2) {
-                Text(name).font(MPFont.bodyEmphasis).foregroundStyle(MPColor.ink).lineLimit(2)
-                Text(MPWalletRowPolicy.subtitle(description: subtitle, type: type)).font(MPFont.bodySmall).foregroundStyle(MPColor.secondary)
+                Text(name).font(MPFont.bodyEmphasis).foregroundStyle(MPColor.ink).lineLimit(2).minimumScaleFactor(0.8)
+                Text(MPWalletRowPolicy.subtitle(description: subtitle, type: type)).font(MPFont.bodySmall).foregroundStyle(MPColor.secondary).lineLimit(2).minimumScaleFactor(0.8)
             }
             Spacer()
             Text(balance).font(MPFont.bodyEmphasis.monospacedDigit()).foregroundStyle(isNegative ? MPColor.danger : MPColor.ink)

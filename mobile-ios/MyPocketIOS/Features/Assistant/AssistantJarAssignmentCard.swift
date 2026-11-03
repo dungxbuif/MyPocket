@@ -70,7 +70,7 @@ struct AssistantJarAssignmentCardBody: View {
             MPStatusMessage(text: "Đề xuất gán hũ chưa đủ dữ liệu để xác nhận.", tone: .danger)
         } else {
             VStack(alignment: .leading, spacing: MPMetrics.sectionSpacing) {
-                ForEach(rows.filter { !removed.contains($0.transactionID) || shownResults != nil }) { row in rowView(row) }
+                ForEach(rows.filter { !removed.contains($0.transactionID) }) { row in rowView(row) }
                 footer
             }
             .task(id: month) {
@@ -96,10 +96,10 @@ struct AssistantJarAssignmentCardBody: View {
                 if !row.reason.isEmpty { MPText(row.reason, style: .secondary) }
                 if let result {
                     let badge = result.badge
+                    MPText("Hũ: \(chosenName(row))", style: .secondary)
                     MPStatusBadge(text: badge.text, tone: badge.tone)
                     if let detail = result.detail { MPText(detail, style: .secondary) }
-                    MPText("Hũ: \(chosenName(row))", style: .secondary)
-                } else if !isApplied && !dismissed {
+                } else if !isApplied && !dismissed && AssistantPersistedActionState.decode(view) != .unavailable {
                     MPOptionSelector(title: "Hũ", options: [MPSelectionOption(id: AssistantJarAssignmentPresentation.unassignID, label: "Bỏ gán hũ")] + jarOptions(row),
                                      selectionID: Binding(get: { jarChoice[row.transactionID] ?? row.jarID }, set: { jarChoice[row.transactionID] = $0 }),
                                      accessibilityIdentifier: "assistant-jar-assignment-selector", isEnabled: !saving)

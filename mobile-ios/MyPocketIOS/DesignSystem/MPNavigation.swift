@@ -685,7 +685,7 @@ struct MPBottomNavigation: View {
                     } label: {
                         VStack(spacing: 4) {
                             MPIconImage(systemName: item.systemName)
-                            Text(item.title).font(MPFont.labelSmall)
+                            Text(item.title).font(MPFont.labelSmall).lineLimit(1).minimumScaleFactor(0.6)
                         }
                         .frame(maxWidth: .infinity, minHeight: MPMetrics.hitTarget)
                         .padding(.horizontal, 4)

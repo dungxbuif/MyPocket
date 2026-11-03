@@ -63,11 +63,14 @@ extension EnvironmentValues {
 struct MPBackgroundWriteStatus: View {
     @ObservedObject var center: MPBackgroundWriteCenter
 
+    /// The progress row is visible exactly while at least one background write is in flight.
+    static func showsProgress(pending: Int) -> Bool { pending > 0 }
+
     /// Shown as an overlay by the shell so it never pushes the content or the bottom navigation.
     var body: some View {
         if center.pending > 0 || !center.failures.isEmpty {
             VStack(spacing: 8) {
-                if center.pending > 0 { MPInlineRefreshProgress(label: "Đang lưu thay đổi…") }
+                if Self.showsProgress(pending: center.pending) { MPInlineRefreshProgress(label: "Đang lưu thay đổi…") }
                 ForEach(center.failures) { failure in
                     VStack(alignment: .leading, spacing: 8) {
                         MPStatusMessage(text: failure.detail.map { "\(failure.message) \($0)" } ?? failure.message, tone: .danger)

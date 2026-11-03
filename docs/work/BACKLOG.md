@@ -46,15 +46,17 @@ Overview jar rows, jar filter menu, jar detail Assistant button and transaction-
 
 Open (needs real data or a device, cannot be closed from this environment):
 - Suggestion quality on the owner's real, ambiguous notes (add `#ten-hu` hashtags or assign some rows, then re-run classification).
-- Screenshot of the iOS `jar_assignment_confirmation` card with a live proposal (the card is unit-tested; backend flow was exercised live via HTTP).
+- Real-device timing (no device attached here).
 - No API to continue the same jar into a later month by hand (months copy forward automatically when opened).
-- Real-device timing; AccessibilityXL tab-label truncation; Months scroll-end shot; wallet duplicate-name and "Đang lưu thay đổi…" overlay shots.
+- Wallet editor: the transient "Đang lưu thay đổi…" overlay and a server rejection banner could not be captured (wallet names are not unique on the
+  server; the overlay is shorter than a screenshot); the progress row is covered by a unit test.
+- Seen, not investigated: an Assistant text bubble above the jar card showed raw `version/amount/id` fields (model text or renderer).
 
 ## UX polish from the independent audit — mostly done, 2026-11-03
 
 Done: FAB over delete, English strings, Overview wallet list affordance, duplicate title, category search copy.
 Closed 2026-11-03 (viewed): bubble clearance via shell `contentMargins` (ledger scroll end), AccessibilityXL keeps `bottom-tab-<id>` (menu removed, bar capped at xxxLarge), wallet row money no longer wraps "đ", create-wallet form no longer shows "Xóa ví".
-Open: Month screen scroll-end screenshot not obtained (UI test app crash at swipe on Months, unexplained, needs repro); dark mode: Overview/Giao dịch editor/Hũ viewed and fixed, Ledger and other screens not re-viewed; wallet duplicate-name rejection banner and "Đang lưu thay đổi…" overlay not viewed; recurring/travel editors captured but not viewed; AX tab labels truncate ("Tổng..."); real-device timing not measurable.
+Closed 2026-11-04 (viewed): Months scroll end (earlier crash did not reproduce), AccessibilityXL tab labels and wallet rows, dark Ledger with jar chip. Open: dark mode for screens other than Overview/Ledger/editor/Hũ; wallet overlay/rejection banner (see above); recurring/travel editors captured but not viewed; real-device timing not measurable.
 
 ## Re-audit defects from committed report findings — fixed, 2026-11-03
 

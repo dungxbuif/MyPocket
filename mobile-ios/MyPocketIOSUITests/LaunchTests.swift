@@ -6102,6 +6102,58 @@ private extension LocalAPIFixture {
         }
         return jarID
     }
+
+    /// Jar in the current month with expenses on earlier days; returns the jar id and the ids of the unassigned expenses.
+    static func jarAssignmentFixture(name: String, month: String, walletID: String, timezone: TimeZone,
+                                     assignedNotes: [String], unassignedNotes: [String]) async throws -> (jarID: String, unassignedIDs: [String]) {
+        let token = try await loginToken()
+        func post(_ path: String, _ object: [String: Any]) async throws -> [String: Any] {
+            var request = URLRequest(url: URL(string: baseURL.absoluteString + path)!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue(UUID().uuidString, forHTTPHeaderField: "Idempotency-Key")
+            request.httpBody = try JSONSerialization.data(withJSONObject: object)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(code) else { throw LocalFixtureError.http(code, String(data: data, encoding: .utf8) ?? "") }
+            return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        }
+        let created = try await post("/jars", ["month": month, "name": name, "allocation_mode": "fixed", "allocation_amount": 5_000_000])
+        let jar = (created["data"] as? [String: Any]) ?? created
+        guard let jarID = (jar["jar_id"] as? String) ?? (jar["id"] as? String) else { throw LocalFixtureError.http(0, "No jar id in \(created)") }
+        let category = try await category(kind: "expense", walletID: walletID)
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
+        let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: Date())) ?? Date()
+        var unassignedIDs: [String] = []
+        var index = 0
+        for (note, assigned) in assignedNotes.map({ ($0, true) }) + unassignedNotes.map({ ($0, false) }) {
+            index += 1
+            // Earlier days of the month when there are any, otherwise minutes before now.
+            let earlier = calendar.date(byAdding: .hour, value: 5 + index, to: startOfMonth) ?? Date()
+            let when = min(earlier, Date().addingTimeInterval(TimeInterval(-60 * index)))
+            var payload: [String: Any] = ["wallet_id": walletID, "category_id": category.id, "type": "expense", "amount": 40_000 + index * 10_000,
+                "occurred_at": ISO8601DateFormatter().string(from: when), "note": note, "included_in_reports": true]
+            if assigned { payload["jar_id"] = jarID }
+            let response = try await post("/transactions", payload)
+            let row = (response["data"] as? [String: Any]) ?? response
+            if !assigned, let id = row["id"] as? String { unassignedIDs.append(id) }
+        }
+        return (jarID, unassignedIDs)
+    }
+
+    /// Jar id of each transaction in the wallet (empty string when unassigned).
+    static func jarIDs(walletID: String) async throws -> [String: String] {
+        let token = try await loginToken()
+        var request = URLRequest(url: URL(string: baseURL.absoluteString + "/transactions?wallet_id=\(walletID)&limit=100")!)
+        request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        let (data, _) = try await URLSession.shared.data(for: request)
+        let root = (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        let rows = (root["data"] as? [[String: Any]]) ?? []
+        var result: [String: String] = [:]
+        for row in rows { if let id = row["id"] as? String { result[id] = (row["jar_id"] as? String) ?? "" } }
+        return result
+    }
 }
 #endif
 
@@ -6489,6 +6541,121 @@ final class LocalFirstRuntimeTests: XCTestCase {
                 let save = app.buttons.matching(NSPredicate(format: "label == 'Lưu' OR label BEGINSWITH 'Lưu'")).firstMatch
                 if save.exists { save.tap(); sleep(2); auditShot(app, "E21-\(tag)-save-empty-or-result") } }
         }
+    }
+
+    func testAssistantJarAssignmentCardWithRealProposal() async throws {
+        continueAfterFailure = true
+        let suffix = String(UUID().uuidString.prefix(4)).lowercased()
+        let wallet = try await LocalAPIFixture.wallet(name: "Jar Card \(suffix)", type: "basic")
+        let timezone = TimeZone(identifier: try await LocalAPIFixture.ownerTimezone()) ?? .current
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
+        let parts = calendar.dateComponents([.year, .month], from: Date())
+        let month = String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        let jarName = "Đi lại \(suffix)"
+        let slug = jarName.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN")).lowercased()
+            .replacingOccurrences(of: "đ", with: "d").replacingOccurrences(of: " ", with: "-")
+        let seeded = try await LocalAPIFixture.jarAssignmentFixture(
+            name: jarName, month: month, walletID: wallet.wallet.id, timezone: timezone,
+            assignedNotes: ["Đổ xăng", "Đổ xăng", "Đổ xăng"], unassignedNotes: ["Đổ xăng", "Đổ xăng", "Mua sắm #\(slug)"])
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        auditOpenAccount(app, "jars")
+        let jarRow = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS %@", jarName)).firstMatch
+        XCTAssertTrue(jarRow.waitForExistence(timeout: 10), "jar row")
+        jarRow.tap(); sleep(2)
+        let classify = app.buttons["jar-detail-classify-assistant"].firstMatch
+        auditSwipeUntil(app, classify, max: 6)
+        XCTAssertTrue(classify.exists)
+        classify.tap()
+        let send = app.buttons["assistant-composer-action"].firstMatch
+        XCTAssertTrue(send.waitForExistence(timeout: 15), "assistant composer")
+        auditShot(app, "G1-assistant-handoff-before-send")
+        send.tap()
+        var apply: XCUIElement { app.buttons.matching(identifier: "assistant-confirm-jar-assignment").allElementsBoundByIndex.last ?? app.buttons["assistant-confirm-jar-assignment"].firstMatch }
+        XCTAssertTrue(app.buttons["assistant-confirm-jar-assignment"].firstMatch.waitForExistence(timeout: 100), "jar_assignment_confirmation card")
+        sleep(1)
+        auditShot(app, "G2-jar-assignment-card")
+        let remove = app.buttons.matching(identifier: "Bỏ khoản này").allElementsBoundByIndex.last ?? app.buttons["Bỏ khoản này"].firstMatch
+        XCTAssertTrue(remove.exists, "remove row")
+        remove.tap(); sleep(1)
+        auditShot(app, "G3-jar-assignment-card-after-remove")
+        XCTAssertTrue(apply.waitForExistence(timeout: 5))
+        apply.tap()
+        let badge = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Đã gán'")).firstMatch
+        XCTAssertTrue(badge.waitForExistence(timeout: 30), "result badge")
+        sleep(1)
+        auditShot(app, "G4-jar-assignment-card-applied")
+        app.swipeUp(); sleep(1)
+        auditShot(app, "G5-jar-assignment-card-applied-summary")
+        XCTAssertFalse(app.buttons["Bỏ khoản này"].firstMatch.exists, "no edit controls after apply")
+        let jarIDs = try await LocalAPIFixture.jarIDs(walletID: wallet.wallet.id)
+        let nowAssigned = seeded.unassignedIDs.filter { jarIDs[$0] == seeded.jarID }
+        print("G_ASSIGNED \(nowAssigned.count) of \(seeded.unassignedIDs.count)")
+        XCTAssertGreaterThanOrEqual(nowAssigned.count, 1, "applied rows carry the jar via API")
+        XCTAssertLessThan(nowAssigned.count, seeded.unassignedIDs.count, "the removed row stays unassigned")
+        try await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
+        try await LocalAPIFixture.delete(wallet)
+    }
+
+    func testGMonthsScrollEnd() throws {
+        continueAfterFailure = true
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        auditOpenAccount(app, "months")
+        auditShot(app, "G6-months-top")
+        let viewport = app.otherElements["shell-content-viewport"].firstMatch
+        for _ in 0..<12 { if viewport.exists { viewport.swipeUp() } else { app.swipeUp() }; XCTAssertEqual(app.state, .runningForeground, "app must stay running while scrolling Months") }
+        sleep(1); auditShot(app, "G7-months-scroll-end")
+    }
+
+    func testGWalletDuplicateNameAndSavingOverlay() async throws {
+        continueAfterFailure = true
+        // Wallet names are not unique on the server (no such rejection exists), so a real server rejection is
+        // provoked with an over-long name instead.
+        let suffix = String(UUID().uuidString.prefix(4))
+        let longName = "Ví \(suffix) " + String(repeating: "x", count: 260)
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        auditOpenAccount(app, "wallets")
+        let add = app.buttons["wallet-add-button"].firstMatch
+        XCTAssertTrue(add.waitForExistence(timeout: 8))
+        add.tap()
+        let name = app.textFields["wallet-editor-name"].firstMatch
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        name.tap(); name.typeText(longName)
+        auditShot(app, "G8-wallet-editor-filled")
+        let save = app.buttons["wallet-editor-save"].firstMatch.exists ? app.buttons["wallet-editor-save"].firstMatch : app.buttons["Tạo ví"].firstMatch
+        save.tap()
+        for i in 0..<6 { auditShot(app, "G9-after-save-\(i)"); usleep(30_000) }
+        sleep(4); auditShot(app, "G10-wallet-rejection-after-4s")
+        try? await LocalAPIFixture.deleteWallets(named: String(longName))
+    }
+
+    func testGLedgerWithJarChip() async throws {
+        continueAfterFailure = true
+        let suffix = String(UUID().uuidString.prefix(4))
+        let wallet = try await LocalAPIFixture.wallet(name: "Chip \(suffix)", type: "basic")
+        let timezone = TimeZone(identifier: try await LocalAPIFixture.ownerTimezone()) ?? .current
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
+        let parts = calendar.dateComponents([.year, .month], from: Date())
+        let month = String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        _ = try await LocalAPIFixture.jarLedgerFixture(name: "Đi lại \(suffix)", month: month, walletID: wallet.wallet.id, notesInJar: ["Đổ xăng", "Gửi xe"], notesUnassigned: ["Cà phê"])
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-transactions"].waitForExistence(timeout: 20))
+        app.buttons["bottom-tab-transactions"].tap(); sleep(4)
+        auditShot(app, "G12-ledger-jar-chip")
+        app.buttons["bottom-tab-overview"].tap(); sleep(3)
+        auditShot(app, "G13-overview")
+        try await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
+        try await LocalAPIFixture.delete(wallet)
     }
 }
 #endif

@@ -38,4 +38,18 @@ final class LocalFirstContractTests: XCTestCase {
         if let failure { center.dismiss(failure) }
         XCTAssertTrue(center.failures.isEmpty)
     }
+
+    @MainActor
+    func testBackgroundWriteStatusShowsProgressWhilePending() async {
+        let center = MPBackgroundWriteCenter()
+        var release: CheckedContinuation<Void, Never>?
+        center.submit(failure: "x", request: { await withCheckedContinuation { release = $0 } }, onSuccess: {})
+        for _ in 0..<50 where release == nil { try? await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertEqual(center.pending, 1)
+        XCTAssertTrue(MPBackgroundWriteStatus.showsProgress(pending: center.pending), "progress row visible while a write is pending")
+        release?.resume()
+        for _ in 0..<50 where center.pending > 0 { try? await Task.sleep(nanoseconds: 20_000_000) }
+        XCTAssertEqual(center.pending, 0)
+        XCTAssertFalse(MPBackgroundWriteStatus.showsProgress(pending: center.pending))
+    }
 }
