@@ -81,6 +81,7 @@ final class OverviewViewModel: ObservableObject {
         }
         await loadMonthSummary()
         await loadInsider()
+        cachedAt = nil // the server answered; the cached banner no longer applies
         await persistSnapshot()
     }
 
@@ -190,6 +191,7 @@ final class OverviewViewModel: ObservableObject {
 }
 
 struct OverviewView: View {
+    @Environment(\.mpTabIsActive) private var tabIsActive
     @Environment(\.mpFinancialQueue) private var financialQueue
     @StateObject private var model: OverviewViewModel
     @Binding private var masked: Bool
@@ -237,7 +239,7 @@ struct OverviewView: View {
                         }
                     } else {
                         if let cachedAt = model.cachedAt {
-                            MPStatusMessage(text: "Bản lưu \(cachedAt.formatted(date: .abbreviated, time: .shortened)) · Chưa cập nhật từ máy chủ.", tone: .info)
+                            MPStatusMessage(text: "Bản lưu \(cachedAt.mpCachedStamp) · Chưa cập nhật từ máy chủ.", tone: .info)
                         }
                         walletsCard
                         if !model.reportInsights.isEmpty {
@@ -264,6 +266,7 @@ struct OverviewView: View {
         .background(MPColor.canvas.ignoresSafeArea())
         .environment(\.timeZone, model.timeZone)
         .task { await model.load() }
+        .mpRefreshOnTabActivation(tabIsActive) { await model.load() }
         .onReceive(financialQueue?.$revision.dropFirst().eraseToAnyPublisher() ?? Empty<Int, Never>().eraseToAnyPublisher()) { _ in
             Task { await model.load() }
         }

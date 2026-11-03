@@ -139,7 +139,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         let api = QueueBoundary(store: store, enabled: false)
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions, sleep: { await sleeper.sleep($0) })
         try await queue.activate(ownerID: "owner-a")
-        _ = try await queue.submit(payload(), key: UUID())
+        _ = try await queue.submitSettled(payload(), key: UUID())
         let deadline = Date().addingTimeInterval(2)
         while await sleeper.delays.isEmpty && Date() < deadline { await Task.yield() }
         let delays = await sleeper.delays
@@ -158,7 +158,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         await api.failNext(.http(status: 503))
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions, now: { clock.now() }, sleep: { await sleeper.sleep($0) })
         try await queue.activate(ownerID: "owner-a")
-        _ = try await queue.submit(payload(), key: UUID())
+        _ = try await queue.submitSettled(payload(), key: UUID())
         let deadline = Date().addingTimeInterval(2)
         while await sleeper.delays.isEmpty && Date() < deadline { await Task.yield() }
         sessions.clear(); try await queue.stop()
@@ -179,7 +179,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         await api.failNext(.unauthorized)
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions)
         try await queue.activate(ownerID: "owner-a")
-        _ = try await queue.submit(payload(), key: UUID())
+        _ = try await queue.submitSettled(payload(), key: UUID())
         try await queue.updateLifecycle(ownerID: "owner-a", isForeground: false)
         try await queue.updateLifecycle(ownerID: "owner-a", isForeground: true)
         try await queue.networkChanged(isAvailable: false)
@@ -197,7 +197,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions)
         try await queue.updateLifecycle(ownerID: "owner-a", isForeground: false)
         let key = UUID()
-        let result = try await queue.submit(payload(), key: key)
+        let result = try await queue.submitSettled(payload(), key: key)
         XCTAssertEqual(result, .queued)
         var rows = try await store.items(accountID: "owner-a")
         XCTAssertEqual(rows.first?.state, .pending)
@@ -216,7 +216,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         try await queue.activate(ownerID: "owner-a")
         try await queue.networkChanged(isAvailable: false)
         let key = UUID()
-        let result = try await queue.submit(payload(), key: key)
+        let result = try await queue.submitSettled(payload(), key: key)
         XCTAssertEqual(result, .queued)
         let beforeCalls = await api.calls; XCTAssertEqual(beforeCalls, 0)
         try await queue.networkChanged(isAvailable: true)
@@ -234,7 +234,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions, now: { clock.now() }, sleep: { await sleeper.sleep($0) })
         try await queue.activate(ownerID: "owner-a")
         let key = UUID()
-        _ = try await queue.submit(payload(), key: key)
+        _ = try await queue.submitSettled(payload(), key: key)
         let deadline = Date().addingTimeInterval(2)
         while await sleeper.delays.isEmpty && Date() < deadline { await Task.yield() }
         let delays = await sleeper.delays
@@ -273,7 +273,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         let api = QueueBoundary(store: store, enabled: false)
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions)
         try await queue.activate(ownerID: "owner-a")
-        _ = try await queue.submit(payload(), key: UUID())
+        _ = try await queue.submitSettled(payload(), key: UUID())
         let id = try XCTUnwrap(queue.items.first?.id)
         try await queue.discard(id: id)
         XCTAssertTrue(queue.items.isEmpty)
@@ -281,7 +281,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         XCTAssertEqual(rows.count, 1); XCTAssertEqual(rows.first?.state, .cancelled)
         let calls = await api.calls
         XCTAssertEqual(calls, 0)
-        _ = try await queue.submit(payload(), key: UUID())
+        _ = try await queue.submitSettled(payload(), key: UUID())
         let second = try XCTUnwrap(queue.items.first?.id)
         try sessions.save(session("owner-b"))
         do { try await queue.discard(id: second); XCTFail("Wrong active session cannot discard old owner") }
@@ -300,7 +300,8 @@ final class FinancialMutationQueueTests: XCTestCase {
         let key = UUID()
         let first = try await queue.replaceRejected(id: old.id, payload: payload(amount: 222), key: key)
         let replay = try await queue.replaceRejected(id: old.id, payload: payload(amount: 222), key: key)
-        XCTAssertEqual(first, .applied); XCTAssertEqual(replay, .applied)
+        await queue.settle()
+        XCTAssertEqual(first, .queued); XCTAssertEqual(replay, .queued)
         let rows = try await store.items(accountID: "owner-a")
         XCTAssertEqual(rows.map(\.state), [.cancelled, .applied])
         XCTAssertEqual(rows[0].idempotencyKey, old.idempotencyKey)
@@ -319,10 +320,18 @@ final class FinancialMutationQueueTests: XCTestCase {
         try sessions.save(session("owner-b"))
         try await queue.activate(ownerID: "owner-b")
         let result = try await queue.submit(payload(amount: 45600), key: UUID())
-        XCTAssertEqual(result, .applied, "Old-owner activity must not suppress the new owner's drain")
+        XCTAssertEqual(result, .queued, "Old-owner activity must not suppress the new owner's drain")
+        // The old owner's transport is still held, so wait for the new owner's own sync only.
+        for _ in 0..<200 {
+            if try await store.items(accountID: "owner-b").first?.state == .applied { break }
+            try await Task.sleep(nanoseconds: 10_000_000)
+        }
         await api.release()
-        do { _ = try await old.value; XCTFail("Old form must not publish into new owner") }
-        catch { XCTAssertEqual(error as? APIError, .accountMismatch) }
+        // Local-first: the old form's save completed once durable, before the owner switch;
+        // the background sync (not the form) is what must never publish into the new owner.
+        let oldResult = try await old.value
+        XCTAssertEqual(oldResult, .queued)
+        await queue.settle()
         XCTAssertTrue(queue.items.isEmpty)
         XCTAssertEqual(queue.revision, 1)
         let oldRows = try await store.items(accountID: "owner-a"), newRows = try await store.items(accountID: "owner-b")
@@ -348,9 +357,9 @@ final class FinancialMutationQueueTests: XCTestCase {
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions)
         try await queue.activate(ownerID: "owner-a")
         let key = UUID()
-        let first = try await queue.submit(payload(), key: key)
-        let repeated = try await queue.submit(payload(), key: key)
-        XCTAssertEqual(first, .applied); XCTAssertEqual(repeated, .applied)
+        let first = try await queue.submitSettled(payload(), key: key)
+        let repeated = try await queue.submitSettled(payload(), key: key)
+        XCTAssertEqual(first, .queued); XCTAssertEqual(repeated, .queued)
         let rows = try await store.items(accountID: "owner-a")
         XCTAssertEqual(rows.count, 1)
         XCTAssertEqual(rows.first?.state, .applied)
@@ -358,7 +367,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         let persisted = await api.observedPersistedSending, calls = await api.calls
         XCTAssertTrue(persisted); XCTAssertEqual(calls, 1)
         XCTAssertEqual(queue.revision, 1)
-        do { _ = try await queue.submit(payload(amount: 999), key: key); XCTFail("Cannot mutate previously queued form key") }
+        do { _ = try await queue.submitSettled(payload(amount: 999), key: key); XCTFail("Cannot mutate previously queued form key") }
         catch { XCTAssertEqual(error as? OutboxStoreError, .intentConflict) }
     }
 
@@ -368,7 +377,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         let api = QueueBoundary(store: store, enabled: false)
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions)
         try await queue.activate(ownerID: "owner-a")
-        let result = try await queue.submit(payload(), key: UUID())
+        let result = try await queue.submitSettled(payload(), key: UUID())
         XCTAssertEqual(result, .queued)
         XCTAssertEqual(queue.items.count, 1)
         XCTAssertEqual(queue.items.first?.state, .pending)
@@ -384,9 +393,9 @@ final class FinancialMutationQueueTests: XCTestCase {
         let api = QueueBoundary(store: store, enabled: false)
         let queue = FinancialMutationQueue(store: store, api: api, sessions: sessions)
         try await queue.activate(ownerID: "owner-a")
-        _ = try await queue.submit(payload(), key: UUID())
+        _ = try await queue.submitSettled(payload(), key: UUID())
         try sessions.save(session("owner-b"))
-        do { _ = try await queue.submit(payload(), key: UUID()); XCTFail("Stale form owner cannot enqueue into new account") }
+        do { _ = try await queue.submitSettled(payload(), key: UUID()); XCTFail("Stale form owner cannot enqueue into new account") }
         catch { XCTAssertEqual(error as? APIError, .accountMismatch) }
         try await queue.activate(ownerID: "owner-b")
         XCTAssertTrue(queue.items.isEmpty)
@@ -402,7 +411,7 @@ final class FinancialMutationQueueTests: XCTestCase {
         try sessions.save(session("owner-a"))
         let queue = FinancialMutationQueue(store: store, api: QueueBoundary(store: store, enabled: false), sessions: sessions)
         try await queue.activate(ownerID: "owner-a")
-        _ = try await queue.submit(payload(), key: UUID())
+        _ = try await queue.submitSettled(payload(), key: UUID())
         sessions.clear()
         try await queue.stop()
         XCTAssertTrue(queue.items.isEmpty)
@@ -411,5 +420,16 @@ final class FinancialMutationQueueTests: XCTestCase {
         try sessions.save(session("owner-a"))
         try await queue.activate(ownerID: "owner-a")
         XCTAssertEqual(queue.items.first?.state, .pending)
+    }
+}
+
+
+extension FinancialMutationQueue {
+    /// Submits and waits for the background sync so assertions see the final persisted state.
+    @discardableResult
+    func submitSettled(_ payload: OutboxPayload, key: UUID) async throws -> FinancialSubmission {
+        let submission = try await submit(payload, key: key)
+        await settle()
+        return submission
     }
 }

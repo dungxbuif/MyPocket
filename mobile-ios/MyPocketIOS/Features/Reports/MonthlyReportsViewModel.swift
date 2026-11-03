@@ -21,6 +21,12 @@ final class MonthlyReportsViewModel: ObservableObject {
         // server read refreshes it; never early-return stale financial data.
         report = cache[scope]
         isLoading = true
+        // First visit in this run: paint the last known report from the encrypted disk cache,
+        // then continue to the server read below (never skipped).
+        if report == nil, let stored = await api.cachedMonthlyReport(month: month, walletID: walletID, granularity: granularity, ownerID: ownerID),
+           generation == requestGeneration, stored.month == month, stored.walletID == walletID {
+            report = stored
+        }
         error = nil
         usedFallback = false
         defer { if generation == requestGeneration { isLoading = false } }

@@ -420,7 +420,16 @@ struct ReportAnalysisModel: Decodable, Sendable {
 
     // Historical provider_called=false was a persistence bug, not provenance.
     var hasCurrentProvenance: Bool {
-        ruleVersion == "report-analysis-v3" && promptVersion == "report-analysis-prompt-v3" && providerCalled != nil
+        Self.version(ruleVersion, prefix: "report-analysis-v") >= 3
+            && Self.version(promptVersion, prefix: "report-analysis-prompt-v") >= 3
+            && providerCalled != nil
+    }
+
+    /// Provenance is trustworthy from v3 onward; a later backend version must not make every new
+    /// analysis look stale until an app release.
+    private static func version(_ value: String?, prefix: String) -> Int {
+        guard let value, value.hasPrefix(prefix) else { return 0 }
+        return Int(value.dropFirst(prefix.count)) ?? 0
     }
 
     var provenanceLabel: String {

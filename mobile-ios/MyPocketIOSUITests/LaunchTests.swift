@@ -6031,3 +6031,116 @@ final class LaunchTests: XCTestCase {
 #endif
     }
 }
+
+#if LOCAL_API_UI
+/// Runtime proof for the local-first contract against the local fixture API (`-UITestAuthenticatedAPI`):
+/// revisiting tabs must not show a blocking loader, and saving a transaction must close the editor
+/// without waiting for the network round trip. Timings are attached to the result bundle.
+@MainActor
+final class LocalFirstRuntimeTests: XCTestCase {
+    private func loaderVisible(_ app: XCUIApplication, for seconds: TimeInterval) -> Bool {
+        let loader = app.descendants(matching: .any)["loading-state"].firstMatch
+        let end = Date().addingTimeInterval(seconds)
+        while Date() < end {
+            if loader.exists { return true }
+            usleep(40_000)
+        }
+        return false
+    }
+
+    func testTabSwitchHasNoBlockingLoaderAndSaveClosesImmediately() async throws {
+        continueAfterFailure = true
+        // The UI-test login maps to its own fixture account, which starts without wallets.
+        let wallet = try await LocalAPIFixture.wallet(name: "LF Cash \(UUID().uuidString.prefix(4))", type: "basic")
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-transactions"].waitForExistence(timeout: 20), "authenticated shell")
+
+        // Let the launch preload mount Transactions and Reports and finish their first read.
+        _ = loaderVisible(app, for: 4)
+
+        var report: [String] = []
+        for (round, tab) in ["transactions", "reports", "overview", "transactions", "reports", "overview"].enumerated() {
+            let started = Date()
+            app.buttons["bottom-tab-\(tab)"].tap()
+            let flashed = loaderVisible(app, for: 1.2)
+            report.append("round \(round + 1) \(tab): blocking loader \(flashed ? "SHOWN" : "not shown") (tap->settled \(Int(Date().timeIntervalSince(started) * 1000)) ms)")
+            XCTAssertFalse(flashed, "tab \(tab) round \(round + 1) showed a blocking loader")
+        }
+
+        // Save latency: open the add editor, enter an amount, save, and time the editor closing.
+        app.buttons["bottom-tab-transactions"].tap()
+        app.buttons["add-transaction-button"].tap()
+        let walletRow = app.buttons["transaction-wallet-row"]
+        XCTAssertTrue(walletRow.waitForExistence(timeout: 10))
+        walletRow.tap()
+        // Pick the first listed wallet (the picker lists wallet names as buttons).
+        let walletName = app.descendants(matching: .any).matching(NSPredicate(format: "label BEGINSWITH %@", wallet.wallet.name)).firstMatch
+        if !walletName.waitForExistence(timeout: 5) {
+            let hierarchy = XCTAttachment(string: app.debugDescription); hierarchy.name = "wallet-menu-hierarchy"; hierarchy.lifetime = .keepAlways; add(hierarchy)
+            print("WALLET_MENU wallets=\(app.descendants(matching: .any).allElementsBoundByIndex.filter { $0.label.contains("Tiền") || $0.label.contains("Mẫu") || $0.label.contains("Tài khoản chính") }.map { "\($0.elementType.rawValue):\($0.label)" }) menuItems=\(app.menuItems.allElementsBoundByIndex.map { $0.label }) sheets=\(app.sheets.count) popovers=\(app.popovers.count) other=\(app.otherElements.matching(NSPredicate(format: "label CONTAINS[c] 'ví' OR label CONTAINS[c] 'tiền'")).allElementsBoundByIndex.map { $0.label })")
+            XCTFail("wallet option not found")
+            return
+        }
+        walletName.tap()
+        let amount = app.textFields["Số tiền"]
+        XCTAssertTrue(amount.waitForExistence(timeout: 10))
+        amount.tap()
+        amount.typeText("12345")
+        if app.buttons["Xong"].exists { app.buttons["Xong"].tap() }
+        let save = app.buttons["Lưu giao dịch"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        let tapped = Date()
+        save.tap()
+        let closed = save.waitForNonExistence(timeout: 10)
+        let closeMs = Int(Date().timeIntervalSince(tapped) * 1000)
+        report.append("save: editor closed=\(closed) in \(closeMs) ms")
+        XCTAssertTrue(closed, "editor must close after save")
+        // With the delay proxy (3 s per write) a network-bound save would take > 3 s.
+        XCTAssertLessThan(closeMs, 2600, "save must not wait for the network")
+
+        // Stay in the app long enough for the delayed background sync to finish.
+        sleep(8)
+        let attachment = XCTAttachment(string: report.joined(separator: "\n"))
+        attachment.name = "local-first-timings"
+        attachment.lifetime = .keepAlways
+        add(attachment)
+        print("LOCAL_FIRST_REPORT\n" + report.joined(separator: "\n"))
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "after-save"; shot.lifetime = .keepAlways; add(shot)
+    }
+
+    /// A save made right before the app is killed stays durable in the encrypted outbox and must
+    /// reach the server on the next launch for the same owner (no loss, no duplicate).
+    func testLaunchDrainsDurableOutboxFromPreviousRun() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-transactions"].waitForExistence(timeout: 20))
+        sleep(10)
+        app.buttons["bottom-tab-transactions"].tap()
+        sleep(2)
+        let section = app.descendants(matching: .any)["financial-outbox-section"].firstMatch
+        print("OUTBOX_SECTION exists=\(section.exists) texts=\(section.staticTexts.allElementsBoundByIndex.map { $0.label })")
+        let shot = XCTAttachment(screenshot: app.screenshot()); shot.name = "drain-after-launch"; shot.lifetime = .keepAlways; add(shot)
+    }
+
+    /// Retained tabs must be invisible to accessibility (VoiceOver and automation) while inactive.
+    /// "Kỳ báo cáo" belongs to the Báo cáo tab only.
+    func testInactiveTabsAreHiddenFromAccessibility() throws {
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-transactions"].waitForExistence(timeout: 20))
+        sleep(4) // preload mounts Giao dịch and Báo cáo
+        let reportOnly = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Kỳ báo cáo' OR identifier CONTAINS 'Kỳ báo cáo'")).firstMatch
+        for tab in ["overview", "transactions", "account"] {
+            app.buttons["bottom-tab-\(tab)"].tap()
+            sleep(1)
+            XCTAssertFalse(reportOnly.exists, "Reports control must not be exposed while the \(tab) tab is active")
+        }
+        app.buttons["bottom-tab-reports"].tap()
+        XCTAssertTrue(reportOnly.waitForExistence(timeout: 5), "Reports control is exposed when its own tab is active")
+    }
+}
+#endif

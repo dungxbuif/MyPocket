@@ -579,7 +579,7 @@ struct AssistantView: View {
                                 MPLoadingView(label: label)
                             }
                             if let error { MPStatusMessage(text: error, tone: .danger) }
-                            if advisorSubmitUncertain {
+                            if advisorSubmitUncertain && !sending {
                                 MPStatusMessage(text: "Yêu cầu có thể đã được tiếp nhận. Giữ nguyên nội dung và dùng nút thử lại để tiếp tục; không tạo yêu cầu mới.", tone: .info)
                                 MPButton("Thử lại yêu cầu", style: .secondary, isLoading: sending) {
                                     Task { await retryUncertainAdvisorSubmit() }
@@ -665,7 +665,7 @@ struct AssistantView: View {
                             MPReportContextAttachment(label: masked ? "Ngữ cảnh báo cáo đã chọn" : handoff.label) {
                                 reportHandoffBinding.wrappedValue = nil
                             }
-                            .disabled(sending || advisorSubmitUncertain || resetting)
+                            .disabled(sending || (advisorSubmitUncertain && !sending) || resetting)
                             .accessibilityIdentifier("assistant-report-context")
                         }
                         if let pending = pendingMessageBinding.wrappedValue,
@@ -679,7 +679,7 @@ struct AssistantView: View {
                         MPChatComposer(
                             text: inputBinding,
                             isBusy: sending || activeRunID != nil || activeEntryTaskID != nil,
-                            isEnabled: capabilities?.enabled == true && !advisorSubmitUncertain,
+                            isEnabled: capabilities?.enabled == true && !(advisorSubmitUncertain && !sending),
                             onSend: { Task { await send() } },
                             onCancel: cancelCurrentWork,
                             mode: composerMode,

@@ -3,6 +3,7 @@ import SwiftUI
 struct AppRootView: View {
     @StateObject private var auth: AuthViewModel
     @StateObject private var routeCoordinator: AppRouteCoordinator
+    @StateObject private var backgroundWrites = MPBackgroundWriteCenter()
     @State private var activeRoute: AppRoute?
     @Environment(\.scenePhase) private var scenePhase
 
@@ -53,6 +54,7 @@ struct AppRootView: View {
         }
         .environmentObject(routeCoordinator)
         .environment(\.mpFinancialQueue, auth.financialQueue)
+        .environment(\.mpBackgroundWrites, backgroundWrites)
         .task(id: FinancialQueueLifecycle(ownerID: authenticatedOwnerID, foreground: scenePhase == .active)) {
             try? await auth.financialQueue?.updateLifecycle(ownerID: authenticatedOwnerID, isForeground: scenePhase == .active)
         }

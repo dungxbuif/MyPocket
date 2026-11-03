@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct MonthlyReportsView: View {
+    @Environment(\.mpTabIsActive) private var tabIsActive
     let api: FinanceAPI
     let onBack: () -> Void
     let masked: Bool
@@ -111,7 +112,7 @@ struct MonthlyReportsView: View {
                     selectedPoint = nil; evidenceError = nil; drilldown = nil
                     await load()
                 }
-                .onDisappear { insiderRequest = UUID() }
+                .mpRefreshOnTabActivation(tabIsActive) { await load() }
             }
         }
     }

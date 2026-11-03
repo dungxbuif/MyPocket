@@ -2,6 +2,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+# A guard that cannot search proves nothing: fail instead of passing vacuously.
+if ! command -v rg >/dev/null 2>&1; then
+  echo "native ios base-component guard FAILED: ripgrep (rg) is required but not installed" >&2
+  exit 2
+fi
 FEATURES="$ROOT/MyPocketIOS/Features"
 
 if [ ! -d "$FEATURES" ]; then

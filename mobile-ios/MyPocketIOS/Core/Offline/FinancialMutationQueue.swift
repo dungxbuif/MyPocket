@@ -96,6 +96,15 @@ final class FinancialMutationQueue: ObservableObject {
         if !items.isEmpty { try await drain(reason: .sameOwnerLogin) }
     }
 
+    private var backgroundDrains: [Task<Void, Never>] = []
+
+    /// Waits for every background sync started by `submit` so far (tests and shutdown).
+    func settle() async {
+        let pending = backgroundDrains
+        backgroundDrains.removeAll()
+        for task in pending { await task.value }
+    }
+
     func submit(_ payload: OutboxPayload, key: UUID) async throws -> FinancialSubmission {
         guard let ownerID else { throw APIError.missingSession }
         guard sessions.load()?.user.id == ownerID else { throw APIError.accountMismatch }
@@ -107,16 +116,20 @@ final class FinancialMutationQueue: ObservableObject {
     private func finishPersisted(_ mutation: OutboxMutation, owner ownerID: String, submission: UInt64) async throws -> FinancialSubmission {
         guard matches(owner: ownerID, epoch: submission) else { throw APIError.accountMismatch }
         try await refresh(owner: ownerID, epoch: submission)
-        // Once persisted, no online fallback/new key is permitted even if sync is unavailable.
-        do { try await drain() }
-        catch {
-            guard matches(owner: ownerID, epoch: submission) else { throw APIError.accountMismatch }
-            errorMessage = "Bản nháp đã lưu trên thiết bị, nhưng chưa thể đồng bộ."
+        // Local-first: the save is complete once the mutation is durable on this device.
+        // Sync runs in the background and publishes through `items`/`revision`; no online
+        // fallback/new key is permitted for a persisted mutation.
+        // Not chained: a hung transport for one owner must never delay another owner's sync.
+        let task = Task { [weak self] in
+            guard let self else { return }
+            do { try await self.drain() }
+            catch {
+                guard self.matches(owner: ownerID, epoch: submission) else { return }
+                self.errorMessage = "Bản nháp đã lưu trên thiết bị, nhưng chưa thể đồng bộ."
+            }
         }
-        guard matches(owner: ownerID, epoch: submission) else { throw APIError.accountMismatch }
-        let persisted = try await store.items(accountID: ownerID)
-        guard matches(owner: ownerID, epoch: submission) else { throw APIError.accountMismatch }
-        return persisted.first(where: { $0.id == mutation.id })?.state == .applied ? .applied : .queued
+        backgroundDrains.append(task)
+        return .queued
     }
 
     func drain(reason: SyncTriggerReason = .foreground) async throws {

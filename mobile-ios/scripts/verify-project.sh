@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# A verifier that cannot search proves nothing: fail instead of passing vacuously.
+if ! command -v rg >/dev/null 2>&1; then
+  echo "native ios project verification FAILED: ripgrep (rg) is required but not installed" >&2
+  exit 2
+fi
+
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 PROJECT="$ROOT/MyPocketIOS.xcodeproj"
 

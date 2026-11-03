@@ -242,6 +242,8 @@ struct TransactionModel: Codable, Identifiable, Equatable, Sendable {
     var transferID: String?
     var createdAt: String
     var updatedAt: String
+    /// Server optimistic-lock version; sent back as `expected_version` when editing.
+    var version: Int64? = nil
 }
 
 struct TransactionInputModel: Codable, Sendable {
@@ -255,6 +257,8 @@ struct TransactionInputModel: Codable, Sendable {
     var includedInReports: Bool
     var travelEventID: String?
     var autoLinkTravel: Bool? = nil
+    /// Set only for edits: the server rejects the write (409) when the row changed meanwhile.
+    var expectedVersion: Int64? = nil
 }
 
 struct BulkDeleteInputModel: Codable, Sendable {

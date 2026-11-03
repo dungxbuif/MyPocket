@@ -256,7 +256,7 @@ struct WalletsView: View {
                     MPStatusMessage(text: errorMessage, tone: .danger)
                 }
                 if let cachedAt = model.cachedAt {
-                    MPStatusMessage(text: "Bản lưu \(cachedAt.formatted(date: .abbreviated, time: .shortened)) · Chưa cập nhật từ máy chủ.", tone: .info)
+                    MPStatusMessage(text: "Bản lưu \(cachedAt.mpCachedStamp) · Chưa cập nhật từ máy chủ.", tone: .info)
                 }
                 if MPLoadingPresentationPolicy.showsBlockingLoader(isLoading: model.isLoading, hasContent: !model.wallets.isEmpty) {
                     MPLoadingView(label: "Đang tải ví...")
@@ -885,6 +885,7 @@ struct WalletDetailView: View {
 }
 
 struct WalletEditorView: View {
+    @Environment(\.mpBackgroundWrites) private var writes
     let api: FinanceAPI
     let wallet: WalletModel?
     let timezone: String
@@ -1075,15 +1076,8 @@ struct WalletEditorView: View {
         defer { saving = false }
         let trimmedDescription = description.trimmingCharacters(in: .whitespacesAndNewlines)
         let input = WalletModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), type: wallet?.type ?? type, openingBalance: wallet?.openingBalance ?? (parsedOpeningBalance ?? 0), isInTotal: isInTotal == "Có", description: trimmedDescription.isEmpty ? nil : trimmedDescription, targetAmount: type == "goal" ? parsedTarget : nil, targetDate: type == "goal" && targetDateEnabled == "Có" ? MPFormat.calendarDateString(targetDate, timeZone: TimeZone(identifier: timezone) ?? .current) : nil, creditLimit: type == "credit" ? parsedCreditLimit : nil, lastStatementBalance: type == "credit" ? parsedStatementBalance : nil, statementDay: type == "credit" ? parsedStatementDay : nil, paymentDueDay: type == "credit" ? parsedPaymentDueDay : nil, goalNotificationsEnabled: type == "goal" ? goalNotificationsEnabled : false)
-        do {
-            if let wallet {
-                _ = try await api.updateWallet(id: wallet.id, input: input)
-            } else {
-                _ = try await api.createWallet(input)
-            }
-            onSaved()
-        } catch {
-            errorMessage = "Không thể lưu ví. Kiểm tra thông tin và thử lại."
-        }
+        let walletID = wallet?.id, api = api, done = onSaved
+        writes.submit(failure: "Không thể lưu ví. Kiểm tra thông tin và thử lại.", request: { if let walletID { _ = try await api.updateWallet(id: walletID, input: input) } else { _ = try await api.createWallet(input) } }, onSuccess: { done() })
+        onCancel()
     }
 }

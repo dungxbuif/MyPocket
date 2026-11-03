@@ -413,8 +413,12 @@ final class TransactionsViewModel: ObservableObject {
         TransactionsPresentation.signedAmount(for: transaction)
     }
 
+    /// Number of optimistic local changes still being confirmed by the server. A refresh
+    /// is skipped meanwhile so it cannot overwrite the local state with stale rows.
+    private var pendingBackground = 0
+
     func load() async {
-        guard !isLoading else { return }
+        guard !isLoading, pendingBackground == 0 else { return }
         isLoading = true
         errorMessage = nil
         cacheWarning = nil
@@ -504,13 +508,76 @@ final class TransactionsViewModel: ObservableObject {
         }
     }
 
-    func delete(_ transaction: TransactionModel) async {
-        do {
-            try await api.deleteTransaction(id: transaction.id)
-            transactions.removeAll { $0.id == transaction.id }
-        } catch {
-            errorMessage = "Không thể xóa giao dịch."
+    static func isVersionConflict(_ error: Error) -> Bool {
+        guard let api = error as? APIError else { return false }
+        switch api {
+        case .http(let status): return status == 409
+        case .problem(let problem): return problem.status == 409
+        default: return false
         }
+    }
+
+    static func signedEffect(_ transaction: TransactionModel) -> Int64 {
+        switch transaction.type {
+        case "income": return transaction.amount
+        case "expense": return -transaction.amount
+        case "adjustment": return transaction.adjustmentDirection == "increase" ? transaction.amount : -transaction.amount
+        default: return 0
+        }
+    }
+
+    /// Keeps wallet balances consistent with optimistic row changes (`sign` -1 removes the row's
+    /// effect, +1 applies it). The server value replaces this after confirmation.
+    private func applyBalance(_ transaction: TransactionModel, sign: Int64) {
+        guard let index = wallets.firstIndex(where: { $0.id == transaction.walletID }) else { return }
+        wallets[index].currentBalance += sign * Self.signedEffect(transaction)
+    }
+
+    /// Local-first edit: apply to the list immediately, confirm in the background,
+    /// restore the previous row and surface the error if the server rejects it.
+    func submitUpdate(id: String, input: TransactionInputModel) {
+        guard let index = transactions.firstIndex(where: { $0.id == id }) else { return }
+        let previous = transactions[index]
+        var next = previous
+        next.walletID = input.walletID; next.categoryID = input.categoryID; next.jarID = input.jarID
+        next.type = input.type; next.amount = input.amount; next.occurredAt = input.occurredAt
+        next.note = input.note; next.includedInReports = input.includedInReports
+        next.travelEventID = input.travelEventID
+        transactions[index] = next
+        applyBalance(previous, sign: -1); applyBalance(next, sign: 1)
+        errorMessage = nil
+        pendingBackground += 1
+        Task {
+            do { _ = try await api.updateTransaction(id: id, input: input) }
+            catch {
+                if let current = transactions.firstIndex(where: { $0.id == id }) {
+                    applyBalance(transactions[current], sign: -1); applyBalance(previous, sign: 1)
+                    transactions[current] = previous
+                }
+                if Self.isVersionConflict(error) {
+                    errorMessage = "Giao dịch đã được thay đổi ở nơi khác. Đã hoàn lại và tải bản mới nhất, hãy sửa lại nếu cần."
+                } else {
+                    errorMessage = "Không thể lưu thay đổi giao dịch. Đã hoàn lại bản trước."
+                }
+            }
+            pendingBackground -= 1
+            await load()
+        }
+    }
+
+    func delete(_ transaction: TransactionModel) async {
+        guard let index = transactions.firstIndex(where: { $0.id == transaction.id }) else { return }
+        transactions.remove(at: index)
+        applyBalance(transaction, sign: -1)
+        pendingBackground += 1
+        defer { pendingBackground -= 1 }
+        do { try await api.deleteTransaction(id: transaction.id) }
+        catch {
+            transactions.insert(transaction, at: min(index, transactions.count))
+            applyBalance(transaction, sign: 1)
+            errorMessage = "Không thể xóa giao dịch. Đã khôi phục."
+        }
+        Task { await load() }
     }
 
     func deleteMany(_ ids: [String]) async -> Bool {
@@ -534,16 +601,22 @@ final class TransactionsViewModel: ObservableObject {
 
     func deleteTransfer(_ transaction: TransactionModel) async {
         guard let transferID = transaction.transferID else { return }
-        do {
-            try await api.deleteTransfer(id: transferID)
-            transactions.removeAll { $0.transferID == transferID }
-        } catch {
-            errorMessage = "Không thể xóa cặp giao dịch chuyển ví."
+        let removed = transactions.enumerated().filter { $0.element.transferID == transferID }
+        transactions.removeAll { $0.transferID == transferID }
+        for item in removed { applyBalance(item.element, sign: -1) }
+        pendingBackground += 1
+        defer { pendingBackground -= 1 }
+        do { try await api.deleteTransfer(id: transferID) }
+        catch {
+            for item in removed { transactions.insert(item.element, at: min(item.offset, transactions.count)); applyBalance(item.element, sign: 1) }
+            errorMessage = "Không thể xóa cặp giao dịch chuyển ví. Đã khôi phục."
         }
+        Task { await load() }
     }
 }
 
 struct TransactionsView: View {
+    @Environment(\.mpTabIsActive) private var tabIsActive
     @Environment(\.mpFinancialQueue) private var financialQueue
     @StateObject private var model: TransactionsViewModel
     @Binding private var addRequested: Bool
@@ -696,7 +769,7 @@ struct TransactionsView: View {
                     MPErrorView(title: "Không tải được giao dịch", detail: errorMessage) { Task { await model.load() } }
                     } else {
                     if let cachedAt = model.cachedAt {
-                        MPStatusMessage(text: "Dữ liệu đã lưu · \(cachedAt.formatted(date: .abbreviated, time: .shortened)). Chưa cập nhật từ máy chủ.")
+                        MPStatusMessage(text: "Dữ liệu đã lưu · \(cachedAt.mpCachedStamp). Chưa cập nhật từ máy chủ.")
                             .accessibilityIdentifier("transactions-stale-data")
                         MPButton("Tải lại", style: .secondary, isLoading: model.isLoading) { Task { await model.load() } }
                     }
@@ -765,6 +838,7 @@ struct TransactionsView: View {
             }
             await model.load()
         }
+        .mpRefreshOnTabActivation(tabIsActive) { await model.load() }
         .onChange(of: model.walletSelection) { _, newValue in
             let selectedType = model.wallets.first(where: { $0.id == newValue })?.type
             model.periodSelection = selectedType == "goal" || selectedType == "credit" ? "all" : "week"
@@ -802,18 +876,20 @@ struct TransactionsView: View {
                         onSaved: closeQueuedEditor, onCancel: closeQueuedEditor)
                 }
             } else {
-            TransactionEditorView(api: modelAPI, wallets: model.wallets, categories: model.categories, timezone: model.accountTimezone, transaction: editTarget) {
+            TransactionEditorView(api: modelAPI, wallets: model.wallets, categories: model.categories, timezone: model.accountTimezone, transaction: editTarget, onSaved: {
                 editorPresented = false
                 editTarget = nil
                 Task { await model.load() }
-            } onCancel: {
+            }, onCancel: {
                 editorPresented = false
                 editTarget = nil
-            } onAIEntry: {
+            }, onAIEntry: {
                 editorPresented = false
                 editTarget = nil
                 onAIEntry?()
-            }
+            }, onSubmitUpdate: { id, input in
+                model.submitUpdate(id: id, input: input)
+            })
             .background(MPColor.canvas.ignoresSafeArea())
             }
         }
@@ -1040,6 +1116,8 @@ struct TransactionEditorView: View {
     let onSaved: () -> Void
     let onCancel: () -> Void
     let onAIEntry: (() -> Void)?
+    /// Local-first edit hook: when set, an edit is applied locally and confirmed in the background.
+    var onSubmitUpdate: ((String, TransactionInputModel) -> Void)? = nil
     @State private var type = "expense"
     @State private var amount = ""
     @State private var note = ""
@@ -1096,7 +1174,8 @@ struct TransactionEditorView: View {
         else { onCancel() }
     }
 
-    init(api: FinanceAPI, wallets: [WalletModel], categories: [CategoryModel], timezone: String = TimeZone.current.identifier, transaction: TransactionModel? = nil, queuedMutation: OutboxMutation? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void, onAIEntry: (() -> Void)? = nil) {
+    init(api: FinanceAPI, wallets: [WalletModel], categories: [CategoryModel], timezone: String = TimeZone.current.identifier, transaction: TransactionModel? = nil, queuedMutation: OutboxMutation? = nil, onSaved: @escaping () -> Void, onCancel: @escaping () -> Void, onAIEntry: (() -> Void)? = nil, onSubmitUpdate: ((String, TransactionInputModel) -> Void)? = nil) {
+        self.onSubmitUpdate = onSubmitUpdate
         self.api = api
         self.wallets = wallets
         self.categories = categories
@@ -1343,7 +1422,12 @@ struct TransactionEditorView: View {
         do {
             let occurredAt = queuedTransactionInput.flatMap { MPFormat.parseInstant($0.occurredAt) == date ? $0.occurredAt : nil } ?? Self.timestamp(from: date, timezone: timezone)
             let input = TransactionInputModel(walletID: wallet.id, categoryID: selectedCategory.id, jarID: jarID.isEmpty ? nil : jarID, type: type, amount: parsed, occurredAt: occurredAt, note: note.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : note.trimmingCharacters(in: .whitespacesAndNewlines), includedInReports: includedInReports, travelEventID: queuedTransactionInput?.travelEventID ?? transaction?.travelEventID)
-            if let transaction { _ = try await api.updateTransaction(id: transaction.id, input: input) }
+            if let transaction {
+                var versioned = input
+                versioned.expectedVersion = transaction.version
+                if let onSubmitUpdate { onSubmitUpdate(transaction.id, versioned) }
+                else { _ = try await api.updateTransaction(id: transaction.id, input: versioned) }
+            }
             else if let queuedMutation {
                 guard let financialQueue else { throw APIError.missingSession }
                 _ = try await financialQueue.replaceRejected(id: queuedMutation.id, payload: .transaction(input), key: intentKey)

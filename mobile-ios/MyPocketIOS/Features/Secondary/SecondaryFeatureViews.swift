@@ -35,6 +35,7 @@ enum BudgetPresentation {
 }
 
 struct BudgetsView: View {
+    @Environment(\.mpBackgroundWrites) private var writes
     let api: FinanceAPI
     let onBack: () -> Void
     let masked: Bool
@@ -270,6 +271,7 @@ struct BudgetsView: View {
         guard !loading else { return }
         let firstLoad = summary == nil
         loading = true; defer { loading = false }
+        if firstLoad, let stored = await api.cachedBudgets(ownerID: ownerID) { summary = stored }
         do {
             async let summaryResult = api.budgets(ownerID: ownerID)
             async let walletResult = api.wallets(ownerID: ownerID)
@@ -302,28 +304,28 @@ struct BudgetsView: View {
         let start = MPFormat.calendarDateString(startDate, timeZone: zone)
         let end = MPFormat.calendarDateString(endDate, timeZone: zone)
         saving = true; error = nil; defer { saving = false }
-        do {
-            let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
-            let walletID = walletScopeID == "__all__" ? nil : walletScopeID
-            let categoryID = categoryScopeID == "__all__" ? nil : categoryScopeID
-            if let seriesTarget {
-                let input = BudgetSeriesUpdateInput(version: seriesTarget.version, name: cleanName, limitAmount: parsed, walletID: walletID, categoryID: categoryID, carryoverEnabled: carryover)
-                _ = try await api.updateBudgetSeries(id: seriesTarget.id, input: input, idempotencyKey: key(for: input), ownerID: ownerID)
-            } else if recurring {
-                let input = BudgetSeriesCreateInput(name: cleanName, limitAmount: parsed, walletID: walletID, categoryID: categoryID, cadence: selectedCadence, startDate: selectedCadence.canonicalStart(startDate, timeZone: zone), carryoverEnabled: carryover)
-                _ = try await api.createBudgetSeries(input, idempotencyKey: key(for: input), ownerID: ownerID)
-            } else {
-                let input = BudgetInputModel(name: cleanName, limitAmount: parsed, walletID: walletID, categoryID: categoryID, startDate: start, endDate: end)
-                if let editTarget { _ = try await api.updateBudget(id: editTarget.id, input: input) } else { _ = try await api.createBudget(input) }
-            }
-            showEditor = false; self.editTarget = nil; seriesTarget = nil; recurring = false; carryover = false; mutationPayload = nil; name = ""; limit = ""; walletScopeID = "__all__"; categoryScopeID = "__all__"; await load()
+        let cleanName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let walletID = walletScopeID == "__all__" ? nil : walletScopeID
+        let categoryID = categoryScopeID == "__all__" ? nil : categoryScopeID
+        let request: () async throws -> Void
+        if let seriesTarget {
+            let input = BudgetSeriesUpdateInput(version: seriesTarget.version, name: cleanName, limitAmount: parsed, walletID: walletID, categoryID: categoryID, carryoverEnabled: carryover)
+            guard let idem = try? key(for: input) else { error = "Không thể lưu ngân sách."; return }
+            let id = seriesTarget.id, owner = ownerID, api = api
+            request = { _ = try await api.updateBudgetSeries(id: id, input: input, idempotencyKey: idem, ownerID: owner) }
+        } else if recurring {
+            let input = BudgetSeriesCreateInput(name: cleanName, limitAmount: parsed, walletID: walletID, categoryID: categoryID, cadence: selectedCadence, startDate: selectedCadence.canonicalStart(startDate, timeZone: zone), carryoverEnabled: carryover)
+            guard let idem = try? key(for: input) else { error = "Không thể lưu ngân sách."; return }
+            let owner = ownerID, api = api
+            request = { _ = try await api.createBudgetSeries(input, idempotencyKey: idem, ownerID: owner) }
+        } else {
+            let input = BudgetInputModel(name: cleanName, limitAmount: parsed, walletID: walletID, categoryID: categoryID, startDate: start, endDate: end)
+            let targetID = editTarget?.id, api = api
+            request = { if let targetID { _ = try await api.updateBudget(id: targetID, input: input) } else { _ = try await api.createBudget(input) } }
         }
-        catch {
-#if DEBUG
-            print("[Budgets] save failed: \(APIError.diagnosticDescription(error))")
-#endif
-            self.error = (error as? APIError)?.userMessage ?? "Không thể lưu ngân sách."
-        }
+        // Local-first: close the editor now, confirm in the background, reload on success.
+        showEditor = false; self.editTarget = nil; seriesTarget = nil; recurring = false; carryover = false; mutationPayload = nil; name = ""; limit = ""; walletScopeID = "__all__"; categoryScopeID = "__all__"
+        writes.submit(failure: "Không thể lưu ngân sách.", request: request, onSuccess: { Task { await load() } })
     }
 
     private func beginCreating() {
@@ -526,7 +528,7 @@ struct ReportsView: View {
                 .accessibilityIdentifier(ReportsReferencePresentation.sectionAccessibilityID(.filter))
                 if let summary, ReportsPresentationPolicy.isComplete(summary: summary, monthDetail: monthDetail) {
                     if let cachedAt {
-                        MPStatusMessage(text: "Bản lưu \(cachedAt.formatted(date: .abbreviated, time: .shortened)) · Chưa cập nhật từ máy chủ.", tone: .info)
+                        MPStatusMessage(text: "Bản lưu \(cachedAt.mpCachedStamp) · Chưa cập nhật từ máy chủ.", tone: .info)
                     }
                     MPFinanceSummaryCard(
                         title: "Tổng quan báo cáo",
@@ -693,6 +695,7 @@ enum CategoriesReferencePresentation {
 }
 
 struct CategoriesView: View {
+    @Environment(\.mpBackgroundWrites) private var writes
     let api: FinanceAPI
     let onBack: () -> Void
     @State private var items: [CategoryModel] = []
@@ -947,18 +950,16 @@ struct CategoriesView: View {
         saving = true
         defer { saving = false }
         if let editTarget, CategoryEditPolicy.metadataIsReadOnly(editTarget) {
-            do {
-                _ = try await api.updateCategoryWallets(id: editTarget.id, walletIDs: Array(selectedWalletIDs))
-                adding = false; self.editTarget = nil; selectedWalletIDs = []; await load()
-            } catch { self.error = "Không thể lưu ví áp dụng." }
+            let id = editTarget.id, ids = Array(selectedWalletIDs), api = api
+            adding = false; self.editTarget = nil; selectedWalletIDs = []
+            writes.submit(failure: "Không thể lưu ví áp dụng.", request: { _ = try await api.updateCategoryWallets(id: id, walletIDs: ids) }, onSuccess: { Task { await load() } })
             return
         }
         guard !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { self.error = "Nhập tên danh mục."; return }
-        do {
-            let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: Array(selectedWalletIDs).sorted(), iconKey: iconKey)
-            if let editTarget { _ = try await api.updateCategory(id: editTarget.id, input: input) } else { _ = try await api.createCategory(input) }
-            cancelEditor(); await load()
-        } catch { self.error = "Không thể lưu danh mục." }
+        let input = CategoryModelInput(name: name.trimmingCharacters(in: .whitespacesAndNewlines), kind: kind, parentID: parentID.isEmpty ? nil : parentID, walletIDs: Array(selectedWalletIDs).sorted(), iconKey: iconKey)
+        let targetID = editTarget?.id, api = api
+        cancelEditor()
+        writes.submit(failure: "Không thể lưu danh mục.", request: { if let targetID { _ = try await api.updateCategory(id: targetID, input: input) } else { _ = try await api.createCategory(input) } }, onSuccess: { Task { await load() } })
     }
     private func changeActive() async {
         guard let editTarget, CategoryEditPolicy.canArchive(editTarget), !saving else { return }
@@ -1032,6 +1033,7 @@ enum JarsFlowCopy {
 }
 
 struct JarsView: View {
+    @Environment(\.mpBackgroundWrites) private var writes
     let api: FinanceAPI
     let onBack: () -> Void
     let masked: Bool
@@ -1298,8 +1300,10 @@ struct JarsView: View {
     private func load() async {
         guard !loading else { return }
         loading = true; defer { loading = false }
+        let wasEmpty = summary == nil
+        if wasEmpty, let stored = await api.cachedJarMonth(month: month) { summary = stored }
         do {
-            let firstLoad = summary == nil
+            let firstLoad = wasEmpty
             if let profile = try? await api.profile() {
                 accountTimezone = profile.timezone
                 if firstLoad { month = MPFormat.currentMonth(timeZone: TimeZone(identifier: accountTimezone) ?? .current) }
@@ -1334,8 +1338,9 @@ struct JarsView: View {
         guard JarAllocationDraftValidator.isValid(mode: mode, amount: parsedAmount, percent: parsedPercent) else { error = "Cách phân bổ không hợp lệ."; return }
         let input = JarConfigInputModel(month: month, name: name.trimmingCharacters(in: .whitespacesAndNewlines), allocationMode: mode, allocationAmount: mode == "fixed" ? parsedAmount : nil, allocationPercent: mode == "percent" ? parsedPercent : nil)
         saving = true; error = nil; defer { saving = false }
-        do { if let editTarget { _ = try await api.updateJarMonth(jarID: editTarget.jarID, month: month, input: input) } else { _ = try await api.createJar(input) }; editorSession.complete(); editTarget = nil; resetEditor(); await load() }
-        catch { self.error = "Không thể lưu hũ." }
+        let targetJarID = editTarget?.jarID, api = api, month = month
+        editorSession.complete(); editTarget = nil; resetEditor()
+        writes.submit(failure: "Không thể lưu hũ.", request: { if let targetJarID { _ = try await api.updateJarMonth(jarID: targetJarID, month: month, input: input) } else { _ = try await api.createJar(input) } }, onSuccess: { Task { await load() } })
     }
     private func remove(_ item: JarItemModel) async {
         guard removingJarID == nil else { return }
@@ -1598,6 +1603,7 @@ enum RecurringReferencePresentation {
 }
 
 struct RecurringView: View {
+    @Environment(\.mpBackgroundWrites) private var writes
     let api: FinanceAPI
     let onBack: () -> Void
     @Environment(\.mpFinancialValuesMasked) private var masked
@@ -1817,14 +1823,11 @@ struct RecurringView: View {
             active: active == "Có"
         )
         saving = true; error = nil; defer { saving = false }
-        do {
-            if let editTarget { _ = try await api.updateRecurring(id: editTarget.id, input: input) }
-            else { _ = try await api.createRecurring(input) }
-            editorSession.complete()
-            self.editTarget = nil
-            resetEditor()
-            await load()
-        } catch { self.error = "Không thể lưu lịch định kỳ." }
+        let targetID = editTarget?.id, api = api
+        editorSession.complete()
+        self.editTarget = nil
+        resetEditor()
+        writes.submit(failure: "Không thể lưu lịch định kỳ.", request: { if let targetID { _ = try await api.updateRecurring(id: targetID, input: input) } else { _ = try await api.createRecurring(input) } }, onSuccess: { Task { await load() } })
     }
     private func delete(_ item: RecurringModel) async { do { try await api.deleteRecurring(id: item.id); await load() } catch { self.error = "Không thể xóa lịch định kỳ." } }
 }
@@ -1836,6 +1839,7 @@ enum TravelReferencePresentation {
 }
 
 struct TravelView: View {
+    @Environment(\.mpBackgroundWrites) private var writes
     let api: FinanceAPI
     let onBack: () -> Void
     @Environment(\.mpFinancialValuesMasked) private var masked
@@ -1981,7 +1985,7 @@ struct TravelView: View {
         default: return "Không giới hạn ngày"
         }
     }
-    private func save() async { guard !saving else { return }; guard TravelEventDraftValidator.isValid(name: name, startsOn: startsOn, endsOn: endsOn) else { self.error = "Tên chuyến và khoảng ngày không hợp lệ."; return }; let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines); let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines); let input = TravelEventInputModel(name: trimmedName, context: trimmedContext.isEmpty ? nil : trimmedContext, startsOn: startsOn.isEmpty ? nil : startsOn, endsOn: endsOn.isEmpty ? nil : endsOn, active: editTarget?.active ?? false); saving = true; error = nil; defer { saving = false }; do { if let editTarget { _ = try await api.updateTravelEvent(id: editTarget.id, input: input) } else { _ = try await api.createTravelEvent(input) }; resetEditor(); editTarget = nil; adding = false; await load() } catch { self.error = "Không thể lưu chuyến đi." } }
+    private func save() async { guard !saving else { return }; guard TravelEventDraftValidator.isValid(name: name, startsOn: startsOn, endsOn: endsOn) else { self.error = "Tên chuyến và khoảng ngày không hợp lệ."; return }; let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines); let trimmedContext = context.trimmingCharacters(in: .whitespacesAndNewlines); let input = TravelEventInputModel(name: trimmedName, context: trimmedContext.isEmpty ? nil : trimmedContext, startsOn: startsOn.isEmpty ? nil : startsOn, endsOn: endsOn.isEmpty ? nil : endsOn, active: editTarget?.active ?? false); let targetID = editTarget?.id, api = api; resetEditor(); editTarget = nil; adding = false; writes.submit(failure: "Không thể lưu chuyến đi.", request: { if let targetID { _ = try await api.updateTravelEvent(id: targetID, input: input) } else { _ = try await api.createTravelEvent(input) } }, onSuccess: { Task { await load() } }) }
     private func remove(_ event: TravelEventModel) async { do { try await api.deleteTravelEvent(id: event.id); await load() } catch { self.error = "Không thể xóa chuyến đi." } }
 }
 

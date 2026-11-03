@@ -149,6 +149,15 @@ final class FinanceAPI: @unchecked Sendable {
         return try await client.send(APIRequest(path: "/reports/monthly?\(components.percentEncodedQuery ?? "")", expectedOwnerID: ownerID))
     }
 
+    /// Last known report for this scope (disk), shown before the server answers.
+    func cachedMonthlyReport(month: String, walletID: String? = nil, granularity: String = "day", ownerID: String? = nil) async -> MonthlyReportModel? {
+        var items = [URLQueryItem(name: "month", value: month), URLQueryItem(name: "granularity", value: granularity)]
+        if let walletID { items.append(URLQueryItem(name: "wallet_id", value: walletID)) }
+        var components = URLComponents()
+        components.queryItems = items
+        return await client.cached(APIRequest(path: "/reports/monthly?\(components.percentEncodedQuery ?? "")", expectedOwnerID: ownerID))
+    }
+
     func monthlyReportTransactions(month: String, walletID: String? = nil, categoryID: String? = nil, kind: String = "all", offset: Int, ownerID: String?) async throws -> ReportTransactionPageModel {
         var items = [URLQueryItem(name: "month", value: month), URLQueryItem(name: "kind", value: kind), URLQueryItem(name: "limit", value: "50"), URLQueryItem(name: "offset", value: String(offset))]
         if let walletID { items.append(URLQueryItem(name: "wallet_id", value: walletID)) }
@@ -247,6 +256,14 @@ final class FinanceAPI: @unchecked Sendable {
 
     func createAdjustment(_ input: AdjustmentInputModel) async throws -> TransactionModel {
         try await client.send(APIRequest(path: "/transactions/adjustment", method: .post, body: try body(input), idempotencyKey: UUID().uuidString))
+    }
+
+    func cachedBudgets(ownerID: String? = nil) async -> BudgetSummaryModel? {
+        await client.cached(APIRequest(path: "/budgets", expectedOwnerID: ownerID))
+    }
+
+    func cachedJarMonth(month: String) async -> JarMonthSummaryModel? {
+        await client.cached(APIRequest(path: "/jars?month=\(month)"))
     }
 
     func budgets(ownerID: String? = nil) async throws -> BudgetSummaryModel {

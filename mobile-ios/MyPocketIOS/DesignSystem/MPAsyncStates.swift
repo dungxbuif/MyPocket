@@ -170,3 +170,10 @@ enum MPStatusTone: Equatable {
         }
     }
 }
+
+extension Date {
+    /// "bản lưu" timestamp shown with cached data, always in Vietnamese (e.g. "03 thg 11, 2026 21:33").
+    var mpCachedStamp: String {
+        formatted(.dateTime.day().month().year().hour().minute().locale(Locale(identifier: "vi_VN")))
+    }
+}

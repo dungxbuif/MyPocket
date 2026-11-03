@@ -33,6 +33,8 @@ struct MainTabView: View {
         self.externalRoute = externalRoute
     }
 
+    @Environment(\.mpBackgroundWrites) private var backgroundWrites
+
     var body: some View {
         GeometryReader { geometry in
         // A full-screen Assistant is a separate experience, not another shell
@@ -49,8 +51,8 @@ struct MainTabView: View {
         ZStack(alignment: .bottomTrailing) {
             VStack(spacing: 0) {
             VStack(spacing: 0) {
-                Group {
-                    switch selection {
+                MPTabKeepAlive(selection: selection, tabs: ["overview", "transactions", "reports", "account"], preload: ["transactions", "reports"]) { tab in
+                    switch tab {
                     case "overview":
                         NavigationStack(path: $overviewPath) {
                         OverviewView(
@@ -150,6 +152,7 @@ struct MainTabView: View {
                         )
                     }
                 }
+                .overlay(alignment: .top) { MPBackgroundWriteStatus(center: backgroundWrites) }
                 .frame(width: geometry.size.width, height: contentHeight, alignment: .top)
                 .clipped()
                 .accessibilityHidden(assistantPresented)

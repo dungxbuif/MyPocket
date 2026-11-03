@@ -28,6 +28,20 @@ final class APIClient: @unchecked Sendable {
         self.baseURL = baseURL
         self.transport = transport
         self.sessionStore = sessionStore
+        // Only the production transport persists reads; injected test transports stay isolated.
+        self.readCache = transport is URLSessionTransport ? MPReadThroughCache.makeDefault(serverURL: baseURL) : nil
+    }
+
+    private let readCache: MPReadThroughCache?
+
+    /// Last known successful response for an allow-listed GET of the signed-in owner, or nil.
+    /// Callers paint it immediately and must still refresh from the server.
+    func cached<Response: Decodable & Sendable>(_ request: APIRequest<Response>) async -> Response? {
+        guard let readCache, request.method == .get, MPReadThroughCache.allows(path: request.path),
+              let owner = sessionStore.load()?.user.id else { return nil }
+        if let expected = request.expectedOwnerID, expected != owner { return nil }
+        guard let data = await readCache.load(ownerID: owner, key: request.path) else { return nil }
+        return try? JSONDecoder.mypocket.decode(APIEnvelope<Response>.self, from: data).data
     }
 
     func send<Response: Decodable>(_ request: APIRequest<Response>) async throws -> Response {
@@ -187,7 +201,13 @@ final class APIClient: @unchecked Sendable {
                 return APIEnvelope(data: empty, meta: nil)
             }
             do {
-                return try JSONDecoder.mypocket.decode(APIEnvelope<Response>.self, from: data)
+                let envelope = try JSONDecoder.mypocket.decode(APIEnvelope<Response>.self, from: data)
+                if request.method == .get, let readCache, MPReadThroughCache.allows(path: request.path),
+                   let owner = sessionOverride?.user.id ?? sessionStore.load()?.user.id {
+                    let path = request.path
+                    Task { await readCache.save(data, ownerID: owner, key: path) }
+                }
+                return envelope
             } catch {
                 throw APIError.decoding(error.localizedDescription)
             }
