@@ -5941,3 +5941,21 @@ contracts. No source, schema, deployment or public-document behavior changed.
 | Base guard, project verification | PASS | `check-base-components.sh`, `verify-project.sh` |
 | `LocalFirstRuntimeTests/testJarsScreenShowsCumulativePlanLikeWalletCards` | PASS | jar 15M x 2 months, 10M spent in the first: headline "Còn có thể chi 20.000.000 đ", "Chưa phân bổ" row, reconciliation line, detail note "Dư từ tháng trước +5.000.000 đ"; screenshots viewed (list, detail) |
 | Audit items 6-8 (FAB over delete, English copy, 3 wallets, duplicate title, search label) | FIXED in code, not re-screenshotted | unit target green; AccessibilityXL tab bar item still OPEN |
+
+## Live Assistant jar-assignment check — 2026-11-03 (FAILED, open)
+
+Fixture account `native-fixture@example.test`, October 2026 (46 unassigned ordinary expenses), real provider
+(DeepSeek-V4.1-Flash via the configured OpenAI-compatible endpoint), message "Gợi ý hũ cho các khoản chi chưa
+phân bổ…" with `jar_context {month: 2026-10}`.
+
+| Attempt | Result |
+| --- | --- |
+| Before `jar_examples` | Run completed with no `jar_assignment_confirmation` card: the model searched notes one by one (8 `search_transactions` lists) and its final text leaked raw tool-call markup |
+| After adding per-jar recent assigned notes (`jar_examples`) and a "propose once, never search per row" instruction | Run FAILED after ~76 s with an empty error code; no card |
+
+Conclusion: the 80%-correct target is unmeasured and the end-to-end flow does not yet work with this model. Backend
+mechanics (validation, per-row apply with `expected_version`, idempotent confirm, owner scoping) are unit/DB tested
+(984 backend tests). Recommended next step (needs owner approval): a deterministic server-side suggester
+(hashtag match, normalised-note match against rows already assigned to a jar) that builds the proposal without
+the model, using the model only for ambiguous rows; and a cap on tool rounds so a run ends with a clear message
+instead of failing silently.

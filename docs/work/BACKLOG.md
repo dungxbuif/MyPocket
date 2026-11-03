@@ -33,7 +33,7 @@ All five items closed: legacy credit rows now list in statements; the push-token
 `/home` returns real counts; amount (≤ 2^53−1) and date (≥ 2000, ≤ +1 year) limits are enforced;
 `/budgets` totals are documented as active-period totals. Evidence in the [validation matrix](VALIDATION_MATRIX.md).
 
-## Hũ hiển thị như ví + AI gán hũ từ ghi chú — in_progress (phase 1 backend done, iOS coded), owner approved 2026-11-03
+## Hũ hiển thị như ví + AI gán hũ từ ghi chú — phases 1–2 done, phase 3 blocked on model quality, owner approved 2026-11-03
 
 Owner decided to keep one concept (Hũ), show jars like wallets with a cumulative "Còn có thể chi"
 plan figure, an always-present "Chưa phân bổ" card, a mandatory reconciliation line against
@@ -42,10 +42,16 @@ via a confirmation card. [Detail design](tickets/JARS-AS-WALLET-CARDS-20261103-D
 [ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md), screen specs under
 `docs/design/pages/{jars,transactions,overview,month-detail,reports,finance-assistant}`. No schema
 change. Phases: 1 API + jar list/detail; 2 ledger filter/chip/editor hint, overview, month, reports;
-3 Assistant tool/card. Starts after local-first acceptance and commit (phase 0). Supersedes the
-earlier "remove jars / wallet hashtags" draft.
+3 Assistant tool/card. Status 2026-11-03: phases 1 and 2 implemented, committed and verified (backend 984,
+native 469, jar screens seen in simulator screenshots); phase 3 backend mechanics committed but the live run
+FAILED (no card; see validation matrix). Open, needs owner decision: deterministic server-side suggester
+(hashtag/normalised-note match) with the model only for ambiguous rows, tool-round cap, then the iOS
+`jar_assignment_confirmation` card (not built). Not screenshotted yet: ledger jar filter/chip/editor hint,
+Overview jar rows, month screen, AccessibilityXL tab bar. Supersedes the earlier "remove jars / hashtags" draft.
 
-## UX polish from the independent audit — draft, 2026-11-03
+## UX polish from the independent audit — mostly done, 2026-11-03
+
+Done: FAB over delete, English strings, Overview wallet list affordance, duplicate title, category search copy. Remaining below.
 
 "+" FAB overlapping the delete button on transaction detail; English strings ("Travel Mode",
 "changelog"); Overview shows only the first 3 wallets; duplicate "Ví của tôi" on Account;

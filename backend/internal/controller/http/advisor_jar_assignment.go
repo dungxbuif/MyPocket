@@ -95,7 +95,41 @@ func (h *AdvisorHandler) jarContext(_ context.Context, principal usecase.Princip
 	}
 	data["unassigned_expenses"] = unassigned
 	data["unassigned_expense_count"] = total
+	if summary != nil {
+		data["jar_examples"] = jarAssignmentExamples(rows, summary.Jars, categoryNames)
+	}
 	return data, nil
+}
+
+// jarAssignmentExamples gives the model evidence it would otherwise fetch with one search per row:
+// the most recent notes of expenses already assigned to each jar. `rows` must be newest first.
+func jarAssignmentExamples(rows []entity.Transaction, jars []entity.JarIdentity, categoryNames map[string]string) []map[string]any {
+	const perJar = 4
+	names := make(map[string]string, len(jars))
+	for _, jar := range jars {
+		names[jar.JarID] = jar.Name
+	}
+	byJar := map[string][]map[string]any{}
+	for _, row := range rows {
+		if row.JarID == nil || row.Type != entity.TransactionTypeExpense || row.Note == nil || strings.TrimSpace(*row.Note) == "" {
+			continue
+		}
+		if len(byJar[*row.JarID]) >= perJar {
+			continue
+		}
+		example := map[string]any{"note": *row.Note}
+		if row.CategoryID != nil {
+			example["category_name"] = categoryNames[*row.CategoryID]
+		}
+		byJar[*row.JarID] = append(byJar[*row.JarID], example)
+	}
+	out := make([]map[string]any, 0, len(byJar))
+	for _, jar := range jars {
+		if examples := byJar[jar.JarID]; len(examples) > 0 {
+			out = append(out, map[string]any{"jar_id": jar.JarID, "jar_name": names[jar.JarID], "recent_assigned_expenses": examples})
+		}
+	}
+	return out
 }
 
 // applyJarAssignments applies a confirmed assign_jar card row by row through

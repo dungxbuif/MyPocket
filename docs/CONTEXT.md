@@ -29,6 +29,12 @@ saves. [Detail design](work/tickets/LOCAL-FIRST-20261103-DETAIL_DESIGN.md) await
 approval (granted 2026-11-03). Implemented: tabs stay mounted with preload, outbox submit no
 longer waits for the network, optimistic edit/delete with rollback. Build passes; tests pending.
 
+## Hũ hiển thị như ví — phases 1–2 done, phase 3 blocked, 2026-11-03
+
+Backend cumulative plan + wallet-style jar screens + ledger/overview/month integration are committed and
+tested. Assistant jar assignment mechanics are committed but the live run with the configured model failed;
+decision needed on a deterministic suggester. See backlog and validation matrix.
+
 ## Hũ hiển thị như ví — design ready, 2026-11-03
 
 Owner approved the jar direction: one concept, wallet-style jar cards with cumulative "Còn có thể
