@@ -6055,3 +6055,9 @@ user's bubble. Fixed by `AssistantCardType.isHiddenContextPart` (hides both cont
 The UI test itself was also made independent of the live provider and of earlier runs (the Assistant thread persists, so older cards stay
 on screen): it waits for a NEW card, counts removable rows relative to the earlier cards and only removes a row when the new card has two or
 more. After the fix: the test passes (1 of 3 rows assigned via API, the removed row stays unassigned) and `JarAssignmentCardTests` 8/8 pass.
+
+Full `LocalFirstRuntimeTests` group re-run after the fix (14 tests): the Assistant card test passes; two other tests failed once. The
+tab-switch test failed because earlier runs left "LF Cash" wallets in the UI-test account, so the wallet picker grew and this run's wallet
+sat off screen (test pollution, not a product regression); it now removes leftovers first and passes (no blocking loader in 6 tab
+switches, save closes in ~1.9 s). `testJarLedgerEditorOverviewMonthAndDetailScreenshots` failed once on "shell + must be hidden on
+transaction detail" and passed on both the first run and a re-run alone; treat it as an intermittent timing check, not yet a root cause.

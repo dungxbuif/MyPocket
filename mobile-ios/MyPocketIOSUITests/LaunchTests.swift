@@ -350,6 +350,22 @@ private enum LocalAPIFixture {
         }
     }
 
+    /// Removes wallets (and their transactions) left behind by earlier runs of the same test.
+    static func deleteWallets(withPrefix prefix: String) async throws {
+        let token = try await loginToken()
+        let existing = try await request(
+            path: "/wallets",
+            method: "GET",
+            token: token,
+            body: nil,
+            decode: FixtureEnvelope<[FixtureWallet]>.self
+        ).data
+        for item in existing where item.name.hasPrefix(prefix) {
+            try? await deleteTransactions(walletID: item.id)
+            try? await deleteWallet(id: item.id, token: token)
+        }
+    }
+
     static func wallet(named name: String) async throws -> FixtureWallet {
         let token = try await loginToken()
         let existing = try await request(
@@ -6182,7 +6198,10 @@ final class LocalFirstRuntimeTests: XCTestCase {
     func testTabSwitchHasNoBlockingLoaderAndSaveClosesImmediately() async throws {
         continueAfterFailure = true
         // The UI-test login maps to its own fixture account, which starts without wallets.
+        // Earlier runs left "LF Cash" wallets behind; a long wallet picker pushes this run's wallet off screen.
+        try await LocalAPIFixture.deleteWallets(withPrefix: "LF Cash")
         let wallet = try await LocalAPIFixture.wallet(name: "LF Cash \(UUID().uuidString.prefix(4))", type: "basic")
+        defer { Task { try? await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id); try? await LocalAPIFixture.delete(wallet) } }
         let app = XCUIApplication()
         app.launchArguments = ["-UITestAuthenticatedAPI"]
         app.launch()
