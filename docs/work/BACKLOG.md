@@ -40,11 +40,15 @@ Overview/Month rows, Assistant `propose_assign_jar` with a deterministic suggest
 fallback card, clear no-evidence reply) and the iOS `jar_assignment_confirmation` card. Evidence: backend 993+, native 475, runtime UI
 tests with screenshots. [Design](tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md), [ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md).
 
-Open (owner-visible, not blocking review):
-- Assistant jar assignment quality is unmeasured on real data (0/47 on the unmodified fixture; 13/13 on seeded evidence). Fixture ids are not UUIDs so a live confirm of the
-  card was impossible; the iOS card is unit-tested only.
-- Screenshots still missing: Assistant jar-assignment card only (needs a UUID-id fixture, see above). Closed 2026-11-03 (viewed): Overview jar rows, jar filter menu, jar detail "Phân loại bằng Trợ lý".
-- Closed: transaction detail now shows a "Hũ" row (viewed).
+Evidence since: leave-one-out on 766 assigned fixture expenses → coverage 99%, high-confidence precision 752/752 (templated data, not
+predictive of real ambiguous notes); live confirm on a UUID clone → 2 applied, 1 conflict, replay idempotent, only applied rows changed;
+Overview jar rows, jar filter menu, jar detail Assistant button and transaction-detail jar row viewed in screenshots.
+
+Open (needs real data or a device, cannot be closed from this environment):
+- Suggestion quality on the owner's real, ambiguous notes (add `#ten-hu` hashtags or assign some rows, then re-run classification).
+- Screenshot of the iOS `jar_assignment_confirmation` card with a live proposal (the card is unit-tested; backend flow was exercised live via HTTP).
+- No API to continue the same jar into a later month by hand (months copy forward automatically when opened).
+- Real-device timing; AccessibilityXL tab-label truncation; Months scroll-end shot; wallet duplicate-name and "Đang lưu thay đổi…" overlay shots.
 
 ## UX polish from the independent audit — mostly done, 2026-11-03
 
