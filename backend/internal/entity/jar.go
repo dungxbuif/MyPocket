@@ -47,6 +47,18 @@ type JarMonthItem struct {
 	CalculatedAllocation *int64   `json:"calculated_allocation,omitempty"`
 	Spent                int64    `json:"spent"`
 	Active               bool     `json:"active"`
+	// Cumulative plan (JAR-12): from the jar's first configured month to the viewed month.
+	// RemainingPlan = allocations of the months that have one − all spending assigned to the jar in
+	// that range. It is a plan figure, never money held in a wallet; nil when no month has an
+	// allocation.
+	CumulativeAllocated int64  `json:"cumulative_allocated"`
+	CumulativeSpent     int64  `json:"cumulative_spent"`
+	RemainingPlan       *int64 `json:"remaining_plan,omitempty"`
+	AllocationMonths    int    `json:"allocation_months"`
+	MonthsInRange       int    `json:"months_in_range"`
+	FirstConfigMonth    string `json:"first_config_month,omitempty"`
+	// MonthVariance is the viewed month's allocation minus its spending (only with an allocation).
+	MonthVariance *int64 `json:"month_variance,omitempty"`
 }
 
 type JarIdentity struct {
@@ -66,6 +78,15 @@ type JarMonthSummary struct {
 	OverOneHundredPercent  bool           `json:"over_one_hundred_percent"`
 	Jars                   []JarIdentity  `json:"jars"`
 	Items                  []JarMonthItem `json:"items"`
+	// RemainingPlanTotal adds each active jar's non-negative remaining plan (an overspent jar never
+	// offsets another jar's remaining plan). UnassignedCumulative is ordinary spending not assigned
+	// to any jar since the first jar configuration. WalletsInTotalBalance is the balance of the
+	// non-credit wallets that count toward the total; PlanExceedsWalletsBy is how much the plan
+	// exceeds that balance (0 when it does not).
+	RemainingPlanTotal    int64 `json:"remaining_plan_total"`
+	UnassignedCumulative  int64 `json:"unassigned_cumulative"`
+	WalletsInTotalBalance int64 `json:"wallets_in_total_balance"`
+	PlanExceedsWalletsBy  int64 `json:"plan_exceeds_wallets_by"`
 }
 
 type JarCumulativeMonth struct {

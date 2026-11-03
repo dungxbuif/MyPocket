@@ -370,12 +370,40 @@ func (h *TransactionHandler) ListTransactions(c *gin.Context) {
 		transactionUnauthorized(c)
 		return
 	}
+	jarFilter := strings.TrimSpace(c.Query("jar_id"))
+	if jarFilter != "" && jarFilter != "unassigned" {
+		if _, err := uuid.Parse(jarFilter); err != nil {
+			transactionBadRequest(c, "jar_id phải là mã hũ hợp lệ hoặc unassigned")
+			return
+		}
+	}
 	transactions, err := h.Transactions.List(owner)
 	if err != nil {
 		Fail(c, http.StatusInternalServerError, Problem{Code: problemCodeTransactionLoadFailed, Title: problemTitleInternalServer, Detail: transactionLoadMessage})
 		return
 	}
-	OK(c, transactions)
+	OK(c, filterTransactionsByJar(transactions, jarFilter))
+}
+
+// filterTransactionsByJar keeps the list unchanged without a filter. `unassigned` selects ordinary
+// expenses with no jar (the "Chưa phân bổ" view); a jar id selects expenses assigned to that jar.
+func filterTransactionsByJar(transactions []entity.Transaction, jarFilter string) []entity.Transaction {
+	if jarFilter == "" {
+		return transactions
+	}
+	filtered := make([]entity.Transaction, 0, len(transactions))
+	for _, row := range transactions {
+		if row.Type != entity.TransactionTypeExpense || row.TransferID != nil || row.CreditKind != nil {
+			continue
+		}
+		switch {
+		case jarFilter == "unassigned" && row.JarID == nil:
+			filtered = append(filtered, row)
+		case jarFilter != "unassigned" && row.JarID != nil && *row.JarID == jarFilter:
+			filtered = append(filtered, row)
+		}
+	}
+	return filtered
 }
 
 // CreateTransaction godoc

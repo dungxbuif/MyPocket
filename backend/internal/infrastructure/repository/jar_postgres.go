@@ -148,6 +148,9 @@ func (r *JarPostgresRepository) ListMonth(owner, monthLabel, timezone string) (*
 			}
 			summary.Items = append(summary.Items, entity.JarMonthItem{JarID: row.JarID, Name: name, AllocationMode: entity.JarAllocationNone, Spent: row.Spent, Active: false})
 		}
+		if err := r.fillCumulativePlans(tx, owner, month, timezone, next, &summary); err != nil {
+			return err
+		}
 		summary.OverIncome = summary.TotalAllocated > summary.ActualIncome
 		summary.OverOneHundredPercent = summary.TotalAllocationPercent > 100
 		return nil
@@ -460,4 +463,135 @@ func (r *JarPostgresRepository) Cumulative(owner, jarID, fromLabel, toLabel, tim
 		summary.Name = "Hũ đã gỡ"
 	}
 	return &summary, nil
+}
+
+// fillCumulativePlans adds the cumulative plan figures (JAR-12/13/14) to a month summary using three
+// bounded queries (configs, spending by jar and month, income by month) instead of one report per jar.
+func (r *JarPostgresRepository) fillCumulativePlans(tx *gorm.DB, owner string, target entity.CalendarDate, timezone string, nextUTC time.Time, summary *entity.JarMonthSummary) error {
+	var configs []entity.JarMonthConfig
+	if err := tx.Where("owner_id = ? AND month <= ?", owner, target).Order("month ASC").Find(&configs).Error; err != nil {
+		return err
+	}
+	var spendRows []struct {
+		JarID string `gorm:"column:jar_id"`
+		Month string `gorm:"column:month"`
+		Spent int64  `gorm:"column:spent"`
+	}
+	if err := tx.Raw(`SELECT COALESCE(t.jar_id, '') AS jar_id,
+		to_char(date_trunc('month', t.occurred_at AT TIME ZONE ?), 'YYYY-MM') AS month, SUM(t.amount) AS spent
+		FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
+		WHERE t.owner_id = ? AND t.type = 'expense' AND t.included_in_reports = true
+		AND COALESCE(c.system_key, '') <> 'expense_transfer_out' AND t.occurred_at < ?
+		GROUP BY 1, 2`, timezone, owner, nextUTC).Scan(&spendRows).Error; err != nil {
+		return err
+	}
+	spent := map[string]map[string]int64{}
+	for _, row := range spendRows {
+		if spent[row.JarID] == nil {
+			spent[row.JarID] = map[string]int64{}
+		}
+		spent[row.JarID][row.Month] = row.Spent
+	}
+	needsIncome := false
+	for _, config := range configs {
+		if config.Active && config.AllocationMode == entity.JarAllocationPercent {
+			needsIncome = true
+			break
+		}
+	}
+	income := map[string]int64{}
+	if needsIncome {
+		var incomeRows []struct {
+			Month  string `gorm:"column:month"`
+			Income int64  `gorm:"column:income"`
+		}
+		if err := tx.Raw(`SELECT to_char(date_trunc('month', t.occurred_at AT TIME ZONE ?), 'YYYY-MM') AS month, SUM(t.amount) AS income
+			FROM transactions t LEFT JOIN categories c ON c.id = t.category_id
+			WHERE t.owner_id = ? AND t.type = 'income' AND t.included_in_reports = true
+			AND COALESCE(c.system_key, '') <> 'income_transfer_in' AND t.occurred_at < ?
+			GROUP BY 1`, timezone, owner, nextUTC).Scan(&incomeRows).Error; err != nil {
+			return err
+		}
+		for _, row := range incomeRows {
+			income[row.Month] = row.Income
+		}
+	}
+	byJar := map[string][]entity.JarMonthConfig{}
+	firstAny := ""
+	for _, config := range configs {
+		byJar[config.JarID] = append(byJar[config.JarID], config)
+		if label := config.Month.Time.Format("2006-01"); firstAny == "" || label < firstAny {
+			firstAny = label
+		}
+	}
+	targetLabel := target.Time.Format("2006-01")
+	for index := range summary.Items {
+		item := &summary.Items[index]
+		jarConfigs := byJar[item.JarID]
+		if len(jarConfigs) == 0 {
+			for _, amount := range spent[item.JarID] {
+				item.CumulativeSpent += amount
+			}
+			continue
+		}
+		byMonth := make(map[string]entity.JarMonthConfig, len(jarConfigs))
+		for _, config := range jarConfigs {
+			byMonth[config.Month.Time.Format("2006-01")] = config
+		}
+		first := jarConfigs[0].Month.Time
+		item.FirstConfigMonth = first.Format("2006-01")
+		for month := first; month.Format("2006-01") <= targetLabel; month = month.AddDate(0, 1, 0) {
+			label := month.Format("2006-01")
+			item.MonthsInRange++
+			item.CumulativeSpent += spent[item.JarID][label]
+			config, ok := byMonth[label]
+			if !ok || !config.Active {
+				continue
+			}
+			switch config.AllocationMode {
+			case entity.JarAllocationFixed:
+				if config.AllocationAmount != nil {
+					item.CumulativeAllocated += *config.AllocationAmount
+					item.AllocationMonths++
+				}
+			case entity.JarAllocationPercent:
+				if config.AllocationPercentBPS != nil {
+					bps := int64(*config.AllocationPercentBPS)
+					value := income[label]/10000*bps + income[label]%10000*bps/10000
+					item.CumulativeAllocated += value
+					item.AllocationMonths++
+				}
+			}
+		}
+		if item.AllocationMonths > 0 {
+			remaining := item.CumulativeAllocated - item.CumulativeSpent
+			item.RemainingPlan = &remaining
+			if item.Active && remaining > 0 {
+				summary.RemainingPlanTotal += remaining
+			}
+		}
+		if item.CalculatedAllocation != nil {
+			variance := *item.CalculatedAllocation - item.Spent
+			item.MonthVariance = &variance
+		}
+	}
+	for label, amount := range spent[""] {
+		if firstAny == "" || label >= firstAny {
+			summary.UnassignedCumulative += amount
+		}
+	}
+	if err := tx.Raw(`SELECT COALESCE(SUM(w.opening_balance), 0) + COALESCE(SUM((
+			SELECT COALESCE(SUM(CASE
+				WHEN t.type = 'income' THEN t.amount
+				WHEN t.type = 'expense' THEN -t.amount
+				WHEN t.type = 'adjustment' AND t.adjustment_direction = 'increase' THEN t.amount
+				WHEN t.type = 'adjustment' THEN -t.amount
+				ELSE 0 END), 0) FROM transactions t WHERE t.wallet_id = w.id)), 0)
+		FROM wallets w WHERE w.owner_id = ? AND w.is_in_total = true AND w.type <> 'credit'`, owner).Scan(&summary.WalletsInTotalBalance).Error; err != nil {
+		return err
+	}
+	if summary.RemainingPlanTotal > summary.WalletsInTotalBalance {
+		summary.PlanExceedsWalletsBy = summary.RemainingPlanTotal - summary.WalletsInTotalBalance
+	}
+	return nil
 }
