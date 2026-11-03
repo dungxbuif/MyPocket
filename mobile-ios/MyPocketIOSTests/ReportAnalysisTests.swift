@@ -67,8 +67,8 @@ final class ReportAnalysisTests: XCTestCase {
         let analysis = ReportAnalysisModel(id: "analysis-secret-id", snapshotID: "saved-snapshot-id", status: "completed")
         let finding = ReportInsightModel(id: "finding-secret-id", title: "Mua sắm vượt 350.000 đ", body: "Chi trong kỳ")
         let handoff = try XCTUnwrap(ReportAssistantHandoff.make(analysis: analysis, finding: finding, month: "2026-11", walletLabel: "Ví tiền mặt"))
-        XCTAssertEqual(handoff.context.snapshotID, "saved-snapshot-id")
-        XCTAssertEqual(handoff.context.findingID, "finding-secret-id")
+        XCTAssertEqual(handoff.context?.snapshotID, "saved-snapshot-id")
+        XCTAssertEqual(handoff.context?.findingID, "finding-secret-id")
         XCTAssertFalse(handoff.prompt.contains("350.000"), "Generated draft must not reveal masked amounts")
         for identifier in [analysis.id, "saved-snapshot-id", finding.id] {
             XCTAssertFalse(handoff.prompt.contains(identifier))

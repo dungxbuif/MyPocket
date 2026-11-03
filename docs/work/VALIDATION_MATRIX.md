@@ -5959,3 +5959,19 @@ mechanics (validation, per-row apply with `expected_version`, idempotent confirm
 (hashtag match, normalised-note match against rows already assigned to a jar) that builds the proposal without
 the model, using the model only for ambiguous rows; and a cap on tool rounds so a run ends with a clear message
 instead of failing silently.
+
+### After deterministic suggester — 2026-11-03 (measured on a clone of the fixture DB, API on :8091, real provider)
+
+Backend tests: 993 pass (984 before; +9 for normalisation, rules, confidence, inactive jar, month scoping, 50-row cap, owner isolation, fallback card, no-jar_context failure kept).
+
+| Scenario | Result |
+| --- | --- |
+| Unmodified fixture, October 2026 | Suggester proposed 0 of 47 rows, 47 `needs_clarification`: the assigned history notes ("... [Mẫu 2026]") never equal the unassigned notes and no note has a hashtag. The model run still FAILED after ~59 s (provider leaks tool markup); with no suggestions there is no fallback card. Precision on proposed rows: not measurable (0 proposed) |
+| Clone with seeded evidence (2 rows 'Giải trí cuối tuần' -> Tận hưởng, 3 'Ăn uống cùng gia đình' -> Ăn uống • Mẫu, 1 conflicting pair 'Thanh toán điện nước', 1 note given `#thiet-yeu`) | Run completed in ~31 s: 13 rows proposed, 27 `needs_clarification` (the conflicting 'Thanh toán điện nước' rows were correctly not guessed). All 13 reasons match their note/hashtag evidence (13/13 plausible, but the evidence was seeded by this test, so this proves the mechanics, not real-world recall) |
+
+Limit found: the fixture uses non-UUID ids (`rich-tx-006`, `rich-jar-need`), so `propose_assign_jar` validation marked every fallback row `rejected` ("Mã giao dịch không hợp lệ"). The card was produced and shown, but a live confirm with this fixture was not possible; UUID ids (production) are covered by unit tests. The 80% target on real data stays unmeasured.
+
+## Jar iOS runtime screenshots (2026-11-03, LocalFirstRuntimeTests.testJarLedgerEditorOverviewMonthAndDetailScreenshots)
+
+Seen (PNG viewed): ledger with jar filter applied (jar filter row "Hũ", chip "Đi lại" on rows; assistant FAB overlaps the amount of the row at the bottom edge); editor (hint "Hũ Đi lại còn có thể chi 4.890.000 đ" under the selector, correct); Tháng screen jar section (two jar rows plus "Chưa phân bổ"; amount of the last row hidden under the assistant FAB at scroll end); transaction detail (no shell "+", UI test asserts it); Overview with "Xem tất cả 12 ví".
+Not captured: Overview month card jar rows (scroll loop did not move, screenshot equals top of Overview); jar filter open sheet and editor selector-open screenshots exist but were not inspected; Dynamic Type AccessibilityXL pass not run; transaction detail does not show the jar (possible gap). Assistant card has unit proof only.

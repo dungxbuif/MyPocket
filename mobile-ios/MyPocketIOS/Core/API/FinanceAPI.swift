@@ -702,6 +702,30 @@ final class FinanceAPI: @unchecked Sendable {
         ))
     }
 
+    func confirmAdvisorJarAssignmentAction(actionID: String, conversationID: String, generation: Int64) async throws -> JarAssignmentConfirmModel {
+        struct Input: Encodable {
+            let conversationID: String
+            let generation: Int64
+        }
+        let escapedActionID = actionID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? actionID
+        return try await client.send(APIRequest(
+            path: "/ai/advisor/actions/\(escapedActionID)/confirm",
+            method: .post,
+            body: try body(Input(conversationID: conversationID, generation: generation))
+        ))
+    }
+
+    /// Replaces the editable rows of a pending proposal. The old action is
+    /// superseded; the returned view carries the only confirmable action id.
+    func replaceAdvisorJarAssignments(actionID: String, edit: JarAssignmentEditBody) async throws -> JSONValue {
+        let escapedActionID = actionID.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? actionID
+        return try await client.send(APIRequest(
+            path: "/ai/advisor/actions/\(escapedActionID)/replace",
+            method: .patch,
+            body: try body(edit)
+        ))
+    }
+
     func cancelAdvisorRun(id: String) async throws {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/ai/advisor/runs/\(id)/cancel", method: .post, idempotencyKey: UUID().uuidString))
     }

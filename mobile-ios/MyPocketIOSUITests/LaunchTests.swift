@@ -6072,6 +6072,36 @@ private extension LocalAPIFixture {
         ])
         return jarID
     }
+
+    /// Seeds one jar with an allocation in `month` plus expenses (some assigned to the jar, some not). Returns the jar id.
+    static func jarLedgerFixture(name: String, month: String, walletID: String, notesInJar: [String], notesUnassigned: [String]) async throws -> String {
+        let token = try await loginToken()
+        func post(_ path: String, _ object: [String: Any]) async throws -> [String: Any] {
+            var request = URLRequest(url: URL(string: baseURL.absoluteString + path)!)
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            request.setValue(UUID().uuidString, forHTTPHeaderField: "Idempotency-Key")
+            request.httpBody = try JSONSerialization.data(withJSONObject: object)
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let code = (response as? HTTPURLResponse)?.statusCode ?? 0
+            guard (200..<300).contains(code) else { throw LocalFixtureError.http(code, String(data: data, encoding: .utf8) ?? "") }
+            return (try JSONSerialization.jsonObject(with: data) as? [String: Any]) ?? [:]
+        }
+        let created = try await post("/jars", ["month": month, "name": name, "allocation_mode": "fixed", "allocation_amount": 5_000_000])
+        let jar = (created["data"] as? [String: Any]) ?? created
+        guard let jarID = (jar["jar_id"] as? String) ?? (jar["id"] as? String) else { throw LocalFixtureError.http(0, "No jar id in \(created)") }
+        let category = try await category(kind: "expense", walletID: walletID)
+        var minute = 0
+        for (note, assigned) in notesInJar.map({ ($0, true) }) + notesUnassigned.map({ ($0, false) }) {
+            minute += 1
+            var payload: [String: Any] = ["wallet_id": walletID, "category_id": category.id, "type": "expense", "amount": 40_000 + minute * 10_000,
+                "occurred_at": ISO8601DateFormatter().string(from: Date().addingTimeInterval(TimeInterval(-60 * minute))), "note": note, "included_in_reports": true]
+            if assigned { payload["jar_id"] = jarID }
+            _ = try await post("/transactions", payload)
+        }
+        return jarID
+    }
 }
 #endif
 
@@ -6243,6 +6273,83 @@ final class LocalFirstRuntimeTests: XCTestCase {
         XCTAssertTrue(note.label.contains("Dư từ tháng trước"), note.label)
         try await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
         try await LocalAPIFixture.delete(wallet)
+    }
+    func testJarLedgerEditorOverviewMonthAndDetailScreenshots() async throws {
+        continueAfterFailure = true
+        let suffix = String(UUID().uuidString.prefix(4))
+        let wallet = try await LocalAPIFixture.wallet(name: "Jar Shot \(suffix)", type: "basic")
+        var extraWallets: [FixtureWalletHandle] = []
+        for index in 1...3 { extraWallets.append(try await LocalAPIFixture.wallet(name: "Ví phụ \(index) \(suffix)", type: "basic")) }
+        let timezone = TimeZone(identifier: try await LocalAPIFixture.ownerTimezone()) ?? .current
+        var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
+        let parts = calendar.dateComponents([.year, .month], from: Date())
+        let month = String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        let jarName = "Đi lại \(suffix)"
+        let jarID = try await LocalAPIFixture.jarLedgerFixture(name: jarName, month: month, walletID: wallet.wallet.id, notesInJar: ["Đổ xăng", "Gửi xe"], notesUnassigned: ["Cà phê", "Ăn trưa"])
+        func shot(_ app: XCUIApplication, _ name: String) {
+            let attachment = XCTAttachment(screenshot: app.screenshot()); attachment.name = name; attachment.lifetime = .keepAlways; add(attachment)
+        }
+        let app = XCUIApplication()
+        app.launchArguments = ["-UITestAuthenticatedAPI"]
+        app.launch()
+        // (6) + (3) Overview
+        XCTAssertTrue(app.buttons["bottom-tab-overview"].waitForExistence(timeout: 20))
+        app.buttons["bottom-tab-overview"].tap()
+        sleep(3)
+        shot(app, "overview-top")
+        let viewAll = app.buttons["overview-view-all-wallets"].firstMatch
+        for _ in 0..<6 where !viewAll.exists { app.swipeUp() }
+        shot(app, "overview-wallets-view-all")
+        let jarRow = app.descendants(matching: .any)["overview-jar-row"].firstMatch
+        for _ in 0..<6 where !jarRow.exists { app.swipeUp() }
+        sleep(1)
+        shot(app, "overview-month-card-jars")
+        // (1) Ledger with jar filter
+        app.buttons["bottom-tab-transactions"].tap()
+        sleep(3)
+        shot(app, "transactions-ledger")
+        let filter = app.buttons["transactions-jar-filter"].firstMatch
+        if filter.waitForExistence(timeout: 5) {
+            filter.tap(); sleep(1); shot(app, "transactions-jar-filter-open")
+            let option = app.buttons[jarName].firstMatch
+            if option.waitForExistence(timeout: 3) { option.tap() }
+            sleep(2); shot(app, "transactions-jar-filter-applied")
+        } else { shot(app, "transactions-jar-filter-MISSING") }
+        // (5) Transaction detail hides the shell +
+        let row = app.descendants(matching: .any).matching(NSPredicate(format: "label CONTAINS 'Đổ xăng'")).firstMatch
+        if row.waitForExistence(timeout: 5) {
+            row.tap(); sleep(2); shot(app, "transaction-detail-no-shell-plus")
+            XCTAssertFalse(app.buttons["add-transaction-button"].firstMatch.isHittable, "shell + must be hidden on transaction detail")
+            let close = app.buttons["Đóng"].firstMatch
+            if close.exists { close.tap() } else { app.swipeDown() }
+        }
+        // (2) Editor
+        if app.buttons["add-transaction-button"].firstMatch.waitForExistence(timeout: 5) {
+            app.buttons["add-transaction-button"].firstMatch.tap(); sleep(2)
+            shot(app, "editor-top")
+            let hint = app.descendants(matching: .any)["transaction-jar-row"].firstMatch
+            for _ in 0..<5 where !hint.exists { app.swipeUp() }
+            if hint.exists { hint.tap(); sleep(1); shot(app, "editor-jar-selector-open")
+                let pick = app.buttons[jarName].firstMatch
+                if pick.waitForExistence(timeout: 3) { pick.tap(); sleep(1) } }
+            shot(app, "editor-jar-hint")
+        }
+        // (4) Month detail
+        app.terminate(); app.launch()
+        XCTAssertTrue(app.buttons["bottom-tab-account"].waitForExistence(timeout: 20))
+        app.buttons["bottom-tab-account"].tap()
+        let entry = app.buttons["more-destination-months"].firstMatch
+        for _ in 0..<16 where !(entry.exists && entry.isHittable) { app.scrollViews.allElementsBoundByIndex.last?.swipeUp() }
+        if entry.waitForExistence(timeout: 5) {
+            entry.tap(); sleep(3); shot(app, "months-list")
+            let unassigned = app.descendants(matching: .any)["month-jar-unassigned"].firstMatch
+            for _ in 0..<6 where !unassigned.exists { app.swipeUp() }
+            shot(app, "months-jar-section")
+        }
+        _ = jarID
+        try await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id)
+        try await LocalAPIFixture.delete(wallet)
+        for extra in extraWallets { try await LocalAPIFixture.delete(extra) }
     }
 }
 #endif

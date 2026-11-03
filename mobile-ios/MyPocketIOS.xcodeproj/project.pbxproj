@@ -87,11 +87,13 @@
 		C1F96EE81FC9694FCA92E961 /* Phosphor-LICENSE.txt in Resources */ = {isa = PBXBuildFile; fileRef = 2ACF7EA31E93B20567EB90CA /* Phosphor-LICENSE.txt */; };
 		C3E92B32CA2AD0B22AC2FD81 /* ReportAnalysisTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 233AB7B7F6BBEEAF4C6BFD44 /* ReportAnalysisTests.swift */; };
 		C5BC2199EE11A3F86A33AA9A /* AssistantEntryBatchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85F1BE2615BFD5D438CAF0EE /* AssistantEntryBatchView.swift */; };
+		C5EC06A5B67EF63045EE4EE8 /* AssistantJarAssignmentCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8D4E8B6137B229C2E0066A0D /* AssistantJarAssignmentCard.swift */; };
 		C7585DBB11AE08A9A3C37AAE /* KeychainSessionStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1FB6E104CF08872B05188BD /* KeychainSessionStore.swift */; };
 		D175FC61CDCB3A23785DE629 /* Envelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = 711B8F5EE726E4B38C0EDB1C /* Envelope.swift */; };
 		D5A07A2E66ADCF31F7D37489 /* OverviewView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7622FCDB17D3632924D412A4 /* OverviewView.swift */; };
 		D7F3FB7B1F6E4FA047D542D1 /* TransactionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E553CBF0778DF943E05D4F9F /* TransactionsView.swift */; };
 		D8B0F589768ED47534D378D9 /* AssistantViews.swift in Sources */ = {isa = PBXBuildFile; fileRef = 80112FF79FDF4111B8533AFE /* AssistantViews.swift */; };
+		DB3BF17A33ADDA940CFDA4B8 /* JarAssignmentCardTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9441085B54D533C0E76D0792 /* JarAssignmentCardTests.swift */; };
 		DC049EC50D87C0D9C00876E4 /* AppRouteCoordinatorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B4D28085FF4584852E20BCF /* AppRouteCoordinatorTests.swift */; };
 		DCAEBE4EA122A964B96C1D60 /* AppRouteTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 961500C0ED1E9EC392DFF556 /* AppRouteTests.swift */; };
 		DF3F41960E2E333152AE37EA /* MPFinancialQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = 62EB1C4C8DD824002B72A996 /* MPFinancialQueue.swift */; };
@@ -203,8 +205,10 @@
 		863A1D951CDA51F951E3E8A1 /* MyPocketIOSUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = MyPocketIOSUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		88D769DADC37190893BC1354 /* FinanceModelTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinanceModelTests.swift; sourceTree = "<group>"; };
 		8A26F5CC9D00EA189B8952BD /* AssistantChatState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantChatState.swift; sourceTree = "<group>"; };
+		8D4E8B6137B229C2E0066A0D /* AssistantJarAssignmentCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AssistantJarAssignmentCard.swift; sourceTree = "<group>"; };
 		90B2CFFC1BD6A73C096A2852 /* FinancialSnapshotCache.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FinancialSnapshotCache.swift; sourceTree = "<group>"; };
 		937833F838F9C4CFA4B03F85 /* PersonalTeam.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = PersonalTeam.entitlements; sourceTree = "<group>"; };
+		9441085B54D533C0E76D0792 /* JarAssignmentCardTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JarAssignmentCardTests.swift; sourceTree = "<group>"; };
 		961500C0ED1E9EC392DFF556 /* AppRouteTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppRouteTests.swift; sourceTree = "<group>"; };
 		9723A8BA4562D535FB497660 /* MyPocketIOSApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MyPocketIOSApp.swift; sourceTree = "<group>"; };
 		990391D2B3622297245248D8 /* MonthlyReportsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MonthlyReportsTests.swift; sourceTree = "<group>"; };
@@ -253,6 +257,7 @@
 				9C3DAE1A9F61F6BD718E15EA /* AssistantActionCard.swift */,
 				8A26F5CC9D00EA189B8952BD /* AssistantChatState.swift */,
 				85F1BE2615BFD5D438CAF0EE /* AssistantEntryBatchView.swift */,
+				8D4E8B6137B229C2E0066A0D /* AssistantJarAssignmentCard.swift */,
 				1FA18134A8B3C07CA3D20B6A /* AssistantScrollPolicy.swift */,
 				80112FF79FDF4111B8533AFE /* AssistantViews.swift */,
 			);
@@ -389,6 +394,7 @@
 				88D769DADC37190893BC1354 /* FinanceModelTests.swift */,
 				DB1220C8997F353268CDCA3A /* FinancialMutationQueueTests.swift */,
 				12092C4382E0470B1C174A46 /* FinancialSnapshotCacheTests.swift */,
+				9441085B54D533C0E76D0792 /* JarAssignmentCardTests.swift */,
 				20916633F23A0E07A2827B0E /* JarPlanPresentationTests.swift */,
 				64C86136B430A28FF9F19E63 /* JarsMonthsReferenceTests.swift */,
 				13873A2FC99AC779589969CC /* LocalFirstContractTests.swift */,
@@ -733,6 +739,7 @@
 				255F3A83100B1690880494F5 /* AssistantActionCard.swift in Sources */,
 				8F318D06A15322CAF8ED5365 /* AssistantChatState.swift in Sources */,
 				C5BC2199EE11A3F86A33AA9A /* AssistantEntryBatchView.swift in Sources */,
+				C5EC06A5B67EF63045EE4EE8 /* AssistantJarAssignmentCard.swift in Sources */,
 				1850C1888BB7DFBE109C6642 /* AssistantScrollPolicy.swift in Sources */,
 				D8B0F589768ED47534D378D9 /* AssistantViews.swift in Sources */,
 				9C32FC80D819E0E7B0D33DF5 /* AuthView.swift in Sources */,
@@ -814,6 +821,7 @@
 				5080A60AB4A01657C7679B28 /* FinanceModelTests.swift in Sources */,
 				19E9A1A952F359BEB4613EFE /* FinancialMutationQueueTests.swift in Sources */,
 				1621FE0919F5CAE19232200C /* FinancialSnapshotCacheTests.swift in Sources */,
+				DB3BF17A33ADDA940CFDA4B8 /* JarAssignmentCardTests.swift in Sources */,
 				5E33FC39A2FC2886C4925747 /* JarPlanPresentationTests.swift in Sources */,
 				2803484A8E245DC63C8A307F /* JarsMonthsReferenceTests.swift in Sources */,
 				E71CBC21BF5D1C3D92A91FB3 /* LocalFirstContractTests.swift in Sources */,

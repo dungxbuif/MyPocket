@@ -557,7 +557,7 @@ struct AssistantView: View {
                                                     onSkip: { item in Task { await decideTypedEntry(batch: batch, item: item, decision: "reject") } }
                                                 )
                                             } else if let data = part.data {
-                                                AssistantStructuredCard(type: part.type, data: data, masked: masked, onCreateWallet: createWalletFromAssistant, onConfirmWalletAction: confirmWalletAction, onConfirmJarAction: confirmJarAction, onConfirmBudgetAction: confirmBudgetAction)
+                                                AssistantStructuredCard(type: part.type, data: data, masked: masked, onCreateWallet: createWalletFromAssistant, onConfirmWalletAction: confirmWalletAction, onConfirmJarAction: confirmJarAction, onConfirmBudgetAction: confirmBudgetAction, jarAssignmentActions: jarAssignmentActions)
                                             } else { MPText("Đã nhận thẻ dữ liệu tài chính.", style: .secondary) }
                                         }
                                     }
@@ -739,7 +739,8 @@ struct AssistantView: View {
                     onCreateWallet: createWalletFromAssistant,
                     onConfirmWalletAction: confirmWalletAction,
                     onConfirmJarAction: confirmJarAction,
-                    onConfirmBudgetAction: confirmBudgetAction
+                    onConfirmBudgetAction: confirmBudgetAction,
+                    jarAssignmentActions: jarAssignmentActions
                 )
             } else {
                 MPStatusMessage(text: "Chưa có dữ liệu tổng quan tài chính.", tone: .info)
@@ -1030,7 +1031,7 @@ struct AssistantView: View {
                 chatState = .idle
                 return
             }
-            let request = pending?.input ?? AdvisorReportMessageInputModel(clientRequestID: clientRequestID, text: text, reportContext: submittedHandoff?.context)
+            let request = pending?.input ?? AdvisorReportMessageInputModel(clientRequestID: clientRequestID, text: text, reportContext: submittedHandoff?.context, jarContext: submittedHandoff?.jarContext)
             // Keep the exact payload in the shell until acknowledgement, including
             // if this full-screen Assistant is dismissed during the request.
             pendingMessageBinding.wrappedValue = AdvisorPendingMessageModel(input: request, handoff: submittedHandoff, uncertain: true)
@@ -1070,7 +1071,7 @@ struct AssistantView: View {
             chatState = .idle
         } catch let apiError as APIError {
             guard sendsAttachments || pendingMessageBinding.wrappedValue?.input.clientRequestID == clientRequestID else { return }
-            if AssistantReportExpiryPolicy.isExpired(apiError, hasReportContext: submittedHandoff != nil) {
+            if AssistantReportExpiryPolicy.isExpired(apiError, hasReportContext: submittedHandoff?.context != nil) {
                 advisorSubmitRequestID = nil
                 advisorSubmitUncertain = false
                 restoreSubmittedDraft(text, handoff: submittedHandoff)
@@ -1236,6 +1237,22 @@ struct AssistantView: View {
         walletActionMessage = "Đã tạo hũ sau khi bạn xác nhận."
     }
 
+    private var jarAssignmentActions: AssistantJarAssignmentActions {
+        AssistantJarAssignmentActions(
+            loadJars: { month in
+                let summary = try await api.jarMonth(month: month)
+                let active = Set(summary.items.filter { $0.active }.map(\.jarID))
+                return summary.jars.filter { active.contains($0.jarID) }.map { MPSelectionOption(id: $0.jarID, label: $0.name) }
+            },
+            replace: { actionID, edit in
+                try await api.replaceAdvisorJarAssignments(actionID: actionID, edit: edit)
+            },
+            confirm: { actionID, conversationID, generation in
+                try await api.confirmAdvisorJarAssignmentAction(actionID: actionID, conversationID: conversationID, generation: generation)
+            }
+        )
+    }
+
     private func confirmBudgetAction(_ actionID: String, conversationID: String, generation: Int64) async throws {
         _ = try await api.confirmAdvisorBudgetAction(actionID: actionID, conversationID: conversationID, generation: generation)
         walletActionMessage = "Đã tạo ngân sách sau khi bạn xác nhận."
@@ -1263,6 +1280,7 @@ enum AssistantCardType {
     }
 
     static func title(for type: String) -> String {
+        if type == "jar_assignment_confirmation" { return "Đề xuất gán hũ" }
         if type == "jar_update_proposal" { return "Đề xuất cập nhật hũ" }
         if type == "budget_creation_proposal" { return "Đề xuất tạo ngân sách" }
         if type == "budget_update_proposal" { return "Đề xuất cập nhật ngân sách" }
@@ -1416,11 +1434,12 @@ struct AssistantStructuredCard: View {
     let onConfirmWalletAction: ((String, String, Int64) async throws -> Void)?
     let onConfirmJarAction: ((String, String, Int64) async throws -> Void)?
     let onConfirmBudgetAction: ((String, String, Int64) async throws -> Void)?
+    let jarAssignmentActions: AssistantJarAssignmentActions?
     @State private var walletConfirmationState: AssistantWalletConfirmationState = .idle
     @State private var walletConfirmationError: String?
     @State private var walletConfirmationRequestKey = UUID().uuidString
 
-    init(type: String, data: JSONValue, masked: Bool = false, onCreateWallet: ((WalletModelInput, String) async throws -> Void)? = nil, onConfirmWalletAction: ((String, String, Int64) async throws -> Void)? = nil, onConfirmJarAction: ((String, String, Int64) async throws -> Void)? = nil, onConfirmBudgetAction: ((String, String, Int64) async throws -> Void)? = nil) {
+    init(type: String, data: JSONValue, masked: Bool = false, onCreateWallet: ((WalletModelInput, String) async throws -> Void)? = nil, onConfirmWalletAction: ((String, String, Int64) async throws -> Void)? = nil, onConfirmJarAction: ((String, String, Int64) async throws -> Void)? = nil, onConfirmBudgetAction: ((String, String, Int64) async throws -> Void)? = nil, jarAssignmentActions: AssistantJarAssignmentActions? = nil) {
         self.type = type
         self.data = data
         self.masked = masked
@@ -1428,13 +1447,15 @@ struct AssistantStructuredCard: View {
         self.onConfirmWalletAction = onConfirmWalletAction
         self.onConfirmJarAction = onConfirmJarAction
         self.onConfirmBudgetAction = onConfirmBudgetAction
+        self.jarAssignmentActions = jarAssignmentActions
     }
 
     var body: some View {
         let normalizedType = AssistantCardType.normalized(type)
-        MPAssistantCard(title: AssistantCardType.title(for: type)) {
+        MPAssistantCard(title: cardTitle) {
             if let view = viewObject {
                 switch normalizedType {
+                case "jar_assignment_confirmation": AssistantJarAssignmentCardBody(view: view, masked: masked, actions: jarAssignmentActions)
                 case "metric_group": metricView(view)
                 case "period_comparison": comparisonView(view)
                 case "transaction_list": transactionListView(view)
@@ -1451,6 +1472,13 @@ struct AssistantStructuredCard: View {
                 MPText(AssistantCardType.fallbackText(data, masked: masked), style: .secondary)
             }
         }
+    }
+
+    private var cardTitle: String {
+        if AssistantCardType.normalized(type) == "jar_assignment_confirmation", let view = viewObject, let rows = JarAssignmentRow.decode(view) {
+            return "Đề xuất gán hũ · \(rows.count) khoản"
+        }
+        return AssistantCardType.title(for: type)
     }
 
     private var viewObject: [String: JSONValue]? {

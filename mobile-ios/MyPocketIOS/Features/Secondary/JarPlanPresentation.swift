@@ -179,6 +179,7 @@ struct JarDetailView: View {
     let onEdit: (JarItemModel) -> Void
     let onRemove: (JarItemModel) -> Void
 
+    @Environment(\.reportAssistantHandoff) private var onAssistantHandoff
     @State private var report: JarCumulativeSummaryModel?
     @State private var transactions: [TransactionModel] = []
     @State private var categories: [CategoryModel] = []
@@ -249,6 +250,12 @@ struct JarDetailView: View {
                         MPText("Khoản chi thường chưa gắn hũ vẫn hợp lệ và được tính trong chi tháng.", style: .secondary)
                     }
                     .accessibilityIdentifier("jar-detail-summary")
+                }
+                if let onAssistantHandoff {
+                    MPButton("Phân loại bằng Trợ lý", style: .secondary, fullWidth: false) {
+                        onAssistantHandoff(.jar(month: month, jarID: item?.jarID, jarName: item?.name))
+                    }
+                    .accessibilityIdentifier("jar-detail-classify-assistant")
                 }
                 if let report, item != nil {
                     MPFinanceCard {

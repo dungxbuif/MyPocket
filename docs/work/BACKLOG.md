@@ -33,30 +33,27 @@ All five items closed: legacy credit rows now list in statements; the push-token
 `/home` returns real counts; amount (≤ 2^53−1) and date (≥ 2000, ≤ +1 year) limits are enforced;
 `/budgets` totals are documented as active-period totals. Evidence in the [validation matrix](VALIDATION_MATRIX.md).
 
-## Hũ hiển thị như ví + AI gán hũ từ ghi chú — phases 1–2 done, phase 3 blocked on model quality, owner approved 2026-11-03
+## Hũ hiển thị như ví + AI gán hũ từ ghi chú — implemented, in_review, 2026-11-03
 
-Owner decided to keep one concept (Hũ), show jars like wallets with a cumulative "Còn có thể chi"
-plan figure, an always-present "Chưa phân bổ" card, a mandatory reconciliation line against
-`is_in_total` wallets, monthly targets unchanged, and Assistant-proposed jar assignment from notes
-via a confirmation card. [Detail design](tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md),
-[ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md), screen specs under
-`docs/design/pages/{jars,transactions,overview,month-detail,reports,finance-assistant}`. No schema
-change. Phases: 1 API + jar list/detail; 2 ledger filter/chip/editor hint, overview, month, reports;
-3 Assistant tool/card. Status 2026-11-03: phases 1 and 2 implemented, committed and verified (backend 984,
-native 469, jar screens seen in simulator screenshots); phase 3 backend mechanics committed but the live run
-FAILED (no card; see validation matrix). Open, needs owner decision: deterministic server-side suggester
-(hashtag/normalised-note match) with the model only for ambiguous rows, tool-round cap, then the iOS
-`jar_assignment_confirmation` card (not built). Not screenshotted yet: ledger jar filter/chip/editor hint,
-Overview jar rows, month screen, AccessibilityXL tab bar. Supersedes the earlier "remove jars / hashtags" draft.
+All three phases are implemented and committed: cumulative plan API and wallet-style jar screens, ledger filter/chip/editor hint,
+Overview/Month rows, Assistant `propose_assign_jar` with a deterministic suggester (hashtag and agreeing-history rules, server-built
+fallback card, clear no-evidence reply) and the iOS `jar_assignment_confirmation` card. Evidence: backend 993+, native 475, runtime UI
+tests with screenshots. [Design](tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DESIGN.md), [ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md).
+
+Open (owner-visible, not blocking review):
+- Assistant jar assignment quality is unmeasured on real data: the suggester proposes 0/47 on the unmodified fixture (assigned notes all end in
+  "[Mẫu 2026]", no hashtags) and 13/13 plausible on evidence seeded by the test agent. Fixture ids are not UUIDs so a live confirm of the
+  card was impossible; the iOS card is unit-tested only and assumes the replace response carries the new action id.
+- Screenshots still missing: Overview month card with the two jar rows (scroll did not move), the Assistant card, jar-filter-open and editor
+  selector states.
+- Transaction detail does not show which jar a transaction belongs to.
 
 ## UX polish from the independent audit — mostly done, 2026-11-03
 
-Done: FAB over delete, English strings, Overview wallet list affordance, duplicate title, category search copy. Remaining below.
-
-"+" FAB overlapping the delete button on transaction detail; English strings ("Travel Mode",
-"changelog"); Overview shows only the first 3 wallets; duplicate "Ví của tôi" on Account;
-AccessibilityXL layout (tab bar menu, wrapped currency); category search label/placeholder
-mismatch; dark mode and the wallet/budget/jar/recurring/travel forms still unaudited.
+Done: FAB over delete, English strings, Overview wallet list affordance, duplicate title, category search copy.
+Open: the assistant bubble covers the amount of the bottom list row at scroll end (ledger and month screens); AccessibilityXL turns the
+tab bar into a menu and wraps currency (not attempted, needs a shared-base fix); dark mode and the wallet/budget/recurring/travel forms are
+unaudited; real-device timing cannot be measured from this environment (no device attached).
 
 ## Re-audit defects from committed report findings — fixed, 2026-11-03
 

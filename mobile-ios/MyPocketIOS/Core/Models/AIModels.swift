@@ -410,10 +410,26 @@ struct AdvisorReportContextModel: Codable, Sendable, Equatable {
     var findingID: String?
 }
 
+/// Hand-off from a jar screen. Only identity and month travel; the server
+/// reloads every fact by id. Encoded as `jar_context {month, jar_id?}`.
+struct AdvisorJarContextModel: Codable, Sendable, Equatable {
+    var month: String
+    var jarID: String?
+}
+
 struct ReportAssistantHandoff: Sendable, Equatable {
-    var context: AdvisorReportContextModel
+    var context: AdvisorReportContextModel?
     var label: String
     var prompt: String
+    var jarContext: AdvisorJarContextModel? = nil
+
+    static func jar(month: String, jarID: String?, jarName: String?) -> Self {
+        let parts = month.split(separator: "-")
+        let monthLabel = parts.count == 2 ? "\(parts[1])/\(parts[0])" : month
+        return Self(context: nil, label: "Gán hũ · \(jarName ?? "tất cả hũ") · \(monthLabel)",
+                    prompt: "Gợi ý hũ cho các khoản chi chưa phân bổ trong tháng này.",
+                    jarContext: AdvisorJarContextModel(month: month, jarID: jarID))
+    }
 }
 
 extension ReportAssistantHandoff {
@@ -437,6 +453,7 @@ struct AdvisorReportMessageInputModel: Codable, Sendable {
     var clientRequestID: String
     var text: String
     var reportContext: AdvisorReportContextModel?
+    var jarContext: AdvisorJarContextModel? = nil
 }
 
 /// The shell retains the exact submitted payload across Assistant dismissal.
@@ -445,4 +462,76 @@ struct AdvisorPendingMessageModel: Sendable {
     var input: AdvisorReportMessageInputModel
     var handoff: ReportAssistantHandoff?
     var uncertain = false
+}
+
+
+// MARK: - Jar assignment proposal card (`jar_assignment_confirmation`)
+
+struct JarAssignmentRow: Equatable, Identifiable, Sendable {
+    var id: String { transactionID }
+    var transactionID: String
+    var jarID: String
+    var jarName: String
+    var note: String
+    var amount: Int64
+    var occurredAt: String
+    var categoryName: String
+    var reason: String
+    var rejected: Bool
+    var rejectReason: String
+
+    static func decode(_ view: [String: JSONValue]) -> [JarAssignmentRow]? {
+        guard case .array(let items) = view["assignments"], !items.isEmpty, items.count <= 50 else { return nil }
+        var rows: [JarAssignmentRow] = []
+        for item in items {
+            guard case .object(let o) = item, case .string(let id)? = o["transaction_id"], !id.isEmpty else { return nil }
+            func str(_ k: String) -> String { if case .string(let v)? = o[k] { return v }; return "" }
+            var amount: Int64 = 0
+            if case .number(let n)? = o["amount"], let exact = Int64(exactly: n) { amount = exact }
+            rows.append(JarAssignmentRow(
+                transactionID: id, jarID: str("jar_id"), jarName: str("jar_name"), note: str("note"), amount: amount,
+                occurredAt: str("occurred_at"), categoryName: str("category_name"), reason: str("reason"),
+                rejected: str("status") == "rejected", rejectReason: str("reject_reason")))
+        }
+        return rows
+    }
+}
+
+struct JarAssignmentResultModel: Codable, Sendable, Equatable {
+    var transactionID: String
+    var status: String
+    var detail: String?
+
+    /// Per-row copy; the overall card status may be "applied" with zero rows applied.
+    var badge: (text: String, tone: MPStatusBadge.Tone) {
+        switch status {
+        case "applied": return ("Đã gán", .success)
+        case "unchanged": return ("Không đổi", .muted)
+        case "conflict": return ("Xung đột – đã đổi ở nơi khác", .danger)
+        default: return ("Bỏ qua", .muted)
+        }
+    }
+}
+
+struct JarAssignmentConfirmModel: Codable, Sendable, Equatable {
+    var status: String
+    var appliedCount: Int
+    var totalCount: Int
+    var results: [JarAssignmentResultModel]
+
+    var summary: String { "Đã gán \(appliedCount)/\(totalCount) khoản" }
+}
+
+struct JarAssignmentEditBody: Encodable, Sendable, Equatable {
+    struct Row: Encodable, Sendable, Equatable {
+        var transactionID: String
+        var jarID: String
+        enum CodingKeys: String, CodingKey { case transactionID = "transaction_id", jarID = "jar_id" }
+    }
+    struct Patch: Encodable, Sendable, Equatable { var assignments: [Row] }
+    var conversationID: String
+    var generation: Int64
+    var revision: Int64
+    var patch: Patch
+    enum CodingKeys: String, CodingKey { case conversationID = "conversation_id", generation, revision, patch }
 }

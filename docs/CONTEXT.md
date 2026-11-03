@@ -29,11 +29,12 @@ saves. [Detail design](work/tickets/LOCAL-FIRST-20261103-DETAIL_DESIGN.md) await
 approval (granted 2026-11-03). Implemented: tabs stay mounted with preload, outbox submit no
 longer waits for the network, optimistic edit/delete with rollback. Build passes; tests pending.
 
-## Hũ hiển thị như ví — phases 1–2 done, phase 3 blocked, 2026-11-03
+## Hũ hiển thị như ví — implemented, in_review, 2026-11-03
 
-Backend cumulative plan + wallet-style jar screens + ledger/overview/month integration are committed and
-tested. Assistant jar assignment mechanics are committed but the live run with the configured model failed;
-decision needed on a deterministic suggester. See backlog and validation matrix.
+Cumulative plan API, wallet-style jar screens, ledger/overview/month integration, the Assistant jar
+suggestion flow (deterministic suggester + fallback card) and the iOS confirmation card are committed and
+tested (backend 993, native 475). Real-data suggestion quality and a few screenshots remain open; see the
+backlog and validation matrix.
 
 ## Hũ hiển thị như ví — design ready, 2026-11-03
 

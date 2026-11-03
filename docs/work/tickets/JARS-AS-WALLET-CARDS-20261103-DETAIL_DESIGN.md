@@ -144,6 +144,8 @@ Tất cả owner-scoped như hiện nay. Không có migration.
 
 ## Tiến độ thực hiện
 
+- iOS Assistant: thẻ `jar_assignment_confirmation` + `jar_context` handoff từ chi tiết hũ đã làm (475 unit test xanh, guard xanh). Chưa có ảnh chụp thẻ trên runtime thật (cần mô hình).
+
 - Giai đoạn 0 xong: ba commit (backend, iOS local-first, docs).
 - Giai đoạn 1 — **backend xong**: `GET /jars?month=` có các trường cộng dồn và tổng đối chiếu; `GET /transactions?jar_id=<id>|unassigned`; test repository cho ví dụ 15/10/20, vượt mức, đối chiếu ví, cô lập tháng. Số liệu thật trên fixture đã đọc lại.
 - Giai đoạn 1 — **iOS đã code, chưa nghiệm thu bằng mắt**: model có trường cộng dồn (optional, payload cũ vẫn decode), base mới `MPJarPlanRow`, `JarPlanPresentation` (tiêu đề/số chính/chú thích/đối chiếu; âm hiển thị "Vượt kế hoạch"), màn Hũ dạng ví + thẻ Chưa phân bổ + dòng đối chiếu, màn chi tiết hũ. Unit test 465 qua; chưa có UI test/ảnh chụp vì tài khoản UI-test không có hũ.
@@ -177,3 +179,4 @@ Tất cả owner-scoped như hiện nay. Không có migration.
 
 [Backlog](../BACKLOG.md) · [ADR-029](../../decisions/ADR-029-jar-cumulative-plan-presentation.md) · [Spec màn Hũ](../../design/pages/jars/README.md) · [Sổ giao dịch](../../design/pages/transactions/README.md) · [Tổng quan](../../design/pages/overview/README.md) · [Tháng](../../design/pages/month-detail/README.md) · [Báo cáo](../../design/pages/reports/README.md) · [Trợ lý](../../design/pages/finance-assistant/README.md) · [Quy tắc](../../requirements/BUSINESS_RULES.md) · [API](../../architecture/API.md) · [Validation](../VALIDATION_MATRIX.md) · [Context](../../CONTEXT.md)
 - Giai đoạn 2 — **iOS đã code và nghiệm thu bằng ảnh cho màn Hũ và chi tiết hũ**: sổ giao dịch có bộ lọc hũ (Tất cả · hũ · Chưa gắn hũ), chip tên hũ trên dòng chi, dòng gợi ý "còn có thể chi / sẽ vượt mức" dưới ô chọn hũ (chỉ thông tin); Tổng quan có hai dòng hũ (cache-first, tải nền); màn Tháng dùng từ "Còn có thể chi" và dòng "Chưa phân bổ"; Báo cáo iOS không có khối hũ nên không đổi. Dọn UX: ẩn nút "+" ở chi tiết giao dịch, Việt hoá "Chế độ du lịch"/"Nhật ký thay đổi", "Xem tất cả N ví", đổi tiêu đề nhóm "Ví của tôi" thành "Tài sản", đồng nhất ô tìm danh mục. UI test `testJarsScreenShowsCumulativePlanLikeWalletCards` qua. Chưa chụp ảnh riêng: bộ lọc hũ, gợi ý trong editor, thẻ tháng Tổng quan, màn Tháng.
+- Trợ lý gắn hũ — bộ gợi ý tất định (2026-11-03): `JarSuggester` (hashtag `#ten-hu`, ghi chú lặp lại trong lịch sử cùng một hũ) chạy trong `jar_context`, trả `suggested_assignments` và `needs_clarification`; server tự dựng thẻ `jar_assignment_confirmation` khi mô hình không tạo được thẻ; chạm giới hạn vòng công cụ trả kết quả đã gom hoặc thông báo rõ. Đo trực tiếp: xem "Live Assistant jar-assignment check" trong VALIDATION_MATRIX.

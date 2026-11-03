@@ -184,7 +184,9 @@ native shell mirrors this contract through `MPShellNavigation` and
 
 The markdown contract is covered by `node scripts/ai-advisor-markdown.test.mjs`.
 
-## Phân loại hũ từ ghi chú — planned 2026-11-03
+## Phân loại hũ từ ghi chú — implemented (iOS) 2026-11-03
+
+iOS: thẻ `jar_assignment_confirmation` (`AssistantJarAssignmentCard.swift`) dùng MPAssistantCard, MPOptionSelector (đổi hũ theo từng dòng, hũ của tháng đề xuất), MPStatusBadge theo dòng, MPButton "Áp dụng"/"Bỏ qua"; chỉnh sửa gửi qua `PATCH /ai/advisor/actions/{id}/replace` rồi xác nhận action mới; kết quả từng dòng (Đã gán / Không đổi / Xung đột – đã đổi ở nơi khác / Bỏ qua) và tóm tắt "Đã gán X/Y khoản". Nút "Phân loại bằng Trợ lý" ở chi tiết hũ gửi `jar_context`. Chưa chạy trên thiết bị với mô hình thật.
 
 Người dùng hỏi "Gợi ý hũ cho các khoản chi chưa phân bổ tháng này" (hoặc bấm "Phân loại bằng Trợ lý" từ chi tiết hũ, gửi `jar_context` theo ID). Trợ lý đọc ghi chú, danh mục và các giao dịch tương tự đã gắn hũ (qua `search_transactions` với `note_contains`), rồi trả thẻ `jar_assignment_confirmation`:
 
