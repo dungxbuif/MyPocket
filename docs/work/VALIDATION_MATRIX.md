@@ -6061,3 +6061,11 @@ tab-switch test failed because earlier runs left "LF Cash" wallets in the UI-tes
 sat off screen (test pollution, not a product regression); it now removes leftovers first and passes (no blocking loader in 6 tab
 switches, save closes in ~1.9 s). `testJarLedgerEditorOverviewMonthAndDetailScreenshots` failed once on "shell + must be hidden on
 transaction detail" and passed on both the first run and a re-run alone; treat it as an intermittent timing check, not yet a root cause.
+
+### 2026-11-04 · `LocalFirstRuntimeTests` green 14/14 after removing three test-pollution flakes
+Root causes were all in the UI tests and the disposable UI-test account, not in the app: (1) wallets and jars left behind by earlier
+tests/runs made the wallet picker and the jar filter menu longer than the screen, so the run's own wallet/jar was off screen (the tab-switch
+test now starts from an empty account; the jar-ledger test scrolls the filter menu to its jar; jars have no delete API, only a per-month
+removal); (2) the Jars-screen test relied on "a jar is copied forward when a month is first created" with a random past month pair, which stops
+holding once a month has been touched, so the fixture now upserts the later month explicitly with `PUT /jars/{id}/months/{month}`; (3) the live
+Assistant card test ignored cards from earlier runs in the persisted thread. Final full-group run: 14 tests, 0 failures, no rerun of single tests.

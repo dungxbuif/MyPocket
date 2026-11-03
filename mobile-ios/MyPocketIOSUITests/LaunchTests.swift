@@ -579,6 +579,23 @@ private enum LocalAPIFixture {
         }
     }
 
+    /// Removes jar month configs left behind by earlier runs; a long jar list pushes this run's jar out of the filter menu.
+    static func deleteJars(withPrefixes prefixes: [String], months: [String]) async throws {
+        let token = try await loginToken()
+        for month in months {
+            let summary = try await request(
+                path: "/jars?month=\(month)", method: "GET", token: token, body: nil,
+                decode: FixtureEnvelope<FixtureJarMonth>.self
+            ).data
+            for item in summary.items where prefixes.contains(where: { item.name.hasPrefix($0) }) {
+                _ = try? await request(
+                    path: "/jars/\(item.jarID)/months/\(month)", method: "DELETE", token: token, body: nil,
+                    decode: EmptyFixtureResponse.self
+                )
+            }
+        }
+    }
+
     static func jar(named name: String, month: String) async throws -> FixtureJarItem {
         let token = try await loginToken()
         let summary = try await request(
@@ -6085,8 +6102,16 @@ private extension LocalAPIFixture {
         guard let jarID = (jar["jar_id"] as? String) ?? (jar["id"] as? String) else {
             throw LocalFixtureError.http(0, "No jar id in \(created)")
         }
-        // A month created for the first time copies the latest earlier month's jars with the same identity.
-        _ = try await get("/jars?month=\(currentMonth)")
+        // Create the later month's config explicitly (upsert) so the run never depends on whether that month
+        // was already "touched" by an earlier run (jars are only copied forward when a month is first created).
+        var upsert = URLRequest(url: baseURL.appendingPathComponent("jars/\(jarID)/months/\(currentMonth)"))
+        upsert.httpMethod = "PUT"
+        upsert.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        upsert.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+        upsert.httpBody = try json(["name": name, "allocation_mode": "fixed", "allocation_amount": allocation])
+        let (upsertData, upsertResponse) = try await URLSession.shared.data(for: upsert)
+        let upsertCode = (upsertResponse as? HTTPURLResponse)?.statusCode ?? 0
+        guard (200..<300).contains(upsertCode) else { throw LocalFixtureError.http(upsertCode, String(data: upsertData, encoding: .utf8) ?? "") }
         let category = try await category(kind: "expense", walletID: walletID)
         _ = try await post("/transactions", [
             "wallet_id": walletID, "category_id": category.id, "jar_id": jarID, "type": "expense", "amount": spent,
@@ -6198,8 +6223,9 @@ final class LocalFirstRuntimeTests: XCTestCase {
     func testTabSwitchHasNoBlockingLoaderAndSaveClosesImmediately() async throws {
         continueAfterFailure = true
         // The UI-test login maps to its own fixture account, which starts without wallets.
-        // Earlier runs left "LF Cash" wallets behind; a long wallet picker pushes this run's wallet off screen.
-        try await LocalAPIFixture.deleteWallets(withPrefix: "LF Cash")
+        // Earlier tests and runs leave wallets behind in this disposable UI-test account; a long wallet picker pushes
+        // this run's wallet off screen, so start from an empty account (it is created empty by design).
+        try await LocalAPIFixture.deleteWallets(withPrefix: "")
         let wallet = try await LocalAPIFixture.wallet(name: "LF Cash \(UUID().uuidString.prefix(4))", type: "basic")
         defer { Task { try? await LocalAPIFixture.deleteTransactions(walletID: wallet.wallet.id); try? await LocalAPIFixture.delete(wallet) } }
         let app = XCUIApplication()
@@ -6361,6 +6387,7 @@ final class LocalFirstRuntimeTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
         let parts = calendar.dateComponents([.year, .month], from: Date())
         let month = String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        try await LocalAPIFixture.deleteJars(withPrefixes: ["Đi lại ", "Ăn uống "], months: [month])
         let jarName = "Đi lại \(suffix)"
         let jarID = try await LocalAPIFixture.jarLedgerFixture(name: jarName, month: month, walletID: wallet.wallet.id, notesInJar: ["Đổ xăng", "Gửi xe"], notesUnassigned: ["Cà phê", "Ăn trưa"])
         func shot(_ app: XCUIApplication, _ name: String) {
@@ -6389,6 +6416,11 @@ final class LocalFirstRuntimeTests: XCTestCase {
         if filter.waitForExistence(timeout: 5) {
             filter.tap(); sleep(1); shot(app, "transactions-jar-filter-open")
             let option = app.buttons[jarName].firstMatch
+            // Earlier runs leave many jars in the menu, so scroll the menu until this run's jar is on screen.
+            for _ in 0..<12 where !(option.exists && option.isHittable) {
+                let from = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+                from.press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.25)))
+            }
             if option.waitForExistence(timeout: 3) { option.tap() }
             sleep(2); shot(app, "transactions-jar-filter-applied")
         } else { shot(app, "transactions-jar-filter-MISSING") }
@@ -6460,6 +6492,7 @@ final class LocalFirstRuntimeTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
         let parts = calendar.dateComponents([.year, .month], from: Date())
         let month = String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        try await LocalAPIFixture.deleteJars(withPrefixes: ["Đi lại ", "Ăn uống "], months: [month])
         let jarName = "Đi lại \(suffix)"
         _ = try await LocalAPIFixture.jarLedgerFixture(name: jarName, month: month, walletID: wallet.wallet.id, notesInJar: ["Đổ xăng", "Gửi xe"], notesUnassigned: ["Cà phê", "Ăn trưa"])
         let app = XCUIApplication()
@@ -6576,6 +6609,7 @@ final class LocalFirstRuntimeTests: XCTestCase {
         var calendar = Calendar(identifier: .gregorian); calendar.timeZone = timezone
         let parts = calendar.dateComponents([.year, .month], from: Date())
         let month = String(format: "%04d-%02d", parts.year ?? 0, parts.month ?? 0)
+        try await LocalAPIFixture.deleteJars(withPrefixes: ["Đi lại ", "Ăn uống "], months: [month])
         let jarName = "Đi lại \(suffix)"
         let slug = jarName.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: Locale(identifier: "vi_VN")).lowercased()
             .replacingOccurrences(of: "đ", with: "d").replacingOccurrences(of: " ", with: "-")
