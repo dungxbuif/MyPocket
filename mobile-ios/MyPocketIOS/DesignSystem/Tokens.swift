@@ -55,16 +55,18 @@ enum MPColor {
     static let row = rowFill
     static let heading = primaryText
     static let accent = primaryAccent
-    static let successSoft = Color(red: 217.0 / 255.0, green: 230.0 / 255.0, blue: 218.0 / 255.0)
-    static let successLine = Color(red: 190.0 / 255.0, green: 202.0 / 255.0, blue: 185.0 / 255.0)
-    static let dangerSoft = Color(red: 255.0 / 255.0, green: 235.0 / 255.0, blue: 238.0 / 255.0)
+    static let successSoft = adaptive(light: (217, 230, 218), dark: (30, 52, 36))
+    static let successLine = adaptive(light: (190, 202, 185), dark: (58, 84, 64))
+    static let dangerSoft = adaptive(light: (255, 235, 238), dark: (64, 30, 34))
     static let warning = Color(red: 217.0 / 255.0, green: 119.0 / 255.0, blue: 6.0 / 255.0)
-    static let warningSoft = Color(red: 255.0 / 255.0, green: 251.0 / 255.0, blue: 235.0 / 255.0)
+    static let warningSoft = adaptive(light: (255, 251, 235), dark: (60, 46, 20))
     static let categoryTeal = Color(red: 13.0 / 255.0, green: 148.0 / 255.0, blue: 136.0 / 255.0)
     static let categoryTealSoft = Color(red: 240.0 / 255.0, green: 253.0 / 255.0, blue: 250.0 / 255.0)
     static let brand = primaryAccent
     static let brandHover = Color(red: 0.0, green: 110.0 / 255.0, blue: 28.0 / 255.0)
     static let action = income
+    /// Text/icon colour on filled action/danger surfaces; dark text keeps contrast on the lighter dark-mode accents.
+    static let onAction = adaptive(light: (255, 255, 255), dark: (8, 40, 14))
     static let actionHover = Color(red: 0.0, green: 83.0 / 255.0, blue: 19.0 / 255.0)
     static let danger = expense
 

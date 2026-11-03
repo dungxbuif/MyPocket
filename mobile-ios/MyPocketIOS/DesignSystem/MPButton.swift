@@ -97,7 +97,7 @@ struct MPButton<Label: View>: View {
 
     private var foreground: Color {
         switch style {
-        case .primary, .destructive: return .white
+        case .primary, .destructive: return MPColor.onAction
         case .outline, .secondary, .ghost, .segmentedSelected: return MPColor.action
         case .key: return MPColor.ink
         case .plain: return MPColor.ink

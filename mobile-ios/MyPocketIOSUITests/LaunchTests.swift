@@ -6363,10 +6363,15 @@ final class LocalFirstRuntimeTests: XCTestCase {
         if entry.waitForExistence(timeout: 5) { entry.tap(); sleep(3) }
     }
 
-    private func auditSwipeUntil(_ app: XCUIApplication, _ element: XCUIElement, max: Int = 10) {
-        for _ in 0..<max where !element.exists {
-            let viewport = app.otherElements["shell-content-viewport"].firstMatch
-            (viewport.exists ? viewport : app.windows.firstMatch).swipeUp()
+    private func auditSwipeUntil(_ app: XCUIApplication, _ element: XCUIElement, max: Int = 8) {
+        for i in 0..<max where !(element.exists && element.isHittable && element.frame.maxY < app.windows.firstMatch.frame.height - 140) {
+            let scroll = app.scrollViews.firstMatch
+            if scroll.exists, i % 2 == 0 { scroll.swipeUp() } else {
+                let window = app.windows.firstMatch.coordinate(withNormalizedOffset: .zero)
+                let from = window.withOffset(CGVector(dx: 200, dy: 600)), to = window.withOffset(CGVector(dx: 200, dy: 200))
+                from.press(forDuration: 0.1, thenDragTo: to)
+            }
+            usleep(400_000)
         }
     }
 
@@ -6386,7 +6391,7 @@ final class LocalFirstRuntimeTests: XCTestCase {
         XCTAssertTrue(app.buttons["bottom-tab-overview"].waitForExistence(timeout: 20))
         sleep(3)
         let jarText = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Hũ: còn có thể chi'")).firstMatch
-        auditSwipeUntil(app, jarText, max: 14)
+        auditSwipeUntil(app, jarText, max: 8)
         XCTAssertTrue(jarText.exists, "Overview month card must show the jar row")
         sleep(1); auditShot(app, "E1-overview-month-card-jar-rows")
         app.buttons["bottom-tab-transactions"].tap(); sleep(3)
@@ -6440,7 +6445,7 @@ final class LocalFirstRuntimeTests: XCTestCase {
     func testAuditDarkMode() throws {
         continueAfterFailure = true
         let app = XCUIApplication()
-        app.launchArguments = ["-UITestAuthenticatedAPI", "-AppleInterfaceStyle", "Dark"]
+        app.launchArguments = ["-UITestAuthenticatedAPI"] // appearance is switched by `xcrun simctl ui <id> appearance dark` outside the test
         app.launch()
         XCTAssertTrue(app.buttons["bottom-tab-overview"].waitForExistence(timeout: 20))
         sleep(3); auditShot(app, "E11-dark-overview")

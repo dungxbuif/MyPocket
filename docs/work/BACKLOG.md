@@ -43,15 +43,14 @@ tests with screenshots. [Design](tickets/JARS-AS-WALLET-CARDS-20261103-DETAIL_DE
 Open (owner-visible, not blocking review):
 - Assistant jar assignment quality is unmeasured on real data (0/47 on the unmodified fixture; 13/13 on seeded evidence). Fixture ids are not UUIDs so a live confirm of the
   card was impossible; the iOS card is unit-tested only.
-- Screenshots still missing: Overview month card jar rows (E1 run: swipe on `shell-content-viewport` did not reach "Hũ: còn có thể chi", screenshot shows the top of Overview),
-  Assistant card, jar detail "Phân loại bằng Trợ lý" (the run crashed the test runner on the Months screen before reaching it). Closed: jar filter menu and editor selector were captured as files but not viewed, so not claimed.
+- Screenshots still missing: Assistant jar-assignment card only (needs a UUID-id fixture, see above). Closed 2026-11-03 (viewed): Overview jar rows, jar filter menu, jar detail "Phân loại bằng Trợ lý".
 - Closed: transaction detail now shows a "Hũ" row (viewed).
 
 ## UX polish from the independent audit — mostly done, 2026-11-03
 
 Done: FAB over delete, English strings, Overview wallet list affordance, duplicate title, category search copy.
 Closed 2026-11-03 (viewed): bubble clearance via shell `contentMargins` (ledger scroll end), AccessibilityXL keeps `bottom-tab-<id>` (menu removed, bar capped at xxxLarge), wallet row money no longer wraps "đ", create-wallet form no longer shows "Xóa ví".
-Open: Month screen scroll-end screenshot not obtained (UI test app crash at swipe on Months, unexplained, needs repro); dark mode unverified (`-AppleInterfaceStyle Dark` launch screenshots were still light, app may pin light scheme); budget editor "Giới hạn" amount field overlaps the "Tự lặp theo chu kỳ" row; wallet duplicate-name rejection banner and "Đang lưu thay đổi…" overlay not viewed; recurring/travel editors captured but not viewed; AX tab labels truncate ("Tổng..."); real-device timing not measurable.
+Open: Month screen scroll-end screenshot not obtained (UI test app crash at swipe on Months, unexplained, needs repro); dark mode: Overview/Giao dịch editor/Hũ viewed and fixed, Ledger and other screens not re-viewed; wallet duplicate-name rejection banner and "Đang lưu thay đổi…" overlay not viewed; recurring/travel editors captured but not viewed; AX tab labels truncate ("Tổng..."); real-device timing not measurable.
 
 ## Re-audit defects from committed report findings — fixed, 2026-11-03
 

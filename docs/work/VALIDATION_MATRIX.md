@@ -6014,3 +6014,12 @@ Unit target 476 green; base guard and verify-project pass. UI run via `LocalFirs
 - E15/E16 wallet create editor: showed "Xóa ví" on create (fixed in WalletsView; re-run shot not viewed). Keyboard covers part of form.
 - E18 wallet list after save: new "Dup 90AB" wallet listed, 0 đ.
 - E21 budget empty save: banner "Nhập tên và giới hạn hợp lệ."; Giới hạn field overlaps the recurring toggle row (defect, open).
+
+## Agent F iOS audit result (2026-11-03)
+
+Unit target 476 green; base guard and verify-project pass (real ripgrep). Only screenshots viewed are listed.
+- Budget editor (Tài khoản, Ngân sách, Thêm): before, the "Giới hạn" field was ~170 px tall (UITextField unbounded vertically, `firstTextBaseline` HStack) and overlapped "Tự lặp theo chu kỳ". Fix in shared `MPAmountField` (centered alignment, height capped at `controlHeight`). After: field single row, toggle row clear (E20/E21 viewed); same fix visible in wallet editor "Số dư ban đầu".
+- Wallet editor with keyboard open (E16): focused "Tên ví" stays visible, pinned "Lưu" sits above the keyboard accessory; no scaffold change needed.
+- Dark mode (via `simctl ui appearance dark`, restored to light and confirmed): app does not force a scheme; tokens are adaptive. Viewed Overview, transaction editor, Hũ chi tiêu. Defects found and fixed in `Tokens.swift`/`MPButton.swift`: `successSoft`/`successLine`/`dangerSoft`/`warningSoft` were hard-coded light (mint "Thêm chi tiết" button on a dark page), and white label on light-green primary button (low contrast). After: dark mint-tinted fill, dark label on "Lưu giao dịch" (E13/E14 viewed). Ledger dark (E12) not re-viewed.
+- Overview month card (E1) after robust swipe (hittable check + coordinate drag): "Hũ: còn có thể chi tổng 34.780.000 đ", "Chưa phân bổ tháng này 1.909.502 đ", "Xem hũ tháng" visible. Jar filter menu (E3) shows jar names plus "Tất cả"/"Chưa gắn hũ"; duplicate "Ăn uống F7F0" appears twice (fixture leftovers). Jar detail (E7) shows "Phân loại bằng Trợ lý" button.
+

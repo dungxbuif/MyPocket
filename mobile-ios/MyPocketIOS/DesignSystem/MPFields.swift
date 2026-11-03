@@ -881,7 +881,7 @@ struct MPAmountField: View {
                     Text(title)
                         .font(MPFont.label)
                         .foregroundStyle(MPColor.ink)
-                    HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    HStack(alignment: .center, spacing: 8) {
                         MPNumberPadTextField(
                             text: $text,
                             placeholder: "0",
@@ -889,7 +889,7 @@ struct MPAmountField: View {
                             presentation: groupsDigits ? .groupedControl : .control,
                             accessibilityIdentifier: accessibilityIdentifier
                         )
-                            .frame(maxWidth: .infinity, minHeight: MPMetrics.controlHeight)
+                            .frame(maxWidth: .infinity, minHeight: MPMetrics.controlHeight, maxHeight: MPMetrics.controlHeight)
                         MPText("VND", style: .secondary)
                             .accessibilityIdentifier("\(title)-currency")
                         if showsCalculator {
