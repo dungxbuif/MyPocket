@@ -19,7 +19,7 @@ import (
 
 const (
 	transactionUnauthorizedMessage        = "chưa đăng nhập"
-	transactionAmountMessage              = "số tiền phải lớn hơn 0"
+	transactionAmountMessage              = "số tiền phải lớn hơn 0 và không vượt quá 9.007.199.254.740.991"
 	transactionTypeMessage                = "loại giao dịch không hợp lệ"
 	transactionWalletMessage              = "ví không tồn tại hoặc không thuộc tài khoản"
 	transactionCreditWalletMessage        = "ví tín dụng cần luồng giao dịch tín dụng riêng"
@@ -144,7 +144,7 @@ func (h *TransactionHandler) CreateTransfer(c *gin.Context) {
 		return
 	}
 	input.SourceWalletID, input.DestinationWalletID = strings.TrimSpace(input.SourceWalletID), strings.TrimSpace(input.DestinationWalletID)
-	if input.Amount <= 0 {
+	if input.Amount <= 0 || input.Amount > entity.MaxSafeMoneyAmount {
 		transactionBadRequest(c, transactionAmountMessage)
 		return
 	}
@@ -165,7 +165,7 @@ func (h *TransactionHandler) CreateTransfer(c *gin.Context) {
 	occurredAt := time.Now().UTC()
 	if strings.TrimSpace(input.OccurredAt) != "" {
 		parsed, err := time.Parse(time.RFC3339, input.OccurredAt)
-		if err != nil {
+		if err != nil || !transactionTimeInRange(parsed) {
 			transactionBadRequest(c, transactionDateMessage)
 			return
 		}
@@ -260,7 +260,7 @@ func (h *TransactionHandler) UpdateTransfer(c *gin.Context) {
 		Fail(c, http.StatusBadRequest, Problem{Code: problemCodeBadRequest, Title: problemTitleBadRequest, Detail: problemDetailInvalidJSON})
 		return
 	}
-	if input.Amount <= 0 {
+	if input.Amount <= 0 || input.Amount > entity.MaxSafeMoneyAmount {
 		transactionBadRequest(c, transactionAmountMessage)
 		return
 	}
@@ -270,7 +270,7 @@ func (h *TransactionHandler) UpdateTransfer(c *gin.Context) {
 		return
 	}
 	parsed, err := time.Parse(time.RFC3339, input.OccurredAt)
-	if err != nil {
+	if err != nil || !transactionTimeInRange(parsed) {
 		transactionBadRequest(c, transactionDateMessage)
 		return
 	}
@@ -480,7 +480,7 @@ func (h *TransactionHandler) CreateAdjustment(c *gin.Context) {
 		return
 	}
 	input.WalletID, input.Direction = strings.TrimSpace(input.WalletID), strings.TrimSpace(input.Direction)
-	if input.Amount <= 0 {
+	if input.Amount <= 0 || input.Amount > entity.MaxSafeMoneyAmount {
 		transactionBadRequest(c, transactionAmountMessage)
 		return
 	}
@@ -500,7 +500,7 @@ func (h *TransactionHandler) CreateAdjustment(c *gin.Context) {
 	occurredAt := time.Now().UTC()
 	if strings.TrimSpace(input.OccurredAt) != "" {
 		parsed, parseErr := time.Parse(time.RFC3339, input.OccurredAt)
-		if parseErr != nil {
+		if parseErr != nil || !transactionTimeInRange(parsed) {
 			transactionBadRequest(c, transactionDateMessage)
 			return
 		}
@@ -776,7 +776,7 @@ func (h *TransactionHandler) bindAndValidate(c *gin.Context, owner string, exist
 
 func (h *TransactionHandler) validateTransactionInput(c *gin.Context, owner string, existing *entity.Transaction, input transactionInput) (transactionInput, time.Time, bool) {
 	input.WalletID, input.Type = strings.TrimSpace(input.WalletID), strings.TrimSpace(input.Type)
-	if input.Amount <= 0 {
+	if input.Amount <= 0 || input.Amount > entity.MaxSafeMoneyAmount {
 		transactionBadRequest(c, transactionAmountMessage)
 		return transactionInput{}, time.Time{}, false
 	}
@@ -824,7 +824,7 @@ func (h *TransactionHandler) validateTransactionInput(c *gin.Context, owner stri
 	occurredAt := time.Now().UTC()
 	if strings.TrimSpace(input.OccurredAt) != "" {
 		parsed, err := time.Parse(time.RFC3339, input.OccurredAt)
-		if err != nil {
+		if err != nil || !transactionTimeInRange(parsed) {
 			transactionBadRequest(c, transactionDateMessage)
 			return transactionInput{}, time.Time{}, false
 		}
@@ -920,4 +920,10 @@ func hashMutationInput(value any) string {
 	bytes, _ := json.Marshal(value)
 	hash := sha256.Sum256(bytes)
 	return hex.EncodeToString(hash[:])
+}
+
+// transactionTimeInRange rejects obviously wrong dates (typos such as year 2030 or 1900) while
+// still allowing planned entries up to one year ahead.
+func transactionTimeInRange(t time.Time) bool {
+	return t.Year() >= 2000 && !t.After(time.Now().UTC().AddDate(1, 0, 0))
 }

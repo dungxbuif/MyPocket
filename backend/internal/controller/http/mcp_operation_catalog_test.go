@@ -144,6 +144,7 @@ var mcpExcludedRouteInventory = map[string]string{
 	"GET /api/v1/reports/monthly":                          "deterministic report read model; not exposed through MCP",
 	"GET /api/v1/reports/monthly/transactions":             "bounded native report drill-down; not exposed through MCP",
 	"POST /api/v1/reports/analyses":                        "on-demand provider job; not exposed through MCP",
+	"GET /api/v1/reports/analyses/latest":                  "saved provider analysis lookup; not exposed through MCP",
 	"GET /api/v1/reports/analyses/{id}":                    "on-demand provider job; not exposed through MCP",
 	"POST /api/v1/reports/analyses/{id}/cancel":            "on-demand provider job; not exposed through MCP",
 	"POST /api/v1/ai/advisor/entries":                      "durable assistant entry acceptance; not exposed through MCP",

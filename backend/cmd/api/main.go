@@ -98,6 +98,16 @@ func main() {
 	authUc.RefreshTTL = cfg.RefreshTTL
 	authUc.Devices = repo.NewDeviceCredentialPostgresRepository(database)
 	authUc.MobileGoogleOAuth = mobileGoogleOAuth
+	authUc.HomeCounts = func(ctx context.Context, ownerID string) (int, int, error) {
+		var wallets, notes int64
+		if err := database.WithContext(ctx).Model(&entity.Wallet{}).Where("owner_id = ?", ownerID).Count(&wallets).Error; err != nil {
+			return 0, 0, err
+		}
+		if err := database.WithContext(ctx).Model(&entity.MonthNote{}).Where("owner_id = ?", ownerID).Count(&notes).Error; err != nil {
+			return 0, 0, err
+		}
+		return int(wallets), int(notes), nil
+	}
 
 	authHandler := httpapi.NewAuthHandler(
 		authUc,

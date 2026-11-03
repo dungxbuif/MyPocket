@@ -179,7 +179,7 @@ func completedOCRText(document ocrDocument) (string, error) {
 			return "", errors.New("OCR result expired or has an invalid expiry")
 		}
 	}
-	if document.Result == nil || strings.TrimSpace(document.Result.Text) == "" || len(document.Result.Text) > maxSourceBytes {
+	if document.Result == nil || strings.TrimSpace(document.Result.Text) == "" || len(document.Result.Text) > maxOCRSourceBytes {
 		return "", errors.New("OCR result text is missing or exceeds limit")
 	}
 	return document.Result.Text, nil

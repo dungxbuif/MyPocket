@@ -697,7 +697,8 @@ func (r *FinanceQueryPostgresRepository) readBudgetProgress(ctx context.Context,
 	// available for carryover, but must not crowd the requested card list.
 	month := strings.TrimSpace(query.Month)
 	activeOn := strings.TrimSpace(query.ActiveOn)
-	if month == "" && activeOn == "" && len(query.ObjectIDs) == 0 {
+	// A name search without a period looks across every period instead of the current month.
+	if month == "" && activeOn == "" && len(query.ObjectIDs) == 0 && strings.TrimSpace(query.BudgetNameQuery) == "" {
 		month = asOf.In(location).Format("2006-01")
 	}
 	var monthStart, monthEnd time.Time
@@ -752,10 +753,6 @@ func (r *FinanceQueryPostgresRepository) readBudgetProgress(ctx context.Context,
 		items = append(items, budget)
 		// Totals describe the displayed selection, including ended weekly
 		// periods and explicit historical IDs. Overlapping spend is counted once.
-		if summary.LimitAmount > entity.MaxSafeMoneyAmount-budget.EffectiveLimitAmount {
-			return entity.FinanceResult{}, entity.ErrFinanceAmountInvalid
-		}
-		summary.LimitAmount += budget.EffectiveLimitAmount
 		for _, row := range entity.MatchBudgetTransactions(budget, transactions, categories, cutoff, location) {
 			if counted[row.ID] {
 				continue
@@ -767,6 +764,11 @@ func (r *FinanceQueryPostgresRepository) readBudgetProgress(ctx context.Context,
 			summary.Spent += row.Amount
 		}
 	}
+	limitTotal, err := budgetSelectionLimit(items)
+	if err != nil {
+		return entity.FinanceResult{}, err
+	}
+	summary.LimitAmount = limitTotal
 	summary.Items = items
 	encoded, err := json.Marshal(summary)
 	if err != nil {
@@ -941,3 +943,28 @@ func (r *FinanceQueryPostgresRepository) expandCategoryIDs(tx *gorm.DB, ownerID 
 func int64Ptr(value int64) *int64 { return &value }
 
 func stringPtr(value string) *string { return &value }
+
+// budgetSelectionLimit totals the limits of a selection of budget periods. A period's
+// effective limit already contains the previous period's leftover; when that previous period
+// of the same series is also selected, only the base limit is added so carryover is not
+// counted twice.
+func budgetSelectionLimit(items []entity.Budget) (int64, error) {
+	endsBefore := map[string]bool{}
+	for _, item := range items {
+		if item.SeriesID != nil {
+			endsBefore[*item.SeriesID+"|"+item.EndDate.AddDate(0, 0, 1).Format("2006-01-02")] = true
+		}
+	}
+	var total int64
+	for _, item := range items {
+		limit := item.EffectiveLimitAmount
+		if item.SeriesID != nil && item.CarryoverAmount > 0 && endsBefore[*item.SeriesID+"|"+item.StartDate.Format("2006-01-02")] {
+			limit = item.BaseLimitAmount
+		}
+		if total > entity.MaxSafeMoneyAmount-limit {
+			return 0, entity.ErrFinanceAmountInvalid
+		}
+		total += limit
+	}
+	return total, nil
+}

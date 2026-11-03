@@ -66,10 +66,12 @@ func TestOCRSourceLimitDoesNotCompleteUnprocessedImages(t *testing.T) {
 			return
 		}
 		submissions++
-		_, _ = io.WriteString(w, `{"status":"completed","result":{"text":"`+strings.Repeat("x", maxSourceBytes-1)+`"}}`)
+		_, _ = io.WriteString(w, `{"status":"completed","result":{"text":"`+strings.Repeat("x", maxOCRSourceBytes-5)+`"}}`)
 	})
 	out, err := client.Extract(context.Background(), Input{Images: []Image{pngImage(t), pngImage(t)}})
-	if err == nil || !strings.Contains(err.Error(), "source text exceeds limit") {
+	// Provider errors are deliberately redacted, so the stable machine code is the contract.
+	var diagnostic *AIProviderError
+	if !errors.As(err, &diagnostic) || diagnostic.Code != "model_source_limit" {
 		t.Fatalf("expected aggregate source limit, got %v", err)
 	}
 	if out.OCRComplete || submissions != 1 || len(out.AttachmentTexts) != 1 || len(out.Drafts) != 0 {

@@ -184,8 +184,9 @@ func TestAIEntryPersistsReviewAndApprovesExactlyOnce(t *testing.T) {
 		t.Fatal(err)
 	}
 	now := time.Now().UTC()
-	task := entity.AdvisorEntryTask{ID: uuid.NewString(), OwnerID: owner, ConversationID: conversation.ID, Generation: 1, ClientRequestID: uuid.NewString(), PayloadHash: "sha256:bound", SessionID: cleanupProcess, Status: entity.AdvisorEntryTaskReviewReady, Stage: "review_ready", DeadlineAt: now.Add(time.Hour), CreatedAt: now, UpdatedAt: now}
-	if err = db.Create(&task).Error; err != nil {
+	task := entity.AdvisorEntryTask{ID: uuid.NewString(), OwnerID: owner, ConversationID: conversation.ID, Generation: 1, ClientRequestID: uuid.NewString(), PayloadHash: "sha256:bound", SessionID: cleanupProcess, Timezone: "Asia/Ho_Chi_Minh", Status: entity.AdvisorEntryTaskReviewReady, Stage: "review_ready", DeadlineAt: now.Add(time.Hour), CreatedAt: now, UpdatedAt: now}
+	// A task outside a batch stores NULL batch columns; the zero values would violate the batch check.
+	if err = db.Omit("batch_id", "batch_version").Create(&task).Error; err != nil {
 		t.Fatal(err)
 	}
 	if err = db.Exec("INSERT INTO advisor_entry_attachment_bindings (task_id, owner_id, attachment_id) VALUES (?, ?, ?)", task.ID, owner, bound.ID).Error; err != nil {

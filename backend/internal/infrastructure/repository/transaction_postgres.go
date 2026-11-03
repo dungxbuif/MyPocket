@@ -283,7 +283,9 @@ func (r *TransactionPostgresRepository) ListCreditStatement(ownerID, walletID st
 	statement.PaymentDueDay = wallet.PaymentDueDay
 	statement.PaymentStatus = "not_configured"
 	statement.Balance = wallet.OpeningBalance
-	query := r.db.Where("owner_id = ? AND wallet_id = ? AND credit_kind IS NOT NULL", ownerID, walletID)
+	// Rows created before the credit ledger have no credit_kind but still move the balance, so the
+	// statement lists every income/expense row to stay reconcilable with it.
+	query := r.db.Where("owner_id = ? AND wallet_id = ? AND (credit_kind IS NOT NULL OR type IN (?, ?))", ownerID, walletID, entity.TransactionTypeIncome, entity.TransactionTypeExpense)
 	if from != nil {
 		query = query.Where("occurred_at >= ?", from.UTC())
 	}

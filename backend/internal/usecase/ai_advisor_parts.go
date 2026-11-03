@@ -3,6 +3,7 @@ package usecase
 import (
 	"encoding/json"
 	"strings"
+	"time"
 
 	"github.com/mypocket/backend/internal/entity"
 )
@@ -131,4 +132,133 @@ func advisorPartType(viewKind string) (string, bool) {
 func isAdvisorProposalView(viewKind string) bool {
 	partType, ok := advisorPartType(viewKind)
 	return ok && (partType == "wallet_confirmation" || partType == "jar_confirmation" || partType == "budget_confirmation" || partType == "transaction_confirmation" || partType == "transfer_confirmation" || partType == "category_confirmation")
+}
+
+// narrowReportFollowUpCards keeps a follow-up about one saved report finding focused on that
+// finding's evidence. The model may run a broad exploratory search; transaction rows outside the
+// finding's category/date/type scope are removed from the card (the card is dropped when nothing
+// is left) and, when several lists remain, only the most specific one (fewest rows) is kept.
+// Runs without report context keep every card because several lists can be a legitimate answer.
+func narrowReportFollowUpCards(parts []entity.AdvisorPart, userMessage *entity.AdvisorMessage) []entity.AdvisorPart {
+	if userMessage == nil {
+		return parts
+	}
+	var contextPart *entity.AdvisorPart
+	for i := range userMessage.Parts {
+		if userMessage.Parts[i].Type == "report_context" {
+			contextPart = &userMessage.Parts[i]
+			break
+		}
+	}
+	if contextPart == nil {
+		return parts
+	}
+	scope := followUpFindingScope(contextPart.Data)
+	narrowed := make([]entity.AdvisorPart, 0, len(parts))
+	for _, part := range parts {
+		if part.Type == "transaction_list" && scope != nil {
+			if filtered, ok := scope.filter(part); ok {
+				part = filtered
+			} else {
+				continue
+			}
+		}
+		narrowed = append(narrowed, part)
+	}
+	rowCount := func(part entity.AdvisorPart) int {
+		data, _ := part.Data.(map[string]any)
+		view, _ := data["view"].(map[string]any)
+		items, _ := view["items"].([]any)
+		return len(items)
+	}
+	best, lists := -1, 0
+	for i, part := range narrowed {
+		if part.Type != "transaction_list" {
+			continue
+		}
+		lists++
+		if n := rowCount(part); n > 0 && (best < 0 || n <= rowCount(narrowed[best])) {
+			best = i
+		}
+	}
+	if lists < 2 || best < 0 {
+		return narrowed
+	}
+	result := make([]entity.AdvisorPart, 0, len(narrowed))
+	for i, part := range narrowed {
+		if part.Type == "transaction_list" && i != best {
+			continue
+		}
+		result = append(result, part)
+	}
+	return result
+}
+
+type followUpScope struct {
+	categories map[string]bool
+	from, end  time.Time
+	kind       string
+}
+
+// followUpFindingScope returns the evidence scope of the single finding carried by a follow-up,
+// or nil when the context covers several findings or has no category-scoped drilldown.
+func followUpFindingScope(data any) *followUpScope {
+	raw, err := json.Marshal(data)
+	if err != nil {
+		return nil
+	}
+	var context struct {
+		Findings []struct {
+			Drilldown struct {
+				CategoryIDs  []string  `json:"category_ids"`
+				From         time.Time `json:"from"`
+				EndExclusive time.Time `json:"end_exclusive"`
+				Type         string    `json:"type"`
+			} `json:"drilldown"`
+		} `json:"findings"`
+	}
+	if json.Unmarshal(raw, &context) != nil || len(context.Findings) != 1 || len(context.Findings[0].Drilldown.CategoryIDs) == 0 {
+		return nil
+	}
+	d := context.Findings[0].Drilldown
+	scope := &followUpScope{categories: map[string]bool{}, from: d.From, end: d.EndExclusive, kind: d.Type}
+	for _, id := range d.CategoryIDs {
+		scope.categories[id] = true
+	}
+	return scope
+}
+
+func (s *followUpScope) filter(part entity.AdvisorPart) (entity.AdvisorPart, bool) {
+	data, _ := part.Data.(map[string]any)
+	view, _ := data["view"].(map[string]any)
+	items, _ := view["items"].([]any)
+	kept := make([]any, 0, len(items))
+	for _, item := range items {
+		row, _ := item.(map[string]any)
+		category, _ := row["category_id"].(string)
+		kind, _ := row["type"].(string)
+		at, err := time.Parse(time.RFC3339, stringValue(row["occurred_at"]))
+		if !s.categories[category] || (s.kind != "" && kind != s.kind) || err != nil ||
+			(!s.from.IsZero() && at.Before(s.from)) || (!s.end.IsZero() && !at.Before(s.end)) {
+			continue
+		}
+		kept = append(kept, item)
+	}
+	if len(kept) == 0 {
+		return part, false
+	}
+	narrowedView := map[string]any{}
+	for k, v := range view {
+		narrowedView[k] = v
+	}
+	narrowedView["items"] = kept
+	narrowedView["total_count"] = len(kept)
+	delete(narrowedView, "next_cursor") // the cursor belongs to the unfiltered search
+	narrowedData := map[string]any{}
+	for k, v := range data {
+		narrowedData[k] = v
+	}
+	narrowedData["view"] = narrowedView
+	part.Data = narrowedData
+	return part, true
 }

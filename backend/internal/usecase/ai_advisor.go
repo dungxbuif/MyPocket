@@ -218,7 +218,7 @@ func (s *AdvisorService) completeRunWithLease(runCtx, terminalCtx context.Contex
 		_ = s.Runtime.FinishRun(terminalCtx, lease, entity.AdvisorStatusFailed, advisorErrorCode(err), answer.Usage)
 		return AdvisorAnswer{}, err
 	}
-	parts := BuildAdvisorPartsForRun(answer, run.ConversationID, run.Generation, run.ID)
+	parts := narrowReportFollowUpCards(BuildAdvisorPartsForRun(answer, run.ConversationID, run.Generation, run.ID), userMessage)
 	previous, err := s.loadContextState(providerCtx, principal, run)
 	if err != nil {
 		return AdvisorAnswer{}, err
@@ -371,7 +371,7 @@ func (s *AdvisorService) completeRun(runCtx, terminalCtx context.Context, princi
 			return AdvisorAnswer{}, fmt.Errorf("%w: %v", ErrAdvisorPrincipalInvalid, err)
 		}
 	}
-	parts := BuildAdvisorPartsForRun(answer, run.ConversationID, run.Generation, run.ID)
+	parts := narrowReportFollowUpCards(BuildAdvisorPartsForRun(answer, run.ConversationID, run.Generation, run.ID), userMessage)
 	if _, err := s.Store.CreateAssistantMessage(runCtx, principal.OwnerID, run.ID, run.Generation, parts); err != nil {
 		_ = s.Store.MarkRunStatus(terminalCtx, principal.OwnerID, run.ID, entity.AdvisorStatusFailed, s.now())
 		return AdvisorAnswer{}, err

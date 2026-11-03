@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"errors"
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -47,6 +48,8 @@ func (h *NotificationHandler) RegisterPushToken(c *gin.Context) {
 			Fail(c, http.StatusConflict, Problem{Code: "PUSH_TOKEN_CONFLICT", Title: "Conflict", Detail: "thiết bị đã được đăng ký cho tài khoản khác"})
 			return
 		}
+		// Never log the provider token; the error is what operators need to diagnose the 500.
+		log.Printf("push token registration failed: %v", err)
 		Fail(c, http.StatusInternalServerError, Problem{Code: "PUSH_TOKEN_REGISTER_FAILED", Title: problemTitleInternalServer, Detail: "không thể đăng ký thiết bị"})
 		return
 	}

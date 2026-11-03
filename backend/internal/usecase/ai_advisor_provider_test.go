@@ -230,7 +230,7 @@ func TestAdvisorOrchestratorPrependsProductHandbook(t *testing.T) {
 	for _, definition := range provider.request.Tools {
 		if definition.Name == "propose_create_jar" {
 			jarToolFound = true
-			if !strings.Contains(definition.Description, "never create it directly") {
+			if !strings.Contains(strings.ToLower(definition.Description), "never create it directly") {
 				t.Fatalf("jar proposal tool must advertise its non-mutating boundary: %q", definition.Description)
 			}
 		}

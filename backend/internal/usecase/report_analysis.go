@@ -70,7 +70,7 @@ func (s *ReportAnalysisService) FollowUpContext(ctx context.Context, principal P
 			return nil, repository.ErrNotFound
 		}
 	}
-	return map[string]any{"analysis_id": analysis.ID, "snapshot_id": snapshot.ID, "scope": snapshot.Report.Scope, "timezone": snapshot.Timezone, "as_of": snapshot.AsOf, "summary": analysis.Summary, "findings": findings, "instruction": "Dữ liệu đã lưu tại as_of, không phải dữ liệu hiện tại. Giữ nguyên phạm vi tháng/ví; dùng công cụ truy vấn khi cần số liệu mới. Không suy diễn nguyên nhân từ tổng tiền."}, nil
+	return map[string]any{"analysis_id": analysis.ID, "snapshot_id": snapshot.ID, "scope": snapshot.Report.Scope, "timezone": snapshot.Timezone, "as_of": snapshot.AsOf, "summary": analysis.Summary, "findings": findings, "instruction": "Dữ liệu đã lưu tại as_of, không phải dữ liệu hiện tại. Giữ nguyên phạm vi tháng/ví; dùng công cụ truy vấn khi cần số liệu mới. Không suy diễn nguyên nhân từ tổng tiền. Khi cần liệt kê giao dịch của nhận xét, gọi search_transactions với đúng category_ids, khoảng ngày (from/end_exclusive) và report_scope của drilldown trong nhận xét; không tìm toàn bộ giao dịch hay mọi danh mục."}, nil
 }
 
 type ReportAnalysisService struct {

@@ -652,7 +652,10 @@ func (r *MonthlyReportPostgresRepository) budgetPreviews(ctx context.Context, tx
 		}
 		// A crossing period keeps its canonical start; month-only spending would
 		// understate its consumption. Carryover above always uses the full scope.
-		walletID := scope.Scope.WalletID
+		// A budget is judged against its own scope. An all-wallet budget keeps all wallets in both
+		// the calculation and its evidence, so a wallet-filtered report cannot report "not over
+		// limit" by comparing one wallet's spending with the whole budget's limit.
+		walletID := ""
 		if budget.WalletID != nil {
 			walletID = *budget.WalletID
 		}
@@ -672,17 +675,6 @@ func (r *MonthlyReportPostgresRepository) budgetPreviews(ctx context.Context, tx
 			sort.Strings(drilldown.CategoryIDs)
 		}
 		spent := budget.Spent
-		if budget.WalletID == nil && walletID != "" {
-			spent = 0
-			scopedBudget := budget
-			scopedBudget.WalletID = &walletID
-			for _, row := range entity.MatchBudgetTransactions(scopedBudget, transactions, categories, end.Add(-time.Nanosecond), scope.Location) {
-				spent, err = entity.CheckedMoneyAdd(spent, row.Amount)
-				if err != nil {
-					return nil, err
-				}
-			}
-		}
 		remaining, err := entity.CheckedMoneyDifference(budget.EffectiveLimitAmount, spent)
 		if err != nil {
 			return nil, err

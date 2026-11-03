@@ -177,3 +177,38 @@ func TestMonthlyBudgetPreviewCarryoverAndExclusiveAsOf(t *testing.T) {
 		t.Fatalf("carryover/as-of=%+v", got)
 	}
 }
+
+// An all-wallet budget must stay all-wallet inside a wallet-filtered report: comparing one
+// wallet's spending with the whole budget's limit would hide an overrun.
+func TestMonthlyBudgetPreviewKeepsAllWalletScopeInWalletFilteredReport(t *testing.T) {
+	db := openReportsPostgresTestDB(t)
+	owner := insertReportsTestUser(t, db, "Asia/Ho_Chi_Minh")
+	location, err := time.LoadLocation("Asia/Ho_Chi_Minh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	walletA, walletB := budgetScopeWallet(t, db, owner), budgetScopeWallet(t, db, owner)
+	root := entity.Category{ID: uuid.NewString(), OwnerID: &owner, Kind: "expense", Name: "Shopping"}
+	if err := db.Create(&root).Error; err != nil {
+		t.Fatal(err)
+	}
+	b := entity.Budget{ID: uuid.NewString(), OwnerID: owner, Name: "All wallets", LimitAmount: 1000, CategoryID: &root.ID, StartDate: budgetScopeDate(t, "2026-11-01"), EndDate: budgetScopeDate(t, "2026-11-30")}
+	if err := db.Create(&b).Error; err != nil {
+		t.Fatal(err)
+	}
+	at := time.Date(2026, 11, 3, 12, 0, 0, 0, location)
+	budgetScopeExpense(t, db, owner, walletA, &root.ID, 300, at)
+	budgetScopeExpense(t, db, owner, walletB, &root.ID, 900, at)
+	repo := NewMonthlyReportPostgresRepository(db)
+	scope, err := repo.resolveScope(context.Background(), db, owner, entity.MonthlyReportScope{Month: "2026-11", WalletID: walletA}, time.Date(2026, 11, 10, 0, 0, 0, 0, location))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := repo.budgetPreviews(context.Background(), db, owner, scope, 0)
+	if err != nil || len(got) != 1 {
+		t.Fatalf("previews=%+v err=%v", got, err)
+	}
+	if got[0].Spent != 1200 || !got[0].OverLimit || got[0].Remaining != -200 || got[0].Drilldown.WalletID != "" {
+		t.Fatalf("all-wallet budget in wallet report = %+v, want spent 1200, over limit, no wallet filter", got[0])
+	}
+}

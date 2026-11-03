@@ -36,6 +36,8 @@ type AuthInteractor struct {
 	MobileGoogleOAuth MobileGoogleOAuthProvider
 	RefreshTTL        time.Duration
 	Devices           repository.DeviceCredentialRepository
+	// HomeCounts reports the owner's real wallet and month-note counts for the home summary.
+	HomeCounts func(ctx context.Context, ownerID string) (wallets, notes int, err error)
 }
 
 func NewAuthInteractor(
@@ -324,7 +326,6 @@ func (a *AuthInteractor) SetTimezone(ctx context.Context, userID, timezone strin
 }
 
 func (a *AuthInteractor) Home(ctx context.Context, userID string) (*HomeOutput, error) {
-	_ = ctx
 	cacheKey := fmt.Sprintf("%s%s", homeCachePrefix, userID)
 	if cached, ok, err := a.CacheRepo.Get(cacheKey); err == nil && ok {
 		var home HomeOutput
@@ -339,16 +340,16 @@ func (a *AuthInteractor) Home(ctx context.Context, userID string) (*HomeOutput, 
 		}
 		return nil, err
 	}
-	home := &HomeOutput{
-		Greeting: "Xin chào " + user.Name,
-		Stats: struct {
-			WalletCount int `json:"wallet_count"`
-			NotesCount  int `json:"notes_count"`
-		}{
-			WalletCount: 0,
-			NotesCount:  0,
-		},
-		Notice: "Chào mừng bạn đến với MyPocket. Hiện tại chưa có dữ liệu giao dịch.",
+	home := &HomeOutput{Greeting: "Xin chào " + user.Name, Notice: "Chào mừng bạn đến với MyPocket. Hiện tại chưa có dữ liệu giao dịch."}
+	if a.HomeCounts != nil {
+		wallets, notes, err := a.HomeCounts(ctx, userID)
+		if err != nil {
+			return nil, err
+		}
+		home.Stats.WalletCount, home.Stats.NotesCount = wallets, notes
+		if wallets > 0 {
+			home.Notice = fmt.Sprintf("Bạn có %d ví và %d ghi chú tháng.", wallets, notes)
+		}
 	}
 	raw, err := json.Marshal(home)
 	if err == nil {
