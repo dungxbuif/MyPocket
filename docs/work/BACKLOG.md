@@ -45,8 +45,8 @@ predictive of real ambiguous notes); live confirm on a UUID clone → 2 applied,
 Overview jar rows, jar filter menu, jar detail Assistant button and transaction-detail jar row viewed in screenshots.
 
 Open (needs real data or a device, cannot be closed from this environment):
-- Suggestion quality on the owner's real, ambiguous notes (add `#ten-hu` hashtags or assign some rows, then re-run classification).
-- Real-device timing (no device attached here).
+- Suggestion quality: owner decided on 2026-11-04 that the check is done by us ("tự kiểm thử") instead of with real notes. Done on a labelled SYNTHETIC set (`ai_advisor_jar_eval_test.go`): 32 notes, 23 proposals, 0 wrong, 23/23 answerable covered, 9/9 no-evidence rows left to the user. Not measured: the live model's semantic guess for notes with no history (only the 3-row card check), and the owner's real notes. Re-open only if the owner wants a real-notes run.
+- Real-device timing: owner declined installing a debug build on the physical iPhone on 2026-11-04 (a Personal Team and a paired iPhone were available). Closed as simulator-only: 6 tab switches without a blocking loader and a save that closes in about 1.9 s with a 3 s write delay. A real-device run stays unmeasured until the owner allows it.
 - Assistant raw text bubble (`id/version/amount`): closed 2026-11-04. Cause found and reproduced on the simulator: the hidden `jar_context` part of the user message rendered as a card because the app filtered only `report_context`. Fixed with `AssistantCardType.isHiddenContextPart`; the server-side sanitiser stays as extra hardening.
 
 ## UX polish from the independent audit — mostly done, 2026-11-03

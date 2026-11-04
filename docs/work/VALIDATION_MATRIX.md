@@ -6069,3 +6069,10 @@ test now starts from an empty account; the jar-ledger test scrolls the filter me
 removal); (2) the Jars-screen test relied on "a jar is copied forward when a month is first created" with a random past month pair, which stops
 holding once a month has been touched, so the fixture now upserts the later month explicitly with `PUT /jars/{id}/months/{month}`; (3) the live
 Assistant card test ignored cards from earlier runs in the persisted thread. Final full-group run: 14 tests, 0 failures, no rerun of single tests.
+
+### 2026-11-04 · Owner decisions on the two open measurements, and a synthetic jar-suggestion benchmark
+Real device: the owner declined installing a debug build on the physical iPhone; timing stays simulator-only (see the 14/14 group above).
+Jar suggestions: instead of the owner's real notes, a fixed labelled SYNTHETIC set is committed as `TestJarSuggesterSyntheticBenchmark`
+(32 Vietnamese notes over 6 jars: repeats with other amounts, accent-less variants, hashtags, new/one-off/ambiguous/retired/empty notes).
+Result: 23 proposals, 0 wrong, 23/23 answerable rows covered, 9/9 rows without evidence left to the user. This shows the rules behave as
+designed; it does not measure the live model on never-seen notes or the owner's real data.
