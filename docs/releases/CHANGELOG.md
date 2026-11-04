@@ -10,6 +10,25 @@ shared_fields: [status]
 
 # Changelog
 
+## Unreleased — Jars as wallet-style plan cards and local-first native app, 2026-11-04
+
+- Jars (Hũ) stay one optional dimension on an ordinary expense and are shown like wallet cards with a cumulative
+  "Còn có thể chi" plan figure, an always-present "Chưa phân bổ" card, a reconciliation line against the wallets that count
+  toward the total, and a jar detail screen. Monthly targets are kept; the figure is a plan, never labelled a balance
+  ([ADR-029](../decisions/ADR-029-jar-cumulative-plan-presentation.md)). Transactions can be filtered by jar
+  (`GET /transactions?jar_id=`); `GET /jars?month=` gains additive cumulative fields; `PUT /jars/{id}/months/{month}`
+  now upserts for an owned jar.
+- The Finance Assistant can propose jar assignments from notes, categories and similar past transactions through a
+  confirmation card (`propose_assign_jar`); it never writes by itself. A deterministic suggester and a server-built
+  fallback card cover provider failures, and leaked tool markup or JSON is removed from assistant text.
+- Native app is local-first: kept-alive tabs, an encrypted read-through cache, an encrypted per-server outbox with
+  optimistic updates and rollback, and a background-write banner, so tab switches show no blocking loader and saves close
+  at once instead of waiting for the network.
+- Fix: the hidden `jar_context` handoff part no longer renders as a raw `id/version/amount` card in the Assistant thread.
+- Verification: backend `go test ./...` passes; native unit 478/478; simulator `LocalFirstRuntimeTests` 14/14.
+  Not measured: a physical iPhone (owner declined an install) and the owner's real notes (synthetic benchmark only:
+  32 notes, 0 wrong proposals). See the [validation matrix](../work/VALIDATION_MATRIX.md).
+
 ## Unreleased — Evidence-backed report findings, 2026-11-02
 
 - Use canonical budget periods/carryover and exact evidence targets, including
