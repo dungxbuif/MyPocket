@@ -14,6 +14,26 @@ default:
   tags:
     - homelab-mac
 
+# Auto DevOps normally places `build` before `test`. The release build has an
+# explicit need on the MyPocket test gate, so keep the included stages but
+# order test before build to make that DAG valid.
+stages:
+  - test
+  - build
+  - deploy
+  - review
+  - dast
+  - staging
+  - canary
+  - production
+  - incremental rollout 10%
+  - incremental rollout 25%
+  - incremental rollout 50%
+  - incremental rollout 75%
+  - incremental rollout 100%
+  - performance
+  - cleanup
+
 # Auto DevOps' generic buildpack job cannot detect this Go service because the
 # application Dockerfile lives under backend/. Override the included `build`
 # job with the repository's reviewed multi-stage image build.
