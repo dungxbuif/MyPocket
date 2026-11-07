@@ -13,8 +13,19 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: 2026-11-02
+updated: 2026-11-07
 ---
+
+## MCP owner API parity — 2026-11-07
+
+| Check | Result |
+| --- | --- |
+| RED coverage tests before implementation | PASS: failed on missing 15 tools and `jar_id` dispatch |
+| Focused MCP catalog, dispatch, OpenAPI, route, JWT/API-key middleware tests | PASS: 155 tests |
+| MCP owner inventory | PASS: 116 tools; 19 non-owner exclusions |
+| `git diff --check` | PASS |
+| Production authenticated initialize/tools/list/calls | NOT RUN: valid owner credential not supplied |
+| Production deployment/release | NOT RUN: outside this step |
 
 ## Independent UI/UX audit (fresh-context agent) and fixes — 2026-11-03
 

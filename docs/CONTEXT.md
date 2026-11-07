@@ -19,8 +19,20 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-11-02
+updated: 2026-11-07
 ---
+
+## MCP owner API parity — implemented locally, 2026-11-07
+
+MCP now exposes all 116 authenticated owner operations available to a valid JWT
+or `mpk_` API key. The catalog added the 15 previously omitted report, advisor
+entry/action, and portfolio catalog operations, plus `transactions.list.jar_id`
+and report snapshot query fields. Non-owner credential, public, service-token,
+and transport routes remain excluded (19 exclusions). Focused MCP, route,
+OpenAPI, and JWT/API-key middleware gates passed 155 tests; commit `bbfe275`.
+This is source-only evidence: no production image, deployment, route exposure,
+or authenticated production probe has run yet. See the [detail design](work/tickets/MCP-API-PARITY-OWNER-COVERAGE-20261107-DETAIL_DESIGN.md)
+and [MCP contract](ai/mcp-api-parity.md).
 
 ## Local-first reads and writes — in_progress, 2026-11-03
 

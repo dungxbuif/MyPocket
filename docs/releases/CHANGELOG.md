@@ -10,6 +10,17 @@ shared_fields: [status]
 
 # Changelog
 
+## Unreleased — MCP owner API parity, 2026-11-07
+
+- Expose all 116 authenticated owner operations through MCP with the same owner
+  authority as JWT and `mpk_` API-key REST calls.
+- Add report snapshot queries, durable advisor entry/action contracts, portfolio
+  catalog/unit/price-source operations, and the `transactions.list` `jar_id`
+  filter to MCP discovery and dispatch.
+- Keep only non-owner credential, public, service-token, and MCP transport routes
+  outside the tool catalog. Production rollout and authenticated live probes are
+  still separate gates.
+
 ## Unreleased — Jars as wallet-style plan cards and local-first native app, 2026-11-04
 
 - Jars (Hũ) stay one optional dimension on an ordinary expense and are shown like wallet cards with a cumulative
