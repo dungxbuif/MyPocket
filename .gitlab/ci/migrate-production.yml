@@ -17,7 +17,9 @@ migrate:production:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
       when: manual
     - when: never
-  allow_failure: false
+  # Keep the protected admin action available without blocking code-only
+  # main pipelines when the release does not require a schema migration.
+  allow_failure: true
   script:
     - |
       set -eu
