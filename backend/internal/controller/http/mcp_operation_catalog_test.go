@@ -26,6 +26,11 @@ POST /api/v1/ai/advisor/conversation/reset
 POST /api/v1/ai/advisor/messages
 POST /api/v1/ai/advisor/messages/async
 POST /api/v1/ai/advisor/actions/{action_id}/confirm
+PATCH /api/v1/ai/advisor/actions/{action_id}/replace
+POST /api/v1/ai/advisor/entries
+GET /api/v1/ai/advisor/entries/{id}
+POST /api/v1/ai/advisor/entries/{id}/cancel
+POST /api/v1/ai/advisor/entries/{id}/decisions
 GET /api/v1/ai/advisor/runs/{id}
 GET /api/v1/ai/advisor/runs/{id}/events
 POST /api/v1/ai/advisor/runs/{id}/cancel
@@ -81,11 +86,15 @@ POST /api/v1/notifications/{id}/read
 POST /api/v1/notifications/devices
 DELETE /api/v1/notifications/devices/{id}
 GET /api/v1/portfolio/summary
+GET /api/v1/portfolio/catalog
+GET /api/v1/portfolio/catalog-config
 GET /api/v1/portfolio/assets
 POST /api/v1/portfolio/assets
 PATCH /api/v1/portfolio/assets/{id}
 DELETE /api/v1/portfolio/assets/{id}
 PATCH /api/v1/portfolio/assets/{id}/price
+PATCH /api/v1/portfolio/assets/{id}/unit
+PATCH /api/v1/portfolio/assets/{id}/price-source
 GET /api/v1/portfolio/assets/{id}/trades
 POST /api/v1/portfolio/assets/{id}/trades
 POST /api/v1/portfolio/assets/{id}/trade-corrections/preview
@@ -96,6 +105,12 @@ PATCH /api/v1/recurring/{id}
 DELETE /api/v1/recurring/{id}
 POST /api/v1/recurring/run-due
 GET /api/v1/reports/insider
+GET /api/v1/reports/monthly
+GET /api/v1/reports/monthly/transactions
+POST /api/v1/reports/analyses
+GET /api/v1/reports/analyses/latest
+GET /api/v1/reports/analyses/{id}
+POST /api/v1/reports/analyses/{id}/cancel
 GET /api/v1/reports/savings
 GET /api/v1/reports/savings/transactions
 GET /api/v1/sync/capabilities
@@ -124,40 +139,25 @@ DELETE /api/v1/wallets/{id}
 
 // Each exclusion is a full method/path, with a reason checked below.
 var mcpExcludedRouteInventory = map[string]string{
-	"POST /api/v1/login":                                   "credential establishment",
-	"POST /api/v1/auth/refresh":                            "credential exchange",
-	"POST /api/v1/auth/device-login":                       "credential establishment",
-	"GET /api/v1/auth/google":                              "credential establishment",
-	"GET /api/v1/auth/google/callback":                     "credential exchange",
-	"POST /api/v1/auth/mobile/google/exchange":             "credential exchange",
-	"GET /api/v1/health":                                   "public health",
-	"GET /api/v1/changelog":                                "public changelog",
-	"GET /api/v1/changelog/{id}":                           "public changelog",
-	"GET /api/v1/agent/feedback":                           "feedback-agent service token",
-	"GET /api/v1/agent/feedback/{id}/screenshot":           "feedback-agent service token",
-	"PATCH /api/v1/internal/feedback/{id}/status":          "feedback-agent service token",
-	"POST /api/v1/internal/changelog":                      "feedback-agent service token",
-	"GET /api/v1/mcp":                                      "SDK protocol entry point; never a recursive tool",
-	"POST /api/v1/mcp":                                     "SDK protocol entry point; never a recursive tool",
-	"DELETE /api/v1/mcp":                                   "SDK protocol entry point; never a recursive tool",
-	"GET /api/v1/docs/*any":                                "public OpenAPI documentation",
-	"GET /api/v1/reports/monthly":                          "deterministic report read model; not exposed through MCP",
-	"GET /api/v1/reports/monthly/transactions":             "bounded native report drill-down; not exposed through MCP",
-	"POST /api/v1/reports/analyses":                        "on-demand provider job; not exposed through MCP",
-	"GET /api/v1/reports/analyses/latest":                  "saved provider analysis lookup; not exposed through MCP",
-	"GET /api/v1/reports/analyses/{id}":                    "on-demand provider job; not exposed through MCP",
-	"POST /api/v1/reports/analyses/{id}/cancel":            "on-demand provider job; not exposed through MCP",
-	"POST /api/v1/ai/advisor/entries":                      "durable assistant entry acceptance; not exposed through MCP",
-	"GET /api/v1/ai/advisor/entries/{id}":                  "durable assistant entry recovery; not exposed through MCP",
-	"POST /api/v1/ai/advisor/entries/{id}/decisions":       "durable assistant proposal decision; not exposed through MCP",
-	"POST /api/v1/ai/advisor/entries/{id}/cancel":          "durable assistant entry cancellation; not exposed through MCP",
-	"PATCH /api/v1/ai/advisor/actions/{action_id}/replace": "server-authoritative action replacement; not exposed through MCP",
-	"GET /api/v1/portfolio/catalog":                        "market product catalog; not exposed through MCP",
-	"GET /api/v1/portfolio/catalog-config":                 "asset type/unit catalog; not exposed through MCP",
-	"PATCH /api/v1/portfolio/assets/{id}/unit":             "portfolio unit confirmation; not exposed through MCP",
-	"PATCH /api/v1/portfolio/assets/{id}/price-source":     "portfolio price-source binding; not exposed through MCP",
-	"GET /docs":  "public documentation redirect",
-	"GET /docs/": "public documentation redirect",
+	"POST /api/v1/login":                          "credential establishment",
+	"POST /api/v1/auth/refresh":                   "credential exchange",
+	"POST /api/v1/auth/device-login":              "credential establishment",
+	"GET /api/v1/auth/google":                     "credential establishment",
+	"GET /api/v1/auth/google/callback":            "credential exchange",
+	"POST /api/v1/auth/mobile/google/exchange":    "credential exchange",
+	"GET /api/v1/health":                          "public health",
+	"GET /api/v1/changelog":                       "public changelog",
+	"GET /api/v1/changelog/{id}":                  "public changelog",
+	"GET /api/v1/agent/feedback":                  "feedback-agent service token",
+	"GET /api/v1/agent/feedback/{id}/screenshot":  "feedback-agent service token",
+	"PATCH /api/v1/internal/feedback/{id}/status": "feedback-agent service token",
+	"POST /api/v1/internal/changelog":             "feedback-agent service token",
+	"GET /api/v1/mcp":                             "SDK protocol entry point; never a recursive tool",
+	"POST /api/v1/mcp":                            "SDK protocol entry point; never a recursive tool",
+	"DELETE /api/v1/mcp":                          "SDK protocol entry point; never a recursive tool",
+	"GET /api/v1/docs/*any":                       "public OpenAPI documentation",
+	"GET /docs":                                   "public documentation redirect",
+	"GET /docs/":                                  "public documentation redirect",
 }
 
 func mcpInventorySet() map[string]bool {
@@ -241,6 +241,16 @@ func TestMCPAuthenticatedRouteParity(t *testing.T) {
 
 func TestMCPRouteExclusions(t *testing.T) {
 	catalog := DefaultExternalOperationCatalog()
+	// These are protocol/bootstrap/public/service routes, never an escape hatch
+	// for omitting a newly added owner business operation.
+	for route := range mcpExcludedRouteInventory {
+		parts := strings.SplitN(route, " ", 2)
+		path := parts[1]
+		allowed := path == "/api/v1/login" || path == "/api/v1/auth/refresh" || path == "/api/v1/auth/device-login" || path == "/api/v1/auth/google" || path == "/api/v1/auth/google/callback" || path == "/api/v1/auth/mobile/google/exchange" || path == "/api/v1/health" || path == "/api/v1/changelog" || path == "/api/v1/changelog/{id}" || path == "/api/v1/agent/feedback" || path == "/api/v1/agent/feedback/{id}/screenshot" || path == "/api/v1/internal/feedback/{id}/status" || path == "/api/v1/internal/changelog" || path == "/api/v1/mcp" || path == "/api/v1/docs/*any" || path == "/docs" || path == "/docs/"
+		if !allowed {
+			t.Errorf("owner business route cannot be excluded: %s", route)
+		}
+	}
 	for _, operation := range catalog.List() {
 		if reason := mcpExcludedRouteInventory[operation.Method+" "+operation.PathTemplate]; reason != "" {
 			t.Errorf("exposed excluded operation: %s (%s)", operation.Name, reason)

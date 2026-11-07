@@ -357,6 +357,15 @@ func (h *AdvisorHandler) ConfirmAction(c *gin.Context) {
 }
 
 // ReplaceAction replaces only the editable fields of one persisted proposal.
+// @Summary Replace editable fields of a persisted advisor proposal
+// @Tags AI Advisor
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param action_id path string true "Persisted action ID"
+// @Param input body advisorReplaceActionInput true "Conversation, generation, revision and editable patch"
+// @Success 200 {object} map[string]any
+// @Router /api/v1/ai/advisor/actions/{action_id}/replace [patch]
 // The old action remains in history as superseded; the returned action ID is
 // the only identity that can later be confirmed.
 func (h *AdvisorHandler) ReplaceAction(c *gin.Context) {
@@ -390,6 +399,20 @@ func (h *AdvisorHandler) ReplaceAction(c *gin.Context) {
 	OK(c, view)
 }
 
+// EntryPost accepts text and private files into a durable advisor entry.
+// @Summary Accept a durable advisor entry
+// @Tags AI Advisor
+// @Accept multipart/form-data
+// @Produce json
+// @Security BearerAuth
+// @Param client_request_id formData string true "Stable request ID for recovery"
+// @Param conversation_id formData string false "Conversation ID; pair with generation or omit both"
+// @Param generation formData int false "Conversation generation"
+// @Param text formData string false "Entry text"
+// @Param timezone formData string false "IANA timezone"
+// @Param files formData file false "Ordered JPEG, PNG, PDF or XLSX files"
+// @Success 202 {object} map[string]any
+// @Router /api/v1/ai/advisor/entries [post]
 func (h *AdvisorHandler) EntryPost(c *gin.Context) {
 	owner, ok := walletOwner(c)
 	if !ok {
@@ -459,6 +482,14 @@ func (h *AdvisorHandler) EntryPost(c *gin.Context) {
 	c.JSON(http.StatusAccepted, Response{Data: task, Meta: nil})
 }
 
+// EntryGet recovers one durable owner entry.
+// @Summary Read a durable advisor entry
+// @Tags AI Advisor
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Entry task ID"
+// @Success 200 {object} map[string]any
+// @Router /api/v1/ai/advisor/entries/{id} [get]
 func (h *AdvisorHandler) EntryGet(c *gin.Context) {
 	owner, ok := walletOwner(c)
 	if !ok {
@@ -477,6 +508,13 @@ func (h *AdvisorHandler) EntryGet(c *gin.Context) {
 	OK(c, view)
 }
 
+// EntryCancel cancels one durable owner entry.
+// @Summary Cancel a durable advisor entry
+// @Tags AI Advisor
+// @Security BearerAuth
+// @Param id path string true "Entry task ID"
+// @Success 204
+// @Router /api/v1/ai/advisor/entries/{id}/cancel [post]
 func (h *AdvisorHandler) EntryCancel(c *gin.Context) {
 	owner, ok := walletOwner(c)
 	if !ok {
@@ -497,6 +535,15 @@ func (h *AdvisorHandler) EntryCancel(c *gin.Context) {
 // EntryDecision applies one row from an accepted durable entry batch. The
 // decision body carries the batch/item versions; the task path remains the
 // owner-scoped recovery identity.
+// @Summary Decide one proposal in a durable advisor entry
+// @Tags AI Advisor
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Entry task ID"
+// @Param input body advisorEntryDecisionInput true "Task, batch/item versions and decision"
+// @Success 200 {object} map[string]any
+// @Router /api/v1/ai/advisor/entries/{id}/decisions [post]
 func (h *AdvisorHandler) EntryDecision(c *gin.Context) {
 	owner, ok := walletOwner(c)
 	if !ok {

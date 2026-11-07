@@ -92,11 +92,11 @@ func TestMCPAgentDocsCatalogLocatorAndExclusions(t *testing.T) {
 	if contract.Endpoint != "/api/v1/mcp" || contract.CatalogMethod != "tools/list" {
 		t.Fatal("agent catalog locator does not resolve to SDK discovery")
 	}
-	if contract.ToolCount != 101 || len(mcpInventorySet()) != contract.ToolCount {
+	if contract.ToolCount != 116 || len(mcpInventorySet()) != contract.ToolCount {
 		t.Fatalf("published tool count=%d; authenticated inventory=%d", contract.ToolCount, len(mcpInventorySet()))
 	}
-	if len(contract.ExcludedOperations) != 34 || len(mcpExcludedRouteInventory) != 34 {
-		t.Fatal("published exclusions must classify all 34 non-tool routes")
+	if len(contract.ExcludedOperations) != 19 || len(mcpExcludedRouteInventory) != 19 {
+		t.Fatal("published exclusions must classify only the 19 non-owner routes")
 	}
 	seen := map[string]bool{}
 	for _, excluded := range contract.ExcludedOperations {
@@ -123,8 +123,8 @@ func TestMCPMachineCatalogDocsPublishEveryRouteAndSchema(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := mcpInventorySet()
-	if len(listed.Tools) != 101 || len(listed.Tools) != len(want) {
-		t.Fatalf("SDK tools/list publishes %d tools; want 101 authenticated operations", len(listed.Tools))
+	if len(listed.Tools) != 116 || len(listed.Tools) != len(want) {
+		t.Fatalf("SDK tools/list publishes %d tools; want 116 authenticated operations", len(listed.Tools))
 	}
 	names, routes := map[string]bool{}, map[string]bool{}
 	for _, tool := range listed.Tools {

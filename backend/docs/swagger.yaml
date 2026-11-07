@@ -508,14 +508,35 @@ definitions:
         type: integer
       allocation_mode:
         type: string
+      allocation_months:
+        type: integer
       allocation_percent:
         type: number
       calculated_allocation:
         type: integer
+      cumulative_allocated:
+        description: |-
+          Cumulative plan (JAR-12): from the jar's first configured month to the viewed month.
+          RemainingPlan = allocations of the months that have one − all spending assigned to the jar in
+          that range. It is a plan figure, never money held in a wallet; nil when no month has an
+          allocation.
+        type: integer
+      cumulative_spent:
+        type: integer
+      first_config_month:
+        type: string
       jar_id:
         type: string
+      month_variance:
+        description: MonthVariance is the viewed month's allocation minus its spending
+          (only with an allocation).
+        type: integer
+      months_in_range:
+        type: integer
       name:
         type: string
+      remaining_plan:
+        type: integer
       spent:
         type: integer
     type: object
@@ -537,6 +558,16 @@ definitions:
         type: boolean
       over_one_hundred_percent:
         type: boolean
+      plan_exceeds_wallets_by:
+        type: integer
+      remaining_plan_total:
+        description: |-
+          RemainingPlanTotal adds each active jar's non-negative remaining plan (an overspent jar never
+          offsets another jar's remaining plan). UnassignedCumulative is ordinary spending not assigned
+          to any jar since the first jar configuration. WalletsInTotalBalance is the balance of the
+          non-credit wallets that count toward the total; PlanExceedsWalletsBy is how much the plan
+          exceeds that balance (0 when it does not).
+        type: integer
       timezone:
         type: string
       total_allocated:
@@ -545,7 +576,11 @@ definitions:
         type: number
       total_spent:
         type: integer
+      unassigned_cumulative:
+        type: integer
       unassigned_spent:
+        type: integer
+      wallets_in_total_balance:
         type: integer
     type: object
   entity.MarketProduct:
@@ -654,6 +689,10 @@ definitions:
       jars:
         items:
           $ref: '#/definitions/entity.ReportJarPreview'
+        type: array
+      previous_series:
+        items:
+          $ref: '#/definitions/entity.ReportSeriesPoint'
         type: array
       quality_flags:
         items:
@@ -876,7 +915,13 @@ definitions:
     properties:
       category_id:
         type: string
+      drilldown:
+        $ref: '#/definitions/entity.ReportDrilldown'
+      end_exclusive:
+        type: string
       fact_ref:
+        type: string
+      from:
         type: string
       id:
         type: string
@@ -897,9 +942,17 @@ definitions:
     properties:
       amount:
         type: integer
+      bucket:
+        type: string
       category_id:
         type: string
+      drilldown:
+        $ref: '#/definitions/entity.ReportDrilldown'
       name:
+        type: string
+      share_bps:
+        type: integer
+      target_id:
         type: string
       transaction_count:
         type: integer
@@ -937,6 +990,8 @@ definitions:
         type: integer
       delta:
         type: integer
+      drilldown:
+        $ref: '#/definitions/entity.ReportDrilldown'
       fact_ref:
         type: string
       name:
@@ -945,9 +1000,13 @@ definitions:
         type: integer
       previous_count:
         type: integer
+      target_id:
+        type: string
     type: object
   entity.ReportDrilldown:
     properties:
+      category_bucket:
+        type: string
       category_ids:
         items:
           type: string
@@ -956,6 +1015,8 @@ definitions:
         type: string
       from:
         type: string
+      target_id:
+        type: string
       type:
         type: string
       wallet_id:
@@ -963,6 +1024,8 @@ definitions:
     type: object
   entity.ReportInsight:
     properties:
+      action_hint:
+        type: string
       as_of:
         type: string
       body:
@@ -980,6 +1043,12 @@ definitions:
       id:
         type: string
       kind:
+        type: string
+      metrics:
+        items:
+          $ref: '#/definitions/entity.ReportMetric'
+        type: array
+      period_label:
         type: string
       rule_version:
         type: string
@@ -1008,6 +1077,13 @@ definitions:
         type: string
       spent:
         type: integer
+    type: object
+  entity.ReportMetric:
+    properties:
+      amount:
+        type: integer
+      label:
+        type: string
     type: object
   entity.ReportRange:
     properties:
@@ -1404,12 +1480,52 @@ definitions:
       generation:
         type: integer
     type: object
+  httpapi.advisorEntryDecisionInput:
+    properties:
+      batch_id:
+        type: string
+      batch_version:
+        type: integer
+      client_request_id:
+        type: string
+      decision:
+        type: string
+      item_id:
+        type: string
+      item_version:
+        type: integer
+      task_id:
+        type: string
+    type: object
+  httpapi.advisorJarContextInput:
+    properties:
+      jar_id:
+        type: string
+      month:
+        type: string
+    type: object
   httpapi.advisorMessageInput:
     properties:
       client_request_id:
         type: string
+      jar_context:
+        $ref: '#/definitions/httpapi.advisorJarContextInput'
+      report_context:
+        $ref: '#/definitions/usecase.ReportFollowUpRequest'
       text:
         type: string
+    type: object
+  httpapi.advisorReplaceActionInput:
+    properties:
+      conversation_id:
+        type: string
+      generation:
+        type: integer
+      patch:
+        additionalProperties: {}
+        type: object
+      revision:
+        type: integer
     type: object
   httpapi.advisorSubmitResponse:
     properties:
@@ -1782,6 +1898,13 @@ definitions:
       refresh_token:
         type: string
     type: object
+  httpapi.reportAnalysisBeginInput:
+    properties:
+      client_request_id:
+        type: string
+      snapshot_id:
+        type: string
+    type: object
   httpapi.timezoneInput:
     properties:
       initialize_only:
@@ -1979,6 +2102,15 @@ definitions:
       token:
         type: string
     type: object
+  usecase.ReportFollowUpRequest:
+    properties:
+      analysis_id:
+        type: string
+      finding_id:
+        type: string
+      snapshot_id:
+        type: string
+    type: object
   usecase.UserProfile:
     properties:
       created_at:
@@ -2090,6 +2222,35 @@ paths:
       summary: Confirm a persisted Finance Assistant action
       tags:
       - AI Advisor
+  /api/v1/ai/advisor/actions/{action_id}/replace:
+    patch:
+      consumes:
+      - application/json
+      parameters:
+      - description: Persisted action ID
+        in: path
+        name: action_id
+        required: true
+        type: string
+      - description: Conversation, generation, revision and editable patch
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.advisorReplaceActionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Replace editable fields of a persisted advisor proposal
+      tags:
+      - AI Advisor
   /api/v1/ai/advisor/capabilities:
     get:
       produces:
@@ -2154,6 +2315,115 @@ paths:
       security:
       - BearerAuth: []
       summary: Explicitly clear the owner's Finance Assistant conversation
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/entries:
+    post:
+      consumes:
+      - multipart/form-data
+      parameters:
+      - description: Stable request ID for recovery
+        in: formData
+        name: client_request_id
+        required: true
+        type: string
+      - description: Conversation ID; pair with generation or omit both
+        in: formData
+        name: conversation_id
+        type: string
+      - description: Conversation generation
+        in: formData
+        name: generation
+        type: integer
+      - description: Entry text
+        in: formData
+        name: text
+        type: string
+      - description: IANA timezone
+        in: formData
+        name: timezone
+        type: string
+      - description: Ordered JPEG, PNG, PDF or XLSX files
+        in: formData
+        name: files
+        type: file
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Accept a durable advisor entry
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/entries/{id}:
+    get:
+      parameters:
+      - description: Entry task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Read a durable advisor entry
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/entries/{id}/cancel:
+    post:
+      parameters:
+      - description: Entry task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+      security:
+      - BearerAuth: []
+      summary: Cancel a durable advisor entry
+      tags:
+      - AI Advisor
+  /api/v1/ai/advisor/entries/{id}/decisions:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Entry task ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Task, batch/item versions and decision
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.advisorEntryDecisionInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Decide one proposal in a durable advisor entry
       tags:
       - AI Advisor
   /api/v1/ai/advisor/messages:
@@ -4707,6 +4977,98 @@ paths:
       summary: Materialize due recurring transaction occurrences
       tags:
       - Recurring
+  /api/v1/reports/analyses:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Snapshot and stable client request ID
+        in: body
+        name: input
+        required: true
+        schema:
+          $ref: '#/definitions/httpapi.reportAnalysisBeginInput'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "202":
+          description: Accepted
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Start a report snapshot analysis
+      tags:
+      - Reports
+  /api/v1/reports/analyses/{id}:
+    get:
+      parameters:
+      - description: Analysis ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Read a report analysis
+      tags:
+      - Reports
+  /api/v1/reports/analyses/{id}/cancel:
+    post:
+      parameters:
+      - description: Analysis ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Cancel a report analysis
+      tags:
+      - Reports
+  /api/v1/reports/analyses/latest:
+    get:
+      parameters:
+      - description: Report snapshot ID
+        in: query
+        name: snapshot_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      security:
+      - BearerAuth: []
+      summary: Read the latest analysis for a report snapshot
+      tags:
+      - Reports
   /api/v1/reports/insider:
     get:
       parameters:
@@ -4801,6 +5163,14 @@ paths:
         in: query
         name: offset
         type: integer
+      - description: Report snapshot ID; pair with target_id
+        in: query
+        name: snapshot_id
+        type: string
+      - description: Snapshot evidence target ID; pair with snapshot_id
+        in: query
+        name: target_id
+        type: string
       produces:
       - application/json
       responses:
@@ -4937,6 +5307,11 @@ paths:
       - Transactions
   /api/v1/transactions:
     get:
+      parameters:
+      - description: Jar UUID or unassigned
+        in: query
+        name: jar_id
+        type: string
       produces:
       - application/json
       responses:

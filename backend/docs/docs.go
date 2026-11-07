@@ -157,6 +157,52 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/ai/advisor/actions/{action_id}/replace": {
+            "patch": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Replace editable fields of a persisted advisor proposal",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Persisted action ID",
+                        "name": "action_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Conversation, generation, revision and editable patch",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.advisorReplaceActionInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/ai/advisor/capabilities": {
             "get": {
                 "security": [
@@ -256,6 +302,180 @@ const docTemplate = `{
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/entity.AdvisorResetResult"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/entries": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Accept a durable advisor entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Stable request ID for recovery",
+                        "name": "client_request_id",
+                        "in": "formData",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Conversation ID; pair with generation or omit both",
+                        "name": "conversation_id",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Conversation generation",
+                        "name": "generation",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Entry text",
+                        "name": "text",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "string",
+                        "description": "IANA timezone",
+                        "name": "timezone",
+                        "in": "formData"
+                    },
+                    {
+                        "type": "file",
+                        "description": "Ordered JPEG, PNG, PDF or XLSX files",
+                        "name": "files",
+                        "in": "formData"
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/entries/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Read a durable advisor entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entry task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/entries/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Cancel a durable advisor entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entry task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    }
+                }
+            }
+        },
+        "/api/v1/ai/advisor/entries/{id}/decisions": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "AI Advisor"
+                ],
+                "summary": "Decide one proposal in a durable advisor entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Entry task ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Task, batch/item versions and decision",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.advisorEntryDecisionInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -4262,6 +4482,154 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/reports/analyses": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Start a report snapshot analysis",
+                "parameters": [
+                    {
+                        "description": "Snapshot and stable client request ID",
+                        "name": "input",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/httpapi.reportAnalysisBeginInput"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    },
+                    "202": {
+                        "description": "Accepted",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/analyses/latest": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Read the latest analysis for a report snapshot",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Report snapshot ID",
+                        "name": "snapshot_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/analyses/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Read a report analysis",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Analysis ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/reports/analyses/{id}/cancel": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Reports"
+                ],
+                "summary": "Cancel a report analysis",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Analysis ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/reports/insider": {
             "get": {
                 "security": [
@@ -4418,6 +4786,18 @@ const docTemplate = `{
                         "type": "integer",
                         "description": "Page offset",
                         "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Report snapshot ID; pair with target_id",
+                        "name": "snapshot_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Snapshot evidence target ID; pair with snapshot_id",
+                        "name": "target_id",
                         "in": "query"
                     }
                 ],
@@ -4637,6 +5017,14 @@ const docTemplate = `{
                     "Transactions"
                 ],
                 "summary": "List transactions",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Jar UUID or unassigned",
+                        "name": "jar_id",
+                        "in": "query"
+                    }
+                ],
                 "responses": {
                     "200": {
                         "description": "OK",
@@ -6474,17 +6862,40 @@ const docTemplate = `{
                 "allocation_mode": {
                     "type": "string"
                 },
+                "allocation_months": {
+                    "type": "integer"
+                },
                 "allocation_percent": {
                     "type": "number"
                 },
                 "calculated_allocation": {
                     "type": "integer"
                 },
+                "cumulative_allocated": {
+                    "description": "Cumulative plan (JAR-12): from the jar's first configured month to the viewed month.\nRemainingPlan = allocations of the months that have one − all spending assigned to the jar in\nthat range. It is a plan figure, never money held in a wallet; nil when no month has an\nallocation.",
+                    "type": "integer"
+                },
+                "cumulative_spent": {
+                    "type": "integer"
+                },
+                "first_config_month": {
+                    "type": "string"
+                },
                 "jar_id": {
                     "type": "string"
                 },
+                "month_variance": {
+                    "description": "MonthVariance is the viewed month's allocation minus its spending (only with an allocation).",
+                    "type": "integer"
+                },
+                "months_in_range": {
+                    "type": "integer"
+                },
                 "name": {
                     "type": "string"
+                },
+                "remaining_plan": {
+                    "type": "integer"
                 },
                 "spent": {
                     "type": "integer"
@@ -6518,6 +6929,13 @@ const docTemplate = `{
                 "over_one_hundred_percent": {
                     "type": "boolean"
                 },
+                "plan_exceeds_wallets_by": {
+                    "type": "integer"
+                },
+                "remaining_plan_total": {
+                    "description": "RemainingPlanTotal adds each active jar's non-negative remaining plan (an overspent jar never\noffsets another jar's remaining plan). UnassignedCumulative is ordinary spending not assigned\nto any jar since the first jar configuration. WalletsInTotalBalance is the balance of the\nnon-credit wallets that count toward the total; PlanExceedsWalletsBy is how much the plan\nexceeds that balance (0 when it does not).",
+                    "type": "integer"
+                },
                 "timezone": {
                     "type": "string"
                 },
@@ -6530,7 +6948,13 @@ const docTemplate = `{
                 "total_spent": {
                     "type": "integer"
                 },
+                "unassigned_cumulative": {
+                    "type": "integer"
+                },
                 "unassigned_spent": {
+                    "type": "integer"
+                },
+                "wallets_in_total_balance": {
                     "type": "integer"
                 }
             }
@@ -6695,6 +7119,12 @@ const docTemplate = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/entity.ReportJarPreview"
+                    }
+                },
+                "previous_series": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.ReportSeriesPoint"
                     }
                 },
                 "quality_flags": {
@@ -7033,7 +7463,16 @@ const docTemplate = `{
                 "category_id": {
                     "type": "string"
                 },
+                "drilldown": {
+                    "$ref": "#/definitions/entity.ReportDrilldown"
+                },
+                "end_exclusive": {
+                    "type": "string"
+                },
                 "fact_ref": {
+                    "type": "string"
+                },
+                "from": {
                     "type": "string"
                 },
                 "id": {
@@ -7065,10 +7504,22 @@ const docTemplate = `{
                 "amount": {
                     "type": "integer"
                 },
+                "bucket": {
+                    "type": "string"
+                },
                 "category_id": {
                     "type": "string"
                 },
+                "drilldown": {
+                    "$ref": "#/definitions/entity.ReportDrilldown"
+                },
                 "name": {
+                    "type": "string"
+                },
+                "share_bps": {
+                    "type": "integer"
+                },
+                "target_id": {
                     "type": "string"
                 },
                 "transaction_count": {
@@ -7126,6 +7577,9 @@ const docTemplate = `{
                 "delta": {
                     "type": "integer"
                 },
+                "drilldown": {
+                    "$ref": "#/definitions/entity.ReportDrilldown"
+                },
                 "fact_ref": {
                     "type": "string"
                 },
@@ -7137,12 +7591,18 @@ const docTemplate = `{
                 },
                 "previous_count": {
                     "type": "integer"
+                },
+                "target_id": {
+                    "type": "string"
                 }
             }
         },
         "entity.ReportDrilldown": {
             "type": "object",
             "properties": {
+                "category_bucket": {
+                    "type": "string"
+                },
                 "category_ids": {
                     "type": "array",
                     "items": {
@@ -7153,6 +7613,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "from": {
+                    "type": "string"
+                },
+                "target_id": {
                     "type": "string"
                 },
                 "type": {
@@ -7166,6 +7629,9 @@ const docTemplate = `{
         "entity.ReportInsight": {
             "type": "object",
             "properties": {
+                "action_hint": {
+                    "type": "string"
+                },
                 "as_of": {
                     "type": "string"
                 },
@@ -7191,6 +7657,15 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/entity.ReportMetric"
+                    }
+                },
+                "period_label": {
                     "type": "string"
                 },
                 "rule_version": {
@@ -7233,6 +7708,17 @@ const docTemplate = `{
                 },
                 "spent": {
                     "type": "integer"
+                }
+            }
+        },
+        "entity.ReportMetric": {
+            "type": "object",
+            "properties": {
+                "amount": {
+                    "type": "integer"
+                },
+                "label": {
+                    "type": "string"
                 }
             }
         },
@@ -7839,14 +8325,75 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.advisorEntryDecisionInput": {
+            "type": "object",
+            "properties": {
+                "batch_id": {
+                    "type": "string"
+                },
+                "batch_version": {
+                    "type": "integer"
+                },
+                "client_request_id": {
+                    "type": "string"
+                },
+                "decision": {
+                    "type": "string"
+                },
+                "item_id": {
+                    "type": "string"
+                },
+                "item_version": {
+                    "type": "integer"
+                },
+                "task_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "httpapi.advisorJarContextInput": {
+            "type": "object",
+            "properties": {
+                "jar_id": {
+                    "type": "string"
+                },
+                "month": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.advisorMessageInput": {
             "type": "object",
             "properties": {
                 "client_request_id": {
                     "type": "string"
                 },
+                "jar_context": {
+                    "$ref": "#/definitions/httpapi.advisorJarContextInput"
+                },
+                "report_context": {
+                    "$ref": "#/definitions/usecase.ReportFollowUpRequest"
+                },
                 "text": {
                     "type": "string"
+                }
+            }
+        },
+        "httpapi.advisorReplaceActionInput": {
+            "type": "object",
+            "properties": {
+                "conversation_id": {
+                    "type": "string"
+                },
+                "generation": {
+                    "type": "integer"
+                },
+                "patch": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "revision": {
+                    "type": "integer"
                 }
             }
         },
@@ -8424,6 +8971,17 @@ const docTemplate = `{
                 }
             }
         },
+        "httpapi.reportAnalysisBeginInput": {
+            "type": "object",
+            "properties": {
+                "client_request_id": {
+                    "type": "string"
+                },
+                "snapshot_id": {
+                    "type": "string"
+                }
+            }
+        },
         "httpapi.timezoneInput": {
             "type": "object",
             "properties": {
@@ -8721,6 +9279,20 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "token": {
+                    "type": "string"
+                }
+            }
+        },
+        "usecase.ReportFollowUpRequest": {
+            "type": "object",
+            "properties": {
+                "analysis_id": {
+                    "type": "string"
+                },
+                "finding_id": {
+                    "type": "string"
+                },
+                "snapshot_id": {
                     "type": "string"
                 }
             }

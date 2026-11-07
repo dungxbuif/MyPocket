@@ -542,6 +542,54 @@ type externalAIEntryInput struct {
 	Files     []externalUploadFile `json:"files"`
 }
 
+type externalAdvisorEntryInput struct {
+	ClientRequestID string               `json:"client_request_id"`
+	ConversationID  string               `json:"conversation_id"`
+	Generation      int64                `json:"generation"`
+	Text            string               `json:"text"`
+	Timezone        string               `json:"timezone"`
+	Files           []externalUploadFile `json:"files"`
+}
+
+// The replacement endpoint accepts a bounded union of editable fields. The
+// canonical action store validates which fields belong to the persisted action.
+type externalAdvisorActionPatch struct {
+	Name                 *string  `json:"name"`
+	Type                 *string  `json:"type"`
+	OpeningBalance       *int64   `json:"opening_balance"`
+	IsInTotal            *bool    `json:"is_in_total"`
+	Description          *string  `json:"description"`
+	TargetAmount         *int64   `json:"target_amount"`
+	TargetDate           *string  `json:"target_date"`
+	CreditLimit          *string  `json:"credit_limit"`
+	LastStatementBalance *string  `json:"last_statement_balance"`
+	StatementDay         *string  `json:"statement_day"`
+	PaymentDueDay        *string  `json:"payment_due_day"`
+	Month                *string  `json:"month"`
+	AllocationMode       *string  `json:"allocation_mode"`
+	AllocationAmount     *int64   `json:"allocation_amount"`
+	AllocationPercent    *float64 `json:"allocation_percent"`
+	LimitAmount          *int64   `json:"limit_amount"`
+	WalletID             *string  `json:"wallet_id"`
+	CategoryID           *string  `json:"category_id"`
+	StartDate            *string  `json:"start_date"`
+	EndDate              *string  `json:"end_date"`
+	Amount               *int64   `json:"amount"`
+	OccurredAt           *string  `json:"occurred_at"`
+	Note                 *string  `json:"note"`
+	IncludedInReports    *bool    `json:"included_in_reports"`
+	SourceWalletID       *string  `json:"source_wallet_id"`
+	DestinationWalletID  *string  `json:"destination_wallet_id"`
+	Kind                 *string  `json:"kind"`
+	ParentID             *string  `json:"parent_id"`
+	WalletIDs            []string `json:"wallet_ids"`
+	IconKey              *string  `json:"icon_key"`
+	Assignments          []struct {
+		TransactionID string  `json:"transaction_id"`
+		JarID         *string `json:"jar_id"`
+	} `json:"assignments"`
+}
+
 type externalFeedbackInput struct {
 	feedbackInput
 	Screenshot externalUploadFile `json:"screenshot"`
@@ -602,9 +650,13 @@ func encodeExternalFeedback(arguments map[string]any) ([]byte, string, error) {
 func encodeExternalMultipart(arguments map[string]any) ([]byte, string, error) {
 	var output bytes.Buffer
 	writer := multipart.NewWriter(&output)
-	for _, name := range []string{"request_id", "text", "timezone"} {
+	for _, name := range []string{"request_id", "client_request_id", "conversation_id", "generation", "text", "timezone"} {
 		if value, exists := arguments[name]; exists {
-			if err := writer.WriteField(name, value.(string)); err != nil {
+			text, err := externalQueryValue(value)
+			if err != nil {
+				return nil, "", err
+			}
+			if err := writer.WriteField(name, text); err != nil {
 				return nil, "", err
 			}
 		}
@@ -762,7 +814,7 @@ func DefaultExternalOperationCatalog() *ExternalOperationCatalog {
 	add("wallets.create", "POST", "/api/v1/wallets", walletInput{})
 	add("wallets.update", "PATCH", "/api/v1/wallets/{id}", walletInput{})
 	add("wallets.delete", "DELETE", "/api/v1/wallets/{id}", nil)
-	add("transactions.list", "GET", "/api/v1/transactions", nil)
+	add("transactions.list", "GET", "/api/v1/transactions", nil, "jar_id")
 	add("transactions.create", "POST", "/api/v1/transactions", transactionCreateInput{})
 	add("transactions.update", "PATCH", "/api/v1/transactions/{id}", transactionInput{})
 	add("transactions.delete", "DELETE", "/api/v1/transactions/{id}", transactionDeleteInput{})
@@ -806,11 +858,15 @@ func DefaultExternalOperationCatalog() *ExternalOperationCatalog {
 	add("travel.activate", "POST", "/api/v1/travel/events/{id}/activate", nil)
 	add("travel.deactivate", "POST", "/api/v1/travel/events/{id}/deactivate", nil)
 	add("portfolio.summary", "GET", "/api/v1/portfolio/summary", nil)
+	add("portfolio.catalog", "GET", "/api/v1/portfolio/catalog", nil)
+	add("portfolio.catalog_config", "GET", "/api/v1/portfolio/catalog-config", nil)
 	add("portfolio.asset.list", "GET", "/api/v1/portfolio/assets", nil)
 	add("portfolio.asset.create", "POST", "/api/v1/portfolio/assets", portfolioAssetInput{})
 	add("portfolio.asset.update", "PATCH", "/api/v1/portfolio/assets/{id}", portfolioAssetUpdateInput{})
 	add("portfolio.asset.delete", "DELETE", "/api/v1/portfolio/assets/{id}", nil)
 	add("portfolio.asset.update_price", "PATCH", "/api/v1/portfolio/assets/{id}/price", portfolioPriceInput{})
+	add("portfolio.asset.update_unit", "PATCH", "/api/v1/portfolio/assets/{id}/unit", portfolioUnitInput{})
+	add("portfolio.asset.update_price_source", "PATCH", "/api/v1/portfolio/assets/{id}/price-source", portfolioPriceSourceInput{})
 	add("portfolio.trade.list", "GET", "/api/v1/portfolio/assets/{id}/trades", nil)
 	add("portfolio.trade.create", "POST", "/api/v1/portfolio/assets/{id}/trades", portfolioTradeInput{})
 	add("portfolio.trade.preview_correction", "POST", "/api/v1/portfolio/assets/{id}/trade-corrections/preview", portfolioTradeCorrectionInput{})
@@ -818,6 +874,12 @@ func DefaultExternalOperationCatalog() *ExternalOperationCatalog {
 	add("reports.savings", "GET", "/api/v1/reports/savings", nil, "month", "wallet_id")
 	add("reports.savings.transactions", "GET", "/api/v1/reports/savings/transactions", nil, "month", "wallet_id", "section", "kind", "limit", "offset")
 	add("reports.insider", "GET", "/api/v1/reports/insider", nil, "month", "wallet_id", "category_id")
+	add("reports.monthly", "GET", "/api/v1/reports/monthly", nil, "month", "wallet_id", "granularity")
+	add("reports.monthly.transactions", "GET", "/api/v1/reports/monthly/transactions", nil, "month", "wallet_id", "category_id", "kind", "limit", "offset", "snapshot_id", "target_id")
+	add("reports.analysis.create", "POST", "/api/v1/reports/analyses", reportAnalysisBeginInput{})
+	add("reports.analysis.latest", "GET", "/api/v1/reports/analyses/latest", nil, "snapshot_id")
+	add("reports.analysis.get", "GET", "/api/v1/reports/analyses/{id}", nil)
+	add("reports.analysis.cancel", "POST", "/api/v1/reports/analyses/{id}/cancel", nil)
 	add("notifications.list", "GET", "/api/v1/notifications", nil)
 	add("notifications.read", "POST", "/api/v1/notifications/{id}/read", nil)
 	add("notifications.device.register", "POST", "/api/v1/notifications/devices", usecase.PushTokenInput{})
@@ -843,6 +905,11 @@ func DefaultExternalOperationCatalog() *ExternalOperationCatalog {
 	add("advisor.run.events", "GET", "/api/v1/ai/advisor/runs/{id}/events", nil, "after_seq")
 	add("advisor.run.cancel", "POST", "/api/v1/ai/advisor/runs/{id}/cancel", nil)
 	add("advisor.action.confirm", "POST", "/api/v1/ai/advisor/actions/{action_id}/confirm", advisorConfirmActionInput{})
+	add("advisor.action.replace", "PATCH", "/api/v1/ai/advisor/actions/{action_id}/replace", advisorReplaceActionInput{})
+	add("advisor.entry.create", "POST", "/api/v1/ai/advisor/entries", externalAdvisorEntryInput{})
+	add("advisor.entry.get", "GET", "/api/v1/ai/advisor/entries/{id}", nil)
+	add("advisor.entry.cancel", "POST", "/api/v1/ai/advisor/entries/{id}/cancel", nil)
+	add("advisor.entry.decide", "POST", "/api/v1/ai/advisor/entries/{id}/decisions", advisorEntryDecisionInput{})
 	add("sync.capabilities", "GET", "/api/v1/sync/capabilities", nil)
 	for i := range operations {
 		op := &operations[i]
@@ -863,7 +930,9 @@ func DefaultExternalOperationCatalog() *ExternalOperationCatalog {
 			op.Idempotency = "required"
 		case "advisor.messages_async":
 			op.Async = true
-		case "ai_entry.process":
+		case "advisor.action.replace":
+			op.InputSchema["properties"].(map[string]any)["patch"] = externalInputSchema(reflect.TypeFor[externalAdvisorActionPatch]())
+		case "ai_entry.process", "advisor.entry.create":
 			op.BodyEncoding = "multipart"
 			op.Async = true
 			properties := op.InputSchema["properties"].(map[string]any)

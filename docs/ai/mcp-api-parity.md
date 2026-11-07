@@ -37,9 +37,11 @@ second static list of schemas in Swagger. Each entry publishes its stable
 domain-qualified `name`, a description containing its canonical `METHOD /path`,
 and an `inputSchema` with a closed object (`additionalProperties: false`). Path
 parameters are required fields; handler business validation still applies.
-The current tested inventory is 101 named tools and 32 explicitly excluded
-method/path entries. New routes must update the catalog or exclusion manifest;
-route parity tests fail on unclassified growth.
+The current tested inventory is 116 named tools covering every authenticated
+owner operation, with 19 excluded credential-establishment, public,
+service-token, and MCP transport method/path entries. Owner operations cannot be
+excluded merely because a client is an agent. New owner routes must update the
+catalog; route parity tests fail on unclassified growth.
 
 This JSON locator is consumed by the documentation contract tests. Exclusions
 are route classifications, not permission scopes:
@@ -52,7 +54,7 @@ are route classifications, not permission scopes:
   "authority": "same_owner_user_operations_no_scopes",
   "catalog_method": "tools/list",
   "schema_field": "inputSchema",
-  "tool_count": 101,
+  "tool_count": 116,
   "excluded_operations": [
     "POST /api/v1/login",
     "POST /api/v1/auth/refresh",
@@ -71,21 +73,6 @@ are route classifications, not permission scopes:
     "POST /api/v1/mcp",
     "DELETE /api/v1/mcp",
     "GET /api/v1/docs/*any",
-    "GET /api/v1/reports/monthly",
-    "GET /api/v1/reports/monthly/transactions",
-    "POST /api/v1/reports/analyses",
-    "GET /api/v1/reports/analyses/{id}",
-    "GET /api/v1/reports/analyses/latest",
-    "POST /api/v1/reports/analyses/{id}/cancel",
-    "POST /api/v1/ai/advisor/entries",
-    "GET /api/v1/ai/advisor/entries/{id}",
-    "POST /api/v1/ai/advisor/entries/{id}/decisions",
-    "POST /api/v1/ai/advisor/entries/{id}/cancel",
-    "PATCH /api/v1/ai/advisor/actions/{action_id}/replace",
-    "GET /api/v1/portfolio/catalog",
-    "GET /api/v1/portfolio/catalog-config",
-    "PATCH /api/v1/portfolio/assets/{id}/unit",
-    "PATCH /api/v1/portfolio/assets/{id}/price-source",
     "GET /docs",
     "GET /docs/"
   ]
@@ -98,6 +85,21 @@ token and are never granted by user credentials. Health, changelog and docs are
 public surfaces; the MCP endpoint itself never becomes a recursive tool.
 
 ## Calls, owner binding and writes
+
+JWT/session REST, full-owner `mpk_` REST, and MCP expose the same owner
+operations. MCP preserves request fields and query filters: `transactions.list`
+accepts `jar_id` (a jar UUID or `unassigned`), and
+`reports.monthly.transactions` accepts `snapshot_id` and `target_id` together
+for exact report-evidence drill-down, as well as the canonical month, wallet,
+category, kind, limit and offset filters.
+
+Monthly reports and analysis use `reports.monthly`,
+`reports.monthly.transactions`, and `reports.analysis.{create,latest,get,cancel}`.
+`reports.analysis.create` takes `snapshot_id` and a stable `client_request_id`;
+read its accepted ID with `reports.analysis.get` rather than resubmitting after
+uncertain acceptance. Portfolio discovery and edits use `portfolio.catalog`,
+`portfolio.catalog_config`, `portfolio.asset.update_unit`, and
+`portfolio.asset.update_price_source`, preserving canonical `expected_version`.
 
 Named descriptors encode JSON, query, path or multipart fields and dispatch
 in-process through the canonical Gin router. The original bearer is validated
@@ -184,6 +186,18 @@ canonical receipt/recovery route before considering another write. Transport
 bounds are not per-owner AI quotas and do not expand authorization.
 
 ## AI entry, async work and attachments
+
+Durable Assistant intake is also available as `advisor.entry.create`,
+`advisor.entry.get`, `advisor.entry.cancel`, and `advisor.entry.decide`.
+Create accepts `client_request_id`, optional `conversation_id` plus `generation`
+(supply both or omit both), `text`, `timezone`, and the same ordered `files`
+representation described below. MCP converts those fields to canonical
+multipart form data. Recover the accepted task ID through `advisor.entry.get`.
+Decisions carry the canonical task/batch/item identities, versions, decision,
+and client request ID. `advisor.action.replace` preserves the conversation,
+generation and revision binding and exposes the bounded union of editable patch
+fields; the persisted action determines which fields are permitted. None of
+these operations bypasses the canonical review or confirmation contract.
 
 `ai_entry.process` accepts `request_id`, `text`, `timezone` and an ordered
 `files` array. Each file has `filename`, `mime_type` and `base64` (standard

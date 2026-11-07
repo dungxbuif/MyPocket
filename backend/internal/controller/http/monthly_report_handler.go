@@ -85,6 +85,8 @@ func monthlyReportMapError(c *gin.Context, err error) {
 // @Param kind query string false "all, income, or expense"
 // @Param limit query int false "Page size up to 100"
 // @Param offset query int false "Page offset"
+// @Param snapshot_id query string false "Report snapshot ID; pair with target_id"
+// @Param target_id query string false "Snapshot evidence target ID; pair with snapshot_id"
 // @Success 200 {object} entity.SavingsTransactionPage
 // @Router /api/v1/reports/monthly/transactions [get]
 func (h *MonthlyReportHandler) ListTransactions(c *gin.Context) {

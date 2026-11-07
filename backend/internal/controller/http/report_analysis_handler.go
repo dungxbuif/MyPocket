@@ -29,6 +29,14 @@ func (r *Router) RegisterReportAnalysisRoutes(h *ReportAnalysisHandler) {
 	g.POST("/analyses/:id/cancel", h.Cancel)
 }
 
+// Latest returns the retained analysis for a report snapshot.
+// @Summary Read the latest analysis for a report snapshot
+// @Tags Reports
+// @Produce json
+// @Security BearerAuth
+// @Param snapshot_id query string true "Report snapshot ID"
+// @Success 200 {object} map[string]any
+// @Router /api/v1/reports/analyses/latest [get]
 func (h *ReportAnalysisHandler) Latest(c *gin.Context) {
 	owner, ok := transactionOwner(c)
 	if !ok {
@@ -52,6 +60,16 @@ func (h *ReportAnalysisHandler) Latest(c *gin.Context) {
 	OK(c, latest)
 }
 
+// Begin starts or recovers a report analysis using a stable client request ID.
+// @Summary Start a report snapshot analysis
+// @Tags Reports
+// @Accept json
+// @Produce json
+// @Security BearerAuth
+// @Param input body reportAnalysisBeginInput true "Snapshot and stable client request ID"
+// @Success 202 {object} map[string]any
+// @Success 200 {object} map[string]any
+// @Router /api/v1/reports/analyses [post]
 func (h *ReportAnalysisHandler) Begin(c *gin.Context) {
 	owner, ok := transactionOwner(c)
 	if !ok {
@@ -82,6 +100,14 @@ func (h *ReportAnalysisHandler) Begin(c *gin.Context) {
 	c.JSON(http.StatusAccepted, Response{Data: response, Meta: nil})
 }
 
+// Get reads one owner-bound analysis.
+// @Summary Read a report analysis
+// @Tags Reports
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Analysis ID"
+// @Success 200 {object} map[string]any
+// @Router /api/v1/reports/analyses/{id} [get]
 func (h *ReportAnalysisHandler) Get(c *gin.Context) {
 	owner, ok := transactionOwner(c)
 	if !ok {
@@ -100,6 +126,14 @@ func (h *ReportAnalysisHandler) Get(c *gin.Context) {
 	OK(c, analysis)
 }
 
+// Cancel cancels one owner-bound analysis.
+// @Summary Cancel a report analysis
+// @Tags Reports
+// @Produce json
+// @Security BearerAuth
+// @Param id path string true "Analysis ID"
+// @Success 200 {object} map[string]any
+// @Router /api/v1/reports/analyses/{id}/cancel [post]
 func (h *ReportAnalysisHandler) Cancel(c *gin.Context) {
 	owner, ok := transactionOwner(c)
 	if !ok {

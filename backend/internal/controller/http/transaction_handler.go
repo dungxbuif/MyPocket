@@ -361,6 +361,7 @@ func (h *TransactionHandler) DeleteTransfer(c *gin.Context) {
 // @Tags Transactions
 // @Produce json
 // @Security BearerAuth
+// @Param jar_id query string false "Jar UUID or unassigned"
 // @Success 200 {array} entity.Transaction
 // @Failure 401 {object} Problem
 // @Router /api/v1/transactions [get]
