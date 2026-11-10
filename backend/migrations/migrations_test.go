@@ -54,16 +54,16 @@ func TestMigrationHistoryIsOrderedAndHasCurrentRolloutFiles(t *testing.T) {
 		}
 	}
 
-	for _, version := range []int{35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53} {
+	for _, version := range []int{35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54} {
 		if _, ok := versions[version]; !ok {
 			t.Fatalf("current release migration %06d is missing", version)
 		}
 	}
-	if got := ordered[len(ordered)-1]; got != 53 {
-		t.Fatalf("latest migration=%06d, want 000053", got)
+	if got := ordered[len(ordered)-1]; got != 54 {
+		t.Fatalf("latest migration=%06d, want 000054", got)
 	}
 
-	for _, version := range []int{36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53} {
+	for _, version := range []int{36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54} {
 		name := fmt.Sprintf("%06d_", version)
 		foundDown := false
 		for _, entry := range entries {

@@ -10,34 +10,35 @@ import (
 // in the executable. Empty service values still register their routes so route
 // contract verification never depends on a live database or provider.
 type ApplicationHandlers struct {
-	Auth          *AuthHandler
-	Profile       *ProfileHandler
-	Home          *HomeHandler
-	Category      *CategoryHandler
-	Wallet        *WalletHandler
-	Transaction   *TransactionHandler
-	Middleware    *AuthMiddleware
-	Notification  *NotificationHandler
-	APIKey        *APIKeyHandler
-	Budget        *BudgetHandler
-	BudgetSeries  *BudgetSeriesHandler
-	BudgetReport  *BudgetReportHandler
-	Savings       *SavingsReportHandler
-	Jar           *JarHandler
-	Month         *MonthHandler
-	Recurring     *RecurringHandler
-	Credit        *CreditHandler
-	Travel        *TravelHandler
-	Portfolio     *PortfolioHandler
-	AssetMarket   *AssetMarketHandler
-	Insider       *InsiderHandler
-	MonthlyReport *MonthlyReportHandler
+	Auth           *AuthHandler
+	Profile        *ProfileHandler
+	Home           *HomeHandler
+	Category       *CategoryHandler
+	Wallet         *WalletHandler
+	Transaction    *TransactionHandler
+	Middleware     *AuthMiddleware
+	Notification   *NotificationHandler
+	APIKey         *APIKeyHandler
+	Budget         *BudgetHandler
+	BudgetSeries   *BudgetSeriesHandler
+	BudgetReport   *BudgetReportHandler
+	Savings        *SavingsReportHandler
+	Jar            *JarHandler
+	Month          *MonthHandler
+	Recurring      *RecurringHandler
+	Credit         *CreditHandler
+	Travel         *TravelHandler
+	Portfolio      *PortfolioHandler
+	AssetMarket    *AssetMarketHandler
+	Insider        *InsiderHandler
+	MonthlyReport  *MonthlyReportHandler
 	ReportAnalysis *ReportAnalysisHandler
-	AIEntry       *AIEntryHandler
-	Advisor       *AdvisorHandler
-	Feedback      *FeedbackHandler
-	Changelog     *ChangelogHandler
-	FeedbackAgent *FeedbackAgentMiddleware
+	AIEntry        *AIEntryHandler
+	Advisor        *AdvisorHandler
+	AssistantProxy *FinanceAssistantProxy
+	Feedback       *FeedbackHandler
+	Changelog      *ChangelogHandler
+	FeedbackAgent  *FeedbackAgentMiddleware
 }
 
 type ApplicationRouterOptions struct {
@@ -72,7 +73,11 @@ func NewApplicationRouter(handlers ApplicationHandlers, options ApplicationRoute
 	r.RegisterMonthlyReportRoutes(applicationHandler(handlers.MonthlyReport))
 	r.RegisterReportAnalysisRoutes(applicationHandler(handlers.ReportAnalysis))
 	r.RegisterAIEntryRoutes(applicationHandler(handlers.AIEntry))
-	r.RegisterAdvisorRoutes(applicationHandler(handlers.Advisor))
+	if handlers.AssistantProxy != nil && handlers.AssistantProxy.Enabled() {
+		r.RegisterFinanceAssistantProxyRoutes(handlers.AssistantProxy, applicationHandler(handlers.Advisor))
+	} else {
+		r.RegisterAdvisorRoutes(applicationHandler(handlers.Advisor))
+	}
 	r.RegisterFeedbackRoutes(mcpFeedbackHandler(applicationHandler(handlers.Feedback)), applicationHandler(handlers.Changelog), applicationHandler(handlers.FeedbackAgent))
 	docs := options.DocsHandler
 	if docs == nil {

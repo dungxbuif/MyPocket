@@ -2,6 +2,8 @@
 
 This folder stores Architecture Decision Records and other durable technical decisions.
 
+- [ADR-030 — External owner-isolated Finance Assistant](ADR-030-external-finance-assistant.md): private Python/LangGraph runtime behind MyPocket auth, channel-isolated transcripts, shared memory and read-only finance access.
+
 - [ADR-022 — Owner-bound native refresh](ADR-022-owner-bound-native-refresh.md): metadata-preserving HTTP and atomic session replacement prevent old refresh overwriting later login/logout.
 
 - [ADR-021 — Full-owner API keys](ADR-021-full-owner-api-keys.md): owner-approved removal of per-key scopes; same-owner JWT-equivalent user operations, lifecycle checks and separate service-token boundary.

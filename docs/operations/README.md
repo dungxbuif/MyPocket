@@ -7,3 +7,4 @@ This folder contains deployment, environment, and release operation instructions
 - `DEPLOYMENT.md`: deploy process.
 - `ENVIRONMENTS.md`: environment inventory.
 - `RELEASE_CHECKLIST.md`: pre-release and post-release checks.
+- `FINANCE_ASSISTANT_SERVICE.md`: external assistant release, secrets, health, backup and restore.

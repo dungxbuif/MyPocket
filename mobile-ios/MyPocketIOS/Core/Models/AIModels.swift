@@ -293,6 +293,30 @@ struct AdvisorRunModel: Codable, Sendable {
     var createdAt: String? = nil
 }
 
+struct AdvisorChannelAdapterModel: Codable, Identifiable, Sendable {
+    var id: String
+    var provider: String
+    var label: String
+    var externalIdentity: String
+    var status: String
+    var createdAt: String
+}
+
+struct AdvisorTelegramAdapterCreateModel: Codable, Sendable {
+    var label: String
+    var botToken: String
+}
+
+struct AdvisorPairingModel: Codable, Sendable {
+    var code: String
+    var expiresInSeconds: Int
+    var telegramDeepLink: String?
+}
+
+struct AdvisorChannelRevokeModel: Codable, Sendable {
+    var revoked: Bool
+}
+
 /// Additive native contract for a typed assistant entry batch. Older advisor
 /// responses simply omit this payload and remain renderable as read-only chat.
 struct AdvisorEntryBatchItemModel: Codable, Identifiable, Sendable {

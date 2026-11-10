@@ -10,6 +10,41 @@ shared_fields: [status, linked_decisions]
 
 # Architecture
 
+## External Finance Assistant runtime — 2026-11-10
+
+The maintained native app continues to use `/api/v1/ai/advisor/*`. When
+`FINANCE_ASSISTANT_URL` and a shared assertion secret are configured, Gin
+authenticates the owner and forwards only the advisor/chat and channel-adapter
+routes to a private Python/FastAPI service. Native clients never call the model
+or Telegram directly. Deterministic overview, AI entry and legacy action
+confirmation remain in Go.
+
+The service uses LangGraph for channel-specific execution/checkpoints, LangMem
+for explicit memory extraction, and a separate PostgreSQL database for messages,
+runs, memories, Telegram bindings and dreaming candidates. Every owner has an
+opaque workspace directory containing reviewable Markdown projections; the
+database, not Markdown, is authoritative. App and Telegram conversations are
+isolated by channel while trusted owner memory is shared. Model input is bounded
+to the most recent configured message window (30 by default); current finance
+facts are fetched again instead of being promoted into memory.
+
+MyPocket signs two-minute HS256 assertions (`iss=mypocket`,
+`aud=finance-assistant`) and creates exact-operation `mpa_` delegations for
+finance reads. App delegations last at most ten minutes and are revoked after
+the request; a Telegram owner delegation lasts at most 90 days and rotates when
+a new adapter is added. Telegram is the first adapter, not a special agent
+runtime: multiple adapters per owner are supported and future channels use the
+same adapter boundary.
+
+The first external-service release is read-only for financial data. It emits
+channel-neutral text and typed `metric_group`, `wallet_balances` and
+`transaction_list` parts for native rendering. Telegram receives a text
+projection. Authenticated Telegram webhooks are persisted and acknowledged
+before model work; the worker leases updates with bounded retries so Telegram is
+not held open for a model response. No model call can write the ledger; existing Go-owned confirmation
+flows remain authoritative. See [ADR-030](../decisions/ADR-030-external-finance-assistant.md)
+and the [API contract](FINANCE_ASSISTANT_API.md).
+
 ## Authenticated MCP boundary — 2026-10-20
 
 The local API candidate exposes `/api/v1/mcp` through the official

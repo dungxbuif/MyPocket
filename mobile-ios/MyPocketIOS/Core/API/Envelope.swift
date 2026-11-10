@@ -69,6 +69,7 @@ struct APIRequest<Response: Decodable & Sendable>: Sendable {
     let auth: APIAuth
     let idempotencyKey: String?
     let expectedOwnerID: String?
+    let timeoutInterval: TimeInterval?
 
     init(
         path: String,
@@ -76,7 +77,8 @@ struct APIRequest<Response: Decodable & Sendable>: Sendable {
         body: Data? = nil,
         auth: APIAuth = .session,
         idempotencyKey: String? = nil,
-        expectedOwnerID: String? = nil
+        expectedOwnerID: String? = nil,
+        timeoutInterval: TimeInterval? = nil
     ) {
         self.path = path
         self.method = method
@@ -84,5 +86,6 @@ struct APIRequest<Response: Decodable & Sendable>: Sendable {
         self.auth = auth
         self.idempotencyKey = idempotencyKey
         self.expectedOwnerID = expectedOwnerID
+        self.timeoutInterval = timeoutInterval
     }
 }

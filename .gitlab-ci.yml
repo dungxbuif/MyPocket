@@ -67,6 +67,28 @@ test:mypocket-release:
     - cd ..
     - ./scripts/mypocket-rollout-preflight.sh
 
+test:finance-assistant:
+  stage: test
+  image: python:3.13
+  services:
+    - name: postgres:17-alpine
+      alias: postgres
+  variables:
+    POSTGRES_USER: finance_assistant
+    POSTGRES_PASSWORD: finance_assistant_test
+    POSTGRES_DB: finance_assistant
+    FINANCE_ASSISTANT_DATABASE_URL: postgresql://finance_assistant:finance_assistant_test@postgres:5432/finance_assistant
+    TEST_FINANCE_ASSISTANT_DATABASE_URL: postgresql://finance_assistant:finance_assistant_test@postgres:5432/finance_assistant
+    FINANCE_ASSISTANT_ASSERTION_SECRET: test-finance-assistant-shared-secret-at-least-32-bytes
+  rules:
+    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
+    - if: '$CI_COMMIT_TAG'
+    - when: never
+  script:
+    - python -m pip install --no-cache-dir './finance-assistant[test]'
+    - python -m finance_assistant.migrate
+    - python -m pytest -q finance-assistant/tests
+
 build:
   stage: build
   image: docker:29.1-cli
@@ -81,6 +103,7 @@ build:
     action: prepare
   needs:
     - job: test:mypocket-release
+    - job: test:finance-assistant
   rules:
     - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH'
     - if: '$CI_COMMIT_TAG'
@@ -108,6 +131,22 @@ build:
         *) echo 'image push did not return an immutable registry digest' >&2; exit 1 ;;
       esac
       printf 'BUILT_IMAGE_REF=%s\n' "${digest_ref}" > build.env
+      assistant_tag="registry.dungxbuif.com/mypocket-finance-assistant:${CI_COMMIT_SHA}"
+      docker buildx build --pull \
+        --platform linux/amd64,linux/arm64 \
+        --file finance-assistant/Dockerfile \
+        --tag "${assistant_tag}" \
+        --push \
+        --metadata-file assistant-build-metadata.json \
+        finance-assistant
+      assistant_digest="$(awk -F'"' '/"containerimage.digest"/ {print $4; exit}' assistant-build-metadata.json)"
+      test -n "${assistant_digest}"
+      assistant_digest_ref="registry.dungxbuif.com/mypocket-finance-assistant@${assistant_digest}"
+      case "${assistant_digest_ref}" in
+        registry.dungxbuif.com/mypocket-finance-assistant@sha256:*) ;;
+        *) echo 'assistant image push did not return an immutable registry digest' >&2; exit 1 ;;
+      esac
+      printf 'BUILT_ASSISTANT_IMAGE_REF=%s\n' "${assistant_digest_ref}" >> build.env
   artifacts:
     reports:
       dotenv: build.env
@@ -128,20 +167,25 @@ promote:homelab-ops:
       apk add --no-cache ca-certificates git
       : "${HOMELAB_OPS_PUSH_TOKEN:?HOMELAB_OPS_PUSH_TOKEN must be protected and masked}"
       : "${BUILT_IMAGE_REF:?build job did not publish BUILT_IMAGE_REF}"
+      : "${BUILT_ASSISTANT_IMAGE_REF:?build job did not publish BUILT_ASSISTANT_IMAGE_REF}"
       case "${BUILT_IMAGE_REF}" in
         registry.dungxbuif.com/mypocket-api@sha256:*) ;;
         *) echo 'promotion requires an immutable MyPocket registry digest' >&2; exit 1 ;;
       esac
+      case "${BUILT_ASSISTANT_IMAGE_REF}" in
+        registry.dungxbuif.com/mypocket-finance-assistant@sha256:*) ;;
+        *) echo 'promotion requires an immutable Finance Assistant registry digest' >&2; exit 1 ;;
+      esac
       ops_url="${HOMELAB_OPS_REPO_URL:-https://gitlab.dungxbuif.com/dungxbuif/homelab-ops.git}"
       ops_dir="${CI_PROJECT_DIR}/.homelab-ops"
       git clone --branch main "https://oauth2:${HOMELAB_OPS_PUSH_TOKEN}@${ops_url#https://}" "$ops_dir"
-      python3 - "$ops_dir/environments/prod/mypocket.json" "$CI_COMMIT_TAG" "$CI_COMMIT_SHA" "$BUILT_IMAGE_REF" <<'PY'
+      python3 - "$ops_dir/environments/prod/mypocket.json" "$CI_COMMIT_TAG" "$CI_COMMIT_SHA" "$BUILT_IMAGE_REF" "$BUILT_ASSISTANT_IMAGE_REF" <<'PY'
       import json
       import pathlib
       import sys
 
       path = pathlib.Path(sys.argv[1])
-      source_tag, source_commit, image_ref = sys.argv[2:]
+      source_tag, source_commit, image_ref, assistant_image_ref = sys.argv[2:]
       data = json.loads(path.read_text())
       if data.get("app") != "mypocket":
           raise SystemExit("ops manifest is not the MyPocket manifest")
@@ -149,7 +193,9 @@ promote:homelab-ops:
       data["source_commit"] = source_commit
       data["promotion_tag"] = source_tag.replace("prod-", "mypocket-prod-", 1)
       data["image"] = image_ref
+      data["assistant_image"] = assistant_image_ref
       data["migration"]["image"] = image_ref
+      data["assistant_migration"]["image"] = assistant_image_ref
       path.write_text(json.dumps(data, indent=2) + "\n")
       PY
       cd "$ops_dir"

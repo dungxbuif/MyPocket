@@ -1,5 +1,25 @@
 # Hỏi trợ lý tài chính trên iPhone
 
+## Kết nối nhiều bot Telegram (bản candidate)
+
+Trong tab **Trợ lý**, mở menu dấu ba chấm và chọn **Kết nối Telegram**. Mỗi bot
+cần một nhãn riêng và token mới lấy từ BotFather. App gửi token một lần qua
+MyPocket; token được dịch vụ kiểm tra, mã hóa và không hiển thị lại. Sau khi tạo
+adapter, chọn **Ghép nối / Mở Telegram** và gửi lệnh `/start` bằng deep link
+trong vòng mười phút. Mỗi tài khoản có thể thêm nhiều bot/adapters và thu hồi
+từng adapter độc lập.
+
+Không dán token bot vào chat hỗ trợ, issue hoặc tài liệu. Nếu token từng xuất
+hiện ở đó, hãy revoke bằng BotFather và tạo token khác trước khi cấu hình. Xóa
+adapter sẽ gỡ webhook và binding; xóa adapter cuối cùng cũng thu hồi quyền đọc
+dữ liệu được cấp cho Telegram.
+
+Hội thoại trong app và từng kênh Telegram có lịch sử riêng, nhưng các ghi nhớ
+đã được tin cậy có thể dùng chung theo tài khoản. Telegram chỉ hiển thị bản text;
+app vẫn có thể hiển thị thẻ số liệu rich component. Bản service mới chỉ đọc và
+phân tích dữ liệu tài chính; nó không tự tạo/sửa/xóa giao dịch, ví, hũ hay ngân
+sách. Tính năng này đã được kiểm thử local nhưng chưa phải tuyên bố production.
+
 Hướng dẫn này mô tả bản native hiện tại. Async chat và dọn lịch sử sau thời gian
 không hoạt động đã được ghi nhận triển khai production ngày 16/10/2026;
 [bản ghi triển khai](../operations/DEPLOYMENT.md) phân biệt các bản local,
@@ -15,10 +35,11 @@ vào ô chat, sửa lại nếu cần rồi nhấn mũi tên **Gửi**.
 - Ở cỡ chữ trợ năng, dùng menu chọn màn hình có nhãn đầy đủ thay thanh bốn tab.
   Đóng bàn phím trước khi đổi màn; câu hỏi chưa gửi vẫn giữ trong phiên hiện tại.
 - Ô nhập mở rộng tối đa bốn dòng; nội dung dài hơn cuộn bên trong ô.
-- App gửi chat qua API bất đồng bộ và nhận mã lượt chạy trước khi model hoàn
-  tất. **Dừng xử lý** dùng mã đó để yêu cầu hủy; backend chặn ghi câu trả lời
-  muộn của lượt đã hủy. Ngắt ngay model ở process khác vẫn cần cơ chế truyền
-  tín hiệu hủy riêng, không được suy ra từ kiểm thử cùng process.
+- Runtime Go cũ gửi chat bất đồng bộ và trả mã lượt chạy trước khi model hoàn
+  tất. Khi bật service Python candidate, route giữ cùng DTO nhưng hiện hoàn tất
+  model trước khi trả; app dùng timeout 250 giây khớp giới hạn service 240 giây.
+  Hủy cross-process/durable queue cho runtime mới chưa được triển khai và không
+  được suy ra từ tên route `/messages/async`.
 - **Chat mới** hủy best-effort các provider run đang chạy trong process khi
   reset được xác nhận; reset replay không hủy run mới. Provider work ở process
   khác vẫn dựa vào generation/lease guard để từ chối ghi muộn.

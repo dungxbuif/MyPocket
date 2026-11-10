@@ -7,6 +7,23 @@ updated: 2026-09-22
 
 # Finance Assistant `/assistant`
 
+## External runtime and channel adapters — candidate 2026-11-10
+
+The native page keeps its current chat shell and rich-part renderer. The header
+overflow adds **Kết nối Telegram**, opening an owner-scoped list where the user
+can add a bot token once, request a pairing deep link, open Telegram, or revoke
+an adapter. Multiple adapters are allowed when labels are distinct. Bot tokens
+are write-only secrets and never appear in list rows or errors.
+
+The app channel renders `metric_group`, `wallet_balances` and
+`transaction_list`; Telegram receives a safe text projection. Channel history
+is not merged. Trusted memory may cross channels. Empty reset clears the app
+channel while an explicit conversation ID clears only that conversation.
+
+This candidate's capability response disables direct writes and proposal
+actions. Existing ledger-side confirmation cards remain owned by the Go backend
+and must not be reimplemented as model-side tool calls.
+
 ## Approved native reference correction — 2026-11-01
 
 This section supersedes the historical pinned-overview, continuous-panel,

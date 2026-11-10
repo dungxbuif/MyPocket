@@ -19,8 +19,25 @@ shared_fields:
   - active_phase
   - active_ticket
   - active_bug
-updated: 2026-11-07
+updated: 2026-11-10
 ---
+
+## External Finance Assistant and Telegram adapters — implementation verified locally, release blocked, 2026-11-10
+
+The approved service split is implemented on the isolated feature worktree:
+MyPocket remains auth/ledger authority; a private Python service owns LangGraph
+execution, LangMem memory, PostgreSQL state and per-owner Markdown projections.
+Native iOS keeps `/api/v1/ai/advisor/*` and rich parts. Owners can add multiple
+Telegram bots and pair each adapter independently. The service is read-only for
+finance data; legacy Go action confirmation remains separate.
+
+Fresh local proof: backend 872 tests; Python 32 tests without PostgreSQL and 33
+with PostgreSQL 17; assistant Python 3.13 image build; promotion/preflight
+contract tests. Production
+is not deployed. Remaining gates: rotate the Telegram token exposed in chat,
+merge to `main`, verify protected runners/secrets/tag rules, create exactly one
+owner source tag `prod-<semver>`, then let the app and homelab-ops pipelines
+build, promote, migrate, deploy and health-check immutable digests.
 
 ## MCP owner API parity — implemented locally, 2026-11-07
 

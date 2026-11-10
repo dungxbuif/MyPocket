@@ -9,6 +9,144 @@ private struct AssistantViewportHeightPreferenceKey: PreferenceKey {
     }
 }
 
+private struct AdvisorChannelAdaptersView: View {
+    let api: FinanceAPI
+    @Environment(\.openURL) private var openURL
+    @State private var adapters: [AdvisorChannelAdapterModel] = []
+    @State private var label = "Telegram cá nhân"
+    @State private var botToken = ""
+    @State private var loading = true
+    @State private var saving = false
+    @State private var busyAdapterID: String?
+    @State private var message: String?
+    @State private var error: String?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            MPStatusMessage(
+                text: "Tạo bot bằng BotFather, dán token một lần. MyPocket xác minh bot, mã hóa token trong database và tự cấu hình webhook.",
+                tone: .info
+            )
+            MPSurfaceCard {
+                VStack(alignment: .leading, spacing: 12) {
+                    MPText("Thêm Telegram bot", style: .emphasis)
+                    MPTextField(title: "Tên hiển thị", text: $label, placeholder: "Telegram cá nhân", accessibilityIdentifier: "assistant-channel-label")
+                    MPSecureField(title: "Bot token", text: $botToken, placeholder: "Token mới từ BotFather", accessibilityIdentifier: "assistant-channel-token")
+                    MPButton("Kết nối", isLoading: saving) {
+                        Task { await createTelegramAdapter() }
+                    }
+                    .disabled(!canCreate)
+                    .accessibilityIdentifier("assistant-channel-create")
+                }
+            }
+            if loading {
+                MPLoadingView(label: "Đang tải các kênh đã kết nối...")
+            } else if adapters.isEmpty {
+                MPStatusMessage(text: "Chưa có kênh Telegram nào.", tone: .info)
+            } else {
+                VStack(alignment: .leading, spacing: 10) {
+                    MPText("Các bot của bạn", style: .emphasis)
+                    ForEach(adapters) { adapter in
+                        MPSurfaceCard {
+                            VStack(alignment: .leading, spacing: 8) {
+                                MPText(adapter.label, style: .emphasis)
+                                MPText("@\(adapter.externalIdentity) · \(adapter.status == "active" ? "Đang hoạt động" : "Đã thu hồi")", style: .secondary)
+                                if adapter.status == "active" {
+                                    HStack(spacing: 8) {
+                                        MPButton("Mở Telegram", style: .secondary, isLoading: busyAdapterID == adapter.id, fullWidth: false) {
+                                            Task { await openPairing(for: adapter) }
+                                        }
+                                        MPButton("Thu hồi", style: .destructive, isLoading: busyAdapterID == adapter.id, fullWidth: false) {
+                                            Task { await revoke(adapter) }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if let message { MPStatusMessage(text: message, tone: .success) }
+            if let error { MPStatusMessage(text: error, tone: .danger) }
+        }
+        .task { await reload() }
+        .accessibilityIdentifier("assistant-channel-adapters-content")
+    }
+
+    private var canCreate: Bool {
+        !saving && !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && botToken.count >= 20
+    }
+
+    private func reload() async {
+        loading = true
+        defer { loading = false }
+        do {
+            adapters = try await api.advisorChannels()
+            error = nil
+        } catch let apiError as APIError {
+            error = apiError.userMessage
+        } catch {
+            self.error = "Không thể tải danh sách kênh."
+        }
+    }
+
+    private func createTelegramAdapter() async {
+        guard canCreate else { return }
+        saving = true
+        defer { saving = false }
+        do {
+            let adapter = try await api.createAdvisorTelegramChannel(
+                label: label.trimmingCharacters(in: .whitespacesAndNewlines),
+                botToken: botToken.trimmingCharacters(in: .whitespacesAndNewlines)
+            )
+            botToken = ""
+            adapters.append(adapter)
+            message = "Đã kết nối @\(adapter.externalIdentity)."
+            error = nil
+        } catch let apiError as APIError {
+            error = apiError.userMessage
+        } catch {
+            self.error = "Token không hợp lệ hoặc Telegram chưa sẵn sàng."
+        }
+    }
+
+    private func openPairing(for adapter: AdvisorChannelAdapterModel) async {
+        busyAdapterID = adapter.id
+        defer { busyAdapterID = nil }
+        do {
+            let pairing = try await api.pairAdvisorChannel(id: adapter.id)
+            guard let value = pairing.telegramDeepLink, let url = URL(string: value) else {
+                error = "Không tạo được liên kết Telegram."
+                return
+            }
+            openURL(url)
+            message = "Liên kết ghép đôi có hiệu lực trong \(pairing.expiresInSeconds / 60) phút."
+            error = nil
+        } catch let apiError as APIError {
+            error = apiError.userMessage
+        } catch {
+            self.error = "Không thể tạo liên kết Telegram."
+        }
+    }
+
+    private func revoke(_ adapter: AdvisorChannelAdapterModel) async {
+        busyAdapterID = adapter.id
+        defer { busyAdapterID = nil }
+        do {
+            _ = try await api.revokeAdvisorChannel(id: adapter.id)
+            if let index = adapters.firstIndex(where: { $0.id == adapter.id }) {
+                adapters[index].status = "revoked"
+            }
+            message = "Đã thu hồi \(adapter.label)."
+            error = nil
+        } catch let apiError as APIError {
+            error = apiError.userMessage
+        } catch {
+            self.error = "Không thể thu hồi bot Telegram."
+        }
+    }
+}
+
 private struct AssistantContentFramePreferenceKey: PreferenceKey {
     static let defaultValue = CGRect.zero
     static func reduce(value: inout CGRect, nextValue: () -> CGRect) {
@@ -360,6 +498,7 @@ struct AssistantView: View {
     @State private var error: String?
     @State private var walletActionMessage: String?
     @State private var overviewPresented = false
+    @State private var channelsPresented = false
     @State private var keyboardVisible = false
     @State private var dismissKeyboardRequest = 0
     @State private var composerFocusRequest = 0
@@ -748,6 +887,11 @@ struct AssistantView: View {
         } footer: {
             MPButton("Đóng", style: .secondary) { overviewPresented = false }
         }
+        .mpFormBottomSheet(isPresented: $channelsPresented, title: "Kênh kết nối", accessibilityIdentifier: "assistant-channel-adapters", onClose: { channelsPresented = false }) {
+            AdvisorChannelAdaptersView(api: api)
+        } footer: {
+            MPButton("Đóng", style: .secondary) { channelsPresented = false }
+        }
         .mpConfirmDialog(
             isPresented: $resetConfirmation,
             title: "Bắt đầu chat mới?",
@@ -760,6 +904,7 @@ struct AssistantView: View {
 
     private var headerActions: [MPOverflowAction] {
         var actions: [MPOverflowAction] = []
+        actions.append(MPOverflowAction(title: "Kết nối Telegram") { channelsPresented = true })
         if overview != nil {
             actions.append(MPOverflowAction(title: "Tổng quan tài chính") { overviewPresented = true })
         }
@@ -1038,7 +1183,8 @@ struct AssistantView: View {
             let result: AdvisorAsyncSubmitModel = try await api.client.send(APIRequest(
                 path: "/ai/advisor/messages/async", method: .post,
                 body: try JSONEncoder.mypocket.encode(request),
-                idempotencyKey: clientRequestID, expectedOwnerID: ownerID
+                idempotencyKey: clientRequestID, expectedOwnerID: ownerID,
+                timeoutInterval: 250
             ))
             guard pendingMessageBinding.wrappedValue?.input.clientRequestID == clientRequestID else { return }
             advisorSubmitRequestID = nil

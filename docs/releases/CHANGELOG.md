@@ -10,6 +10,28 @@ shared_fields: [status]
 
 # Changelog
 
+## Unreleased — External Finance Assistant and Telegram adapters, 2026-11-10
+
+- Add a private Python/FastAPI service using LangGraph, LangMem and PostgreSQL
+  for durable owner memory, channel-specific history, dreaming candidates and
+  opaque per-owner Markdown workspaces.
+- Keep the native `/api/v1/ai/advisor/*` facade. MyPocket verifies the owner,
+  signs short-lived service assertions and issues revocable exact-operation
+  delegated credentials; iOS never receives provider credentials.
+- Add multiple Telegram adapters per owner with one-time bot-token entry,
+  encrypted storage, Bot API validation, secret-token webhooks, expiring
+  single-use pairing and adapter revocation.
+- Add native adapter management and preserve rich `metric_group`,
+  `wallet_balances` and `transaction_list` parts in app history. Telegram uses a
+  text projection and does not share its transcript with the app.
+- The new runtime is read-only for financial data. Existing Go-owned action
+  confirmation remains unchanged; reserved `action_drafts` schema is not a
+  shipped capability.
+- Local evidence: Go 872 tests, Python 32 tests without PostgreSQL plus 33 tests
+  with PostgreSQL 17, and a Python
+  3.13 image build. Production release, live provider/webhook/device UAT and
+  backup/restore drill remain pending.
+
 ## Unreleased — MCP owner API parity, 2026-11-07
 
 - Expose all 116 authenticated owner operations through MCP with the same owner

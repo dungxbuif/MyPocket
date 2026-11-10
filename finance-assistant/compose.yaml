@@ -1,0 +1,55 @@
+services:
+  finance-assistant:
+    build: .
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      finance-assistant-migrate:
+        condition: service_completed_successfully
+    volumes:
+      - finance_assistant_data:/data
+    networks: [assistant_private]
+    restart: unless-stopped
+  finance-assistant-migrate:
+    build: .
+    command: ["python", "-m", "finance_assistant.migrate"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [assistant_private]
+    restart: "no"
+  finance-assistant-worker:
+    build: .
+    command: ["python", "-m", "finance_assistant.worker"]
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      finance-assistant-migrate:
+        condition: service_completed_successfully
+    volumes:
+      - finance_assistant_data:/data
+    networks: [assistant_private]
+    restart: unless-stopped
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: finance_assistant
+      POSTGRES_USER: finance_assistant
+      POSTGRES_PASSWORD: change-me
+    volumes:
+      - finance_assistant_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U finance_assistant"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [assistant_private]
+volumes:
+  finance_assistant_data:
+  finance_assistant_postgres:
+networks:
+  assistant_private:
+    internal: true

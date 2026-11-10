@@ -150,6 +150,9 @@ final class APIClient: @unchecked Sendable {
         try validateExpectedOwner(request)
         let url = try makeURL(path: request.path)
         var urlRequest = URLRequest(url: url)
+        if let timeoutInterval = request.timeoutInterval {
+            urlRequest.timeoutInterval = timeoutInterval
+        }
         urlRequest.httpMethod = request.method.rawValue
         urlRequest.httpBody = request.body
         urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")

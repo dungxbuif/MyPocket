@@ -60,4 +60,16 @@ final class AIModelsTests: XCTestCase {
         let legacyProcess = try JSONDecoder.mypocket.decode(EntryProcessModel.self, from: Data(legacy.utf8))
         XCTAssertTrue(legacyProcess.attachmentDiagnostics.isEmpty)
     }
+
+    func testTelegramAdapterAndPairingDecode() throws {
+        let adapterFixture = #"{"id":"adapter-1","provider":"telegram","label":"Cá nhân","external_identity":"mypocket_bot","status":"active","created_at":"2026-11-10T00:00:00Z"}"#
+        let adapter = try JSONDecoder.mypocket.decode(AdvisorChannelAdapterModel.self, from: Data(adapterFixture.utf8))
+        XCTAssertEqual(adapter.externalIdentity, "mypocket_bot")
+        XCTAssertEqual(adapter.status, "active")
+
+        let pairingFixture = #"{"code":"pair-code","expires_in_seconds":600,"telegram_deep_link":"https://t.me/mypocket_bot?start=pair-code"}"#
+        let pairing = try JSONDecoder.mypocket.decode(AdvisorPairingModel.self, from: Data(pairingFixture.utf8))
+        XCTAssertEqual(pairing.expiresInSeconds, 600)
+        XCTAssertEqual(pairing.telegramDeepLink, "https://t.me/mypocket_bot?start=pair-code")
+    }
 }

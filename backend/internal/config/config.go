@@ -15,6 +15,8 @@ type Config struct {
 	AIStoreUsage              bool
 	AIAdvisorRunLeasesEnabled bool
 	AIAdvisorGroundingEnabled bool
+	FinanceAssistantURL       string
+	FinanceAssistantSecret    string
 	OCRAPIURL                 string
 	OCRAPIKey                 string
 	S3Endpoint                string
@@ -60,6 +62,8 @@ func Load() Config {
 		AIStoreUsage:              getenvBool("AI_STORE_USAGE", true),
 		AIAdvisorRunLeasesEnabled: getenvBool("AI_ADVISOR_RUN_LEASES_ENABLED", false),
 		AIAdvisorGroundingEnabled: getenvBool("AI_ADVISOR_GROUNDING_ENABLED", false),
+		FinanceAssistantURL:       getenv("FINANCE_ASSISTANT_URL", ""),
+		FinanceAssistantSecret:    getenvOrFile("FINANCE_ASSISTANT_ASSERTION_SECRET", "FINANCE_ASSISTANT_ASSERTION_SECRET_FILE", ""),
 		OCRAPIURL:                 getenv("OCR_API_URL", "https://ocr.dungxbuif.com"),
 		OCRAPIKey:                 getenv("OCR_API_KEY", ""),
 		S3Endpoint:                getenv("S3_ENDPOINT", ""),
@@ -101,6 +105,19 @@ func Load() Config {
 func getenv(key, defaultValue string) string {
 	if value := os.Getenv(key); value != "" {
 		return value
+	}
+	return defaultValue
+}
+
+func getenvOrFile(key, fileKey, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	if path := strings.TrimSpace(os.Getenv(fileKey)); path != "" {
+		contents, err := os.ReadFile(path)
+		if err == nil && strings.TrimSpace(string(contents)) != "" {
+			return strings.TrimSpace(string(contents))
+		}
 	}
 	return defaultValue
 }

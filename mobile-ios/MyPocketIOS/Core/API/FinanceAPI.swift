@@ -638,10 +638,16 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/advisor/messages", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
     }
 
-    /// Starts the advisor run without waiting for provider completion. The
-    /// returned run ID lets the UI cancel even the first request.
+    /// Uses the advisor run DTO. The external service candidate may complete
+    /// provider work before acknowledging, so the request matches its 240s bound.
     func beginAdvisorMessage(_ input: AdvisorMessageInputModel) async throws -> AdvisorAsyncSubmitModel {
-        try await client.send(APIRequest(path: "/ai/advisor/messages/async", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
+        try await client.send(APIRequest(
+            path: "/ai/advisor/messages/async",
+            method: .post,
+            body: try body(input),
+            idempotencyKey: input.clientRequestID,
+            timeoutInterval: 250
+        ))
     }
 
     /// Confirms a server-persisted assistant action. Financial fields are
@@ -728,6 +734,33 @@ final class FinanceAPI: @unchecked Sendable {
 
     func cancelAdvisorRun(id: String) async throws {
         let _: EmptyResponse = try await client.send(APIRequest(path: "/ai/advisor/runs/\(id)/cancel", method: .post, idempotencyKey: UUID().uuidString))
+    }
+
+    func advisorChannels() async throws -> [AdvisorChannelAdapterModel] {
+        try await client.send(APIRequest(path: "/ai/advisor/channels"))
+    }
+
+    func createAdvisorTelegramChannel(label: String, botToken: String) async throws -> AdvisorChannelAdapterModel {
+        try await client.send(APIRequest(
+            path: "/ai/advisor/channels/telegram",
+            method: .post,
+            body: try body(AdvisorTelegramAdapterCreateModel(label: label, botToken: botToken)),
+            idempotencyKey: UUID().uuidString
+        ))
+    }
+
+    func pairAdvisorChannel(id: String) async throws -> AdvisorPairingModel {
+        let escapedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        return try await client.send(APIRequest(
+            path: "/ai/advisor/channels/\(escapedID)/pairings",
+            method: .post,
+            idempotencyKey: UUID().uuidString
+        ))
+    }
+
+    func revokeAdvisorChannel(id: String) async throws -> AdvisorChannelRevokeModel {
+        let escapedID = id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+        return try await client.send(APIRequest(path: "/ai/advisor/channels/\(escapedID)", method: .delete))
     }
 
     func editEntryProposal(id: String, version: Int, draft: EntryDraftModel) async throws -> EntryProposalModel {

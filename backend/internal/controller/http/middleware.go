@@ -24,10 +24,11 @@ const (
 )
 
 type AuthMiddleware struct {
-	TokenSvc      usecase.TokenService
-	VerifySession func(string) (string, error)
-	APIKeys       *usecase.UserAPIKeyService
-	Audit         repository.AuditSink
+	TokenSvc             usecase.TokenService
+	VerifySession        func(string) (string, error)
+	APIKeys              *usecase.UserAPIKeyService
+	AssistantDelegations *usecase.AssistantDelegationService
+	Audit                repository.AuditSink
 }
 
 func NewAuthMiddleware(tokenSvc usecase.TokenService, verifySession func(string) (string, error)) *AuthMiddleware {
@@ -54,6 +55,9 @@ func (m *AuthMiddleware) RequireAuth(c *gin.Context) {
 	if token := strings.TrimSpace(parts[1]); strings.HasPrefix(token, "mpk_") {
 		m.authenticateUserAPIKey(c, token)
 		return
+	} else if strings.HasPrefix(token, "mpa_") {
+		m.authenticateAssistantDelegation(c, token)
+		return
 	}
 	claims, err := m.TokenSvc.Verify(parts[1])
 	if err != nil {
@@ -73,6 +77,23 @@ func (m *AuthMiddleware) RequireAuth(c *gin.Context) {
 	}
 	c.Set(contextUserIDKey, userID)
 	c.Set(contextAdvisorPrincipalKey, usecase.Principal{OwnerID: userID, CredentialKind: "session", CredentialID: claims.SessionID, ExpiresAt: claims.ExpiresAt})
+	c.Next()
+}
+
+func (m *AuthMiddleware) authenticateAssistantDelegation(c *gin.Context, token string) {
+	if m == nil || m.AssistantDelegations == nil {
+		Fail(c, http.StatusUnauthorized, Problem{Code: problemCodeTokenInvalid, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
+		c.Abort()
+		return
+	}
+	principal, err := m.AssistantDelegations.Authenticate(c.Request.Context(), token, c.Request.Method, c.FullPath())
+	if err != nil {
+		Fail(c, http.StatusForbidden, Problem{Code: problemCodeTokenInvalid, Title: problemTitleUnauthorized, Detail: invalidTokenMsg})
+		c.Abort()
+		return
+	}
+	c.Set(contextUserIDKey, principal.OwnerID)
+	c.Set(contextAdvisorPrincipalKey, principal)
 	c.Next()
 }
 

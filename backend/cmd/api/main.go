@@ -132,6 +132,8 @@ func main() {
 	middleware := httpapi.NewAuthMiddleware(jwtSvc, verifySession)
 	apiKeyService := usecase.NewUserAPIKeyService(repo.NewUserAPIKeyPostgresRepository(database))
 	middleware.APIKeys = apiKeyService
+	assistantDelegations := usecase.NewAssistantDelegationService(repo.NewAssistantDelegationPostgresRepository(database))
+	middleware.AssistantDelegations = assistantDelegations
 	middleware.Audit = cacheRepo
 	handlers := httpapi.ApplicationHandlers{
 		Auth: authHandler, Profile: profileHandler, Home: homeHandler,
@@ -218,6 +220,12 @@ func main() {
 		Budgets:      budgetRepository,
 		Categories:   categoryRepository,
 		Transactions: transactionRepository,
+	}
+	if strings.TrimSpace(cfg.FinanceAssistantURL) != "" {
+		if len(cfg.FinanceAssistantSecret) < 32 {
+			log.Fatal("FINANCE_ASSISTANT_ASSERTION_SECRET must contain at least 32 characters when FINANCE_ASSISTANT_URL is configured")
+		}
+		handlers.AssistantProxy = &httpapi.FinanceAssistantProxy{BaseURL: cfg.FinanceAssistantURL, Secret: cfg.FinanceAssistantSecret, Delegations: assistantDelegations}
 	}
 	feedbackRepository := repo.NewFeedbackPostgresRepository(database)
 	changelogRepository := repo.NewChangelogPostgresRepository(database)

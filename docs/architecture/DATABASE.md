@@ -49,6 +49,7 @@ referenced user data; restore from a database backup is the recovery path.
 | `000038` | Adds optimistic portfolio asset versions and immutable trade correction revisions. | Additive; original trades remain unchanged, corrections are owner-scoped and replayed from the full history. |
 | `000039` | Adds durable owner-scoped APNs delivery hand-off rows. | Additive; deduped route payloads only, no provider call or token exposure. |
 | `000040` | Adds optimistic-lock versions to ordinary transactions and personal categories. | Additive; existing rows default to version `1`; stale writes fail closed with a conflict. |
+| `000054` | Adds revocable owner-bound `assistant_delegations` for the external Finance Assistant. | Additive; secrets are hashed, operations are explicit, and active rows can be revoked without changing owner API keys. |
 
 The dedicated native fixture database on local55434 is verified version `32`, `dirty=false`;
 the stage-v1 baseline and later additive migrations own the complete schema.
@@ -62,6 +63,33 @@ do not use `force` as a normal rollout or rollback mechanism. The read-only
 checkout preflight is [`scripts/mypocket-rollout-preflight.sh`](../../scripts/mypocket-rollout-preflight.sh);
 the operational sequence and rollback evidence are in
 [`ROLLOUT_READINESS.md`](../operations/ROLLOUT_READINESS.md).
+
+## Finance Assistant database and workspace
+
+The external service owns a separate PostgreSQL schema created by
+`finance-assistant/src/finance_assistant/sql/0001_initial.sql`. It stores
+channel-scoped conversation messages and typed parts, durable agent runs,
+explicit memories, pending dream candidates with source references, Telegram
+adapters/bindings/pairings, encrypted delegated credentials and delivery/job
+state. Owner IDs are carried only from verified MyPocket assertions or Telegram
+bindings. LangGraph checkpoint/store tables are created by their official setup
+methods in the same database.
+
+`telegram_inbound_jobs` is the durable webhook acknowledgement boundary. Rows
+are unique by adapter/update ID, leased with `SKIP LOCKED`, retried after
+transient failures and marked failed after ten attempts. Webhook requests never
+wait for model completion.
+
+`action_drafts` exists as reserved schema only; the candidate does not expose a
+financial-write capability or draft execution route. Do not infer shipped
+mutation support from the table.
+
+PostgreSQL is authoritative. `/data/workspaces/<sha256-derived-owner>/` contains
+atomic mode-0600 `USER.md`, `MEMORY.md` and `DREAMS.md` projections. Restore uses
+the assistant database backup plus the named workspace-volume archive. These are
+separate backup classes, so a timestamp mismatch is resolved in favor of the
+database and projections are regenerated/reconciled. The Markdown volume alone
+is not a complete restore.
 
 ## Financial replay receipts
 

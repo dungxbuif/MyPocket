@@ -20,8 +20,37 @@ shared_fields: [status, trace]
 | System | Purpose | Contract | Owner | Status |
 | --- | --- | --- | --- | --- |
 | OCR Platform (`https://ocr.dungxbuif.com`) | Receipt OCR for images/PDFs before text-only LLM extraction; scan enhancement not in current public OpenAPI | `docs/architecture/OCR_API.md` | human-approved provider; credentials are deployment-managed | adapter tests pass locally; current live OCR/S3 UAT is credential-gated and pending |
+| OpenAI-compatible model API | Finance Assistant reasoning and memory candidate extraction | `FINANCE_ASSISTANT_MODEL_BASE_URL`, `FINANCE_ASSISTANT_MODEL_NAME`, secret `finance_assistant_model_api_key` | deployment-managed; never exposed to iOS/Telegram | local contract tests; production release pending |
+| Telegram Bot API | Optional per-owner channel adapters and webhooks | one encrypted bot token per adapter; secret-token webhook | each owner supplies and may revoke each bot | local adapter tests; production release pending |
 
 ## Credentials And Secrets
+
+### External Finance Assistant model and Telegram
+
+The Python service is the only new component that calls the model. It uses the
+same OpenAI-compatible boundary as MyPocket, but has separate deployment
+configuration. Local defaults remain `http://127.0.0.1:1234/v1` and
+`Qwen3.6-35B-A3B-MLX-4bit`; the production manifest selects
+`https://token-api.fpt.ai/v1` and `DeepSeek-V4.1-Flash`. This is a deployment
+selector, not evidence that the production release has run. The client sends
+`max_completion_tokens=4096`, uses a 240-second timeout, disables library
+retries and has no provider fallback. Base URLs fail closed unless they are
+absolute HTTP(S) URLs without userinfo, query or fragment.
+
+Model prompts contain the owner's recent assistant conversation, recalled
+memory and the finance data returned by the owner-bounded MyPocket delegation.
+This means configured provider processing includes personal financial data;
+deployment approval must treat the provider as a data processor. Provider keys
+are Docker secrets and are never placed in native builds, Telegram messages,
+Markdown projections or logs.
+
+An owner adds a Telegram bot token in the native app. The service validates it
+with `getMe`, installs an HTTPS webhook with a generated secret, encrypts the
+token at rest, and returns only adapter metadata. Pairing uses a single-use
+ten-minute deep-link code. Deleting an adapter first removes its webhook and
+revokes its bindings. The bot token pasted in a chat or ticket is compromised
+and must be revoked with BotFather before use; it must not be copied into a
+database, environment file or CI variable.
 
 Current production verification (2026-10-20): the FPT AI deployment selector is
 `DeepSeek-V4.1-Flash`. The older `DeepSeek-V4-Flash` text in the historical

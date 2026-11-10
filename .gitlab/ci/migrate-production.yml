@@ -7,15 +7,13 @@ migrate:production:
     name: production
     action: prepare
   resource_group: mypocket-production-db
-  # Migration is an explicit production action. It consumes the immutable
-  # digest emitted by this pipeline's reviewed Docker build, while remaining
-  # independent from unrelated Auto DevOps build/security jobs.
+  # Frozen 2026-11-01 release contract: only homelab-ops may migrate or deploy
+  # production. Keep this legacy job inert so an old UI bookmark cannot bypass
+  # the receipt-tag pipeline.
   needs:
     - job: build
       artifacts: true
   rules:
-    - if: '$CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH && $CI_COMMIT_REF_PROTECTED == "true"'
-      when: manual
     - when: never
   # Keep the protected admin action available without blocking code-only
   # main pipelines when the release does not require a schema migration.

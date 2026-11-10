@@ -1,5 +1,27 @@
 # Authentication and refresh-token contract
 
+## Finance Assistant service authentication
+
+The native app uses its existing MyPocket owner session or active owner API key;
+it never authenticates directly to the Python service. Gin derives the owner and
+signs a two-minute HS256 assertion with issuer `mypocket`, audience
+`finance-assistant`, a unique ID and an action allow-list. The service rejects
+client-supplied owner headers and scopes every database/filesystem lookup to the
+verified subject.
+
+Finance reads use `mpa_` delegated credentials stored only as hashes by
+MyPocket. App message calls receive a ten-minute credential that is revoked when
+the request finishes. Telegram receives an encrypted, rotated owner credential
+with a maximum 90-day lifetime so webhook processing can call MyPocket without
+an interactive session. Adding a new adapter revokes the previous delegation;
+removing the final active adapter revokes the current one. These credentials
+permit only the exact finance-read operations declared by the delegation use
+case and are not equivalent to an owner `mpk_` key.
+
+Telegram webhooks authenticate independently with the Bot API secret-token
+header, then resolve an adapter-specific owner binding. Pairing codes are
+single-use, expire after ten minutes and cannot bind a different adapter.
+
 Full-owner API-key authorization is deployed in the current REST release.
 All JWT-protected user operations accept validated Bearer mpk_ keys, including
 financial writes/key management. No scopes; old arrays ignored. Keys still
