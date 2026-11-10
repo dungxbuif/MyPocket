@@ -29,6 +29,9 @@ The assistant runtime receives an explicit `FINANCE_ASSISTANT_DATABASE_SCHEMA`,
 normalizes every PostgreSQL connection to that schema, and the migration creates
 and selects the same schema before applying its idempotent SQL. The migration
 then verifies the required durable queue table before exiting successfully.
+The application persistence pool also supplies the schema as a libpq connection
+option for every newly opened connection; this is independent of URI parsing
+and covers run queues, Telegram jobs, memories, adapters, and conversations.
 This keeps API, worker, LangGraph checkpointer/store, and the one-shot migration
 on one namespace even when an older database URL secret is reused.
 

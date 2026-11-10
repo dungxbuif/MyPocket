@@ -63,7 +63,7 @@ async def run_once() -> int:
     api_key = settings.model_api_key.get_secret_value()
     if not api_key:
         raise RuntimeError("FINANCE_ASSISTANT_MODEL_API_KEY is required for dreaming")
-    persistence = PostgresPersistence(settings.database_url)
+    persistence = PostgresPersistence(settings.database_url, settings.database_schema)
     await persistence.open()
     worker_id = str(uuid.uuid4())
     chat_model = build_chat_model(settings)

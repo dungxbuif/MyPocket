@@ -42,7 +42,9 @@ def build_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(_: FastAPI):
-        persistence = PostgresPersistence(settings.database_url)
+        persistence = PostgresPersistence(
+            settings.database_url, settings.database_schema
+        )
         await persistence.open()
         async with AsyncPostgresSaver.from_conn_string(settings.database_url) as checkpointer:
             async with AsyncPostgresStore.from_conn_string(settings.database_url) as store:

@@ -144,8 +144,16 @@ class InMemoryPersistence:
 
 
 class PostgresPersistence:
-    def __init__(self, database_url: str) -> None:
-        self.pool = AsyncConnectionPool(database_url, open=False, kwargs={"autocommit": True, "row_factory": dict_row})
+    def __init__(self, database_url: str, database_schema: str = "public") -> None:
+        self.pool = AsyncConnectionPool(
+            database_url,
+            open=False,
+            kwargs={
+                "autocommit": True,
+                "row_factory": dict_row,
+                "options": f"-csearch_path={database_schema}",
+            },
+        )
 
     async def open(self) -> None:
         await self.pool.open()
