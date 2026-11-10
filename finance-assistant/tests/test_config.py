@@ -4,6 +4,7 @@ import json
 from langchain_core.messages import HumanMessage
 import pytest
 import respx
+from urllib.parse import parse_qs, urlsplit
 
 from finance_assistant.config import Settings
 from finance_assistant.model_provider import build_chat_model
@@ -32,6 +33,25 @@ def test_model_provider_matches_existing_openai_compatible_profile() -> None:
 def test_model_provider_rejects_unsafe_base_urls(url: str) -> None:
     with pytest.raises(ValueError, match="model base URL"):
         settings(model_base_url=url)
+
+
+def test_database_url_pins_explicit_schema_and_preserves_query() -> None:
+    value = settings(
+        database_url="postgresql://assistant:secret@postgres:5432/mypocket?sslmode=require&options=stale",
+        database_schema="finance_assistant",
+    )
+
+    query = parse_qs(urlsplit(value.database_url).query)
+    assert query["sslmode"] == ["require"]
+    assert query["options"] == ["-csearch_path=finance_assistant"]
+
+
+@pytest.mark.parametrize(
+    "schema", ["Finance-Assistant", "public,finance_assistant", "finance assistant"]
+)
+def test_database_schema_rejects_unsafe_identifiers(schema: str) -> None:
+    with pytest.raises(ValueError, match="database schema"):
+        settings(database_schema=schema)
 
 
 @pytest.mark.asyncio

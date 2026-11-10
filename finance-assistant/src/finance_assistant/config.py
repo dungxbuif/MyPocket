@@ -1,6 +1,7 @@
 from functools import lru_cache
 from pathlib import Path
-from urllib.parse import urlparse
+import re
+from urllib.parse import parse_qsl, urlencode, urlparse, urlsplit, urlunsplit
 
 from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -11,6 +12,7 @@ class Settings(BaseSettings):
 
     environment: str = "development"
     database_url: str = "postgresql://finance_assistant:finance_assistant@postgres:5432/finance_assistant"
+    database_schema: str = "public"
     data_root: Path = Path("/data")
     assertion_secret: SecretStr = SecretStr("")
     assertion_secret_file: Path | None = None
@@ -40,6 +42,24 @@ class Settings(BaseSettings):
                 setattr(self, value_name, SecretStr(path.read_text(encoding="utf-8").strip()))
         if self.database_url_file:
             self.database_url = self.database_url_file.read_text(encoding="utf-8").strip()
+        if not re.fullmatch(r"[a-z_][a-z0-9_]*", self.database_schema):
+            raise ValueError("database schema must be a lowercase PostgreSQL identifier")
+        database = urlsplit(self.database_url)
+        query = [
+            (key, value)
+            for key, value in parse_qsl(database.query, keep_blank_values=True)
+            if key != "options"
+        ]
+        query.append(("options", f"-csearch_path={self.database_schema}"))
+        self.database_url = urlunsplit(
+            (
+                database.scheme,
+                database.netloc,
+                database.path,
+                urlencode(query),
+                database.fragment,
+            )
+        )
         if len(self.assertion_secret.get_secret_value()) < 32:
             raise ValueError("assertion secret must contain at least 32 characters")
         parsed = urlparse(self.model_base_url)

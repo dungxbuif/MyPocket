@@ -22,6 +22,22 @@ Move the native Trợ lý runtime into a separate Python service using LangGraph
 - Existing proposal confirmation and ledger mutations remain in the Go backend. The external service does not execute financial writes; its `action_drafts` table is reserved schema and is not an advertised capability.
 - PostgreSQL is authoritative. Markdown files are atomic, reviewable projections (`USER.md`, `MEMORY.md`, `DREAMS.md`). Database and `/data` are both backed up; if their timestamps differ, database state wins and projections must be regenerated/reconciled rather than imported as authority.
 
+## Production schema selection correction — 2026-11-11
+
+Production must not rely only on a `search_path` embedded in a Docker secret.
+The assistant runtime receives an explicit `FINANCE_ASSISTANT_DATABASE_SCHEMA`,
+normalizes every PostgreSQL connection to that schema, and the migration creates
+and selects the same schema before applying its idempotent SQL. The migration
+then verifies the required durable queue table before exiting successfully.
+This keeps API, worker, LangGraph checkpointer/store, and the one-shot migration
+on one namespace even when an older database URL secret is reused.
+
+Verification requires unit coverage for schema-name validation and DSN
+normalization, a migrated disposable PostgreSQL integration run, the existing
+Finance Assistant suite, and a production receipt whose migration, worker
+stability, health, and verify jobs all pass. No public route, request schema, or
+financial write authority changes.
+
 ## Rejected alternatives
 
 - Direct app-to-assistant auth, because it creates a second public credential boundary.
