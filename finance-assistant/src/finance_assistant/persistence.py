@@ -8,6 +8,7 @@ import hashlib
 import uuid
 from typing import Any, Protocol
 
+from psycopg import sql
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from psycopg_pool import AsyncConnectionPool
@@ -145,9 +146,17 @@ class InMemoryPersistence:
 
 class PostgresPersistence:
     def __init__(self, database_url: str, database_schema: str = "public") -> None:
+        async def configure_connection(connection) -> None:
+            await connection.execute(
+                sql.SQL("SET search_path TO {}").format(
+                    sql.Identifier(database_schema)
+                )
+            )
+
         self.pool = AsyncConnectionPool(
             database_url,
             open=False,
+            configure=configure_connection,
             kwargs={
                 "autocommit": True,
                 "row_factory": dict_row,

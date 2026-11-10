@@ -32,6 +32,9 @@ then verifies the required durable queue table before exiting successfully.
 The application persistence pool also supplies the schema as a libpq connection
 option for every newly opened connection; this is independent of URI parsing
 and covers run queues, Telegram jobs, memories, adapters, and conversations.
+In addition, the pool configure callback executes a quoted `SET search_path`
+on each newly opened connection. Repository correctness therefore does not
+depend on whether a particular libpq/pool build honors URI or keyword options.
 The worker invokes the same idempotent schema ensure once, using its own
 effective settings, before entering the polling loop. The protected deploy
 migration remains the release gate; startup ensure is defense in depth against

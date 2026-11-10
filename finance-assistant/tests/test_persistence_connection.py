@@ -21,3 +21,4 @@ def test_postgres_pool_pins_schema_for_every_connection(monkeypatch) -> None:
         == "postgresql://assistant:secret@postgres/mypocket"
     )
     assert captured["kwargs"]["options"] == "-csearch_path=finance_assistant"
+    assert callable(captured["configure"])
