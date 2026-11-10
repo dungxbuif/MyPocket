@@ -13,6 +13,7 @@ from .credentials import PostgresCredentialVault
 from .identity import AssistantIdentity, AssertionErrorCode, AssertionVerifier
 from .models import ChannelAdapterRevokeResponse, ChannelAdapterView, PairingResponse, TelegramAdapterCreate, TurnRequest, TurnResponse
 from .pairing import PairingRegistry
+from .run_jobs import AssistantRunQueue, TERMINAL_RUN_STATUSES
 from .telegram_jobs import TelegramJobIntake
 
 
@@ -24,6 +25,7 @@ class Services:
     adapters: ChannelAdapterService | None = None
     credentials: PostgresCredentialVault | None = None
     telegram: TelegramJobIntake | None = None
+    runs: AssistantRunQueue | None = None
 
 
 def create_app(services: Services) -> FastAPI:
@@ -179,43 +181,63 @@ def create_app(services: Services) -> FastAPI:
             await services.runtime.persistence.reset_channel(actor.owner_id, "app")
         return {"data": {"conversation_id": conversation_id, "generation": 1, "server_time": datetime.now(UTC).isoformat(), "replayed": False}}
 
-    async def compat_submit(payload: dict, actor: AssistantIdentity, delegated_credential: str | None) -> TurnResponse:
+    def compat_request(payload: dict) -> TurnRequest:
         text = str(payload.get("text", "")).strip()
         if not text:
             raise HTTPException(status_code=400, detail="text is required")
         conversation_id = str(payload.get("conversation_id", "default"))
         request_id = str(payload.get("client_request_id") or uuid.uuid4())
-        return await services.runtime.run_turn(actor.owner_id, TurnRequest(conversation_id=conversation_id, channel_id="app", platform_message_id=request_id, text=text), delegated_credential=delegated_credential)
+        return TurnRequest(conversation_id=conversation_id, channel_id="app", platform_message_id=request_id, text=text)
+
+    async def compat_submit(payload: dict, actor: AssistantIdentity, delegated_credential: str | None) -> TurnResponse:
+        return await services.runtime.run_turn(actor.owner_id, compat_request(payload), delegated_credential=delegated_credential)
 
     @app.post("/api/v1/ai/advisor/messages")
     async def compat_submit_sync(payload: dict, actor: AssistantIdentity = Depends(require_action("assistant:chat")), x_mypocket_delegation: str | None = Header(default=None)):
         result = await compat_submit(payload, actor, x_mypocket_delegation)
         return {"data": result.model_dump()}
 
-    @app.post("/api/v1/ai/advisor/messages/async")
+    @app.post("/api/v1/ai/advisor/messages/async", status_code=202)
     async def compat_submit_async(payload: dict, actor: AssistantIdentity = Depends(require_action("assistant:chat")), x_mypocket_delegation: str | None = Header(default=None)):
-        result = await compat_submit(payload, actor, x_mypocket_delegation)
-        return {"data": {"run_id": result.run_id, "conversation_id": result.conversation_id, "status": result.status}}
+        if services.runs is None or not x_mypocket_delegation:
+            raise HTTPException(status_code=503, detail="durable assistant runs unavailable")
+        try:
+            result = await services.runs.enqueue(actor.owner_id, compat_request(payload), x_mypocket_delegation)
+        except ValueError as exc:
+            if "conflict" in str(exc):
+                raise HTTPException(status_code=409, detail="client_request_id conflict") from exc
+            raise HTTPException(status_code=400, detail="invalid assistant request") from exc
+        return {"data": {"run_id": result["run_id"], "conversation_id": result["conversation_id"], "status": result["status"]}}
+
+    async def compat_run_payload(owner_id: str, run_id: str) -> dict | None:
+        if services.runs is not None:
+            return await services.runs.get(owner_id, run_id)
+        return await services.runtime.persistence.get_run(owner_id, run_id)
 
     @app.get("/api/v1/ai/advisor/runs/{run_id}")
     async def compat_run(run_id: str, actor: AssistantIdentity = Depends(require_action("assistant:chat"))):
-        result = await services.runtime.get_run(actor.owner_id, run_id)
+        result = await compat_run_payload(actor.owner_id, run_id)
         if result is None:
             raise HTTPException(status_code=404, detail="run not found")
-        return {"data": {"id": result.run_id, "conversation_id": result.conversation_id, "generation": 1, "status": result.status, "last_event_seq": 1, "created_at": datetime.now(UTC).isoformat(), "updated_at": datetime.now(UTC).isoformat()}}
+        return {"data": {"id": result["run_id"], "conversation_id": result["conversation_id"], "generation": 1, "status": result["status"], "error_code": result.get("error_code"), "last_event_seq": 1 if result["status"] in TERMINAL_RUN_STATUSES else 0, "created_at": result.get("created_at"), "updated_at": result.get("updated_at")}}
 
     @app.get("/api/v1/ai/advisor/runs/{run_id}/events")
     async def compat_events(run_id: str, actor: AssistantIdentity = Depends(require_action("assistant:chat"))):
-        result = await services.runtime.get_run(actor.owner_id, run_id)
+        result = await compat_run_payload(actor.owner_id, run_id)
         if result is None:
             raise HTTPException(status_code=404, detail="run not found")
-        return {"data": [{"seq": 1, "run_id": run_id, "type": "completed", "data": result.model_dump(), "created_at": datetime.now(UTC).isoformat()}]}
+        events = []
+        if result["status"] in TERMINAL_RUN_STATUSES:
+            events.append({"seq": 1, "run_id": run_id, "type": result["status"], "data": result, "created_at": result.get("updated_at") or datetime.now(UTC).isoformat()})
+        return {"data": events}
 
     @app.post("/api/v1/ai/advisor/runs/{run_id}/cancel")
     async def compat_cancel(run_id: str, actor: AssistantIdentity = Depends(require_action("assistant:chat"))):
-        result = await services.runtime.get_run(actor.owner_id, run_id)
+        if services.runs is None:
+            raise HTTPException(status_code=503, detail="durable assistant runs unavailable")
+        result = await services.runs.cancel(actor.owner_id, run_id)
         if result is None:
             raise HTTPException(status_code=404, detail="run not found")
-        return {"data": {"id": run_id, "status": result.status}}
+        return {"data": {"id": run_id, "status": result["status"]}}
 
     return app

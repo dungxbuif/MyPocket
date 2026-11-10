@@ -22,6 +22,7 @@ class MessageRecord:
     text: str
     created_at: datetime
     parts: list[dict[str, Any]] = field(default_factory=list)
+    platform_message_id: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -41,6 +42,7 @@ class Persistence(Protocol):
     async def accept_event(self, owner_id: str, channel_id: str, platform_message_id: str) -> bool: ...
     async def release_event(self, owner_id: str, channel_id: str, platform_message_id: str) -> None: ...
     async def append_message(self, record: MessageRecord) -> None: ...
+    async def event_response(self, owner_id: str, channel_id: str, platform_message_id: str) -> MessageRecord | None: ...
     async def list_messages(self, owner_id: str, channel_id: str, conversation_id: str, limit: int = 50) -> list[MessageRecord]: ...
     async def reset_messages(self, owner_id: str, channel_id: str, conversation_id: str) -> None: ...
     async def reset_channel(self, owner_id: str, channel_id: str) -> None: ...
@@ -77,7 +79,22 @@ class InMemoryPersistence:
 
     async def append_message(self, record: MessageRecord) -> None:
         async with self._lock:
+            if record.platform_message_id and any(
+                row.owner_id == record.owner_id
+                and row.channel_id == record.channel_id
+                and row.platform_message_id == record.platform_message_id
+                and row.role == record.role
+                for row in self.messages
+            ):
+                return
             self.messages.append(record)
+
+    async def event_response(self, owner_id: str, channel_id: str, platform_message_id: str) -> MessageRecord | None:
+        return next((
+            row for row in reversed(self.messages)
+            if row.owner_id == owner_id and row.channel_id == channel_id
+            and row.platform_message_id == platform_message_id and row.role == "assistant"
+        ), None)
 
     async def list_messages(self, owner_id: str, channel_id: str, conversation_id: str, limit: int = 50) -> list[MessageRecord]:
         rows = [row for row in self.messages if row.owner_id == owner_id and row.channel_id == channel_id and row.conversation_id == conversation_id]
@@ -154,14 +171,27 @@ class PostgresPersistence:
     async def append_message(self, record: MessageRecord) -> None:
         async with self.pool.connection() as conn:
             await conn.execute(
-                "INSERT INTO conversation_messages(owner_id,channel_id,conversation_id,role,text,created_at,parts) VALUES (%s,%s,%s,%s,%s,%s,%s)",
-                (record.owner_id, record.channel_id, record.conversation_id, record.role, record.text, record.created_at, Jsonb(record.parts)),
+                "INSERT INTO conversation_messages(owner_id,channel_id,conversation_id,role,text,created_at,parts,platform_message_id) "
+                "VALUES (%s,%s,%s,%s,%s,%s,%s,%s) ON CONFLICT(owner_id,channel_id,platform_message_id,role) "
+                "WHERE platform_message_id IS NOT NULL DO NOTHING",
+                (record.owner_id, record.channel_id, record.conversation_id, record.role, record.text, record.created_at, Jsonb(record.parts), record.platform_message_id),
             )
+
+    async def event_response(self, owner_id: str, channel_id: str, platform_message_id: str) -> MessageRecord | None:
+        async with self.pool.connection() as conn:
+            result = await conn.execute(
+                "SELECT owner_id,channel_id,conversation_id,role,text,created_at,parts,platform_message_id "
+                "FROM conversation_messages WHERE owner_id=%s AND channel_id=%s AND platform_message_id=%s "
+                "AND role='assistant' ORDER BY seq DESC LIMIT 1",
+                (owner_id, channel_id, platform_message_id),
+            )
+            row = await result.fetchone()
+        return MessageRecord(**row) if row else None
 
     async def list_messages(self, owner_id: str, channel_id: str, conversation_id: str, limit: int = 50) -> list[MessageRecord]:
         async with self.pool.connection() as conn:
             result = await conn.execute(
-                "SELECT owner_id,channel_id,conversation_id,role,text,created_at,parts FROM conversation_messages WHERE owner_id=%s AND channel_id=%s AND conversation_id=%s ORDER BY seq DESC LIMIT %s",
+                "SELECT owner_id,channel_id,conversation_id,role,text,created_at,parts,platform_message_id FROM conversation_messages WHERE owner_id=%s AND channel_id=%s AND conversation_id=%s ORDER BY seq DESC LIMIT %s",
                 (owner_id, channel_id, conversation_id, limit),
             )
             rows = list(reversed(await result.fetchall()))

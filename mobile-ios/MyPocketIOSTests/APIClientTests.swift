@@ -198,7 +198,7 @@ final class APIClientTests: XCTestCase {
         XCTAssertEqual(requests[0].value(forHTTPHeaderField: "Idempotency-Key"), "advisor-retry-1")
         XCTAssertEqual(requests[1].value(forHTTPHeaderField: "Idempotency-Key"), "advisor-retry-1")
         XCTAssertEqual(requests[0].httpBody, requests[1].httpBody)
-        XCTAssertEqual(requests[0].timeoutInterval, 250)
+        XCTAssertEqual(requests[0].timeoutInterval, 60)
     }
 
     func testAdvisorRunDecodesAdditiveLifecycleMetadataAndLegacyPayload() async throws {

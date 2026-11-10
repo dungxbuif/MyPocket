@@ -15,10 +15,15 @@ CREATE TABLE IF NOT EXISTS conversation_messages (
     role text NOT NULL CHECK (role IN ('user','assistant','tool')),
     text text NOT NULL,
     parts jsonb NOT NULL DEFAULT '[]'::jsonb,
+    platform_message_id text,
     created_at timestamptz NOT NULL DEFAULT now()
 );
 ALTER TABLE conversation_messages ADD COLUMN IF NOT EXISTS parts jsonb NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE conversation_messages ADD COLUMN IF NOT EXISTS platform_message_id text;
 CREATE INDEX IF NOT EXISTS conversation_messages_scope ON conversation_messages(owner_id, channel_id, conversation_id, seq DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS conversation_messages_event_role
+    ON conversation_messages(owner_id,channel_id,platform_message_id,role)
+    WHERE platform_message_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS agent_runs (
     id uuid PRIMARY KEY,
@@ -28,6 +33,26 @@ CREATE TABLE IF NOT EXISTS agent_runs (
     updated_at timestamptz NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS agent_runs_owner ON agent_runs(owner_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS assistant_run_jobs (
+    run_id uuid PRIMARY KEY REFERENCES agent_runs(id) ON DELETE CASCADE,
+    owner_id text NOT NULL,
+    client_request_id text NOT NULL,
+    request_hash text NOT NULL,
+    request jsonb NOT NULL,
+    encrypted_delegation bytea,
+    attempts integer NOT NULL DEFAULT 0,
+    available_at timestamptz NOT NULL DEFAULT now(),
+    lease_owner text,
+    lease_until timestamptz,
+    cancel_requested boolean NOT NULL DEFAULT false,
+    completed_at timestamptz,
+    failed_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    UNIQUE(owner_id, client_request_id)
+);
+CREATE INDEX IF NOT EXISTS assistant_run_jobs_ready ON assistant_run_jobs(available_at,created_at)
+    WHERE completed_at IS NULL AND failed_at IS NULL AND cancel_requested=false;
 
 CREATE TABLE IF NOT EXISTS memories (
     id uuid PRIMARY KEY,

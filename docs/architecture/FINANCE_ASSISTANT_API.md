@@ -22,10 +22,10 @@ owner ID.
 | `GET` | `/conversation/messages?conversation_id=…` | App-channel history with typed parts |
 | `POST` | `/conversation/reset` | Reset one app conversation, or the app channel when no ID is supplied |
 | `POST` | `/messages` | Compatibility submit |
-| `POST` | `/messages/async` | Submit using the native run DTO; current implementation completes model work before returning and native allows 250 seconds |
+| `POST` | `/messages/async` | Persist a durable run and return `queued` before model work |
 | `GET` | `/runs/{id}` | Owner-scoped durable run state |
 | `GET` | `/runs/{id}/events` | Bounded completed-event representation; not token streaming |
-| `POST` | `/runs/{id}/cancel` | Compatibility response for a known run; cross-process interruption is not implemented in this service candidate |
+| `POST` | `/runs/{id}/cancel` | Cancel queued work or cooperatively interrupt a running provider request |
 | `GET` | `/channels` | List the owner's channel adapters |
 | `POST` | `/channels/telegram` | Validate and store one Telegram bot token under a distinct label |
 | `POST` | `/channels/{adapter_id}/pairings` | Issue an adapter-scoped, single-use ten-minute pairing code |

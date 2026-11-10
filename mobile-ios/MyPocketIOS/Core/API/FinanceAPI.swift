@@ -638,15 +638,13 @@ final class FinanceAPI: @unchecked Sendable {
         try await client.send(APIRequest(path: "/ai/advisor/messages", method: .post, body: try body(input), idempotencyKey: input.clientRequestID))
     }
 
-    /// Uses the advisor run DTO. The external service candidate may complete
-    /// provider work before acknowledging, so the request matches its 240s bound.
+    /// Persists one durable advisor run and returns before provider work.
     func beginAdvisorMessage(_ input: AdvisorMessageInputModel) async throws -> AdvisorAsyncSubmitModel {
         try await client.send(APIRequest(
             path: "/ai/advisor/messages/async",
             method: .post,
             body: try body(input),
-            idempotencyKey: input.clientRequestID,
-            timeoutInterval: 250
+            idempotencyKey: input.clientRequestID
         ))
     }
 

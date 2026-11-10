@@ -10,8 +10,11 @@ client-supplied owner headers and scopes every database/filesystem lookup to the
 verified subject.
 
 Finance reads use `mpa_` delegated credentials stored only as hashes by
-MyPocket. App message calls receive a ten-minute credential that is revoked when
-the request finishes. Telegram receives an encrypted, rotated owner credential
+MyPocket. Synchronous app calls receive a ten-minute credential that is revoked
+when the response finishes. Async chat encrypts its per-run copy in the
+assistant queue, clears it on every terminal outcome and relies on the same
+ten-minute backend expiry rather than revoking it before the worker can run.
+Telegram receives an encrypted, rotated owner credential
 with a maximum 90-day lifetime so webhook processing can call MyPocket without
 an interactive session. Adding a new adapter revokes the previous delegation;
 removing the final active adapter revokes the current one. These credentials

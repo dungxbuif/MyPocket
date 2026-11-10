@@ -27,7 +27,10 @@ shared_fields: [status]
 - The new runtime is read-only for financial data. Existing Go-owned action
   confirmation remains unchanged; reserved `action_drafts` schema is not a
   shipped capability.
-- Local evidence: Go 872 tests, Python 32 tests without PostgreSQL plus 33 tests
+- Add durable app-run intake with encrypted per-run delegation, idempotent
+  acknowledgement, worker leasing/retry, restart recovery and cooperative
+  queued/running cancellation.
+- Local evidence: Go 873 tests, Python 38 tests without PostgreSQL plus 39 tests
   with PostgreSQL 17, and a Python
   3.13 image build. Production release, live provider/webhook/device UAT and
   backup/restore drill remain pending.

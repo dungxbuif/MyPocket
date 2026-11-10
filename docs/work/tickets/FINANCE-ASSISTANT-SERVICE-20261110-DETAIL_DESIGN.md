@@ -1,7 +1,7 @@
 ---
 artifact_type: detail_design
 id: FINANCE-ASSISTANT-SERVICE-20261110
-status: implemented_local_release_blocked
+status: implementation_extended_for_durable_runs
 owner: shared
 approval: approved_by_owner_2026_11_10
 ---
@@ -46,9 +46,24 @@ Architecture, auth/API reference, OpenAPI, ADR, operations/backup runbook, valid
 ## Implemented boundary (reconciled 2026-11-10)
 
 - Native iOS never receives model credentials and never calls a model endpoint. It calls the existing `/api/v1/ai/advisor/*` facade; MyPocket authenticates the owner and proxies the allow-listed routes to the private Python service.
-- The compatibility `/messages/async` DTO is retained, but this candidate completes provider work before acknowledgement. Native allows 250 seconds for the service's 240-second model bound. A durable queued/cancellable external run is a follow-up, not a shipped claim.
+- `/messages/async` durably creates one owner-scoped run and encrypted work item,
+  then returns `queued` without waiting for the provider. Replays of the same
+  `client_request_id` return the same run. The worker leases jobs with
+  `SKIP LOCKED`, exposes `queued`/`running`/terminal state through the existing
+  run route, retries bounded transient failures, and cooperatively cancels both
+  queued and running work. Completed messages remain the source for rich native
+  history.
+- The per-run `mpa_` delegation is encrypted at rest and expires after ten
+  minutes. The proxy does not revoke it at acknowledgement because the worker
+  still needs it; the assistant deletes the encrypted copy on every terminal
+  outcome and the backend credential expires independently. Synchronous
+  requests retain immediate revocation.
 - The service uses LangGraph 1.0.1, LangMem 0.0.30 and PostgreSQL-backed checkpoints/store. OpenAI-compatible model calls are bounded to 240 seconds, 4096 output tokens and zero library retries/fallbacks.
-- App submissions receive a ten-minute `mpa_` delegation that is revoked after the request. Telegram adapters share a rotated owner delegation with a 90-day maximum lifetime; removing the final adapter revokes it.
+- Synchronous app submissions receive a ten-minute `mpa_` delegation that is
+  revoked after the response. Asynchronous submissions retain only an encrypted
+  per-run copy until a terminal outcome; the backend credential independently
+  expires after ten minutes. Telegram adapters share a rotated owner delegation
+  with a 90-day maximum lifetime; removing the final adapter revokes it.
 - Each owner may register multiple Telegram bots under distinct labels. Bot tokens are accepted once, validated with Bot API, encrypted at rest, and never returned. Pairing codes are adapter-scoped, single-use and expire after ten minutes.
 - Telegram webhooks authenticate, persist a unique inbound job and return `202` before model work. The worker leases jobs, retries transient failures and keeps update/message idempotency.
 - Explicit memories are owner-scoped and can be recalled across channels. App and Telegram transcripts/checkpoints remain separate. Dream candidates are derived only from user messages, keep provenance, and are not auto-promoted into trusted memory.

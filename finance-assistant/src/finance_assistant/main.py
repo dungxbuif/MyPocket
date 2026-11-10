@@ -17,6 +17,7 @@ from .model_provider import build_chat_model
 from .mypocket import LiveFinanceContext, MyPocketClient
 from .pairing import PairingRegistry, PostgresPairingRegistry
 from .persistence import InMemoryPersistence, PostgresPersistence
+from .run_jobs import PostgresAssistantRunQueue
 from .telegram_jobs import PostgresTelegramJobQueue
 from .workspace import WorkspaceProjector
 
@@ -65,6 +66,7 @@ def build_app(settings: Settings | None = None) -> FastAPI:
                 mypocket = MyPocketClient(settings.mypocket_base_url)
                 services.runtime.finance_context = LiveFinanceContext(mypocket, services.credentials)
                 services.telegram = PostgresTelegramJobQueue(persistence.pool)
+                services.runs = PostgresAssistantRunQueue(persistence.pool, encryption_key)
                 try:
                     yield
                 finally:

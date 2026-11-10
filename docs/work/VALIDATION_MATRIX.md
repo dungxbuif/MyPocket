@@ -20,13 +20,13 @@ updated: 2026-11-10
 
 | Check | Result |
 | --- | --- |
-| Backend auth/proxy/delegation and full Go suite | PASS: 872 tests in 20 packages |
-| Python suite without PostgreSQL | PASS: 32, with the PostgreSQL-only integration case skipped |
-| PostgreSQL 17 migration + full Python suite | PASS: 33, including restart durability, owner isolation, durable Telegram intake and official LangGraph checkpoint/store |
+| Backend auth/proxy/delegation and full Go suite | PASS: 873 tests in 20 packages |
+| Python suite without PostgreSQL | PASS: 38, with the PostgreSQL-only integration case skipped |
+| PostgreSQL 17 migration + full Python suite | PASS: 39, including restart durability, owner isolation, encrypted durable app/Telegram intake, cooperative cancellation and official LangGraph checkpoint/store |
 | OpenAI-compatible request contract | PASS: selected endpoint/model, bearer header and `max_completion_tokens=4096`; no live provider call |
 | Assistant runtime image | PASS: Python 3.13 image built with pinned direct dependencies |
 | Promotion and migration preflight contracts | PASS; production preflight warns that backup evidence is absent |
-| Native generic simulator build and focused model tests | PASS at implementation checkpoint; no physical-device/Telegram UI UAT |
+| Native generic simulator build and focused model/run tests | PASS at implementation checkpoint; async submit uses the normal 60-second transport bound because acknowledgement precedes model work; no physical-device/Telegram UI UAT |
 | Production release and webhook/provider probe | NOT RUN: feature branches are not merged/tagged; protected secrets/runners not verified |
 | Backup/restore drill | NOT RUN: production database and workspace volume do not exist yet |
 

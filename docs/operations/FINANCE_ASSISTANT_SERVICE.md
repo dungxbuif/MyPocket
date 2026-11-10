@@ -44,6 +44,12 @@ The public route is limited to
 `/v1/channels/telegram/{adapter_id}/webhook` on the money host. All other
 assistant endpoints stay on private Swarm networks.
 
+The worker owns both durable app runs and Telegram intake. An app submit is
+healthy only when it returns `202 queued`, the run advances through
+`running` to a terminal state, and completed history contains the same rich
+parts. Queue depth, attempts, expired leases and terminal failures must be
+inspected in PostgreSQL; never log decrypted delegations or bot tokens.
+
 ## Backup and restore
 
 Back up the assistant PostgreSQL database with the normal database class and

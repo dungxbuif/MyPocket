@@ -1183,8 +1183,7 @@ struct AssistantView: View {
             let result: AdvisorAsyncSubmitModel = try await api.client.send(APIRequest(
                 path: "/ai/advisor/messages/async", method: .post,
                 body: try JSONEncoder.mypocket.encode(request),
-                idempotencyKey: clientRequestID, expectedOwnerID: ownerID,
-                timeoutInterval: 250
+                idempotencyKey: clientRequestID, expectedOwnerID: ownerID
             ))
             guard pendingMessageBinding.wrappedValue?.input.clientRequestID == clientRequestID else { return }
             advisorSubmitRequestID = nil

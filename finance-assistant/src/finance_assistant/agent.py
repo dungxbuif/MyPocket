@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from datetime import UTC, datetime
 from typing import Protocol, Awaitable, Callable
@@ -84,31 +85,50 @@ class AgentRuntime:
         text = await self.model.reply(context_messages, memories, finance.prompt_lines)
         return {"messages": [AIMessage(content=text, additional_kwargs={"response_parts": finance.parts})]}
 
-    async def run_turn(self, owner_id: str, request: TurnRequest, *, delegated_credential: str | None = None) -> TurnResponse:
+    async def run_turn(self, owner_id: str, request: TurnRequest, *, delegated_credential: str | None = None, run_id: str | None = None) -> TurnResponse:
         scope = ConversationScope(owner_id, request.channel_id, request.conversation_id)
         accepted = await self.persistence.accept_event(owner_id, request.channel_id, request.platform_message_id)
         if not accepted:
-            rows = await self.persistence.list_messages(owner_id, request.channel_id, request.conversation_id, 1)
-            text = rows[-1].text if rows and rows[-1].role == "assistant" else "Yêu cầu đã được xử lý."
-            return TurnResponse(run_id=request.platform_message_id, conversation_id=request.conversation_id, status="duplicate", text=text)
+            previous = await self.persistence.event_response(owner_id, request.channel_id, request.platform_message_id)
+            if previous is not None:
+                parts = [ResponsePart.model_validate(part) for part in previous.parts]
+                return TurnResponse(run_id=run_id or request.platform_message_id, conversation_id=request.conversation_id, status="duplicate", text=previous.text, parts=parts)
+            if run_id is None:
+                return TurnResponse(run_id=request.platform_message_id, conversation_id=request.conversation_id, status="duplicate", text="Yêu cầu đang được xử lý.")
+            # A durable queue lease proves no sibling worker owns this job. An
+            # accepted event without a response is therefore an abandoned
+            # process claim from a crashed worker and can be reclaimed safely.
+            await self.persistence.release_event(owner_id, request.channel_id, request.platform_message_id)
+            accepted = await self.persistence.accept_event(owner_id, request.channel_id, request.platform_message_id)
+            if not accepted:
+                return TurnResponse(run_id=run_id, conversation_id=request.conversation_id, status="duplicate", text="Yêu cầu đang được xử lý.")
 
         try:
             result = await self.graph.ainvoke(
                 {"messages": [HumanMessage(content=request.text)]},
                 config={"configurable": {"thread_id": scope.thread_id, "owner_id": owner_id, "channel_id": request.channel_id, "delegated_credential": delegated_credential}},
             )
+        except asyncio.CancelledError:
+            await self.persistence.release_event(owner_id, request.channel_id, request.platform_message_id)
+            raise
         except Exception:
             await self.persistence.release_event(owner_id, request.channel_id, request.platform_message_id)
             raise
         now = datetime.now(UTC)
-        await self.persistence.append_message(MessageRecord(owner_id, request.channel_id, request.conversation_id, "user", request.text, now))
+        await self.persistence.append_message(MessageRecord(
+            owner_id, request.channel_id, request.conversation_id, "user", request.text, now,
+            platform_message_id=request.platform_message_id,
+        ))
         await self.memory.remember_explicit(owner_id, request.text, request.platform_message_id)
         text = str(result["messages"][-1].content)
         raw_parts = result["messages"][-1].additional_kwargs.get("response_parts", [])
         parts = [ResponsePart.model_validate(part) for part in raw_parts]
-        await self.persistence.append_message(MessageRecord(owner_id, request.channel_id, request.conversation_id, "assistant", text, datetime.now(UTC), [part.model_dump() for part in parts]))
+        await self.persistence.append_message(MessageRecord(
+            owner_id, request.channel_id, request.conversation_id, "assistant", text, datetime.now(UTC),
+            [part.model_dump() for part in parts], request.platform_message_id,
+        ))
         await self.persistence.schedule_dream(owner_id)
-        response = TurnResponse(run_id=str(uuid.uuid4()), conversation_id=request.conversation_id, status="completed", text=text, parts=parts)
+        response = TurnResponse(run_id=run_id or str(uuid.uuid4()), conversation_id=request.conversation_id, status="completed", text=text, parts=parts)
         await self.persistence.put_run(owner_id, response.run_id, response.model_dump())
         return response
 

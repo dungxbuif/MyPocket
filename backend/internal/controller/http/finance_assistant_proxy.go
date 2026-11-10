@@ -126,8 +126,9 @@ func (p *FinanceAssistantProxy) Forward(c *gin.Context) {
 	req.Header.Set("X-Request-ID", requestID(c))
 	var issued usecase.AssistantDelegationCreated
 	persistDelegation := c.Request.Method == http.MethodPost && c.FullPath() == advisorRoute+"/channels/telegram"
-	ephemeralDelegation := c.Request.Method == http.MethodPost && (c.FullPath() == advisorRoute+"/messages" || c.FullPath() == advisorRoute+"/messages/async")
-	if persistDelegation || ephemeralDelegation {
+	synchronousDelegation := c.Request.Method == http.MethodPost && c.FullPath() == advisorRoute+"/messages"
+	durableRunDelegation := c.Request.Method == http.MethodPost && c.FullPath() == advisorRoute+"/messages/async"
+	if persistDelegation || synchronousDelegation || durableRunDelegation {
 		if p.Delegations == nil {
 			Fail(c, http.StatusServiceUnavailable, Problem{Code: "finance_assistant_delegation_unavailable", Title: problemTitleInternalServer, Detail: "Finance Assistant chưa thể truy cập dữ liệu tài chính."})
 			return
@@ -153,7 +154,7 @@ func (p *FinanceAssistantProxy) Forward(c *gin.Context) {
 		return
 	}
 	defer response.Body.Close()
-	if issued.Delegation.ID != "" && (response.StatusCode >= http.StatusBadRequest || ephemeralDelegation) {
+	if issued.Delegation.ID != "" && (response.StatusCode >= http.StatusBadRequest || synchronousDelegation) {
 		_ = p.Delegations.Revoke(c.Request.Context(), principal.OwnerID, issued.Delegation.ID)
 	}
 	if response.StatusCode < http.StatusBadRequest {

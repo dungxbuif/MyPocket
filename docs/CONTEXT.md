@@ -31,7 +31,7 @@ Native iOS keeps `/api/v1/ai/advisor/*` and rich parts. Owners can add multiple
 Telegram bots and pair each adapter independently. The service is read-only for
 finance data; legacy Go action confirmation remains separate.
 
-Fresh local proof: backend 872 tests; Python 32 tests without PostgreSQL and 33
+Fresh local proof: backend 873 tests; Python 38 tests without PostgreSQL and 39
 with PostgreSQL 17; assistant Python 3.13 image build; promotion/preflight
 contract tests. Production
 is not deployed. Remaining gates: rotate the Telegram token exposed in chat,

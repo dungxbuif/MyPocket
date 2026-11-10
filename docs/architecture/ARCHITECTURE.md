@@ -30,8 +30,10 @@ facts are fetched again instead of being promoted into memory.
 
 MyPocket signs two-minute HS256 assertions (`iss=mypocket`,
 `aud=finance-assistant`) and creates exact-operation `mpa_` delegations for
-finance reads. App delegations last at most ten minutes and are revoked after
-the request; a Telegram owner delegation lasts at most 90 days and rotates when
+finance reads. Synchronous app delegations are revoked after the response.
+Async app runs keep only an encrypted per-run copy until a terminal outcome;
+the backend credential expires after at most ten minutes. A Telegram owner
+delegation lasts at most 90 days and rotates when
 a new adapter is added. Telegram is the first adapter, not a special agent
 runtime: multiple adapters per owner are supported and future channels use the
 same adapter boundary.
@@ -41,7 +43,9 @@ channel-neutral text and typed `metric_group`, `wallet_balances` and
 `transaction_list` parts for native rendering. Telegram receives a text
 projection. Authenticated Telegram webhooks are persisted and acknowledged
 before model work; the worker leases updates with bounded retries so Telegram is
-not held open for a model response. No model call can write the ledger; existing Go-owned confirmation
+not held open for a model response. App chat uses the same durable pattern:
+acknowledged runs survive API restarts, are leased with `SKIP LOCKED`, and can
+be cooperatively cancelled while queued or running. No model call can write the ledger; existing Go-owned confirmation
 flows remain authoritative. See [ADR-030](../decisions/ADR-030-external-finance-assistant.md)
 and the [API contract](FINANCE_ASSISTANT_API.md).
 

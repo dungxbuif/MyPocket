@@ -68,7 +68,8 @@ the operational sequence and rollback evidence are in
 
 The external service owns a separate PostgreSQL schema created by
 `finance-assistant/src/finance_assistant/sql/0001_initial.sql`. It stores
-channel-scoped conversation messages and typed parts, durable agent runs,
+channel-scoped conversation messages and typed parts, durable agent runs and
+encrypted `assistant_run_jobs`,
 explicit memories, pending dream candidates with source references, Telegram
 adapters/bindings/pairings, encrypted delegated credentials and delivery/job
 state. Owner IDs are carried only from verified MyPocket assertions or Telegram
@@ -79,6 +80,12 @@ methods in the same database.
 are unique by adapter/update ID, leased with `SKIP LOCKED`, retried after
 transient failures and marked failed after ten attempts. Webhook requests never
 wait for model completion.
+
+`assistant_run_jobs` is the native-chat acknowledgement boundary. Owner and
+`client_request_id` form the replay key; delegation ciphertext is cleared on
+completion, failure or cancellation. Queue rows and `agent_runs` are written in
+one transaction, leased with `SKIP LOCKED`, and retain terminal state without
+retaining the delegated secret.
 
 `action_drafts` exists as reserved schema only; the candidate does not expose a
 financial-write capability or draft execution route. Do not infer shipped

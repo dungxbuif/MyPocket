@@ -35,11 +35,10 @@ vào ô chat, sửa lại nếu cần rồi nhấn mũi tên **Gửi**.
 - Ở cỡ chữ trợ năng, dùng menu chọn màn hình có nhãn đầy đủ thay thanh bốn tab.
   Đóng bàn phím trước khi đổi màn; câu hỏi chưa gửi vẫn giữ trong phiên hiện tại.
 - Ô nhập mở rộng tối đa bốn dòng; nội dung dài hơn cuộn bên trong ô.
-- Runtime Go cũ gửi chat bất đồng bộ và trả mã lượt chạy trước khi model hoàn
-  tất. Khi bật service Python candidate, route giữ cùng DTO nhưng hiện hoàn tất
-  model trước khi trả; app dùng timeout 250 giây khớp giới hạn service 240 giây.
-  Hủy cross-process/durable queue cho runtime mới chưa được triển khai và không
-  được suy ra từ tên route `/messages/async`.
+- Service Python ghi bền vững yêu cầu và trả mã lượt chạy `queued` trước khi gọi
+  model. App theo dõi trạng thái `queued`/`running` cho tới trạng thái cuối mà
+  không giữ request submit mở. Gửi lại cùng `client_request_id` trả đúng lượt
+  chạy cũ; nút hủy có thể bỏ job đang chờ hoặc ngắt provider request đang chạy.
 - **Chat mới** hủy best-effort các provider run đang chạy trong process khi
   reset được xác nhận; reset replay không hủy run mới. Provider work ở process
   khác vẫn dựa vào generation/lease guard để từ chối ghi muộn.

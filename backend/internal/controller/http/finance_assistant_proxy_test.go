@@ -129,6 +129,35 @@ func TestFinanceAssistantProxyUsesAndRevokesEphemeralLedgerDelegation(t *testing
 	}
 }
 
+func TestFinanceAssistantProxyRetainsAsyncDelegationForDurableWorker(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	secret := "test-finance-assistant-shared-secret-at-least-32-bytes"
+	upstream := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if token := r.Header.Get("X-MyPocket-Delegation"); len(token) < 5 || token[:4] != "mpa_" {
+			t.Fatalf("missing scoped delegation: %q", token)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusAccepted)
+		_, _ = w.Write([]byte(`{"data":{"run_id":"run-1","conversation_id":"main","status":"queued"}}`))
+	}))
+	defer upstream.Close()
+	repo := &proxyDelegationRepo{}
+	proxy := &FinanceAssistantProxy{BaseURL: upstream.URL, Secret: secret, Delegations: usecase.NewAssistantDelegationService(repo)}
+	engine := gin.New()
+	engine.POST(advisorRoute+"/messages/async", func(c *gin.Context) {
+		c.Set(contextAdvisorPrincipalKey, usecase.Principal{OwnerID: "owner-a", CredentialID: "session-a", CredentialKind: "session"})
+		proxy.Forward(c)
+	})
+	recorder := httptest.NewRecorder()
+	engine.ServeHTTP(recorder, httptest.NewRequest(http.MethodPost, advisorRoute+"/messages/async", nil))
+	if recorder.Code != http.StatusAccepted {
+		t.Fatalf("status=%d body=%s", recorder.Code, recorder.Body.String())
+	}
+	if len(repo.revoked) != 0 {
+		t.Fatalf("async delegation revoked before worker use: %v", repo.revoked)
+	}
+}
+
 func TestFinanceAssistantProxyWrapsChannelPayloadForNativeEnvelope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	secret := "test-finance-assistant-shared-secret-at-least-32-bytes"

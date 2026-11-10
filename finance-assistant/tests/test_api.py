@@ -14,7 +14,9 @@ from finance_assistant.models import TurnRequest
 from finance_assistant.mypocket import FinanceContextResult
 from finance_assistant.pairing import PairingRegistry
 from finance_assistant.persistence import InMemoryPersistence
+from finance_assistant.run_jobs import InMemoryAssistantRunQueue
 from finance_assistant.workspace import WorkspaceProjector
+from finance_assistant.worker import process_assistant_run
 
 
 SECRET = "test-finance-assistant-shared-secret-at-least-32-bytes"
@@ -34,7 +36,114 @@ def client(tmp_path) -> TestClient:
     persistence = InMemoryPersistence()
     memory = MemoryService(persistence, WorkspaceProjector(tmp_path))
     runtime = AgentRuntime(persistence, memory, SafeLocalModel())
-    return TestClient(create_app(Services(AssertionVerifier(SECRET), runtime, PairingRegistry())))
+    return TestClient(create_app(Services(
+        AssertionVerifier(SECRET), runtime, PairingRegistry(),
+        runs=InMemoryAssistantRunQueue(persistence),
+    )))
+
+
+def test_async_submit_is_durable_idempotent_and_cancellable_before_model_work(tmp_path) -> None:
+    api = client(tmp_path)
+    headers = {"Authorization": bearer("owner-a"), "X-MyPocket-Delegation": "mpa_test.secret"}
+    payload = {"conversation_id": "main", "client_request_id": "request-1", "text": "balance"}
+
+    first = api.post("/api/v1/ai/advisor/messages/async", headers=headers, json=payload)
+    replay = api.post("/api/v1/ai/advisor/messages/async", headers=headers, json=payload)
+
+    assert first.status_code == 202
+    assert first.json()["data"]["status"] == "queued"
+    assert replay.status_code == 202
+    assert replay.json()["data"]["run_id"] == first.json()["data"]["run_id"]
+    run_id = first.json()["data"]["run_id"]
+    assert api.get(f"/api/v1/ai/advisor/runs/{run_id}", headers=headers).json()["data"]["status"] == "queued"
+
+    cancelled = api.post(f"/api/v1/ai/advisor/runs/{run_id}/cancel", headers=headers)
+    assert cancelled.status_code == 200
+    assert cancelled.json()["data"]["status"] == "cancelled"
+    assert api.get(f"/api/v1/ai/advisor/runs/{run_id}", headers=headers).json()["data"]["status"] == "cancelled"
+
+
+def test_async_submit_requires_worker_delegation(tmp_path) -> None:
+    response = client(tmp_path).post(
+        "/api/v1/ai/advisor/messages/async",
+        headers={"Authorization": bearer("owner-a")},
+        json={"conversation_id": "main", "client_request_id": "request-1", "text": "balance"},
+    )
+    assert response.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_durable_worker_completes_queued_run_with_stable_run_id(tmp_path) -> None:
+    persistence = InMemoryPersistence()
+    runtime = AgentRuntime(persistence, MemoryService(persistence, WorkspaceProjector(tmp_path)), SafeLocalModel())
+    queue = InMemoryAssistantRunQueue(persistence)
+    request = TurnRequest(conversation_id="main", channel_id="app", platform_message_id="request-1", text="balance")
+    accepted = await queue.enqueue("owner-a", request, "mpa_test.secret")
+    job = (await queue.lease("worker-a"))[0]
+
+    assert await process_assistant_run(runtime, queue, job, "worker-a", poll_interval=0.01)
+
+    completed = await queue.get("owner-a", accepted["run_id"])
+    assert completed is not None
+    assert completed["run_id"] == accepted["run_id"]
+    assert completed["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_durable_worker_cooperatively_cancels_running_model(tmp_path) -> None:
+    started = asyncio.Event()
+
+    class SlowModel:
+        async def reply(self, messages, memories, ledger_context):
+            started.set()
+            await asyncio.Event().wait()
+
+    persistence = InMemoryPersistence()
+    runtime = AgentRuntime(persistence, MemoryService(persistence, WorkspaceProjector(tmp_path)), SlowModel())
+    queue = InMemoryAssistantRunQueue(persistence)
+    request = TurnRequest(conversation_id="main", channel_id="app", platform_message_id="request-1", text="balance")
+    accepted = await queue.enqueue("owner-a", request, "mpa_test.secret")
+    job = (await queue.lease("worker-a"))[0]
+    processing = asyncio.create_task(process_assistant_run(runtime, queue, job, "worker-a", poll_interval=0.01))
+    await started.wait()
+
+    cancellation = await queue.cancel("owner-a", accepted["run_id"])
+    assert cancellation is not None and cancellation["status"] == "running"
+    assert not await processing
+    cancelled = await queue.get("owner-a", accepted["run_id"])
+    assert cancelled is not None and cancelled["status"] == "cancelled"
+    assert await persistence.list_messages("owner-a", "app", "main") == []
+
+
+@pytest.mark.asyncio
+async def test_durable_worker_recovers_completion_after_post_model_crash_window(tmp_path) -> None:
+    persistence = InMemoryPersistence()
+    runtime = AgentRuntime(persistence, MemoryService(persistence, WorkspaceProjector(tmp_path)), SafeLocalModel())
+    request = TurnRequest(conversation_id="main", channel_id="app", platform_message_id="request-1", text="balance")
+    await runtime.run_turn("owner-a", request)
+    queue = InMemoryAssistantRunQueue(persistence)
+    accepted = await queue.enqueue("owner-a", request, "mpa_test.secret")
+    job = (await queue.lease("worker-a"))[0]
+
+    assert await process_assistant_run(runtime, queue, job, "worker-a", poll_interval=0.01)
+    recovered = await queue.get("owner-a", accepted["run_id"])
+    assert recovered is not None and recovered["status"] == "completed"
+
+
+@pytest.mark.asyncio
+async def test_durable_worker_reclaims_abandoned_event_claim_without_response(tmp_path) -> None:
+    persistence = InMemoryPersistence()
+    runtime = AgentRuntime(persistence, MemoryService(persistence, WorkspaceProjector(tmp_path)), SafeLocalModel())
+    request = TurnRequest(conversation_id="main", channel_id="app", platform_message_id="request-1", text="balance")
+    assert await persistence.accept_event("owner-a", "app", request.platform_message_id)
+    queue = InMemoryAssistantRunQueue(persistence)
+    accepted = await queue.enqueue("owner-a", request, "mpa_test.secret")
+    job = (await queue.lease("worker-a"))[0]
+
+    assert await process_assistant_run(runtime, queue, job, "worker-a", poll_interval=0.01)
+    recovered = await queue.get("owner-a", accepted["run_id"])
+    assert recovered is not None and recovered["status"] == "completed"
+    assert [row.role for row in await persistence.list_messages("owner-a", "app", "main")] == ["user", "assistant"]
 
 
 def test_turn_rejects_spoofed_owner_header_before_workspace_access(tmp_path) -> None:
