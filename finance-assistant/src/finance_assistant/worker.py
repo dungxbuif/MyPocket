@@ -11,6 +11,7 @@ from .channel_adapters import ChannelAdapterService, PostgresAdapterRepository
 from .config import get_settings
 from .credentials import PostgresCredentialVault
 from .memory import DreamWorker, LangMemDreamer, MemoryService
+from .migrate import migrate
 from .model_provider import build_chat_model
 from .mypocket import LiveFinanceContext, MyPocketClient
 from .pairing import PostgresPairingRegistry
@@ -129,6 +130,7 @@ async def run_once() -> int:
 
 
 async def main() -> None:
+    await migrate()
     while True:
         await run_once()
         await asyncio.sleep(30)

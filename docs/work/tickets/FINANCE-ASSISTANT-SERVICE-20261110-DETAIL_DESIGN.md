@@ -32,6 +32,10 @@ then verifies the required durable queue table before exiting successfully.
 The application persistence pool also supplies the schema as a libpq connection
 option for every newly opened connection; this is independent of URI parsing
 and covers run queues, Telegram jobs, memories, adapters, and conversations.
+The worker invokes the same idempotent schema ensure once, using its own
+effective settings, before entering the polling loop. The protected deploy
+migration remains the release gate; startup ensure is defense in depth against
+runtime secret/namespace drift and never drops or rewrites existing data.
 This keeps API, worker, LangGraph checkpointer/store, and the one-shot migration
 on one namespace even when an older database URL secret is reused.
 
