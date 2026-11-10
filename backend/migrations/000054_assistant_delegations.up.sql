@@ -1,6 +1,6 @@
 CREATE TABLE assistant_delegations (
     id uuid PRIMARY KEY,
-    owner_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    owner_id text NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
     lookup_id text NOT NULL UNIQUE,
     secret_hash text NOT NULL,
     allowed_operations jsonb NOT NULL,

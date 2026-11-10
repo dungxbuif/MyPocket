@@ -169,6 +169,30 @@ func TestCurrentRolloutMigrationsAreAdditiveAndOwnerSafe(t *testing.T) {
 	}
 }
 
+func TestAssistantDelegationMigrationUsesAuthoritativeOwnerKey(t *testing.T) {
+	contents, err := migrationFiles.ReadFile("000054_assistant_delegations.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sql := strings.ToUpper(string(contents))
+	for _, required := range []string{
+		`OWNER_ID TEXT NOT NULL REFERENCES "USER"(ID) ON DELETE CASCADE`,
+		`LOOKUP_ID TEXT NOT NULL UNIQUE`,
+	} {
+		if !strings.Contains(sql, required) {
+			t.Errorf("000054_assistant_delegations.up.sql missing owner contract %q", required)
+		}
+	}
+	for _, forbidden := range []string{
+		"OWNER_ID UUID",
+		"REFERENCES USERS(ID)",
+	} {
+		if strings.Contains(sql, forbidden) {
+			t.Errorf("000054_assistant_delegations.up.sql contains invalid owner contract %q", forbidden)
+		}
+	}
+}
+
 func TestRowVersionMigrationPreservesCASInvariant(t *testing.T) {
 	contents, err := migrationFiles.ReadFile("000040_row_versions.up.sql")
 	if err != nil {

@@ -29,8 +29,9 @@ confirmation remains the only assistant-adjacent financial mutation path.
   inspection/backup, not an execution database.
 - Model processing may include personal financial context and therefore needs
   explicit provider/privacy approval.
-- The deployment adds a database, worker, named volume, webhook route, four
-  Docker secrets and coordinated backup/restore obligations.
+- The deployment adds an isolated PostgreSQL schema, worker, named volume,
+  webhook route, four Docker secrets and coordinated backup/restore
+  obligations. It reuses MyPocket's existing database and text owner key.
 
 ## Alternatives
 
