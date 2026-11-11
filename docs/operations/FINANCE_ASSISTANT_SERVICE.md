@@ -68,10 +68,10 @@ is unsupported because projections are not authoritative.
 
 ## Current gate
 
-Source/image/route contracts are locally tested. Production is blocked until
-the feature is merged, the exposed bot token is rotated, protected release
-prerequisites are verified and the owner creates the source tag. No live model,
-Telegram webhook, production migration or restore drill is claimed.
+Release `prod-1.3.19` is deployed and its Telegram/model/ledger path is verified
+in production. The disclosed test bot token remains the only open operational
+gate: revoke it in BotFather and replace the adapter credential before treating
+the bot as long-lived. A restore drill is still not claimed.
 
 ## Live Telegram enrollment verification — 2026-11-11
 
@@ -105,3 +105,24 @@ real UUID scope validates. Production E2E is complete only after a fresh
 single-use pairing returns the success message and a read-only wallet question
 returns through Telegram. Existing MyPocket health and all unrelated services
 must remain healthy through the normal immutable `prod-<semver>` release path.
+
+## Production E2E record — 2026-11-11
+
+- App pipeline `#877` passed both test jobs, immutable build and ops promotion
+  for `prod-1.3.19`; ops pipeline `#879` passed validation, protected VM100
+  deployment and production verification.
+- The focused Pi5 enrollment added only `finance-assistant-telegram`. The live
+  dummy webhook returns `401`, existing MyPocket health remains `200`, and the
+  dynamic file retained inode `2475801`; Traefik was not restarted.
+- Telegram reports the exact registered webhook with zero pending updates. Its
+  retained last-error metadata refers to the pre-route `404`; subsequent durable
+  jobs and replies prove successful delivery after enrollment.
+- A fresh single-use pairing returned `Đã kết nối Telegram với MyPocket.` A new
+  read-only wallet question completed in one worker attempt and received a
+  finance-backed Telegram answer. One earlier job remains failed after ten
+  pre-release attempts as historical evidence of the rejected 45-character
+  channel scope; it is not pending.
+- MyPocket API/worker and Finance Assistant API/worker all remained `1/1`.
+  Final database evidence is one active binding and the expected user/assistant
+  message pair; no token, owner ID, pairing code or financial payload is stored
+  in this record.
