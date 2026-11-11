@@ -28,7 +28,7 @@ updated: 2026-11-11
 | Assistant runtime image | PASS: Python 3.13 image built with pinned direct dependencies |
 | Promotion and migration preflight contracts | PASS; production preflight warns that backup evidence is absent |
 | Native generic simulator build and focused model/run tests | PASS: project/base/icon guards and focused `AIModelsTests` on iPhone 16 Simulator; no new physical-device UAT |
-| Production release and webhook/provider probe | Existing `prod-1.3.19` Telegram/model/ledger E2E PASS; model-selected tool release pending |
+| Production release and webhook/provider probe | `prod-1.3.20` app pipeline `#884` and ops pipeline `#886` PASS; Telegram selected the jars read path and recalled an explicit preference on the next turn; truthful acknowledgement patch pending |
 | Backup/restore drill | PASS on disposable PostgreSQL 17 and workspace tree: checksums, memory, separate app/Telegram history, owner isolation, snapshot 0700 and Markdown 0600; production DR drill not run |
 
 Security gate: a Telegram bot token was pasted into the conversation and was

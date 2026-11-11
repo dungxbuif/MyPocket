@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 import pytest
 
 import finance_assistant.agent as agent_module
-from finance_assistant.agent import AgentRuntime, SafeLocalModel
+from finance_assistant.agent import AgentRuntime, OpenAICompatibleModel, SafeLocalModel
 from finance_assistant.api import Services, create_app
 from finance_assistant.identity import AssertionVerifier
 from finance_assistant.memory import MemoryService
@@ -22,6 +22,24 @@ from finance_assistant.worker import process_assistant_run
 
 
 SECRET = "test-finance-assistant-shared-secret-at-least-32-bytes"
+
+
+@pytest.mark.asyncio
+async def test_model_prompt_truthfully_describes_explicit_memory_persistence() -> None:
+    class CapturingModel:
+        def bind_tools(self, tools):
+            return self
+
+        async def ainvoke(self, messages):
+            self.messages = messages
+            return SimpleNamespace(content="ok", tool_calls=[])
+
+    provider = CapturingModel()
+    await OpenAICompatibleModel(provider).reply([], [], [])
+
+    system = provider.messages[0].content
+    assert "Explicit remember requests are persisted after a successful turn" in system
+    assert "Do not claim that durable memory is unavailable" in system
 
 
 def bearer(owner: str = "owner-a", actions: list[str] | None = None) -> str:

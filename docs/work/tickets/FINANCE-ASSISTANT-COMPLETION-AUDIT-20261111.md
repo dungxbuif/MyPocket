@@ -1,7 +1,7 @@
 ---
 artifact_type: implementation_audit
 id: FINANCE-ASSISTANT-COMPLETION-AUDIT-20261111
-status: implementation_complete_release_pending
+status: released_patch_pending
 owner: shared
 ---
 
@@ -43,6 +43,14 @@ mutation is exposed.
   turn cap, aggregate result bounds and one 240-second turn deadline pass.
 - Real-client timeout and malformed-JSON failures normalize to safe,
   credential-free unavailable context rather than failing the durable run.
+- Production Telegram E2E found that explicit memory was persisted and recalled
+  correctly on the next turn, but the acknowledgement falsely claimed memory
+  was unavailable. The prompt contract must state that successful explicit
+  remember requests are persisted by the service; a focused model-envelope test
+  must fail before the prompt is corrected.
+- `prod-1.3.20` app pipeline `#884` and ops receipt pipeline `#886` passed. The
+  production Telegram jars-read and subsequent memory recall passed; the prompt
+  regression failed then passed locally and requires its immutable patch receipt.
 - Full Python suite passes 53 tests without PostgreSQL and 54 with the isolated
   PostgreSQL 17 integration database.
 - Backend controller HTTP package passes 316 tests. Focused native model tests

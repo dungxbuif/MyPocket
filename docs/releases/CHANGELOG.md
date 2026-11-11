@@ -36,11 +36,13 @@ shared_fields: [status]
   remains explicitly read-only. Transport/JSON failures become safe unavailable
   context; per-round, per-turn, prompt, rich-part and whole-turn deadline bounds
   prevent a model batch from escaping the durable worker lease.
+- Correct the provider prompt so an explicit remember request is acknowledged as
+  durable service memory instead of falsely claiming memory is unavailable.
 - Completion evidence: controller HTTP 316 tests, Python 53 tests without
   PostgreSQL and 54 with PostgreSQL 17, focused iPhone 16 model tests, native
   guards, plus a disposable checksum-verified database/workspace restore drill.
-  The existing `prod-1.3.19` Telegram/model/ledger E2E passed; the read-tool
-  completion release and owner bot-token rotation remain pending.
+  `prod-1.3.20` pipelines `#884`/`#886` and production Telegram read-tool plus
+  memory-recall E2E passed. Owner bot-token rotation remains pending.
 
 ## Unreleased — MCP owner API parity, 2026-11-07
 
