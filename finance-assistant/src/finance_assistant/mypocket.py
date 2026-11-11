@@ -11,6 +11,60 @@ class MyPocketError(RuntimeError):
     pass
 
 
+FINANCE_READ_TOOLS = (
+    {
+        "type": "function",
+        "function": {
+            "name": "home",
+            "description": "Read the owner's current MyPocket overview.",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "wallets",
+            "description": "List the owner's wallets and current balances.",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "transactions",
+            "description": "Read recent owner transactions for analysis.",
+            "parameters": {
+                "type": "object",
+                "properties": {"limit": {"type": "integer", "minimum": 1, "maximum": 100, "default": 20}},
+                "additionalProperties": False,
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "budgets",
+            "description": "List the owner's budgets.",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "jars",
+            "description": "List the owner's savings jars.",
+            "parameters": {"type": "object", "properties": {}, "additionalProperties": False},
+        },
+    },
+)
+
+
+@dataclass(frozen=True, slots=True)
+class FinanceToolCall:
+    operation: str
+    arguments: dict[str, Any] = field(default_factory=dict)
+
+
 @dataclass(slots=True)
 class FinanceContextResult:
     prompt_lines: list[str] = field(default_factory=list)
@@ -57,18 +111,35 @@ class LiveFinanceContext:
         self.credential_vault = credential_vault
 
     async def __call__(self, owner_id: str, channel_id: str, message: str, delegated_credential: str | None = None) -> FinanceContextResult:
-        try:
-            token = delegated_credential or await self.credential_vault.get(owner_id)
-        except KeyError:
-            return FinanceContextResult(["ledger: unavailable (delegated credential missing)"])
         operations = ["home", "wallets"]
         normalized = message.lower()
         if any(word in normalized for word in ("giao dịch", "chi tiêu", "transaction", "spending")):
             operations.append("transactions")
+        return await self.execute(
+            owner_id,
+            [FinanceToolCall(operation, {"limit": 20} if operation == "transactions" else {}) for operation in operations],
+            delegated_credential,
+        )
+
+    async def execute(
+        self,
+        owner_id: str,
+        calls: list[FinanceToolCall],
+        delegated_credential: str | None = None,
+    ) -> FinanceContextResult:
+        allowed = {tool["function"]["name"] for tool in FINANCE_READ_TOOLS}
+        if any(call.operation not in allowed for call in calls):
+            raise MyPocketError("operation_not_allowed")
+        try:
+            token = delegated_credential or await self.credential_vault.get(owner_id)
+        except KeyError:
+            return FinanceContextResult(["ledger: unavailable (delegated credential missing)"])
         result = FinanceContextResult()
-        for operation in operations:
+        for call in calls:
+            operation = call.operation
+            params = self._safe_params(call)
             try:
-                data = await self.client.read(token, operation, {"limit": 20} if operation == "transactions" else None)
+                data = await self.client.read(token, operation, params)
                 encoded = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
                 result.prompt_lines.append(f"{operation}: {encoded[:20_000]}")
                 view = data.get("data", data) if isinstance(data, dict) else data
@@ -84,6 +155,15 @@ class LiveFinanceContext:
             except MyPocketError as exc:
                 result.prompt_lines.append(f"{operation}: unavailable ({exc})")
         return result
+
+    @staticmethod
+    def _safe_params(call: FinanceToolCall) -> dict[str, Any] | None:
+        if call.operation != "transactions":
+            return None
+        raw_limit = call.arguments.get("limit", 20)
+        if isinstance(raw_limit, bool) or not isinstance(raw_limit, int):
+            raise MyPocketError("invalid_tool_arguments")
+        return {"limit": min(max(raw_limit, 1), 100)}
 
     @staticmethod
     def _items(value: Any) -> list[dict[str, Any]]:
