@@ -1,7 +1,7 @@
 ---
 artifact_type: implementation_audit
 id: FINANCE-ASSISTANT-COMPLETION-AUDIT-20261111
-status: released_patch_pending
+status: released_owner_rotation_pending
 owner: shared
 ---
 
@@ -51,6 +51,11 @@ mutation is exposed.
 - `prod-1.3.20` app pipeline `#884` and ops receipt pipeline `#886` passed. The
   production Telegram jars-read and subsequent memory recall passed; the prompt
   regression failed then passed locally and requires its immutable patch receipt.
+- `prod-1.3.21` app pipeline `#888` and ops receipt pipeline `#890` passed,
+  including protected deploy and production verification jobs. A new Telegram
+  explicit remember request received a truthful durable-memory acknowledgement.
+  Implementation and release gates are complete; rotating the disclosed bot
+  token remains an owner-only credential action.
 - Full Python suite passes 53 tests without PostgreSQL and 54 with the isolated
   PostgreSQL 17 integration database.
 - Backend controller HTTP package passes 316 tests. Focused native model tests

@@ -73,11 +73,12 @@ is unsupported because projections are not authoritative.
 
 ## Current gate
 
-Release `prod-1.3.20` is deployed through app pipeline `#884` and ops receipt
-pipeline `#886`. Production Telegram E2E selected the `jars` read path and
-recalled an explicit response-style memory on the next turn. The follow-up
-prompt correction for truthful memory acknowledgement targets the next immutable
-patch receipt. The disclosed test bot token remains an
+Release `prod-1.3.21` is deployed through app pipeline `#888` and ops receipt
+pipeline `#890`; deploy and production verification jobs passed with backup and
+release receipts. Production Telegram E2E selected the `jars` read path,
+recalled an explicit response-style memory on the next turn and acknowledged a
+new explicit remember request without denying durable memory. The disclosed
+test bot token remains an
 open owner action: revoke it in BotFather and replace the adapter credential
 before treating the bot as long-lived.
 

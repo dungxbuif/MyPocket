@@ -41,8 +41,9 @@ shared_fields: [status]
 - Completion evidence: controller HTTP 316 tests, Python 53 tests without
   PostgreSQL and 54 with PostgreSQL 17, focused iPhone 16 model tests, native
   guards, plus a disposable checksum-verified database/workspace restore drill.
-  `prod-1.3.20` pipelines `#884`/`#886` and production Telegram read-tool plus
-  memory-recall E2E passed. Owner bot-token rotation remains pending.
+  `prod-1.3.21` pipelines `#888`/`#890`, deploy/production verification and
+  production Telegram read-tool, memory-recall and truthful acknowledgement E2E
+  passed. Owner bot-token rotation remains pending.
 
 ## Unreleased — MCP owner API parity, 2026-11-07
 
