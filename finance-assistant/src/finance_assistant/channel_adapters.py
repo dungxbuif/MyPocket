@@ -62,6 +62,12 @@ class PostgresAdapterRepository:
     def __init__(self, pool: AsyncConnectionPool) -> None:
         self.pool = pool
 
+    @staticmethod
+    def _adapter(row) -> ChannelAdapter:
+        values = dict(row)
+        values["id"] = str(values["id"])
+        return ChannelAdapter(**values)
+
     async def create(self, adapter: ChannelAdapter) -> None:
         async with self.pool.connection() as conn:
             await conn.execute(
@@ -76,7 +82,7 @@ class PostgresAdapterRepository:
                 (adapter_id,),
             )
             row = await result.fetchone()
-        return ChannelAdapter(**row) if row else None
+        return self._adapter(row) if row else None
 
     async def list_owner(self, owner_id: str) -> list[ChannelAdapter]:
         async with self.pool.connection() as conn:
@@ -85,7 +91,7 @@ class PostgresAdapterRepository:
                 (owner_id,),
             )
             rows = await result.fetchall()
-        return [ChannelAdapter(**row) for row in rows]
+        return [self._adapter(row) for row in rows]
 
     async def revoke(self, owner_id: str, adapter_id: str) -> bool:
         async with self.pool.connection() as conn:

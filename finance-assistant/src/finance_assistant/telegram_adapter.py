@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 from typing import Any
 
 import httpx
@@ -13,6 +14,11 @@ class TelegramAdapter:
     def __init__(self, runtime: AgentRuntime, pairings: PairingRegistry) -> None:
         self.runtime = runtime
         self.pairings = pairings
+
+    @staticmethod
+    def channel_id(adapter_id: str) -> str:
+        digest = hashlib.sha256(adapter_id.encode()).hexdigest()[:24]
+        return f"telegram-{digest}"
 
     async def handle_update(self, payload: dict[str, Any], *, adapter_id: str, owner_id: str, bot_token: str) -> TurnResponse | None:
         update_id = str(payload.get("update_id", ""))
@@ -42,7 +48,7 @@ class TelegramAdapter:
             return None
         response = await self.runtime.run_turn(
             binding.owner_id,
-            TurnRequest(channel_id=f"telegram-{adapter_id}", conversation_id=str(chat["id"]), platform_message_id=update_id, text=text),
+            TurnRequest(channel_id=self.channel_id(adapter_id), conversation_id=str(chat["id"]), platform_message_id=update_id, text=text),
         )
         await self.send(bot_token, chat["id"], self.render(response))
         return response
