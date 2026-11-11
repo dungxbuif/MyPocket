@@ -30,10 +30,15 @@ shared_fields: [status]
 - Add durable app-run intake with encrypted per-run delegation, idempotent
   acknowledgement, worker leasing/retry, restart recovery and cooperative
   queued/running cancellation.
-- Local evidence: Go 873 tests, Python 38 tests without PostgreSQL plus 39 tests
-  with PostgreSQL 17, and a Python
-  3.13 image build. Production release, live provider/webhook/device UAT and
-  backup/restore drill remain pending.
+- Add a bounded model-selected read-tool loop for `home`, `wallets`,
+  `transactions`, `budgets` and `jars`. Owner identity and delegation stay
+  service-owned; unknown/write calls fail before HTTP and capability discovery
+  remains explicitly read-only.
+- Completion evidence: controller HTTP 316 tests, Python 53 tests without
+  PostgreSQL and 54 with PostgreSQL 17, focused iPhone 16 model tests, native
+  guards, plus a disposable checksum-verified database/workspace restore drill.
+  The existing `prod-1.3.19` Telegram/model/ledger E2E passed; the read-tool
+  completion release and owner bot-token rotation remain pending.
 
 ## Unreleased — MCP owner API parity, 2026-11-07
 

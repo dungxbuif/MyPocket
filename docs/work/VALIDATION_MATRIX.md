@@ -13,25 +13,28 @@ ai_fields:
 shared_fields:
   - matrix_rows
   - validation_status
-updated: 2026-11-10
+updated: 2026-11-11
 ---
 
-## External Finance Assistant — 2026-11-10
+## External Finance Assistant — 2026-11-11
 
 | Check | Result |
 | --- | --- |
-| Backend auth/proxy/delegation and full Go suite | PASS: 873 tests in 20 packages |
-| Python suite without PostgreSQL | PASS: 38, with the PostgreSQL-only integration case skipped |
-| PostgreSQL 17 migration + full Python suite | PASS: 39, including restart durability, owner isolation, encrypted durable app/Telegram intake, cooperative cancellation and official LangGraph checkpoint/store |
+| Backend auth/proxy/delegation | PASS: controller HTTP package 316 tests |
+| Python suite without PostgreSQL | PASS: 53, with the PostgreSQL-only integration case skipped |
+| PostgreSQL 17 migration + full Python suite | PASS: 54, including restart durability, owner isolation, encrypted durable app/Telegram intake, cooperative cancellation and official LangGraph checkpoint/store |
+| Model-selected finance tools | PASS: exact read-only catalog (`home`, `wallets`, `transactions`, `budgets`, `jars`), owner/delegation injection, invalid/write rejection, rich-part ordering and three-round cap |
 | OpenAI-compatible request contract | PASS: selected endpoint/model, bearer header and `max_completion_tokens=4096`; no live provider call |
 | Assistant runtime image | PASS: Python 3.13 image built with pinned direct dependencies |
 | Promotion and migration preflight contracts | PASS; production preflight warns that backup evidence is absent |
-| Native generic simulator build and focused model/run tests | PASS at implementation checkpoint; async submit uses the normal 60-second transport bound because acknowledgement precedes model work; no physical-device/Telegram UI UAT |
-| Production release and webhook/provider probe | NOT RUN: feature branches are not merged/tagged; protected secrets/runners not verified |
-| Backup/restore drill | NOT RUN: production database and workspace volume do not exist yet |
+| Native generic simulator build and focused model/run tests | PASS: project/base/icon guards and focused `AIModelsTests` on iPhone 16 Simulator; no new physical-device UAT |
+| Production release and webhook/provider probe | Existing `prod-1.3.19` Telegram/model/ledger E2E PASS; model-selected tool release pending |
+| Backup/restore drill | PASS on disposable PostgreSQL 17 and workspace tree: checksums, memory, separate app/Telegram history, owner isolation, snapshot 0700 and Markdown 0600; production DR drill not run |
 
-Security gate: a Telegram bot token was pasted into the conversation. It is not
-stored by this implementation and must be revoked/rotated before any live setup.
+Security gate: a Telegram bot token was pasted into the conversation and was
+used for the temporary production E2E at the owner's direction. It must be
+revoked/rotated and the adapter replaced before long-lived use; the token value
+is not recorded in repository evidence.
 
 ## MCP owner API parity — 2026-11-07
 

@@ -1,7 +1,7 @@
 ---
 artifact_type: implementation_audit
 id: FINANCE-ASSISTANT-COMPLETION-AUDIT-20261111
-status: active
+status: implementation_complete_release_pending
 owner: shared
 ---
 
@@ -33,6 +33,21 @@ mutation is exposed.
 | Durable runs and isolation | PostgreSQL run/Telegram queues, signed assertion, delegated credential vault | Run full unit and PostgreSQL integration suites |
 | Backup and restore | Scripts and runbook exist; production restore drill not claimed | Validate scripts statically and run an isolated disposable restore drill before claiming completion |
 | Production state | `prod-1.3.19` Telegram/model/ledger path passed | Release only through one new protected `prod-<semver>` tag after all gates; user must rotate disclosed bot token |
+
+## Implementation evidence
+
+- Exact five-tool read catalog, bounded parameters and deterministic rich parts:
+  focused tests pass.
+- Model-selected tool loop: owner/delegation propagation, multiple calls,
+  invalid/write rejection and three-round cap pass.
+- Full Python suite passes 53 tests without PostgreSQL and 54 with the isolated
+  PostgreSQL 17 integration database.
+- Backend controller HTTP package passes 316 tests. Focused native model tests
+  pass on iPhone 16 Simulator; project, base-component and icon-catalog guards
+  pass.
+- Disposable backup/restore passes checksum verification, retains one trusted
+  memory, separate app/Telegram histories, owner isolation and mode-0600
+  Markdown projections. Production DR remains a distinct operations exercise.
 
 ## Affected contracts
 

@@ -1,6 +1,6 @@
 # Hỏi trợ lý tài chính trên iPhone
 
-## Kết nối nhiều bot Telegram (bản candidate)
+## Kết nối nhiều bot Telegram
 
 Trong tab **Trợ lý**, mở menu dấu ba chấm và chọn **Kết nối Telegram**. Mỗi bot
 cần một nhãn riêng và token mới lấy từ BotFather. App gửi token một lần qua
@@ -18,7 +18,14 @@ Hội thoại trong app và từng kênh Telegram có lịch sử riêng, nhưng
 đã được tin cậy có thể dùng chung theo tài khoản. Telegram chỉ hiển thị bản text;
 app vẫn có thể hiển thị thẻ số liệu rich component. Bản service mới chỉ đọc và
 phân tích dữ liệu tài chính; nó không tự tạo/sửa/xóa giao dịch, ví, hũ hay ngân
-sách. Tính năng này đã được kiểm thử local nhưng chưa phải tuyên bố production.
+sách. Luồng service/model/ledger và Telegram đã được kiểm tra production; token
+nào từng bị dán vào chat vẫn phải được revoke và thay mới trước khi dùng lâu dài.
+
+Model tự chọn trong năm công cụ đọc `home`, `wallets`, `transactions`,
+`budgets`, `jars` tùy câu hỏi, tối đa ba vòng mỗi lượt. Owner và credential do
+service gắn ở phía máy chủ, không phải tham số model. Endpoint capabilities luôn
+giữ `write=false` và `direct_writes=false`; các luồng xác nhận cũ do Go backend
+quản lý không biến thành quyền ghi trực tiếp của external assistant.
 
 Hướng dẫn này mô tả bản native hiện tại. Async chat và dọn lịch sử sau thời gian
 không hoạt động đã được ghi nhận triển khai production ngày 16/10/2026;

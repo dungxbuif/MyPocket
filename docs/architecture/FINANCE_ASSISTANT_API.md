@@ -1,14 +1,15 @@
 ---
 artifact_type: api_reference
 id: FINANCE-ASSISTANT-API
-status: candidate
+status: active
 owner: shared
 ---
 
 # Finance Assistant API and channel contract
 
 This is the stable human- and agent-readable reference for the external
-Finance Assistant candidate. Production deployment is not claimed here.
+Finance Assistant. Deployment evidence and remaining credential-rotation gates
+are recorded in the operations runbook.
 
 ## Native facade
 
@@ -59,6 +60,13 @@ The current `parts_version` is `1`. Supported rich types are text,
 ignored or rendered as safe text. Capability flags are `write=false`,
 `direct_writes=false`, `proposal_actions=false` and
 `confirmation_required=true`.
+
+`tools` advertises exactly five model-selectable read operations: `home`,
+`wallets`, `transactions`, `budgets` and `jars`. A turn may execute at most
+three tool rounds. The model supplies only the operation and bounded public
+arguments; the service injects owner identity and the `mpa_` delegation. An
+unknown or write-like operation is rejected before an HTTP request. No
+advertised tool can create, update or delete financial data.
 
 The service's own OpenAPI document is available on its private network at
 `/openapi.json`; it is not an alternative public authentication surface.

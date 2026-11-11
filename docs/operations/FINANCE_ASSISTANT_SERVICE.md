@@ -1,7 +1,7 @@
 ---
 artifact_type: operational_runbook
 id: FINANCE-ASSISTANT-SERVICE
-status: candidate
+status: active
 owner: shared
 ---
 
@@ -69,9 +69,16 @@ is unsupported because projections are not authoritative.
 ## Current gate
 
 Release `prod-1.3.19` is deployed and its Telegram/model/ledger path is verified
-in production. The disclosed test bot token remains the only open operational
-gate: revoke it in BotFather and replace the adapter credential before treating
-the bot as long-lived. A restore drill is still not claimed.
+in production. The model-selected read-tool completion is locally verified and
+awaits its immutable release receipt. The disclosed test bot token remains an
+open owner action: revoke it in BotFather and replace the adapter credential
+before treating the bot as long-lived.
+
+An isolated PostgreSQL 17 backup/restore drill passed on 2026-11-11. It restored
+one trusted memory, separate app and Telegram histories, owner isolation and the
+workspace archive; checksum validation passed, snapshot directory mode was
+0700 and restored Markdown files retained mode 0600. This proves the scripts
+and data contract on disposable data, not a production disaster-recovery drill.
 
 ## Live Telegram enrollment verification — 2026-11-11
 
