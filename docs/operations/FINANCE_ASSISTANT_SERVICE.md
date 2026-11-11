@@ -88,3 +88,20 @@ the durable inbound queue, single-use pairing, worker completion, a Telegram
 reply and an owner-scoped finance read. Record only counts, states and redacted
 timestamps. A healthy service or successful webhook registration alone is not
 an end-to-end pass.
+
+The live check exposed two PostgreSQL type/boundary regressions before any
+financial response was returned. Psycopg yields the adapter UUID as a UUID
+object even though `ChannelAdapter.id` is a string contract, so a successfully
+redeemed pairing was persisted and then incorrectly rejected by the worker's
+adapter comparison. The subsequent channel scope used
+`telegram-<adapter UUID>`, which is 45 characters and therefore fails the
+`TurnRequest.channel_id` maximum of 40 before model execution.
+
+The corrective release must normalize repository adapter IDs to strings and
+derive a deterministic, adapter-specific Telegram channel ID that satisfies the
+existing validation limit. Regression tests must prove pairing succeeds with a
+UUID-backed repository row, two adapters retain distinct channel scopes, and a
+real UUID scope validates. Production E2E is complete only after a fresh
+single-use pairing returns the success message and a read-only wallet question
+returns through Telegram. Existing MyPocket health and all unrelated services
+must remain healthy through the normal immutable `prod-<semver>` release path.
