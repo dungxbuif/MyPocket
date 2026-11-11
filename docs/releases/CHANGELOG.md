@@ -33,7 +33,9 @@ shared_fields: [status]
 - Add a bounded model-selected read-tool loop for `home`, `wallets`,
   `transactions`, `budgets` and `jars`. Owner identity and delegation stay
   service-owned; unknown/write calls fail before HTTP and capability discovery
-  remains explicitly read-only.
+  remains explicitly read-only. Transport/JSON failures become safe unavailable
+  context; per-round, per-turn, prompt, rich-part and whole-turn deadline bounds
+  prevent a model batch from escaping the durable worker lease.
 - Completion evidence: controller HTTP 316 tests, Python 53 tests without
   PostgreSQL and 54 with PostgreSQL 17, focused iPhone 16 model tests, native
   guards, plus a disposable checksum-verified database/workspace restore drill.

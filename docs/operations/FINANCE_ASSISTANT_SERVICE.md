@@ -50,6 +50,11 @@ healthy only when it returns `202 queued`, the run advances through
 parts. Queue depth, attempts, expired leases and terminal failures must be
 inspected in PostgreSQL; never log decrypted delegations or bot tokens.
 
+The advertised 240-second run timeout covers the complete LangGraph turn,
+including all model and finance-tool rounds, and remains below the five-minute
+queue lease. A deadline returns a safe completed message instead of allowing a
+second worker to reclaim still-running work.
+
 ## Backup and restore
 
 Back up the assistant PostgreSQL database with the normal database class and

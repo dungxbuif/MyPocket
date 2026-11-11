@@ -1,4 +1,5 @@
 import asyncio
+import json
 from types import SimpleNamespace
 from datetime import UTC, datetime, timedelta
 
@@ -352,6 +353,72 @@ def test_invalid_model_tool_call_becomes_safe_unavailable_context(tmp_path) -> N
 
     assert response.text == "cannot do that"
     assert model.contexts[-1] == ["tool: unavailable (operation_not_allowed)"]
+
+
+def test_tool_work_is_bounded_per_round_per_turn_and_by_result_size(tmp_path) -> None:
+    class RepeatingBatchModel:
+        def __init__(self):
+            self.calls = 0
+            self.final_context = []
+
+        async def reply(self, messages, memories, ledger_context):
+            self.calls += 1
+            if self.calls <= 2:
+                return agent_module.ModelReply(tool_calls=[
+                    FinanceToolCall("transactions", {"limit": limit}) for limit in range(1, 101)
+                ])
+            self.final_context = list(ledger_context)
+            return agent_module.ModelReply(text="bounded")
+
+    class FinanceTools:
+        def __init__(self):
+            self.batch_sizes = []
+
+        async def execute(self, owner_id, calls, delegated_credential):
+            self.batch_sizes.append(len(calls))
+            return FinanceContextResult(
+                ["x" * 20_000 for _ in calls],
+                [{"type": "notice", "data": {"text": "x" * 50_000}} for _ in calls],
+            )
+
+    persistence = InMemoryPersistence()
+    model = RepeatingBatchModel()
+    tools = FinanceTools()
+    response = asyncio.run(AgentRuntime(
+        persistence,
+        MemoryService(persistence, WorkspaceProjector(tmp_path)),
+        model,
+        finance_context=tools,
+    ).run_turn("owner-a", TurnRequest(
+        conversation_id="main", channel_id="app", platform_message_id="m1", text="everything",
+    ), delegated_credential="mpa_ephemeral"))
+
+    assert tools.batch_sizes == [5, 3]
+    assert sum(len(line) for line in model.final_context) <= 40_000
+    assert len(json.dumps([part.model_dump() for part in response.parts])) <= 100_000
+    assert any("limit" in line for line in model.final_context)
+
+
+def test_complete_turn_uses_one_deadline_and_returns_safe_timeout(tmp_path) -> None:
+    class SlowModel:
+        async def reply(self, messages, memories, ledger_context):
+            await asyncio.sleep(0.05)
+            return "late"
+
+    persistence = InMemoryPersistence()
+    response = asyncio.run(AgentRuntime(
+        persistence,
+        MemoryService(persistence, WorkspaceProjector(tmp_path)),
+        SlowModel(),
+        run_timeout_seconds=0.01,
+    ).run_turn("owner-a", TurnRequest(
+        conversation_id="main", channel_id="app", platform_message_id="m1", text="slow",
+    )))
+
+    assert response.status == "completed"
+    assert "thời gian" in response.text.lower()
+    rows = asyncio.run(persistence.list_messages("owner-a", "app", "main"))
+    assert [row.role for row in rows] == ["user", "assistant"]
 
 
 def test_model_context_is_bounded_to_recent_messages(tmp_path) -> None:

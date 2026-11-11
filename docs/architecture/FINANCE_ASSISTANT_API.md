@@ -63,10 +63,14 @@ ignored or rendered as safe text. Capability flags are `write=false`,
 
 `tools` advertises exactly five model-selectable read operations: `home`,
 `wallets`, `transactions`, `budgets` and `jars`. A turn may execute at most
-three tool rounds. The model supplies only the operation and bounded public
-arguments; the service injects owner identity and the `mpa_` delegation. An
-unknown or write-like operation is rejected before an HTTP request. No
-advertised tool can create, update or delete financial data.
+three tool rounds, five unique calls per round and eight calls total. Aggregate
+model-visible ledger context is capped at 40,000 characters and stored rich
+parts at 100,000 serialized bytes. The model supplies only the operation and
+bounded public arguments; the service injects owner identity and the `mpa_`
+delegation. An unknown or write-like operation is rejected before an HTTP
+request. Transport and malformed-response failures become credential-free
+`unavailable` context. No advertised tool can create, update or delete
+financial data.
 
 The service's own OpenAPI document is available on its private network at
 `/openapi.json`; it is not an alternative public authentication surface.

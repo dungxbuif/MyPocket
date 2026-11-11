@@ -89,7 +89,10 @@ class MyPocketClient:
         if operation not in self.READ_OPERATIONS:
             raise MyPocketError("operation_not_allowed")
         method, path = self.READ_OPERATIONS[operation]
-        response = await self.client.request(method, path, headers=self._headers(token), params=params)
+        try:
+            response = await self.client.request(method, path, headers=self._headers(token), params=params)
+        except httpx.RequestError as exc:
+            raise MyPocketError("transport_unavailable") from exc
         return self._decode(response)
 
     @staticmethod
@@ -102,7 +105,10 @@ class MyPocketClient:
     def _decode(response: httpx.Response) -> Any:
         if response.status_code >= 400:
             raise MyPocketError(f"mypocket_{response.status_code}")
-        return response.json()
+        try:
+            return response.json()
+        except ValueError as exc:
+            raise MyPocketError("invalid_response") from exc
 
 
 class LiveFinanceContext:

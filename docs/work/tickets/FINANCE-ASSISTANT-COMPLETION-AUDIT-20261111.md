@@ -39,7 +39,10 @@ mutation is exposed.
 - Exact five-tool read catalog, bounded parameters and deterministic rich parts:
   focused tests pass.
 - Model-selected tool loop: owner/delegation propagation, multiple calls,
-  invalid/write rejection and three-round cap pass.
+  invalid/write rejection, three-round cap, five-call round cap, eight-call
+  turn cap, aggregate result bounds and one 240-second turn deadline pass.
+- Real-client timeout and malformed-JSON failures normalize to safe,
+  credential-free unavailable context rather than failing the durable run.
 - Full Python suite passes 53 tests without PostgreSQL and 54 with the isolated
   PostgreSQL 17 integration database.
 - Backend controller HTTP package passes 316 tests. Focused native model tests

@@ -1,4 +1,5 @@
 import pytest
+import httpx
 
 import finance_assistant.mypocket as mypocket
 
@@ -100,6 +101,33 @@ async def test_executor_returns_unavailable_without_call_when_delegation_missing
     assert result.prompt_lines == ["ledger: unavailable (delegated credential missing)"]
     assert result.parts == []
     assert client.calls == []
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("failure", "expected"),
+    [("timeout", "transport_unavailable"), ("malformed", "invalid_response")],
+)
+async def test_real_client_normalizes_transport_and_decode_failures(failure, expected) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if failure == "timeout":
+            raise httpx.ReadTimeout("private detail", request=request)
+        return httpx.Response(200, text="not-json", request=request)
+
+    client = MyPocketClient("https://mypocket.invalid")
+    await client.client.aclose()
+    client.client = httpx.AsyncClient(
+        base_url="https://mypocket.invalid", transport=httpx.MockTransport(handler),
+    )
+    try:
+        result = await LiveFinanceContext(client, Vault()).execute(
+            "owner-a", [mypocket.FinanceToolCall("wallets")], "mpa_ephemeral",
+        )
+    finally:
+        await client.close()
+
+    assert result.prompt_lines == [f"wallets: unavailable ({expected})"]
+    assert result.parts == []
 
 
 @pytest.mark.asyncio

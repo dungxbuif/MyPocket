@@ -163,7 +163,7 @@ def create_app(services: Services) -> FastAPI:
     @app.get("/api/v1/ai/advisor/capabilities")
     async def compat_capabilities(actor: AssistantIdentity = Depends(require_action("assistant:chat"))):
         tools = [tool["function"]["name"] for tool in FINANCE_READ_TOOLS]
-        return {"data": {"enabled": True, "write": False, "tools": tools, "direct_writes": False, "proposal_actions": False, "confirmation_required": True, "parts_version": 1, "run_timeout_seconds": 240, "grounding_version": 1, "entry_integration": False, "memory": True, "channel_adapters": True}}
+        return {"data": {"enabled": True, "write": False, "tools": tools, "direct_writes": False, "proposal_actions": False, "confirmation_required": True, "parts_version": 1, "run_timeout_seconds": int(services.runtime.run_timeout_seconds), "grounding_version": 1, "entry_integration": False, "memory": True, "channel_adapters": True}}
 
     @app.get("/api/v1/ai/advisor/conversation/messages")
     async def compat_messages(conversation_id: str, actor: AssistantIdentity = Depends(require_action("assistant:chat"))):
