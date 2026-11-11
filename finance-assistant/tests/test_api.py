@@ -194,8 +194,11 @@ def test_native_capabilities_decode_contract_and_empty_reset(tmp_path) -> None:
     headers = {"Authorization": bearer("owner-a")}
     capabilities = api.get("/api/v1/ai/advisor/capabilities", headers=headers)
     assert capabilities.status_code == 200
-    assert capabilities.json()["data"]["tools"] == []
-    assert capabilities.json()["data"]["entry_integration"] is False
+    contract = capabilities.json()["data"]
+    assert contract["tools"] == ["home", "wallets", "transactions", "budgets", "jars"]
+    assert contract["write"] is False
+    assert contract["direct_writes"] is False
+    assert contract["entry_integration"] is False
 
     api.post("/v1/turns", headers=headers, json={"conversation_id": "main", "channel_id": "app", "platform_message_id": "m1", "text": "hello"})
     reset = api.post("/api/v1/ai/advisor/conversation/reset", headers=headers)
