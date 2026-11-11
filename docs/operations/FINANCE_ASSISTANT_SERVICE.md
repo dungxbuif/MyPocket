@@ -72,3 +72,19 @@ Source/image/route contracts are locally tested. Production is blocked until
 the feature is merged, the exposed bot token is rotated, protected release
 prerequisites are verified and the owner creates the source tag. No live model,
 Telegram webhook, production migration or restore drill is claimed.
+
+## Live Telegram enrollment verification — 2026-11-11
+
+The first production adapter will be enrolled for the established primary
+owner through the same `ChannelAdapterService`, encrypted credential vault and
+Telegram `setWebhook` path used by the authenticated native facade. No token,
+webhook secret, owner identifier, pairing code or financial payload may enter
+the work note or operator logs. The temporary bot credential supplied for this
+check must be revoked after verification because it was previously disclosed.
+
+Verification is boundary-based: confirm adapter and delegated credential rows,
+the exact public webhook URL reported by Telegram, one private-chat update in
+the durable inbound queue, single-use pairing, worker completion, a Telegram
+reply and an owner-scoped finance read. Record only counts, states and redacted
+timestamps. A healthy service or successful webhook registration alone is not
+an end-to-end pass.
