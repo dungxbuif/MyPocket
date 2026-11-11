@@ -6,12 +6,13 @@ import jwt
 from fastapi.testclient import TestClient
 import pytest
 
+import finance_assistant.agent as agent_module
 from finance_assistant.agent import AgentRuntime, SafeLocalModel
 from finance_assistant.api import Services, create_app
 from finance_assistant.identity import AssertionVerifier
 from finance_assistant.memory import MemoryService
 from finance_assistant.models import TurnRequest
-from finance_assistant.mypocket import FinanceContextResult
+from finance_assistant.mypocket import FinanceContextResult, FinanceToolCall, MyPocketError
 from finance_assistant.pairing import PairingRegistry
 from finance_assistant.persistence import InMemoryPersistence
 from finance_assistant.run_jobs import InMemoryAssistantRunQueue
@@ -217,27 +218,137 @@ def test_run_survives_runtime_recreation(tmp_path) -> None:
 
 
 def test_app_turn_passes_ephemeral_delegation_to_finance_context(tmp_path) -> None:
-    captured = []
+    class ToolModel:
+        def __init__(self):
+            self.calls = 0
 
-    async def finance_context(owner_id: str, channel_id: str, message: str, token: str | None):
-        captured.append((owner_id, channel_id, message, token))
-        return FinanceContextResult(parts=[{"type": "notice", "data": {"text": "fresh"}}])
+        async def reply(self, messages, memories, ledger_context):
+            self.calls += 1
+            if self.calls == 1:
+                return agent_module.ModelReply(tool_calls=[FinanceToolCall("wallets")])
+            assert ledger_context == ["wallets: fresh"]
+            return agent_module.ModelReply(text="done")
+
+    class FinanceTools:
+        def __init__(self):
+            self.calls = []
+
+        async def execute(self, owner_id, calls, delegated_credential):
+            self.calls.append((owner_id, calls, delegated_credential))
+            return FinanceContextResult(
+                ["wallets: fresh"],
+                [{"type": "notice", "data": {"text": "fresh"}}],
+            )
 
     persistence = InMemoryPersistence()
+    finance_tools = FinanceTools()
     runtime = AgentRuntime(
         persistence,
         MemoryService(persistence, WorkspaceProjector(tmp_path)),
-        SafeLocalModel(),
-        finance_context=finance_context,
+        ToolModel(),
+        finance_context=finance_tools,
     )
     request = TurnRequest(
         conversation_id="main", channel_id="app", platform_message_id="m1", text="balance"
     )
     response = asyncio.run(runtime.run_turn("owner-a", request, delegated_credential="mpa_ephemeral"))
-    assert captured == [("owner-a", "app", "balance", "mpa_ephemeral")]
+    assert finance_tools.calls == [
+        ("owner-a", [FinanceToolCall("wallets")], "mpa_ephemeral"),
+    ]
+    assert response.text == "done"
     assert response.parts[0].type == "notice"
     rows = asyncio.run(persistence.list_messages("owner-a", "app", "main"))
     assert rows[-1].parts[0]["type"] == "notice"
+
+
+def test_model_can_request_multiple_read_tools_in_one_round(tmp_path) -> None:
+    class ToolModel:
+        def __init__(self):
+            self.calls = 0
+
+        async def reply(self, messages, memories, ledger_context):
+            self.calls += 1
+            if self.calls == 1:
+                return agent_module.ModelReply(tool_calls=[
+                    FinanceToolCall("budgets"), FinanceToolCall("jars"),
+                ])
+            return agent_module.ModelReply(text="grounded")
+
+    class FinanceTools:
+        async def execute(self, owner_id, calls, delegated_credential):
+            assert owner_id == "owner-a"
+            assert [call.operation for call in calls] == ["budgets", "jars"]
+            return FinanceContextResult(["budgets: []", "jars: []"])
+
+    persistence = InMemoryPersistence()
+    response = asyncio.run(AgentRuntime(
+        persistence,
+        MemoryService(persistence, WorkspaceProjector(tmp_path)),
+        ToolModel(),
+        finance_context=FinanceTools(),
+    ).run_turn("owner-a", TurnRequest(
+        conversation_id="main", channel_id="app", platform_message_id="m1", text="plans",
+    ), delegated_credential="mpa_ephemeral"))
+
+    assert response.text == "grounded"
+
+
+def test_model_tool_loop_stops_after_three_execution_rounds(tmp_path) -> None:
+    class RepeatingModel:
+        async def reply(self, messages, memories, ledger_context):
+            return agent_module.ModelReply(tool_calls=[FinanceToolCall("wallets")])
+
+    class FinanceTools:
+        def __init__(self):
+            self.calls = 0
+
+        async def execute(self, owner_id, calls, delegated_credential):
+            self.calls += 1
+            return FinanceContextResult([f"wallets round {self.calls}"])
+
+    persistence = InMemoryPersistence()
+    tools = FinanceTools()
+    response = asyncio.run(AgentRuntime(
+        persistence,
+        MemoryService(persistence, WorkspaceProjector(tmp_path)),
+        RepeatingModel(),
+        finance_context=tools,
+    ).run_turn("owner-a", TurnRequest(
+        conversation_id="main", channel_id="app", platform_message_id="m1", text="loop",
+    ), delegated_credential="mpa_ephemeral"))
+
+    assert tools.calls == 3
+    assert "giới hạn" in response.text.lower()
+
+
+def test_invalid_model_tool_call_becomes_safe_unavailable_context(tmp_path) -> None:
+    class ToolModel:
+        def __init__(self):
+            self.contexts = []
+
+        async def reply(self, messages, memories, ledger_context):
+            self.contexts.append(list(ledger_context))
+            if len(self.contexts) == 1:
+                return agent_module.ModelReply(tool_calls=[FinanceToolCall("delete_transaction")])
+            return agent_module.ModelReply(text="cannot do that")
+
+    class FinanceTools:
+        async def execute(self, owner_id, calls, delegated_credential):
+            raise MyPocketError("operation_not_allowed")
+
+    persistence = InMemoryPersistence()
+    model = ToolModel()
+    response = asyncio.run(AgentRuntime(
+        persistence,
+        MemoryService(persistence, WorkspaceProjector(tmp_path)),
+        model,
+        finance_context=FinanceTools(),
+    ).run_turn("owner-a", TurnRequest(
+        conversation_id="main", channel_id="app", platform_message_id="m1", text="delete it",
+    ), delegated_credential="mpa_ephemeral"))
+
+    assert response.text == "cannot do that"
+    assert model.contexts[-1] == ["tool: unavailable (operation_not_allowed)"]
 
 
 def test_model_context_is_bounded_to_recent_messages(tmp_path) -> None:
